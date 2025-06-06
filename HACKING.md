@@ -197,15 +197,6 @@ The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
 are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
-# Design decisions in Scenario
-
-The `State` object is immutable from the perspective of the test writer. At the moment there is some hackery here and there (`object.__setattr__`...) to bypass the read-only dataclass for when the charm code mutates the state; at some point it would be nice to refactor the code to make that unnecessary.
-
-At the moment the mocking operates at the level of `ops.ModelBackend`-mediated hook tool calls. `ModelBackend` would `Popen` hook tool calls, but `Scenario` patches the methods that would call `Popen`, which is therefore never called. Instead, values are returned according to the `State`. We could consider allowing to operate in increasing levels of stricter confinement:
-
-  - Actually generate hook tool scripts that read/write from/to `State`, making patching `ModelBackend` unnecessary.
-  - On top of that, run the whole simulation in a container.
-
 # Dev Tools
 
 ## Formatting and Checking
