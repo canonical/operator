@@ -2,13 +2,13 @@
 # How to manage relations
 > See first: {external+juju:ref}`Juju | Relation <relation>`, {external+juju:ref}`Juju | Manage relations <manage-relations>`, {external+charmcraft:ref}`Charmcraft | Manage relations <manage-relations>`
 
-To add relation capabilities to a charm, you’ll have to define the relation in your charm’s charmcraft.yaml file and then add relation event handlers in your charm’s `src/charm.py` file.
+To add relation capabilities to a charm, you’ll have to define the relation in your charm's `charmcraft.yaml` file and then add relation event handlers in your charm's `src/charm.py` file.
 
 ## Implement the feature
 
 ### Declare the relation endpoint
 
-To integrate with another charm, or with itself (to communicate with other units of the same charm), declare the required and optional relations in your charm’s `charmcraft.yaml` file.
+To integrate with another charm, or with itself (to communicate with other units of the same charm), declare the required and optional relations in your charm's `charmcraft.yaml` file.
 
 ```{caution}
 
@@ -46,7 +46,7 @@ requires:
 
 Note that implementing a cross-model relation is done in the same way as one between applications in the same model. The ops library does not distinguish between data from a different model or from the same model as the one the charm is deployed to.
 
-Which side of the relation is the “provider” or the “requirer” is often arbitrary, but if one side has a workload that is a server and the other a client, then the server side should be the provider. This becomes important for how Juju sets up network permissions in cross-model relations.
+Which side of the relation is the 'provider' or the 'requirer' is sometimes arbitrary, but if one side has a workload that is a server and the other a client, then the server side should be the provider. This becomes important for how Juju sets up network permissions in cross-model relations.
 
 If the relation is with a subordinate charm, make sure to set the `scope` field to `container`.
 
@@ -67,7 +67,7 @@ Other than this, implement a subordinate relation in the same way as any other r
 
 For most relations, you will now want to progress with using the charm library recommended by the charm that you are integrating with. Read the documentation for the other charm on Charmhub and follow the instructions, which will typically involve adding a requirer object in your charm’s `__init__` and then observing custom events.
 
-In most cases, the charm library will handle observing the Juju relation events, and your charm will only need to interact with the library’s custom API. Come back to this guide when you are ready to add tests.
+In most cases, the charm library will handle observing the Juju relation events, and your charm will only need to interact with the library's custom API. Come back to this guide when you are ready to add tests.
 
 > See more: [Charmhub](https://charmhub.io)
 
@@ -78,9 +78,11 @@ If you are developing your own interface - most commonly for charm-specific peer
 (set-up-a-relation)=
 ##### Set up a relation
 
-To do initial setup work when a charm is first integrated with another charm (or, in the case of a peer relation, when a charm is first deployed) your charm will need to observe the relation-created event. For example, a charm providing a database relation might need to create the database and credentials, so that the requirer charm can use the database. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-created` event observers for the relevant relations and pair those with an event handler.
+To do initial setup work when a charm is first integrated with another charm (or, in the case of a peer relation, when a charm is first deployed) your charm will need to observe the relation-created event. For example, a charm providing a database relation might need to create the database and credentials, so that the requirer charm can use the database.
 
-The name of the event to observe is combined with the name of the endpoint. With an endpoint named “db”, to observe `relation-created`, our code would look like:
+In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-created` event observers for the relevant relations and pair those with an event handler.
+
+The name of the event to observe is combined with the name of the endpoint. With an endpoint named "db", to observe `relation-created`, our code would look like:
 
 ```python
 framework.observe(self.on.db_relation_created, self._on_db_relation_created)
@@ -266,12 +268,12 @@ from ops import testing
 
 ctx = testing.Context(MyCharm)
 relation = testing.Relation(endpoint='smtp', remote_units_data={1: {}})
-state_in = testing.State(relations=[relation])
+state_in = testing.State(relations={relation})
 state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit_id=1), state=state_in)
 assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
 ```
 
-> See more: [Scenario Relations](ops.testing.RelationBase)
+> See more: [](ops.testing.RelationBase)
 
 ### Write integration tests
 
@@ -281,7 +283,7 @@ The pytest-operator plugin provides methods to deploy multiple charms. For examp
 
 ```python
 # This assumes that your integration tests already include the standard
-# build and deploy test that the charmcraft profile provides.
+# build and deploy test that the Charmcraft profile provides.
 
 @pytest.mark.abort_on_fail
 async def test_active_when_deploy_db_facade(ops_test: OpsTest):

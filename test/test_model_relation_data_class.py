@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import functools
 import ipaddress
 import json
@@ -79,6 +80,8 @@ class MyDatabag:
             self.quux = Nested()
         else:
             self.quux = quux
+        if self.foo in self.baz:
+            raise ValueError('foo cannot be in baz')
 
     def __setattr__(self, key: str, value: Any):
         if key == 'bar' and (not isinstance(value, int) or value < 0):
@@ -142,6 +145,8 @@ class MyDataclassDatabag:
         assert isinstance(self.bar, int)
         if self.bar < 0:
             raise ValueError('bar must be a zero or positive int')
+        if self.foo in self.baz:
+            raise ValueError('foo cannot be in baz')
 
     def __setattr__(self, key: str, value: Any):
         if key == 'bar' and (not isinstance(value, int) or value < 0):
@@ -166,6 +171,14 @@ if pydantic:
         bar: int = pydantic.Field(default=0, ge=0)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
+        @pydantic.field_validator('baz')
+        @classmethod
+        def check_foo_not_in_baz(cls, baz, values):
+            foo = values.data.get('foo')
+            if foo in baz:
+                raise ValueError('foo cannot be in baz')
+            return baz
+
         model_config = pydantic.ConfigDict(validate_assignment=True)
 
     class MyPydanticDataclassCharm(BaseTestCharm):
@@ -178,6 +191,14 @@ if pydantic:
         baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0, ge=0)
         quux: Nested = pydantic.Field(default_factory=Nested)
+
+        @pydantic.field_validator('baz')
+        @classmethod
+        def check_foo_not_in_baz(cls, baz, values):
+            foo = values.data.get('foo')
+            if foo in baz:
+                raise ValueError('foo cannot be in baz')
+            return baz
 
         model_config = pydantic.ConfigDict(validate_assignment=True)
 
@@ -237,6 +258,26 @@ def test_relation_load_fail(
     with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
     assert isinstance(exc_info.value.__cause__, raised)
+
+
+@pytest.mark.parametrize('charm_class', _test_classes)
+def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.load(self.databag_class, event.app, decoder=self.decoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    # The value of 'foo' cannot be in the 'baz' list.
+    data = {
+        'foo': json.dumps('value'),
+        'bar': json.dumps('1979'),
+        'baz': json.dumps(['value', 'b']),
+    }
+    rel = testing.Relation('db', remote_app_data=data)
+    state_in = testing.State(leader=True, relations={rel})
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+        ctx.run(ctx.on.relation_changed(rel), state_in)
+    assert isinstance(exc_info.value.__cause__, ValueError)
 
 
 class _AliasProtocol(Protocol):
@@ -524,10 +565,17 @@ def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
     assert rel_out.local_app_data['foo'] == 'EULAV1'
 
 
+class Country(enum.Enum):
+    NZ = 'New Zealand'
+    JP = 'Japan'
+    CN = 'China'
+
+
 class CommonTypesProtocol(Protocol):
     url: str
     ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str
     network: ipaddress.IPv4Network | ipaddress.IPv6Network | str
+    origin: Country | str
 
     def __init__(
         self,
@@ -535,6 +583,7 @@ class CommonTypesProtocol(Protocol):
         url: str,
         ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
         network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+        origin: Country | str,
     ): ...
 
 
@@ -554,6 +603,7 @@ class CommonTypes(BaseTestCharmCommonTypes):
             url: str
             ip: ipaddress.IPv4Address | ipaddress.IPv6Address
             network: ipaddress.IPv4Network | ipaddress.IPv6Network
+            origin: Country | str
 
             def __init__(
                 self,
@@ -561,6 +611,7 @@ class CommonTypes(BaseTestCharmCommonTypes):
                 url: str,
                 ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
                 network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+                origin: Country | str,
             ):
                 if not self._validate_url(url):
                     raise ValueError(f'Invalid URL: {url}')
@@ -573,6 +624,9 @@ class CommonTypes(BaseTestCharmCommonTypes):
                     self.network = ipaddress.ip_network(network)
                 else:
                     self.network = network
+                if isinstance(origin, str):
+                    origin = Country(origin)
+                self.origin = origin
 
             @staticmethod
             def _validate_url(url: str):
@@ -590,12 +644,16 @@ class CommonTypes(BaseTestCharmCommonTypes):
                     value, (ipaddress.IPv4Network, ipaddress.IPv6Network)
                 ):
                     raise ValueError(f'Invalid network: {value}')
+                if key == 'origin' and isinstance(value, str):
+                    value = Country(value)
                 super().__setattr__(key, value)
 
         return Data
 
     @staticmethod
     def _str_encoder(x: Any) -> str:
+        if isinstance(x, Country):
+            return json.dumps(x.value)
         return json.dumps(str(x))
 
     encoder: Callable[[Any], str] | None = _str_encoder
@@ -613,6 +671,9 @@ class IPJSONEncoder(json.JSONEncoder):
             ),
         ):
             return str(obj)
+        # Not an IP, but for the tests simplest to just include it here.
+        elif isinstance(obj, Country):
+            return obj.value
         return super().default(obj)
 
 
@@ -641,6 +702,7 @@ class CommonTypesDataclasses(BaseTestCharmCommonTypes):
             url: str
             ip: ipaddress.IPv4Address | ipaddress.IPv6Address
             network: ipaddress.IPv4Network | ipaddress.IPv6Network
+            origin: Country | str
 
         return Data
 
@@ -657,6 +719,7 @@ if pydantic:
         url: pydantic.AnyHttpUrl  # type: ignore
         ip: pydantic.IPvAnyAddress  # type: ignore
         network: pydantic.IPvAnyNetwork  # type: ignore
+        origin: Country
 
     class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
         @property
@@ -669,6 +732,7 @@ if pydantic:
         url: pydantic.AnyHttpUrl  # type: ignore
         ip: pydantic.IPvAnyAddress  # type: ignore
         network: pydantic.IPvAnyNetwork  # type: ignore
+        origin: Country
 
     class CommonTypesPydantic(BaseTestCharmCommonTypes):
         @property
@@ -692,6 +756,7 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
             data.url = 'https://new.example.com'
             data.ip = ipaddress.ip_address('127.0.0.3')
             data.network = ipaddress.ip_network('127.0.2.0/24')
+            data.origin = Country.JP
             event.relation.save(data, self.app, encoder=self.encoder)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
@@ -699,6 +764,7 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
         'url': json.dumps('https://example.com'),
         'ip': json.dumps('127.0.0.2'),
         'network': json.dumps('127.0.1.0/24'),
+        'origin': json.dumps('New Zealand'),
     }
     rel_in = testing.Relation('db', remote_app_data=data_in)
     state_in = testing.State(leader=True, relations={rel_in})
@@ -707,8 +773,4 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
     assert rel_out.local_app_data['url'] == json.dumps('https://new.example.com')
     assert rel_out.local_app_data['ip'] == json.dumps('127.0.0.3')
     assert rel_out.local_app_data['network'] == json.dumps('127.0.2.0/24')
-
-
-# TODO: add a test that uses enums.
-# TODO: add a test that validates a combination of fields.
-# TODO: add in support for Scenario automatically JSON'ing the relation content.
+    assert rel_out.local_app_data['origin'] == json.dumps('Japan')
