@@ -31,6 +31,7 @@ from scenario.state import (
     SubordinateRelation,
     TCPPort,
 )
+from scenario.context import Context
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
@@ -649,3 +650,84 @@ def test_state_immutable_with_changed_data_stored_state():
     )
     assert not stored_state_in.content
     assert 'seen' in stored_state_out.content
+
+
+def test_state_from_context():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    state = State.from_context(ctx)
+    assert state.config == {'foo': 'bar'}
+    assert len(state.containers) == 1
+    assert state.get_container('container').can_connect
+    assert len(state.relations) == 4
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+
+
+def test_state_from_context_extend():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        config={'foo': 'baz'},
+        leader=True,
+        containers={container},
+        relations={relation},
+        stored_states={stored_state},
+    )
+    assert state.config == {'foo': 'baz'}
+    assert len(state.containers) == 2
+    assert state.get_container('container').can_connect
+    assert not state.get_container('other-container').can_connect
+    assert len(state.relations) == 5
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+    assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
