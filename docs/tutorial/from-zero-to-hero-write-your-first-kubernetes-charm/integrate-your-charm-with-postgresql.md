@@ -242,6 +242,7 @@ Now that the charm is getting more complex, there are many more cases where the 
 In your charm's `__init__` add a new observer:
 
 ```python
+# Report the unit status after each event.
 framework.observe(self.on.collect_unit_status, self._on_collect_status)
 ```
 

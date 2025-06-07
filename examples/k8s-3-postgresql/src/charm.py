@@ -41,6 +41,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         self.pebble_service_name = 'fastapi-service'
         framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
+        # Report the unit status after each event.
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # The 'relation_name' comes from the 'charmcraft.yaml file'.
         # The 'database_name' is the name of the database that our application requires.
