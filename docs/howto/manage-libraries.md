@@ -87,7 +87,7 @@ class DatabaseRequirer(ops.Object):
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
         self.framework.observe(charm.on['database'].relation_changed, self._on_db_changed)
-    
+
     def _on_db_changed(self, event: ops.RelationChangedEvent):
         if remote_data_is_valid(event.relation):
             secret = ...
@@ -121,8 +121,8 @@ class MyTestCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.db = DatabaseRequirer(self, 'my-relation')
-        
-    
+
+
 @pytest.mark.parametrize('event', (
     'start', 'install', 'stop', 'remove', 'update-status', #...
 ))
@@ -207,4 +207,121 @@ def test_ready_event():
     assert isinstance(relation_changed_event, ops.RelationChangedEvent)
     assert isinstance(custom_event, DatabaseReadyEvent)
     assert custom_event.credential_secret.id == secret.id
+```
+
+### Write a library that manages a relation interface
+
+First, for a new interface, design the interface and the process related charms
+will use to populate the relation data. In the simplest case, the providing
+charm might populate the local app data when the relation is created, but a
+conversation between the charms is more common, where the requiring charm will
+populate its local data with a request, and the providing charm will use that to
+provide a suitable response. In more complex cases, this conversation might have
+multiple stages.
+
+> See more: [](manage-interfaces)
+
+If the library is implementing an existing interface, find the schema and
+details of the processes by which relation data is added on Charmhub in the
+integrations tabs, or by navigating to `https://charmhub.io/integrations/{integration-name}`.
+Alternatively, the interface details can be found in the
+[charm-relation-interfaces](https://github.com/canonical/charm-relation-interfaces)
+repository.
+
+In the documentation for the interface, find the description of the various
+databags. For example, for
+[v2 of the `tracing` interface](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/tracing/v2/README.md):
+
+```yaml
+# unit_data: <empty>
+application_data:
+  receivers:
+    - protocol:
+        name: otlp_http
+        type: http
+      url: http://traefik_address:2331
+    - protocol:
+        name: otlp_grpc
+        type: grpc
+      url: traefik_address:2331
+```
+
+Use this to create Python classes that model the databags. In many cases, there
+will already be appropriate classes in the interface documentation. Continuing
+with the `tracing` example:
+
+```python
+class TransportProtocolType(enum.Enum):
+    """Receiver Type."""
+    HTTP = "http"
+    GRPC = "grpc"
+
+
+class ProtocolType(pydantic.BaseModel):
+    """Protocol Type."""
+    name: str = pydantic.Field(
+        description="Receiver protocol name. What protocols are supported (and what they are called) "
+        "may differ per provider.",
+        examples=["otlp_grpc", "otlp_http", "tempo_http", "jaeger_thrift_compact"],
+    )
+    type: TransportProtocolType = pydantic.Field(
+        description="The transport protocol used by this receiver.",
+        examples=["http", "grpc"],
+    )
+
+
+class Receiver(pydantic.BaseModel):
+    """Specification of an active receiver."""
+    protocol: ProtocolType = pydantic.Field(description="Receiver protocol name and type.")
+    url: str = pydantic.Field(
+        description="""URL at which the receiver is reachable. If there's an ingress, it would be the external URL.
+        Otherwise, it would be the service's fqdn or internal IP.
+        If the protocol type is grpc, the url will not contain a scheme.""",
+        examples=[
+            "http://traefik_address:2331",
+            "https://traefik_address:2331",
+            "http://tempo_public_ip:2331",
+            "https://tempo_public_ip:2331",
+            "tempo_public_ip:2331",
+        ],
+    )
+
+
+class TracingProviderAppData(pydantic.BaseModel):
+    receivers: list[Receiver] = pydantic.Field(
+        description="A list of enabled receivers in the form of the protocol they use and their resolvable server url.",
+    )
+```
+
+```{tip}
+Ops defaults to transparently serialising each field to and from JSON, so you
+do not need to wrap each field in `pydantic.Json`.
+```
+
+In your `src/charm.py`, use the class you created to load and save data from the
+relation.
+
+```python
+receiver_protocol_to_transport_protocol: dict[str, TransportProtocolType] = {
+    "zipkin": TransportProtocolType.HTTP,
+    "otlp_grpc": TransportProtocolType.GRPC,
+    "otlp_http": TransportProtocolType.HTTP,
+    "jaeger_thrift_http": TransportProtocolType.HTTP,
+    "jaeger_grpc": TransportProtocolType.GRPC,
+}
+
+def _publish_provider(self, relation: ops.Relation, receivers: Iterable[tuple[str, str]]):
+    data = TracingProviderAppData(
+        receivers=[
+            Receiver(
+                url=url,
+                protocol=ProtocolType(
+                    name=protocol,
+                    type=receiver_protocol_to_transport_protocol[protocol],
+                ),
+            )
+            for protocol, url in receivers
+        ],
+    )
+    relation.save(data, self._charm.app)
 ```

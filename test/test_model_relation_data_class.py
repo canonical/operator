@@ -20,7 +20,7 @@ import functools
 import ipaddress
 import json
 import urllib.parse
-from typing import Any, Callable, Protocol, cast
+from typing import Any, Callable, Iterable, Protocol, cast
 
 import pytest
 
@@ -774,3 +774,124 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
     assert rel_out.local_app_data['ip'] == json.dumps('127.0.0.3')
     assert rel_out.local_app_data['network'] == json.dumps('127.0.2.0/24')
     assert rel_out.local_app_data['origin'] == json.dumps('Japan')
+
+
+# This test is based on the example in the manage-libraries how-to guide, which
+# is in turn based on the tracing (v2) interface.
+# The description and examples are kept in place from the doc, even though they
+# are not necessarily used in the test itself, to keep the two copies roughly in
+# sync.
+@pytest.mark.skipif(
+    pydantic is None,
+    reason='pydantic is not available, so we cannot test pydantic-based classes.',
+)
+def test_relation_tracing_provider():
+    assert pydantic is not None
+
+    class TransportProtocolType(enum.Enum):
+        HTTP = 'http'
+        GRPC = 'grpc'
+
+    class ProtocolType(pydantic.BaseModel):
+        name: str = pydantic.Field(
+            description='Receiver protocol name. What protocols are supported '
+            '(and what they are called) may differ per provider.',
+            examples=['otlp_grpc', 'otlp_http', 'tempo_http', 'jaeger_thrift_compact'],
+        )
+        type: TransportProtocolType = pydantic.Field(
+            description='The transport protocol used by this receiver.',
+            examples=['http', 'grpc'],
+        )
+
+    class Receiver(pydantic.BaseModel):
+        protocol: ProtocolType = pydantic.Field(description='Receiver protocol name and type.')
+        url: str = pydantic.Field(
+            description="""URL at which the receiver is reachable. If there's an
+            ingress, it would be the external URL.
+            Otherwise, it would be the service's fqdn or internal IP.
+            If the protocol type is grpc, the url will not contain a scheme.""",
+            examples=[
+                'http://traefik_address:2331',
+                'https://traefik_address:2331',
+                'http://tempo_public_ip:2331',
+                'https://tempo_public_ip:2331',
+                'tempo_public_ip:2331',
+            ],
+        )
+
+    class TracingProviderAppData(pydantic.BaseModel):
+        receivers: list[Receiver] = pydantic.Field(
+            description='A list of enabled receivers in the form of the '
+            'protocol they use and their resolvable server url.',
+        )
+
+    receiver_protocol_to_transport_protocol: dict[str, TransportProtocolType] = {
+        'zipkin': TransportProtocolType.HTTP,
+        'otlp_grpc': TransportProtocolType.GRPC,
+        'otlp_http': TransportProtocolType.HTTP,
+        'jaeger_thrift_http': TransportProtocolType.HTTP,
+        'jaeger_grpc': TransportProtocolType.GRPC,
+    }
+
+    # This would typically be a charmlib, but a charm is simpler to use for this test.
+    class TracingProviderCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['tracing'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            urls = Receiver.model_json_schema()['properties']['url']['examples']  # type: ignore
+            urls = cast('list[str]', urls)
+            receiver_prototcols = list(receiver_protocol_to_transport_protocol)
+            # Cycle through the protocols so that the test uses each of them.
+            receivers = [
+                (receiver_prototcols[i % len(receiver_prototcols)], url)
+                for i, url in enumerate(urls)
+            ]
+            self._publish_provider(event.relation, receivers)
+
+        def _publish_provider(self, relation: ops.Relation, receivers: Iterable[tuple[str, str]]):
+            data = TracingProviderAppData(
+                receivers=[
+                    Receiver(
+                        url=url,
+                        protocol=ProtocolType(
+                            name=protocol,
+                            type=receiver_protocol_to_transport_protocol[protocol],
+                        ),
+                    )
+                    for protocol, url in receivers
+                ],
+            )
+            relation.save(data, self.app)
+
+    ctx = testing.Context(
+        TracingProviderCharm,
+        meta={'name': 'tracer', 'provides': {'tracing': {'interface': 'tracing'}}},
+    )
+    rel_in = testing.Relation('tracing')
+    state_in = testing.State(leader=True, relations={rel_in})
+    state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
+    rel_out = state_out.get_relation(rel_in.id)
+    receivers = json.loads(rel_out.local_app_data.get('receivers'))
+    assert len(receivers) == 5
+    assert {
+        'protocol': {'name': 'zipkin', 'type': 'http'},
+        'url': 'http://traefik_address:2331',
+    } in receivers
+    assert {
+        'protocol': {'name': 'otlp_grpc', 'type': 'grpc'},
+        'url': 'https://traefik_address:2331',
+    } in receivers
+    assert {
+        'protocol': {'name': 'otlp_http', 'type': 'http'},
+        'url': 'http://tempo_public_ip:2331',
+    } in receivers
+    assert {
+        'protocol': {'name': 'jaeger_thrift_http', 'type': 'http'},
+        'url': 'https://tempo_public_ip:2331',
+    } in receivers
+    assert {
+        'protocol': {'name': 'jaeger_grpc', 'type': 'grpc'},
+        'url': 'tempo_public_ip:2331',
+    } in receivers
