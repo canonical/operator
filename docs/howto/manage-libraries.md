@@ -220,7 +220,7 @@ populate its local data with a request, and the providing charm will use that to
 provide a suitable response. In more complex cases, this conversation might have
 multiple stages.
 
-> See more: [](manage-interfaces)
+> See more: {ref}`manage-interfaces`
 
 If the library is implementing an existing interface, find the schema and
 details of the processes by which relation data is added on Charmhub in the
