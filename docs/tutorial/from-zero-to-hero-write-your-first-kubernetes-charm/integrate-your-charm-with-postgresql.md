@@ -442,7 +442,7 @@ Now that our charm integrates with the PostgreSQL database, if there's not a dat
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before any relations/configurations take place.
+    Assert on the unit status before integration or configuration.
     """
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm('.')

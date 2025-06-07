@@ -1,3 +1,35 @@
+# 2.22.0 - 29 May 2025
+
+## Features
+
+* Add Juju topology labels (#1744)
+
+## Fixes
+
+* Turn on databag access validation in `__init__` (#1737)
+* Allow event suffixes to appear in event names in `ops.testing` (#1754)
+
+## Documentation
+
+* Document how to manage metrics (#1692)
+* Link to our docs from the top of our README (#1710)
+* Update code in K8s tutorial, with source in repo (part 1) (#1719)
+* Update links to juju.is/docs (#1725)
+* Fix link in breakpoint output, remove link from Harness error message (#1726)
+* Update Matrix channel name to Charm Tech (#1740)
+* Rename configurations to configuration (#1746)
+* Fix typos in code snippets by @MattiaSarti (#1750)
+
+## CI
+
+* Add `ops[tracing]` integration tests (#1686)
+* Pin workflows by hash (#1721)
+* Disable alertmanager compatibility tests until upstream fix (#1745)
+* Remove explicit scopes and update HACKING.md (#1748)
+* Pin trusted workflows by tag (#1752)
+* Re-enable `alertmanager-k8s-operator` in observability charm tests (#1753)
+* Fix reporting to TIOBE after `ops[tracing]` addition (#1755)
+
 # 2.21.1 - 1 May 2025
 
 ## Reverted

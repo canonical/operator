@@ -438,7 +438,8 @@ class Harness(Generic[CharmType]):
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
         # rather than TestCharm has no attribute foo.
         TestCharm.__name__ = self._charm_cls.__name__
-        self._charm = TestCharm(self._framework)  # type: ignore
+        with self.framework._event_context('__init__'):
+            self._charm = TestCharm(self._framework)  # type: ignore
 
     def begin_with_initial_hooks(self) -> None:
         """Fire the same hooks that Juju would fire at startup.
@@ -2474,13 +2475,6 @@ class _TestingModelBackend:
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
-
-        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
-            relation_id
-        ):
-            raise RuntimeError(
-                'remote-side relation data cannot be accessed during a relation-broken event'
-            )
 
         if relation_id not in self._relation_data_raw:
             raise RelationNotFoundError(relation_id)

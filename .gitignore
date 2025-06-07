@@ -7,6 +7,8 @@ venv
 /docsenv
 .vscode
 .coverage
+.coverage-ops
+.coverage-tracing
 coverage.xml
 .coverage.data
 /.tox

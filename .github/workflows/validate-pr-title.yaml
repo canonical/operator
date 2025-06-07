@@ -32,8 +32,4 @@ jobs:
             refactor
             revert
             test
-          scopes: |
-            harness
-            testing
-            tracing
-          requireScope: false
+          disallowScopes: ".*"
