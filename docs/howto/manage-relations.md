@@ -75,6 +75,8 @@ In most cases, the charm library will handle observing the Juju relation events,
 
 If you are developing your own interface - most commonly for charm-specific peer data exchange, then you will need to observe the Juju relation events and add appropriate handlers.
 
+> See more: [](manage-libraries-write-a-library)
+
 (set-up-a-relation)=
 ##### Set up a relation
 
@@ -88,6 +90,14 @@ The name of the event to observe is combined with the name of the endpoint. With
 framework.observe(self.on.db_relation_created, self._on_db_relation_created)
 ```
 
+In `src/charm.py`, create a class that defines the schema for the relation data.
+For example:
+
+```python
+class DatabaseProviderAppData(pydantic.BaseModel):
+    credentials: str | None = pydantic.Field(default=None, description="A Juju secret ID")
+```
+
 Now, in the body of the charm definition, define the event handler. In this example, if we are the leader unit, then we create a database and pass the credentials to use it to the charm on the other side via the relation data:
 
 ```python
@@ -95,8 +105,11 @@ def _on_db_relation_created(self, event: ops.RelationCreatedEvent):
     if not self.unit.is_leader():
         return
     credentials = self.create_database(event.app.name)
-    event.relation.data[event.app].update(credentials)
+    data = DatabaseProviderAppData(credentials=credentials)
+    relation.save(data, event.app)
 ```
+
+> See more: [](ops.Relation.save)
 
 The event object that is passed to the handler has a `relation` property, which contains an [](ops.Relation) object. Your charm uses this object to find out about the relation (such as which units are included, in the [`.units` attribute](ops.Relation.units), or whether the relation is broken, in the [`.active` attribute](ops.Relation.active)) and to get and set data in the relation databag.
 
@@ -108,12 +121,21 @@ To do additional setup work when each unit joins the relation (both when the cha
 framework.observe(self.on.smtp_relation_joined, self._on_smtp_relation_joined)
 ```
 
+In `src/charm.py`, create a class that defines the schema for the relation data.
+For example:
+
+```python
+class SMTPProviderUnitData(pydantic.BaseMode):
+    smtp_credentials: str = pydantic.Field(description="A Juju secret ID")
+```
+
 Now, in the body of the charm definition, define the event handler. In this example, a “smtp_credentials” key is set in the unit data with the ID of a secret:
 
 ```python
 def _on_smtp_relation_joined(self, event: ops.RelationJoinedEvent):
     smtp_credentials_secret_id = self.create_smtp_user(event.unit.name)
-    event.relation.data[event.unit]["smtp_credentials"] = smtp_credentials_secret_id
+    data = SMTPProviderUnitData(smtp_credentials=smtp_credentials_secret_id)
+    relation.save(data, event.unit)
 ```
 
 > See more: [](ops.RelationJoinedEvent)
@@ -158,7 +180,8 @@ def _update_configuration(self, _: ops.Eventbase):
     if not db_relation:
         # We’re not integrated with the database charm yet.
         return
-    secret_id = db_relation.data[self.model.app]['credentials']
+    data = db_relation.load(DatabaseProviderAppData, self.app)
+    secret_id = data.credentials
     if not secret_id:
         # The credentials haven’t been added to the relation by the remote app yet.
         return

@@ -39,6 +39,7 @@ def test_ready_event():
     assert ...
 ```
 
+(manage-libraries-write-a-library)=
 ## Write a library
 
 When you're writing libraries, instead of callbacks, use custom events. This results in a more Ops-native-feeling API. From a technical standpoint, a custom event is an [](ops.EventBase) subclass that can be emitted to Ops at any point throughout the charm's lifecycle. These events are totally unknown to Juju. They are essentially charm-internal, and can be useful to abstract certain conditional workflows and wrap the top level Juju event so it can be observed independently.
@@ -325,3 +326,5 @@ def _publish_provider(self, relation: ops.Relation, receivers: Iterable[tuple[st
     )
     relation.save(data, self._charm.app)
 ```
+
+> See more: [](ops.Relation.save)
