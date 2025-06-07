@@ -21,6 +21,7 @@ jobs:
           - examples/k8s-1-minimal
           - examples/k8s-2-configurable
           - examples/k8s-3-postgresql
+          - examples/k8s-4-action
 
     steps:
       - uses: actions/checkout@v4
