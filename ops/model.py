@@ -120,7 +120,7 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
-_RelationDataClassType = TypeVar('_RelationDataClassType')
+_T = TypeVar('_T')
 
 
 class Model:
@@ -1776,21 +1776,18 @@ class Relation:
 
     def load(
         self,
-        cls: type[_RelationDataClassType],
+        cls: type[_T],
         app_or_unit: Unit | Application,
         *args: Any,
         decoder: Callable[[str], Any] | None = None,
         errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
-    ) -> _RelationDataClassType:
+    ) -> _T:
         """Load the data for this relation into an instance of a data class.
 
         The raw Juju relation data is passed to the data class's ``__init__``
-        method as keyword arguments, with:
-
-        * Dashes in names converted to underscores.
-        * Values decoded using the provided decoder function, or
-          :func:`json.loads` if no decoder is provided.
+        method as keyword arguments, with values decoded using the provided
+        decoder function, or :func:`json.loads` if no decoder is provided.
 
         Any additional positional or keyword arguments will be passed through to
         the data class ``__init__``.
@@ -1803,10 +1800,6 @@ class Relation:
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided,
                 :func:`json.loads` will be used.
-            errors: what to do if the parameters are invalid. If ``fail``, this
-                will set the action to failed with an appropriate message and
-                then immediately exit. If ``raise``, ``load_params`` will not
-                catch any exceptions, leaving the charm to handle errors.
             errors: what to do if the relation data is invalid. If ``blocked``,
                 this will set the unit status to blocked with an appropriate
                 message and then exit successfully (this informs Juju that
@@ -1817,7 +1810,8 @@ class Relation:
             kwargs: keyword arguments to pass through to the data class.
 
         Returns:
-            An instance of the data class with the current relation data values.
+            An instance of the data class that was provided as ``cls`` with the
+                current relation data values.
 
         Raises:
             ValueError: if ``errors`` is set to ``raise`` and instantiating the
@@ -1858,7 +1852,7 @@ class Relation:
         *,
         encoder: Callable[[Any], str] | None = None,
     ):
-        """Save the data from the provided data class object to Juju relation data.
+        """Save the data from the provided data class object to the Juju relation data.
 
         Args:
             obj: an object with attributes to save to the relation data.

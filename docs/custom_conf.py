@@ -348,7 +348,7 @@ nitpick_ignore = [
     ('py:class', 'ops.model._ModelBackend'),
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
-    ('py:class', 'ops.model._RelationDataClassType'),
+    ('py:class', 'ops.model._T'),
     ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),
