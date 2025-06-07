@@ -16,16 +16,16 @@ description: |
 summary: |
   FastAPI Demo charm for Kubernetes
 
+assumes:
+  - juju >= 3.1
+  - k8s-api
+
 config:
   options:
     server-port:
       default: 8000
       description: Default port on which FastAPI is available
       type: int
-
-assumes:
-  - juju >= 3.1
-  - k8s-api
 
 requires:
   database:
