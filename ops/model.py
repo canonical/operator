@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import datetime
 import enum
@@ -52,8 +53,10 @@ from typing import (
     MutableMapping,
     TextIO,
     TypedDict,
+    TypeVar,
     Union,
     get_args,
+    get_type_hints,
 )
 
 from . import charm as _charm
@@ -115,6 +118,9 @@ _NetworkDict = TypedDict(
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
+
+_T = TypeVar('_T')
 
 
 class Model:
@@ -926,7 +932,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
     def __contains__(self, key: str):
         return key in self._data
@@ -1739,6 +1745,7 @@ class Relation:
         self.units: set[Unit] = set()
         self.active = active
         self._backend = backend
+        self._cache = cache
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1789,6 +1796,136 @@ class Relation:
             d = self._backend.relation_model_get(self.id)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
+
+    def load(
+        self,
+        cls: type[_T],
+        app_or_unit: Unit | Application,
+        *args: Any,
+        decoder: Callable[[str], Any] | None = None,
+        errors: Literal['raise', 'blocked'] = 'raise',
+        **kwargs: Any,
+    ) -> _T:
+        """Load the data for this relation into an instance of a data class.
+
+        The raw Juju relation data is passed to the data class's ``__init__``
+        method as keyword arguments, with values decoded using the provided
+        decoder function, or :func:`json.loads` if no decoder is provided.
+
+        Any additional positional or keyword arguments will be passed through to
+        the data class ``__init__``.
+
+        Args:
+            cls: A class that will accept the Juju relation data as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            app_or_unit: The source of the data to load. This can be either a
+                :class:`Unit` or :class:`Application` instance.
+            decoder: An optional callable that will be used to decode each field
+                before loading into the class. If not provided,
+                :func:`json.loads` will be used.
+            errors: what to do if the relation data is invalid. If ``blocked``,
+                this will set the unit status to blocked with an appropriate
+                message and then exit successfully (this informs Juju that
+                the event was handled and it will not be retried).
+                If ``raise``, ``load`` will not catch any exceptions, leaving
+                the charm to handle errors.
+            args: positional arguments to pass through to the data class.
+            kwargs: keyword arguments to pass through to the data class.
+
+        Returns:
+            An instance of the data class that was provided as ``cls`` with the
+                current relation data values.
+
+        Raises:
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                data class raises a ValueError.
+        """
+        try:
+            fields = _charm._juju_fields(cls)
+        except ValueError:
+            fields = None
+        data: dict[str, Any] = copy.deepcopy(kwargs)
+        if decoder is None:
+            decoder = json.loads
+        for key, value in sorted(self.data[app_or_unit].items()):
+            value = decoder(value)
+            if fields is None:
+                data[key] = value
+            else:
+                if key not in fields:
+                    continue
+                data[fields[key]] = value
+        try:
+            return cls(*args, **data)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            self._backend.status_set(
+                'blocked',
+                f'Invalid relation data, relation={self}, bag={app_or_unit}: {e}',
+            )
+            from ._main import _Abort
+
+            raise _Abort(0) from e
+
+    def save(
+        self,
+        obj: object,
+        app_or_unit: Unit | Application,
+        *,
+        encoder: Callable[[Any], str] | None = None,
+    ):
+        """Save the data from the provided data class object to the Juju relation data.
+
+        Args:
+            obj: an object with attributes to save to the relation data.
+            app_or_unit: The destination in which to save the data to save. This
+                can be either a :class:`Unit` or :class:`Application` instance.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, :func:`json.dumps` will
+                be used.
+
+        Raises:
+            ValueError: if the encoder does not return a string.
+            RelationNotFoundError: if the relation does not exist.
+            ModelError: if the charm does not have permission to write to the
+                relation data.
+        """
+        if encoder is None:
+            encoder = json.dumps
+
+        # Determine the fields, which become the Juju keys, and the values for
+        # each field.
+        fields: dict[str, str] = {}  # Class attribute name: Juju key.
+        if dataclasses.is_dataclass(obj):
+            assert not isinstance(obj, type)
+            for field in dataclasses.fields(obj):
+                alias = field.metadata.get('alias', field.name)
+                fields[field.name] = alias
+            values = dataclasses.asdict(obj)
+        elif hasattr(obj.__class__, 'model_fields'):
+            # Pydantic models:
+            for name, field in obj.__class__.model_fields.items():  # type: ignore
+                # Pydantic takes care of the alias.
+                fields[field.alias or name] = field.alias or name  # type: ignore
+            values = obj.model_dump(mode='json', by_alias=True, exclude_defaults=False)  # type: ignore
+        else:
+            # If we could not otherwise determine the fields for the class,
+            # store all the fields that have type annotations. If a charm needs
+            # a more specific set of fields, then it should use a dataclass or
+            # Pydantic model instead.
+            fields = {k: k for k in get_type_hints(obj.__class__)}
+            values = {field: getattr(obj, field) for field in fields}
+
+        # Encode each value, and then pass it over to Juju.
+        data: dict[str, str] = {}
+        for attr, field in sorted(fields.items()):
+            if not isinstance(field, str):
+                raise ValueError(
+                    f'The value for "{field}" must be a string, not {type(field).__name__}'
+                )
+            data[field] = encoder(values[attr])
+        self.data[app_or_unit].update(data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
@@ -2205,7 +2342,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._paths: dict[str, Path | None] = {name: None for name in names}
+        self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -2256,9 +2393,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: _StorageDictType = {
-            storage_name: None for storage_name in storage_names
-        }
+        self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
     def __contains__(self, key: str):
         return key in self._storage_map
