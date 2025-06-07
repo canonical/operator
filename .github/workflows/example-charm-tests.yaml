@@ -38,10 +38,9 @@ jobs:
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
-          # Gets the job done... Better for tox.ini to have a dedicated target for charmlibs?
+          # Gets the job done... Better for tox.ini to have a dedicated env for fetching charmlibs?
           awk '/from charms\.[^ ]+/ { sub(/^from /, ""); system("charmcraft fetch-lib " $1) }' src/charm.py
       - name: Run unit tests
         run: |
           cd ${{ matrix.dir }}
-          charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
           tox -e unit
