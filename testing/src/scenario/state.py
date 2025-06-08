@@ -572,7 +572,7 @@ class RelationBase(_max_posargs(2)):
 
     def _get_databag_for_remote(
         self,
-        unit_id: int,  # noqa: U100
+        unit_id: int,
     ) -> RawDataBagContents:
         """Return the databag for some remote unit ID."""
         raise NotImplementedError()
