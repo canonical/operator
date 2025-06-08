@@ -1086,18 +1086,13 @@ tracing = [
 coverage = [
     { name = "coverage", version = "7.6.1", source = { registry = "https://pypi.org/simple" }, extra = ["toml"], marker = "python_full_version < '3.9'" },
     { name = "coverage", version = "7.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["toml"], marker = "python_full_version >= '3.9'" },
-    { name = "jsonpatch" },
-    { name = "pytest" },
-    { name = "pyyaml" },
-    { name = "typing-extensions", version = "4.13.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
-    { name = "typing-extensions", version = "4.14.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
-    { name = "websocket-client" },
 ]
 docs = [
     { name = "canonical-sphinx-extensions" },
     { name = "furo" },
     { name = "linkify-it-py" },
     { name = "myst-parser", marker = "python_full_version >= '3.10'" },
+    { name = "ops", extra = ["testing", "tracing"] },
     { name = "pyspelling" },
     { name = "sphinx", version = "8.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "sphinx-autobuild", version = "2021.3.14", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
@@ -1116,25 +1111,21 @@ lint = [
     { name = "ruff" },
 ]
 static = [
-    { name = "opentelemetry-api" },
-    { name = "ops", extra = ["testing"] },
+    { name = "ops", extra = ["testing", "tracing"] },
     { name = "pyright" },
+]
+unit = [
+    { name = "jsonpatch" },
+    { name = "ops", extra = ["testing", "tracing"] },
     { name = "pytest" },
     { name = "pyyaml" },
     { name = "typing-extensions", version = "4.13.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "typing-extensions", version = "4.14.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "websocket-client" },
 ]
-unit = [
-    { name = "jsonpatch" },
-    { name = "ops", extra = ["testing", "tracing"] },
-    { name = "pytest" },
+xdist = [
     { name = "pytest-xdist", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pytest-xdist", version = "3.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
-    { name = "pyyaml" },
-    { name = "typing-extensions", version = "4.13.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
-    { name = "typing-extensions", version = "4.14.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
-    { name = "websocket-client" },
 ]
 
 [package.metadata]
@@ -1149,19 +1140,13 @@ requires-dist = [
 provides-extras = ["testing", "tracing", "harness"]
 
 [package.metadata.requires-dev]
-coverage = [
-    { name = "coverage", extras = ["toml"], specifier = "~=7.0" },
-    { name = "jsonpatch", specifier = "~=1.33" },
-    { name = "pytest", specifier = "~=8.0" },
-    { name = "pyyaml", specifier = "==6.*" },
-    { name = "typing-extensions", specifier = "~=4.2" },
-    { name = "websocket-client", specifier = "==1.*" },
-]
+coverage = [{ name = "coverage", extras = ["toml"], specifier = "~=7.0" }]
 docs = [
     { name = "canonical-sphinx-extensions" },
     { name = "furo" },
     { name = "linkify-it-py" },
     { name = "myst-parser", marker = "python_full_version >= '3.10'" },
+    { name = "ops", extras = ["testing", "tracing"], editable = "." },
     { name = "pyspelling" },
     { name = "sphinx", marker = "python_full_version >= '3.10'", specifier = "~=8.0.0" },
     { name = "sphinx-autobuild" },
@@ -1177,23 +1162,18 @@ lint = [
     { name = "ruff", specifier = "==0.11.2" },
 ]
 static = [
-    { name = "opentelemetry-api", specifier = "~=1.30" },
-    { name = "ops", extras = ["testing"], editable = "." },
+    { name = "ops", extras = ["testing", "tracing"], editable = "." },
     { name = "pyright", specifier = "==1.1.385" },
-    { name = "pytest", specifier = "~=8.0" },
-    { name = "pyyaml", specifier = "==6.*" },
-    { name = "typing-extensions", specifier = "~=4.2" },
-    { name = "websocket-client", specifier = "==1.*" },
 ]
 unit = [
     { name = "jsonpatch", specifier = "~=1.33" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
     { name = "pytest", specifier = "~=8.0" },
-    { name = "pytest-xdist", specifier = "~=3.6" },
     { name = "pyyaml", specifier = "==6.*" },
     { name = "typing-extensions", specifier = "~=4.2" },
     { name = "websocket-client", specifier = "==1.*" },
 ]
+xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
 
 [[package]]
 name = "ops-scenario"
