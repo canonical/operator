@@ -84,6 +84,16 @@ xdist = [
 coverage = [
     "coverage[toml]~=7.0",
 ]
+integration = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "pytest-operator~=0.23",
+    "jubilant~=1.0",
+    "minio~=7.2",
+    "httpx~=0.28",
+    "juju>=2.9,<4",
+    "build",  # TODO: switch build to uv
+]
 
 [project.urls]
 "Homepage" = "https://ops.readthedocs.io/en/latest/"
