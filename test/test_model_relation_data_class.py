@@ -163,6 +163,7 @@ class MyDataclassCharm(BaseTestCharm):
 _test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
 
 if pydantic:
+    assert pydantic is not None
 
     @pydantic.dataclasses.dataclass
     class MyPydanticDataclassDatabag:
@@ -173,8 +174,9 @@ if pydantic:
 
         @pydantic.field_validator('baz')
         @classmethod
-        def check_foo_not_in_baz(cls, baz, values):
-            foo = values.data.get('foo')
+        def check_foo_not_in_baz(cls, baz: list[str], values: Any):
+            data = cast('dict[str, Any]', values.data)
+            foo = data.get('foo')
             if foo in baz:
                 raise ValueError('foo cannot be in baz')
             return baz
@@ -194,8 +196,9 @@ if pydantic:
 
         @pydantic.field_validator('baz')
         @classmethod
-        def check_foo_not_in_baz(cls, baz, values):
-            foo = values.data.get('foo')
+        def check_foo_not_in_baz(cls, baz: list[str], values: Any):
+            data = cast('dict[str, Any]', values.data)
+            foo = data.get('foo')
             if foo in baz:
                 raise ValueError('foo cannot be in baz')
             return baz
@@ -840,7 +843,7 @@ def test_relation_tracing_provider():
             framework.observe(self.on['tracing'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            urls = Receiver.model_json_schema()['properties']['url']['examples']  # type: ignore
+            urls = Receiver.model_json_schema()['properties']['url']['examples']
             urls = cast('list[str]', urls)
             receiver_prototcols = list(receiver_protocol_to_transport_protocol)
             # Cycle through the protocols so that the test uses each of them.
@@ -873,7 +876,7 @@ def test_relation_tracing_provider():
     state_in = testing.State(leader=True, relations={rel_in})
     state_out = ctx.run(ctx.on.relation_changed(rel_in), state_in)
     rel_out = state_out.get_relation(rel_in.id)
-    receivers = json.loads(rel_out.local_app_data.get('receivers'))
+    receivers = json.loads(rel_out.local_app_data['receivers'])
     assert len(receivers) == 5
     assert {
         'protocol': {'name': 'zipkin', 'type': 'http'},
