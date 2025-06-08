@@ -20,15 +20,14 @@ import typing
 import pytest
 
 import ops
-from ops import Framework
-from ops.testing import CharmEvents, Context, State
+from ops import testing
 
 
 def collect_filtered(
     *event_type: type[ops.EventBase], meta: dict[str, typing.Any] | None = None
 ) -> tuple[ops.EventBase, ...]:
-    ctx = Context(ops.CharmBase, meta={'name': 'ben', **(meta or {})})
-    with ctx(ctx.on.update_status(), State()) as mgr:
+    ctx = testing.Context(ops.CharmBase, meta={'name': 'ben', **(meta or {})})
+    with ctx(ctx.on.update_status(), testing.State()) as mgr:
         return tuple(e.event_type for e in mgr.charm.on.events(*event_type).values())  # type: ignore
 
 
@@ -61,11 +60,11 @@ def test_filtering_single(evt_type: type[ops.EventBase]):
 @pytest.mark.parametrize(
     'filter_arg, event_to_emit, expect_run',
     (
-        ((ops.RelationEvent,), CharmEvents.update_status(), False),
-        ((ops.UpdateStatusEvent,), CharmEvents.update_status(), True),
-        ((ops.UpdateStatusEvent, ops.RelationEvent), CharmEvents.update_status(), True),
-        ((ops.HookEvent,), CharmEvents.update_status(), True),
-        ((ops.SecretExpiredEvent,), CharmEvents.update_status(), False),
+        ((ops.RelationEvent,), testing.CharmEvents.update_status(), False),
+        ((ops.UpdateStatusEvent,), testing.CharmEvents.update_status(), True),
+        ((ops.UpdateStatusEvent, ops.RelationEvent), testing.CharmEvents.update_status(), True),
+        ((ops.HookEvent,), testing.CharmEvents.update_status(), True),
+        ((ops.SecretExpiredEvent,), testing.CharmEvents.update_status(), False),
     ),
 )
 def test_filtered_observer(
@@ -74,7 +73,7 @@ def test_filtered_observer(
     class MyCharm(ops.CharmBase):
         run = False
 
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for e in self.on.events(*filter_arg).values():
                 framework.observe(e, self._on_event)
@@ -82,6 +81,6 @@ def test_filtered_observer(
         def _on_event(self, _: ops.EventBase):
             MyCharm.run = True
 
-    ctx = Context(MyCharm, meta={'name': 'ben'})
-    ctx.run(event_to_emit, State())
+    ctx = testing.Context(MyCharm, meta={'name': 'ben'})
+    ctx.run(event_to_emit, testing.State())
     assert MyCharm.run is expect_run
