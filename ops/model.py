@@ -1792,8 +1792,14 @@ class Relation:
         Any additional positional or keyword arguments will be passed through to
         the data class ``__init__``.
 
+        For example::
+
+            data = event.relation.load(DatabaseModel, event.app)
+            secret_id = data.credentials
+
         Args:
-            cls: A class that will accept the Juju relation data as keyword
+            cls: A class, typically a Pydantic `BaseModel` subclass or a
+                dataclass, that will accept the Juju relation data as keyword
                 arguments, and raise ``ValueError`` if validation fails.
             app_or_unit: The source of the data to load. This can be either a
                 :class:`Unit` or :class:`Application` instance.
@@ -1854,8 +1860,15 @@ class Relation:
     ):
         """Save the data from the provided data class object to the Juju relation data.
 
+        For example::
+
+            relation = self.model.get_relation('tracing')
+            data = TracingRequirerData(receivers=['otlp_http'])
+            relation.save(data, self.app)
+
         Args:
-            obj: an object with attributes to save to the relation data.
+            obj: an object with attributes to save to the relation data, typically
+                a Pydantic ``BaseModel`` subclass or dataclass.
             app_or_unit: The destination in which to save the data to save. This
                 can be either a :class:`Unit` or :class:`Application` instance.
             encoder: An optional callable that will be used to encode each field
