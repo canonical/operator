@@ -1789,13 +1789,13 @@ class Relation:
         method as keyword arguments, with values decoded using the provided
         decoder function, or :func:`json.loads` if no decoder is provided.
 
-        Any additional positional or keyword arguments will be passed through to
-        the data class ``__init__``.
-
         For example::
 
             data = event.relation.load(DatabaseModel, event.app)
             secret_id = data.credentials
+
+        Any additional positional or keyword arguments will be passed through to
+        the data class ``__init__``.
 
         Args:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
@@ -1817,7 +1817,7 @@ class Relation:
 
         Returns:
             An instance of the data class that was provided as ``cls`` with the
-                current relation data values.
+            current relation data values.
 
         Raises:
             ValueError: if ``errors`` is set to ``raise`` and instantiating the
