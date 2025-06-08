@@ -46,6 +46,11 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
     return FakeScript(request)
 
 
+@pytest.fixture
+def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+
+
 class TestModel:
     @pytest.fixture
     def harness(self):
@@ -1042,7 +1047,7 @@ class TestModel:
 
         self.assertBackendCalls(harness, [])
 
-    def test_storage(self, fake_script: FakeScript):
+    def test_storage(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         raw: ops.charm._StorageMetaDict = {
             'type': 'test',
@@ -1132,7 +1137,7 @@ class TestModel:
     ):
         assert expected == harness._get_backend_calls(reset=reset)
 
-    def test_run_error(self, fake_script: FakeScript):
+    def test_run_error(self, fake_script: FakeScript, fake_juju_version: None):
         model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
         fake_script.write('status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
         with pytest.raises(ops.ModelError) as excinfo:
@@ -1174,7 +1179,7 @@ class TestModel:
         # Make sure it's not being loaded from the environment.
         assert JujuVersion.from_environ() == '0.0.0'
 
-    def test_relation_remote_model(self, fake_script: FakeScript):
+    def test_relation_remote_model(self, fake_script: FakeScript, fake_juju_version: None):
         fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
         fake_script.write('relation-ids', """echo '["db0:1"]'""")
         fake_script.write('relation-model-get', """echo '{"uuid": "UUID"}'""")
@@ -1672,7 +1677,7 @@ class TestApplication:
 
 class TestContainers:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
@@ -1720,7 +1725,7 @@ containers:
 
 class TestContainerPebble:
     @pytest.fixture
-    def container(self):
+    def container(self, fake_juju_version: None):
         meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
@@ -2415,7 +2420,7 @@ class MockPebbleClient:
 
 class TestModelBindings:
     @pytest.fixture
-    def model(self, fake_script: FakeScript):
+    def model(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         meta.relations = {
             'db0': ops.RelationMeta(
@@ -2561,7 +2566,7 @@ class TestModelBindings:
             ['network-get', 'db0', '--format=json'],
         ]
 
-    def test_broken_relations(self, fake_script: FakeScript):
+    def test_broken_relations(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         meta.relations = {
             'db0': ops.RelationMeta(
@@ -2730,8 +2735,8 @@ class TestModelBackend:
     def backend(self):
         backend_instance = getattr(self, '_backend', None)
         if backend_instance is None:
-            os.environ['JUJU_VERSION'] = '0.0.0'
-            self._backend = _ModelBackend('myapp/0')
+            with mock.patch.dict(os.environ, {'JUJU_VERSION': '0.0.0'}):
+                self._backend = _ModelBackend('myapp/0')
         return self._backend
 
     def test_relation_get_set_is_app_arg(self):
@@ -3426,7 +3431,7 @@ class TestLazyMapping:
 
 class TestSecrets:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
 
     def test_app_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
@@ -3714,7 +3719,7 @@ class TestSecretInfo:
 
 class TestSecretClass:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
 
     def make_secret(
@@ -4072,7 +4077,7 @@ class TestSecretClass:
 
 class TestPorts:
     @pytest.fixture
-    def unit(self):
+    def unit(self, fake_juju_version: None):
         model = ops.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
         return model.unit
 
@@ -4228,7 +4233,7 @@ class TestPorts:
 
 
 class TestUnit:
-    def test_reboot(self, fake_script: FakeScript):
+    def test_reboot(self, fake_script: FakeScript, fake_juju_version: None):
         model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
         unit = model.unit
         fake_script.write('juju-reboot', 'exit 0')
@@ -4391,7 +4396,7 @@ class TestCloudSpec:
 
 class TestGetCloudSpec:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
 
     def test_success(self, fake_script: FakeScript, model: ops.Model):
