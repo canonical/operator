@@ -91,9 +91,6 @@ jobs:
           # To suppress the "Restore cache failed" error, since there is no go.sum file here.
           cache: false
 
-      - name: Install tox
-        run: pip install tox~=4.2
-
       - name: Install Pebble
         run: go install github.com/canonical/pebble/cmd/pebble@master
 
