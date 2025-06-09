@@ -58,14 +58,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb  # v6.1.0
+      - run: uv tool install tox --with tox-uv
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv tool install -p ${{ matrix.python-version }} tox --with tox-uv
 
       - name: Run unit tests
         run: tox -e unit
 
       - name: Run tracing unit tests
-        run: cd tracing && tox -e unit
+        run: cd tracing && tox -e py${{ matrix.python-version }}-unit
 
   test-real-pebble:
     runs-on: ${{ matrix.os }}
@@ -81,8 +81,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb  # v6.1.0
+      - run: uv tool install tox --with tox-uv
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv tool install -p ${{ matrix.python-version }} tox --with tox-uv
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -102,7 +102,7 @@ jobs:
           PEBBLE: /tmp/pebble
 
       - name: Run Real pebble tests
-        run: tox -e unit -- test/test_real_pebble.py
+        run: tox -e py${{ matrix.python-version }} unit -- test/test_real_pebble.py
         env:
           RUN_REAL_PEBBLE_TESTS: 1
           PEBBLE: /tmp/pebble
