@@ -1734,7 +1734,7 @@ class State(_max_posargs(0)):
         if meta:
             for relation_type in ('requires', 'provides', 'peers'):
                 for endpoint, details in meta.get(relation_type, {}).items():
-                    if any(rel for rel in relations if rel.endpoint == endpoint):
+                    if any(rel.endpoint == endpoint for rel in relations):
                         continue
                     if relation_type == 'peers':
                         relation_class = PeerRelation
@@ -1744,11 +1744,11 @@ class State(_max_posargs(0)):
                         relation_class = Relation
                     relations.add(relation_class(endpoint, details['interface']))
             for container_name in meta.get('containers', {}):
-                if any(c for c in containers if c.name == container_name):
+                if any(c.name == container_name for c in containers):
                     continue
                 containers.add(Container(name=container_name, can_connect=True))
             for storage_name in meta.get('storage', {}):
-                if any(s for s in storages if s.name == storage_name):
+                if any(s.name == storage_name for s in storages):
                     continue
                 storages.add(Storage(name=storage_name))
         stored_states = kwargs.pop('stored_states', set())
