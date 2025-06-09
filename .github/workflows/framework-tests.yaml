@@ -94,18 +94,10 @@ jobs:
       - name: Install Pebble
         run: go install github.com/canonical/pebble/cmd/pebble@master
 
-      - name: Start Pebble
-        run: |
-          umask 0
-          $HOME/go/bin/pebble run --create-dirs --http=:4000 &
-        env:
-          PEBBLE: /tmp/pebble
-
       - name: Run Real pebble tests
-        run: tox -e py${{ matrix.python-version }} unit -- test/test_real_pebble.py
+        run: tox -e py${{ matrix.python-version }}-pebble
         env:
-          RUN_REAL_PEBBLE_TESTS: 1
-          PEBBLE: /tmp/pebble
+          PATH: "$HOME/go/bin:$PATH"
 
   pip-install:
     runs-on: ${{ matrix.os }}
