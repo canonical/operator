@@ -23,12 +23,12 @@ $ cat version
 0522e1fd009dac78adb3d0652d91a1e8ff7982ae
 ```
 
-Typically, your publishing or packing workflow takes care of updating file file, so
+Typically, your publishing or packing workflow takes care of updating this file, so
 that it will automatically match the revision that you're creating and publishing.
 Generally, using a version control revision is the best choice, as it unambiguously
 identifies the code that was used to build the charm.
 
-One way to achieve this is to include in your `charmcraft.yaml` a parts build
+One way to achieve this is to modify your `charmcraft.yaml` file to include a parts build
 override, such as:
 
 ```yaml
@@ -39,7 +39,7 @@ parts:
     build-packages: [git]
     build-snaps: [astral-uv]
     override-build: |
-      craftctl default
+      craftctl default  # Run the default build steps.
       git describe --always > $CRAFT_PART_INSTALL/version
 ```
 
