@@ -1913,10 +1913,10 @@ class Relation:
                 be used.
 
         Raises:
-            ValueError: if the encoder does not return a string.
+            RelationDataTypeError: if the encoder does not return a string.
             RelationNotFoundError: if the relation does not exist.
-            ModelError: if the charm does not have permission to write to the
-                relation data.
+            RelationDataAccessError: if the charm does not have permission to
+                write to the relation data.
         """
         if encoder is None:
             encoder = json.dumps
@@ -1945,13 +1945,7 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
-        data: dict[str, str] = {}
-        for attr, field in sorted(fields.items()):
-            if not isinstance(field, str):
-                raise ValueError(
-                    f'The value for "{field}" must be a string, not {type(field).__name__}'
-                )
-            data[field] = encoder(values[attr])
+        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
         self.data[app_or_unit].update(data)
 
 
