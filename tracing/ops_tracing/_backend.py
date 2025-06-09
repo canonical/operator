@@ -73,7 +73,9 @@ def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvi
     global _exporter
     _exporter = BufferingSpanExporter(charm_dir / BUFFER_FILENAME)
     span_processor = BatchSpanProcessor(_exporter)
-    return TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(span_processor)
+    return provider
 
 
 def set_destination(url: str | None, ca: str | None) -> None:

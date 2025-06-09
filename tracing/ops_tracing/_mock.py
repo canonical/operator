@@ -52,7 +52,6 @@ def patch_tracing() -> Generator[None, None, None]:
 
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create an OpenTelemetry tracing provider suitable for testing."""
-    return TracerProvider(
-        resource=resource,
-        active_span_processor=SimpleSpanProcessor(InMemorySpanExporter()),  # type: ignore
-    )
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
+    return provider
