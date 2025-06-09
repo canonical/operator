@@ -62,7 +62,7 @@ jobs:
       - run: uv python install ${{ matrix.python-version }}
 
       - name: Run unit tests
-        run: tox -e unit
+        run: tox -e py${{ matrix.python-version }}-unit
 
       - name: Run tracing unit tests
         run: cd tracing && tox -e py${{ matrix.python-version }}-unit
@@ -92,12 +92,12 @@ jobs:
           cache: false
 
       - name: Install Pebble
-        run: go install github.com/canonical/pebble/cmd/pebble@master
+        run: |
+          go install github.com/canonical/pebble/cmd/pebble@master
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
       - name: Run Real pebble tests
         run: tox -e py${{ matrix.python-version }}-pebble
-        env:
-          PATH: "$HOME/go/bin:$PATH"
 
   pip-install:
     runs-on: ${{ matrix.os }}
