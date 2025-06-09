@@ -32,7 +32,6 @@ except ImportError:
 
 import ops
 from ops import testing
-from ops._main import _Abort
 
 
 @dataclasses.dataclass
@@ -239,19 +238,11 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
     assert obj.quux is not None and obj.quux.sub == 28
 
 
-@pytest.mark.parametrize(
-    'errors,raised', [('raise', ValueError), ('blocked', _Abort), (None, ValueError)]
-)
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail(
-    errors: str | None, raised: type[Exception], charm_class: type[BaseTestCharm]
-):
+def test_relation_load_fail(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            kwargs: dict[str, Any] = {'decoder': self.decoder}
-            if errors is not None:
-                kwargs['errors'] = errors
-            event.relation.load(self.databag_class, event.app, **kwargs)
+            event.relation.load(self.databag_class, event.app, decoder=self.decoder)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     # 'bar' should be an int, not a string.
@@ -260,7 +251,7 @@ def test_relation_load_fail(
     state_in = testing.State(leader=True, relations={rel})
     with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    assert isinstance(exc_info.value.__cause__, raised)
+    assert isinstance(exc_info.value.__cause__, ValueError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)

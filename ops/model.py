@@ -1780,7 +1780,6 @@ class Relation:
         app_or_unit: Unit | Application,
         *args: Any,
         decoder: Callable[[str], Any] | None = None,
-        errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
     ) -> _T:
         """Load the data for this relation into an instance of a data class.
@@ -1822,22 +1821,12 @@ class Relation:
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided,
                 :func:`json.loads` will be used.
-            errors: what to do if the relation data is invalid. If ``blocked``,
-                this will set the unit status to blocked with an appropriate
-                message and then exit successfully (this informs Juju that
-                the event was handled and it will not be retried).
-                If ``raise``, ``load`` will not catch any exceptions, leaving
-                the charm to handle errors.
             args: positional arguments to pass through to the data class.
             kwargs: keyword arguments to pass through to the data class.
 
         Returns:
             An instance of the data class that was provided as ``cls`` with the
             current relation data values.
-
-        Raises:
-            ValueError: if ``errors`` is set to ``raise`` and instantiating the
-                data class raises a ValueError.
         """
         try:
             fields = _charm._juju_fields(cls)
@@ -1852,18 +1841,7 @@ class Relation:
                 data[key] = value
             elif key in fields:
                 data[fields[key]] = value
-        try:
-            return cls(*args, **data)
-        except ValueError as e:
-            if errors == 'raise':
-                raise
-            self._backend.status_set(
-                'blocked',
-                f'Invalid relation data, relation={self}, bag={app_or_unit}: {e}',
-            )
-            from ._main import _Abort
-
-            raise _Abort(0) from e
+        return cls(*args, **data)
 
     def save(
         self,
