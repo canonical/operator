@@ -626,8 +626,9 @@ class _CommonTypesData:
         else:
             self.network = network
         if isinstance(origin, str):
-            origin = Country(origin)
-        self.origin = origin
+            self.origin = Country(origin)
+        else:
+            self.origin = origin
 
     @staticmethod
     def _validate_url(url: str):
@@ -704,6 +705,48 @@ class _CommonTypesDataclass:
     network: ipaddress.IPv4Network | ipaddress.IPv6Network
     origin: Country | str
 
+    def __init__(
+        self,
+        *,
+        url: str,
+        ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
+        network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+        origin: Country | str,
+    ):
+        if not self._validate_url(url):
+            raise ValueError(f'Invalid URL: {url}')
+        self.url = url
+        if isinstance(ip, str):
+            self.ip = ipaddress.ip_address(ip)
+        else:
+            self.ip = ip
+        if isinstance(network, str):
+            self.network = ipaddress.ip_network(network)
+        else:
+            self.network = network
+        if isinstance(origin, str):
+            self.origin = Country(origin)
+        else:
+            self.origin = origin
+
+    @staticmethod
+    def _validate_url(url: str):
+        parsed_url = urllib.parse.urlparse(url)
+        return bool(parsed_url.scheme and parsed_url.netloc)
+
+    def __setattr__(self, key: str, value: Any):
+        if key == 'url' and not self._validate_url(value):
+            raise ValueError(f'Invalid URL: {value}')
+        if key == 'ip' and not isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            raise ValueError(f'Invalid IP address: {value}')
+        if key == 'network' and not isinstance(
+            value, (ipaddress.IPv4Network, ipaddress.IPv6Network)
+        ):
+            raise ValueError(f'Invalid network: {value}')
+        if key == 'origin' and isinstance(value, str):
+            value = Country(value)
+        super().__setattr__(key, value)
+
 
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
     @property
@@ -757,6 +800,13 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
             data: CommonTypesProtocol = event.relation.load(
                 self.databag_class, event.app, decoder=self.decoder
             )
+            # In the Pydantic classes .url is an AnyHttpUrl, and in the others it is
+            # a regular string. For the purposes of this test, we're ok with it just
+            # being a string.
+            assert str(data.url) == 'https://example.com/'
+            assert data.ip == ipaddress.ip_address('127.0.0.2')
+            assert data.network == ipaddress.ip_network('127.0.1.0/24')
+            assert data.origin == Country.NZ
             data.url = 'https://new.example.com'
             data.ip = ipaddress.ip_address('127.0.0.3')
             data.network = ipaddress.ip_network('127.0.2.0/24')
@@ -765,7 +815,7 @@ def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     data_in = {
-        'url': json.dumps('https://example.com'),
+        'url': json.dumps('https://example.com/'),
         'ip': json.dumps('127.0.0.2'),
         'network': json.dumps('127.0.1.0/24'),
         'origin': json.dumps('New Zealand'),
