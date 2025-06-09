@@ -1749,7 +1749,7 @@ class State(_max_posargs(0)):
         relations = set() if relations is None else relations
         for relation_type in ('requires', 'provides', 'peers'):
             for endpoint, details in meta.get(relation_type, {}).items():
-                if any(rel for rel in relations if rel.endpoint == endpoint):
+                if any(rel.endpoint == endpoint for rel in relations):
                     continue
                 if relation_type == 'peers':
                     relation_class = PeerRelation
@@ -1760,12 +1760,12 @@ class State(_max_posargs(0)):
                 relations.add(relation_class(endpoint, details['interface']))
         containers = set() if containers is None else containers
         for container_name in meta.get('containers', {}):
-            if any(c for c in containers if c.name == container_name):
+            if any(c.name == container_name for c in containers):
                 continue
             containers.add(Container(name=container_name, can_connect=True))
         storages = set() if storages is None else storages
         for storage_name in meta.get('storage', {}):
-            if any(s for s in storages if s.name == storage_name):
+            if any(s.name == storage_name for s in storages):
                 continue
             storages.add(Storage(name=storage_name))
         stored_states = set() if stored_states is None else stored_states
@@ -1773,7 +1773,7 @@ class State(_max_posargs(0)):
             value = getattr(ctx.charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
                 owner_path = ctx.charm_spec.charm_type.handle_kind
-                if any(s.name == attr and s.owner_path == owner_path for s in stored_states):
+                if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
         kwargs = {}
