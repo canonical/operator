@@ -1441,6 +1441,21 @@ class CharmBase(Object):
           permission to access it).
         * dashes in names are converted to underscores.
 
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju config that have a matching field in the class are passed as
+        arguments. Pydantic fields that have an ``alias``, or dataclasses that
+        have a ``metadata{'alias'=}``, will have the alias applied when loading.
+
+        For example::
+
+            class Config(pydantic.BaseModel):
+                # This field is called 'class' in the Juju config options.
+                workload_class: str = pydantic.Field(alias='class')
+
+            def _on_config_changed(self, event: ops.ConfigChangedEvent):
+                data = self.load_config(Config, errors='blocked')
+                # `data.workload_class` has the value of the Juju option `class`
+
         Any additional positional or keyword arguments to this method will be
         passed through to the config class ``__init__``.
 
