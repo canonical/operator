@@ -311,7 +311,7 @@ class _DataclassesAlias:
     other: str = 'baz'
 
 
-_alias_data_classes: list[type[object]] = [_Alias, _DataclassesAlias]
+_alias_classes: list[type[object]] = [_Alias, _DataclassesAlias]
 
 if pydantic is not None:
 
@@ -324,11 +324,11 @@ if pydantic is not None:
         foo_bar: int = pydantic.Field(42, alias='fooBar')
         other: str = pydantic.Field('baz')
 
-    _alias_data_classes.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
+    _alias_classes.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
 
 
 @pytest.mark.parametrize('relation_data', [{}, {'fooBar': '24'}])
-@pytest.mark.parametrize('data_class', _alias_data_classes)
+@pytest.mark.parametrize('data_class', _alias_classes)
 def test_relation_load_custom_naming_pattern(
     relation_data: dict[str, str], data_class: type[_AliasProtocol]
 ):
@@ -350,7 +350,7 @@ def test_relation_load_custom_naming_pattern(
     assert obj.other == 'baz'
 
 
-@pytest.mark.parametrize('data_class', _alias_data_classes)
+@pytest.mark.parametrize('data_class', _alias_classes)
 def test_relation_save_custom_naming_pattern(data_class: type[_AliasProtocol]):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
