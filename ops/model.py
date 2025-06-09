@@ -1886,8 +1886,8 @@ class Relation:
         fields will be saved through to the relation data. Pydantic fields that
         have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``, will
         have the object's value saved under the alias name. For other classes, all
-        of the object's attributes that have a class type annotation will be saved
-        through to the relation data.
+        of the object's attributes that have a class type annotation and value set
+        on the object will be saved through to the relation data.
 
         For example::
 
