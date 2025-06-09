@@ -507,7 +507,7 @@ class _DataclassesOneString:
     foo: str
 
 
-_one_string_data_classes: list[type[object]] = [_OneString, _DataclassesOneString]
+_one_string_classes: list[type[object]] = [_OneString, _DataclassesOneString]
 
 if pydantic is not None:
 
@@ -518,10 +518,10 @@ if pydantic is not None:
     class _PydanticBaseModelOneString(pydantic.BaseModel):
         foo: str = pydantic.Field()
 
-    _one_string_data_classes.extend([_PydanticDataclassesOneString, _PydanticBaseModelOneString])
+    _one_string_classes.extend([_PydanticDataclassesOneString, _PydanticBaseModelOneString])
 
 
-@pytest.mark.parametrize('data_class', _one_string_data_classes)
+@pytest.mark.parametrize('data_class', _one_string_classes)
 def test_relation_save_no_encode(data_class: type[_OneStringProtocol]):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
