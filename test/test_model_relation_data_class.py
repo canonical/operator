@@ -328,9 +328,9 @@ if pydantic is not None:
 
 
 @pytest.mark.parametrize('relation_data', [{}, {'fooBar': '24'}])
-@pytest.mark.parametrize('data_class', _alias_classes)
+@pytest.mark.parametrize('relation_data_class', _alias_classes)
 def test_relation_load_custom_naming_pattern(
-    relation_data: dict[str, str], data_class: type[_AliasProtocol]
+    relation_data: dict[str, str], relation_data_class: type[_AliasProtocol]
 ):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -338,7 +338,7 @@ def test_relation_load_custom_naming_pattern(
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            self.data = event.relation.load(data_class, event.app)
+            self.data = event.relation.load(relation_data_class, event.app)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel = testing.Relation('db', remote_app_data=relation_data)
@@ -350,15 +350,15 @@ def test_relation_load_custom_naming_pattern(
     assert obj.other == 'baz'
 
 
-@pytest.mark.parametrize('data_class', _alias_classes)
-def test_relation_save_custom_naming_pattern(data_class: type[_AliasProtocol]):
+@pytest.mark.parametrize('relation_data_class', _alias_classes)
+def test_relation_save_custom_naming_pattern(relation_data_class: type[_AliasProtocol]):
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            data = event.relation.load(data_class, event.app)
+            data = event.relation.load(relation_data_class, event.app)
             data.foo_bar = 24
             data.other = 'foo'
             event.relation.save(data, self.app)
