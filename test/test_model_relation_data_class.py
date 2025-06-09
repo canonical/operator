@@ -557,6 +557,7 @@ def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, self.app, decoder=custom_decode)
+            assert data.foo == 'eulav'
             data.foo = data.foo + '1'
             event.relation.save(data, self.app, encoder=custom_encode)
 
