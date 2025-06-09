@@ -4410,5 +4410,23 @@ class TestGetCloudSpec:
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
 
 
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_departing_unit_in_relations():
+    ctx = ops.testing.Context(
+        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
+    )
+    # In this mocked Juju data, only unit/0 is included.
+    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    state_in = ops.testing.State(relations={rel})
+    # We simulate a relation-departed event where the departing unit is unit/1.
+    with ctx(ctx.on.relation_departed(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        # The departing unit, unit/1, should be in the .units set for the relation
+        # even though it was not in the mocked Juju data.
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
+
+
 if __name__ == '__main__':
     unittest.main()
