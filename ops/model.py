@@ -1794,6 +1794,22 @@ class Relation:
             data = event.relation.load(DatabaseModel, event.app)
             secret_id = data.credentials
 
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju relation data that have a matching field in the class are
+        passed as arguments. Pydantic fields that have an ``alias``, or
+        dataclasses that have a ``metadata{'alias'=}``, will have the alias
+        applied when loading.
+
+        For example::
+
+            class Data(pydantic.BaseModel):
+                # This field is called 'secret-id' in the Juju relation data.
+                secret_id: str = pydantic.Field(alias='secret-id')
+
+            def _observer(self, event: ops.RelationEvent):
+                data = event.relation.load(Data, event.app)
+                secret = self.model.get_secret(data.secret_id)
+
         Any additional positional or keyword arguments will be passed through to
         the data class ``__init__``.
 
@@ -1865,6 +1881,29 @@ class Relation:
             relation = self.model.get_relation('tracing')
             data = TracingRequirerData(receivers=['otlp_http'])
             relation.save(data, self.app)
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only the class's
+        fields will be saved through to the relation data. Pydantic fields that
+        have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``, will
+        have the object's value saved under the alias name. For other classes, all
+        of the object's attributes that have a class type annotation will be saved
+        through to the relation data.
+
+        For example::
+
+            class TransferData(pydantic.BaseModel):
+                source: pydantic.AnyHttpUrl = pydantic.Field(alias='from')
+                destination: pydantic.AnyHttpUrl = pydantic.Field(alias='to')
+
+            def _add_transfer(self):
+                data = TransferData(
+                    source='https://a.example.com',
+                    destination='https://b.example.com',
+                )
+                relation = self.model.get_relation('mover')
+                # data.source will be stored under the Juju relation key 'from'
+                # data.destination will be stored under the Juju relation key 'to'
+                relation.save(data, self.unit)
 
         Args:
             obj: an object with attributes to save to the relation data, typically
