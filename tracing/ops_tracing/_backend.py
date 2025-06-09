@@ -32,6 +32,9 @@ from ._export import BufferingSpanExporter
 BUFFER_FILENAME: str = '.tracing-data.db'
 """Name of the buffer file where the trace data is stored, next to .unit-state.db."""
 
+_exporter: BufferingSpanExporter | None = None
+"""A reference to the exporter that we passed to OpenTelemetry SDK at setup."""
+
 
 def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
     """Set up the tracing subsystem and configure OpenTelemetry.
@@ -67,21 +70,12 @@ def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create the OpenTelemetry tracer provider."""
     # Separate function so that it's easy to override in tests
-    exporter = BufferingSpanExporter(charm_dir / BUFFER_FILENAME)
-    span_processor = BatchSpanProcessor(exporter)
-    return TracerProvider(resource=resource, active_span_processor=span_processor)  # type: ignore
-
-
-def get_exporter() -> BufferingSpanExporter | None:
-    """Get our export from OpenTelemetry SDK."""
-    try:
-        exporter = get_tracer_provider()._active_span_processor.span_exporter  # type: ignore
-    except AttributeError:
-        # The global tracer provider was not configured by us and has a wrong processor.
-        return None
-    if not exporter or not isinstance(exporter, BufferingSpanExporter):
-        return None
-    return exporter
+    global _exporter
+    _exporter = BufferingSpanExporter(charm_dir / BUFFER_FILENAME)
+    span_processor = BatchSpanProcessor(_exporter)
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(span_processor)
+    return provider
 
 
 def set_destination(url: str | None, ca: str | None) -> None:
@@ -98,20 +92,20 @@ def set_destination(url: str | None, ca: str | None) -> None:
 
     config = Destination(url, ca)
 
-    if not (exporter := get_exporter()):
+    if not _exporter:
         # Perhaps our tracer provider was never set up.
         return
 
-    if config == exporter.buffer.load_destination():
+    if config == _exporter.buffer.load_destination():
         return
-    exporter.buffer.save_destination(config)
+    _exporter.buffer.save_destination(config)
 
 
 def mark_observed() -> None:
     """Mark the trace data collected in this dispatch as higher priority."""
-    if not (exporter := get_exporter()):
+    if not _exporter:
         return
-    exporter.buffer.mark_observed()
+    _exporter.buffer.mark_observed()
 
 
 def shutdown() -> None:
