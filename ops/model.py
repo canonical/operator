@@ -1925,7 +1925,7 @@ class Relation:
         # each field.
         fields: dict[str, str] = {}  # Class attribute name: Juju key.
         if dataclasses.is_dataclass(obj):
-            assert not isinstance(obj, type)
+            assert not isinstance(obj, type)  # dataclass instance, not class.
             for field in dataclasses.fields(obj):
                 alias = field.metadata.get('alias', field.name)
                 fields[field.name] = alias
