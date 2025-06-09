@@ -41,40 +41,40 @@ class Nested:
 
 class DatabagProtocol(Protocol):
     foo: str
-    baz: list[str]
     bar: int
+    baz: list[str]
     quux: Nested
 
     def __init__(
         self,
         *,
         foo: str,
-        baz: list[str] = [],  # noqa: B006
         bar: int = 0,
+        baz: list[str] = [],  # noqa: B006
         quux: Nested = Nested(),  # noqa: B008
     ): ...
 
 
 class MyDatabag:
     foo: str
-    baz: list[str]
     bar: int
+    baz: list[str]
     quux: Nested
 
     def __init__(
-        self, foo: str, baz: list[str] | None = None, bar: int = 0, quux: Nested | None = None
+        self, foo: str, bar: int = 0, baz: list[str] | None = None, quux: Nested | None = None
     ):
         assert isinstance(foo, str)
         self.foo = foo
+        if not isinstance(bar, int) or bar < 0:
+            raise ValueError('bar must be a zero or positive int')
+        self.bar = bar
         if isinstance(baz, list):
             assert all(isinstance(i, str) for i in baz)
             self.baz = baz
         else:
             assert baz is None
             self.baz = []
-        if not isinstance(bar, int) or bar < 0:
-            raise ValueError('bar must be a zero or positive int')
-        self.bar = bar
         if quux is None:
             self.quux = Nested()
         else:
@@ -133,17 +133,17 @@ class MyCharm(BaseTestCharm):
 @dataclasses.dataclass
 class MyDataclassDatabag:
     foo: str
-    baz: list[str] = dataclasses.field(default_factory=list)
     bar: int = dataclasses.field(default=0)
+    baz: list[str] = dataclasses.field(default_factory=list)
     quux: Nested = dataclasses.field(default_factory=Nested)
 
     def __post_init__(self):
         assert isinstance(self.foo, str)
-        assert isinstance(self.baz, list)
-        assert all(isinstance(i, str) for i in self.baz)
         assert isinstance(self.bar, int)
         if self.bar < 0:
             raise ValueError('bar must be a zero or positive int')
+        assert isinstance(self.baz, list)
+        assert all(isinstance(i, str) for i in self.baz)
         if self.foo in self.baz:
             raise ValueError('foo cannot be in baz')
 
@@ -167,8 +167,8 @@ if pydantic:
     @pydantic.dataclasses.dataclass
     class MyPydanticDataclassDatabag:
         foo: str
-        baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0, ge=0)
+        baz: list[str] = pydantic.Field(default_factory=list)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
         @pydantic.field_validator('baz')
@@ -189,8 +189,8 @@ if pydantic:
 
     class MyPydanticDatabag(pydantic.BaseModel):
         foo: str
-        baz: list[str] = pydantic.Field(default_factory=list)
         bar: int = pydantic.Field(default=0, ge=0)
+        baz: list[str] = pydantic.Field(default_factory=list)
         quux: Nested = pydantic.Field(default_factory=Nested)
 
         @pydantic.field_validator('baz')
@@ -218,9 +218,9 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, event.app, decoder=self.decoder)
             self.newfoo = len(data.foo)
+            self.newbar = data.bar + 1
             assert data.baz is not None
             self.newbaz = [*data.baz, 'new']
-            self.newbar = data.bar + 1
             assert data.quux is not None
             self.newquux = Nested(sub=data.quux.sub + 1)
             self.data = data
