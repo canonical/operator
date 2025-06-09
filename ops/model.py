@@ -1850,9 +1850,7 @@ class Relation:
             value = decoder(value)
             if fields is None:
                 data[key] = value
-            else:
-                if key not in fields:
-                    continue
+            elif key in fields:
                 data[fields[key]] = value
         try:
             return cls(*args, **data)
