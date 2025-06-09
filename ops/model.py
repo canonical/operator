@@ -1872,7 +1872,7 @@ class Relation:
         *,
         encoder: Callable[[Any], str] | None = None,
     ):
-        """Save the data from the provided data class object to the Juju relation data.
+        """Save the data from the provided object to the Juju relation data.
 
         For example::
 
