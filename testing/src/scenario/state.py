@@ -1755,15 +1755,10 @@ class State(_max_posargs(0)):
         for attr in dir(ctx.charm_spec.charm_type):
             value = getattr(ctx.charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
-                if any(
-                    ss
-                    for ss in stored_states
-                    if ss.name == attr and ss.owner_path == ctx.charm_spec.charm_type.handle_kind
-                ):
+                owner_path = ctx.charm_spec.charm_type.handle_kind
+                if any(s.name == attr and s.owner_path == owner_path for s in stored_states):
                     continue
-                stored_states.add(
-                    StoredState(attr, owner_path=ctx.charm_spec.charm_type.handle_kind)
-                )
+                stored_states.add(StoredState(attr, owner_path=owner_path))
         return cls(
             config=generated_config,
             relations=relations,
