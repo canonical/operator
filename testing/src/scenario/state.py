@@ -1691,7 +1691,25 @@ class State(_max_posargs(0)):
     def from_context(
         cls,
         ctx: Context[CharmType],
-        **kwargs: Any,
+        *,
+        # If provided, these merge with or replace the generated versions.
+        config: dict[str, str | int | float | bool] | None = None,
+        relations: Iterable[RelationBase] | None = None,
+        containers: Iterable[Container] | None = None,
+        storages: Iterable[Storage] | None = None,
+        stored_states: Iterable[StoredState] | None = None,
+        # The following arguments are passed through to __init__.
+        networks: Iterable[Network] | None = None,
+        opened_ports: Iterable[Port] | None = None,
+        leader: bool | None = None,
+        model: Model | None = None,
+        secrets: Iterable[Secret] | None = None,
+        resources: Iterable[Resource] | None = None,
+        planned_units: int | None = None,
+        deferred: Sequence[DeferredEvent] | None = None,
+        app_status: _EntityStatus | None = None,
+        unit_status: _EntityStatus | None = None,
+        workload_version: str | None = None,
     ) -> State:
         """Create a State from the charm context.
 
@@ -1721,14 +1739,14 @@ class State(_max_posargs(0)):
         arguments will be merged, with the passed values taking precedence.
         """
         meta = ctx.charm_spec.meta
-        config = ctx.charm_spec.config
-        generated_config = kwargs.pop('config', {})
-        if config:
-            options = config.get('options', {})
+        spec_config = ctx.charm_spec.config
+        config = {} if config is None else config
+        if spec_config:
+            options = spec_config.get('options', {})
             for option, details in options.items():
-                if option not in generated_config and 'default' in details:
-                    generated_config[option] = details['default']
-        relations = kwargs.pop('relations', set())
+                if option not in config and 'default' in details:
+                    config[option] = details['default']
+        relations = set() if relations is None else relations
         for relation_type in ('requires', 'provides', 'peers'):
             for endpoint, details in meta.get(relation_type, {}).items():
                 if any(rel for rel in relations if rel.endpoint == endpoint):
@@ -1740,17 +1758,17 @@ class State(_max_posargs(0)):
                 else:
                     relation_class = Relation
                 relations.add(relation_class(endpoint, details['interface']))
-        containers = kwargs.pop('containers', set())
+        containers = set() if containers is None else containers
         for container_name in meta.get('containers', {}):
             if any(c for c in containers if c.name == container_name):
                 continue
             containers.add(Container(name=container_name, can_connect=True))
-        storages = kwargs.pop('storage', set())
+        storages = set() if storages is None else storages
         for storage_name in meta.get('storage', {}):
             if any(s for s in storages if s.name == storage_name):
                 continue
             storages.add(Storage(name=storage_name))
-        stored_states = kwargs.pop('stored_states', set())
+        stored_states = set() if stored_states is None else stored_states
         for attr in dir(ctx.charm_spec.charm_type):
             value = getattr(ctx.charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
@@ -1758,8 +1776,33 @@ class State(_max_posargs(0)):
                 if any(s.name == attr and s.owner_path == owner_path for s in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
+        kwargs = {}
+        if networks is not None:
+            kwargs['networks'] = networks
+        if opened_ports is not None:
+            kwargs['opened_ports'] = opened_ports
+        if leader is not None:
+            kwargs['leader'] = leader
+        if model is not None:
+            kwargs['model'] = model
+        if secrets is not None:
+            kwargs['secrets'] = secrets
+        if resources is not None:
+            kwargs['resources'] = resources
+        if planned_units is not None:
+            kwargs['planned_units'] = planned_units
+        if deferred is not None:
+            kwargs['deferred'] = deferred
+        if app_status is not None:
+            kwargs['app_status'] = app_status
+        if unit_status is not None:
+            kwargs['unit_status'] = unit_status
+        if workload_version is not None:
+            kwargs['workload_version'] = workload_version
+
+>>>>>>> 70ebddb (Adjustments per review.)
         return cls(
-            config=generated_config,
+            config=config,
             relations=relations,
             containers=containers,
             storages=storages,
