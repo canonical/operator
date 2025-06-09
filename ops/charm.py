@@ -243,6 +243,19 @@ class ActionEvent(EventBase):
         ``__init__`` method as keyword arguments, with dashes in names
         converted to underscores.
 
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju action parameters that have a matching field in the class are
+        passed as arguments.
+
+        For example::
+
+            class BackupParams(pydantic.BaseModel):
+                filename: str
+
+            def _on_do_backup(self, event: ops.ActionEvent):
+                params = event.load_params(BackupParams)
+                # params.filename contains the value passed by the Juju user.
+
         Any additional positional or keyword arguments will be passed through to
         the action class ``__init__``.
 
