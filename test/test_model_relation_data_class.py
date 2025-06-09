@@ -577,9 +577,9 @@ class Country(enum.Enum):
 
 class CommonTypesProtocol(Protocol):
     url: str
-    ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str
-    network: ipaddress.IPv4Network | ipaddress.IPv6Network | str
-    origin: Country | str
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+    network: ipaddress.IPv4Network | ipaddress.IPv6Network
+    origin: Country
 
     def __init__(
         self,
@@ -600,59 +600,58 @@ class BaseTestCharmCommonTypes(ops.CharmBase):
     decoder: Callable[[Any], str] | None = None
 
 
+class _CommonTypesData:
+    url: str
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+    network: ipaddress.IPv4Network | ipaddress.IPv6Network
+    origin: Country | str
+
+    def __init__(
+        self,
+        *,
+        url: str,
+        ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
+        network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
+        origin: Country | str,
+    ):
+        if not self._validate_url(url):
+            raise ValueError(f'Invalid URL: {url}')
+        self.url = url
+        if isinstance(ip, str):
+            self.ip = ipaddress.ip_address(ip)
+        else:
+            self.ip = ip
+        if isinstance(network, str):
+            self.network = ipaddress.ip_network(network)
+        else:
+            self.network = network
+        if isinstance(origin, str):
+            origin = Country(origin)
+        self.origin = origin
+
+    @staticmethod
+    def _validate_url(url: str):
+        parsed_url = urllib.parse.urlparse(url)
+        return bool(parsed_url.scheme and parsed_url.netloc)
+
+    def __setattr__(self, key: str, value: Any):
+        if key == 'url' and not self._validate_url(value):
+            raise ValueError(f'Invalid URL: {value}')
+        if key == 'ip' and not isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            raise ValueError(f'Invalid IP address: {value}')
+        if key == 'network' and not isinstance(
+            value, (ipaddress.IPv4Network, ipaddress.IPv6Network)
+        ):
+            raise ValueError(f'Invalid network: {value}')
+        if key == 'origin' and isinstance(value, str):
+            value = Country(value)
+        super().__setattr__(key, value)
+
+
 class CommonTypes(BaseTestCharmCommonTypes):
     @property
     def databag_class(self):
-        class Data:
-            url: str
-            ip: ipaddress.IPv4Address | ipaddress.IPv6Address
-            network: ipaddress.IPv4Network | ipaddress.IPv6Network
-            origin: Country | str
-
-            def __init__(
-                self,
-                *,
-                url: str,
-                ip: ipaddress.IPv4Address | ipaddress.IPv6Address | str,
-                network: ipaddress.IPv4Network | ipaddress.IPv6Network | str,
-                origin: Country | str,
-            ):
-                if not self._validate_url(url):
-                    raise ValueError(f'Invalid URL: {url}')
-                self.url = url
-                if isinstance(ip, str):
-                    self.ip = ipaddress.ip_address(ip)
-                else:
-                    self.ip = ip
-                if isinstance(network, str):
-                    self.network = ipaddress.ip_network(network)
-                else:
-                    self.network = network
-                if isinstance(origin, str):
-                    origin = Country(origin)
-                self.origin = origin
-
-            @staticmethod
-            def _validate_url(url: str):
-                parsed_url = urllib.parse.urlparse(url)
-                return bool(parsed_url.scheme and parsed_url.netloc)
-
-            def __setattr__(self, key: str, value: Any):
-                if key == 'url' and not self._validate_url(value):
-                    raise ValueError(f'Invalid URL: {value}')
-                if key == 'ip' and not isinstance(
-                    value, (ipaddress.IPv4Address, ipaddress.IPv6Address)
-                ):
-                    raise ValueError(f'Invalid IP address: {value}')
-                if key == 'network' and not isinstance(
-                    value, (ipaddress.IPv4Network, ipaddress.IPv6Network)
-                ):
-                    raise ValueError(f'Invalid network: {value}')
-                if key == 'origin' and isinstance(value, str):
-                    value = Country(value)
-                super().__setattr__(key, value)
-
-        return Data
+        return _CommonTypesData
 
     @staticmethod
     def _str_encoder(x: Any) -> str:
@@ -698,17 +697,18 @@ json_ip_encode = functools.partial(json.dumps, cls=IPJSONEncoder)
 json_ip_decode = functools.partial(json.loads, object_hook=json_ip_hook)
 
 
+@dataclasses.dataclass
+class _CommonTypesDataclass:
+    url: str
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address
+    network: ipaddress.IPv4Network | ipaddress.IPv6Network
+    origin: Country | str
+
+
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
     @property
     def databag_class(self):
-        @dataclasses.dataclass
-        class Data:
-            url: str
-            ip: ipaddress.IPv4Address | ipaddress.IPv6Address
-            network: ipaddress.IPv4Network | ipaddress.IPv6Network
-            origin: Country | str
-
-        return Data
+        return _CommonTypesDataclass
 
     encoder: Callable[[Any], str] | None = json_ip_encode
     decoder: Callable[[str], Any] | None = json_ip_decode
