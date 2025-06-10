@@ -1796,8 +1796,9 @@ class Relation:
         For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
         the Juju relation data that have a matching field in the class are
         passed as arguments. Pydantic fields that have an ``alias``, or
-        dataclasses that have a ``metadata{'alias'=}``, will have the alias
-        applied when loading.
+        dataclasses that have a ``metadata{'alias'=}``, will expect the Juju
+        relation data field to have the alias name, but will set the attribute
+        on the class to the field name.
 
         For example::
 
@@ -1860,10 +1861,11 @@ class Relation:
 
         For dataclasses and Pydantic ``BaseModel`` subclasses, only the class's
         fields will be saved through to the relation data. Pydantic fields that
-        have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``, will
-        have the object's value saved under the alias name. For other classes, all
-        of the object's attributes that have a class type annotation and value set
-        on the object will be saved through to the relation data.
+        have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``,
+        will have the object's value saved to the Juju relation data with the
+        alias as the key. For other classes, all of the object's attributes that
+        have a class type annotation and value set on the object will be saved
+        through to the relation data.
 
         For example::
 
