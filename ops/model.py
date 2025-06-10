@@ -1777,7 +1777,7 @@ class Relation:
     def load(
         self,
         cls: type[_T],
-        app_or_unit: Unit | Application,
+        src: Unit | Application,
         *args: Any,
         decoder: Callable[[str], Any] | None = None,
         **kwargs: Any,
@@ -1817,7 +1817,7 @@ class Relation:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
                 dataclass, that will accept the Juju relation data as keyword
                 arguments, and raise ``ValueError`` if validation fails.
-            app_or_unit: The source of the data to load. This can be either a
+            src: The source of the data to load. This can be either a
                 :class:`Unit` or :class:`Application` instance.
             decoder: An optional callable that will be used to decode each field
                 before loading into the class. If not provided,
@@ -1836,7 +1836,7 @@ class Relation:
         data: dict[str, Any] = copy.deepcopy(kwargs)
         if decoder is None:
             decoder = json.loads
-        for key, value in sorted(self.data[app_or_unit].items()):
+        for key, value in sorted(self.data[src].items()):
             value = decoder(value)
             if fields is None:
                 data[key] = value
@@ -1847,7 +1847,7 @@ class Relation:
     def save(
         self,
         obj: object,
-        app_or_unit: Unit | Application,
+        dst: Unit | Application,
         *,
         encoder: Callable[[Any], str] | None = None,
     ):
@@ -1886,7 +1886,7 @@ class Relation:
         Args:
             obj: an object with attributes to save to the relation data, typically
                 a Pydantic ``BaseModel`` subclass or dataclass.
-            app_or_unit: The destination in which to save the data to save. This
+            dst: The destination in which to save the data to save. This
                 can be either a :class:`Unit` or :class:`Application` instance.
             encoder: An optional callable that will be used to encode each field
                 before passing to Juju. If not provided, :func:`json.dumps` will
@@ -1926,7 +1926,7 @@ class Relation:
 
         # Encode each value, and then pass it over to Juju.
         data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
-        self.data[app_or_unit].update(data)
+        self.data[dst].update(data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
