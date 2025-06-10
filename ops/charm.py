@@ -25,8 +25,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    Generator,
     List,
     Literal,
     Mapping,
@@ -228,6 +226,76 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def load_params(
+        self,
+        cls: type[_T],
+        *args: Any,
+        errors: Literal['raise', 'fail'] = 'raise',
+        **kwargs: Any,
+    ) -> _T:
+        """Load the action parameters into an instance of an action class.
+
+        The raw Juju action parameters are passed to the action class's
+        ``__init__`` method as keyword arguments, with dashes in names
+        converted to underscores.
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju action parameters that have a matching field in the class are
+        passed as arguments.
+
+        For example::
+
+            class BackupParams(pydantic.BaseModel):
+                filename: str
+
+            def _on_do_backup(self, event: ops.ActionEvent):
+                params = event.load_params(BackupParams)
+                # params.filename contains the value passed by the Juju user.
+
+        Any additional positional or keyword arguments will be passed through to
+        the action class ``__init__``.
+
+        Args:
+            cls: A class that will accept the Juju parameters as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            errors: what to do if the parameters are invalid. If ``fail``, this
+                will set the action to failed with an appropriate message and
+                then immediately exit. If ``raise``, ``load_params`` will not
+                catch any exceptions, leaving the charm to handle errors.
+            args: positional arguments to pass through to the action class.
+            kwargs: keyword arguments to pass through to the action class.
+
+        Returns:
+            An instance of the action class that was provided in the ``cls``
+            argument with the provided parameter values.
+
+        Raises:
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                action class raises a ValueError.
+        """
+        try:
+            fields = _juju_fields(cls)
+        except ValueError:
+            fields = None
+        params: dict[str, Any] = kwargs.copy()
+        for key, value in sorted(self.params.items()):
+            attr = key.replace('-', '_')
+            if fields is None:
+                params[attr] = value
+            else:
+                if attr not in fields:
+                    continue
+                params[fields[attr]] = value
+        try:
+            return cls(*args, **params)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            self.fail(f'Error in action parameters: {e}')
+            from ._main import _Abort
+
+            raise _Abort(0) from e
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
@@ -1484,7 +1552,7 @@ class CharmBase(Object):
 
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         try:
-            fields = set(_juju_option_names(cls))
+            fields = set(_juju_fields(cls))
         except ValueError:
             fields = None
         for key, value in self.config.items():
@@ -1516,28 +1584,6 @@ class CharmBase(Object):
             raise _Abort(0) from e
 
 
-def _juju_option_names(cls: type[object]) -> Generator[str]:
-    """Iterates over all the option names to include in the config YAML.
-
-    Raises:
-        ValueError: if unable to determine which fields to include
-    """
-    # Dataclasses:
-    try:
-        fields = [field.name for field in dataclasses.fields(cls)]  # type: ignore
-    except TypeError:
-        pass
-    else:
-        yield from sorted(fields)
-        return
-    # Pydantic models:
-    if hasattr(cls, 'model_fields'):
-        yield from sorted(cls.model_fields)  # type: ignore
-        return
-    # It's not clear, so give up.
-    raise ValueError('Unable to find field list')
-
-
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
 
@@ -1553,6 +1599,49 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     unit = charm.unit
     if unit._collected_statuses:
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
+
+
+def _juju_fields(cls: type[object]) -> dict[str, str]:
+    """Iterates over all the field names to include when loading into a class.
+
+    Any Juju names that are not in the returned dictionary should not be passed to
+    the class. Names that are in the dictionary are mapped to the argument name;
+    in most cases this is the same string, but for aliases will differ.
+
+    Returns:
+        A dictionary where the key is the Juju name and the value is the name of
+        the attribute in the Python class.
+
+    Raises:
+        ValueError: if unable to determine which fields to include
+    """
+    # Dataclasses:
+    juju_to_arg: dict[str, str] = {}
+    try:
+        fields = dataclasses.fields(cls)  # type: ignore
+    except TypeError:
+        pass
+    else:
+        for field in fields:
+            alias = field.metadata.get('alias', field.name)
+            # If this a Pydantic dataclass, then it handles the alias.
+            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
+            # best here, but we don't want to import pydantic in ops, so
+            # we look more explicitly.
+            if getattr(cls, '__is_pydantic_dataclass__', False):
+                juju_to_arg[alias] = alias
+            else:
+                juju_to_arg[alias] = field.name
+        return juju_to_arg
+    # Pydantic models:
+    class_fields: dict[str, str] = {}
+    if hasattr(cls, 'model_fields'):
+        for name, field in cls.model_fields.items():  # type: ignore
+            # Pydantic takes care of the alias.
+            class_fields[field.alias or name] = field.alias or name  # type: ignore
+        return class_fields
+    # It's not clear, so give up.
+    raise ValueError('Unable to find class fields')
 
 
 class CharmMeta:
@@ -1820,12 +1909,12 @@ class CharmMeta:
         meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast('Optional[Dict[str, Any]]', yaml.safe_load(actions))
+            raw_actions = cast('dict[str, Any] | None', yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         raw_config = {}
         if config is not None:
-            raw_config = cast('Optional[Dict[str, Any]]', yaml.safe_load(config))
+            raw_config = cast('dict[str, Any] | None', yaml.safe_load(config))
             if raw_config is None:
                 raw_config = {}
         return cls(meta, raw_actions, raw_config)
