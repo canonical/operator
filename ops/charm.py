@@ -1324,7 +1324,7 @@ class CharmEvents(ObjectEvents):
     """
 
 
-_ConfigType = TypeVar('_ConfigType')
+_T = TypeVar('_T')
 
 
 class CharmBase(Object):
@@ -1424,11 +1424,11 @@ class CharmBase(Object):
 
     def load_config(
         self,
-        cls: type[_ConfigType],
+        cls: type[_T],
         *args: Any,
         errors: Literal['raise', 'blocked'] = 'raise',
         **kwargs: Any,
-    ) -> _ConfigType:
+    ) -> _T:
         """Load the config into an instance of a config class.
 
         The raw Juju config is passed to the config class's ``__init__``, as
@@ -1473,7 +1473,8 @@ class CharmBase(Object):
             kwargs: keyword arguments to pass through to the config class.
 
         Returns:
-            An instance of the config class with the current config values.
+            An instance of the config class that was passed in the ``cls`` argument
+            with the current config values.
 
         Raises:
             ValueError: if the configuration is invalid and ``errors`` is set to
