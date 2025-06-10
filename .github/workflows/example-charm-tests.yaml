@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  test-tutorial-k8s:
+  charm-unit-tests:
     runs-on: ubuntu-latest
 
     strategy:
