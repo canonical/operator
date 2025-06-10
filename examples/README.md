@@ -2,7 +2,7 @@ This directory contains charms that are used as examples in the Ops documentatio
 
 Contents:
 
-- [httpbin-demo](httpbin-demo) - A Kubernetes charm for [kennethreitz/httpbin](https://github.com/kennethreitz/httpbin) that demonstrates how to restart the workload when a configutation option changes. to try the charm:
+- [httpbin-demo](httpbin-demo) - A Kubernetes charm for [kennethreitz/httpbin](https://github.com/kennethreitz/httpbin) that demonstrates how to restart the workload when a configuration option changes. to try the charm:
 
     ```
     charmcraft pack
