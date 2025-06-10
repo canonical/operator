@@ -222,14 +222,12 @@ multiple stages.
 
 > See more: {ref}`manage-interfaces`
 
-If the library is implementing an existing interface, find the schema and
-details of the processes by which relation data is added on Charmhub in the
-integrations tabs, or by navigating to `https://charmhub.io/integrations/{integration-name}`.
-Alternatively, the interface details can be found in the
+If the library is implementing an existing interface, find the interface documentation by following links from the Integrations tab on Charmhub, or by navigating to `https://charmhub.io/integrations/{integration-name}`.
+Alternatively, the interface documentation can be found in the
 [charm-relation-interfaces](https://github.com/canonical/charm-relation-interfaces)
 repository.
 
-In the documentation for the interface, find the description of the various
+In the interface documentation, find the description of the various
 databags. For example, for
 [v2 of the `tracing` interface](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/tracing/v2/README.md):
 
