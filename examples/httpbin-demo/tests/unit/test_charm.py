@@ -1,19 +1,28 @@
-# Copyright 2025 david.wilding@canonical.com
-# See LICENSE file for licensing details.
+# Copyright 2025 Canonical Ltd.
 #
-# Learn more about testing at: https://juju.is/docs/sdk/testing
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from charm import HttpbinDemoCharm
 
 import ops
 import ops.pebble
 from ops import testing
 
-from charm import HttpbinDemoCharm
-
 
 def test_httpbin_pebble_ready():
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container("httpbin", can_connect=True)
+    container = testing.Container('httpbin', can_connect=True)
     state_in = testing.State(containers={container})
 
     # Act:
@@ -22,19 +31,19 @@ def test_httpbin_pebble_ready():
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     expected_plan = {
-        "services": {
-            "httpbin": {
-                "override": "replace",
-                "summary": "httpbin",
-                "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                "startup": "enabled",
-                "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
+        'services': {
+            'httpbin': {
+                'override': 'replace',
+                'summary': 'httpbin',
+                'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
+                'startup': 'enabled',
+                'environment': {'GUNICORN_CMD_ARGS': '--log-level info'},
             }
         },
     }
     assert expected_plan == updated_plan
     assert (
-        state_out.get_container(container.name).service_statuses["httpbin"]
+        state_out.get_container(container.name).service_statuses['httpbin']
         == ops.pebble.ServiceStatus.ACTIVE
     )
     assert state_out.unit_status == testing.ActiveStatus()
@@ -44,10 +53,10 @@ def test_config_changed_valid_can_connect():
     """Test a config-changed event when the config is valid and the container can be reached."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)  # The default config will be read from charmcraft.yaml
-    container = testing.Container("httpbin", can_connect=True)
+    container = testing.Container('httpbin', can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={"log-level": "debug"},  # This is the config the charmer passed with `juju config`
+        config={'log-level': 'debug'},  # This is the config the charmer passed with `juju config`
     )
 
     # Act:
@@ -55,8 +64,8 @@ def test_config_changed_valid_can_connect():
 
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
-    gunicorn_args = updated_plan.services["httpbin"].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
+    gunicorn_args = updated_plan.services['httpbin'].environment['GUNICORN_CMD_ARGS']
+    assert gunicorn_args == '--log-level debug'
     assert state_out.unit_status == testing.ActiveStatus()
 
 
@@ -68,8 +77,8 @@ def test_config_changed_valid_cannot_connect():
     """
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container("httpbin", can_connect=False)
-    state_in = testing.State(containers={container}, config={"log-level": "debug"})
+    container = testing.Container('httpbin', can_connect=False)
+    state_in = testing.State(containers={container}, config={'log-level': 'debug'})
 
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -82,9 +91,9 @@ def test_config_changed_invalid():
     """Test a config-changed event when the config is invalid."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container("httpbin", can_connect=True)
-    invalid_level = "foobar"
-    state_in = testing.State(containers={container}, config={"log-level": invalid_level})
+    container = testing.Container('httpbin', can_connect=True)
+    invalid_level = 'foobar'
+    state_in = testing.State(containers={container}, config={'log-level': invalid_level})
 
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
