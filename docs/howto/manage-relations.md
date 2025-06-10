@@ -115,7 +115,7 @@ The event object that is passed to the handler has a `relation` property, which 
 
 > See more: [](ops.RelationCreatedEvent)
 
-To do additional setup work when each unit joins the relation (both when the charms are first integrated and when additional units are added to the charm), your charm will need to observe the `relation-joined` event. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-joined` event observers for the relevant relations and pair those with an event handler. For example:
+To do additional setup work when each unit joins the relation (both when the charms are first integrated and when additional units are added to the charm), your charm will need to observe the `relation-joined` event. For example, to provide SMTP credentials to each unit that joins the `smtp` relation: in the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-joined` event observers for the relevant relations and pair those with an event handler. For example:
 
 ```python
 framework.observe(self.on.smtp_relation_joined, self._on_smtp_relation_joined)
