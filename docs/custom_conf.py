@@ -342,7 +342,6 @@ nitpick_ignore = [
     ('py:class', 'IdentityDict'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
-    ('py:class', 'ops.charm._ActionType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
     ('py:class', 'ops.charm._T'),
     ('py:class', 'ops.model._AddressDict'),

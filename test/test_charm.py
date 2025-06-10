@@ -1349,7 +1349,7 @@ class MyConfig:
             self.my_secret = my_secret
 
 
-class BaseTestCharm(ops.CharmBase):
+class BaseTestConfigCharm(ops.CharmBase):
     _config_errors: typing.Literal['blocked', 'raise'] | None = None
 
     def __init__(self, framework: ops.Framework):
@@ -1374,7 +1374,7 @@ class BaseTestCharm(ops.CharmBase):
         raise NotImplementedError
 
 
-class MyCharm(BaseTestCharm):
+class _MyConfigCharm(BaseTestConfigCharm):
     @property
     def config_class(self) -> type[_ConfigProtocol]:
         return MyConfig
@@ -1395,13 +1395,13 @@ class MyDataclassConfig:
             raise ValueError('my_int must be zero or positive')
 
 
-class MyDataclassCharm(BaseTestCharm):
+class _MyDataclassConfigCharm(BaseTestConfigCharm):
     @property
     def config_class(self) -> type[_ConfigProtocol]:
         return MyDataclassConfig
 
 
-_test_classes: list[type[BaseTestCharm]] = [MyCharm, MyDataclassCharm]
+_test_config_classes: list[type[BaseTestConfigCharm]] = [_MyConfigCharm, _MyDataclassConfigCharm]
 
 if pydantic:
 
@@ -1420,7 +1420,7 @@ if pydantic:
                 raise ValueError('my_int must be zero or positive')
             return my_int
 
-    class MyPydanticDataclassCharm(BaseTestCharm):
+    class _MyPydanticDataclassConfigCharm(BaseTestConfigCharm):
         @property
         def config_class(self) -> type[_ConfigProtocol]:
             return MyPydanticDataclassConfig
@@ -1443,12 +1443,12 @@ if pydantic:
             arbitrary_types_allowed = True
             frozen = True
 
-    class MyPydanticBaseModelCharm(BaseTestCharm):
+    class _MyPydanticBaseModelConfigCharm(BaseTestConfigCharm):
         @property
         def config_class(self) -> type[_ConfigProtocol]:
             return MyPydanticBaseModelConfig
 
-    _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
+    _test_config_classes.extend((_MyPydanticDataclassConfigCharm, _MyPydanticBaseModelConfigCharm))
 
 
 _config = """
@@ -1469,8 +1469,8 @@ options:
 """
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init(charm_class: type[BaseTestCharm], request: pytest.FixtureRequest):
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_init(charm_class: type[BaseTestConfigCharm], request: pytest.FixtureRequest):
     harness = testing.Harness(charm_class, config=_config)
     request.addfinalizer(harness.cleanup)
     harness.begin()
@@ -1485,7 +1485,7 @@ def test_config_init(charm_class: type[BaseTestCharm], request: pytest.FixtureRe
     assert typed_config.my_secret is None
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_config_classes)
 def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     harness = testing.Harness(charm_class, config=_config)
     request.addfinalizer(harness.cleanup)
@@ -1509,7 +1509,7 @@ def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pyte
     'errors,exc',
     (('raise', ValueError), ('blocked', ops._main._Abort), (None, ValueError)),
 )
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_config_classes)
 def test_config_with_error_blocked(
     charm_class: type[ops.CharmBase],
     errors: typing.Literal['blocked', 'raise'] | None,
@@ -1531,7 +1531,7 @@ def test_config_with_error_blocked(
         assert 'my_int must be zero or positive' in status_dict['message']
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_config_classes)
 def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
     harness = testing.Harness(charm_class, config=_config)
     request.addfinalizer(harness.cleanup)
@@ -1668,7 +1668,7 @@ class MyAction:
             self.my_list = my_list
 
 
-class BaseTestCharm(ops.CharmBase):
+class BaseTestActionCharm(ops.CharmBase):
     errors: typing.Literal['fail', 'raise'] = 'fail'
 
     def __init__(self, framework: ops.Framework):
@@ -1690,7 +1690,7 @@ class BaseTestCharm(ops.CharmBase):
         event.set_results({'params': params})
 
 
-class MyCharm(BaseTestCharm):
+class _MyActionCharm(BaseTestActionCharm):
     @property
     def action_class(self) -> type[MyAction]:
         return MyAction
@@ -1711,13 +1711,13 @@ class MyDataclassAction:
             raise ValueError('my_int must be zero or positive')
 
 
-class MyDataclassCharm(BaseTestCharm):
+class _MyDataclassActionCharm(BaseTestActionCharm):
     @property
     def action_class(self) -> type[MyDataclassAction]:
         return MyDataclassAction
 
 
-_test_classes: list[type[ops.CharmBase]] = [MyCharm, MyDataclassCharm]
+_test_action_classes: list[type[ops.CharmBase]] = [_MyActionCharm, _MyDataclassActionCharm]
 
 if pydantic:
 
@@ -1736,7 +1736,7 @@ if pydantic:
                 raise ValueError('my_int must be zero or positive')
             return my_int
 
-    class MyPydanticDataclassCharm(BaseTestCharm):
+    class _MyPydanticDataclassActionCharm(BaseTestActionCharm):
         @property
         def action_class(self) -> type[MyPydanticDataclassAction]:
             return MyPydanticDataclassAction
@@ -1750,17 +1750,17 @@ if pydantic:
 
         model_config = pydantic.ConfigDict(frozen=True)
 
-    class MyPydanticBaseModelCharm(BaseTestCharm):
+    class _MyPydanticBaseModelActionCharm(BaseTestActionCharm):
         @property
         def action_class(self) -> type[MyPydanticBaseModelAction]:
             return MyPydanticBaseModelAction
 
-    _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
+    _test_action_classes.extend((_MyPydanticDataclassActionCharm, _MyPydanticBaseModelActionCharm))
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_action_classes)
 def test_action_init(
-    charm_class: type[BaseTestCharm],
+    charm_class: type[BaseTestActionCharm],
     request: pytest.FixtureRequest,
 ):
     action_yaml = """
@@ -1795,9 +1795,9 @@ my-action:
     assert isinstance(params_out.my_list, list)
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_action_classes)
 def test_action_init_non_default(
-    charm_class: type[BaseTestCharm],
+    charm_class: type[BaseTestActionCharm],
     request: pytest.FixtureRequest,
 ):
     action_yaml = """
@@ -1835,9 +1835,9 @@ my-action:
     assert params_out.my_list == ['a', 'b', 'c']
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_action_classes)
 def test_action_with_error_fail(
-    charm_class: type[BaseTestCharm],
+    charm_class: type[BaseTestActionCharm],
     request: pytest.FixtureRequest,
 ):
     action_yaml = """
@@ -1860,9 +1860,9 @@ my-action:
     assert harness._backend._running_action.failure_message
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
+@pytest.mark.parametrize('charm_class', _test_action_classes)
 def test_action_with_error_raise(
-    charm_class: type[BaseTestCharm],
+    charm_class: type[BaseTestActionCharm],
     request: pytest.FixtureRequest,
 ):
     class RaiseCharm(charm_class):
