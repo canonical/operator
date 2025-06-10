@@ -82,7 +82,7 @@ If you are developing your own interface - most commonly for charm-specific peer
 
 To do initial setup work when a charm is first integrated with another charm (or, in the case of a peer relation, when a charm is first deployed) your charm will need to observe the relation-created event. For example, a charm providing a database relation might need to create the database and credentials, so that the requirer charm can use the database.
 
-In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-created` event observers for the relevant relations and pair those with an event handler.
+In the `src/charm.py` file of the charm that's providing the relation, in the `__init__` function, set up `relation-created` event observers for the relevant relations and pair those with an event handler.
 
 The name of the event to observe is combined with the name of the endpoint. With an endpoint named "db", to observe `relation-created`, our code would look like:
 
