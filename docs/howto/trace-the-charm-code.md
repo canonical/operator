@@ -62,8 +62,6 @@ a charm named `my-charm`, assuming that
 [Charmed Tempo HA](https://discourse.charmhub.io/t/charmed-tempo-ha/15531) has already been
 deployed:
 
-TODO: what are the actual names for tempo's tracing and certificate_transfer?
-
 ```bash
 juju deploy my-charm
 juju integrate my-charm tempo
