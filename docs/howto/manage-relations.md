@@ -259,19 +259,65 @@ def _on_db_relation_broken(self, event: ops.RelationBrokenEvent):
 
 ### Write unit tests
 
-For each relation event that your charm observes, write at least one test. Create a `Relation` object that defines the relation, include that in the input state, run the relation event, and assert that the output state is what you’d expect. For example:
+For each relation event that your charm observes, write at least one test.
+Create a `Relation` object that defines the relation, include that in the input
+state, run the relation event, and assert that the output state is what you'd
+expect. For example:
 
 ```python
 from ops import testing
 
 ctx = testing.Context(MyCharm)
 relation = testing.Relation(endpoint='smtp', remote_units_data={1: {}})
-state_in = testing.State(relations=[relation])
+state_in = testing.State(relations={relation})
 state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit_id=1), state=state_in)
 assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
 ```
 
 > See more: [Scenario Relations](ops.testing.RelationBase)
+
+To declare a peer relation, you should use [](ops.testing.PeerRelation). The
+core difference with regular relations is that peer relations do not have a
+"remote app" (it's this app, in fact). So unlike `Relation`, a `PeerRelation`
+does not have `remote_app_name` or `remote_app_data` arguments. Also, it talks
+in terms of `peers`:
+
+- `Relation.remote_units_data` maps to `PeerRelation.peers_data`
+
+```python
+relation = testing.PeerRelation(
+    endpoint='peers',
+    peers_data={1: {}, 2: {}, 42: {'foo': 'bar'}},
+)
+```
+
+Be mindful when using `PeerRelation` not to include the current unit's ID in
+`peers_data` or `peers_ids`. To mock the current unit's peer data, set it in
+`local_unit_data` as with other relation types.
+
+To declare a subordinate relation, you should use
+[](ops.testing.SubordinateRelation). The core difference with regular relations
+is that subordinate relations always have exactly one remote unit. Because of
+that, `SubordinateRelation`, compared to `Relation`, always talks in terms of
+`remote`:
+
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data`
+  taking a single `dict[str:str]`. The remote unit ID can be provided as a
+  separate argument.
+- `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id`
+  (a single ID instead of a list of IDs)
+- `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data`
+  (a single databag instead of a mapping from unit IDs to databags)
+
+```python
+relation = testing.SubordinateRelation(
+    endpoint='peers',
+    remote_unit_data={'foo': 'bar'},
+    remote_app_name='zookeeper',
+    remote_unit_id=42
+)
+relation.remote_unit_name  # 'zookeeper/42'
+```
 
 ### Write integration tests
 
