@@ -178,7 +178,7 @@ def _update_configuration(self, _: ops.Eventbase):
     # This handles secret-changed and relation-changed.
     db_relation = self.model.get_relation('db')
     if not db_relation:
-        # We’re not integrated with the database charm yet.
+        # We're not integrated with the database charm yet.
         return
     data = db_relation.load(DatabaseProviderAppData, self.app)
     secret_id = data.credentials
