@@ -89,6 +89,9 @@ class MyDatabag:
 
 
 class BaseTestCharm(ops.CharmBase):
+    encoder: Callable[[Any], str] | None = None
+    decoder: Callable[[str], Any] | None = None
+
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
@@ -99,9 +102,6 @@ class BaseTestCharm(ops.CharmBase):
     @property
     def databag_class(self) -> type[DatabagProtocol]:
         raise NotImplementedError('databag_class must be set in the subclass')
-
-    encoder: Callable[[Any], str] | None = None
-    decoder: Callable[[str], Any] | None = None
 
 
 class NestedEncoder(json.JSONEncoder):
@@ -122,12 +122,12 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 
 class MyCharm(BaseTestCharm):
+    encoder = nested_encode
+    decoder = nested_decode
+
     @property
     def databag_class(self) -> type[DatabagProtocol]:
         return MyDatabag
-
-    encoder: Callable[[Any], str] | None = nested_encode
-    decoder: Callable[[str], Any] | None = nested_decode
 
 
 @dataclasses.dataclass
@@ -583,12 +583,12 @@ class CommonTypesProtocol(Protocol):
 
 
 class BaseTestCharmCommonTypes(ops.CharmBase):
+    encoder: Callable[[Any], str] | None = None
+    decoder: Callable[[Any], str] | None = None
+
     @property
     def databag_class(self) -> type[CommonTypesProtocol]:
         raise NotImplementedError('databag_class must be set in the subclass')
-
-    encoder: Callable[[Any], str] | None = None
-    decoder: Callable[[Any], str] | None = None
 
 
 class _CommonTypesData:
@@ -646,12 +646,10 @@ class CommonTypes(BaseTestCharmCommonTypes):
         return _CommonTypesData
 
     @staticmethod
-    def _str_encoder(x: Any) -> str:
+    def encoder(x: Any) -> str:
         if isinstance(x, Country):
             return json.dumps(x.value)
         return json.dumps(str(x))
-
-    encoder: Callable[[Any], str] | None = _str_encoder
 
 
 class IPJSONEncoder(json.JSONEncoder):
@@ -740,12 +738,12 @@ class _CommonTypesDataclass:
 
 
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
+    encoder = json_ip_encode
+    decoder = json_ip_decode
+
     @property
     def databag_class(self):
         return _CommonTypesDataclass
-
-    encoder: Callable[[Any], str] | None = json_ip_encode
-    decoder: Callable[[str], Any] | None = json_ip_decode
 
 
 _common_types_classes: list[type[ops.CharmBase]] = [CommonTypes, CommonTypesDataclasses]
@@ -760,11 +758,11 @@ if pydantic:
         origin: Country
 
     class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
+        encoder = json_ip_encode
+
         @property
         def databag_class(self):
             return _DataPydanticDataclass
-
-        encoder: Callable[[Any], str] | None = json_ip_encode
 
     class _DataBaseModel(pydantic.BaseModel):
         url: pydantic.AnyHttpUrl  # type: ignore
