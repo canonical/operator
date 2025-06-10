@@ -299,8 +299,8 @@ Ops defaults to transparently serialising each field to and from JSON, so you
 do not need to wrap each field in `pydantic.Json`.
 ```
 
-In your `src/charm.py`, use the class you created to load and save data from the
-relation.
+In your `src/charm.py` file, use the class you created to load and save data from the
+relation:
 
 ```python
 receiver_protocol_to_transport_protocol: dict[str, TransportProtocolType] = {
