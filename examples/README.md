@@ -6,7 +6,7 @@ Contents:
 
     ```
     charmcraft pack
-    juju deploy ./httpbin-demo-24.04-amd64.charm --resource httpbin-image=kennethreitz/httpbin
+    juju deploy ./httpbin-demo_ubuntu-22.04-amd64.charm --resource httpbin-image=kennethreitz/httpbin
     ```
 
 - [k8s-1-minimal](k8s-1-minimal) - The charm constructed in [Create a minimal Kubernetes charm](https://ops.readthedocs.io/en/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html). This charm is a minimal Kubernetes charm for a demo web server.
