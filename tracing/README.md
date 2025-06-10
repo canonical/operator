@@ -26,7 +26,7 @@ You’ll find setup instructions, usage examples, and best practices for leverag
 
 ## Community and Support
 
-- **Matrix Chat**: [Ops Library Development](https://matrix.to/#/#charmhub-ops:ubuntu.com)
+- **Matrix Chat**: [Charm Tech](https://matrix.to/#/#charmhub-ops:ubuntu.com)
 - **Forum**: [Charmhub - Discuss Python operator development](https://discourse.charmhub.io/)
 - **Issue Tracker**: See [GitHub issues](https://github.com/canonical/ops/issues)
 - **Further Links**: See the [ops PyPI page](https://pypi.org/project/ops/)

@@ -7329,3 +7329,75 @@ def test_scenario_available():
     ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
     state = ctx.run(ctx.on.start(), ops.testing.State())
     assert isinstance(state.unit_status, ops.testing.UnknownStatus)
+
+
+@pytest.mark.parametrize('test_context', ['init', 'event'])
+@pytest.mark.parametrize(
+    'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
+)
+def test_relation_validates_access(
+    request: pytest.FixtureRequest, is_leader: bool, test_context: str
+):
+    """Test that relation databag read/write access in __init__ is the same as in observers."""
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['my-act'].action, self._on_action)
+            self.validated = 0
+            self.test_validation('init')
+
+        def _on_action(self, action: ops.ActionEvent):
+            self.test_validation('event')
+
+        def test_validation(self, context: str):
+            if context != test_context:
+                return
+            self.validated += 1
+            rel = self.model.get_relation('my-rel')
+            assert rel is not None
+
+            # remote application databag
+            # any unit can read the remote application databag
+            remote_app_data = rel.data[rel.app]
+            assert remote_app_data['k'] == 'remote val'
+            assert len(remote_app_data.items()) == 1
+            # no unit can write to the remote application databag
+            with pytest.raises(ops.RelationDataAccessError):
+                remote_app_data['k'] = 'something'
+
+            # local application databag
+            local_app_data = rel.data[self.app]
+            # only the leader can read or write the local application databag
+            if self.unit.is_leader():
+                assert local_app_data['k'] == 'local val'  # test read
+                local_app_data['k'] = 'new val'  # test write
+            else:
+                with pytest.raises(ops.RelationDataAccessError):
+                    local_app_data['k']
+            # these probably fail at real runtime with a ModelError
+            # but pass here because the validation methods are only hooked up to get/set
+            assert len(local_app_data.items()) == 1
+            assert 'k' in local_app_data
+
+    harness = ops.testing.Harness(
+        Charm,
+        meta="""
+name: my-charm
+requires:
+  my-rel:
+    interface: my-face
+""",
+        actions="""
+my-act:
+""",
+    )
+    request.addfinalizer(harness.cleanup)
+    # create relation and setup remote application databag
+    rid = harness.add_relation('my-rel', remote_app='remote', app_data={'k': 'remote val'})
+    # setup local application databag
+    harness.update_relation_data(rid, 'my-charm', {'k': 'local val'})
+    harness.set_leader(is_leader)
+    harness.begin()  # run Charm.__init__
+    harness.run_action('my-act')  # run Charm._on_action
+    assert harness.charm.validated
