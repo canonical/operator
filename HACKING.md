@@ -170,6 +170,10 @@ is automatically generated from Python docstrings.
 
 For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
 
+Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html) instead of legacy [ops.testing.Harness](https://ops.readthedocs.io/en/latest/reference/ops-testing-harness.html) tests.
+
+Tests should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
+
 Pull requests should have a short title that follows the
 [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
 
@@ -370,7 +374,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
 11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
    used for docs (in case dependencies have been updated in `pyproject.toml`)
-   using the same Python version as specified in the `.readthedocs.yaml` file.
+   using the same Python version as specified in the `docs/.readthedocs.yaml` file.
 12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
    and doc requirement bumps into main (and get it merged).
 13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
