@@ -280,12 +280,6 @@ class _AliasProtocol(Protocol):
 
 
 class _Alias:  # noqa: B903
-    other: str
-
-    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
-        self.foo_bar = fooBar
-        self.other = other
-
     # This is pretty quirky, but we need `fooBar` to be in the type annotations
     # and we need it to return the value of `foo_bar` to correctly save back to
     # Juju. Other than being ugly to look at, this means that the class offers
@@ -294,6 +288,12 @@ class _Alias:  # noqa: B903
     # We have this here so that we can still have the standard set of four
     # classes being tested.
     fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # noqa: N815
+
+    other: str
+
+    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+        self.foo_bar = fooBar
+        self.other = other
 
 
 @dataclasses.dataclass
