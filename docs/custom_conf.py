@@ -343,6 +343,7 @@ nitpick_ignore = [
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
+    ('py:class', 'ops.charm._T'),
     ('py:class', 'ops.model._AddressDict'),
     ('py:class', 'ops.model._GenericLazyMapping'),
     ('py:class', 'ops.model._ModelBackend'),

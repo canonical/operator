@@ -135,13 +135,19 @@ class Model:
         meta: _charm.CharmMeta,
         backend: _ModelBackend,
         broken_relation_id: int | None = None,
+        remote_unit_name: str | None = None,
     ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: dict[str, _charm.RelationMeta] = meta.relations
         self._relations = RelationMapping(
-            relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
+            relations,
+            self.unit,
+            self._backend,
+            self._cache,
+            broken_relation_id=broken_relation_id,
+            _remote_unit=self._cache.get(Unit, remote_unit_name) if remote_unit_name else None,
         )
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
@@ -915,12 +921,14 @@ class RelationMapping(Mapping[str, List['Relation']]):
         backend: _ModelBackend,
         cache: _ModelCache,
         broken_relation_id: int | None,
+        _remote_unit: Unit | None = None,
     ):
         self._peers: set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
+        self._remote_unit = _remote_unit
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
@@ -944,7 +952,13 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 if rid == self._broken_relation_id:
                     continue
                 relation = Relation(
-                    relation_name, rid, is_peer, self._our_unit, self._backend, self._cache
+                    relation_name,
+                    rid,
+                    is_peer,
+                    self._our_unit,
+                    self._backend,
+                    self._cache,
+                    _remote_unit=self._remote_unit,
                 )
                 relation_list.append(relation)
         return relation_list
@@ -979,6 +993,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                     self._backend,
                     self._cache,
                     active=False,
+                    _remote_unit=self._remote_unit,
                 )
         relations = self[relation_name]
         num_related = len(relations)
@@ -1712,6 +1727,8 @@ class Relation:
     ``relation-broken`` event associated with this relation.
     """
 
+    _remote_unit: Unit | None
+
     def __init__(
         self,
         relation_name: str,
@@ -1721,6 +1738,7 @@ class Relation:
         backend: _ModelBackend,
         cache: _ModelCache,
         active: bool = True,
+        _remote_unit: Unit | None = None,
     ):
         self.name = relation_name
         self.id = relation_id
@@ -1742,6 +1760,11 @@ class Relation:
         except RelationNotFoundError:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
+
+        # In relation-departed `relation-list` doesn't include the remote unit,
+        # but the data should still be available.
+        if _remote_unit is not None:
+            self.units.add(_remote_unit)
 
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
@@ -2790,12 +2813,14 @@ class Container:
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
-            user_id: User ID (UID) for file.
-            user: Username for file. User's UID must match user_id if both are
-                specified.
-            group_id: Group ID (GID) for file.
-            group: Group name for file. Group's GID must match group_id if
-                both are specified.
+            user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
+            user: Username for file. User's UID must match ``user_id`` if both are
+                specified. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
+            group_id: Group ID (GID) for file. May only be specified with ``user_id`` or ``user``.
+            group: Group name for file. Group's GID must match ``group_id`` if
+                both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.push(
             str(path),
@@ -3120,12 +3145,15 @@ class Container:
             make_parents: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
-            user_id: User ID (UID) for directory.
-            user: Username for directory. User's UID must match user_id if
-                both are specified.
+            user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
+                is provided, the group is set to the user's default group.
+            user: Username for directory. User's UID must match ``user_id`` if
+                both are specified. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
             group_id: Group ID (GID) for directory.
-            group: Group name for directory. Group's GID must match group_id
-                if both are specified.
+                May only be specified with ``user_id`` or ``user``.
+            group: Group name for directory. Group's GID must match ``group_id``
+                if both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.make_dir(
             str(path),
