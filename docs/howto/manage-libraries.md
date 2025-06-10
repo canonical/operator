@@ -212,10 +212,10 @@ def test_ready_event():
 
 ### Write a library that manages a relation interface
 
-First, for a new interface, design the interface and the process related charms
+First, for a new interface, design the interface and the process that related charms
 will use to populate the relation data. In the simplest case, the providing
 charm might populate the local app data when the relation is created, but a
-conversation between the charms is more common, where the requiring charm will
+conversation between the charms is more common. In a conversation, the requiring charm will
 populate its local data with a request, and the providing charm will use that to
 provide a suitable response. In more complex cases, this conversation might have
 multiple stages.
