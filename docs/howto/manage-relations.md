@@ -183,7 +183,7 @@ def _update_configuration(self, _: ops.Eventbase):
     data = db_relation.load(DatabaseProviderAppData, self.app)
     secret_id = data.credentials
     if not secret_id:
-        # The credentials haven’t been added to the relation by the remote app yet.
+        # The credentials haven't been added to the relation by the remote app yet.
         return
     secret_contents = self.model.get_secret(id=secret_id).get_contents(refresh=True)
     self.push_configuration(
