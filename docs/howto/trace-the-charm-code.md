@@ -12,8 +12,8 @@ options, and API details.
 
 To enable basic tracing:
 
-- In your charm's `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
-- In your `charmcraft.yaml`, declare the tracing and (optionally) ca relations, for example:
+- In `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
+- In `charmcraft.yaml`, declare the tracing and (optionally) certificate_transfer relations, for example:
 
 ```yaml
 requires:
