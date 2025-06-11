@@ -13,7 +13,7 @@ options, and API details.
 To enable basic tracing:
 
 - In `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
-- In `charmcraft.yaml`, declare the tracing and (optionally) certificate_transfer relations, for example:
+- In `charmcraft.yaml`, declare the relations for tracing and (optionally) certificate_transfer interfaces, for example:
 
 ```yaml
 requires:
@@ -99,15 +99,12 @@ tracer = opentelemetry.trace.get_tracer(__name__)
 class Workload:
     ...
     def migrate_db(self):
-        with tracer.start_as_current_span('migrate-db'):
+        with tracer.start_as_current_span('migrate-db') as span:
             for attempt in range(3):
                 try:
-                    subprocess.run('/path/to/migrate.sh', capture_output=True, check=True)
+                    subprocess.check_output('/path/to/migrate.sh')
                 except subprocess.CalledProcessError:
-                    opentelemetry.trace.get_current_span().add_event(
-                        'db-migrate-failed',
-                        {'attempt': attempt},
-                    )
+                    span.add_event('db-migrate-failed', {'attempt': attempt})
                     time.sleep(10 ** attempt)
                 else:
                     break
