@@ -2772,7 +2772,9 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
-    def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend):
+    def test_relation_tool_errors(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend
+    ):
         monkeypatch.setattr(
             backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.8.0'})
         )
@@ -2839,7 +2841,8 @@ class TestModelBackend:
     def test_relation_get_juju_version_quirks(
         self,
         fake_script: FakeScript,
-        monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        backend: _ModelBackend,
         version: str,
     ):
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
@@ -2865,7 +2868,8 @@ class TestModelBackend:
     def test_relation_set_juju_version_quirks(
         self,
         fake_script: FakeScript,
-        monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        backend: _ModelBackend,
         version: str,
     ):
         # on 2.7.0+, things proceed as expected
@@ -3203,7 +3207,9 @@ class TestModelBackend:
         backend.application_version_set('1.2b3')
         assert fake_script.calls() == [['application-version-set', '--', '1.2b3']]
 
-    def test_application_version_set_invalid(self, fake_script: FakeScript, backend: _ModelBackend):
+    def test_application_version_set_invalid(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
         fake_script.write('application-version-set', 'exit 0')
         with pytest.raises(TypeError):
             backend.application_version_set(2)  # type: ignore
@@ -3307,15 +3313,19 @@ class TestModelBackend:
             with pytest.raises(ops.ModelError):
                 backend.add_metrics(metrics, labels)
 
-    def test_relation_remote_app_name_env(self, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend):
+    def test_relation_remote_app_name_env(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv('JUJU_VERSION', '0.0.0')
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(5) == 'remoteapp1'
+
         monkeypatch.setenv('JUJU_RELATION_ID', '5')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
-            self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend
     ):
         # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
         fake_script.write(
@@ -3342,7 +3352,9 @@ echo '"remoteapp2"'
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:6')
         assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
-    def test_relation_remote_app_name_script_errors(self, fake_script: FakeScript, backend: _ModelBackend):
+    def test_relation_remote_app_name_script_errors(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
         fake_script.write(
             'relation-list',
             r"""
