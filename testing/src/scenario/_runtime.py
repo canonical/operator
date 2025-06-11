@@ -435,7 +435,9 @@ def capture_events(
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit
 
-    yield captured
-
-    Framework._emit = _real_emit
-    Framework.reemit = _real_reemit
+    # A finally block is needed here in case the code raises SystemExit or KeyboardInterrupt.
+    try:
+        yield captured
+    finally:
+        Framework._emit = _real_emit
+        Framework.reemit = _real_reemit
