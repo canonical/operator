@@ -1439,9 +1439,7 @@ if pydantic:
                 raise ValueError('my_int must be zero or positive')
             return my_int
 
-        class Config:
-            arbitrary_types_allowed = True
-            frozen = True
+        model_config = pydantic.ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     class _MyPydanticBaseModelConfigCharm(BaseTestConfigCharm):
         @property
