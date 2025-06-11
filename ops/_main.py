@@ -25,6 +25,8 @@ import warnings
 from pathlib import Path
 from typing import Any, Union, cast
 
+import opentelemetry.trace
+
 from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
@@ -445,6 +447,12 @@ class _Manager:
 
         args, kwargs = self._get_event_args(event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
+        # If tracing is set up, log the trace id so that tools like jhack can pick it up.
+        # If tracing is not set up, span is non-recording and trace is zero.
+        trace_id = opentelemetry.trace.get_current_span().get_span_context().trace_id
+        if trace_id:
+            # Note that https://github.com/canonical/jhack depends on exact string format.
+            logger.debug("Starting root trace with id='%s'.", hex(trace_id)[2:])
         event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):
