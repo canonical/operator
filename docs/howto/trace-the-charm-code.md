@@ -5,7 +5,7 @@
 `ops.tracing.Tracing`, allowing you to observe and instrument your charm's
 execution using OpenTelemetry.
 
-Refer to the `ops.tracing` reference for the canonical usage example, configuration
+Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
 options, and API details.
 
 ## Getting started
@@ -27,7 +27,7 @@ requires:
     optional: true
 ```
 
-- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object, for example:
+- In your charm's `__init__` method, instantiate the `ops.tracing.Tracing` object, for example:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -132,7 +132,7 @@ class Workload:
 - In your charm code, remove the `@trace_charm` decorator and its helpers: the
   `tracing_endpoint` and `server_cert` properties or methods.
 - In your `charmcraft.yaml`, take note of the tracing and (optionally) ca relation names.
-- In your charm class `__init__`, instantiate the `ops.tracing.Tracing(...)` object,
+- In your charm's `__init__` method, instantiate the `ops.tracing.Tracing` object,
   using the relation names from the previous step
 
 Note that the `charm_tracing` charm library auto-instruments all public functions
