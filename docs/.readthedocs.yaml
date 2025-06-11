@@ -12,4 +12,5 @@ build:
     build:
       html:
         - uv tool install tox --with tox-uv
-        - ~/.local/bin/tox -e docs
+        - uv tool update-shell
+        - tox -e docs
