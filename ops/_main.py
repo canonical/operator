@@ -451,6 +451,7 @@ class _Manager:
         # If tracing is not set up, span is non-recording and trace is zero.
         trace_id = opentelemetry.trace.get_current_span().get_span_context().trace_id
         if trace_id:
+            # Note that https://github.com/canonical/jhack depends on exact string format.
             logger.debug("Starting root trace with id='%s'.", hex(trace_id)[2:])
         event_to_emit.emit(*args, **kwargs)
 
