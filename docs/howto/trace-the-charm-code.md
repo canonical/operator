@@ -44,7 +44,7 @@ class MyCharm(ops.CharmBase):
 At this point, Ops will trace:
 - The `ops.main()` call
 - Events that Ops emits, including all the Juju events
-- Hook tools called by the charm code
+- Ops calls that inspect and update Juju (also called "hook tools")
 - Pebble API access by the charm code
 
 This provides coarse-grained tracing, focused on the boundaries between the
