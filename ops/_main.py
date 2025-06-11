@@ -446,12 +446,10 @@ class _Manager:
             return
 
         args, kwargs = self._get_event_args(event_to_emit)
-        logger.debug('Emitting Juju event %s.', event_name)
-        # If tracing is set up, log the trace id so that tools like jhack can pick it up.
-        # If tracing is not set up, span is non-recording and trace is zero.
-        trace_id = opentelemetry.trace.get_current_span().get_span_context().trace_id
-        if trace_id:
-            logger.debug("Starting root trace with id='%s'.", hex(trace_id)[2:])
+        trace_id = hex(opentelemetry.trace.get_current_span().get_span_context().trace_id)[
+            2:
+        ].rjust(32, '0')
+        logger.debug('Emitting Juju event %s, traceId: %s.', event_name, trace_id)
         event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):
