@@ -2772,12 +2772,9 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
-    def test_relation_tool_errors(
-        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend
-    ):
-        monkeypatch.setattr(
-            backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.8.0'})
-        )
+    def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv('JUJU_VERSION', '2.8.0')
+        backend = _ModelBackend('myapp/0')
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [
@@ -2842,24 +2839,21 @@ class TestModelBackend:
         self,
         fake_script: FakeScript,
         monkeypatch: pytest.MonkeyPatch,
-        backend: _ModelBackend,
         version: str,
     ):
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
-        monkeypatch.setattr(
-            backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
-        )
+        monkeypatch.setenv('JUJU_VERSION', version)
+        backend = _ModelBackend('myapp/0')
         rel_data = backend.relation_get(1, 'foo/0', is_app=True)
         assert rel_data == {'foo': 'bar'}
         calls = [' '.join(i) for i in fake_script.calls(clear=True)]
         assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
 
         # before 2.7.0, it just fails (no --app support)
-        monkeypatch.setattr(
-            backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
-        )
+        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        backend = _ModelBackend('myapp/0')
         with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
@@ -2869,7 +2863,6 @@ class TestModelBackend:
         self,
         fake_script: FakeScript,
         monkeypatch: pytest.MonkeyPatch,
-        backend: _ModelBackend,
         version: str,
     ):
         # on 2.7.0+, things proceed as expected
@@ -2881,9 +2874,8 @@ class TestModelBackend:
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()),
             )
-            monkeypatch.setattr(
-                backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
-            )
+            monkeypatch.setenv('JUJU_VERSION', version)
+            backend = _ModelBackend('myapp/0')
             backend.relation_set(1, {'foo': 'bar'}, is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
@@ -2895,9 +2887,8 @@ class TestModelBackend:
         assert decoded == 'foo: bar\n'
 
         # before 2.7.0, it just fails always (no --app support)
-        monkeypatch.setattr(
-            backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
-        )
+        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        backend = _ModelBackend('myapp/0')
         with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
             backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
@@ -3325,7 +3316,7 @@ class TestModelBackend:
         assert backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
-        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, backend: _ModelBackend
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch,
     ):
         # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
         fake_script.write(
@@ -3334,6 +3325,8 @@ class TestModelBackend:
 echo '"remoteapp2"'
 """,
         )
+        monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(1) == 'remoteapp2'
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '1', '--app', '--format=json'],
@@ -3341,15 +3334,18 @@ echo '"remoteapp2"'
 
         # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
         monkeypatch.delenv('JUJU_RELATION_ID')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # Both set, but JUJU_RELATION_ID a different relation
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:6')
+        backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
     def test_relation_remote_app_name_script_errors(
