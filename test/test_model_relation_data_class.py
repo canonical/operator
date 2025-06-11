@@ -657,7 +657,7 @@ class CommonTypes(BaseTestCharmCommonTypes):
         return json.dumps(str(x))
 
 
-class IPJSONEncoder(json.JSONEncoder):
+class _IPJSONEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
         if isinstance(
             obj,
@@ -669,8 +669,12 @@ class IPJSONEncoder(json.JSONEncoder):
             ),
         ):
             return str(obj)
-        # Not an IP, but for the tests simplest to just include it here.
-        elif isinstance(obj, Country):
+        return super().default(obj)
+
+
+class _CountryAndIPJSONEncoder(_IPJSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, Country):
             return obj.value
         return super().default(obj)
 
@@ -688,7 +692,7 @@ def json_ip_hook(dct: dict[str, Any]) -> dict[str, Any]:
     return dct
 
 
-json_ip_encode = functools.partial(json.dumps, cls=IPJSONEncoder)
+json_ip_and_country_encode = functools.partial(json.dumps, cls=_CountryAndIPJSONEncoder)
 json_ip_decode = functools.partial(json.loads, object_hook=json_ip_hook)
 
 
@@ -743,7 +747,7 @@ class _CommonTypesDataclass:
 
 
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
-    encoder = json_ip_encode
+    encoder = json_ip_and_country_encode
     decoder = json_ip_decode
 
     @property
@@ -763,7 +767,7 @@ if pydantic:
         origin: Country
 
     class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
-        encoder = json_ip_encode
+        encoder = json_ip_and_country_encode
 
         @property
         def databag_class(self):
