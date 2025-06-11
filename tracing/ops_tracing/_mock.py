@@ -38,10 +38,13 @@ def patch_tracing() -> Generator[None, None, None]:
     real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
     real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
     real_create_provider = _backend._create_provider
+    real_exporter = _backend._exporter
     _backend._create_provider = _create_provider
+    _backend._exporter = None
     try:
         yield
     finally:
+        _backend._exporter = real_exporter
         _backend._create_provider = real_create_provider
         opentelemetry.trace._TRACER_PROVIDER = real_otel_provider
         opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done = real_otel_once_done
@@ -49,7 +52,6 @@ def patch_tracing() -> Generator[None, None, None]:
 
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create an OpenTelemetry tracing provider suitable for testing."""
-    return TracerProvider(
-        resource=resource,
-        active_span_processor=SimpleSpanProcessor(InMemorySpanExporter()),  # type: ignore
-    )
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
+    return provider
