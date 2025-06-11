@@ -52,10 +52,12 @@ charm code and the external processes.
 
 When you deploy your charm, until it is integrated with an app providing the `tracing` relation
 (and optionally the `certificate_transfer` relation), the traces will be buffered in a tracing
-database on the unit. When the charm is successfully integrated with the `tracing` provider,
-the buffered traces and new traces will be sent to the tracing destination. For Kubernetes
-charms, if the container is recreated, any buffered traces will be lost. Ops will buffer traces
-for a reasonable period of time and amount of space.
+database on the unit. Ops allocates a reasonable amount of storage for the buffered traces.
+
+When the charm is successfully integrated with the `tracing` provider,
+the buffered traces and new traces will be sent to the tracing destination.
+
+For Kubernetes charms, if the container is recreated, any buffered traces will be lost.
 
 For example, to send traces to [Grafana Tempo](https://grafana.com/docs/tempo/latest/) from
 a charm named `my-charm`, assuming that
