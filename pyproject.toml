@@ -56,26 +56,14 @@ docs = [
     "sphinxcontrib-jquery",
     "sphinxext-opengraph",
 ]
-# Discussion/decision point:
-# Static analysis needs both `static` (tools) and `unit` (lib types)
-#
-# Denormalised option:
-# We could copy-paste unit into static, coverage, benchmark...
-# that would present a clear named, user-facing group names.
-#
-# Normalised option:
-# Or we could minimise repetition and require tox to use static+unit
-# that would keep groups lean and meaningful internally
 static = [
     "ops[testing,tracing]",
     "pyright==1.1.385",
+    "typing_extensions~=4.2",
 ]
 unit = [
     "ops[testing,tracing]",
-    "PyYAML==6.*",
-    "websocket-client==1.*",
     "pytest~=8.0",
-    "typing_extensions~=4.2",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
     "eval-type-backport~=0.2; python_version < \"3.10\"",
@@ -94,7 +82,7 @@ integration = [
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",
-    "build",  # TODO: switch build to uv
+    "build",  # Until #1814 and #1813 are done
 ]
 
 [project.urls]
@@ -112,7 +100,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.uv.workspace]
 members = ["tracing", "testing"]
-exclude = ["packages/seeds"]
 
 [tool.uv.sources]
 ops = { workspace = true }

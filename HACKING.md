@@ -2,13 +2,35 @@
 
 To work in the framework itself you will need Python >= 3.8. Linting, testing,
 and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/), which you should install.
-For improved performance on the tests, ensure that you have PyYAML
-installed with the correct extensions:
+[`tox`](https://tox.readthedocs.io/en/latest/).
+
+First, make sure to install [uv](https://docs.astral.sh/uv/), for example via:
+
+```sh
+sudo snap install astral-uv --classic
+```
+
+Then install `tox` with extensions, as well as a range of Python versions:
+
+```sh
+uv python install 3.8 3.10 3.11 3.12
+uv tool install tox --with tox-uv
+uv tool update-shell
+```
+
+You can validate that you have a working installation by running:
+```sh
+tox --version
+4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
+registered plugins:
+    tox-uv-1.26.0 at /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox_uv/plugin.py with uv==0.7.12
+```
+
+For improved performance on the tests, install the library that allows
+PyYAML to use C speedups:
 
 ```sh
 apt-get install libyaml-dev
-pip install --force-reinstall --no-cache-dir pyyaml
 ```
 
 # Testing
@@ -36,22 +58,17 @@ tox -e docs
 tox -e unit -- -k <pattern>
 ```
 
-For more in depth debugging, you can enter any of `tox`'s created virtualenvs
-provided they have been run at least once and do fun things - e.g. run
-`pytest` directly:
+For more in depth debugging, you the virtualenv so that you can run
+`pytest` or other tools directly:
 
 ```sh
-# Enter the linting virtualenv
-source .tox/lint/bin/activate
-
-...
-
-# Enter the unit testing virtualenv and run tests
-source .tox/unit/bin/activate
+uv sync --all-groups
+source .venv/bin/activate
 pytest
-...
-
 ```
+
+Likewise, use this virtualenv to enable Python type hints and language server if
+you use an editor from the console or specify it as interpreter path in an IDE.
 
 ## Pebble Tests
 
