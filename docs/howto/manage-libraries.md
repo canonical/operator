@@ -292,6 +292,11 @@ class TracingProviderAppData(pydantic.BaseModel):
     )
 ```
 
+```{tip}
+The Ops [](ops.Relation.load) and [](ops.Relation.save) methods serialise and deserialise the values
+of each field, and default to using JSON, so you do not need to wrap fields in `pydantic.Json`.
+```
+
 In your `src/charm.py` file, use the class you created to load and save data from the
 relation:
 
