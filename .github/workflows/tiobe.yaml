@@ -16,13 +16,11 @@ jobs:
           persist-credentials: false
 
         # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox~=4.2 coverage[toml] flake8 pylint websocket-client==1.* pyyaml==6.* pytest~=7.2 pytest-operator~=0.23 opentelemetry-api~=1.0 importlib-metadata opentelemetry-sdk~=1.30 pydantic ops-scenario ops-tracing
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb  # v6.1.0
+      - run: uv tool install tox --with tox-uv
+
       - name: Generate coverage report
-        run: |
-          tox -e coverage,coverage-tracing,coverage-report
+        run: tox -e coverage,coverage-tracing,coverage-report
 
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@009979693978bfefad2ad15c1020066694968dc7  # v3.4.0
