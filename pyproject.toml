@@ -74,6 +74,9 @@ xdist = [
 coverage = [
     "coverage[toml]~=7.0",
 ]
+benchmark = [
+    "pytest-benchmark~=5.0; python_version >= \"3.9\"",
+]
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.0",
