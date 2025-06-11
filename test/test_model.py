@@ -3316,7 +3316,9 @@ class TestModelBackend:
         assert backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
-        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch,
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
         fake_script.write(
