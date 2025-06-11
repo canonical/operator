@@ -25,7 +25,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
     List,
     Literal,
     Mapping,
@@ -33,6 +32,7 @@ from typing import (
     Optional,
     TextIO,
     TypedDict,
+    TypeVar,
     cast,
 )
 
@@ -226,6 +226,76 @@ class ActionEvent(EventBase):
             message: Optional message to record why it has failed.
         """
         self.framework.model._backend.action_fail(message)
+
+    def load_params(
+        self,
+        cls: type[_T],
+        *args: Any,
+        errors: Literal['raise', 'fail'] = 'raise',
+        **kwargs: Any,
+    ) -> _T:
+        """Load the action parameters into an instance of an action class.
+
+        The raw Juju action parameters are passed to the action class's
+        ``__init__`` method as keyword arguments, with dashes in names
+        converted to underscores.
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju action parameters that have a matching field in the class are
+        passed as arguments.
+
+        For example::
+
+            class BackupParams(pydantic.BaseModel):
+                filename: str
+
+            def _on_do_backup(self, event: ops.ActionEvent):
+                params = event.load_params(BackupParams)
+                # params.filename contains the value passed by the Juju user.
+
+        Any additional positional or keyword arguments will be passed through to
+        the action class ``__init__``.
+
+        Args:
+            cls: A class that will accept the Juju parameters as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            errors: what to do if the parameters are invalid. If ``fail``, this
+                will set the action to failed with an appropriate message and
+                then immediately exit. If ``raise``, ``load_params`` will not
+                catch any exceptions, leaving the charm to handle errors.
+            args: positional arguments to pass through to the action class.
+            kwargs: keyword arguments to pass through to the action class.
+
+        Returns:
+            An instance of the action class that was provided in the ``cls``
+            argument with the provided parameter values.
+
+        Raises:
+            ValueError: if ``errors`` is set to ``raise`` and instantiating the
+                action class raises a ValueError.
+        """
+        try:
+            fields = _juju_fields(cls)
+        except ValueError:
+            fields = None
+        params: dict[str, Any] = kwargs.copy()
+        for key, value in sorted(self.params.items()):
+            attr = key.replace('-', '_')
+            if fields is None:
+                params[attr] = value
+            else:
+                if attr not in fields:
+                    continue
+                params[fields[attr]] = value
+        try:
+            return cls(*args, **params)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            self.fail(f'Error in action parameters: {e}')
+            from ._main import _Abort
+
+            raise _Abort(0) from e
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id=} via {self.handle}>'
@@ -1322,6 +1392,9 @@ class CharmEvents(ObjectEvents):
     """
 
 
+_T = TypeVar('_T')
+
+
 class CharmBase(Object):
     """Base class that represents the charm overall.
 
@@ -1417,6 +1490,99 @@ class CharmBase(Object):
         """A mapping containing the charm's config and current values."""
         return self.model.config
 
+    def load_config(
+        self,
+        cls: type[_T],
+        *args: Any,
+        errors: Literal['raise', 'blocked'] = 'raise',
+        **kwargs: Any,
+    ) -> _T:
+        """Load the config into an instance of a config class.
+
+        The raw Juju config is passed to the config class's ``__init__``, as
+        keyword arguments, with the following changes:
+
+        * ``secret`` type options have a :class:`model.Secret` value rather
+          than the secret ID. Note that the secret object is not validated by
+          Juju at this time, so may raise :class:`SecretNotFoundError` when it
+          is used later (if the secret does not exist or the unit does not have
+          permission to access it).
+        * dashes in names are converted to underscores.
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju config that have a matching field in the class are passed as
+        arguments. Pydantic fields that have an ``alias``, or dataclasses that
+        have a ``metadata{'alias'=}``, will have the alias applied when loading.
+
+        For example::
+
+            class Config(pydantic.BaseModel):
+                # This field is called 'class' in the Juju config options.
+                workload_class: str = pydantic.Field(alias='class')
+
+            def _on_config_changed(self, event: ops.ConfigChangedEvent):
+                data = self.load_config(Config, errors='blocked')
+                # `data.workload_class` has the value of the Juju option `class`
+
+        Any additional positional or keyword arguments to this method will be
+        passed through to the config class ``__init__``.
+
+        Args:
+            cls: A class that will accept the Juju options as keyword arguments,
+                and raise ``ValueError`` if validation fails.
+            errors: what to do if the config is invalid. If ``blocked``, this
+                will set the unit status to blocked with an appropriate message
+                and then exit successfully (this informs Juju that
+                the event was handled and it will not be retried).
+                If ``raise``, ``load_config``
+                will not catch any exceptions, leaving the charm to handle
+                errors.
+            args: positional arguments to pass through to the config class.
+            kwargs: keyword arguments to pass through to the config class.
+
+        Returns:
+            An instance of the config class that was passed in the ``cls`` argument
+            with the current config values.
+
+        Raises:
+            ValueError: if the configuration is invalid and ``errors`` is set to
+                ``raise``.
+        """
+        from ._main import _Abort
+
+        config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
+        try:
+            fields = set(_juju_fields(cls))
+        except ValueError:
+            fields = None
+        for key, value in self.config.items():
+            attr = key.replace('-', '_')
+            if fields is not None and attr not in fields:
+                continue
+            option_type = self.meta.config.get(key)
+            # Convert secret IDs to secret objects. We create the object rather
+            # that using model.get_secret so that it's entirely lazy, in the
+            # same way that SecretEvent.secret is.
+            if option_type and option_type.type == 'secret':
+                assert isinstance(value, str)  # Juju will have made sure of this.
+                value = model.Secret(
+                    backend=self.model._backend,
+                    id=value,
+                    _secret_set_cache=self.model._cache._secret_set_cache,
+                )
+            config[attr] = value
+        try:
+            return cls(*args, **config)
+        except ValueError as e:
+            if errors == 'raise':
+                raise
+            # We exit with a zero code because we don't want Juju to retry
+            # (the config needs to be fixed by the Juju user), and we don't
+            # want the status we just set to be overridden by an error
+            # status.
+            self.unit.status = model.BlockedStatus(f'Invalid config: {e}')
+            raise _Abort(0) from e
+
 
 def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     """Trigger collect-status events and evaluate and set the highest-priority status.
@@ -1435,16 +1601,61 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
 
 
+def _juju_fields(cls: type[object]) -> dict[str, str]:
+    """Iterates over all the field names to include when loading into a class.
+
+    Any Juju names that are not in the returned dictionary should not be passed to
+    the class. Names that are in the dictionary are mapped to the argument name;
+    in most cases this is the same string, but for aliases will differ.
+
+    Returns:
+        A dictionary where the key is the Juju name and the value is the name of
+        the attribute in the Python class.
+
+    Raises:
+        ValueError: if unable to determine which fields to include
+    """
+    # Dataclasses:
+    juju_to_arg: dict[str, str] = {}
+    try:
+        fields = dataclasses.fields(cls)  # type: ignore
+    except TypeError:
+        pass
+    else:
+        for field in fields:
+            alias = field.metadata.get('alias', field.name)
+            # If this a Pydantic dataclass, then it handles the alias.
+            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
+            # best here, but we don't want to import pydantic in ops, so
+            # we look more explicitly.
+            if getattr(cls, '__is_pydantic_dataclass__', False):
+                juju_to_arg[alias] = alias
+            else:
+                juju_to_arg[alias] = field.name
+        return juju_to_arg
+    # Pydantic models:
+    class_fields: dict[str, str] = {}
+    if hasattr(cls, 'model_fields'):
+        for name, field in cls.model_fields.items():  # type: ignore
+            # Pydantic takes care of the alias.
+            class_fields[field.alias or name] = field.alias or name  # type: ignore
+        return class_fields
+    # It's not clear, so give up.
+    raise ValueError('Unable to find class fields')
+
+
 class CharmMeta:
     """Object containing the metadata for the charm.
 
-    This is read from ``metadata.yaml`` and ``actions.yaml``. Generally
-    charms will define this information, rather than reading it at runtime. This
-    class is mostly for the framework to understand what the charm has defined.
+    This is read from ``metadata.yaml``, ``config.yaml``, and ``actions.yaml``.
+    Generally charms will define this information, rather than reading it at
+    runtime. This class is mostly for the framework to understand what the charm
+    has defined.
 
     Args:
         raw: a mapping containing the contents of metadata.yaml
         actions_raw: a mapping containing the contents of actions.yaml
+        config_raw: a mapping containing the contents of config.yaml
     """
 
     name: str
@@ -1638,7 +1849,6 @@ class CharmMeta:
             meta = yaml.safe_load(f.read())
 
         actions = None
-
         actions_path = charm_root / 'actions.yaml'
         if actions_path.exists():
             with actions_path.open() as f:
@@ -1699,12 +1909,12 @@ class CharmMeta:
         meta = yaml.safe_load(metadata)
         raw_actions = {}
         if actions is not None:
-            raw_actions = cast('Optional[Dict[str, Any]]', yaml.safe_load(actions))
+            raw_actions = cast('dict[str, Any] | None', yaml.safe_load(actions))
             if raw_actions is None:
                 raw_actions = {}
         raw_config = {}
         if config is not None:
-            raw_config = cast('Optional[Dict[str, Any]]', yaml.safe_load(config))
+            raw_config = cast('dict[str, Any] | None', yaml.safe_load(config))
             if raw_config is None:
                 raw_config = {}
         return cls(meta, raw_actions, raw_config)
