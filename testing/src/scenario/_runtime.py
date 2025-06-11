@@ -435,7 +435,10 @@ def capture_events(
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit
 
-    # A finally block is needed here in case the code raises SystemExit or KeyboardInterrupt.
+    # A finally block is needed here in case the code raises an exception that
+    # isn't a subclass of Exception (like SystemExit or KeyboardInterrupt).
+    # Those are captured by the exec() code that uses this context manager, but
+    # ones outside of Exception are not.
     try:
         yield captured
     finally:
