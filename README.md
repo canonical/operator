@@ -92,7 +92,6 @@ class OpsExampleCharm(ops.CharmBase):
 
 ```python
 import ops
-import ops.pebble
 from ops import testing
 
 from charm import OpsExampleCharm
