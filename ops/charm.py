@@ -1604,9 +1604,9 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
 def _juju_fields(cls: type[object]) -> dict[str, str]:
     """Iterates over all the field names to include when loading into a class.
 
-    Any Juju names that are not in the returned dictionary should not be passed to
-    the class. Names that are in the dictionary are mapped to the argument name;
-    in most cases this is the same string, but for aliases will differ.
+    Any Juju names that are not in the returned dictionary should not be passed
+    to the class. Names that are in the dictionary are mapped to the argument
+    name; in most cases this is the same string, but for aliases will differ.
 
     Returns:
         A dictionary where the key is the Juju name and the value is the name of
@@ -1617,12 +1617,8 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     """
     # Dataclasses:
     juju_to_arg: dict[str, str] = {}
-    try:
-        fields = dataclasses.fields(cls)  # type: ignore
-    except TypeError:
-        pass
-    else:
-        for field in fields:
+    if dataclasses.is_dataclass(cls):
+        for field in dataclasses.fields(cls):
             alias = field.metadata.get('alias', field.name)
             # If this a Pydantic dataclass, then it handles the alias.
             # Using pydantic.dataclasses.is_pydantic_dataclass() would be
