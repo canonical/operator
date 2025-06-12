@@ -259,6 +259,7 @@ if TYPE_CHECKING:
             'level': NotRequired[str],
             'startup': NotRequired[Literal['enabled', 'disabled']],
             'status': str,
+            'successes': NotRequired[int],
             'failures': NotRequired[int],
             'threshold': int,
             'change-id': NotRequired[str],
@@ -1451,6 +1452,17 @@ class CheckInfo:
     :attr:`CheckStatus.INACTIVE` means the check is not running.
     """
 
+    successes: int | None
+    """Number of times this check has succeeded.
+
+    This is reset when the check succeeds again after the check's failure
+    threshold was reached. This will be zero if the check has never run, or
+    has never run successfully.
+
+    This will be None if the version of Pebble being queried doesn't return
+    the ``successes`` field (introduced in Pebble v1.23.0).
+    """
+
     failures: int
     """Number of failures since the check last succeeded.
 
@@ -1475,6 +1487,7 @@ class CheckInfo:
         name: str,
         level: CheckLevel | str | None,
         status: CheckStatus | str,
+        successes: int | None = None,
         failures: int = 0,
         threshold: int = 0,
         change_id: ChangeID | None = None,
@@ -1484,6 +1497,7 @@ class CheckInfo:
         self.level = level
         self.startup = startup
         self.status = status
+        self.successes = successes
         self.failures = failures
         self.threshold = threshold
         self.change_id = change_id
@@ -1509,6 +1523,7 @@ class CheckInfo:
             level=level,
             startup=CheckStartup(d.get('startup', 'enabled')),
             status=status,
+            successes=d.get('successes'),
             failures=d.get('failures', 0),
             threshold=d['threshold'],
             change_id=change_id,
@@ -1521,10 +1536,25 @@ class CheckInfo:
             f'level={self.level}, '
             f'startup={self.startup}, '
             f'status={self.status}, '
+            f'successes={self.successes}, '
             f'failures={self.failures}, '
             f'threshold={self.threshold!r}, '
             f'change_id={self.change_id!r})'
         )
+
+    @property
+    def has_run(self):
+        """Report whether this check has run at least once (successfully or otherwise).
+
+        Raises:
+            NotImplementedError: If running against a version of Pebble too
+                old to support the "successes" field.
+        """
+        if self.successes is None:
+            raise NotImplementedError(
+                'Pebble version doesn\'t support "successes" (introduced in Pebble 1.23.0)'
+            )
+        return self.successes > 0 or self.failures > 0
 
 
 class NoticeType(enum.Enum):
