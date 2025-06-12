@@ -386,8 +386,8 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
     - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
     - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
-11. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
-   and doc requirement bumps into main (and get it merged).
+11. Add, commit, and push, and open a PR to get the `CHANGES.md` update and version
+   bumps into main (and get it merged).
 12. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
    If the tests don't pass at the tip of the main branch, do not release.
 13. When you are ready, click "Publish". GitHub will create the additional tag.
