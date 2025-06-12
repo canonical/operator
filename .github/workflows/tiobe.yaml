@@ -22,6 +22,11 @@ jobs:
       - name: Generate coverage report
         run: tox -e coverage,coverage-tracing,coverage-report
 
+      - name: Install TIOBE and project dependencies
+        run: |
+          uv export --no-emit-project --frozen --no-hashes --group unit --group static > requirements.txt
+          pip install flake8 pylint -e . -r requirements.txt
+
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@009979693978bfefad2ad15c1020066694968dc7  # v3.4.0
         with:
