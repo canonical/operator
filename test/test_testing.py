@@ -6668,8 +6668,8 @@ class TestActions:
             unobserved-param-tester:
               description: consectetur adipiscing elit
               params:
-                foo
-                bar
+                foo: {}
+                bar: {}
               required: [foo]
               additionalProperties: false
             log-and-results:
