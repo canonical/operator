@@ -13,12 +13,12 @@ sudo snap install astral-uv --classic
 Then install `tox` with extensions, as well as a range of Python versions:
 
 ```sh
-uv python install 3.8 3.10 3.11 3.12
 uv tool install tox --with tox-uv
 uv tool update-shell
 ```
 
 You can validate that you have a working installation by running:
+
 ```sh
 tox --version
 4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
