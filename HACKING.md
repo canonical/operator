@@ -4,7 +4,7 @@ To work in the framework itself you will need Python >= 3.8. Linting, testing,
 and docs automation is performed using
 [`tox`](https://tox.readthedocs.io/en/latest/).
 
-First, make sure to install [uv](https://docs.astral.sh/uv/), for example via:
+First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 
 ```sh
 sudo snap install astral-uv --classic
@@ -30,7 +30,7 @@ For improved performance on the tests, install the library that allows
 PyYAML to use C speedups:
 
 ```sh
-apt-get install libyaml-dev
+sudo apt-get install libyaml-dev
 ```
 
 # Testing
@@ -55,7 +55,7 @@ tox -e docs
 tox -e unit -- -k <pattern>
 ```
 
-For more in depth debugging, you the virtualenv so that you can run
+For more in depth debugging, you can enter the virtualenv so that you can run
 `pytest` or other tools directly:
 
 ```sh
