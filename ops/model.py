@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import datetime
 import enum
@@ -52,8 +53,10 @@ from typing import (
     MutableMapping,
     TextIO,
     TypedDict,
+    TypeVar,
     Union,
     get_args,
+    get_type_hints,
 )
 
 from . import charm as _charm
@@ -115,6 +118,9 @@ _NetworkDict = TypedDict(
 logger = logging.getLogger(__name__)
 
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
+
+
+_T = TypeVar('_T')
 
 
 class Model:
@@ -926,7 +932,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
     def __contains__(self, key: str):
         return key in self._data
@@ -1739,6 +1745,7 @@ class Relation:
         self.units: set[Unit] = set()
         self.active = active
         self._backend = backend
+        self._cache = cache
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1789,6 +1796,164 @@ class Relation:
             d = self._backend.relation_model_get(self.id)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
+
+    def load(
+        self,
+        cls: type[_T],
+        src: Unit | Application,
+        *args: Any,
+        decoder: Callable[[str], Any] | None = None,
+        **kwargs: Any,
+    ) -> _T:
+        """Load the data for this relation into an instance of a data class.
+
+        The raw Juju relation data is passed to the data class's ``__init__``
+        method as keyword arguments, with values decoded using the provided
+        decoder function, or :func:`json.loads` if no decoder is provided.
+
+        For example::
+
+            data = event.relation.load(DatabaseModel, event.app)
+            secret_id = data.credentials
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju relation data that have a matching field in the class are
+        passed as arguments. Pydantic fields that have an ``alias``, or
+        dataclasses that have a ``metadata{'alias'=}``, will expect the Juju
+        relation data field to have the alias name, but will set the attribute
+        on the class to the field name.
+
+        For example::
+
+            class Data(pydantic.BaseModel):
+                # This field is called 'secret-id' in the Juju relation data.
+                secret_id: str = pydantic.Field(alias='secret-id')
+
+            def _observer(self, event: ops.RelationEvent):
+                data = event.relation.load(Data, event.app)
+                secret = self.model.get_secret(data.secret_id)
+
+        Any additional positional or keyword arguments will be passed through to
+        the data class ``__init__``.
+
+        Args:
+            cls: A class, typically a Pydantic `BaseModel` subclass or a
+                dataclass, that will accept the Juju relation data as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            src: The source of the data to load. This can be either a
+                :class:`Unit` or :class:`Application` instance.
+            decoder: An optional callable that will be used to decode each field
+                before loading into the class. If not provided,
+                :func:`json.loads` will be used.
+            args: positional arguments to pass through to the data class.
+            kwargs: keyword arguments to pass through to the data class.
+
+        Returns:
+            An instance of the data class that was provided as ``cls`` with the
+            current relation data values.
+        """
+        try:
+            fields = _charm._juju_fields(cls)
+        except ValueError:
+            fields = None
+        data: dict[str, Any] = copy.deepcopy(kwargs)
+        if decoder is None:
+            decoder = json.loads
+        for key, value in sorted(self.data[src].items()):
+            value = decoder(value)
+            if fields is None:
+                data[key] = value
+            elif key in fields:
+                data[fields[key]] = value
+        return cls(*args, **data)
+
+    def save(
+        self,
+        obj: object,
+        dst: Unit | Application,
+        *,
+        encoder: Callable[[Any], str] | None = None,
+    ):
+        """Save the data from the provided object to the Juju relation data.
+
+        For example::
+
+            relation = self.model.get_relation('tracing')
+            data = TracingRequirerData(receivers=['otlp_http'])
+            relation.save(data, self.app)
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only the class's
+        fields will be saved through to the relation data. Pydantic fields that
+        have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``,
+        will have the object's value saved to the Juju relation data with the
+        alias as the key. For other classes, all of the object's attributes that
+        have a class type annotation and value set on the object will be saved
+        through to the relation data.
+
+        For example::
+
+            class TransferData(pydantic.BaseModel):
+                source: pydantic.AnyHttpUrl = pydantic.Field(alias='from')
+                destination: pydantic.AnyHttpUrl = pydantic.Field(alias='to')
+
+            def _add_transfer(self):
+                data = TransferData(
+                    source='https://a.example.com',
+                    destination='https://b.example.com',
+                )
+                relation = self.model.get_relation('mover')
+                # data.source will be stored under the Juju relation key 'from'
+                # data.destination will be stored under the Juju relation key 'to'
+                relation.save(data, self.unit)
+
+        Args:
+            obj: an object with attributes to save to the relation data, typically
+                a Pydantic ``BaseModel`` subclass or dataclass.
+            dst: The destination in which to save the data to save. This
+                can be either a :class:`Unit` or :class:`Application` instance.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, :func:`json.dumps` will
+                be used.
+
+        Raises:
+            RelationDataTypeError: if the encoder does not return a string.
+            RelationNotFoundError: if the relation does not exist.
+            RelationDataAccessError: if the charm does not have permission to
+                write to the relation data.
+        """
+        if encoder is None:
+            encoder = json.dumps
+
+        # Determine the fields, which become the Juju keys, and the values for
+        # each field.
+        fields: dict[str, str] = {}  # Class attribute name: Juju key.
+        if dataclasses.is_dataclass(obj):
+            assert not isinstance(obj, type)  # dataclass instance, not class.
+            for field in dataclasses.fields(obj):
+                alias = field.metadata.get('alias', field.name)
+                fields[field.name] = alias
+            values = dataclasses.asdict(obj)
+        elif hasattr(obj.__class__, 'model_fields'):
+            # Pydantic models:
+            for name, field in obj.__class__.model_fields.items():  # type: ignore
+                # Pydantic takes care of the alias.
+                fields[field.alias or name] = field.alias or name  # type: ignore
+            values = obj.model_dump(mode='json', by_alias=True, exclude_defaults=False)  # type: ignore
+        else:
+            # If we could not otherwise determine the fields for the class,
+            # store all the fields that have type annotations. If a charm needs
+            # a more specific set of fields, then it should use a dataclass or
+            # Pydantic model instead.
+            try:
+                fields = {k: k for k in get_type_hints(obj.__class__)}
+            except TypeError:
+                # Most likely Python 3.8. It's not as good, but use __annotations__.
+                fields = {k: k for k in obj.__class__.__annotations__}
+            values = {field: getattr(obj, field) for field in fields}
+
+        # Encode each value, and then pass it over to Juju.
+        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
+        self.data[dst].update(data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
@@ -2205,7 +2370,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._paths: dict[str, Path | None] = {name: None for name in names}
+        self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -2256,9 +2421,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: _StorageDictType = {
-            storage_name: None for storage_name in storage_names
-        }
+        self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
     def __contains__(self, key: str):
         return key in self._storage_map
