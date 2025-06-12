@@ -128,7 +128,7 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing.Harness`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness)
+> See more: [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
