@@ -86,46 +86,48 @@ class OpsExampleCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-> See more: [`ops.PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/index.html#ops.PebbleReadyEvent)
+> See more: [`ops.PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent)
 
-- The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a testing harness:
+- The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a unit test:
 
 ```python
-import ops.testing
+import ops
+from ops import testing
 
-class TestCharm(unittest.TestCase):
-    def setUp(self):
-        self.harness = ops.testing.Harness(OpsExampleCharm)
-        self.addCleanup(self.harness.cleanup)
-        self.harness.begin()
+from charm import OpsExampleCharm
 
-    def test_httpbin_pebble_ready(self):
-        # Expected plan after Pebble ready with default config
-        expected_plan = {
-            "services": {
-                "httpbin": {
-                    "override": "replace",
-                    "summary": "httpbin",
-                    "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                    "startup": "enabled",
-                    "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
-                }
-            },
-        }
-        # Simulate the container coming up and emission of pebble-ready event
-        self.harness.container_pebble_ready("httpbin")
-        # Get the plan now we've run PebbleReady
-        updated_plan = self.harness.get_container_pebble_plan("httpbin").to_dict()
-        # Check we've got the plan we expected
-        self.assertEqual(expected_plan, updated_plan)
-        # Check the service was started
-        service = self.harness.model.unit.get_container("httpbin").get_service("httpbin")
-        self.assertTrue(service.is_running())
-        # Ensure we set an ActiveStatus with no message
-        self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
+
+def test_httpbin_pebble_ready():
+    # Arrange:
+    ctx = testing.Context(OpsExampleCharm)
+    container = testing.Container("httpbin", can_connect=True)
+    state_in = testing.State(containers={container})
+
+    # Act:
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
+
+    # Assert:
+    updated_plan = state_out.get_container(container.name).plan
+    expected_plan = {
+        "services": {
+            "httpbin": {
+                "override": "replace",
+                "summary": "httpbin",
+                "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
+                "startup": "enabled",
+                "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
+            }
+        },
+    }
+    assert expected_plan == updated_plan
+    assert (
+        state_out.get_container(container.name).service_statuses["httpbin"]
+        == ops.pebble.ServiceStatus.ACTIVE
+    )
+    assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing.Harness`](https://ops.readthedocs.io/en/latest/#ops.testing.Harness)
+> See more: [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
