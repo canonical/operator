@@ -15,7 +15,6 @@
 from charm import HttpbinDemoCharm
 
 import ops
-import ops.pebble
 from ops import testing
 
 
