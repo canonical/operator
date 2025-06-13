@@ -1455,9 +1455,10 @@ class CheckInfo:
     successes: int | None
     """Number of times this check has succeeded.
 
-    This is reset when the check succeeds again after the check's failure
-    threshold was reached. This will be zero if the check has never run, or
-    has never run successfully.
+    This will be zero if the check has never run successfully after being started,
+    either on Pebble startup through `startup: enabled`, or due to
+    :meth:`Client.start_checks`. It is reset to one when the check
+    succeeds after the check's failure threshold was reached.
 
     This will be None if the version of Pebble being queried doesn't return
     the ``successes`` field (introduced in Pebble v1.23.0).
