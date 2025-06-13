@@ -43,7 +43,7 @@ Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testi
 
 # Coding style
 
-We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
+We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
 
 # Documentation
 
@@ -91,15 +91,15 @@ tox -e docs-live
 
 ## How to document version dependencies
 
-We don't publish separate documentation for separate versions of ops. The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are always for the in-development (main branch) of ops, and do not include any notes indicating changes or additions across ops versions. We encourage all charmers to promptly upgrade to the latest version of ops, and to refer to the release notes and changelog for learning about changes.
+We don't publish separate documentation for separate versions of Ops. The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are always for the in-development (main branch) of Ops, and do not include any notes indicating changes or additions across Ops versions. We encourage all charmers to promptly upgrade to the latest version of Ops, and to refer to the release notes and changelog for learning about changes.
 
 We do note when features behave differently when using different versions of Juju.
 
 In docstrings:
 
 - Use `.. jujuadded:: x.y` to indicate that the feature is only available when using version x.y (or higher) of Juju.
-- Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
-- Use `..jujuremoved:: x.y` when the feature will be available in ops but not in that version (or later) of Juju.
+- Use `..jujuchanged:: x.y` when the feature's behaviour _in Ops_ changes.
+- Use `..jujuremoved:: x.y` when the feature will be available in Ops but not in that version (or later) of Juju.
 
 Similar directives also work in MyST Markdown. For example:
 
