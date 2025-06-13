@@ -46,7 +46,28 @@ from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
+    from typing import TypedDict
+    from typing_extensions import Unpack
     from . import Context
+
+    class StateKwargs(TypedDict, total=False):
+        config: dict[str, str | int | float | bool]
+        relations: Iterable[RelationBase]
+        networks: Iterable[Network]
+        containers: Iterable[Container]
+        storages: Iterable[Storage]
+        opened_ports: Iterable[Port]
+        leader: bool
+        model: Model
+        secrets: Iterable[Secret]
+        resources: Iterable[Resource]
+        planned_units: int
+        deferred: Sequence[DeferredEvent]
+        stored_states: Iterable[StoredState]
+        app_status: _EntityStatus
+        unit_status: _EntityStatus
+        workload_version: str
+
 
 AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
@@ -1698,18 +1719,7 @@ class State(_max_posargs(0)):
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
         stored_states: Iterable[StoredState] | None = None,
-        # The following arguments are passed through to __init__.
-        networks: Iterable[Network] | None = None,
-        opened_ports: Iterable[Port] | None = None,
-        leader: bool | None = None,
-        model: Model | None = None,
-        secrets: Iterable[Secret] | None = None,
-        resources: Iterable[Resource] | None = None,
-        planned_units: int | None = None,
-        deferred: Sequence[DeferredEvent] | None = None,
-        app_status: _EntityStatus | None = None,
-        unit_status: _EntityStatus | None = None,
-        workload_version: str | None = None,
+        **kwargs: Unpack[StateKwargs],
     ) -> State:
         """Create a State from the charm context.
 
@@ -1776,31 +1786,6 @@ class State(_max_posargs(0)):
                 if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
-        kwargs = {}
-        if networks is not None:
-            kwargs['networks'] = networks
-        if opened_ports is not None:
-            kwargs['opened_ports'] = opened_ports
-        if leader is not None:
-            kwargs['leader'] = leader
-        if model is not None:
-            kwargs['model'] = model
-        if secrets is not None:
-            kwargs['secrets'] = secrets
-        if resources is not None:
-            kwargs['resources'] = resources
-        if planned_units is not None:
-            kwargs['planned_units'] = planned_units
-        if deferred is not None:
-            kwargs['deferred'] = deferred
-        if app_status is not None:
-            kwargs['app_status'] = app_status
-        if unit_status is not None:
-            kwargs['unit_status'] = unit_status
-        if workload_version is not None:
-            kwargs['workload_version'] = workload_version
-
->>>>>>> 70ebddb (Adjustments per review.)
         return cls(
             config=config,
             relations=relations,
