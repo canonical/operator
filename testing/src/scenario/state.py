@@ -1729,28 +1729,27 @@ class State(_max_posargs(0)):
                 if option not in generated_config and 'default' in details:
                     generated_config[option] = details['default']
         relations = kwargs.pop('relations', set())
+        for relation_type in ('requires', 'provides', 'peers'):
+            for endpoint, details in meta.get(relation_type, {}).items():
+                if any(rel for rel in relations if rel.endpoint == endpoint):
+                    continue
+                if relation_type == 'peers':
+                    relation_class = PeerRelation
+                elif details.get('scope') == 'container':
+                    relation_class = SubordinateRelation
+                else:
+                    relation_class = Relation
+                relations.add(relation_class(endpoint, details['interface']))
         containers = kwargs.pop('containers', set())
+        for container_name in meta.get('containers', {}):
+            if any(c for c in containers if c.name == container_name):
+                continue
+            containers.add(Container(name=container_name, can_connect=True))
         storages = kwargs.pop('storage', set())
-        if meta:
-            for relation_type in ('requires', 'provides', 'peers'):
-                for endpoint, details in meta.get(relation_type, {}).items():
-                    if any(rel.endpoint == endpoint for rel in relations):
-                        continue
-                    if relation_type == 'peers':
-                        relation_class = PeerRelation
-                    elif details.get('scope') == 'container':
-                        relation_class = SubordinateRelation
-                    else:
-                        relation_class = Relation
-                    relations.add(relation_class(endpoint, details['interface']))
-            for container_name in meta.get('containers', {}):
-                if any(c.name == container_name for c in containers):
-                    continue
-                containers.add(Container(name=container_name, can_connect=True))
-            for storage_name in meta.get('storage', {}):
-                if any(s.name == storage_name for s in storages):
-                    continue
-                storages.add(Storage(name=storage_name))
+        for storage_name in meta.get('storage', {}):
+            if any(s for s in storages if s.name == storage_name):
+                continue
+            storages.add(Storage(name=storage_name))
         stored_states = kwargs.pop('stored_states', set())
         for attr in dir(ctx.charm_spec.charm_type):
             value = getattr(ctx.charm_spec.charm_type, attr)
