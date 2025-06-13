@@ -66,7 +66,7 @@ When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the con
 
 ### Define the Prometheus relation interface
 
-In your `charmcraft.yaml` file, before the `peers` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrating with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
+In your `charmcraft.yaml` file, after the `requires` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrating with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
 
 ```yaml
 provides:
@@ -87,10 +87,11 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated. 
 
 ```python
+# Provide a metrics endpoint for Prometheus to scrape.
 self._prometheus_scraping = MetricsEndpointProvider(
     self,
-    relation_name="metrics-endpoint",
-    jobs=[{"static_configs": [{"targets": [f"*:{self.config['server-port']}"]}]}],
+    relation_name='metrics-endpoint',
+    jobs=[{'static_configs': [{'targets': [f'*:{self.config["server-port"]}']}]}],
     refresh_event=self.on.config_changed,
 )
 ```
@@ -156,8 +157,9 @@ from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
 Then, in your charm's `__init__` method, initialise the `LogProxyConsumer` instance with the defined log files, as shown below. The `log-proxy` relation name comes from the `charmcraft.yaml` file and the`demo_server.log` file is the file where the application writes logs. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api`).
 
 ```python
+# Enable pushing application logs to Loki.
 self._logging = LogProxyConsumer(
-    self, relation_name="log-proxy", log_files=["demo_server.log"]
+    self, relation_name='log-proxy', log_files=['demo_server.log']
 )
 ```
 
@@ -220,8 +222,10 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider` instance, as below. The `grafana-dashboard` is the relation name you defined earlier in your `charmcraft.yaml` file. Overall, this code states that your application supports the Grafana interface.
 
 ```python
-# Provide grafana dashboards over a relation interface
-self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
+# Provide grafana dashboards over a relation interface.
+self._grafana_dashboards = GrafanaDashboardProvider(
+    self, relation_name='grafana-dashboard'
+)
 ```
 
 <!-- UPDATE LINKS

@@ -1,0 +1,72 @@
+type: charm
+bases:
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+    run-on:
+    - name: ubuntu
+      channel: "22.04"
+
+name: demo-api-charm
+title: |
+  demo-fastapi-k8s
+description: |
+  This is a demo charm built on top of a small Python FastAPI server.
+  This charm can be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
+summary: |
+  FastAPI Demo charm for Kubernetes
+
+assumes:
+  - juju >= 3.1
+  - k8s-api
+
+parts:
+  charm:
+    build-packages:
+      # Required for the cos-lite packages, which have a Rust dependency.
+      - cargo
+
+config:
+  options:
+    server-port:
+      default: 8000
+      description: Default port on which FastAPI is available
+      type: int
+
+requires:
+  database:
+    interface: postgresql_client
+    limit: 1
+  log-proxy:
+    interface: loki_push_api
+    limit: 1
+
+provides:
+  metrics-endpoint:
+    interface: prometheus_scrape
+  grafana-dashboard:
+    interface: grafana_dashboard
+
+actions:
+  get-db-info:
+    description: Fetches Database authentication information
+    params:
+      show-password:
+        description: Show username and password in output information
+        type: boolean
+        default: False
+
+containers:
+  demo-server:
+    resource: demo-server-image
+
+resources:
+  # An OCI image resource for each container listed above.
+  # You may remove this if your charm will run without a workload sidecar container.
+  demo-server-image:
+    type: oci-image
+    description: OCI image from GitHub Container Repository
+    # The upstream-source field is ignored by Juju. It is included here as a reference
+    # so the integration testing suite knows which image to deploy during testing. This field
+    # is also used by the 'canonical/charming-actions' GitHub action for automated releasing.
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.1
