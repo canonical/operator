@@ -50,7 +50,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from typing_extensions import Unpack
     from . import Context
 
-    class StateKwargs(TypedDict, total=False):
+    class _StateKwargs(TypedDict, total=False):
         config: dict[str, str | int | float | bool]
         relations: Iterable[RelationBase]
         networks: Iterable[Network]
@@ -1784,7 +1784,7 @@ class State(_max_posargs(0)):
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
         stored_states: Iterable[StoredState] | None = None,
-        **kwargs: Unpack[StateKwargs],
+        **kwargs: Unpack[_StateKwargs],
     ) -> State:
         """Create a State from the charm context.
 

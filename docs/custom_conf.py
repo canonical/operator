@@ -330,6 +330,7 @@ nitpick_ignore = [
     ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
+    ('py:class', '_StateKwargs'),
     ('py:class', '_StorageMetaDict'),
     ('py:class', '_TaskDict'),
     ('py:class', '_TextOrBinaryIO'),
