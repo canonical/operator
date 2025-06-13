@@ -23,6 +23,7 @@ from scenario.state import (
     Notice,
     PeerRelation,
     Relation,
+    RelationBase,
     Resource,
     Secret,
     State,
@@ -731,3 +732,72 @@ def test_state_from_context_extend():
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
     assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
+
+
+def test_state_from_context_merge_config():
+    ctx = Context(
+        ops.CharmBase,
+        meta={'name': 'alex'},
+        config={'options': {'foo': {'type': 'string', 'default': 'str'}}},
+    )
+    state = State.from_context(ctx, config={'bar': 'baz'})
+    assert state.config == {'foo': 'str', 'bar': 'baz'}
+
+
+@pytest.mark.parametrize(
+    'rel_type,endpoint',
+    [(Relation, 'relreq'), (PeerRelation, 'peer'), (SubordinateRelation, 'sub')],
+)
+def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], endpoint: str):
+    meta = {
+        'name': 'sam',
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+    }
+    rel = rel_type(endpoint)
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, relations={rel})
+    # The passed in relation should be used, not the one from the context, which
+    # means the interface should be None, as it wasn't provided, but is in the
+    # context/meta.
+    assert state.get_relation(rel.id).interface is None
+
+
+def test_state_from_context_skip_exiting_container():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+    }
+    container = Container(name='container')
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, containers={container})
+    assert state.get_container(container.name).can_connect is False
+
+
+def test_state_from_context_skip_exiting_storage():
+    meta = {
+        'name': 'sam',
+        'storage': {'storage': {}},
+    }
+    storage = Storage(name='storage')
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, storages={storage})
+    assert state.get_storage(storage.name, index=storage.index) == storage
+
+
+def test_state_from_context_skip_exiting_stored_state():
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    meta = {
+        'name': 'sam',
+    }
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    ctx = Context(Charm, meta=meta)
+    state = State.from_context(ctx, stored_states={stored_state})
+    assert state.get_stored_state(
+        stored_state.name, owner_path=stored_state.owner_path
+    ).content == {'foo': 'bar'}
