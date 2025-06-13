@@ -25,6 +25,8 @@ import warnings
 from pathlib import Path
 from typing import Any, Union, cast
 
+import opentelemetry.trace
+
 from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
@@ -366,14 +368,24 @@ class _Manager:
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
-
         if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
 
         model = _model.Model(
-            self._charm_meta, self._model_backend, broken_relation_id=broken_relation_id
+            self._charm_meta,
+            self._model_backend,
+            broken_relation_id=broken_relation_id,
+            # In a RelationDeparted event, the unit is not included in the Juju
+            # `relation-list` output, but the charm still has access to the remote
+            # relation data. To provide the charm with a mechanism for getting
+            # access to that data, we include the remote unit in Relation.units.
+            # In other relation events (such as RelationChanged) the unit will
+            # already be in the set via `relation-list` - adding it via this extra
+            # mechanism will not change the final set, and is simpler than only
+            # adding it in specific events.
+            remote_unit_name=self._juju_context.remote_unit_name,
         )
         store = self._make_storage(dispatcher)
         framework = _framework.Framework(
@@ -435,6 +447,12 @@ class _Manager:
 
         args, kwargs = self._get_event_args(event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
+        # If tracing is set up, log the trace id so that tools like jhack can pick it up.
+        # If tracing is not set up, span is non-recording and trace is zero.
+        trace_id = opentelemetry.trace.get_current_span().get_span_context().trace_id
+        if trace_id:
+            # Note that https://github.com/canonical/jhack depends on exact string format.
+            logger.debug("Starting root trace with id='%s'.", hex(trace_id)[2:])
         event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):

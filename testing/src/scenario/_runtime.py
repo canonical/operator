@@ -340,9 +340,9 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
-                raise UncaughtCharmError(
-                    f'Uncaught exception ({type(e)}) in operator/charm code: {e!r}',
-                ) from e
+                # The following is intentionally on one long line, so that the last line of pdb
+                # output shows the error message (pdb shows the "raise" line).
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
 
             finally:
                 for key in tuple(os.environ):
@@ -435,7 +435,12 @@ def capture_events(
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit
 
-    yield captured
-
-    Framework._emit = _real_emit
-    Framework.reemit = _real_reemit
+    # A finally block is needed here in case the code raises an exception that
+    # isn't a subclass of Exception (like SystemExit or KeyboardInterrupt).
+    # Those are captured by the exec() code that uses this context manager, but
+    # ones outside of Exception are not.
+    try:
+        yield captured
+    finally:
+        Framework._emit = _real_emit
+        Framework.reemit = _real_reemit

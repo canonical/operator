@@ -2,13 +2,35 @@
 
 To work in the framework itself you will need Python >= 3.8. Linting, testing,
 and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/), which you should install.
-For improved performance on the tests, ensure that you have PyYAML
-installed with the correct extensions:
+[`tox`](https://tox.readthedocs.io/en/latest/).
+
+First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 
 ```sh
-apt-get install libyaml-dev
-pip install --force-reinstall --no-cache-dir pyyaml
+sudo snap install astral-uv --classic
+```
+
+Then install `tox` with extensions, as well as a range of Python versions:
+
+```sh
+uv tool install tox --with tox-uv
+uv tool update-shell
+```
+
+You can validate that you have a working installation by running:
+
+```sh
+tox --version
+4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
+registered plugins:
+    tox-uv-1.26.0 at /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox_uv/plugin.py with uv==0.7.12
+```
+
+For improved performance on the tests, install the library that allows
+PyYAML to use C speedups:
+
+```sh
+sudo apt-get install libyaml-dev
 ```
 
 # Testing
@@ -26,9 +48,6 @@ tox -e unit -- test/test_charm.py
 # Format the code using Ruff
 tox -e format
 
-# Compile the requirements.txt file for docs
-tox -e docs-deps
-
 # Generate a local copy of the Sphinx docs in docs/_build
 tox -e docs
 
@@ -36,22 +55,17 @@ tox -e docs
 tox -e unit -- -k <pattern>
 ```
 
-For more in depth debugging, you can enter any of `tox`'s created virtualenvs
-provided they have been run at least once and do fun things - e.g. run
-`pytest` directly:
+For more in depth debugging, you can enter the virtualenv so that you can run
+`pytest` or other tools directly:
 
 ```sh
-# Enter the linting virtualenv
-source .tox/lint/bin/activate
-
-...
-
-# Enter the unit testing virtualenv and run tests
-source .tox/unit/bin/activate
+uv sync --all-groups
+source .venv/bin/activate
 pytest
-...
-
 ```
+
+Likewise, use this virtualenv to enable Python type hints and language server if
+you use an editor from the console or specify it as interpreter path in an IDE.
 
 ## Pebble Tests
 
@@ -311,7 +325,7 @@ To pull in new dependency changes from the starter pack, change to the starter p
 make html
 ```
 
-Then, compare the generated file `.sphinx/requirements.txt`and the `project.optional-dependencies.docs` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
+Then, compare the generated file `.sphinx/requirements.txt` and the `docs` declaration in the `dependency-groups` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
 
 # Dependencies
 
@@ -372,14 +386,11 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
     - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
     - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
-11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
-   used for docs (in case dependencies have been updated in `pyproject.toml`)
-   using the same Python version as specified in the `docs/.readthedocs.yaml` file.
-12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
-   and doc requirement bumps into main (and get it merged).
-13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
+11. Add, commit, and push, and open a PR to get the `CHANGES.md` update and version
+   bumps into main (and get it merged).
+12. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
    If the tests don't pass at the tip of the main branch, do not release.
-14. When you are ready, click "Publish". GitHub will create the additional tag.
+13. When you are ready, click "Publish". GitHub will create the additional tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -392,9 +403,9 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
+14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
     and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-16. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
+15. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
    For example, if 2.90.0 is the next expected `ops` version, use
    `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
    There will be a total of seven changes:

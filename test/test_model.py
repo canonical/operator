@@ -46,6 +46,11 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
     return FakeScript(request)
 
 
+@pytest.fixture
+def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+
+
 class TestModel:
     @pytest.fixture
     def harness(self):
@@ -1042,7 +1047,7 @@ class TestModel:
 
         self.assertBackendCalls(harness, [])
 
-    def test_storage(self, fake_script: FakeScript):
+    def test_storage(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         raw: ops.charm._StorageMetaDict = {
             'type': 'test',
@@ -1132,7 +1137,7 @@ class TestModel:
     ):
         assert expected == harness._get_backend_calls(reset=reset)
 
-    def test_run_error(self, fake_script: FakeScript):
+    def test_run_error(self, fake_script: FakeScript, fake_juju_version: None):
         model = ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
         fake_script.write('status-get', """echo 'ERROR cannot get status' >&2; exit 1""")
         with pytest.raises(ops.ModelError) as excinfo:
@@ -1174,7 +1179,7 @@ class TestModel:
         # Make sure it's not being loaded from the environment.
         assert JujuVersion.from_environ() == '0.0.0'
 
-    def test_relation_remote_model(self, fake_script: FakeScript):
+    def test_relation_remote_model(self, fake_script: FakeScript, fake_juju_version: None):
         fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
         fake_script.write('relation-ids', """echo '["db0:1"]'""")
         fake_script.write('relation-model-get', """echo '{"uuid": "UUID"}'""")
@@ -1672,7 +1677,7 @@ class TestApplication:
 
 class TestContainers:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
@@ -1720,7 +1725,7 @@ containers:
 
 class TestContainerPebble:
     @pytest.fixture
-    def container(self):
+    def container(self, fake_juju_version: None):
         meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
 containers:
@@ -2415,7 +2420,7 @@ class MockPebbleClient:
 
 class TestModelBindings:
     @pytest.fixture
-    def model(self, fake_script: FakeScript):
+    def model(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         meta.relations = {
             'db0': ops.RelationMeta(
@@ -2561,7 +2566,7 @@ class TestModelBindings:
             ['network-get', 'db0', '--format=json'],
         ]
 
-    def test_broken_relations(self, fake_script: FakeScript):
+    def test_broken_relations(self, fake_script: FakeScript, fake_juju_version: None):
         meta = ops.CharmMeta()
         meta.relations = {
             'db0': ops.RelationMeta(
@@ -2726,35 +2731,31 @@ _ValidMetricsTestCase = typing.Tuple[
 
 
 class TestModelBackend:
-    @property
-    def backend(self):
-        backend_instance = getattr(self, '_backend', None)
-        if backend_instance is None:
-            os.environ['JUJU_VERSION'] = '0.0.0'
-            self._backend = _ModelBackend('myapp/0')
-        return self._backend
+    @pytest.fixture
+    def backend(self, fake_juju_version: None) -> _ModelBackend:
+        return _ModelBackend('myapp/0')
 
-    def test_relation_get_set_is_app_arg(self):
+    def test_relation_get_set_is_app_arg(self, backend: _ModelBackend):
         # No is_app provided.
         with pytest.raises(TypeError):
-            self.backend.relation_set(1, {'fookey': 'barval'})  # type: ignore
+            backend.relation_set(1, {'fookey': 'barval'})  # type: ignore
 
         with pytest.raises(TypeError):
-            self.backend.relation_get(1, 'fooentity')  # type: ignore
+            backend.relation_get(1, 'fooentity')  # type: ignore
 
         # Invalid types for is_app.
         for is_app_v in [None, 1, 2.0, 'a', b'beef']:
             with pytest.raises(TypeError):
-                self.backend.relation_set(1, {'fookey': 'barval'}, is_app=is_app_v)  # type: ignore
+                backend.relation_set(1, {'fookey': 'barval'}, is_app=is_app_v)  # type: ignore
 
             with pytest.raises(TypeError):
-                self.backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
+                backend.relation_get(1, 'fooentity', is_app=is_app_v)  # type: ignore
 
-    def test_is_leader_refresh(self, fake_script: FakeScript):
+    def test_is_leader_refresh(self, fake_script: FakeScript, backend: _ModelBackend):
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
-        model = ops.Model(meta, self.backend)
+        model = ops.Model(meta, backend)
         fake_script.write('is-leader', 'echo false')
         assert not model.unit.is_leader()
 
@@ -2763,66 +2764,65 @@ class TestModelBackend:
         # If you don't force it, we don't check, so we won't see the change
         assert not model.unit.is_leader()
         # If we force a recheck, then we notice
-        self.backend._leader_check_time = None
+        backend._leader_check_time = None
         assert model.unit.is_leader()
 
         # Force a recheck without changing the leadership status.
         fake_script.write('is-leader', 'echo true')
-        self.backend._leader_check_time = None
+        backend._leader_check_time = None
         assert model.unit.is_leader()
 
     def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(
-            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.8.0'})
-        )
+        monkeypatch.setenv('JUJU_VERSION', '2.8.0')
+        backend = _ModelBackend('myapp/0')
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
 
         test_cases = [
             (
                 lambda: fake_script.write('relation-list', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.relation_list(3),
+                lambda: backend.relation_list(3),
                 ops.ModelError,
                 [['relation-list', '-r', '3', '--format=json']],
             ),
             (
                 lambda: fake_script.write('relation-list', f'echo {err_msg} >&2 ; exit 2'),
-                lambda: self.backend.relation_list(3),
+                lambda: backend.relation_list(3),
                 ops.RelationNotFoundError,
                 [['relation-list', '-r', '3', '--format=json']],
             ),
             (
                 lambda: fake_script.write('relation-set', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
+                lambda: backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.ModelError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: fake_script.write('relation-set', f'echo {err_msg} >&2 ; exit 2'),
-                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=False),
+                lambda: backend.relation_set(3, {'foo': 'bar'}, is_app=False),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--file', '-']],
             ),
             (
                 lambda: None,
-                lambda: self.backend.relation_set(3, {'foo': 'bar'}, is_app=True),
+                lambda: backend.relation_set(3, {'foo': 'bar'}, is_app=True),
                 ops.RelationNotFoundError,
                 [['relation-set', '-r', '3', '--app', '--file', '-']],
             ),
             (
                 lambda: fake_script.write('relation-get', 'echo fooerror >&2 ; exit 1'),
-                lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
+                lambda: backend.relation_get(3, 'remote/0', is_app=False),
                 ops.ModelError,
                 [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
             ),
             (
                 lambda: fake_script.write('relation-get', f'echo {err_msg} >&2 ; exit 2'),
-                lambda: self.backend.relation_get(3, 'remote/0', is_app=False),
+                lambda: backend.relation_get(3, 'remote/0', is_app=False),
                 ops.RelationNotFoundError,
                 [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
             ),
             (
                 lambda: None,
-                lambda: self.backend.relation_get(3, 'remote/0', is_app=True),
+                lambda: backend.relation_get(3, 'remote/0', is_app=True),
                 ops.RelationNotFoundError,
                 [['relation-get', '-r', '3', '-', 'remote/0', '--app', '--format=json']],
             ),
@@ -2844,20 +2844,18 @@ class TestModelBackend:
         fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
 
         # on 2.7.0+, things proceed as expected
-        monkeypatch.setattr(
-            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
-        )
-        rel_data = self.backend.relation_get(1, 'foo/0', is_app=True)
+        monkeypatch.setenv('JUJU_VERSION', version)
+        backend = _ModelBackend('myapp/0')
+        rel_data = backend.relation_get(1, 'foo/0', is_app=True)
         assert rel_data == {'foo': 'bar'}
         calls = [' '.join(i) for i in fake_script.calls(clear=True)]
         assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
 
         # before 2.7.0, it just fails (no --app support)
-        monkeypatch.setattr(
-            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
-        )
+        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        backend = _ModelBackend('myapp/0')
         with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
-            self.backend.relation_get(1, 'foo/0', is_app=True)
+            backend.relation_get(1, 'foo/0', is_app=True)
         assert fake_script.calls() == []
 
     @pytest.mark.parametrize('version', ['2.8.0', '2.7.0'])
@@ -2876,10 +2874,9 @@ class TestModelBackend:
                 cat >> {}
                 """).format(pathlib.Path(t.name).as_posix()),
             )
-            monkeypatch.setattr(
-                self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': version})
-            )
-            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
+            monkeypatch.setenv('JUJU_VERSION', version)
+            backend = _ModelBackend('myapp/0')
+            backend.relation_set(1, {'foo': 'bar'}, is_app=True)
             calls = [' '.join(i) for i in fake_script.calls(clear=True)]
             assert calls == ['relation-set -r 1 --app --file -']
             t.seek(0)
@@ -2890,18 +2887,17 @@ class TestModelBackend:
         assert decoded == 'foo: bar\n'
 
         # before 2.7.0, it just fails always (no --app support)
-        monkeypatch.setattr(
-            self.backend, '_juju_context', _JujuContext.from_dict({'JUJU_VERSION': '2.6.9'})
-        )
+        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
+        backend = _ModelBackend('myapp/0')
         with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
-            self.backend.relation_set(1, {'foo': 'bar'}, is_app=True)
+            backend.relation_set(1, {'foo': 'bar'}, is_app=True)
         assert fake_script.calls() == []
 
-    def test_status_get(self, fake_script: FakeScript):
+    def test_status_get(self, fake_script: FakeScript, backend: _ModelBackend):
         # taken from actual Juju output
         content = '{"message": "", "status": "unknown", "status-data": {}}'
         fake_script.write('status-get', f"echo '{content}'")
-        s = self.backend.status_get(is_app=False)
+        s = backend.status_get(is_app=False)
         assert s['status'] == 'unknown'
         assert s['message'] == ''
         # taken from actual Juju output
@@ -2922,7 +2918,7 @@ class TestModelBackend:
             }
             """)
         fake_script.write('status-get', f"echo '{content}'")
-        s = self.backend.status_get(is_app=True)
+        s = backend.status_get(is_app=True)
         assert s['status'] == 'maintenance'
         assert s['message'] == 'installing'
         assert fake_script.calls(clear=True) == [
@@ -2930,27 +2926,27 @@ class TestModelBackend:
             ['status-get', '--include-data', '--application=True', '--format=json'],
         ]
 
-    def test_status_is_app_forced_kwargs(self, fake_script: FakeScript):
+    def test_status_is_app_forced_kwargs(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('status-get', 'exit 1')
         fake_script.write('status-set', 'exit 1')
 
         test_cases = (
-            lambda: self.backend.status_get(False),  # type: ignore
-            lambda: self.backend.status_get(True),  # type: ignore
-            lambda: self.backend.status_set('active', '', False),  # type: ignore
-            lambda: self.backend.status_set('active', '', True),  # type: ignore
+            lambda: backend.status_get(False),  # type: ignore
+            lambda: backend.status_get(True),  # type: ignore
+            lambda: backend.status_set('active', '', False),  # type: ignore
+            lambda: backend.status_set('active', '', True),  # type: ignore
         )
 
         for case in test_cases:
             with pytest.raises(TypeError):
                 case()
 
-    def test_local_set_invalid_status(self, fake_script: FakeScript):
+    def test_local_set_invalid_status(self, fake_script: FakeScript, backend: _ModelBackend):
         # ops will directly raise InvalidStatusError if you try to set status to unknown or error
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
-        model = ops.Model(meta, self.backend)
+        model = ops.Model(meta, backend)
         fake_script.write('is-leader', 'echo true')
 
         with pytest.raises(ops.InvalidStatusError):
@@ -2971,7 +2967,7 @@ class TestModelBackend:
         ]
 
     @pytest.mark.parametrize('name', ['active', 'waiting', 'blocked', 'maintenance', 'error'])
-    def test_local_get_status(self, fake_script: FakeScript, name: str):
+    def test_local_get_status(self, fake_script: FakeScript, backend: _ModelBackend, name: str):
         expected_cls = {
             'active': ops.ActiveStatus,
             'waiting': ops.WaitingStatus,
@@ -2983,7 +2979,7 @@ class TestModelBackend:
         meta = ops.CharmMeta.from_yaml("""
             name: myapp
         """)
-        model = ops.Model(meta, self.backend)
+        model = ops.Model(meta, backend)
 
         content = json.dumps({
             'message': 'foo',
@@ -3010,47 +3006,47 @@ class TestModelBackend:
         assert model.app.status.name == name
         assert model.app.status.message == 'bar'
 
-    def test_status_set_is_app_not_bool_raises(self):
+    def test_status_set_is_app_not_bool_raises(self, backend: _ModelBackend):
         for is_app_v in [None, 1, 2.0, 'a', b'beef', object()]:
             with pytest.raises(TypeError):
-                self.backend.status_set(
+                backend.status_set(
                     'active',
                     is_app=is_app_v,  # type: ignore[assignment]
                 )
 
-    def test_status_set_message_not_str_raises(self):
+    def test_status_set_message_not_str_raises(self, backend: _ModelBackend):
         for message in [None, 1, 2.0, True, b'beef', object()]:
             with pytest.raises(TypeError):
-                self.backend.status_set(
+                backend.status_set(
                     'active',
                     message=message,  # type: ignore[assignment]
                 )
 
-    def test_storage_tool_errors(self, fake_script: FakeScript):
+    def test_storage_tool_errors(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.storage_list('foobar')
+            backend.storage_list('foobar')
         assert fake_script.calls(clear=True) == [['storage-list', 'foobar', '--format=json']]
         fake_script.write('storage-get', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.storage_get('foobar', 'someattr')
+            backend.storage_get('foobar', 'someattr')
         assert fake_script.calls(clear=True) == [
             ['storage-get', '-s', 'foobar', 'someattr', '--format=json']
         ]
         fake_script.write('storage-add', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.storage_add('foobar', count=2)
+            backend.storage_add('foobar', count=2)
         assert fake_script.calls(clear=True) == [['storage-add', 'foobar=2']]
         fake_script.write('storage-add', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(TypeError):
-            (self.backend.storage_add('foobar', count=object),)  # type: ignore
+            (backend.storage_add('foobar', count=object),)  # type: ignore
         assert fake_script.calls(clear=True) == []
         fake_script.write('storage-add', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(TypeError):
-            self.backend.storage_add('foobar', count=True)
+            backend.storage_add('foobar', count=True)
         assert fake_script.calls(clear=True) == []
 
-    def test_network_get(self, fake_script: FakeScript):
+    def test_network_get(self, fake_script: FakeScript, backend: _ModelBackend):
         network_get_out = """{
   "bind-addresses": [
     {
@@ -3075,30 +3071,30 @@ class TestModelBackend:
         fake_script.write(
             'network-get', f"""[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1"""
         )
-        network_info = self.backend.network_get('deadbeef')
+        network_info = backend.network_get('deadbeef')
         assert network_info == json.loads(network_get_out)
         assert fake_script.calls(clear=True) == [['network-get', 'deadbeef', '--format=json']]
 
-        network_info = self.backend.network_get('deadbeef', 1)
+        network_info = backend.network_get('deadbeef', 1)
         assert network_info == json.loads(network_get_out)
         assert fake_script.calls(clear=True) == [
             ['network-get', 'deadbeef', '-r', '1', '--format=json']
         ]
 
-    def test_network_get_errors(self, fake_script: FakeScript):
+    def test_network_get_errors(self, fake_script: FakeScript, backend: _ModelBackend):
         err_no_endpoint = 'ERROR no network config found for binding "$2"'
         err_no_rel = 'ERROR invalid value "$3" for option -r: relation not found'
 
         test_cases = [
             (
                 lambda: fake_script.write('network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
-                lambda: self.backend.network_get('deadbeef'),
+                lambda: backend.network_get('deadbeef'),
                 ops.ModelError,
                 [['network-get', 'deadbeef', '--format=json']],
             ),
             (
                 lambda: fake_script.write('network-get', f'echo {err_no_rel} >&2 ; exit 2'),
-                lambda: self.backend.network_get('deadbeef', 3),
+                lambda: backend.network_get('deadbeef', 3),
                 ops.RelationNotFoundError,
                 [['network-get', 'deadbeef', '-r', '3', '--format=json']],
             ),
@@ -3109,124 +3105,126 @@ class TestModelBackend:
                 run()
             assert fake_script.calls(clear=True) == calls
 
-    def test_action_get_error(self, fake_script: FakeScript):
+    def test_action_get_error(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', '')
         fake_script.write('action-get', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.action_get()
+            backend.action_get()
         calls = [['action-get', '--format=json']]
         assert fake_script.calls(clear=True) == calls
 
-    def test_action_set_error(self, fake_script: FakeScript):
+    def test_action_set_error(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', '')
         fake_script.write('action-set', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
+            backend.action_set(OrderedDict([('foo', 'bar'), ('dead', 'beef cafe')]))
         assert sorted(['action-set', 'dead=beef cafe', 'foo=bar']) == sorted(
             fake_script.calls(clear=True)[0]
         )
 
-    def test_action_log_error(self, fake_script: FakeScript):
+    def test_action_log_error(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', '')
         fake_script.write('action-log', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.action_log('log-message')
+            backend.action_log('log-message')
         calls = [['action-log', 'log-message']]
         assert fake_script.calls(clear=True) == calls
 
-    def test_action_get(self, fake_script: FakeScript):
+    def test_action_get(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', """echo '{"foo-name": "bar", "silent": false}'""")
-        params = self.backend.action_get()
+        params = backend.action_get()
         assert params['foo-name'] == 'bar'
         assert not params['silent']
         assert fake_script.calls() == [['action-get', '--format=json']]
 
-    def test_action_set(self, fake_script: FakeScript):
+    def test_action_set(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-set', 'exit 0')
-        self.backend.action_set({'x': 'dead beef', 'y': 1})
+        backend.action_set({'x': 'dead beef', 'y': 1})
         assert sorted(['action-set', 'x=dead beef', 'y=1']), sorted(fake_script.calls()[0])
 
-    def test_action_set_key_validation(self, fake_script: FakeScript):
+    def test_action_set_key_validation(self, fake_script: FakeScript, backend: _ModelBackend):
         with pytest.raises(ValueError):
-            self.backend.action_set({'X': 'dead beef', 'y': 1})
+            backend.action_set({'X': 'dead beef', 'y': 1})
         with pytest.raises(ValueError):
-            self.backend.action_set({'some&key': 'dead beef', 'y': 1})
+            backend.action_set({'some&key': 'dead beef', 'y': 1})
         with pytest.raises(ValueError):
-            self.backend.action_set({'someKey': 'dead beef', 'y': 1})
+            backend.action_set({'someKey': 'dead beef', 'y': 1})
         with pytest.raises(ValueError):
-            self.backend.action_set({'some_key': 'dead beef', 'y': 1})
+            backend.action_set({'some_key': 'dead beef', 'y': 1})
 
-    def test_action_set_nested(self, fake_script: FakeScript):
+    def test_action_set_nested(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-set', 'exit 0')
-        self.backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
+        backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
         assert sorted(['action-set', 'a.b=1', 'a.c=2', 'd=3']) == sorted(fake_script.calls()[0])
 
-    def test_action_set_more_nested(self, fake_script: FakeScript):
+    def test_action_set_more_nested(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-set', 'exit 0')
-        self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
+        backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4})
         assert sorted(['action-set', 'a.b=1', 'a.c=2', 'a.d.e=3', 'f=4']) == sorted(
             fake_script.calls()[0]
         )
 
-    def test_action_set_dotted_dict(self, fake_script: FakeScript):
+    def test_action_set_dotted_dict(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-set', 'exit 0')
-        self.backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
+        backend.action_set({'a.b': 1, 'a': {'c': 2}, 'd': 3})
         assert sorted(['action-set', 'a.b=1', 'a.c=2', 'd=3']) == sorted(fake_script.calls()[0])
 
-    def test_action_set_duplicated_keys(self, fake_script: FakeScript):
+    def test_action_set_duplicated_keys(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-set', 'exit 0')
         with pytest.raises(ValueError):
-            self.backend.action_set({'a.b': 1, 'a': {'b': 2}, 'd': 3})
+            backend.action_set({'a.b': 1, 'a': {'b': 2}, 'd': 3})
         with pytest.raises(ValueError):
-            self.backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4, 'a.d.e': 'foo'})
+            backend.action_set({'a': {'b': 1, 'c': 2, 'd': {'e': 3}}, 'f': 4, 'a.d.e': 'foo'})
 
-    def test_action_fail(self, fake_script: FakeScript):
+    def test_action_fail(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-fail', 'exit 0')
-        self.backend.action_fail('error 42')
+        backend.action_fail('error 42')
         assert fake_script.calls() == [['action-fail', 'error 42']]
 
-    def test_action_log(self, fake_script: FakeScript):
+    def test_action_log(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-log', 'exit 0')
-        self.backend.action_log('progress: 42%')
+        backend.action_log('progress: 42%')
         assert fake_script.calls() == [['action-log', 'progress: 42%']]
 
-    def test_application_version_set(self, fake_script: FakeScript):
+    def test_application_version_set(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('application-version-set', 'exit 0')
-        self.backend.application_version_set('1.2b3')
+        backend.application_version_set('1.2b3')
         assert fake_script.calls() == [['application-version-set', '--', '1.2b3']]
 
-    def test_application_version_set_invalid(self, fake_script: FakeScript):
+    def test_application_version_set_invalid(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
         fake_script.write('application-version-set', 'exit 0')
         with pytest.raises(TypeError):
-            self.backend.application_version_set(2)  # type: ignore
+            backend.application_version_set(2)  # type: ignore
         with pytest.raises(TypeError):
-            self.backend.application_version_set()  # type: ignore
+            backend.application_version_set()  # type: ignore
         assert fake_script.calls() == []
 
-    def test_juju_log(self, fake_script: FakeScript):
+    def test_juju_log(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('juju-log', 'exit 0')
-        self.backend.juju_log('WARNING', 'foo')
+        backend.juju_log('WARNING', 'foo')
         assert fake_script.calls(clear=True) == [
             ['juju-log', '--log-level', 'WARNING', '--', 'foo']
         ]
 
         with pytest.raises(TypeError):
-            self.backend.juju_log('DEBUG')  # type: ignore
+            backend.juju_log('DEBUG')  # type: ignore
         assert fake_script.calls(clear=True) == []
 
         fake_script.write('juju-log', 'exit 1')
         with pytest.raises(ops.ModelError):
-            self.backend.juju_log('BAR', 'foo')
+            backend.juju_log('BAR', 'foo')
         assert fake_script.calls(clear=True) == [['juju-log', '--log-level', 'BAR', '--', 'foo']]
 
-    def test_valid_metrics(self, fake_script: FakeScript):
+    def test_valid_metrics(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('add-metric', 'exit 0')
         test_cases: list[_ValidMetricsTestCase] = [
             (
@@ -3251,10 +3249,10 @@ class TestModelBackend:
             ),
         ]
         for metrics, labels, expected_calls in test_cases:
-            self.backend.add_metrics(metrics, labels)
+            backend.add_metrics(metrics, labels)
             assert fake_script.calls(clear=True) == expected_calls
 
-    def test_invalid_metric_names(self, fake_script: FakeScript):
+    def test_invalid_metric_names(self, fake_script: FakeScript, backend: _ModelBackend):
         invalid_inputs: list[_MetricAndLabelPair] = [
             ({'': 4.2}, {}),
             ({'1': 4.2}, {}),
@@ -3271,9 +3269,9 @@ class TestModelBackend:
         ]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                backend.add_metrics(metrics, labels)
 
-    def test_invalid_metric_values(self):
+    def test_invalid_metric_values(self, backend: _ModelBackend):
         invalid_inputs: list[_MetricAndLabelPair] = [
             ({'a': float('+inf')}, {}),
             ({'a': float('-inf')}, {}),
@@ -3283,9 +3281,9 @@ class TestModelBackend:
         ]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                backend.add_metrics(metrics, labels)
 
-    def test_invalid_metric_labels(self):
+    def test_invalid_metric_labels(self, backend: _ModelBackend):
         invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'': 'baz'}),
             ({'foo': 4.2}, {',bar': 'baz'}),
@@ -3294,9 +3292,9 @@ class TestModelBackend:
         ]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                backend.add_metrics(metrics, labels)
 
-    def test_invalid_metric_label_values(self):
+    def test_invalid_metric_label_values(self, backend: _ModelBackend):
         invalid_inputs: list[_MetricAndLabelPair] = [
             ({'foo': 4.2}, {'bar': ''}),
             ({'foo': 4.2}, {'bar': 'b,az'}),
@@ -3304,17 +3302,23 @@ class TestModelBackend:
         ]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
-                self.backend.add_metrics(metrics, labels)
+                backend.add_metrics(metrics, labels)
 
     def test_relation_remote_app_name_env(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv('JUJU_VERSION', '0.0.0')
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
-        assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(5) == 'remoteapp1'
+
         monkeypatch.setenv('JUJU_RELATION_ID', '5')
-        assert self.backend.relation_remote_app_name(5) == 'remoteapp1'
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(5) == 'remoteapp1'
 
     def test_relation_remote_app_name_script_success(
-        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         # JUJU_RELATION_ID and JUJU_REMOTE_APP both unset
         fake_script.write(
@@ -3323,25 +3327,32 @@ class TestModelBackend:
 echo '"remoteapp2"'
 """,
         )
-        assert self.backend.relation_remote_app_name(1) == 'remoteapp2'
+        monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(1) == 'remoteapp2'
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '1', '--app', '--format=json'],
         ]
 
         # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:5')
-        assert self.backend.relation_remote_app_name(5) == 'remoteapp2'
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # JUJU_RELATION_ID unset but JUJU_REMOTE_APP set
         monkeypatch.delenv('JUJU_RELATION_ID')
         monkeypatch.setenv('JUJU_REMOTE_APP', 'remoteapp1')
-        assert self.backend.relation_remote_app_name(5) == 'remoteapp2'
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
         # Both set, but JUJU_RELATION_ID a different relation
         monkeypatch.setenv('JUJU_RELATION_ID', 'x:6')
-        assert self.backend.relation_remote_app_name(5) == 'remoteapp2'
+        backend = _ModelBackend('myapp/0')
+        assert backend.relation_remote_app_name(5) == 'remoteapp2'
 
-    def test_relation_remote_app_name_script_errors(self, fake_script: FakeScript):
+    def test_relation_remote_app_name_script_errors(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
         fake_script.write(
             'relation-list',
             r"""
@@ -3349,7 +3360,7 @@ echo "ERROR invalid value \"6\" for option -r: relation not found" >&2  # NOQA
 exit 2
 """,
         )
-        assert self.backend.relation_remote_app_name(6) is None
+        assert backend.relation_remote_app_name(6) is None
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '6', '--app', '--format=json'],
         ]
@@ -3361,12 +3372,12 @@ echo "ERROR option provided but not defined: --app" >&2
 exit 2
 """,
         )
-        assert self.backend.relation_remote_app_name(6) is None
+        assert backend.relation_remote_app_name(6) is None
         assert fake_script.calls(clear=True) == [
             ['relation-list', '-r', '6', '--app', '--format=json'],
         ]
 
-    def test_planned_units(self, fake_script: FakeScript):
+    def test_planned_units(self, fake_script: FakeScript, backend: _ModelBackend):
         # no units
         fake_script.write(
             'goal-state',
@@ -3374,7 +3385,7 @@ exit 2
 echo '{"units":{}, "relations":{}}'
 """,
         )
-        assert self.backend.planned_units() == 0
+        assert backend.planned_units() == 0
 
         # only active units
         fake_script.write(
@@ -3388,7 +3399,7 @@ echo '{
     "relations": {}
 }'""",
         )
-        assert self.backend.planned_units() == 2
+        assert backend.planned_units() == 2
 
         # active and dying units
         fake_script.write(
@@ -3402,7 +3413,7 @@ echo '{
     "relations": {}
 }'""",
         )
-        assert self.backend.planned_units() == 1
+        assert backend.planned_units() == 1
 
 
 class TestLazyMapping:
@@ -3426,7 +3437,7 @@ class TestLazyMapping:
 
 class TestSecrets:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
 
     def test_app_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
@@ -3714,7 +3725,7 @@ class TestSecretInfo:
 
 class TestSecretClass:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
 
     def make_secret(
@@ -4072,7 +4083,7 @@ class TestSecretClass:
 
 class TestPorts:
     @pytest.fixture
-    def unit(self):
+    def unit(self, fake_juju_version: None):
         model = ops.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
         return model.unit
 
@@ -4228,7 +4239,7 @@ class TestPorts:
 
 
 class TestUnit:
-    def test_reboot(self, fake_script: FakeScript):
+    def test_reboot(self, fake_script: FakeScript, fake_juju_version: None):
         model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
         unit = model.unit
         fake_script.write('juju-reboot', 'exit 0')
@@ -4391,7 +4402,7 @@ class TestCloudSpec:
 
 class TestGetCloudSpec:
     @pytest.fixture
-    def model(self):
+    def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
 
     def test_success(self, fake_script: FakeScript, model: ops.Model):
@@ -4408,6 +4419,24 @@ class TestGetCloudSpec:
         with pytest.raises(ops.ModelError) as excinfo:
             model.get_cloud_spec()
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_departing_unit_in_relations():
+    ctx = ops.testing.Context(
+        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
+    )
+    # In this mocked Juju data, only unit/0 is included.
+    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    state_in = ops.testing.State(relations={rel})
+    # We simulate a relation-departed event where the departing unit is unit/1.
+    with ctx(ctx.on.relation_departed(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        # The departing unit, unit/1, should be in the .units set for the relation
+        # even though it was not in the mocked Juju data.
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
 
 
 if __name__ == '__main__':
