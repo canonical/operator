@@ -123,8 +123,8 @@ All enhancements require review before being merged. Code review typically exami
 - Test coverage
 - User experience
 
-When evaluating design decisions, we optimize for the following personas, in descending order of priority:
+When evaluating design decisions, we give priority to the following personas:
 
-- Charm authors and maintainers
+- Charm authors and maintainers (highest priority)
 - Contributors to the Ops codebase
 - Juju developers
