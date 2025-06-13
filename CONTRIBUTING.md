@@ -43,7 +43,7 @@ Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testi
 
 # Coding style
 
-We follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_, as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
+We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
 
 # Documentation
 
