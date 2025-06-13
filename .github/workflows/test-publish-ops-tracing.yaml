@@ -18,8 +18,7 @@ jobs:
           enable-cache: false
       - run: |
           cd tracing
-          uv build --sdist --wheel
-          rm -vf dist/.gitignore  # https://github.com/astral-sh/uv/issues/11652
+          uv build --sdist --wheel ./  # https://github.com/astral-sh/uv/issues/13914
       # This step is expected to fail until the trusted publisher configuration
       # is updated in the test PYPI settings.
       - uses: pypa/gh-action-pypi-publish@release/v1
