@@ -37,7 +37,9 @@ To help us review your changes, please rebase your pull request onto the `main` 
 
 Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html) instead of legacy [ops.testing.Harness](https://ops.readthedocs.io/en/latest/reference/ops-testing-harness.html) tests.
 
-Tests should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
+Tests for Ops should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
+
+Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testing/tests) and [`ops-tracing`](https://github.com/canonical/operator/tree/main/tracing/test) are arranged differently in places. Try to find the most logical place to add tests, based on the code that is tested.
 
 # Coding style
 
