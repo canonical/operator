@@ -1,6 +1,6 @@
 We welcome contributions to Ops!
 
-Before developing enhancements, please consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case. If you would like to chat with us about your use cases or proposed implementation, you can reach us at [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
+Before working on changes, please consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case. If you would like to chat with us about your use cases or proposed implementation, you can reach us at [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
 
 For detailed technical information about the development of Ops, see [HACKING.md](./HACKING.md).
 
@@ -117,7 +117,7 @@ The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt)
 
 # Reviews
 
-All enhancements require review before being merged. Code review typically examines:
+All changes require review before being merged. Code review typically examines:
 
 - Code quality
 - Test coverage
