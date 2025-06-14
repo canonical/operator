@@ -105,12 +105,15 @@ class TestRealPebble:
         assert checks[0].name == 'bad'
         assert checks[0].level == pebble.CheckLevel.READY
         assert checks[0].status == pebble.CheckStatus.UP
+        assert checks[0].successes is not None and checks[0].successes >= 0
         assert checks[1].name == 'good'
         assert checks[1].level == pebble.CheckLevel.ALIVE
         assert checks[1].status == pebble.CheckStatus.UP
+        assert checks[1].successes is not None and checks[1].successes >= 0
         assert checks[2].name == 'other'
         assert checks[2].level == pebble.CheckLevel.UNSET
         assert checks[2].status == pebble.CheckStatus.UP
+        assert checks[2].successes is not None and checks[2].successes >= 0
 
         # And /v1/health should return "healthy"
         health = self._get_health()
