@@ -479,6 +479,7 @@ def test_pebble_check_failed():
     layer = pebble.Layer({'checks': {'http-check': {'override': 'replace', 'startup': 'enabled'}}})
     check = CheckInfo(
         'http-check',
+        successes=3,
         failures=7,
         status=pebble.CheckStatus.DOWN,
         level=layer.checks['http-check'].level,
@@ -491,6 +492,7 @@ def test_pebble_check_failed():
     assert len(infos) == 1
     assert infos[0].name == 'http-check'
     assert infos[0].status == pebble.CheckStatus.DOWN
+    assert infos[0].successes == 3
     assert infos[0].failures == 7
 
 
@@ -509,6 +511,7 @@ def test_pebble_check_recovered():
     layer = pebble.Layer({'checks': {'http-check': {'override': 'replace', 'startup': 'enabled'}}})
     check = CheckInfo(
         'http-check',
+        successes=None,
         status=pebble.CheckStatus.UP,
         level=layer.checks['http-check'].level,
         startup=layer.checks['http-check'].startup,
@@ -520,6 +523,7 @@ def test_pebble_check_recovered():
     assert len(infos) == 1
     assert infos[0].name == 'http-check'
     assert infos[0].status == pebble.CheckStatus.UP
+    assert infos[0].successes is None
     assert infos[0].failures == 0
 
 
@@ -557,6 +561,7 @@ def test_pebble_check_failed_two_containers():
     assert len(foo_infos) == 1
     assert foo_infos[0].name == 'http-check'
     assert foo_infos[0].status == pebble.CheckStatus.DOWN
+    assert foo_infos[0].successes == 0
     assert foo_infos[0].failures == 7
     assert len(bar_infos) == 0
 

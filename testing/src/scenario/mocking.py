@@ -835,6 +835,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                 level=level,
                 startup=info.startup,
                 status=status,
+                successes=info.successes,
                 failures=info.failures,
                 threshold=info.threshold,
                 change_id=info.change_id,
