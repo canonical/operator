@@ -4262,7 +4262,9 @@ class LazyCheckInfo:
 
     name: str
     level: pebble.CheckLevel | str | None
+    startup: pebble.CheckStartup
     status: pebble.CheckStatus | str
+    successes: int | None
     failures: int
     threshold: int
     change_id: pebble.ChangeID | None
