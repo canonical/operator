@@ -49,7 +49,7 @@ charm-libs:
 
 Next, run the following command to download the libraries:
 
-```
+```text
 ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
 ```
 

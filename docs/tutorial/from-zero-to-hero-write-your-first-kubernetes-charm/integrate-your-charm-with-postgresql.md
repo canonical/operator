@@ -40,7 +40,7 @@ This tells Charmcraft that your charm requires the [data_interfaces](https://cha
 
 Next, run the following command to download the library:
 
-```
+```text
 ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
