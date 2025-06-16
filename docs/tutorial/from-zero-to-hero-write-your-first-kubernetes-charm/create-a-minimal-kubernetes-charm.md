@@ -110,7 +110,7 @@ Create a file called `requirements.txt`. This is a  file that describes all the 
 In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
 
 ```
-ops >= 2.11
+ops < 4
 ```
 
 
