@@ -12,6 +12,7 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _next_storage_index,
     Address,
     BindAddress,
     CheckInfo,
@@ -757,13 +758,12 @@ def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], 
             'sub': {'interface': 'below', 'scope': 'container'},
         },
     }
-    rel = rel_type(endpoint)
+    rel = rel_type(endpoint, local_app_data={'a': 'b'})
     ctx = Context(ops.CharmBase, meta=meta)
     state = State.from_context(ctx, relations={rel})
-    # The passed in relation should be used, not the one from the context, which
-    # means the interface should be None, as it wasn't provided, but is in the
-    # context/meta.
-    assert state.get_relation(rel.id).interface is None
+    # We should have the relation passed in, that has data, not an empty one
+    # from the context.
+    assert state.get_relation(rel.id).local_app_data == {'a': 'b'}
 
 
 def test_state_from_context_skip_exiting_container():
@@ -771,9 +771,13 @@ def test_state_from_context_skip_exiting_container():
         'name': 'sam',
         'containers': {'container': {}},
     }
-    container = Container(name='container')
+    notice = Notice('example.com/notice')
+    container = Container(name='container', notices=[notice])
     ctx = Context(ops.CharmBase, meta=meta)
     state = State.from_context(ctx, containers={container})
+    # We should have the container passed in, that has notices and has the
+    # default of can_connect=False, not the one from the context.
+    assert state.get_container(container.name).notices == [notice]
     assert state.get_container(container.name).can_connect is False
 
 
@@ -782,10 +786,16 @@ def test_state_from_context_skip_exiting_storage():
         'name': 'sam',
         'storage': {'storage': {}},
     }
+    next_index = _next_storage_index(update=False)
     storage = Storage(name='storage')
+    assert storage.index == next_index
+    next_index = _next_storage_index(update=False)
     ctx = Context(ops.CharmBase, meta=meta)
     state = State.from_context(ctx, storages={storage})
+    # We should have the storage passed in. If the context created a new one,
+    # the index would have increased.
     assert state.get_storage(storage.name, index=storage.index) == storage
+    assert _next_storage_index(update=False) == next_index
 
 
 def test_state_from_context_skip_exiting_stored_state():
@@ -798,6 +808,8 @@ def test_state_from_context_skip_exiting_stored_state():
     stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
     ctx = Context(Charm, meta=meta)
     state = State.from_context(ctx, stored_states={stored_state})
+    # We should have the stored state passed in, that has content, not an empty
+    # one from the context.
     assert state.get_stored_state(
         stored_state.name, owner_path=stored_state.owner_path
     ).content == {'foo': 'bar'}
