@@ -294,7 +294,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
-            return tuple(f'{self.app_name}/{unit_id}' for unit_id in relation.peers_data)
+            this_unit = int(self.unit_name.split('/')[-1])
+            return tuple(
+                f'{self.app_name}/{unit_id}'
+                for unit_id in relation.peers_data
+                if unit_id != this_unit
+            )
         remote_name = self.relation_remote_app_name(relation_id)
         return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
