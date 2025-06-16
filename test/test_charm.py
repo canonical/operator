@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import enum
 import functools
 import pathlib
 import tempfile
@@ -23,8 +25,16 @@ from pathlib import Path
 import pytest
 import yaml
 
+try:
+    import pydantic
+    import pydantic.dataclasses
+except ImportError:
+    pydantic = None
+
 import ops
 import ops.charm
+from ops import testing
+from ops._main import _Abort
 from ops.model import ModelError, StatusName
 
 from .test_helpers import FakeScript, create_framework
@@ -1289,3 +1299,801 @@ def test_meta_charm_user_default():
 name: my-charm
 """)
     assert meta.charm_user == 'root'
+
+
+class _ConfigProtocol(typing.Protocol):
+    @property
+    def my_bool(self) -> bool | None: ...
+    @property
+    def my_int(self) -> int: ...
+    @property
+    def my_float(self) -> float: ...
+    @property
+    def my_str(self) -> str: ...
+    @property
+    def my_secret(self) -> ops.Secret | None: ...
+
+
+class MyConfig:
+    my_bool: bool | None = None
+    my_int: int = 42
+    my_float: float = 3.14
+    my_str: str = 'foo'
+    my_secret: ops.Secret | None = None
+
+    def __init__(
+        self,
+        *,
+        my_bool: bool | int | float | str | None = None,
+        my_int: bool | int | float | str = 42,
+        my_float: bool | int | float | str = 3.14,
+        my_str: bool | int | float | str = 'foo',
+        my_secret: ops.Secret | None = None,
+    ):
+        super().__init__()
+        # Juju takes care of making sure the types are correct, so this
+        # is only to help the Python type checking understand that.
+        if my_bool is not None:
+            assert isinstance(my_bool, bool)
+        self.my_bool = my_bool
+        assert isinstance(my_float, float)
+        self.my_float = my_float
+        assert isinstance(my_int, int)
+        if my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+        self.my_int = my_int
+        assert isinstance(my_str, str)
+        self.my_str = my_str
+        if my_secret is not None:
+            assert isinstance(my_secret, ops.Secret)
+            self.my_secret = my_secret
+
+
+class BaseTestConfigCharm(ops.CharmBase):
+    _config_errors: typing.Literal['blocked', 'raise'] | None = None
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        if self._config_errors:
+            self.typed_config = self.load_config(self.config_class, errors=self._config_errors)
+        else:
+            self.typed_config = self.load_config(self.config_class)
+        # These should not have any type errors.
+        new_float = self.typed_config.my_float + 2006.8
+        new_int = self.typed_config.my_int + 1979
+        new_str = self.typed_config.my_str + 'bar'
+        if self.typed_config.my_secret is not None:
+            label = self.typed_config.my_secret.label
+        else:
+            label = 'no secret'
+        # 'Use' the values to avoid unused variable errors.
+        self.data = f'{new_float=}, {new_int=}, {new_str=}, {label=}'
+
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        raise NotImplementedError
+
+
+class _MyConfigCharm(BaseTestConfigCharm):
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        return MyConfig
+
+
+# Note that we would really like to have kw_only=True here as well, but that's
+# not available in Python 3.8.
+@dataclasses.dataclass(frozen=True)
+class MyDataclassConfig:
+    my_bool: bool | None = None
+    my_int: int = 42
+    my_float: float = 3.14
+    my_str: str = 'foo'
+    my_secret: ops.Secret | None = None
+
+    def __post_init__(self):
+        if self.my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+
+
+class _MyDataclassConfigCharm(BaseTestConfigCharm):
+    @property
+    def config_class(self) -> type[_ConfigProtocol]:
+        return MyDataclassConfig
+
+
+_test_config_classes: list[type[BaseTestConfigCharm]] = [_MyConfigCharm, _MyDataclassConfigCharm]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True, config={'arbitrary_types_allowed': True})
+    class MyPydanticDataclassConfig:
+        my_bool: bool | None = pydantic.Field(None)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_str: str = pydantic.Field('foo')
+        my_secret: ops.Secret | None = pydantic.Field(None)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+    class _MyPydanticDataclassConfigCharm(BaseTestConfigCharm):
+        @property
+        def config_class(self) -> type[_ConfigProtocol]:
+            return MyPydanticDataclassConfig
+
+    class MyPydanticBaseModelConfig(pydantic.BaseModel):
+        my_bool: bool | None = pydantic.Field(None)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_str: str = pydantic.Field('foo')
+        my_secret: ops.Secret | None = pydantic.Field(None)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+        model_config = pydantic.ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    class _MyPydanticBaseModelConfigCharm(BaseTestConfigCharm):
+        @property
+        def config_class(self) -> type[_ConfigProtocol]:
+            return MyPydanticBaseModelConfig
+
+    _test_config_classes.extend((_MyPydanticDataclassConfigCharm, _MyPydanticBaseModelConfigCharm))
+
+
+_config = """
+options:
+    my-bool:
+        type: boolean
+    my-int:
+        type: int
+        default: 42
+    my-float:
+        type: float
+        default: 3.14
+    my-str:
+        type: string
+        default: foo
+    my-secret:
+        type: secret
+"""
+
+
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_init(charm_class: type[BaseTestConfigCharm], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert typed_config.my_bool is None
+    assert typed_config.my_float == 3.14
+    assert isinstance(typed_config.my_float, float)
+    assert typed_config.my_int == 42
+    assert isinstance(typed_config.my_int, int)
+    assert typed_config.my_str == 'foo'
+    assert isinstance(typed_config.my_str, str)
+    assert typed_config.my_secret is None
+
+
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({
+        'my-bool': True,
+        'my-float': 2.71,
+        'my-int': 24,
+        'my-str': 'bar',
+    })
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    assert typed_config.my_bool is True
+    assert typed_config.my_float == 2.71
+    assert typed_config.my_int == 24
+    assert typed_config.my_str == 'bar'
+    assert typed_config.my_secret is None
+
+
+@pytest.mark.parametrize(
+    'errors,exc',
+    (('raise', ValueError), ('blocked', ops._main._Abort), (None, ValueError)),
+)
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_with_error_blocked(
+    charm_class: type[ops.CharmBase],
+    errors: typing.Literal['blocked', 'raise'] | None,
+    exc: type[Exception],
+    request: pytest.FixtureRequest,
+):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    charm_class._config_errors = errors  # type: ignore
+    request.addfinalizer(lambda: setattr(charm_class, '_config_errors', None))
+    harness.update_config({
+        'my-int': -1,
+    })
+    with pytest.raises(exc):
+        harness.begin()
+    if errors == 'blocked':
+        status_dict = harness._backend.status_get()
+        assert status_dict['status'] == 'blocked'
+        assert 'my_int must be zero or positive' in status_dict['message']
+
+
+@pytest.mark.parametrize('charm_class', _test_config_classes)
+def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
+    harness = testing.Harness(charm_class, config=_config)
+    request.addfinalizer(harness.cleanup)
+    content = {'password': 'admin'}
+    secret_id = harness.add_user_secret(content)
+    harness.grant_secret(secret_id, harness.model.app.name)
+    harness.update_config({
+        'my-secret': secret_id,
+    })
+    harness.begin()
+    typed_config = harness.charm.typed_config  # type: ignore
+    typed_config = typing.cast('_ConfigProtocol', typed_config)
+    secret = typed_config.my_secret
+    assert secret is not None
+    assert secret.id == secret_id
+    assert secret.get_content() == content
+
+
+def test_config_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Config:
+        a: int
+        b: float
+        c: str
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(Config, 10, c='foo')
+
+    schema = """
+options:
+    b:
+        type: float
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'b': 3.14})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, Config)
+    assert typed_config.a == 10
+    assert typed_config.b == 3.14
+    assert typed_config.c == 'foo'
+
+
+class SmallConfig:
+    x: int
+
+    # Note that for plain classes we do not try to determine the fields
+    # and instead get all arguments.
+    def __init__(self, x: int, **_):
+        self.x = x
+
+
+@dataclasses.dataclass(frozen=True)
+class SmallDataclassConfig:
+    x: int
+
+
+_small_configs: list[type[object]] = [SmallConfig, SmallDataclassConfig]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class SmallPydanticDataclassConfig:
+        x: int
+
+    class SmallPydanticBaseModelConfig(pydantic.BaseModel):
+        x: int = pydantic.Field()
+
+    _small_configs.extend((SmallPydanticDataclassConfig, SmallPydanticBaseModelConfig))
+
+
+@pytest.mark.parametrize('config_class', _small_configs)
+def test_config_partial_init(config_class: type[object], request: pytest.FixtureRequest):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(config_class)
+
+    # Harness needs to know about *all* the options, even though the charm does not.
+    schema = """
+options:
+    x:
+        type: int
+    y:
+        type: string
+        description: An int not used in the class
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    # The raw config contains more fields than the class requires.
+    harness.update_config({'x': 42, 'y': 'foo'})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, config_class)
+    assert typed_config.x == 42  # type: ignore
+    assert not hasattr(typed_config, 'y')
+
+
+class MyAction:
+    my_str: str
+    my_bool: bool = False
+    my_int: int = 42
+    my_float: float = 3.14
+    my_list: list[str] = []  # noqa: RUF012
+
+    def __init__(
+        self,
+        *,
+        my_str: typing.Any,
+        my_bool: typing.Any = False,
+        my_int: typing.Any = 42,
+        my_float: typing.Any = 3.14,
+        my_list: typing.Any = None,
+    ):
+        super().__init__()
+        assert isinstance(my_bool, bool)
+        self.my_bool = my_bool
+        assert isinstance(my_float, float)
+        self.my_float = my_float
+        assert isinstance(my_float, float)
+        assert isinstance(my_int, int)
+        if my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+        self.my_int = my_int
+        assert isinstance(my_str, str)
+        self.my_str = my_str
+        if my_list is None:
+            self.my_list = []
+        else:
+            assert isinstance(my_list, list)
+            self.my_list = my_list
+
+
+class BaseTestActionCharm(ops.CharmBase):
+    errors: typing.Literal['fail', 'raise'] = 'fail'
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on['my-action'].action, self._on_action)
+
+    @property
+    def action_class(self) -> type[MyAction]:
+        raise NotImplementedError
+
+    def _on_action(self, event: ops.ActionEvent):
+        params = event.load_params(self.action_class, errors=self.errors)
+        # These should not have any type errors.
+        new_float = params.my_float + 2006.8
+        new_int = params.my_int + 1979
+        new_str = params.my_str + 'bar'
+        new_list = params.my_list[:]
+        event.log(f'{new_float=}, {new_int=}, {new_str=}, {new_list=}')
+        event.set_results({'params': params})
+
+
+class _MyActionCharm(BaseTestActionCharm):
+    @property
+    def action_class(self) -> type[MyAction]:
+        return MyAction
+
+
+# Note that we would really like to have kw_only=True here as well, but that's
+# not available in Python 3.8.
+@dataclasses.dataclass(frozen=True)
+class MyDataclassAction:
+    my_str: str
+    my_bool: bool = False
+    my_int: int = 42
+    my_float: float = 3.14
+    my_list: list[str] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        if self.my_int < 0:
+            raise ValueError('my_int must be zero or positive')
+
+
+class _MyDataclassActionCharm(BaseTestActionCharm):
+    @property
+    def action_class(self) -> type[MyDataclassAction]:
+        return MyDataclassAction
+
+
+_test_action_classes: list[type[ops.CharmBase]] = [_MyActionCharm, _MyDataclassActionCharm]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class MyPydanticDataclassAction:
+        my_str: str = pydantic.Field()
+        my_bool: bool = pydantic.Field(False)
+        my_int: int = pydantic.Field(42)
+        my_float: float = pydantic.Field(3.14)
+        my_list: list[str] = pydantic.Field(default_factory=list)
+
+        @pydantic.field_validator('my_int')
+        @classmethod
+        def validate_my_int(cls, my_int: int) -> int:
+            if my_int < 0:
+                raise ValueError('my_int must be zero or positive')
+            return my_int
+
+    class _MyPydanticDataclassActionCharm(BaseTestActionCharm):
+        @property
+        def action_class(self) -> type[MyPydanticDataclassAction]:
+            return MyPydanticDataclassAction
+
+    class MyPydanticBaseModelAction(pydantic.BaseModel):
+        my_str: str = pydantic.Field()
+        my_bool: bool = pydantic.Field(False)
+        my_int: int = pydantic.Field(42, ge=0)
+        my_float: float = pydantic.Field(3.14)
+        my_list: list[str] = pydantic.Field(default_factory=list)
+
+        model_config = pydantic.ConfigDict(frozen=True)
+
+    class _MyPydanticBaseModelActionCharm(BaseTestActionCharm):
+        @property
+        def action_class(self) -> type[MyPydanticBaseModelAction]:
+            return MyPydanticBaseModelAction
+
+    _test_action_classes.extend((_MyPydanticDataclassActionCharm, _MyPydanticBaseModelActionCharm))
+
+
+@pytest.mark.parametrize('charm_class', _test_action_classes)
+def test_action_init(
+    charm_class: type[BaseTestActionCharm],
+    request: pytest.FixtureRequest,
+):
+    action_yaml = """
+my-action:
+    params:
+        my-str:
+            type: string
+        my-bool:
+            type: boolean
+            default: false
+        my-int:
+            type: integer
+            default: 42
+        my-float:
+            type: float
+            default: 3.14
+        my-list:
+            type: list
+"""
+    harness = testing.Harness(charm_class, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_out = harness.run_action('my-action', {'my-str': 'foo'}).results['params']
+    assert params_out.my_bool is False
+    assert params_out.my_float == 3.14
+    assert isinstance(params_out.my_float, float)
+    assert params_out.my_int == 42
+    assert isinstance(params_out.my_int, int)
+    assert params_out.my_str == 'foo'
+    assert isinstance(params_out.my_str, str)
+    assert params_out.my_list == []
+    assert isinstance(params_out.my_list, list)
+
+
+@pytest.mark.parametrize('charm_class', _test_action_classes)
+def test_action_init_non_default(
+    charm_class: type[BaseTestActionCharm],
+    request: pytest.FixtureRequest,
+):
+    action_yaml = """
+my-action:
+    params:
+        my-str:
+            type: string
+        my-bool:
+            type: boolean
+            default: false
+        my-int:
+            type: integer
+            default: 42
+        my-float:
+            type: float
+            default: 3.14
+        my-list:
+            type: list
+"""
+    harness = testing.Harness(charm_class, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_in = {
+        'my-bool': True,
+        'my-float': 2.71,
+        'my-int': 24,
+        'my-str': 'bar',
+        'my-list': ['a', 'b', 'c'],
+    }
+    params_out = harness.run_action('my-action', params_in).results['params']
+    assert params_out.my_bool is True
+    assert params_out.my_float == 2.71
+    assert params_out.my_int == 24
+    assert params_out.my_str == 'bar'
+    assert params_out.my_list == ['a', 'b', 'c']
+
+
+@pytest.mark.parametrize('charm_class', _test_action_classes)
+def test_action_with_error_fail(
+    charm_class: type[BaseTestActionCharm],
+    request: pytest.FixtureRequest,
+):
+    action_yaml = """
+my-action:
+    params:
+        my-str:
+            type: string
+            default: foo
+        my-int:
+            type: integer
+            default: 42
+"""
+    harness = testing.Harness(charm_class, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    with pytest.raises(_Abort):
+        harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
+    # There should be a failure message, but we're not concerned with the exact
+    # wording, which will differ between action classes.
+    assert harness._backend._running_action.failure_message
+
+
+@pytest.mark.parametrize('charm_class', _test_action_classes)
+def test_action_with_error_raise(
+    charm_class: type[BaseTestActionCharm],
+    request: pytest.FixtureRequest,
+):
+    class RaiseCharm(charm_class):
+        errors = 'raise'
+
+    action_yaml = """
+my-action:
+    params:
+        my-str:
+            type: string
+            default: foo
+        my-int:
+            type: integer
+            default: 42
+"""
+
+    harness = testing.Harness(RaiseCharm, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    with pytest.raises(ValueError):
+        harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
+
+
+class _Alias:  # noqa: B903
+    def __init__(self, fooBar: int, other: str):  # noqa: N803
+        self.foo_bar = fooBar
+        self.other = other
+
+
+@dataclasses.dataclass(frozen=True)
+class _DataclassesAlias:
+    foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+    other: str = 'baz'
+
+
+_alias_action_classes: list[type[object]] = [_Alias, _DataclassesAlias]
+
+if pydantic is not None:
+
+    @pydantic.dataclasses.dataclass(frozen=True, init=False)
+    class _PydanticDataclassesAlias:
+        foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+        other: str = pydantic.Field(default='baz')
+
+    class _PydanticBaseModelAlias(pydantic.BaseModel):
+        foo_bar: int = pydantic.Field(42, alias='fooBar')
+        other: str = pydantic.Field('baz')
+
+    _alias_action_classes.extend([_PydanticDataclassesAlias, _PydanticBaseModelAlias])
+
+
+@pytest.mark.parametrize('action_params', [{}, {'fooBar': 24}])
+@pytest.mark.parametrize('action_class', _alias_action_classes)
+def test_action_custom_naming_pattern(
+    action_params: dict[str, int], action_class: type[object], request: pytest.FixtureRequest
+):
+    # The latest version of Pydantic available for Python 3.8 does not support
+    # the `alias` metadata, so we need to skip the test for that case.
+    if pydantic is not None and action_class is _PydanticDataclassesAlias:
+        pytest.skip('Pydantic does not support dataclasses alias metadata in this version.')
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['act'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(action_class)
+            event.set_results({'params': params})
+
+    action_yaml = """
+act:
+    params:
+        fooBar:
+            type: int
+            default: 42
+        other:
+            type: string
+            default: baz
+"""
+    harness = testing.Harness(Charm, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_out = harness.run_action('act', action_params).results['params']
+    assert params_out.foo_bar == action_params.get('fooBar', 42)
+    assert params_out.other == 'baz'
+
+
+def test_action_extra_args(request: pytest.FixtureRequest):
+    @dataclasses.dataclass
+    class Action:
+        a: int
+        b: float
+        c: str
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['action'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(Action, 10, c='foo')
+            event.set_results({'params': params})
+
+    action_yaml = """
+action:
+    params:
+        b:
+            type: float
+"""
+    harness = testing.Harness(Charm, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params = harness.run_action('action', {'b': 3.14}).results['params']
+    assert params.a == 10
+    assert params.b == 3.14
+    assert params.c == 'foo'
+
+
+# Note that this test is based on the example in the actions how-to doc.
+# Ideally, the configuration and charm classes are kept the same as in that
+# doc, so that we are confident that the code we're recommending charmers
+# write will actually work. This means that the test is a bit more verbose
+# than otherwise, but not excessively so.
+@pytest.mark.skipif(
+    pydantic is None,
+    reason='pydantic is not available, so we cannot test pydantic-based classes.',
+)
+def test_action_nested_with_enum(request: pytest.FixtureRequest):
+    assert pydantic is not None
+
+    class CompressionKind(enum.Enum):
+        GZIP = 'gzip'
+        BZIP = 'bzip2'
+        XZ = 'xz'
+
+    class Compression(pydantic.BaseModel):
+        kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
+        quality: int = pydantic.Field(5, description='Compression quality.', ge=0, le=9)
+
+    class SnapshotAction(pydantic.BaseModel):
+        """Take a snapshot of the database."""
+
+        filename: str = pydantic.Field(description='The name of the snapshot file.')
+        compression: Compression = pydantic.Field(  # type: ignore
+            default_factory=Compression,  # type: ignore
+            description='The type of compression to use.',
+        )
+
+    class DBCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['snapshot'].action, self._on_snapshot_action)
+
+        def _on_snapshot_action(self, event: ops.ActionEvent):
+            params = event.load_params(SnapshotAction, errors='raise')
+            event.log(f'Generating snapshot into {params.filename}')
+            success = self.do_snapshot(
+                filename=params.filename,
+                kind=params.compression.kind,
+                quality=params.compression.quality,
+            )
+            if not success:
+                event.fail('Failed to generate snapshot.')
+                return
+            msg = f'Stored snapshot in {params.filename}.'
+            event.set_results({'result': msg})
+
+        def do_snapshot(self, filename: str, kind: CompressionKind, quality: int) -> bool:
+            self.snapped = [filename, kind, quality]
+            return True
+
+    action_yaml = """
+snapshot:
+    description: Take a snapshot of the database.
+    params:
+        filename:
+            type: string
+            description: The name of the snapshot file.
+        compression:
+            type: object
+            description: The type of compression to use.
+            properties:
+                kind:
+                    type: string
+                    enum:
+                    - gzip
+                    - bzip2
+                    - xz
+                    default: gzip
+                quality:
+                    description: Compression quality
+                    type: integer
+                    default: 5
+                    minimum: 0
+                    maximum: 9
+    required:
+    - filename
+    additionalProperties: false
+"""
+
+    harness = testing.Harness(DBCharm, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    # Snapshot with the defaults.
+    out = harness.run_action('snapshot', {'filename': 'snap.bz2'})
+    assert out.results['result'] == 'Stored snapshot in snap.bz2.'
+    assert harness.charm.snapped == ['snap.bz2', CompressionKind.BZIP, 5]
+    # Snapshot with custom values.
+    out = harness.run_action(
+        'snapshot',
+        {
+            'filename': 'snap.gz',
+            'compression': {'kind': 'gzip', 'quality': 7},
+        },
+    )
+    assert out.results['result'] == 'Stored snapshot in snap.gz.'
+    assert harness.charm.snapped == ['snap.gz', CompressionKind.GZIP, 7]
+    # Snapshot with an invalid compression kind.
+    with pytest.raises(ValueError):
+        harness.run_action(
+            'snapshot',
+            {
+                'filename': 'snap.zip',
+                'compression': {'kind': 'zip'},
+            },
+        )
+    # Snapshot with an invalid compression quality.
+    with pytest.raises(ValueError):
+        harness.run_action(
+            'snapshot',
+            {
+                'filename': 'snap.xz',
+                'compression': {'kind': 'xz', 'quality': 10},
+            },
+        )

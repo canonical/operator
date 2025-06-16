@@ -25,21 +25,6 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-docs = [
-    "canonical-sphinx-extensions",
-    "furo",
-    "linkify-it-py",
-    "myst-parser",
-    "pyspelling",
-    "sphinx ~= 8.0.0",
-    "sphinx-autobuild",
-    "sphinx-copybutton",
-    "sphinx-design",
-    "sphinx-notfound-page",
-    "sphinx-tabs",
-    "sphinxcontrib-jquery",
-    "sphinxext-opengraph",
-]
 testing = [
     "ops-scenario==7.23.0.dev0",
 ]
@@ -49,6 +34,59 @@ tracing = [
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
 harness = []
+
+[dependency-groups]
+lint = [
+    "ruff==0.11.2",
+    "codespell==2.4.1",
+]
+docs = [
+    "ops[testing,tracing]",
+    "canonical-sphinx-extensions",
+    "furo",
+    "linkify-it-py",
+    "myst-parser; python_version >= \"3.10\"",
+    "pyspelling",
+    "sphinx ~= 8.0.0; python_version >= \"3.10\"",
+    "sphinx-autobuild",
+    "sphinx-copybutton",
+    "sphinx-design",
+    "sphinx-notfound-page",
+    "sphinx-tabs",
+    "sphinxcontrib-jquery",
+    "sphinxext-opengraph",
+]
+static = [
+    "ops[testing,tracing]",
+    "pyright==1.1.385",
+    "typing_extensions~=4.2",
+]
+unit = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "jsonpatch~=1.33",
+    "pydantic~=2.10",
+    "eval-type-backport~=0.2; python_version < \"3.10\"",
+]
+xdist = [
+    "pytest-xdist~=3.6",
+]
+coverage = [
+    "coverage[toml]~=7.0",
+]
+benchmark = [
+    "pytest-benchmark~=5.0; python_version >= \"3.9\"",
+]
+integration = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "pytest-operator~=0.23",
+    "jubilant~=1.0",
+    "minio~=7.2",
+    "httpx~=0.28",
+    "juju>=2.9,<4",
+    "build",  # Until #1814 and #1813 are done
+]
 
 [project.urls]
 "Homepage" = "https://ops.readthedocs.io/en/latest/"
@@ -62,6 +100,14 @@ requires = [
     "setuptools>=60",
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.uv.workspace]
+members = ["tracing", "testing"]
+
+[tool.uv.sources]
+ops = { workspace = true }
+ops-scenario = { workspace = true }
+ops-tracing = { workspace = true }
 
 [tool.setuptools.packages.find]
 include = ["ops"]

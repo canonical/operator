@@ -572,7 +572,7 @@ class RelationBase(_max_posargs(2)):
 
     def _get_databag_for_remote(
         self,
-        unit_id: int,  # noqa: U100
+        unit_id: int,
     ) -> RawDataBagContents:
         """Return the databag for some remote unit ID."""
         raise NotImplementedError()
@@ -956,6 +956,13 @@ class CheckInfo(_max_posargs(1)):
     been stopped, so is not currently running.
     """
 
+    successes: int | None = 0
+    """Number of times this check has succeeded.
+
+    Set this to None to simulate an older version of Pebble which doesn't have
+    the ``successes`` field (introduced in Pebble v1.23.0).
+    """
+
     failures: int = 0
     """Number of failures since the check last succeeded."""
 
@@ -989,6 +996,7 @@ class CheckInfo(_max_posargs(1)):
             level=self.level,
             startup=self.startup,
             status=self.status,
+            successes=self.successes,
             failures=self.failures,
             threshold=self.threshold,
             change_id=self.change_id,

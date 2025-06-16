@@ -1,0 +1,45 @@
+type: charm
+bases:
+  - build-on:
+    - name: ubuntu
+      channel: "22.04"
+    run-on:
+    - name: ubuntu
+      channel: "22.04"
+
+name: httpbin-demo
+title: |
+  httpbin-demo
+description: |
+  A Kubernetes charm for kennethreitz/httpbin that demonstrates how to restart the workload when a configuration option changes.
+summary: |
+  A demo Kubernetes charm.
+
+assumes:
+  - juju >= 3.1
+  - k8s-api
+
+config:
+  options:
+    log-level:
+      description: |
+        Configures the log level of gunicorn.
+
+        Acceptable values are: "info", "debug", "warning", "error" and "critical"
+      default: "info"
+      type: string
+
+containers:
+  httpbin:
+    resource: httpbin-image
+
+resources:
+  # An OCI image resource for each container listed above.
+  # You may remove this if your charm will run without a workload sidecar container.
+  httpbin-image:
+    type: oci-image
+    description: OCI image for httpbin
+    # The upstream-source field is ignored by Juju. It is included here as a reference
+    # so the integration testing suite knows which image to deploy during testing. This field
+    # is also used by the 'canonical/charming-actions' GitHub action for automated releasing.
+    upstream-source: kennethreitz/httpbin

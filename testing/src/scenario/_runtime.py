@@ -435,7 +435,12 @@ def capture_events(
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit
 
-    yield captured
-
-    Framework._emit = _real_emit
-    Framework.reemit = _real_reemit
+    # A finally block is needed here in case the code raises an exception that
+    # isn't a subclass of Exception (like SystemExit or KeyboardInterrupt).
+    # Those are captured by the exec() code that uses this context manager, but
+    # ones outside of Exception are not.
+    try:
+        yield captured
+    finally:
+        Framework._emit = _real_emit
+        Framework.reemit = _real_reemit
