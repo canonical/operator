@@ -32,6 +32,10 @@ requires:
     interface: postgresql_client
     limit: 1
 
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+
 actions:
   get-db-info:
     description: Fetches Database authentication information

@@ -27,24 +27,30 @@ In the charming universe, what you would do is deploy the existing [Canonical Ob
 
 In this part of the tutorial we will follow this process to collect various metrics and logs about your application and visualise them on a dashboard.
 
-## Integrate with Prometheus
+## Fetch libraries
 
-Follow the steps below to make your charm capable of integrating with the existing [Prometheus](https://charmhub.io/prometheus-k8s) charm. This will enable your charm user to collect real-time metrics about your application.
+Your charm will need several more libraries from Charmhub.
 
-### Fetch the Prometheus interface libraries
+Ensure you're in your Multipass Ubuntu VM, in your charm project directory. Then, in `charmcraft.yaml`, extend the `charm-libs` section:
 
-Ensure you're in your Multipass Ubuntu VM, in your charm project directory. 
-
-Then, satisfy the interface library requirement of the Prometheus charm by fetching the [`prometheus_scrape`](https://charmhub.io/prometheus-k8s/libraries/prometheus_scrape) library:
-
-```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.prometheus_k8s.v0.prometheus_scrape
+```yaml
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+  - lib: grafana_k8s.grafana_dashboard
+    version: "0"
+  - lib: loki_k8s.loki_push_api
+    version: "0"
+  - lib: observability_libs.juju_topology
+    version: "0"
+  - lib: prometheus_k8s.prometheus_scrape
+    version: "0"
 ```
 
-Also satisfy the dependency requirements of the `prometheus_scrape` library by fetching the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library:
+Next, run the following command to download the libraries:
 
-```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.observability_libs.v0.juju_topology
+```
+ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now include the structure below:
@@ -52,6 +58,15 @@ Your charm directory should now include the structure below:
 ```text
 lib
 └── charms
+    ├── data_platform_libs
+    │   └── v0
+    │       └── data_interfaces.py
+    ├── grafana_k8s
+    │   └── v0
+    │       └── grafana_dashboard.py
+    ├── loki_k8s
+    │   └── v0
+    │       └── loki_push_api.py
     ├── observability_libs
     │   └── v0
     │       └── juju_topology.py
@@ -61,8 +76,12 @@ lib
 ```
 
 ```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.prometheus_k8s.v0.prometheus_scrape`.
+When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. To import a library in your code, use `charms.prometheus_k8s.v0.prometheus_scrape`, for example.
 ```
+
+## Integrate with Prometheus
+
+Follow the steps below to make your charm capable of integrating with the existing [Prometheus](https://charmhub.io/prometheus-k8s) charm. This will enable your charm user to collect real-time metrics about your application.
 
 ### Define the Prometheus relation interface
 
@@ -102,34 +121,6 @@ Congratulations, your charm is ready to be integrated with Prometheus!
 
 Follow the steps below to make your charm capable of integrating with the existing [Loki](https://charmhub.io/loki-k8s) charm. This will enable your charm user to collect application logs.
 
-### Fetch the Loki interface libraries
-
-Ensure you're in your Multipass Ubuntu VM, in your charm folder. 
-
-Then, satisfy the interface library requirements of the Loki charm by fetching the [loki_push_api](https://charmhub.io/loki-k8s/libraries/loki_push_api) library:
-
-```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.loki_k8s.v0.loki_push_api
-```
-
-This should add to your charm directory the structure below:
-
-```text
-lib
-└── charms
-    ├── loki_k8s
-    │   └── v0
-    │       └── loki_push_api.py
-```
-
-```{note}
-The `loki_push_api` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
-```
-
-```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.loki_k8s.v0.loki_push_api`.
-```
-
 ### Define the Loki relation interface
 
 In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
@@ -168,34 +159,6 @@ Congratulations, your charm can now also integrate with Loki!
 ## Integrate with Grafana
 
 Follow the steps below to make your charm capable of integrating with the existing [Grafana](https://charmhub.io/grafana-k8s) charm. This will allow your charm user to visualise the data collected from Prometheus and Loki.
-
-### Fetch the Grafana interface libraries
-
-Ensure you're in your Multipass Ubuntu VM, in your charm folder. 
-
-Then, satisfy the interface requirement of the Grafana charm by fetching the [grafana_dashboard](https://charmhub.io/grafana-k8s/libraries/grafana_dashboard) library:
-
-```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.grafana_k8s.v0.grafana_dashboard
-```
-
-Your charm directory should now include the structure below:
-
-```text
-lib
-└── charms
-    ├── grafana_k8s
-    │   └── v0
-    │       └── grafana_dashboard.py
-```
-
-```{note}
-The `grafana_dashboard` library also depends on the  [`juju_topology`](https://charmhub.io/observability-libs/libraries/juju_topology) library, but you have already fetched it above for Prometheus.
-```
-
-```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. Thus, to import this library in your code, use just `charms.grafana_k8s.v0.grafana_dashboard`.
-```
 
 ### Define the Grafana relation interface
 

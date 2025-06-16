@@ -28,10 +28,20 @@ A charm often requires or supports relations to other charms. For example, to ma
 
 ## Fetch the required database interface charm libraries
 
-Navigate to your charm directory and fetch the [data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces) charm library from Charmhub:
+In `charmcraft.yaml`, add a `charm-libs` section before the `containers` section:
+
+```yaml
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+```
+
+This tells Charmcraft that your charm requires the [data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces) charm library from Charmhub.
+
+Next, run the following command to download the library:
 
 ```
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-lib charms.data_platform_libs.v0.data_interfaces
+ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now contain the structure below:
@@ -52,7 +62,7 @@ Now, time to define the charm relation interface.
 
 First, find out the name of the interface that PostgreSQL offers for other charms to connect to it. According to the [documentation of the PostgreSQL charm](https://charmhub.io/postgresql-k8s?channel=14/stable), the interface is called `postgresql_client`.
 
-Next, open the `charmcraft.yaml` file of your charm and, before the `containers` section, define a relation endpoint using a `requires` block, as below. This endpoint says that our charm is requesting a relation called `database` over an interface called `postgresql_client` with a maximum number of supported connections of 1. (Note: Here, `database` is a custom relation name, though in general we recommend sticking to default recommended names for each charm.)
+Next, open the `charmcraft.yaml` file of your charm and, before the `charm-libs` section, define a relation endpoint using a `requires` block, as below. This endpoint says that our charm is requesting a relation called `database` over an interface called `postgresql_client` with a maximum number of supported connections of 1. (Note: Here, `database` is a custom relation name, though in general we recommend sticking to default recommended names for each charm.)
 
 ```yaml
 requires:

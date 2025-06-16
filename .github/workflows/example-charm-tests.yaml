@@ -39,8 +39,7 @@ jobs:
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
-          # Gets the job done... Better for tox.ini to have a dedicated env for fetching charmlibs?
-          awk '/from charms\.[^ ]+/ { sub(/^from /, ""); system("charmcraft fetch-lib " $1) }' src/charm.py
+          charmcraft fetch-libs
       - name: Run unit tests
         run: |
           cd ${{ matrix.dir }}
