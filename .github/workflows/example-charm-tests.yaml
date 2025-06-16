@@ -40,7 +40,9 @@ jobs:
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
-          charmcraft fetch-libs
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
       - name: Run unit tests
         run: |
           cd ${{ matrix.dir }}
