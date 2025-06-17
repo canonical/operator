@@ -68,7 +68,7 @@ def check_consistency(
     juju_version: str,
     unit_id: int,
 ):
-    """Validate the combination of a state, an event, a charm spec, and a Juju version.
+    """Validate the combination of a state, event, charm spec, Juju version, and unit.
 
     When invoked, it performs a series of checks that validate that the state is
     consistent with itself, with the event being emitted, the charm metadata,
