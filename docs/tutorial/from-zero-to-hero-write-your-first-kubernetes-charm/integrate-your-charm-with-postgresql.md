@@ -317,8 +317,8 @@ juju status --relations --watch 1s
 You should see both applications get to the `active` status, and also that the `postgresql-k8s` charm has a relation to the `demo-api-charm` over the `postgresql_client` interface, as below:
 
 ```text
-Model        Controller           Cloud/Region        Version  SLA          Timestamp
-charm-model  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:50:39+01:00
+Model        Controller  Cloud/Region        Version  SLA          Timestamp
+charm-model  microk8s    microk8s/localhost  3.0.0    unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
 demo-api-charm  0.0.9    active      1  demo-api-charm             1  10.152.183.233  no       
