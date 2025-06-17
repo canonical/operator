@@ -39,7 +39,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
         """Report the status of the workload (runs after each event)."""
-        if self.log_level not in VALID_LOG_LEVELS:
+        if self.log_level.lower() not in VALID_LOG_LEVELS:
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
             return
         if not self.container.can_connect():
@@ -63,7 +63,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        if self.log_level not in VALID_LOG_LEVELS or not self.container.can_connect():
+        if self.log_level.lower() not in VALID_LOG_LEVELS or not self.container.can_connect():
             return
         # Update the configuration of the workload.
         self.container.add_layer('httpbin', self._pebble_layer, combine=True)
