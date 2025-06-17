@@ -87,7 +87,7 @@ def test_config_changed_valid_cannot_connect():
 
 
 def test_config_changed_valid_upper_case():
-    """Test a config-changed event when the config is valid and upper case."""
+    """Test a config-changed event when the config is valid and uppercase."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container('httpbin', can_connect=True)
