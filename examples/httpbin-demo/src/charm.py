@@ -34,15 +34,14 @@ class HttpbinDemoCharm(ops.CharmBase):
         super().__init__(framework)
         framework.observe(self.on['httpbin'].pebble_ready, self._on_httpbin_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
+        self.container = self.unit.get_container('httpbin')
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Define and start a workload using the Pebble API."""
-        # Get a reference the container attribute on the PebbleReadyEvent
-        container = event.workload
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer('httpbin', self._pebble_layer, combine=True)
+        self.container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
-        container.replan()
+        self.container.replan()
         self.unit.status = ops.ActiveStatus()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
@@ -53,11 +52,10 @@ class HttpbinDemoCharm(ops.CharmBase):
         # Do some validation of the configuration option
         if log_level in VALID_LOG_LEVELS:
             # The config is good, so update the configuration of the workload
-            container = self.unit.get_container('httpbin')
             # Push an updated layer with the new config
             try:
-                container.add_layer('httpbin', self._pebble_layer, combine=True)
-                container.replan()
+                self.container.add_layer('httpbin', self._pebble_layer, combine=True)
+                self.container.replan()
             except ops.pebble.ConnectionError:
                 # We were unable to connect to the Pebble API, so we defer this event
                 self.unit.status = ops.MaintenanceStatus('waiting for Pebble API')
