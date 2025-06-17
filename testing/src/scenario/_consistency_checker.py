@@ -66,6 +66,7 @@ def check_consistency(
     event: _Event,
     charm_spec: _CharmSpec[Any],
     juju_version: str,
+    unit_id: int,
 ):
     """Validate the combination of a state, an event, a charm spec, and a Juju version.
 
@@ -111,6 +112,7 @@ def check_consistency(
             event=event,
             charm_spec=charm_spec,
             juju_version=juju_version_,
+            unit_id=unit_id,
         )
         errors.extend(results.errors)
         warnings.extend(results.warnings)
@@ -536,6 +538,7 @@ def check_relation_consistency(
     state: State,
     event: _Event,
     charm_spec: _CharmSpec[CharmType],
+    unit_id: int,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any relations in the :class:`scenario.State`."""
@@ -597,6 +600,18 @@ def check_relation_consistency(
             errors.append('duplicate endpoint name in metadata.')
             break
         seen_endpoints.add(endpoint)
+
+    # make sure that a peer relation doesn't have data for its own unit in peers_data
+    for relation in state.relations:
+        if not isinstance(relation, PeerRelation):
+            continue
+        if unit_id in relation.peers_data:
+            errors.append(
+                f'`peers_data` should only contain data for other units, not '
+                f'for the unit under test (unit {unit_id}). '
+                f'Instead of `peers_data={{{unit_id}: x, other_unit: y}}`, use '
+                f'`peers_data={{other_unit: y}}, local_unit_data=x`.',
+            )
 
     return Results(errors, [])
 
