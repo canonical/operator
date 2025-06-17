@@ -296,7 +296,7 @@ class Runtime:
         """
         from ._consistency_checker import check_consistency  # avoid cycles
 
-        check_consistency(state, event, self._charm_spec, self._juju_version)
+        check_consistency(state, event, self._charm_spec, self._juju_version, self._unit_id)
 
         charm_type = self._charm_spec.charm_type
         logger.info(f'Preparing to fire {event.name} on {charm_type.__name__}')
