@@ -86,6 +86,23 @@ def test_config_changed_valid_cannot_connect():
     assert isinstance(state_out.unit_status, testing.MaintenanceStatus)
 
 
+def test_config_changed_valid_upper_case():
+    """Test a config-changed event when the config is valid and upper case."""
+    # Arrange:
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container('httpbin', can_connect=True)
+    state_in = testing.State(containers={container}, config={'log-level': 'DEBUG'})
+
+    # Act:
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+
+    # Assert:
+    updated_plan = state_out.get_container(container.name).plan
+    gunicorn_args = updated_plan.services['httpbin'].environment['GUNICORN_CMD_ARGS']
+    assert gunicorn_args == '--log-level DEBUG'
+    assert isinstance(state_out.unit_status, testing.ActiveStatus)
+
+
 def test_config_changed_invalid():
     """Test a config-changed event when the config is invalid."""
     # Arrange:
