@@ -710,9 +710,7 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(
-        default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},
-    )
+    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
     """Current contents of the peer databags."""
     # Consistency checks will validate that *this unit*'s ID is not in here.
 
