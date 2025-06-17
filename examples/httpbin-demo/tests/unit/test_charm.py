@@ -86,7 +86,7 @@ def test_config_changed_valid_cannot_connect():
     assert isinstance(state_out.unit_status, testing.MaintenanceStatus)
 
 
-def test_config_changed_valid_upper_case():
+def test_config_changed_valid_uppercase():
     """Test a config-changed event when the config is valid and uppercase."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
