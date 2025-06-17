@@ -1188,6 +1188,36 @@ class Container(_max_posargs(1)):
         raise KeyError(f'check-info: {name} not found in the Container')
 
 
+def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
+    """Create a layer from a `rockcraft.yaml` file.
+
+    This is a convenience function to create a Pebble layer from a
+    rockcraft.yaml file, that can then be passed to :class:`Container`, rather
+    than duplicating the layer contents in the test code. For example:
+
+        container = Container(
+            name='my-container',
+            layers={'rock': layer_from_rockcraft(pathlib.Path('rockcraft.yaml'))},
+        )
+
+    Args:
+        path: Path to the `rockcraft.yaml` file.
+    """
+    if isinstance(path, str):
+        path = pathlib.Path(path)
+    if not path.is_file():
+        raise ValueError(f'rockcraft.yaml file not found at {path}')
+    with path.open('r') as f:
+        rockcraft = yaml.safe_load(f)
+    layer_dict: pebble.LayerDict = {
+        'summary': rockcraft['summary'],
+        'description': f'{rockcraft.get("description", "(no description)")} (built from the rockcraft.yaml at {path})',
+        'services': rockcraft.get('services', {}),
+        'checks': rockcraft.get('checks', {}),
+    }
+    return pebble.Layer(layer_dict)
+
+
 _RawStatusLiteral = Literal[
     'waiting',
     'blocked',

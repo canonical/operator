@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import copy
+import tempfile
 from dataclasses import asdict, replace
 from typing import Any
+
+import yaml
 
 import ops
 import pytest
@@ -30,6 +33,7 @@ from scenario.state import (
     StoredState,
     SubordinateRelation,
     TCPPort,
+    layer_from_rockcraft,
 )
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
@@ -649,3 +653,140 @@ def test_state_immutable_with_changed_data_stored_state():
     )
     assert not stored_state_in.content
     assert 'seen' in stored_state_out.content
+
+
+@pytest.mark.parametrize(
+    'rockcraft',
+    [
+        pytest.param({'summary': 'Empty Layer'}, id='empty-layer'),
+        pytest.param(
+            {'summary': 'Layer with description', 'description': 'This is a test layer.'},
+            id='layer-with-description',
+        ),
+        pytest.param(
+            {
+                'summary': 'Layer with a service',
+                'services': {'srv1': {'override': 'replace', 'command': 'echo hello'}},
+            },
+            id='layer-with-service',
+        ),
+        pytest.param(
+            {
+                'summary': 'Layer with a check',
+                'checks': {'chk1': {'override': 'merge', 'exec': {'command': 'echo hello'}}},
+            },
+            id='layer-with-check',
+        ),
+        # This is from the example in the Rockcraft documentation:
+        # https://documentation.ubuntu.com/rockcraft/en/latest/reference/rockcraft.yaml/
+        # (with an extra service and two checks added).
+        pytest.param(
+            {
+                'name': 'hello',
+                'title': 'Hello World',
+                'summary': 'A Hello World rock',
+                'description': 'This is an example of a Rockcraft project for a Hello World rock.',
+                'version': 'latest',
+                'base': 'bare',
+                'build-base': 'ubuntu@22.04',
+                'license': 'Apache-2.0',
+                'run-user': '_daemon_',
+                'environment': {
+                    'FOO': 'bar',
+                },
+                'services': {
+                    'hello': {
+                        'override': 'replace',
+                        'command': '/usr/bin/hello -t',
+                        'environment': {
+                            'VAR1': 'value',
+                            'VAR2': 'other value',
+                        },
+                    },
+                    'hello-echo': {
+                        'override': 'replace',
+                        'command': 'echo hello',
+                    },
+                },
+                'checks': {
+                    'chk1': {
+                        'override': 'merge',
+                        'exec': {
+                            'command': '/usr/bin/hello -c',
+                        },
+                    },
+                    'chk2': {
+                        'override': 'merge',
+                        'level': 'ready',
+                        'tcp': {
+                            'port': 8000,
+                        },
+                    },
+                },
+                'platforms': {
+                    'amd64': {},
+                    'armhf': {
+                        'build-on': ['armhf', 'arm64'],
+                    },
+                    'ibm': {
+                        'build-on': ['s390x'],
+                        'build-for': 's390x',
+                    },
+                },
+                'parts': {
+                    'hello': {
+                        'plugin': 'nil',
+                        'stage-packages': ['hello'],
+                    },
+                },
+            },
+            id='rockcraft-doc-example',
+        ),
+    ],
+)
+def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
+        yaml.safe_dump(rockcraft, f)
+        rockcraft_path = f.name
+        layer = layer_from_rockcraft(rockcraft_path)
+    assert layer.summary == rockcraft['summary']
+    if 'description' in rockcraft:
+        description = (
+            f'{rockcraft["description"]} (built from the rockcraft.yaml at {rockcraft_path})'
+        )
+    else:
+        description = f'(no description) (built from the rockcraft.yaml at {rockcraft_path})'
+    assert layer.description == description
+    assert len(layer.services) == len(rockcraft.get('services', {}))
+    for service_name, service in rockcraft.get('services', {}).items():
+        assert service_name in layer.services
+        layer_service = layer.services[service_name]
+        assert layer_service.command == service['command']
+        assert layer_service.override == service['override']
+        if 'environment' in service:
+            assert layer_service.environment == service['environment']
+    assert len(layer.checks) == len(rockcraft.get('checks', {}))
+    for check_name, check in rockcraft.get('checks', {}).items():
+        assert check_name in layer.checks
+        layer_check = layer.checks[check_name]
+        assert layer_check.override == check['override']
+        layer_check_level = layer_check.level
+        if hasattr(layer_check_level, 'value'):
+            layer_check_level = layer_check_level.value
+        assert layer_check_level == check.get('level', ops.pebble.CheckLevel.UNSET.value)
+        if 'exec' in check:
+            assert layer_check.exec['command'] == check['exec']['command']
+        if 'tcp' in check:
+            assert layer_check.tcp['port'] == check['tcp']['port']
+
+
+def test_layer_from_rockcraft_safe():
+    dangerous_yaml = """
+    !!python/object/apply:os.system ["echo unsafe"]
+    """
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
+        f.write(dangerous_yaml)
+        f.flush()
+        rockcraft_path = f.name
+        with pytest.raises(yaml.error.YAMLError):
+            layer_from_rockcraft(rockcraft_path)
