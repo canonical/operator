@@ -17,7 +17,6 @@
 """Charm the service."""
 
 import logging
-from typing import cast
 
 import ops
 
@@ -32,9 +31,28 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
         framework.observe(self.on['httpbin'].pebble_ready, self._on_httpbin_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
+        self.log_level = str(self.config['log-level'])  # str() is here for the type checker.
         self.container = self.unit.get_container('httpbin')
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
+        """Report the status of the workload (runs after each event)."""
+        if self.log_level not in VALID_LOG_LEVELS:
+            event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
+            return
+        if not self.container.can_connect():
+            event.add_status(ops.MaintenanceStatus('waiting for container'))
+            return
+        try:
+            if not self.container.get_service('httpbin').is_running():
+                event.add_status(ops.MaintenanceStatus('waiting for workload'))
+                return
+        except ops.ModelError:
+            event.add_status(ops.MaintenanceStatus('waiting for Pebble'))
+            return
+        event.add_status(ops.ActiveStatus())
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Define and start a workload using the Pebble API."""
@@ -42,31 +60,15 @@ class HttpbinDemoCharm(ops.CharmBase):
         self.container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         self.container.replan()
-        self.unit.status = ops.ActiveStatus()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        # Fetch the new config value
-        log_level = cast('str', self.model.config['log-level']).lower()
-
-        # Do some validation of the configuration option
-        if log_level in VALID_LOG_LEVELS:
-            # The config is good, so update the configuration of the workload
-            # Push an updated layer with the new config
-            try:
-                self.container.add_layer('httpbin', self._pebble_layer, combine=True)
-                self.container.replan()
-            except ops.pebble.ConnectionError:
-                # We were unable to connect to the Pebble API, so we defer this event
-                self.unit.status = ops.MaintenanceStatus('waiting for Pebble API')
-                event.defer()
-                return
-
-            logger.debug("Log level for gunicorn changed to '%s'", log_level)
-            self.unit.status = ops.ActiveStatus()
-        else:
-            # In this case, the config option is bad, so block the charm and notify the operator.
-            self.unit.status = ops.BlockedStatus(f"invalid log level: '{log_level}'")
+        if self.log_level not in VALID_LOG_LEVELS or not self.container.can_connect():
+            return
+        # Update the configuration of the workload
+        self.container.add_layer('httpbin', self._pebble_layer, combine=True)
+        self.container.replan()
+        logger.debug("Log level for gunicorn changed to '%s'", self.log_level)
 
     @property
     def _pebble_layer(self) -> ops.pebble.LayerDict:
