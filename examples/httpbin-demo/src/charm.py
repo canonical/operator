@@ -20,7 +20,7 @@ import logging
 
 import ops
 
-# Log messages can be retrieved using juju debug-log
+# Log messages can be retrieved using juju debug-log.
 logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ['info', 'debug', 'warning', 'error', 'critical']
@@ -56,7 +56,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Define and start a workload using the Pebble API."""
-        # Add initial Pebble config layer using the Pebble API
+        # Add initial Pebble config layer using the Pebble API.
         self.container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         self.container.replan()
@@ -65,7 +65,7 @@ class HttpbinDemoCharm(ops.CharmBase):
         """Handle changed configuration."""
         if self.log_level not in VALID_LOG_LEVELS or not self.container.can_connect():
             return
-        # Update the configuration of the workload
+        # Update the configuration of the workload.
         self.container.add_layer('httpbin', self._pebble_layer, combine=True)
         self.container.replan()
         logger.debug("Log level for gunicorn changed to '%s'", self.log_level)
