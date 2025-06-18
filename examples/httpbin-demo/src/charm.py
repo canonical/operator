@@ -17,6 +17,7 @@
 """Charm the service."""
 
 import logging
+import time
 
 import ops
 
@@ -50,7 +51,7 @@ class HttpbinDemoCharm(ops.CharmBase):
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
                 return
         except ops.ModelError:
-            event.add_status(ops.MaintenanceStatus('waiting for Pebble'))
+            event.add_status(ops.MaintenanceStatus('waiting for workload container'))
             return
         event.add_status(ops.ActiveStatus())
 
@@ -63,11 +64,25 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        if self.log_level.lower() not in VALID_LOG_LEVELS or not self.container.can_connect():
+        if self.log_level.lower() not in VALID_LOG_LEVELS:
             return
         # Update the configuration of the workload.
-        self.container.add_layer('httpbin', self._pebble_layer, combine=True)
-        self.container.replan()
+        # We might not be able to access the workload container yet, so we'll try a few times.
+        max_attepts = 3
+        for attempt in range(max_attepts):
+            try:
+                self.container.add_layer('httpbin', self._pebble_layer, combine=True)
+                self.container.replan()
+            except (ops.pebble.APIError, ops.pebble.ConnectionError):  # noqa: PERF203 (try-except in loop)
+                logger.info('Unable to reconfigure gunicorn (attempt %d)', attempt + 1)
+                time.sleep(2**attempt)
+            else:
+                break
+        else:
+            logger.warning('Unable to reconfigure gunicorn after %d attempts.', max_attepts)
+            # We expect that there'll be a pebble-ready event in the future,
+            # which will configure and start the workload.
+            return
         logger.debug("Log level for gunicorn changed to '%s'", self.log_level)
 
     @property
