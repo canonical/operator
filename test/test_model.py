@@ -4439,5 +4439,57 @@ def test_departing_unit_in_relations():
         assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
 
 
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_relation_has_correct_units():
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_peer_relation_changed)
+            framework.observe(self.on['peer'].relation_changed, self._on_peer_relation_changed)
+
+        def _on_peer_relation_changed(self, event: ops.RelationChangedEvent):
+            self.event = event
+
+    ctx = ops.testing.Context(
+        Charm,
+        meta={
+            'name': 'mycharm',
+            'requires': {'db': {'interface': 'db'}},
+            'peers': {'peer': {'interface': 'gossip'}},
+        },
+    )
+    rel = ops.testing.Relation('db', remote_units_data={1: {}, 2: {}, 3: {}}, remote_app_name='db')
+    peer = ops.testing.PeerRelation('peer', peers_data={1: {}, 2: {}})
+    state_in = ops.testing.State(relations={rel, peer})
+
+    with ctx(ctx.on.relation_changed(peer, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert {unit.name for unit in mgr.charm.event.relation.units} == {'mycharm/1', 'mycharm/2'}
+        assert {unit.name for unit in mgr.charm.model.relations['peer'][0].units} == {
+            'mycharm/1',
+            'mycharm/2',
+        }
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {
+            'db/1',
+            'db/2',
+            'db/3',
+        }
+
+    with ctx(ctx.on.relation_changed(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert {unit.name for unit in mgr.charm.event.relation.units} == {'db/1', 'db/2', 'db/3'}
+        assert {unit.name for unit in mgr.charm.model.relations['peer'][0].units} == {
+            'mycharm/1',
+            'mycharm/2',
+        }
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {
+            'db/1',
+            'db/2',
+            'db/3',
+        }
+
+
 if __name__ == '__main__':
     unittest.main()
