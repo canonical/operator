@@ -34,7 +34,7 @@ class HttpbinDemoCharm(ops.CharmBase):
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         framework.observe(self.on['httpbin'].pebble_ready, self._on_httpbin_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
-        self.log_level = str(self.config['log-level'])  # str() is here for the type checker.
+        self.log_level = str(self.config['log-level']).lower()  # str() is for the type checker.
         self.container = self.unit.get_container('httpbin')
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -83,7 +83,7 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
                     'startup': 'enabled',
                     'environment': {
-                        'GUNICORN_CMD_ARGS': f'--log-level {self.model.config["log-level"]}'
+                        'GUNICORN_CMD_ARGS': f'--log-level {self.log_level}'
                     },
                 }
             },

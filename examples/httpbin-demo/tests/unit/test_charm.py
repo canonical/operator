@@ -99,7 +99,7 @@ def test_config_changed_valid_uppercase():
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services['httpbin'].environment['GUNICORN_CMD_ARGS']
-    assert gunicorn_args == '--log-level DEBUG'
+    assert gunicorn_args == '--log-level debug'
     assert isinstance(state_out.unit_status, testing.ActiveStatus)
 
 
