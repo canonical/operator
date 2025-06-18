@@ -1763,7 +1763,11 @@ class Relation:
 
         # In relation-departed `relation-list` doesn't include the remote unit,
         # but the data should still be available.
-        if _remote_unit is not None:
+        if (
+            _remote_unit is not None
+            and not is_peer
+            and _remote_unit.name.startswith(relation_name)
+        ):
             self.units.add(_remote_unit)
 
         # If we didn't get the remote app via our_unit.app or the units list,
