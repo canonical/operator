@@ -71,8 +71,8 @@ class HttpbinDemoCharm(ops.CharmBase):
             return
         # Update the configuration of the workload.
         # We might not be able to access the workload container yet, so we'll try a few times.
-        max_attepts = 3
-        for attempt in range(max_attepts):
+        max_attempts = 3
+        for attempt in range(max_attempts):
             try:
                 self.container.add_layer('httpbin', self._pebble_layer, combine=True)
                 self.container.replan()
@@ -82,7 +82,7 @@ class HttpbinDemoCharm(ops.CharmBase):
             else:
                 break
         else:
-            logger.warning('Unable to reconfigure gunicorn after %d attempts.', max_attepts)
+            logger.warning('Unable to reconfigure gunicorn after %d attempts.', max_attempts)
             # We expect that there'll be a pebble-ready event in the future,
             # which will configure and start the workload.
             return
