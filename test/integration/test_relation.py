@@ -11,14 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Learn more about testing at
-# https://ops.readthedocs.io/en/latest/explanation/testing.html
 
 from __future__ import annotations
 
 import json
-import textwrap
 from typing import Callable
 
 import jubilant
@@ -26,56 +22,50 @@ import jubilant
 
 def test_relation_units(build_relation_charm: Callable[[], str], juju: jubilant.Juju):
     """Ensure that the correct set of units are returned from relation.units."""
+    # Build and deploy a simple charm, and scale it up to have two units, so
+    # the peer relation has multiple units.
     charm_path = build_relation_charm()
     juju.deploy(charm_path)
     juju.add_unit('test-relation', num_units=2)
 
+    # Deploy two instances of the dummy 'any-charm', which can provide many
+    # types of relation. Scale them up to have multiple units as well.
     db = 'test-db'
-    db_src_overwrite = {
-        'any_charm.py': textwrap.dedent(
-            """
-        import ops
-        from any_charm_base import AnyCharmBase
-        class AnyCharm(AnyCharmBase):
-            def __init__(self, framework):
-                super().__init__(framework)
-                self.unit.status = ops.ActiveStatus('ok')
-        """
-        ),
-    }
     juju.deploy(
         'any-charm',
         db,
-        config={'src-overwrite': json.dumps(db_src_overwrite)},
         num_units=3,
         channel='latest/beta',
     )
     juju.integrate('test-relation:db', db)
     ingress = 'test-ingress'
-    ingress_src_overwrite = {
-        'any_charm.py': textwrap.dedent(
-            """
-        import ops
-        from any_charm_base import AnyCharmBase
-        class AnyCharm(AnyCharmBase):
-            def __init__(self, framework):
-                super().__init__(framework)
-                self.unit.status = ops.ActiveStatus('ok')
-        """
-        ),
-    }
     juju.deploy(
         'any-charm',
         ingress,
-        config={'src-overwrite': json.dumps(ingress_src_overwrite)},
         num_units=2,
         channel='latest/beta',
     )
     juju.integrate('test-relation:ingress', ingress)
 
-    juju.wait(jubilant.all_active)
+    # Let everything settle. This should be reasonably quick, since the charms
+    # aren't actually doing anything.
+    status = juju.wait(jubilant.all_active)
 
+    # Verify that relation.units returns the expected set of units.
+    peer_units = set(status.get_units('test-relation'))
+    # The unit running the action will not be included in the peer relation list.
+    peer_units.remove('test-relation/0')
+    db_units = set(status.get_units(db))
+    ingress_units = set(status.get_units(ingress))
     task = juju.run('test-relation/0', 'get-units')
     assert task.success, task.message
+    ops_units = json.loads(task.results['units'])
 
-    assert task.results['units'] == {}
+    assert all(
+        unit.startswith(f'{app}/')
+        for rel, app in [('db', db), ('ingress', ingress), ('peer', 'test-relation')]
+        for unit in ops_units[rel]
+    )
+    assert set(ops_units['db']) == db_units
+    assert set(ops_units['ingress']) == ingress_units
+    assert set(ops_units['peer']) == peer_units

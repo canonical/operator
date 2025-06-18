@@ -29,64 +29,90 @@ import pytest
 
 @pytest.fixture
 def juju() -> Generator[jubilant.Juju]:
-    """Make a Juju model with the tracing part of COS ready."""
+    """Make a Juju model for testing."""
     with jubilant.temp_model() as juju:
-        juju.wait_timeout = 360
-        deploy_tempo(juju)
-        deploy_tempo_worker(juju)
-        juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
-        juju.deploy('s3-integrator')
-
-        juju.integrate('tempo:s3', 's3-integrator')
-        juju.integrate('tempo:tempo-cluster', 'tempo-worker')
-
-        juju.wait(
-            lambda status: jubilant.all_active(status, 'minio')
-            and jubilant.all_blocked(status, 's3-integrator')
-        )
-
-        address = juju.status().apps['minio'].address
-        mc_client = minio.Minio(
-            f'{address}:9000',
-            access_key='accesskey',
-            secret_key='mysoverysecretkey',
-            secure=False,
-        )
-
-        found = mc_client.bucket_exists('tempo')
-        if not found:
-            mc_client.make_bucket('tempo')
-
-        juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
-        juju.run(
-            's3-integrator/0',
-            'sync-s3-credentials',
-            {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
-        )
-
-        # Tempo goes through a cycle of:
-        # - update own stateful set
-        # - kill own pod
-        # - new pod is scheduled by k8s
-        # - check own stateful set
-        #
-        # This process may take a while.
-
-        juju.wait(jubilant.all_active)
-
+        juju.wait_timeout = 900
         yield juju
-
         print(juju.debug_log())
 
 
+@pytest.fixture
+def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
+    """Make a Juju model with the tracing part of COS ready."""
+    deploy_tempo(juju)
+    deploy_tempo_worker(juju)
+    juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
+    juju.deploy('s3-integrator')
+
+    juju.integrate('tempo:s3', 's3-integrator')
+    juju.integrate('tempo:tempo-cluster', 'tempo-worker')
+
+    juju.wait(
+        lambda status: jubilant.all_active(status, 'minio')
+        and jubilant.all_blocked(status, 's3-integrator')
+    )
+
+    address = juju.status().apps['minio'].address
+    mc_client = minio.Minio(
+        f'{address}:9000',
+        access_key='accesskey',
+        secret_key='mysoverysecretkey',
+        secure=False,
+    )
+
+    found = mc_client.bucket_exists('tempo')
+    if not found:
+        mc_client.make_bucket('tempo')
+
+    juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
+    juju.run(
+        's3-integrator/0',
+        'sync-s3-credentials',
+        {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
+    )
+
+    # Tempo goes through a cycle of:
+    # - update own stateful set
+    # - kill own pod
+    # - new pod is scheduled by k8s
+    # - check own stateful set
+    #
+    # This process may take a while.
+
+    juju.wait(jubilant.all_active)
+
+    yield juju
+
+
 @pytest.fixture(scope='session')
-def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
-    """Prepare and return the test charm directory.
+def tracing_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
+    """Prepare and return the test_tracing charm directory.
 
     Builds and injects `ops` and `ops-tracing` from the local checkout in to the
     charm's dependencies. Cleans up afterwards.
     """
-    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'  # type: ignore
+    assert isinstance(charm_dir, pathlib.Path)
+    yield from _prepare_generic_charm_dir(root_path=pytestconfig.rootpath, charm_dir=charm_dir)
+
+
+@pytest.fixture(scope='session')
+def relation_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
+    """Prepare and return the test_relation charm directory.
+
+    Builds and injects `ops` from the local checkout in to the charm's
+    dependencies. Cleans up afterwards.
+    """
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_relation'  # type: ignore
+    assert isinstance(charm_dir, pathlib.Path)
+    yield from _prepare_generic_charm_dir(
+        root_path=pytestconfig.rootpath, charm_dir=charm_dir, build_tracing=False
+    )
+
+
+def _prepare_generic_charm_dir(
+    root_path: pathlib.Path, *, charm_dir: pathlib.Path, build_tracing: bool = True
+):
     requirements_file = charm_dir / 'requirements.txt'
 
     def cleanup():
@@ -107,7 +133,7 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
                 'build',
                 '--sdist',
                 '--directory',
-                pytestconfig.rootpath,
+                root_path,
                 '--out-dir',
                 charm_dir,
             ],
@@ -116,20 +142,21 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
             capture_output=True,
         )
 
-        subprocess.run(
-            [  # noqa: S607
-                'uv',
-                'build',
-                '--sdist',
-                '--directory',
-                pytestconfig.rootpath / 'tracing',
-                '--out-dir',
-                charm_dir,
-            ],
-            text=True,
-            check=True,
-            capture_output=True,
-        )
+        if build_tracing:
+            subprocess.run(
+                [  # noqa: S607
+                    'uv',
+                    'build',
+                    '--sdist',
+                    '--directory',
+                    root_path / 'tracing',
+                    '--out-dir',
+                    charm_dir,
+                ],
+                text=True,
+                check=True,
+                capture_output=True,
+            )
     except subprocess.CalledProcessError as e:
         logging.error('%s stderr:\n%s', e.cmd, e.stderr)
         raise
@@ -144,12 +171,26 @@ def charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
 
 
 @pytest.fixture(scope='session')
-def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
-    """Build the test charm and provide the artefact path.
+def build_tracing_charm(tracing_charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
+    """Build the test_tracing charm and provide the artefact path.
 
     Starts building the test-tracing charm early.
     Call the fixture value to get the built charm file path.
     """
+    yield from _build_charm(tracing_charm_dir, 'test-tracing_amd64.charm')
+
+
+@pytest.fixture(scope='session')
+def build_relation_charm(relation_charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
+    """Build the test_relation charm and provide the artefact path.
+
+    Starts building the test-relation charm early.
+    Call the fixture value to get the built charm file path.
+    """
+    yield from _build_charm(relation_charm_dir, 'test-relation_amd64.charm')
+
+
+def _build_charm(charm_dir: pathlib.Path, expected_artifact: str) -> Generator[Callable[[], str]]:
     proc = subprocess.Popen(
         ['charmcraft', 'pack', '--verbose'],  # noqa: S607
         cwd=str(charm_dir),
@@ -161,7 +202,7 @@ def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
     def wait_for_build_to_complete():
         proc.communicate()
         assert proc.returncode == 0
-        charm = charm_dir / 'test-tracing_amd64.charm'
+        charm = charm_dir / expected_artifact
         assert charm.exists()
         return str(charm)
 
@@ -175,8 +216,8 @@ def build_charm(charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
     logging.info('`charmcraft pack` stderr follows:\n%s', stderr)
 
 
-def deploy_tempo(juju: jubilant.Juju):
-    juju.deploy(
+def deploy_tempo(tracing_juju: jubilant.Juju):
+    tracing_juju.deploy(
         'tempo-coordinator-k8s',
         app='tempo',
         channel='edge',
@@ -188,8 +229,8 @@ def deploy_tempo(juju: jubilant.Juju):
     )
 
 
-def deploy_tempo_worker(juju: jubilant.Juju):
-    juju.deploy(
+def deploy_tempo_worker(tracing_juju: jubilant.Juju):
+    tracing_juju.deploy(
         'tempo-worker-k8s',
         app='tempo-worker',
         channel='edge',
