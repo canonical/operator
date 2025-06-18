@@ -82,9 +82,7 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'summary': 'httpbin',
                     'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
                     'startup': 'enabled',
-                    'environment': {
-                        'GUNICORN_CMD_ARGS': f'--log-level {self.log_level}'
-                    },
+                    'environment': {'GUNICORN_CMD_ARGS': f'--log-level {self.log_level}'},
                 }
             },
         }
