@@ -61,6 +61,9 @@ class HttpbinDemoCharm(ops.CharmBase):
         self.container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         self.container.replan()
+        # In rare cases, these calls could fail because the workload container became unavailable.
+        # If this happens, we'll let the unit go into error status. The hook will be retried, or
+        # the Juju user can investigate.
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
