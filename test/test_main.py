@@ -438,8 +438,17 @@ class _TestMain(abc.ABC):
         assert isinstance(state, ops.BoundStoredState)
         assert list(state.observed_event_types) == ['ConfigChangedEvent', 'UpdateStatusEvent']
 
+    @pytest.mark.parametrize(
+        'event_class,event_name',
+        [
+            (ops.CollectMetricsEvent, 'collect-metrics'),
+            (ops.HookEvent, 'meter-status-changed'),  # Ops doesn't have an event object for this.
+        ],
+    )
     @pytest.mark.usefixtures('setup_charm')
-    def test_no_reemission_on_collect_metrics(self, fake_script: FakeScript):
+    def test_no_reemission_on_restricted_event(
+        self, event_class: type[ops.EventBase], event_name: str, fake_script: FakeScript
+    ):
         fake_script.write('add-metric', 'exit 0')
 
         # First run "install" to make sure all hooks are set up.
@@ -454,12 +463,15 @@ class _TestMain(abc.ABC):
         assert list(state.observed_event_types) == ['ConfigChangedEvent']
 
         # Re-emit should not pick the deferred config-changed because
-        # collect-metrics runs in a restricted context.
-        state = self._simulate_event(
-            fake_script, EventSpec(ops.CollectMetricsEvent, 'collect-metrics')
-        )
+        # the event runs in a restricted context.
+        state = self._simulate_event(fake_script, EventSpec(event_class, event_name))
         assert isinstance(state, ops.BoundStoredState)
-        assert list(state.observed_event_types) == ['CollectMetricsEvent']
+        # Ops doesn't support observing meter-status-changed, so there are no
+        # observed event types in that case.
+        if event_name == 'meter-status-changed':
+            assert not state.observed_event_types
+        else:
+            assert list(state.observed_event_types) == [event_class.__name__]
 
     @pytest.mark.usefixtures('setup_charm')
     def test_multiple_events_handled(self, fake_script: FakeScript):
