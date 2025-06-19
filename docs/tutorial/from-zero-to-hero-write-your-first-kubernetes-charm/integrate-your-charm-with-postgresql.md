@@ -69,6 +69,7 @@ requires:
   database:
     interface: postgresql_client
     limit: 1
+    optional: false
 ```
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.

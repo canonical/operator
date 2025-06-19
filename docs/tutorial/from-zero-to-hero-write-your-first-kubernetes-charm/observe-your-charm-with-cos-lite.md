@@ -130,6 +130,7 @@ requires:
   database:
     interface: postgresql_client
     limit: 1
+    optional: false
   log-proxy:
     interface: loki_push_api
     limit: 1

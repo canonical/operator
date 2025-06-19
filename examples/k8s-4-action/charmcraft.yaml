@@ -30,6 +30,7 @@ requires:
   database:
     interface: postgresql_client
     limit: 1
+    optional: false
 
 charm-libs:
   - lib: data_platform_libs.data_interfaces
