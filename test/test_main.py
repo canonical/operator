@@ -803,7 +803,6 @@ class _TestMain(abc.ABC):
             VERSION_LOGLINE,
             ['juju-log', '--log-level', 'DEBUG', '--', 'Emitting Juju event collect_metrics.'],
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
-            ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
 
