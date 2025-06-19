@@ -134,6 +134,7 @@ requires:
   log-proxy:
     interface: loki_push_api
     limit: 1
+    optional: true
 ```
 
 ## Import the Loki interface libraries and set up the Loki API
