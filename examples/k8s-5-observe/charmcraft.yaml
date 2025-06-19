@@ -45,8 +45,10 @@ requires:
 provides:
   metrics-endpoint:
     interface: prometheus_scrape
+    optional: true
   grafana-dashboard:
     interface: grafana_dashboard
+    optional: true
 
 charm-libs:
   - lib: data_platform_libs.data_interfaces

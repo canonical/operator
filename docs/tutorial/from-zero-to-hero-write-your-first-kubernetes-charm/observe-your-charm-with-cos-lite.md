@@ -91,6 +91,7 @@ In your `charmcraft.yaml` file, after the `requires` block, add a `provides` end
 provides:
   metrics-endpoint:
     interface: prometheus_scrape
+    optional: true
 ```
 
 ## Import the Prometheus interface libraries and set up Prometheus scraping
@@ -170,8 +171,10 @@ In your `charmcraft.yaml` file, add another `provides` endpoint with relation na
 provides:
   metrics-endpoint:
     interface: prometheus_scrape
+    optional: true
   grafana-dashboard:
     interface: grafana_dashboard
+    optional: true
 ```
 
 ### Import the Grafana interface libraries and set up the Grafana dashboards
