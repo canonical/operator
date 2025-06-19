@@ -473,6 +473,41 @@ class _TestMain(abc.ABC):
         else:
             assert list(state.observed_event_types) == [event_class.__name__]
 
+    @pytest.mark.parametrize('is_leader', [True, False], ids=['leader', 'not_leader'])
+    @pytest.mark.parametrize(
+        'event_class,event_name,restricted',
+        [
+            pytest.param(ops.CollectMetricsEvent, 'collect-metrics', True, id='collect_metrics'),
+            pytest.param(ops.HookEvent, 'meter-status-changed', True, id='meter_status_changed'),
+            pytest.param(ops.StartEvent, 'start', False, id='start'),
+        ],
+    )
+    @pytest.mark.usefixtures('setup_charm')
+    def test_no_collect_status_on_restricted_event(
+        self,
+        is_leader: bool,
+        event_class: type[ops.EventBase],
+        event_name: str,
+        restricted: bool,
+        fake_script: FakeScript,
+    ):
+        fake_script.write('is-leader', f'echo {str(is_leader).lower()}')
+        fake_script.write('add-metric', 'exit 0')
+
+        # First run "install" to make sure all hooks are set up.
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
+        assert isinstance(state, ops.BoundStoredState)
+        assert list(state.observed_event_types) == ['InstallEvent']
+
+        state = self._simulate_event(fake_script, EventSpec(event_class, event_name))
+        assert isinstance(state, ops.BoundStoredState)
+        expected: list[str] = []
+        if not restricted:
+            if is_leader:
+                expected.append('collect_app_status')
+            expected.append('collect_unit_status')
+        assert list(state.on_collect_status) == expected
+
     @pytest.mark.usefixtures('setup_charm')
     def test_multiple_events_handled(self, fake_script: FakeScript):
         fake_script.write('action-get', "echo '{}'")
