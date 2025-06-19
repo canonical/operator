@@ -42,7 +42,6 @@ class HttpbinDemoCharm(ops.CharmBase):
         """Report the status of the workload (runs after each event)."""
         if self.log_level.lower() not in VALID_LOG_LEVELS:
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
-            return
         try:
             if not self.container.get_service('httpbin').is_running():
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
