@@ -60,13 +60,13 @@ def test_config_changed():
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert (
-        '--port=8080'
-        in state_out.get_container(container.name)
+    command = (
+        state_out.get_container(container.name)
         .layers['fastapi_demo']
         .services['fastapi-service']
         .command
     )
+    assert '--port=8080' in command
 
 
 def test_config_changed_invalid_port():
