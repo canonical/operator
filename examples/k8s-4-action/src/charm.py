@@ -69,20 +69,20 @@ class FastAPIDemoCharm(ops.CharmBase):
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         port = self.config['server-port']
         if port == 22:
-            event.add_status(ops.BlockedStatus('invalid port number, 22 is reserved for SSH'))
+            event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
         if not self.model.get_relation('database'):
             # We need the user to do 'juju integrate'.
-            event.add_status(ops.BlockedStatus('waiting for database relation'))
+            event.add_status(ops.BlockedStatus('Waiting for database relation'))
         elif not self.database.fetch_relation_data():
             # We need the charms to finish integrating.
-            event.add_status(ops.WaitingStatus('waiting for database relation'))
+            event.add_status(ops.WaitingStatus('Waiting for database relation'))
         try:
             status = self.container.get_service(self.pebble_service_name)
         except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-            event.add_status(ops.MaintenanceStatus('waiting for Pebble in workload container'))
+            event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
         else:
             if not status.is_running():
-                event.add_status(ops.MaintenanceStatus('waiting for the service to start up'))
+                event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
@@ -131,7 +131,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('assembling Pebble layers')
+        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
         try:
             self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
             logger.info("Added updated layer 'fastapi_demo' to Pebble plan")

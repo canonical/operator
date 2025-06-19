@@ -79,5 +79,5 @@ def test_config_changed_invalid_port():
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        'invalid port number, 22 is reserved for SSH'
+        'Invalid port number, 22 is reserved for SSH'
     )

@@ -263,20 +263,20 @@ And define a method that does the various checks, adding appropriate statuses. T
 def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     port = self.config['server-port']
     if port == 22:
-        event.add_status(ops.BlockedStatus('invalid port number, 22 is reserved for SSH'))
+        event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
     if not self.model.get_relation('database'):
         # We need the user to do 'juju integrate'.
-        event.add_status(ops.BlockedStatus('waiting for database relation'))
+        event.add_status(ops.BlockedStatus('Waiting for database relation'))
     elif not self.database.fetch_relation_data():
         # We need the charms to finish integrating.
-        event.add_status(ops.WaitingStatus('waiting for database relation'))
+        event.add_status(ops.WaitingStatus('Waiting for database relation'))
     try:
         status = self.container.get_service(self.pebble_service_name)
     except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-        event.add_status(ops.MaintenanceStatus('waiting for Pebble in workload container'))
+        event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
     else:
         if not status.is_running():
-            event.add_status(ops.MaintenanceStatus('waiting for the service to start up'))
+            event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
     # If nothing is wrong, then the status is active.
     event.add_status(ops.ActiveStatus())
 ```
@@ -297,7 +297,7 @@ And remove the following lines from `_update_layer_and_restart`:
 ```
 
 ```python
-    self.unit.status = ops.MaintenanceStatus('waiting for Pebble in workload container')
+    self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
 ## Validate your charm
@@ -432,14 +432,14 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')
 ```
 
 Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
 
 ```python
     # Check the unit is blocked:
-    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')
 ```
 
 Now run `tox -e unit` to make sure all test cases pass.

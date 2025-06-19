@@ -43,7 +43,7 @@ def test_pebble_layer():
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
     # Check the unit is blocked:
-    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')
     # Check the service was started:
     assert (
         state_out.get_container(container.name).service_statuses['fastapi-service']
@@ -79,7 +79,7 @@ def test_config_changed_invalid_port():
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        'invalid port number, 22 is reserved for SSH'
+        'Invalid port number, 22 is reserved for SSH'
     )
 
 
@@ -124,4 +124,4 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == testing.BlockedStatus('waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')

@@ -44,7 +44,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         port = self.config['server-port']  # See charmcraft.yaml
 
         if port == 22:
-            self.unit.status = ops.BlockedStatus('invalid port number, 22 is reserved for SSH')
+            self.unit.status = ops.BlockedStatus('Invalid port number, 22 is reserved for SSH')
             return
 
         logger.debug('New application port is requested: %s', port)
@@ -63,7 +63,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('assembling Pebble layers')
+        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
         try:
             self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
             logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
@@ -76,7 +76,7 @@ class FastAPIDemoCharm(ops.CharmBase):
             self.unit.status = ops.ActiveStatus()
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info('Unable to connect to Pebble: %s', e)
-            self.unit.status = ops.MaintenanceStatus('waiting for Pebble in workload container')
+            self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 
     @property
     def _pebble_layer(self) -> ops.pebble.Layer:
