@@ -226,6 +226,10 @@ class _JujuContext:
                 else None
             ),
             unit_name=env.get('JUJU_UNIT_NAME', ''),
-            version=JujuVersion(env['JUJU_VERSION']),
+            # The meter-status-changed event, triggered by `juju set-meter-status`,
+            # does not set JUJU_VERSION, but all other events do. When we drop support
+            # for Juju 2 and Juju 3 we can change this to always expect JUJU_VERSION,
+            # as that event no longer exists in Juju 4.
+            version=JujuVersion(env.get('JUJU_VERSION', '0.0.0')),
             workload_name=env.get('JUJU_WORKLOAD_NAME') or None,
         )
