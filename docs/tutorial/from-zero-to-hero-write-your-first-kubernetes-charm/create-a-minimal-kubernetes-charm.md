@@ -590,12 +590,13 @@ deps =
     pytest-operator
     -r {tox_root}/requirements.txt
 commands =
-    pytest -v \
-           -s \
-           --tb native \
-           --log-cli-level=INFO \
-           {posargs} \
-           {[vars]tests_path}/integration
+    pytest \
+        -v \
+        -s \
+        --tb native \
+        --log-cli-level=INFO \
+        {posargs} \
+        {[vars]tests_path}/integration
 ```
 
 If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.
