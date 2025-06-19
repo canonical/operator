@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import asdict, replace
-from typing import Any
+from typing import Any, Callable, Iterable, Generator
 
 import ops
 import pytest
@@ -718,6 +718,7 @@ def test_state_from_context_extend():
         relations={relation},
         stored_states={stored_state},
     )
+    assert state.leader is True
     assert state.config == {'foo': 'baz'}
     assert len(state.containers) == 2
     assert state.get_container('container').can_connect
@@ -813,3 +814,44 @@ def test_state_from_context_skip_exiting_stored_state():
     assert state.get_stored_state(
         stored_state.name, owner_path=stored_state.owner_path
     ).content == {'foo': 'bar'}
+
+
+def _make_generator(items: Iterable[Any]) -> Generator[Any]:
+    return (item for item in items)
+
+
+@pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
+def test_state_from_non_sets(iterable: Callable[..., Any]):
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(Charm, meta=meta)
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        containers=iterable({container}),
+        relations=iterable({relation}),
+        stored_states=iterable({stored_state}),
+    )
+    assert len(state.containers) == 2
+    assert isinstance(state.containers, frozenset)
+    assert len(state.relations) == 5
+    assert isinstance(state.relations, frozenset)
+    assert len(state.storages) == 1
+    assert isinstance(state.storages, frozenset)
+    assert len(state.stored_states) == 1
+    assert isinstance(state.stored_states, frozenset)

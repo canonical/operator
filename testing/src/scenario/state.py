@@ -1829,7 +1829,7 @@ class State(_max_posargs(0)):
             for option, details in options.items():
                 if option not in config and 'default' in details:
                     config[option] = details['default']
-        relations = set() if relations is None else relations
+        relations = set(relations or ())
         for relation_type in ('requires', 'provides', 'peers'):
             for endpoint, details in meta.get(relation_type, {}).items():
                 if any(rel.endpoint == endpoint for rel in relations):
@@ -1841,17 +1841,17 @@ class State(_max_posargs(0)):
                 else:
                     relation_class = Relation
                 relations.add(relation_class(endpoint, details['interface']))
-        containers = set() if containers is None else containers
+        containers = set(containers or ())
         for container_name in meta.get('containers', {}):
             if any(c.name == container_name for c in containers):
                 continue
             containers.add(Container(name=container_name, can_connect=True))
-        storages = set() if storages is None else storages
+        storages = set(storages or ())
         for storage_name in meta.get('storage', {}):
             if any(s.name == storage_name for s in storages):
                 continue
             storages.add(Storage(name=storage_name))
-        stored_states = set() if stored_states is None else stored_states
+        stored_states = set(stored_states or ())
         for attr in dir(ctx.charm_spec.charm_type):
             value = getattr(ctx.charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
