@@ -40,7 +40,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
         """Report the status of the workload (runs after each event)."""
-        if self.log_level.lower() not in VALID_LOG_LEVELS:
+        if self.log_level not in VALID_LOG_LEVELS:
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
         try:
             if not self.container.get_service('httpbin').is_running():
@@ -61,7 +61,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        if self.log_level.lower() not in VALID_LOG_LEVELS:
+        if self.log_level not in VALID_LOG_LEVELS:
             return
         # Update the configuration of the workload.
         # We might not be able to access the workload container yet, so we'll try a few times.
