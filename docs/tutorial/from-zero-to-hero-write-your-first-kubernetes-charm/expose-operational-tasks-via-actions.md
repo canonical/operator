@@ -33,7 +33,7 @@ Open the `charmcraft.yaml` file and add to it a block defining an action, as bel
 ```yaml
 actions:
   get-db-info:
-    description: Fetches Database authentication information
+    description: Fetches database authentication information
     params:
       show-password:
         description: Show username and password in output information
