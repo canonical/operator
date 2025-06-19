@@ -1,0 +1,32 @@
+name: test-relation
+type: charm
+title: Test relation
+summary: Test relation
+description: |
+    This charm is used to test the ops implementation of Juju relations.
+
+base: ubuntu@24.04
+build-base: ubuntu@24.04
+platforms:
+    amd64:
+
+parts:
+    test-relation:
+        plugin: charm
+        source: .
+
+requires:
+    db:
+        interface: db
+        optional: false
+    ingress:
+        interface: ingress
+        optional: false
+
+peers:
+    peer:
+        interface: gossip
+
+actions:
+    get-units:
+        description: List all units of all relations.

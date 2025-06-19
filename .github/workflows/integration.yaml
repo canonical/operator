@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         preset: ['k8s', 'microk8s']
-        test: ['test_direct_connection', 'test_with_tls']
+        test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
 
     steps:
       - run: |

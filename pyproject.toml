@@ -81,7 +81,7 @@ integration = [
     "ops[testing,tracing]",
     "pytest~=8.0",
     "pytest-operator~=0.23",
-    "jubilant~=1.0",
+    "jubilant~=1.2",
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",
