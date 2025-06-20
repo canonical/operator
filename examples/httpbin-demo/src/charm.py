@@ -45,7 +45,7 @@ class HttpbinDemoCharm(ops.CharmBase):
         if self.log_level not in VALID_LOG_LEVELS:
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
         try:
-            if not self.container.get_service('httpbin').is_running():
+            if not self.container.get_service(SERVICE_NAME).is_running():
                 # We can connect to Pebble in the container, but the service isn't running.
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
         except ops.pebble.ConnectionError:
