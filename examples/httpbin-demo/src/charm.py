@@ -45,10 +45,21 @@ class HttpbinDemoCharm(ops.CharmBase):
         if self.log_level not in VALID_LOG_LEVELS:
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
         try:
-            if not self.container.get_service(SERVICE_NAME).is_running():
+            if not self.container.get_service('httpbin').is_running():
+                # We can connect to Pebble in the container, but the service isn't running.
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
-        except (ops.pebble.ConnectionError, ops.ModelError):
+        except ops.pebble.ConnectionError:
+            # We can't connect to Pebble in the container.
             event.add_status(ops.MaintenanceStatus('waiting for workload container'))
+        except ops.pebble.APIError:
+            # It's technically possible (but unlikely) for Pebble to have an internal error.
+            logger.error('Unable to fetch service info from Pebble')
+            raise
+        except ops.ModelError:
+            # We asked for the status of a service that doesn't exist in Pebble.
+            # If this error happens, in means there's a bug in the charm.
+            logger.error("Unable to find service '%s' in service info", SERVICE_NAME)
+            raise
         event.add_status(ops.ActiveStatus())
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
