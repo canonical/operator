@@ -127,14 +127,16 @@ class Ops(_Manager):
         self.context = context
         self.charm_spec = charm_spec
         self.store = None
+        self.trace_data = []
 
         try:
             import ops_tracing._mock  # break circular import
 
             self._tracing_mock = ops_tracing._mock.patch_tracing()
-            self._tracing_mock.__enter__()
+            self._tracing_exporter = self._tracing_mock.__enter__()
         except ImportError:
             self._tracing_mock = None
+            self._tracing_exporter = None
 
         model_backend = _MockModelBackend(
             state=state,
@@ -270,6 +272,27 @@ class Ops(_Manager):
         self.state = dataclasses.replace(self.state, deferred=deferred, stored_states=stored_state)
 
     def _destroy(self):
+        # Must be run first, so that ops._main trace span is finished.
         super()._destroy()
         if self._tracing_mock:
+            assert self._tracing_exporter
+            data = self._tracing_exporter.get_finished_spans()
+            # FIXME: think if this is worth the effort:
+            # OpenTelemetry SDK stores spans chronologically by end time.
+            # This means that `ops._main` span is last.
+            #
+            # We'd want to offer trace data in a consistent order,
+            # ideally chronologically by start_time.
+            # However, a unit test could be run with time frozen.
+            #
+            # `reversed` ensures that outermost spans appear earlier...
+            # but inverts the order of consecutive spans...
+
+            # Minor discussion: what it takes to type-check cleanly.
+            #
+            # .start_time is always set, but it's declared nullable.
+            self.trace_data = sorted(reversed(data), key=lambda s: s.start_time or 0)
+            from operator import attrgetter
+            # this option type checks cleanly though
+            self.trace_data = sorted(reversed(data), key=attrgetter('start_time'))
             self._tracing_mock.__exit__(None, None, None)

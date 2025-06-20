@@ -31,6 +31,8 @@ def test_charm_runs(sample_charm: Type[ops.CharmBase]):
     state_in = ops.testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
     assert isinstance(state_out.unit_status, ops.ActiveStatus)
+    assert "ops.main" in [span.name for span in ctx.trace_data]
+    assert "my collect status" in [span.name for span in ctx.trace_data]
 
 
 @pytest.fixture

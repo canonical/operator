@@ -27,23 +27,38 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from . import _backend
 
 
+# A global SPAN_PROCESSOR that will be captured by every tracer object
+# (ops._private.tracer, charm.tracer, lib.charms.foo.tracer) on first use.
+# The dummy argument is mandatory and will be overridden in patch_tracing().
+SPAN_PROCESSOR = SimpleSpanProcessor(InMemorySpanExporter())
+
+
 @contextlib.contextmanager
-def patch_tracing() -> Generator[None, None, None]:
+def patch_tracing() -> Generator[InMemorySpanExporter, None, None]:
     """Patch ops[tracing] for unit tests.
 
     Replaces the real buffer and exporter with an in-memory store.
     This effectively removes the requirement for unique directories for each unit test.
     """
-    # OTEL tries hard to prevent tracing provider from being set twice
+    # Work around OpenTelemetry tracer provider singleton enforcement.
     real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
     real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
+    # print(real_otel_provider, real_otel_once_done)
     real_create_provider = _backend._create_provider
     real_exporter = _backend._exporter
+    dummy_exporter = SPAN_PROCESSOR.span_exporter
+
+    # An exporter that accumulates trace data from one Scenario context.run().
+    exporter = InMemorySpanExporter()
+    SPAN_PROCESSOR.span_exporter = exporter
+    # print("created exporter", exporter, exporter._stopped)
+
     _backend._create_provider = _create_provider
     _backend._exporter = None
     try:
-        yield
+        yield exporter
     finally:
+        SPAN_PROCESSOR.span_exporter = dummy_exporter
         _backend._exporter = real_exporter
         _backend._create_provider = real_create_provider
         opentelemetry.trace._TRACER_PROVIDER = real_otel_provider
@@ -53,5 +68,5 @@ def patch_tracing() -> Generator[None, None, None]:
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create an OpenTelemetry tracing provider suitable for testing."""
     provider = TracerProvider(resource=resource)
-    provider.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
+    provider.add_span_processor(SPAN_PROCESSOR)
     return provider

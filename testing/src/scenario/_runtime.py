@@ -323,6 +323,8 @@ class Runtime:
             logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops  # noqa: F811
 
+            ops = None
+
             try:
                 ops = Ops(
                     state=output_state,
@@ -345,6 +347,9 @@ class Runtime:
                 raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
 
             finally:
+                if ops:
+                    ops._destroy()
+                    context.trace_data.extend(ops.trace_data)
                 for key in tuple(os.environ):
                     if key not in previous_env:
                         del os.environ[key]
