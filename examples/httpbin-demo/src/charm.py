@@ -48,17 +48,18 @@ class HttpbinDemoCharm(ops.CharmBase):
             if not self.container.get_service(SERVICE_NAME).is_running():
                 # We can connect to Pebble in the container, but the service isn't running.
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
+        except ops.ModelError:
+            # We can connect to Pebble in the container, but the service doesn't exist. This is
+            # most likely because we haven't added a layer yet (perhaps because the value of
+            # log-level isn't valid).
+            event.add_status(ops.MaintenanceStatus('waiting for workload config'))
         except ops.pebble.ConnectionError:
-            # We can't connect to Pebble in the container.
+            # We can't connect to Pebble in the container. This is most likely because the
+            # container isn't ready yet.
             event.add_status(ops.MaintenanceStatus('waiting for workload container'))
         except ops.pebble.APIError:
             # It's technically possible (but unlikely) for Pebble to have an internal error.
             logger.error('Unable to fetch service info from Pebble')
-            raise
-        except ops.ModelError:
-            # We asked for the status of a service that doesn't exist in Pebble.
-            # If this error happens, it means there's a bug in the charm.
-            logger.error("Unable to find service '%s' in service info", SERVICE_NAME)
             raise
         event.add_status(ops.ActiveStatus())
 
