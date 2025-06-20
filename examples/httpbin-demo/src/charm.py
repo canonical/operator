@@ -46,16 +46,15 @@ class HttpbinDemoCharm(ops.CharmBase):
             event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
         try:
             if not self.container.get_service(SERVICE_NAME).is_running():
-                # We can connect to Pebble in the container, but the service isn't running.
+                # We can connect to Pebble in the container, but the service hasn't started yet.
                 event.add_status(ops.MaintenanceStatus('waiting for workload'))
         except ops.ModelError:
             # We can connect to Pebble in the container, but the service doesn't exist. This is
-            # most likely because we haven't added a layer yet (perhaps because the value of
-            # log-level isn't valid).
-            event.add_status(ops.MaintenanceStatus('waiting for workload config'))
+            # most likely because we haven't added a layer yet.
+            event.add_status(ops.MaintenanceStatus('waiting for workload container'))
         except ops.pebble.ConnectionError:
             # We can't connect to Pebble in the container. This is most likely because the
-            # container isn't ready yet.
+            # container hasn't started yet.
             event.add_status(ops.MaintenanceStatus('waiting for workload container'))
         except ops.pebble.APIError:
             # It's technically possible (but unlikely) for Pebble to have an internal error.
