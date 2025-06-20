@@ -57,7 +57,7 @@ class HttpbinDemoCharm(ops.CharmBase):
             raise
         except ops.ModelError:
             # We asked for the status of a service that doesn't exist in Pebble.
-            # If this error happens, in means there's a bug in the charm.
+            # If this error happens, it means there's a bug in the charm.
             logger.error("Unable to find service '%s' in service info", SERVICE_NAME)
             raise
         event.add_status(ops.ActiveStatus())
