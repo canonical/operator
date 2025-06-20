@@ -561,7 +561,11 @@ class Context(Generic[CharmType]):
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
     trace_data: list[ReadableSpan]
-    """Trace data generated during the last run."""
+    """Trace data generated during the last run.
+
+    A list of :py:class:`opentelemetry.sdk.trace.ReadableSpan`
+    """
+
     action_logs: list[str]
     """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
 
