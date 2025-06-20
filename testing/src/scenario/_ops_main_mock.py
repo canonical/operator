@@ -293,6 +293,7 @@ class Ops(_Manager):
             # .start_time is always set, but it's declared nullable.
             self.trace_data = sorted(reversed(data), key=lambda s: s.start_time or 0)
             from operator import attrgetter
+
             # this option type checks cleanly though
             self.trace_data = sorted(reversed(data), key=attrgetter('start_time'))
             self._tracing_mock.__exit__(None, None, None)

@@ -26,7 +26,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from . import _backend
 
-
 # A global SPAN_PROCESSOR that will be captured by every tracer object
 # (ops._private.tracer, charm.tracer, lib.charms.foo.tracer) on first use.
 # The dummy argument is mandatory and will be overridden in patch_tracing().
