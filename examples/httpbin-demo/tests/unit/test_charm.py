@@ -97,7 +97,10 @@ def test_config_changed_valid_cannot_connect():
     """
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=False)
+    container = testing.Container(
+        CONTAINER_NAME,
+        can_connect=False,  # No need to provide the layer here, as the container is unavailable.
+    )
     state_in = testing.State(containers={container}, config={'log-level': 'debug'})
 
     # Act:
