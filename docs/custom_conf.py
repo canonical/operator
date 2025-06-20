@@ -304,6 +304,7 @@ intersphinx_mapping = {
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
+    'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
 }
 
 # -- General configuration ---------------------------------------------------
@@ -340,6 +341,7 @@ nitpick_ignore = [
     ('py:class', 'CharmType'),
     ('py:class', 'LocalIdentityDict'),
     ('py:class', 'IdentityDict'),
+    ('py:class', 'ReadableSpan'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
