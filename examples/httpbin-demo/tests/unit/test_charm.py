@@ -16,7 +16,8 @@ from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
 
 from ops import pebble, testing
 
-# Mocks the default Pebble layer in the workload container, so that Ops can find the service.
+# Mocks the default Pebble layer in the workload container. We'll provide this layer to
+# testing.Container() to ensure that our collect-status handler can always find the service.
 layer = pebble.Layer({
     'services': {
         SERVICE_NAME: {
