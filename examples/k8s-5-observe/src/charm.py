@@ -25,7 +25,7 @@ import logging
 # because 'charmcraft pack' copies its contents to the project root.
 from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
 import ops
@@ -55,8 +55,8 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Events on charm actions that are run via 'juju run'.
         framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
         # Enable pushing application logs to Loki.
-        self._logging = LogProxyConsumer(
-            self, relation_name='log-proxy', log_files=['demo_server.log']
+        self._logging = LogForwarder(
+            self, relation_name='logging'
         )
         # Provide a metrics endpoint for Prometheus to scrape.
         self._prometheus_scraping = MetricsEndpointProvider(
