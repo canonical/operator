@@ -61,11 +61,9 @@ def test_relation_units(build_relation_charm: Callable[[], str], juju: jubilant.
     assert task.success, task.message
     ops_units = json.loads(task.results['units'])
 
-    assert all(
-        unit.startswith(f'{app}/')
-        for rel, app in [('db', db), ('ingress', ingress), ('peer', 'test-relation')]
-        for unit in ops_units[rel]
-    )
+    assert all(unit.startswith('db/') for unit in ops_units[db])
+    assert all(unit.startswith('ingress/') for unit in ops_units[ingress])
+    assert all(unit.startswith('peer/') for unit in ops_units['test-relation])
     assert set(ops_units['db']) == db_units
     assert set(ops_units['ingress']) == ingress_units
     assert set(ops_units['peer']) == peer_units
