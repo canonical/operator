@@ -348,7 +348,7 @@ class Runtime:
 
             finally:
                 if ops:
-                    ops._destroy()
+                    ops.destroy()
                     context.trace_data.extend(ops.trace_data)
                 for key in tuple(os.environ):
                     if key not in previous_env:

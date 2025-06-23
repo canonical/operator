@@ -463,7 +463,7 @@ class _Manager:
         """Perform any necessary cleanup before the framework is closed."""
         # Provided for child classes - nothing needs to be done in the base.
 
-    def _destroy(self):
+    def destroy(self):
         """Finalise the manager."""
         from . import tracing  # break circular import
 
@@ -495,4 +495,4 @@ def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None 
         sys.exit(e.exit_code)
     finally:
         if manager:
-            manager._destroy()
+            manager.destroy()

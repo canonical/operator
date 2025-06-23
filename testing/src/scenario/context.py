@@ -136,7 +136,7 @@ class Manager(Generic[CharmType]):
             self.run()
         # guaranteed to be set: run was either called before, or right above
         assert self.ops
-        self.ops._destroy()
+        self.ops.destroy()
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -563,7 +563,9 @@ class Context(Generic[CharmType]):
     trace_data: list[ReadableSpan]
     """Trace data generated during the last run.
 
-    A list of :py:class:`opentelemetry.sdk.trace.ReadableSpan`
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
+    order of this list. Rather, tests could validate parent/child relationships or containment by
+    start and end timestamps.
     """
 
     action_logs: list[str]
