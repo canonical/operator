@@ -10,7 +10,9 @@ reference/index
 explanation/index
 ```
 
-
+```{important}
+This is the documentation for version 2 of Ops, which stopped being actively developed in June 2025. Unless your charm specifically requires Ops 2, you should use Ops 3 or higher. See the [latest documentation](https://ops.readthedocs.io).
+```
 
 The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
 
