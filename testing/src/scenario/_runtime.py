@@ -191,6 +191,8 @@ class Runtime:
             """The charm's event sources, but wrapped."""
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
+        WrappedEvents.__qualname__ = charm_type.on.__class__.__qualname__
+        WrappedEvents.__module__ = charm_type.on.__class__.__module__
 
         class WrappedCharm(charm_type):
             """The test charm's type, but with events wrapped."""
@@ -198,6 +200,8 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
+        WrappedCharm.__qualname__ = charm_type.__qualname__
+        WrappedCharm.__module__ = charm_type.__module__
         return typing.cast('Type[CharmType]', WrappedCharm)
 
     @contextmanager

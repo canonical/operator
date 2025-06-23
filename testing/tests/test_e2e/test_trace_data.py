@@ -28,7 +28,21 @@ class TracedCharm(ops.CharmBase):
 
 def test_trace_data():
     ctx = Context(TracedCharm, meta=META)
-    ctx.run(ctx.on.start(), State())
+    ctx.run(ctx.on.start(), State(leader=True))
+
+    assert {s.name for s in ctx.trace_data} == {
+        # The entry point and root span.
+        'ops.main',
+        # Start event emitted on this charm.
+        'start: TracedCharm',
+        # Start event emitted on the first party charm lib.
+        'start: Tracing',
+        # Emitted on the leader.
+        'collect_app_status: TracedCharm',
+        # Emitted on all units.
+        'collect_unit_status: TracedCharm',
+    }
+
     main_span = next(s for s in ctx.trace_data if s.name == 'ops.main')
     assert not main_span.parent
     assert {e.name for e in main_span.events} == {
