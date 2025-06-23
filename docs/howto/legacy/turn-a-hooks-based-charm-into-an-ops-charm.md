@@ -113,7 +113,7 @@ if __name__ == "__main__":
     main(ops.Microsample)
 
 ```
-This is obviously horrible, but we can verify that it actually works and it is a useful exercise to verify that the only difference between the hooks-based charm and this Ops charm is the syntax by which the developer has to map hook names to handler scripts. 
+Relying on `popen` is _not_ how Ops is supposed to be used. However, this code will work, and it demonstrates the core principle of mapping hook names to handler code.
 
 ```{important}
 
