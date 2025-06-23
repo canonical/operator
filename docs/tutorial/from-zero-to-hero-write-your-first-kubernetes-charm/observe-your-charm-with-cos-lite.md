@@ -124,7 +124,7 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 ### Define the Loki relation interface
 
-In your `charmcraft.yaml` file, beneath your existing requires endpoint, add another requires endpoint with relation name `logging` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `logging` is the default relation name recommended by the `loki_push_api` interface library.)
+In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with relation name `logging` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `logging` is the default relation name recommended by the `loki_push_api` interface library.)
 
 ```yaml
 requires:
@@ -143,13 +143,13 @@ In your `src/charm.py` file, do the following:
 
 First, import the `loki_push_api` lib:
 
-```
+```python
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 ```
 
-Then, in your charm’s `__init__` method, initialise the `LogForwarder` instance as shown below. The `logging` relation name comes from the `charmcraft.yaml` file. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api` interface).
+Then, in your charm's `__init__` method, initialise the `LogForwarder` instance as shown below. The `logging` relation name comes from the `charmcraft.yaml` file. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api` interface).
 
-```
+```python
 # Enable pushing application logs to Loki.
 self._logging = LogForwarder(
     self, relation_name='logging'
