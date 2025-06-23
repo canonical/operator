@@ -55,9 +55,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Events on charm actions that are run via 'juju run'.
         framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
         # Enable pushing application logs to Loki.
-        self._logging = LogForwarder(
-            self, relation_name='logging'
-        )
+        self._logging = LogForwarder(self, relation_name='logging')
         # Provide a metrics endpoint for Prometheus to scrape.
         self._prometheus_scraping = MetricsEndpointProvider(
             self,

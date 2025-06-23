@@ -151,9 +151,7 @@ Then, in your charm's `__init__` method, initialise the `LogForwarder` instance 
 
 ```python
 # Enable pushing application logs to Loki.
-self._logging = LogForwarder(
-    self, relation_name='logging'
-)
+self._logging = LogForwarder(self, relation_name='logging')
 ```
 
 Congratulations, your charm can now also integrate with Loki!
