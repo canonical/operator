@@ -40,7 +40,7 @@ charm-libs:
   - lib: grafana_k8s.grafana_dashboard
     version: "0"
   - lib: loki_k8s.loki_push_api
-    version: "0"
+    version: "1"
   - lib: observability_libs.juju_topology
     version: "0"
   - lib: prometheus_k8s.prometheus_scrape
@@ -65,7 +65,7 @@ lib
     │   └── v0
     │       └── grafana_dashboard.py
     ├── loki_k8s
-    │   └── v0
+    │   └── v1
     │       └── loki_push_api.py
     ├── observability_libs
     │   └── v0
@@ -124,7 +124,7 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 ### Define the Loki relation interface
 
-In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with  relation name `log-proxy` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `log-proxy` is the default relation name recommended by the `loki_push_api` interface library.)
+In your `charmcraft.yaml` file, beneath your existing requires endpoint, add another requires endpoint with relation name `logging` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `logging` is the default relation name recommended by the `loki_push_api` interface library.)
 
 ```yaml
 requires:
@@ -132,9 +132,8 @@ requires:
     interface: postgresql_client
     limit: 1
     optional: false
-  log-proxy:
+  logging:
     interface: loki_push_api
-    limit: 1
     optional: true
 ```
 
@@ -142,18 +141,18 @@ requires:
 
 In your `src/charm.py` file, do the following:
 
-First, import the `loki_push_api` lib: 
+First, import the `loki_push_api` lib:
 
-```python
-from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
+```
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 ```
 
-Then, in your charm's `__init__` method, initialise the `LogProxyConsumer` instance with the defined log files, as shown below. The `log-proxy` relation name comes from the `charmcraft.yaml` file and the`demo_server.log` file is the file where the application writes logs. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api`).
+Then, in your charm’s `__init__` method, initialise the `LogForwarder` instance as shown below. The `logging` relation name comes from the `charmcraft.yaml` file. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api` interface).
 
-```python
+```
 # Enable pushing application logs to Loki.
-self._logging = LogProxyConsumer(
-    self, relation_name='log-proxy', log_files=['demo_server.log']
+self._logging = LogForwarder(
+    self, relation_name='logging'
 )
 ```
 
