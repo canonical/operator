@@ -4461,10 +4461,10 @@ def test_relation_has_correct_units():
         },
     )
     rel1 = ops.testing.Relation(
-        'db', remote_units_data={1: {}, 2: {}, 3: {}}, remote_app_name='db'
+        'db', remote_units_data={1: {}, 2: {}, 3: {}}, remote_app_name='test-db'
     )
     rel2 = ops.testing.Relation(
-        'ingress', remote_units_data={4: {}, 6: {}}, remote_app_name='ingress'
+        'ingress', remote_units_data={4: {}, 6: {}}, remote_app_name='test-ingress'
     )
     peer = ops.testing.PeerRelation('peer', peers_data={1: {}, 2: {}})
     state_in = ops.testing.State(relations={rel1, rel2, peer})
@@ -4476,15 +4476,29 @@ def test_relation_has_correct_units():
         mgr.run()
         assert unit_names(mgr.charm.event.relation) == {'mycharm/1', 'mycharm/2'}
         assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
-        assert unit_names(mgr.charm.model.relations['db'][0]) == {'db/1', 'db/2', 'db/3'}
-        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {'ingress/4', 'ingress/6'}
+        assert unit_names(mgr.charm.model.relations['db'][0]) == {
+            'test-db/1',
+            'test-db/2',
+            'test-db/3',
+        }
+        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
+            'test-ingress/4',
+            'test-ingress/6',
+        }
 
     with ctx(ctx.on.relation_changed(rel1, remote_unit=1), state_in) as mgr:
         mgr.run()
-        assert unit_names(mgr.charm.event.relation) == {'db/1', 'db/2', 'db/3'}
+        assert unit_names(mgr.charm.event.relation) == {'test-db/1', 'test-db/2', 'test-db/3'}
         assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
-        assert unit_names(mgr.charm.model.relations['db'][0]) == {'db/1', 'db/2', 'db/3'}
-        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {'ingress/4', 'ingress/6'}
+        assert unit_names(mgr.charm.model.relations['db'][0]) == {
+            'test-db/1',
+            'test-db/2',
+            'test-db/3',
+        }
+        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
+            'test-ingress/4',
+            'test-ingress/6',
+        }
 
 
 if __name__ == '__main__':

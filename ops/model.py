@@ -1761,15 +1761,6 @@ class Relation:
             # If the relation is dead, just treat it as if it has no remote units.
             self.active = False
 
-        # In relation-departed `relation-list` doesn't include the remote unit,
-        # but the data should still be available.
-        if (
-            _remote_unit is not None
-            and not is_peer
-            and _remote_unit.name.startswith(relation_name)
-        ):
-            self.units.add(_remote_unit)
-
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
         if app is None:
@@ -1780,6 +1771,15 @@ class Relation:
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
         self.data = RelationData(self, our_unit, backend)
+
+        # In relation-departed `relation-list` doesn't include the remote unit,
+        # but the data should still be available.
+        if (
+            _remote_unit is not None
+            and not is_peer
+            and _remote_unit.name.startswith(f'{self.app.name}/')
+        ):
+            self.units.add(_remote_unit)
 
         self._remote_model: RemoteModel | None = None
 
