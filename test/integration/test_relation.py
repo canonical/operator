@@ -64,9 +64,9 @@ def test_relation_units(build_relation_charm: Callable[[], str], juju: jubilant.
 
     # The keys in the action results are the endpoint names, and the values are
     # the unit names received from Juju.
-    assert all(unit.startswith('db/') for unit in ops_units['db'])
-    assert all(unit.startswith('ingress/') for unit in ops_units['ingress'])
-    assert all(unit.startswith('peer/') for unit in ops_units['peer'])
+    assert all(unit.startswith('test-db/') for unit in ops_units['db'])
+    assert all(unit.startswith('test-ingress/') for unit in ops_units['ingress'])
+    assert all(unit.startswith('test-relation/') for unit in ops_units['peer'])
     assert set(ops_units['db']) == db_units
     assert set(ops_units['ingress']) == ingress_units
     assert set(ops_units['peer']) == peer_units
