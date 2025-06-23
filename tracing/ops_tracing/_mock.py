@@ -42,7 +42,6 @@ def patch_tracing() -> Generator[InMemorySpanExporter, None, None]:
     # Work around OpenTelemetry tracer provider singleton enforcement.
     real_otel_provider = opentelemetry.trace._TRACER_PROVIDER
     real_otel_once_done = opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done
-    # print(real_otel_provider, real_otel_once_done)
     real_create_provider = _backend._create_provider
     real_exporter = _backend._exporter
     dummy_exporter = SPAN_PROCESSOR.span_exporter
@@ -50,7 +49,6 @@ def patch_tracing() -> Generator[InMemorySpanExporter, None, None]:
     # An exporter that accumulates trace data from one Scenario context.run().
     exporter = InMemorySpanExporter()
     SPAN_PROCESSOR.span_exporter = exporter
-    # print("created exporter", exporter, exporter._stopped)
 
     _backend._create_provider = _create_provider
     _backend._exporter = None
