@@ -1,0 +1,28 @@
+clients:
+  sbom:
+      service_url: https://sbom-request.canonical.com
+      department: charm_engineering
+      email: tony.meyer@canonical.com
+      team: charm_tech
+  secscan:
+    - include_id_params: true
+
+
+artifacts:
+  - name: ops
+    type: wheel
+    version: 2.22.0
+    channel: latest/stable
+    base: '25.10'
+
+  - name: ops-scenario
+    type: wheel
+    version: 7.22.0
+    channel: latest/stable
+    base: '25.10'
+
+  - name: ops-tracing
+    type: wheel
+    version: 2.22.0
+    channel: latest/stable
+    base: '25.10'

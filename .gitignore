@@ -38,3 +38,8 @@ juju-crashdump*.tar.xz
 
 # Benchmark test artifacts
 .benchmarks
+
+# sbomber
+/pkgs
+/reports
+.statefile.yaml
