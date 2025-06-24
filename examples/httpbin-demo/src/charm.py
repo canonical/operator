@@ -37,13 +37,13 @@ class HttpbinDemoCharm(ops.CharmBase):
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         framework.observe(self.on[CONTAINER_NAME].pebble_ready, self._on_httpbin_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
-        self.log_level = str(self.config['log-level']).lower()  # str() is for the type checker.
         self.container = self.unit.get_container(CONTAINER_NAME)
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
         """Report the status of the workload (runs after each event)."""
-        if self.log_level not in VALID_LOG_LEVELS:
-            event.add_status(ops.BlockedStatus(f"invalid log level: '{self.log_level}'"))
+        log_level = str(self.config['log-level']).lower()
+        if log_level not in VALID_LOG_LEVELS:
+            event.add_status(ops.BlockedStatus(f"invalid log level: '{log_level}'"))
         try:
             if not self.container.get_service(SERVICE_NAME).is_running():
                 # We can connect to Pebble in the container, but the service hasn't started yet.
@@ -64,8 +64,11 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Define and start a workload using the Pebble API."""
+        log_level = str(self.config['log-level']).lower()
+        if log_level not in VALID_LOG_LEVELS:
+            return
         # Add initial Pebble config layer using the Pebble API.
-        self.container.add_layer('httpbin', self._pebble_layer, combine=True)
+        self.container.add_layer('httpbin', self._make_pebble_layer(log_level), combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         self.container.replan()
         # In rare cases, these calls could fail because the workload container became unavailable.
@@ -74,14 +77,17 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        if self.log_level not in VALID_LOG_LEVELS:
+        log_level = str(self.config['log-level']).lower()
+        if log_level not in VALID_LOG_LEVELS:
             return
         # Update the configuration of the workload.
         # We might not be able to access the workload container yet, so we'll try a few times.
         max_attempts = 3
         for attempt in range(max_attempts):
             try:
-                self.container.add_layer('httpbin', self._pebble_layer, combine=True)
+                self.container.add_layer(
+                    'httpbin', self._make_pebble_layer(log_level), combine=True
+                )
                 self.container.replan()
             except (ops.pebble.APIError, ops.pebble.ConnectionError):  # noqa: PERF203 (try-except in loop)
                 logger.info('Unable to reconfigure gunicorn (attempt %d)', attempt + 1)
@@ -93,10 +99,9 @@ class HttpbinDemoCharm(ops.CharmBase):
             # We expect that there'll be a pebble-ready event in the future,
             # which will configure and start the workload.
             return
-        logger.debug("Log level for gunicorn changed to '%s'", self.log_level)
+        logger.debug("Log level for gunicorn changed to '%s'", log_level)
 
-    @property
-    def _pebble_layer(self) -> ops.pebble.LayerDict:
+    def _make_pebble_layer(self, log_level: str) -> ops.pebble.LayerDict:
         """Return a dictionary representing a Pebble layer."""
         return {
             'summary': 'httpbin layer',
@@ -107,7 +112,7 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'summary': 'httpbin',
                     'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
                     'startup': 'enabled',
-                    'environment': {'GUNICORN_CMD_ARGS': f'--log-level {self.log_level}'},
+                    'environment': {'GUNICORN_CMD_ARGS': f'--log-level {log_level}'},
                 }
             },
         }
