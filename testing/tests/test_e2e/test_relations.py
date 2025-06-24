@@ -712,7 +712,7 @@ def test_peer_relation_default_values():
     assert relation.interface == interface
     assert relation.local_app_data == {}
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
-    assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}
+    assert relation.peers_data == {}
 
 
 def test_relation_remote_model():
@@ -738,3 +738,33 @@ def test_relation_remote_model():
         mgr.run()
         assert mgr.charm.remote_model_uuid == 'UUID'
         assert mgr.charm.remote_model_uuid != mgr.charm.model.uuid
+
+
+def test_peer_relation_units_does_not_contain_this_unit():
+    relation_name = 'relation-name'
+
+    class Charm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on.update_status, self._update_status)
+
+        def _update_status(self, _: EventBase):
+            rel = self.model.get_relation(relation_name)
+            assert rel is not None
+            assert self.unit not in rel.units
+            data = rel.data[self.unit]
+            data['this-unit'] = str(self.unit)
+
+    ctx = Context(
+        Charm,
+        meta={
+            'name': 'charm-name',
+            'peers': {relation_name: {'interface': 'interface-name'}},
+        },
+    )
+    rel_in = PeerRelation(
+        endpoint=relation_name,
+    )
+    state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
+    rel_out = state.get_relation(rel_in.id)
+    assert rel_out.local_unit_data.get('this-unit') == '<ops.model.Unit charm-name/0>'

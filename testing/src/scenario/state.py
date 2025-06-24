@@ -710,10 +710,13 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(
-        default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},
-    )
-    """Current contents of the peer databags."""
+    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
+    """Current contents of the peer databags.
+
+    Note that this does not include data for the unit being tested. Data for
+    that unit must be added to :attr:`RelationBase.local_unit_data`. To control
+    which unit is being tested, pass ``unit_id`` to the :class:`Context`.
+    """
     # Consistency checks will validate that *this unit*'s ID is not in here.
 
     def __hash__(self) -> int:
