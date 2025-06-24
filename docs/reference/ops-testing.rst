@@ -124,3 +124,4 @@ A test consists of three broad steps:
 .. autoclass:: ops.testing.errors.ActionMissingFromContextError
 .. autoclass:: ops.testing.errors.NoObserverError
 .. autoclass:: ops.testing.errors.BadOwnerPath
+.. automethod:: ops.testing.layer_from_rockcraft

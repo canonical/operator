@@ -110,7 +110,7 @@ class PauseCharm(ops.CharmBase):
         self.name = "pause"
         # This event is dynamically determined from the service name
         # in ops.pebble.Layer
-        # 
+        #
         # If you set self.name as above and use it in the layer definition following this
         # example, the event will be <self.name>_pebble_ready
         framework.observe(self.on.pause_pebble_ready, self._on_pause_pebble_ready)
@@ -160,7 +160,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
     # Get a reference to the container so we can manipulate it
     container = self.unit.get_container(self.name)
 
-    # Create a new config layer - specify 'override: merge' in 
+    # Create a new config layer - specify 'override: merge' in
     # the 'pause' service definition to overlay with existing layer
     layer = ops.pebble.Layer(
         {
@@ -250,6 +250,24 @@ state = testing.State(containers={
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
 would give `False`.
 
+A [](testing.Container) contains a list of [](ops.pebble.Layer)s, just like an [](ops.Container).
+You might start the test with some existing layers -- from a `rockcraft.yaml` file, for example, and
+assert that the charm adds an additional layer.
+
+```python
+def test_add_layer():
+    ctx = testing.Context(MyCharm)
+    layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
+    container_in = testing.Container('workload', layers=[layer])
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
+    assert len(state_out.get_container(container.name).layers) == 2
+    new_plan = state_out.get_container(container.name).plan
+    assert ...  # Verify that the plan contains changes made in pebble-ready.
+```
+
+> See more: [](testing.layer_from_rockcraft)
+
 ### Mount files in the container
 
 You can configure a container to have some files in it:
@@ -334,7 +352,7 @@ def test_pebble_push():
         MyCharm,
         meta={'name': 'foo', 'containers': {'foo': {}}}
     )
-    
+
     state_out = ctx.run(ctx.on.start(), state_in)
 
     # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
@@ -879,7 +897,7 @@ stdout, _ = process.wait_output()
 logger.info('Output: %r', stdout)
 ```
 
-By default, input is sent and output is received as Unicode using the UTF-8 encoding. You can change this with the `encoding` parameter (which defaults to `utf-8`). The most common case is to set `encoding=None`, which means "use raw bytes", in which case `stdin` must be a bytes object and `wait_output()` returns bytes objects. 
+By default, input is sent and output is received as Unicode using the UTF-8 encoding. You can change this with the `encoding` parameter (which defaults to `utf-8`). The most common case is to set `encoding=None`, which means "use raw bytes", in which case `stdin` must be a bytes object and `wait_output()` returns bytes objects.
 
 For example, the following will log `Output: b'\x01\x02'`:
 
