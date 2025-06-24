@@ -4439,5 +4439,67 @@ def test_departing_unit_in_relations():
         assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
 
 
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_relation_has_correct_units():
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_peer_relation_changed)
+            framework.observe(self.on['peer'].relation_changed, self._on_peer_relation_changed)
+
+        def _on_peer_relation_changed(self, event: ops.RelationChangedEvent):
+            self.event = event
+
+    ctx = ops.testing.Context(
+        Charm,
+        meta={
+            'name': 'mycharm',
+            'requires': {'db': {'interface': 'db'}, 'ingress': {'interface': 'ingress'}},
+            'peers': {'peer': {'interface': 'gossip'}},
+        },
+    )
+    rel1 = ops.testing.Relation(
+        'db', remote_units_data={1: {}, 2: {}, 3: {}}, remote_app_name='test-db'
+    )
+    rel2 = ops.testing.Relation(
+        'ingress', remote_units_data={4: {}, 6: {}}, remote_app_name='test-ingress'
+    )
+    peer = ops.testing.PeerRelation('peer', peers_data={1: {}, 2: {}})
+    state_in = ops.testing.State(relations={rel1, rel2, peer})
+
+    def unit_names(relation: ops.Relation):
+        return {unit.name for unit in relation.units}
+
+    with ctx(ctx.on.relation_changed(peer, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert unit_names(mgr.charm.event.relation) == {'mycharm/1', 'mycharm/2'}
+        assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
+        assert unit_names(mgr.charm.model.relations['db'][0]) == {
+            'test-db/1',
+            'test-db/2',
+            'test-db/3',
+        }
+        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
+            'test-ingress/4',
+            'test-ingress/6',
+        }
+
+    with ctx(ctx.on.relation_changed(rel1, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert unit_names(mgr.charm.event.relation) == {'test-db/1', 'test-db/2', 'test-db/3'}
+        assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
+        assert unit_names(mgr.charm.model.relations['db'][0]) == {
+            'test-db/1',
+            'test-db/2',
+            'test-db/3',
+        }
+        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
+            'test-ingress/4',
+            'test-ingress/6',
+        }
+
+
 if __name__ == '__main__':
     unittest.main()
