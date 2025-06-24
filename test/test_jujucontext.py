@@ -69,6 +69,12 @@ class TestJujuContext:
         juju_context = _JujuContext.from_dict({'JUJU_VERSION': '3.4.0'})
         assert juju_context.version == JujuVersion('3.4.0')
 
+    def test_no_juju_version_provided(self):
+        # Note that this only happens in the restricted context events, so can
+        # be removed once ops requires Juju 4.
+        juju_context = _JujuContext.from_dict({})
+        assert juju_context.version == JujuVersion('0.0.0')
+
     def test_parsing_storage_id_to_name(self):
         juju_context = _JujuContext.from_dict({
             'JUJU_VERSION': '0.0.0',
