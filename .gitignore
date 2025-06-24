@@ -38,3 +38,6 @@ juju-crashdump*.tar.xz
 
 # Benchmark test artifacts
 .benchmarks
+
+# Libs for example charms
+/examples/*/lib

@@ -49,3 +49,35 @@ def test_pebble_layer():
         state_out.get_container(container.name).service_statuses['fastapi-service']
         == ops.pebble.ServiceStatus.ACTIVE
     )
+
+
+def test_config_changed():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name='demo-server', can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={'server-port': 8080},
+        leader=True,
+    )
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    command = (
+        state_out.get_container(container.name)
+        .layers['fastapi_demo']
+        .services['fastapi-service']
+        .command
+    )
+    assert '--port=8080' in command
+
+
+def test_config_changed_invalid_port():
+    ctx = testing.Context(FastAPIDemoCharm)
+    container = testing.Container(name='demo-server', can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        config={'server-port': 22},
+        leader=True,
+    )
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert state_out.unit_status == testing.BlockedStatus(
+        'Invalid port number, 22 is reserved for SSH'
+    )
