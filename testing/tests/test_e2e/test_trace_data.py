@@ -11,11 +11,6 @@ META = {
 
 
 class TracedCharm(ops.CharmBase):
-    META = {
-        'name': 'traced_charm',
-        'requires': {'charm-tracing': {'interface': 'tracing'}},
-    }
-
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.tracing = ops.tracing.Tracing(self, 'charm-tracing')
