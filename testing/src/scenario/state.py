@@ -46,7 +46,28 @@ from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
+    from typing import TypedDict
+    from typing_extensions import Unpack
     from . import Context
+
+    class _StateKwargs(TypedDict, total=False):
+        config: dict[str, str | int | float | bool]
+        relations: Iterable[RelationBase]
+        networks: Iterable[Network]
+        containers: Iterable[Container]
+        storages: Iterable[Storage]
+        opened_ports: Iterable[Port]
+        leader: bool
+        model: Model
+        secrets: Iterable[Secret]
+        resources: Iterable[Resource]
+        planned_units: int
+        deferred: Sequence[DeferredEvent]
+        stored_states: Iterable[StoredState]
+        app_status: _EntityStatus
+        unit_status: _EntityStatus
+        workload_version: str
+
 
 AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
 RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
@@ -1761,6 +1782,93 @@ class State(_max_posargs(0)):
         normalized_endpoint = _normalise_name(endpoint)
         return tuple(
             r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
+        )
+
+    @classmethod
+    def from_context(
+        cls,
+        ctx: Context[CharmType],
+        *,
+        # If provided, these merge with or replace the generated versions.
+        config: dict[str, str | int | float | bool] | None = None,
+        relations: Iterable[RelationBase] | None = None,
+        containers: Iterable[Container] | None = None,
+        storages: Iterable[Storage] | None = None,
+        stored_states: Iterable[StoredState] | None = None,
+        **kwargs: Unpack[_StateKwargs],
+    ) -> State:
+        """Create a State from the charm context.
+
+        The initial data is loaded from the metadata in the context:
+
+        * `config` is loaded from the metadata's `config` field
+        * `relations` are loaded from the metadata's `requires`, `provides`, and `peers` fields
+        * `containers` are loaded from the metadata's `containers` field, and
+          are created with `can_connect=True`
+        * `storages` are loaded from the metadata's `storage` field
+        * `stored_states` are added if found as class attributes of the charm
+
+        This simulates a Juju state where all the related charms have been
+        integrated, and all the containers have been created, but no data has
+        been added to the relations or stored states.
+
+        Any additional keyword arguments will be passed to the State __init__,
+        for example::
+
+            state_in = State.from_context(
+                ctx,
+                leader=True,
+                unit_status=testing.ActiveStatus(),
+            )
+
+        Items that are found in the metadata and are also in the passed
+        arguments will be merged, with the passed values taking precedence.
+        """
+        meta = ctx.charm_spec.meta
+        spec_config = ctx.charm_spec.config
+        config = {} if config is None else config
+        if spec_config:
+            options = spec_config.get('options', {})
+            for option, details in options.items():
+                if option not in config and 'default' in details:
+                    config[option] = details['default']
+        relations = set(relations or ())
+        for relation_type in ('requires', 'provides', 'peers'):
+            for endpoint, details in meta.get(relation_type, {}).items():
+                if any(rel.endpoint == endpoint for rel in relations):
+                    continue
+                if relation_type == 'peers':
+                    relation_class = PeerRelation
+                elif details.get('scope') == 'container':
+                    relation_class = SubordinateRelation
+                else:
+                    relation_class = Relation
+                relations.add(relation_class(endpoint, details['interface']))
+        containers = set(containers or ())
+        for container_name in meta.get('containers', {}):
+            if any(c.name == container_name for c in containers):
+                continue
+            containers.add(Container(name=container_name, can_connect=True))
+        storages = set(storages or ())
+        for storage_name in meta.get('storage', {}):
+            if any(s.name == storage_name for s in storages):
+                continue
+            storages.add(Storage(name=storage_name))
+        stored_states = set(stored_states or ())
+        for attr in dir(ctx.charm_spec.charm_type):
+            value = getattr(ctx.charm_spec.charm_type, attr)
+            if isinstance(value, ops.StoredState):
+                owner_path = ctx.charm_spec.charm_type.handle_kind
+                if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
+                    continue
+                stored_states.add(StoredState(attr, owner_path=owner_path))
+        return cls(
+            config=config,
+            relations=relations,
+            containers=containers,
+            storages=storages,
+            stored_states=stored_states,
+            **kwargs,
         )
 
 

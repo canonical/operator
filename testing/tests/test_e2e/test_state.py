@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import asdict, replace
-from typing import Any
+from typing import Any, Callable, Iterable, Generator
 
 import ops
 import pytest
@@ -12,6 +12,7 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _next_storage_index,
     Address,
     BindAddress,
     CheckInfo,
@@ -23,6 +24,7 @@ from scenario.state import (
     Notice,
     PeerRelation,
     Relation,
+    RelationBase,
     Resource,
     Secret,
     State,
@@ -31,6 +33,7 @@ from scenario.state import (
     SubordinateRelation,
     TCPPort,
 )
+from scenario.context import Context
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
@@ -649,3 +652,206 @@ def test_state_immutable_with_changed_data_stored_state():
     )
     assert not stored_state_in.content
     assert 'seen' in stored_state_out.content
+
+
+def test_state_from_context():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    state = State.from_context(ctx)
+    assert state.config == {'foo': 'bar'}
+    assert len(state.containers) == 1
+    assert state.get_container('container').can_connect
+    assert len(state.relations) == 4
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+
+
+def test_state_from_context_extend():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        config={'foo': 'baz'},
+        leader=True,
+        containers={container},
+        relations={relation},
+        stored_states={stored_state},
+    )
+    assert state.leader is True
+    assert state.config == {'foo': 'baz'}
+    assert len(state.containers) == 2
+    assert state.get_container('container').can_connect
+    assert not state.get_container('other-container').can_connect
+    assert len(state.relations) == 5
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+    assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
+
+
+def test_state_from_context_merge_config():
+    ctx = Context(
+        ops.CharmBase,
+        meta={'name': 'alex'},
+        config={'options': {'foo': {'type': 'string', 'default': 'str'}}},
+    )
+    state = State.from_context(ctx, config={'bar': 'baz'})
+    assert state.config == {'foo': 'str', 'bar': 'baz'}
+
+
+@pytest.mark.parametrize(
+    'rel_type,endpoint',
+    [(Relation, 'relreq'), (PeerRelation, 'peer'), (SubordinateRelation, 'sub')],
+)
+def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], endpoint: str):
+    meta = {
+        'name': 'sam',
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+    }
+    rel = rel_type(endpoint, local_app_data={'a': 'b'})
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, relations={rel})
+    # We should have the relation passed in, that has data, not an empty one
+    # from the context.
+    assert state.get_relation(rel.id).local_app_data == {'a': 'b'}
+
+
+def test_state_from_context_skip_exiting_container():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+    }
+    notice = Notice('example.com/notice')
+    container = Container(name='container', notices=[notice])
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, containers={container})
+    # We should have the container passed in, that has notices and has the
+    # default of can_connect=False, not the one from the context.
+    assert state.get_container(container.name).notices == [notice]
+    assert state.get_container(container.name).can_connect is False
+
+
+def test_state_from_context_skip_exiting_storage():
+    meta = {
+        'name': 'sam',
+        'storage': {'storage': {}},
+    }
+    next_index = _next_storage_index(update=False)
+    storage = Storage(name='storage')
+    assert storage.index == next_index
+    next_index = _next_storage_index(update=False)
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, storages={storage})
+    # We should have the storage passed in. If the context created a new one,
+    # the index would have increased.
+    assert state.get_storage(storage.name, index=storage.index) == storage
+    assert _next_storage_index(update=False) == next_index
+
+
+def test_state_from_context_skip_exiting_stored_state():
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    meta = {
+        'name': 'sam',
+    }
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    ctx = Context(Charm, meta=meta)
+    state = State.from_context(ctx, stored_states={stored_state})
+    # We should have the stored state passed in, that has content, not an empty
+    # one from the context.
+    assert state.get_stored_state(
+        stored_state.name, owner_path=stored_state.owner_path
+    ).content == {'foo': 'bar'}
+
+
+def _make_generator(items: Iterable[Any]) -> Generator[Any]:
+    return (item for item in items)
+
+
+@pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
+def test_state_from_non_sets(iterable: Callable[..., Any]):
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(Charm, meta=meta)
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        containers=iterable({container}),
+        relations=iterable({relation}),
+        stored_states=iterable({stored_state}),
+    )
+    assert len(state.containers) == 2
+    assert isinstance(state.containers, frozenset)
+    assert len(state.relations) == 5
+    assert isinstance(state.relations, frozenset)
+    assert len(state.storages) == 1
+    assert isinstance(state.storages, frozenset)
+    assert len(state.stored_states) == 1
+    assert isinstance(state.stored_states, frozenset)
