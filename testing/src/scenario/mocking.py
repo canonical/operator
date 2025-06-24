@@ -294,6 +294,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
+            # The current unit should never be in `peers_data`, and there is a
+            # consistency check to enforce that, but in case something has gone
+            # wrong, filter it out to match Juju's behaviour.
             this_unit = int(self.unit_name.split('/')[-1])
             return tuple(
                 f'{self.app_name}/{unit_id}'

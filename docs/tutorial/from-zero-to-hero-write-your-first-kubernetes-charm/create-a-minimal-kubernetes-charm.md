@@ -59,7 +59,6 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm can be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```
@@ -110,7 +109,7 @@ Create a file called `requirements.txt`. This is a  file that describes all the 
 In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
 
 ```
-ops >= 2.11
+ops>2,<4
 ```
 
 
@@ -466,13 +465,12 @@ deps =
     ops[testing]
     -r {tox_root}/requirements.txt
 commands =
-    coverage run --source={[vars]src_path} \
-                 -m pytest \
-                 --tb native \
-                 -v \
-                 -s \
-                 {posargs} \
-                 {[vars]tests_path}/unit
+    coverage run --source={[vars]src_path} -m pytest \
+        -v \
+        -s \
+        --tb native \
+        {posargs} \
+        {[vars]tests_path}/unit
     coverage report
 ```
 > Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
@@ -522,7 +520,7 @@ def test_pebble_layer():
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
-    # Check the unit status is active
+    # Check the unit is active:
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
@@ -592,12 +590,13 @@ deps =
     pytest-operator
     -r {tox_root}/requirements.txt
 commands =
-    pytest -v \
-           -s \
-           --tb native \
-           --log-cli-level=INFO \
-           {posargs} \
-           {[vars]tests_path}/integration
+    pytest \
+        -v \
+        -s \
+        --tb native \
+        --log-cli-level=INFO \
+        {posargs} \
+        {[vars]tests_path}/integration
 ```
 
 If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.

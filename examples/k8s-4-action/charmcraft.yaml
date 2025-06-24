@@ -19,6 +19,32 @@ assumes:
   - juju >= 3.1
   - k8s-api
 
+config:
+  options:
+    server-port:
+      default: 8000
+      description: Default port on which FastAPI is available
+      type: int
+
+requires:
+  database:
+    interface: postgresql_client
+    limit: 1
+    optional: false
+
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+
+actions:
+  get-db-info:
+    description: Fetches database authentication information
+    params:
+      show-password:
+        description: Show username and password in output information
+        type: boolean
+        default: False
+
 containers:
   demo-server:
     resource: demo-server-image

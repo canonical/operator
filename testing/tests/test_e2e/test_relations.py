@@ -712,7 +712,7 @@ def test_peer_relation_default_values():
     assert relation.interface == interface
     assert relation.local_app_data == {}
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
-    assert relation.peers_data == {0: _DEFAULT_JUJU_DATABAG}
+    assert relation.peers_data == {}
 
 
 def test_relation_remote_model():

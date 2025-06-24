@@ -245,7 +245,6 @@ How you can connect to a private or public address is dependent on your configur
 > Example implementations: [mongodb-k8s-operator](https://github.com/canonical/mongodb-k8s-operator/blob/8b9ebbee3f225ca98175c25781f1936dc4a62a7d/tests/integration/metrics_tests/test_metrics.py#L33), [tempo-k8s-operator](https://github.com/canonical/tempo-k8s-operator/blob/78a1143d99af99a1a56fe9ff82b1a3563e4fd2f7/tests/integration/test_integration.py#L69), [synapse](https://github.com/canonical/synapse-operator/blob/eb44f4959a00040f08b98470f8b17cae4cc616da/tests/integration/conftest.py#L170)
 
 > See more:
-> - {external+juju:ref}`Charm development best practices > Fetching network information <charm-development-best-practices>`
 > - {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
 
 ### Run a subprocess command within Juju context
