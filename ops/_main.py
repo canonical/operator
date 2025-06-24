@@ -215,7 +215,7 @@ class _Dispatcher:
         state-get) are not available. As such, we change how we interact with
         Juju.
         """
-        return self.event_name in ('collect_metrics',)
+        return self.event_name in ('collect_metrics', 'meter_status_changed')
 
 
 def _should_use_controller_storage(
@@ -413,8 +413,11 @@ class _Manager:
 
         # Emit the Juju event.
         self._emit_charm_event(self.dispatcher.event_name)
-        # Emit collect-status events.
-        _charm._evaluate_status(self.charm)
+        # Emit collect-status events. In a restricted context, we can't run
+        # is-leader, so can't do the full evaluation. Skip it rather than
+        # only running the unit status.
+        if not self.dispatcher.is_restricted_context():
+            _charm._evaluate_status(self.charm)
 
     def _get_event_to_emit(self, event_name: str) -> _framework.BoundEvent | None:
         try:

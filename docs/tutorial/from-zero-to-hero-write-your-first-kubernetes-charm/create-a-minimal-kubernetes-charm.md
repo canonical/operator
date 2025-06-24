@@ -383,9 +383,9 @@ You should see a JSON string with the version of the application:
 {"version":"1.0.0"}
 ```
 
+Congratulations, you've successfully created a minimal Kubernetes charm!
 
-```{dropdown} Expand if you wish to inspect your deployment further
-
+### Inspect your deployment further
 
 1. Run:
 
@@ -414,9 +414,8 @@ demo-api-charm-0                 2/2     Running   0               7d2h
 ```text
 kubectl -n welcome-k8s describe pod demo-api-charm-0
 ```
-In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
 
-**Congratulations, you've successfully created a minimal Kubernetes charm!** 
+In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
 
 (write-unit-tests-for-your-charm)=
 ## Write unit tests for your charm

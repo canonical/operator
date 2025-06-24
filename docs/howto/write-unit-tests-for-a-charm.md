@@ -30,7 +30,7 @@ So that we have a charm to test, declare a placeholder charm type in `charm.py`:
 
 ```python
 class MyCharm(ops.CharmBase):
-    pass        
+    pass
 ```
 
 Then open a new `test_foo.py` file for the test code and import the [`ops.testing`](ops_testing) framework:
@@ -53,7 +53,7 @@ This follows the typical test structure:
 For example, suppose that `MyCharm` uses `Container.Push` to write a YAML config file on the pebble-ready event:
 
 ```python
-def _on_pebble_ready(self, event: ops.PebbleReadyEvent):        
+def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
     container = event.workload
     container.push('/etc/config.yaml', 'message: Hello, world!', make_dirs=True)
     # ...
@@ -95,9 +95,36 @@ If you prefer to use unittest, you should rewrite this as a method of a `TestCas
 
 ```
 
-> See more: 
+> See more:
 >  - [`State`](ops.testing.State)
 >  - [`Context`](ops.testing.Context)
+
+To start with a `State` that has components based on the charm's metadata, use the `State.from_context` method. For example, with this `charmcraft.yaml` file:
+
+```yaml
+name: my-charm
+containers:
+  workload:
+    resource: workload-image
+peers:
+  group-chat:
+    interface: gossip
+```
+
+Using `State.from_context` will automatically add in a `testing.Container` and `testing.PeerRelation`. For example:
+
+```python
+def test_peer_changed():
+    ctx = testing.Context(MyCharm)
+    # We can pass in all of the arguments for `State()` as well.
+    state_in = testing.State.from_context(ctx, leader=True)
+    rel_in = state_in.get_relations('group-chat')[0]
+    state_out = ctx.run(ctx.on.relation_changed(rel), state_in)
+    rel_out = state_out.get_relation(rel.in)
+    assert rel_out.peers_data...
+```
+
+> See more: [](ops.testing.State.from_context)
 
 ## Mocking beyond the State
 
@@ -124,7 +151,7 @@ Then you should rewrite the test to pass the patched charm type to the `Context`
 
 ```python
 def test_charm_runs(my_charm):
-    # Arrange: 
+    # Arrange:
     #  Create a Context to specify what code we will be running
     ctx = testing.Context(my_charm)
     # ...
