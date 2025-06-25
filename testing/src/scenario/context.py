@@ -53,6 +53,7 @@ if TYPE_CHECKING:  # pragma: no cover
         State,
         _EntityStatus,
     )
+    from opentelemetry.sdk.trace import ReadableSpan
 
 logger = scenario_logger.getChild('runtime')
 
@@ -135,7 +136,7 @@ class Manager(Generic[CharmType]):
             self.run()
         # guaranteed to be set: run was either called before, or right above
         assert self.ops
-        self.ops._destroy()
+        self.ops.destroy()
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -441,6 +442,7 @@ class Context(Generic[CharmType]):
     - :attr:`emitted_events`
     - :attr:`action_logs`
     - :attr:`action_results`
+    - :attr:`trace_data`
 
     This allows you to write assertions not only on the output state, but also, to some
     extent, on the path the charm took to get there.
@@ -558,6 +560,14 @@ class Context(Generic[CharmType]):
     """
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
+    trace_data: list[ReadableSpan]
+    """Trace data generated during the last run.
+
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
+    order of this list. Rather, tests could validate parent/child relationships or containment by
+    start and end timestamps.
+    """
+
     action_logs: list[str]
     """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
 
@@ -674,6 +684,7 @@ class Context(Generic[CharmType]):
         self.removed_secret_revisions: list[int] = []
         self.emitted_events: list[ops.EventBase] = []
         self.requested_storages: dict[str, int] = {}
+        self.trace_data = []
 
         # set by Runtime.exec() in self._run()
         self._output_state: State | None = None
