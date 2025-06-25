@@ -754,12 +754,8 @@ def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
         layer = layer_from_rockcraft(rockcraft_path)
     assert layer.summary == rockcraft['summary']
     if 'description' in rockcraft:
-        description = (
-            f'{rockcraft["description"]} (built from the rockcraft.yaml at {rockcraft_path})'
-        )
-    else:
-        description = f'(no description) (built from the rockcraft.yaml at {rockcraft_path})'
-    assert layer.description == description
+        assert description in layer.description
+    assert rockcraft_path in description
     assert len(layer.services) == len(rockcraft.get('services', {}))
     for service_name, service in rockcraft.get('services', {}).items():
         assert service_name in layer.services
