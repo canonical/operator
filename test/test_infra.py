@@ -86,10 +86,10 @@ def test_ops_testing_doc():
             found_names.update({
                 line.split('ops.testing.', 1)[1].strip()
                 for line in testing_doc
-                if line.strip().startswith(
+                if line.strip().startswith((
                     '.. autoclass:: ops.testing.',
                     '.. automethod:: ops.testing.',
-                )
+                ))
             })
 
     assert expected_names == found_names
