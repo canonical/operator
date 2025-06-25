@@ -41,8 +41,3 @@ juju-crashdump*.tar.xz
 
 # Libs for example charms
 /examples/*/lib
-
-# sbomber
-/pkgs
-/reports
-.statefile.yaml
