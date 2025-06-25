@@ -56,7 +56,6 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
 )
 def test_ops_testing_doc():
     """Ensure that ops.testing's documentation includes all the expected names."""
-    prefix = ('.. autoclass:: ops.testing.', '.. automethod:: ops.testing.')
     # We don't document the type aliases.
     expected_names = set(
         name
@@ -87,7 +86,10 @@ def test_ops_testing_doc():
             found_names.update({
                 line.split('ops.testing.', 1)[1].strip()
                 for line in testing_doc
-                if line.strip().startswith(prefix)
+                if line.strip().startswith(
+                    '.. autoclass:: ops.testing.',
+                    '.. automethod:: ops.testing.',
+                )
             })
 
     assert expected_names == found_names
