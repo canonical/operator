@@ -251,7 +251,7 @@ Example:
 
 Example:
 
-- Avoid: "For reference information about the API, see [API and clients] and [API]." (It's hard to tell the difference of these two.)
+- Avoid: "For reference information about the API, see [API and clients] and [API]." (It's hard to tell the difference between these two.)
 - Prefer: "For an explanation of API access levels, see [API and clients]. For the full API reference, see [API reference]." (Clear.)
 
 ### Don't over-promote
