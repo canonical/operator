@@ -236,7 +236,7 @@ However, it's okay to use acronyms that are very well known in our domain, like 
 
 ### Be consistent
 
-Choice of words: For example, if the whole document uses "mandatory", you probably shouldn't use "required" in a newly added paragraph. For another example, if the whole doc uses "list foo" when adding new content, don't use "get a list of bar".
+Choice of words: For example, if the whole document uses "mandatory", you probably shouldn't use "required" in a newly added paragraph. For another example, if the whole document uses "list foo" when adding new content, don't use "get a list of bar".
 
 ### Be precise
 
