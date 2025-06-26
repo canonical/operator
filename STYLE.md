@@ -302,5 +302,5 @@ When describing a generic behaviour:
 ### YAML
 
 - Use quotes for strings: This is especially important if a string contains special characters or starts with a number.
-- Indentation: Always use spaces and be consistent with the number of spaces throughout the same file (usually, this should be two or four).
+- Indentation: Always use spaces and be consistent with the number of spaces throughout the same file (two, unless the file already uses a different number).
 - Use comments: Comments will help you and others understand what that data is used for.
