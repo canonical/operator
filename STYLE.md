@@ -140,7 +140,7 @@ Example:
 - Avoid: "If the command doesn’t exit within 1 second, the start is considered successful." (Negative)
 - Prefer: "If the command stays running for the 1-second window, the start is considered successful." (Positive)
 
-Exceptions: Only use negative phrasing when:
+Only use negative phrasing when:
 
 - The failure case is the primary concern (for example, error handling).
 - The positive phrasing is awkward or less clear.
