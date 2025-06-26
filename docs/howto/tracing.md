@@ -9,24 +9,35 @@ What it’s not, including that charm tracing is not useful for business analyti
 
 ### Why trace your charms
 
-### What is Traced
+Observability transforms a Juju deployment from a black box to a real-time system.
+
+Trace data is structured and contextual; {ref}`this helps users <tracing-users>` understand application's behaviour at different points in your charm's lifecycle.
+
+### What is traced
 
 #### What ops and charm libs provide
 
-> Hints:
-Ops already provides the key ingredients, list them, explain them.
-Charm library authors are responsible for instrumenting their charm libs.
-Examples.
+Ops contains own instrumentation, unit and integration tests for it.
+- The {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` first-party charm library class comes with validation at object init time, so that charms and charm libraries don't have to test that.
+- Likewise, buffering and export logic is already tested as part of Ops, and charms should not write integration
+tests to cover these.
+- Ops creates the root span and a span when calling each observer, these can be relied on in your unit tests.
+- Ops creates spans for Juju hook tool invocations and Pebble operations, so you typically don't have to.
+
+Charm libraries should instrument their logic at coarse granularity, and add attributes or events with logical information:
+- spawned processed, that is `subprocess.*` calls with enough details what is being run, excluding sensitive data like the contents of keys or passwords
+- outbound HTTP or RPC requests, as well as requests to own workload or peers, that is `requests.*` or `httpx.*` calls
+- important operations or operations that are intended to take time, like `bcrypt.hashpw()` or `ec.generate_private_key()`
 
 ### What your charm needs to do
 
-> Hints:
-The ops.tracing.Tracing() object setup.
-Explain that for simple cases that’s it, as ops and charm libs cover quite a lot.
-Highlight unique workload features that do require manual instrumentation.
-Subprocess calls
-HTTP or RPC calls to workload
-Important function calls if workload-specific Python module is installed
+Charms authors should note that relatively little, if anything, needs to be instrumented in the charm code:
+- decisions, such as fail-over
+- external or long processes, like `subprocess.*`, `requests.*` or call to a Python module specific to your workload
+- points where important values can be exposed as attributes
+- additional context for other instrumentation, like doing A for remote app B in a provider charm
+
+In a simple case, all the charm author needs to do is to instantiate {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` in the charm's `__init__` and provide it with relation names.
 
 ## Add tracing to an existing charm
 
@@ -74,6 +85,8 @@ At this point, Ops will trace:
 - Ops calls that inspect and update Juju (also called "hook tools")
 - Pebble API access by the charm code
 
+### Fixme heading
+
 This provides coarse-grained tracing, focused on the boundaries between the
 charm code and the external processes.
 
@@ -94,16 +107,37 @@ juju deploy my-charm
 juju integrate my-charm tempo
 ```
 
+### Fixme more
+
 
 ## Replace the charm_tracing library
 
-Migration guide from `charm_tracing` charm lib to `ops[tracing]`.
+- In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
+  `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
+  `opentelemetry-semantic-conventions` and add `ops[tracing]` instead.
+- In your repository, remove the `charm_tracing` charm library.
+- In your charm code, remove the `@trace_charm` decorator and its helpers: the
+  `tracing_endpoint` and `server_cert` properties or methods.
+- In your `charmcraft.yaml`, take note of the tracing and (optionally) ca relation names.
+- In your charm's `__init__` method, instantiate the `ops.tracing.Tracing` object,
+  using the relation names from the previous step
+
+Note that the `charm_tracing` charm library auto-instruments all public functions
+of the decorated charm class. `ops[tracing]` doesn't do that, and you are expected
+to create custom spans and events using the OpenTelemetry API where that makes sense.
 
 ## Trace a charm library
 
 > Hints:
 OTEL API usage.
 A (dummy) charm to test the charm lib.
+
+- At the top of your charm library, `import opentelemetry.trace`.
+- After the imports in your charm library, create the tracer object as
+  `tracer = opentelemetry.trace.get_tracer(name)` where the name could be your
+  charm library name, or Python module `__name__`.
+- See the [Custom spans and events](custom-spans-and-events) section above to
+  create OpenTelemetry spans and events in the key places in your charm library.
 
 ## Include tracing in a new charm
 
@@ -182,24 +216,6 @@ Links to COS documentation
 
 ### Division of responsibilities
 
-Ops contains own instrumentation, unit and integration tests for it.
-- The {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` first-party charm library class comes with validation at object init time, so that charms and charm libraries don't have to test that.
-- Likewise, buffering and export logic is already tested as part of Ops, and charms should not write integration
-tests to cover these.
-- Ops creates the root span and a span when calling each observer, these can be relied on in your unit tests.
-- Ops creates spans for Juju hook tool invocations and Pebble operations, so you typically don't have to.
-
-Charm libraries should instrument their logic at coarse granularity, and add attributes or events with logical information:
-- spawned processed, that is `subprocess.*` calls with enough details what is being run, excluding sensitive data like the contents of keys or passwords
-- outbound HTTP or RPC requests, as well as requests to own workload or peers, that is `requests.*` or `httpx.*` calls
-- important operations or operations are intended to take time, like `bcrypt.hashpw()` or `ec.generate_private_key()`
-
-Charms authors should note that therefore relatively little, if anything, needs to be instrumented in the charm code:
-- decisions, such as fail-over
-- external or long processes, like `subprocess.*` or `requests.*`
-- points where important values can be exposed as attributes
-- additional context for other instrumentation, like doing A for remote app B in a provider charm
-
 ---
 
 `ops[tracing]` provides the first party charm tracing library,
@@ -254,31 +270,6 @@ class Workload:
                 logger.error('Could not migrate the database')
             ...
 ```
-
-## Adding tracing to charm libraries
-
-- At the top of your charm library, `import opentelemetry.trace`.
-- After the imports in your charm library, create the tracer object as
-  `tracer = opentelemetry.trace.get_tracer(name)` where the name could be your
-  charm library name, or Python module `__name__`.
-- See the [Custom spans and events](custom-spans-and-events) section above to
-  create OpenTelemetry spans and events in the key places in your charm library.
-
-## Migrating from the charm\_tracing charm library
-
-- In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
-  `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
-  `opentelemetry-semantic-conventions` and add `ops[tracing]` instead.
-- In your repository, remove the `charm_tracing` charm library.
-- In your charm code, remove the `@trace_charm` decorator and its helpers: the
-  `tracing_endpoint` and `server_cert` properties or methods.
-- In your `charmcraft.yaml`, take note of the tracing and (optionally) ca relation names.
-- In your charm's `__init__` method, instantiate the `ops.tracing.Tracing` object,
-  using the relation names from the previous step
-
-Note that the `charm_tracing` charm library auto-instruments all public functions
-of the decorated charm class. `ops[tracing]` doesn't do that, and you are expected
-to create custom spans and events using the OpenTelemetry API where that makes sense.
 
 ## Lower-level API
 

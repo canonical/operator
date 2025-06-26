@@ -1,5 +1,6 @@
 (tracing)=
 # Tracing
+(tracing-users)=
 ## Tracing users
 
 Instrument generously, so that more context is captured than is immediately needed; this ensures that enough data is available for each role:
@@ -12,7 +13,7 @@ Instrument generously, so that more context is captured than is immediately need
 
 **QA teams** can incorporate trace assertions into integration tests to simplify interoperability testing.
 
-At the same time, we do not recommend deriving **business metrics** from charm trace data, as the workload trace data should be the primary source instead.
+At the same time, we do not recommend deriving **business metrics** from charm trace data, as the workload trace data should be the primary source.
 
 ## Relations
 
