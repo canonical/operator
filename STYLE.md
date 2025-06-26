@@ -282,11 +282,15 @@ Exception: If documenting a client library (for example, Go/Python SDKs), implem
 
 Choose between the "a" or "the" articles carefully.
 
-- Avoid: "The format of the duration string is a sequence of decimal numbers"
-- Prefer: "The format of a duration string is a sequence of decimal numbers." (Describing a generic parameter, not a specific one.)
+When describing a generic parameter:
+
+- Avoid: "The format of the duration string is a sequence of decimal numbers."
+- Prefer: "The format of a duration string is a sequence of decimal numbers."
+
+When describing a generic behaviour:
 
 - Avoid: "Restart the service when the health check fails."
-- Prefer: "Restart a service when the health check fails." (When describing a generic behaviour, no specific service is implied.)
+- Prefer: "Restart a service when the health check fails." (No specific service is implied.)
 
 
 ### Code blocks
