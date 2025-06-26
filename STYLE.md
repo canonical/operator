@@ -137,7 +137,7 @@ State conditions positively: what should happen, rather than what shouldn't. Foc
 
 Example:
 
-- Avoid: "If the command doesn’t exit within 1 second, the start is considered successful." (Negative)
+- Avoid: "If the command doesn't exit within 1 second, the start is considered successful." (Negative)
 - Prefer: "If the command stays running for the 1-second window, the start is considered successful." (Positive)
 
 Only use negative phrasing when:
