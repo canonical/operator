@@ -154,7 +154,7 @@ We should only use the passive voice when we don't know or care about who perfor
 Example:
 
 - Avoid: "A minimal check is created using the default values"
-- Prefer: "We create a minimal check, using the default values"
+- Prefer: "Create a minimal check, using the default values"
 
 ### Avoid subjective, be objective
 
