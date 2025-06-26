@@ -147,7 +147,7 @@ Only use negative phrasing when:
 
 ### Avoid passive, be active
 
-Use the active voice as much as possible.
+Use the active voice as much as possible, especially in direct instructions to the reader.
 
 We should only use the passive voice when we don't know or care about who performed the action.
 
@@ -155,6 +155,8 @@ Example:
 
 - Avoid: "A minimal check is created using the default values"
 - Prefer: "Create a minimal check, using the default values"
+
+Writing "We create ..." rather than "Create ..." in explanatory documentation is also fine.
 
 ### Avoid subjective, be objective
 
@@ -276,8 +278,6 @@ Example:
 - Avoid: "The `Change` ID will be empty when the check is stopped." (Implementation-specific.)
 - Prefer: "The `Status` will be 'inactive' when the check is stopped." (General.)
 
-Exception: If documenting a client library (for example, Go/Python SDKs), implementation details are appropriate.
-
 ### Articles
 
 Choose between the "a" or "the" articles carefully.
@@ -296,8 +296,10 @@ When describing a generic behaviour:
 ### Code blocks
 
 - Consistency: the styles of code blocks and terminal output samples should be the same, at least within the same document.
-- Preferred style: Use `{code-block}` when showing files. Use `{terminal}` (`.rst` style) when showing commands or terminal output. Avoid using `{code-block}` for commands or terminal output, unless it's consistent with the existing content in the same document.
-- Highlighting: Use `:emphasize-lines: 8-10` with `{code-block}` for highlighting lines in files when necessary. Don't add an inconsistent `{code-block}` just so that you can highlight lines in commands or terminal output. Instead, use `{terminal}` along with helpful words and comments.
+- Preferred style: Use triple-backtick followed by language or `{code-block}` when showing files. Use `{terminal}` (`.rst` style) when showing commands or terminal output. Avoid using triple-backtick followed by language or `{code-block}` for commands or terminal output, unless it's consistent with the existing content in the same document.
+- Highlighting: Use `:emphasize-lines: 8-10` with `{code-block}` for highlighting lines in relatively long code blocks when necessary. Don't add an inconsistent `{code-block}` just so that you can highlight lines in commands or terminal output. Instead, use `{terminal}` along with helpful words and comments.
+
+For more information, see [MyST Code and Code-blocks](https://mystmd.org/guide/code).
 
 ### YAML
 
