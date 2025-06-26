@@ -38,8 +38,8 @@ commands =
            -s \
            --tb native \
            --log-cli-level=INFO \
-           {posargs} \
-           {[vars]tests_path}/integration
+           {[vars]tests_path}/integration \
+           {posargs}
 ```
 
 ## Create a test file

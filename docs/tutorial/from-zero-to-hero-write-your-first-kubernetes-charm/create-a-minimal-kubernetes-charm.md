@@ -468,8 +468,8 @@ commands =
         -v \
         -s \
         --tb native \
-        {posargs} \
-        {[vars]tests_path}/unit
+        {[vars]tests_path}/unit \
+        {posargs}
     coverage report
 ```
 > Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
@@ -594,8 +594,8 @@ commands =
         -s \
         --tb native \
         --log-cli-level=INFO \
-        {posargs} \
-        {[vars]tests_path}/integration
+        {[vars]tests_path}/integration \
+        {posargs}
 ```
 
 If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.
