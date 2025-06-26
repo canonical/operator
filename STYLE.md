@@ -173,7 +173,7 @@ Examples:
 
 ### Be concise and avoid repetition
 
-For example, avoid long introductions in a how-to guide or a tutorial. They might be appropriate if we were writing a blog post or a book, but not for documentation.
+For example, avoid long introductions. In tutorials, how-to guides, and reference documentation, get the reader to the core of the content as quickly as possible.
 
 Trim repetitive titles: Avoid repeating the name if the surrounding content already provides context.
 
