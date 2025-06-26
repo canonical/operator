@@ -242,7 +242,7 @@ Choice of words: For example, if the whole document uses "mandatory", you probab
 
 Be precise in names and verbs. Use precise verbs to describe the behaviour. For example, the appropriate description of `/v1/services` is "list services", while "get a service" is probably a better fit for `/v1/services/{name}`.
 
-Split distinct ideas: Use separate sentences or clauses, and avoid cramming. Don’t merge unrelated details into a single phrase (for example, parameter format and default behaviour).
+Split distinct ideas: Use separate sentences or clauses, and avoid cramming. Don't merge unrelated details into a single phrase (for example, parameter format and default behaviour).
 
 Example:
 
