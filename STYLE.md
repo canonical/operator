@@ -273,8 +273,8 @@ Focus on behaviour, not internal implementation: Describe what it does rather th
 
 Example:
 
-- Avoid: "`Change.Err` will be non-empty if the change had an error." (Code-specific)
-- Prefer: "The `err` field in the response will contain an error message if the operation failed." (General)
+- Avoid: "The `Change` ID will be empty when the check is stopped." (Implementation-specific.)
+- Prefer: "The `Status` will be 'inactive' when the check is stopped." (General.)
 
 Exception: If documenting a client library (for example, Go/Python SDKs), implementation details are appropriate.
 
