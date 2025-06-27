@@ -159,9 +159,9 @@ class Model:
 
     @property
     def unit(self) -> Unit:
-        """The unit that is running this code.
+        """The current unit. Equivalent to :attr:`CharmBase.unit`.
 
-        Use :meth:`get_unit` to get an arbitrary unit by name.
+        To get a unit by name, use :meth:`get_unit`.
         """
         return self._unit
 
@@ -238,12 +238,12 @@ class Model:
         return self._backend._juju_context.version
 
     def get_unit(self, unit_name: str) -> Unit:
-        """Get an arbitrary unit by name.
-
-        Use :attr:`unit` to get the current unit.
+        """Get a unit by name.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
+
+        To get the current unit, use :attr:`CharmBase.unit` or :attr:`unit`.
         """
         return self._cache.get(Unit, unit_name)
 

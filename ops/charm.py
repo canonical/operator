@@ -1472,7 +1472,7 @@ class CharmBase(Object):
 
     @property
     def unit(self) -> model.Unit:
-        """Unit that this execution is responsible for."""
+        """The current unit."""
         return self.framework.model.unit
 
     @property
