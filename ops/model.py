@@ -426,7 +426,7 @@ class Application:
 
         Example::
 
-            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
+            self.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -609,7 +609,7 @@ class Unit:
 
         Example::
 
-            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
+            self.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
