@@ -380,7 +380,9 @@ class Application:
     """Represents a named application in the model.
 
     This might be this charm's application, or might be an application this charm is integrated
-    with. Don't instantiate Application objects directly. To get the application that this unit is
+    with.
+
+    Don't instantiate Application objects directly. To get the application that this unit is
     part of, use :attr:`CharmBase.app`. To get an application by name, use :meth:`Model.get_app`.
     """
 
