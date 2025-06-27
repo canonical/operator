@@ -167,9 +167,9 @@ class Model:
 
     @property
     def app(self) -> Application:
-        """The application this unit is a part of.
+        """The application that this unit is part of. Equivalent to :attr:`CharmBase.app`.
 
-        Use :meth:`get_app` to get an arbitrary application by name.
+        To get an application by name, use :meth:`get_app`.
         """
         return self._unit.app
 
@@ -250,10 +250,10 @@ class Model:
     def get_app(self, app_name: str) -> Application:
         """Get an application by name.
 
-        Use :attr:`app` to get this charm's application.
-
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
+
+        To get the application that this unit is part of, use :attr:`CharmBase.app` or :attr:`app`.
         """
         return self._cache.get(Application, app_name)
 
@@ -380,9 +380,8 @@ class Application:
     """Represents a named application in the model.
 
     This might be this charm's application, or might be an application this charm is integrated
-    with. Charmers should not instantiate Application objects directly, but should use
-    :attr:`Model.app` to get the application this unit is part of, or
-    :meth:`Model.get_app` if they need a reference to a given application.
+    with. Don't instantiate Application objects directly. To get the application that this unit is
+    part of, use :attr:`CharmBase.app`. To get an application by name, use :meth:`Model.get_app`.
     """
 
     name: str
