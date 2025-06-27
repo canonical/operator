@@ -2,10 +2,7 @@
 # Tracing how-to
 ## Introduction
 
-> Hints:
-In the how-to doc itself, I'd probably try to compact these into key points in the intro and put the full details in https://ops.readthedocs.io/en/latest/explanation/tracing.html
-A section with motivation, form the viewpoints of: charm developers, field engineering (initial deployment), managed solutions (SRE), and solutions QA (testing).
-What it’s not, including that charm tracing is not useful for business analytics, while workload tracing is.
+This document shows you how to trace your charm code and send the traces to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
 ### Why trace your charms
 
@@ -110,7 +107,7 @@ juju integrate my-charm tempo
 ### Fixme more
 
 
-## Replace the charm_tracing library
+### Replace the charm_tracing library
 
 - In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
   `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
@@ -286,8 +283,8 @@ The destination is persisted in the unit's tracing database, next to the tracing
 Thus, a delta charm would only call this function when some relation or configuration
 value is changed.
 
-At the same time, calling this function with the same data is a no-op.
-A reconciler charm may therefore safely call it unconditionally.
+At the same time, calling this function with the same arguments is a no-op.
+A charm that follows the reconciler pattern may therefore safely call it unconditionally.
 
 The `url` parameter must be the full endpoint URL, like `http://localhost/v1/traces`.
 
