@@ -557,6 +557,9 @@ class Unit:
 
     This might be the current unit, another unit of the charm's application, or a unit of
     another application that the charm is integrated with.
+
+    Don't instantiate Unit objects directly. To get the current unit, use :attr:`CharmBase.unit`.
+    To get a unit by name, use :meth:`Model.get_unit`.
     """
 
     name: str
