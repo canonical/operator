@@ -1,6 +1,6 @@
 [project]
 name = "ops-tracing"
-version = "2.23.0.dev0"
+version = "2.23.0"
 description = "The tracing facility for the Ops library."
 requires-python = ">=3.8"
 readme = "README.md"
