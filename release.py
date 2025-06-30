@@ -406,7 +406,7 @@ def update_tracing_pyproject_version(new_ops_version: str):
     )
     updated = re.sub(
         PYPROJECT_OPS_VERSION_STR,
-        f'ops-tracing=={new_ops_version}',
+        f'ops=={new_ops_version}',
         updated,
     )
     file_path.write_text(updated)
