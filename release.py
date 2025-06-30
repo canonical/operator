@@ -55,12 +55,26 @@ if 'GITHUB_TOKEN' not in os.environ:
     logger.critical('Environment variable GITHUB_TOKEN not set.')
     exit(1)
 
-OPS_VERSION_STR = r'version: str = \'(\d+\.\d+\.\d+(?:\.dev\d+)?)\''
-PYPROJECT_VERSION_STR = r'version = "(\d+\.\d+\.\d+(?:\.dev\d+)?)"'
+VERSION_STR = r'(\d+\.\d+\.\d+(?:\.dev\d+)?)'
+OPS_SRC_VERSION_STR = r'version: str = \'' + VERSION_STR + "'"
+PYPROJECT_VERSION_STR = r'version = "' + VERSION_STR + '"'
+PYPROJECT_OPS_VERSION_STR = r'ops==' + VERSION_STR
+PYPROJECT_TESTING_VERSION_STR = r'ops-scenario==' + VERSION_STR
+PYPROJECT_TRACING_VERSION_STR = r'ops-tracing==' + VERSION_STR
+# match the following two lines in uv.lock:
+# name = "ops-scenario"
+# version = "7.23.0.dev0"
+UVLOCK_TESTING_VERSION_STR = r'name = "ops-scenario"\nversion = "' + VERSION_STR + '"'
+# match the following two lines in uv.lock:
+# name = "ops-tracing"
+# version = "2.23.0.dev0"
+UVLOCK_TRACING_VERSION_STR = r'name = "ops-tracing"\nversion = "' + VERSION_STR + '"'
 VERSION_FILES = {
-    'ops': 'ops/version.py',
+    'ops/src': 'ops/version.py',
+    'ops/pyproject': 'pyproject.toml',
     'testing': 'testing/pyproject.toml',
     'tracing': 'tracing/pyproject.toml',
+    'uvlock': 'uv.lock',
 }
 
 auth = github.Auth.Token(os.environ['GITHUB_TOKEN'])
@@ -311,82 +325,136 @@ def parse_version(version: str) -> tuple[str, str]:
     return base_version, dev_suffix
 
 
-def update_ops_version(new_version: str):
-    """Update the ops version in the specified file."""
-    file = VERSION_FILES['ops']
-    file_path = Path(file)
-    content = file_path.read_text()
-    updated = re.sub(
-        OPS_VERSION_STR,
-        f"version: str = '{new_version}'",
-        content,
-    )
-    file_path.write_text(updated)
-    logger.info(f'Updated {file} to release version: {updated}')
-
-
-def bump_and_add_dev_suffix(module: str, version_regex: str):
-    """Bump and add a '.dev0' suffix to the version."""
-    file = VERSION_FILES[module]
-    file_path = Path(file)
-    content = file_path.read_text()
-    match = re.search(version_regex, content)
-    if not match:
-        raise ValueError(f'Could not find version string in {file_path}')
-    version_str = match.group(1)
-    current_version, dev_suffix = parse_version(version_str)
-    if dev_suffix:
-        raise ValueError(f'Version already has dev suffix: {current_version}')
-    new_version = bump_minor_version(current_version) + '.dev0'
-    updated = re.sub(
-        OPS_VERSION_STR,
-        f"version: str = '{new_version}'",
-        content,
-    )
-    file_path.write_text(updated)
-    logger.info(f'Updated {file} to release version: {new_version}')
-
-
-def update_testing_pyproject_version():
-    """Update the pyproject version in the specified file."""
+def get_testing_version_without_dev_suffix():
+    """Parse the current version of the testing module without .dev0 suffix."""
     file = VERSION_FILES['testing']
     file_path = Path(file)
     content = file_path.read_text()
     match = re.search(PYPROJECT_VERSION_STR, content)
     if not match:
-        raise ValueError(f'Could not find version string in {file_path}')
+        raise ValueError(f'Could not find version string in {file}')
     version_str = match.group(1)
-    current_version, dev_suffix = parse_version(version_str)
-    if not dev_suffix:
-        raise ValueError(f'Version does not have dev suffix: {current_version}')
-    new_version = current_version  # Remove dev suffix, keep base version
-    updated = re.sub(PYPROJECT_VERSION_STR, f'version = "{new_version}"', file_path.read_text())
+    current_version, _ = parse_version(version_str)
+    return current_version
+
+
+def update_ops_version(new_ops_version: str, new_testing_version: str):
+    """Update the ops version in version.py and pyproject.toml."""
+    # version.py
+    ops_src_file = VERSION_FILES['ops/src']
+    ops_src_file_path = Path(ops_src_file)
+    content = ops_src_file_path.read_text()
+    updated = re.sub(
+        OPS_SRC_VERSION_STR,
+        f"version: str = '{new_ops_version}'",
+        content,
+    )
+    ops_src_file_path.write_text(updated)
+    logger.info(f'Updated {ops_src_file} to release version: {new_ops_version}')
+
+    # pyproject
+    ops_pyproject_file = VERSION_FILES['ops/pyproject']
+    ops_pyproject_file_path = Path(ops_pyproject_file)
+    content = ops_pyproject_file_path.read_text()
+    updated = re.sub(
+        PYPROJECT_TESTING_VERSION_STR,
+        f'ops-scenario=={new_testing_version}',
+        content,
+    )
+    updated = re.sub(
+        PYPROJECT_TRACING_VERSION_STR,
+        f'ops-tracing=={new_ops_version}',
+        updated,
+    )
+    ops_pyproject_file_path.write_text(updated)
+    logger.info(
+        f'Updated {ops_pyproject_file} to release version: ops {new_ops_version}'
+        f' testing {new_testing_version}'
+    )
+
+def update_testing_pyproject_version(new_ops_version: str, new_testing_version: str):
+    """Update the testing pyproject version."""
+    file = VERSION_FILES['testing']
+    file_path = Path(file)
+    content = file_path.read_text()
+    updated = re.sub(
+        PYPROJECT_VERSION_STR,
+        f'version = "{new_testing_version}"',
+        content,
+    )
+    updated = re.sub(
+        PYPROJECT_OPS_VERSION_STR,
+        f'ops-scenario=={new_testing_version}',
+        updated,
+    )
     file_path.write_text(updated)
-    logger.info(f'Updated {file} to release version: {new_version}')
+    logger.info(
+        f'Updated {file} to release version: ops {new_ops_version} testing {new_testing_version}'
+    )
 
-
-def update_tracing_pyproject_version(new_version: str):
-    """Update the pyproject version in the specified file."""
+def update_tracing_pyproject_version(new_ops_version: str):
+    """Update the tracing pyproject version."""
     file = VERSION_FILES['tracing']
     file_path = Path(file)
     content = file_path.read_text()
-    updated = re.sub(PYPROJECT_VERSION_STR, f'version = "{new_version}"', content)
+    updated = re.sub(
+        PYPROJECT_VERSION_STR,
+        f'version = "{new_ops_version}"',
+        content,
+    )
+    updated = re.sub(
+        PYPROJECT_OPS_VERSION_STR,
+        f'ops-tracing=={new_ops_version}',
+        updated,
+    )
     file_path.write_text(updated)
-    logger.info(f'Updated {file} to release version: {updated}')
+    logger.info(f'Updated {file} to release version: ops {new_ops_version}')
+
+
+def update_uv_lock(new_ops_version: str, new_testing_version: str):
+    """Update the uv.lock file with new ops and testing versions."""
+    file = VERSION_FILES['uvlock']
+    file_path = Path(file)
+    content = file_path.read_text()
+    updated = re.sub(
+        UVLOCK_TESTING_VERSION_STR,
+        f'name = "ops-scenario"\nversion = "{new_testing_version}"',
+        content,
+    )
+    updated = re.sub(
+        UVLOCK_TRACING_VERSION_STR,
+        f'name = "ops-tracing"\nversion = "{new_ops_version}"',
+        updated,
+    )
+    file_path.write_text(updated)
+    logger.info(
+        f'Updated {file} to release version: ops {new_ops_version} testing {new_testing_version}'
+    )
 
 
 def update_versions_for_release(version: str):
     """Update version files to the specified release version."""
-    update_ops_version(version)
-    update_testing_pyproject_version()
-    update_tracing_pyproject_version(version)
+    new_ops_version = version
+    # Remove dev suffix, keep base version, bump minor version.
+    new_testing_version = get_testing_version_without_dev_suffix()
+    update_ops_version(new_ops_version, new_testing_version)
+    update_testing_pyproject_version(new_ops_version, new_testing_version)
+    update_tracing_pyproject_version(new_ops_version)
+    update_uv_lock(new_ops_version, new_testing_version)
 
 
-def update_versions_for_post_release():
+def update_versions_for_post_release(repo: github.Repository.Repository, branch_name: str):
     """Update version files to the post-release version with '.dev0' suffix."""
-    bump_and_add_dev_suffix('ops', OPS_VERSION_STR)
-    bump_and_add_dev_suffix('testing', PYPROJECT_VERSION_STR)
-    bump_and_add_dev_suffix('tracing', PYPROJECT_VERSION_STR)
+    latest_ops_version = get_latest_version(repo, branch_name)
+    if not latest_ops_version:
+        logger.error(f'No latest version found in branch "{branch_name}".')
+        raise ValueError('No latest version found.')
+    new_ops_version = bump_minor_version(latest_ops_version) + '.dev0'
+    new_testing_version = bump_minor_version(get_testing_version_without_dev_suffix()) + '.dev0'
+    update_ops_version(new_ops_version, new_testing_version)
+    update_testing_pyproject_version(new_ops_version, new_testing_version)
+    update_tracing_pyproject_version(new_ops_version)
+    update_uv_lock(new_ops_version, new_testing_version)
 
 
 def countdown(msg: str, t: int):
@@ -447,7 +515,7 @@ def draft_release(owner: str, repo_name: str, branch: str):
 
     new_branch = f'release-prep-{tag}'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    changed_files = ['CHANGES.md', *VERSION_FILES]
+    changed_files = ['CHANGES.md', *VERSION_FILES.values()]
     for file in changed_files:
         subprocess.run(['/usr/bin/git', 'add', file], check=True)
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
@@ -490,13 +558,15 @@ def post_release(owner: str, repo_name: str, branch: str):
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
 
-    update_versions_for_post_release()
+    update_versions_for_post_release(repo, branch)
 
     new_branch = 'post-release'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    for file in VERSION_FILES:
+    for file in VERSION_FILES.values():
         subprocess.run(['/usr/bin/git', 'add', file], check=True)
-    subprocess.run(['/usr/bin/git', 'commit', '-m', 'chore: post release'], check=True)
+    subprocess.run(
+        ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True
+    )
     subprocess.run(['/usr/bin/git', 'push', 'origin', new_branch], check=True)
     pr = repo.create_pull(
         title='Post Release',
