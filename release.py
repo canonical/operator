@@ -429,13 +429,64 @@ def update_versions_for_release(version: str):
     update_uv_lock()
 
 
+def get_post_release_version(repo: github.Repository.Repository, branch_name: str) -> str:
+    """Get the new version after release.
+
+    Can be overridden with a user-provided version.
+    """
+    latest_version = get_latest_version(repo, branch_name)
+
+    if latest_version is None:
+        logger.info('No version tags found in branch "{branch_name}".')
+        suggested_version = ''
+    else:
+        if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
+            logger.warning(
+                f'Latest version "{latest_version}" does not follow semantic '
+                f'versioning (X.Y.Z) format. Please input the new version manually.'
+            )
+            suggested_version = ''
+        else:
+            suggested_version = bump_minor_version(latest_version)
+            logger.info(f'Latest version in branch "{branch_name}": {latest_version}')
+            logger.info(f'Suggested new version: {suggested_version}')
+
+    while True:
+        user_input = input(
+            f'Input post release version (press enter to use suggested version '
+            f"{suggested_version or 'required'}), or 'c' to cancel: "
+        ).strip()
+
+        if user_input.lower() == 'c':
+            logger.warning('Post release creation canceled.')
+            return ''
+
+        version_to_use = user_input if user_input else suggested_version
+
+        if not version_to_use:
+            logger.error('Error: No version specified and no suggestion available')
+            continue
+
+        confirm = (
+            input(f"Confirm using new version '{version_to_use}' for post release'? [y/N]: ")
+            .strip()
+            .lower()
+        )
+
+        if confirm == 'y':
+            break
+
+        logger.info("Let's try again...")
+
+    return version_to_use
+
+
 def update_versions_for_post_release(repo: github.Repository.Repository, branch_name: str):
     """Update version files to the post-release version with '.dev0' suffix."""
-    latest_ops_version = get_latest_version(repo, branch_name)
-    if not latest_ops_version:
+    new_ops_version = get_post_release_version(repo, branch_name)
+    if not new_ops_version:
         logger.error(f'No latest version found in branch "{branch_name}".')
         raise ValueError('No latest version found.')
-    new_ops_version = bump_minor_version(latest_ops_version) + '.dev0'
     new_testing_version = bump_minor_version(get_testing_version_without_dev_suffix()) + '.dev0'
     update_ops_version(new_ops_version, new_testing_version)
     update_testing_pyproject_version(new_ops_version, new_testing_version)
