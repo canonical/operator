@@ -372,6 +372,7 @@ def update_ops_version(new_ops_version: str, new_testing_version: str):
         f' testing {new_testing_version}'
     )
 
+
 def update_testing_pyproject_version(new_ops_version: str, new_testing_version: str):
     """Update the testing pyproject version."""
     file = VERSION_FILES['testing']
@@ -384,13 +385,14 @@ def update_testing_pyproject_version(new_ops_version: str, new_testing_version: 
     )
     updated = re.sub(
         PYPROJECT_OPS_VERSION_STR,
-        f'ops-scenario=={new_testing_version}',
+        f'ops=={new_ops_version}',
         updated,
     )
     file_path.write_text(updated)
     logger.info(
         f'Updated {file} to release version: ops {new_ops_version} testing {new_testing_version}'
     )
+
 
 def update_tracing_pyproject_version(new_ops_version: str):
     """Update the tracing pyproject version."""
