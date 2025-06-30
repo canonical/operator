@@ -87,9 +87,6 @@ integration = [
     "juju>=2.9,<4",
     "build",  # Until #1814 and #1813 are done
 ]
-release = [
-    "pygithub~=2.6",
-]
 
 [project.urls]
 "Homepage" = "https://ops.readthedocs.io/en/latest/"
