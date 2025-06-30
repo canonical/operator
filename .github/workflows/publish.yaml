@@ -3,7 +3,7 @@ name: Publish
 "on":
   push:
     tags:
-      - '3.*'
+      - '[1-3].*'
 
 permissions:
   id-token: write
