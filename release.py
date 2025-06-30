@@ -453,7 +453,7 @@ def draft_release(owner: str, repo_name: str, branch: str):
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
     subprocess.run(['/usr/bin/git', 'push', 'origin', new_branch], check=True)
     pr = repo.create_pull(
-        title=f'Release Preparation: {tag}',
+        title=f'chore: update changelog and versions for {tag} release',
         body=f'This PR prepares the release of version {tag}.',
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
         base=branch,
