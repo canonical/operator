@@ -413,25 +413,9 @@ def update_tracing_pyproject_version(new_ops_version: str):
     logger.info(f'Updated {file} to release version: ops {new_ops_version}')
 
 
-def update_uv_lock(new_ops_version: str, new_testing_version: str):
-    """Update the uv.lock file with new ops and testing versions."""
-    file = VERSION_FILES['uvlock']
-    file_path = Path(file)
-    content = file_path.read_text()
-    updated = re.sub(
-        UVLOCK_TESTING_VERSION_STR,
-        f'name = "ops-scenario"\nversion = "{new_testing_version}"',
-        content,
-    )
-    updated = re.sub(
-        UVLOCK_TRACING_VERSION_STR,
-        f'name = "ops-tracing"\nversion = "{new_ops_version}"',
-        updated,
-    )
-    file_path.write_text(updated)
-    logger.info(
-        f'Updated {file} to release version: ops {new_ops_version} testing {new_testing_version}'
-    )
+def update_uv_lock():
+    """Update the uv.lock file with the new versions."""
+    subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
 def update_versions_for_release(version: str):
@@ -442,7 +426,7 @@ def update_versions_for_release(version: str):
     update_ops_version(new_ops_version, new_testing_version)
     update_testing_pyproject_version(new_ops_version, new_testing_version)
     update_tracing_pyproject_version(new_ops_version)
-    update_uv_lock(new_ops_version, new_testing_version)
+    update_uv_lock()
 
 
 def update_versions_for_post_release(repo: github.Repository.Repository, branch_name: str):
@@ -456,7 +440,7 @@ def update_versions_for_post_release(repo: github.Repository.Repository, branch_
     update_ops_version(new_ops_version, new_testing_version)
     update_testing_pyproject_version(new_ops_version, new_testing_version)
     update_tracing_pyproject_version(new_ops_version)
-    update_uv_lock(new_ops_version, new_testing_version)
+    update_uv_lock()
 
 
 def countdown(msg: str, t: int):
