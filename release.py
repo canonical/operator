@@ -57,11 +57,11 @@ if 'GITHUB_TOKEN' not in os.environ:
 
 OPS_VERSION_STR = r'version: str = \'(\d+\.\d+\.\d+(?:\.dev\d+)?)\''
 PYPROJECT_VERSION_STR = r'version = "(\d+\.\d+\.\d+(?:\.dev\d+)?)"'
-VERSION_FILES = [
-    'ops/version.py',
-    'testing/pyproject.toml',
-    'tracing/pyproject.toml',
-]
+VERSION_FILES = {
+    'ops': 'ops/version.py',
+    'testing': 'testing/pyproject.toml',
+    'tracing': 'tracing/pyproject.toml',
+}
 
 auth = github.Auth.Token(os.environ['GITHUB_TOKEN'])
 gh_client = github.Github(auth=auth)
@@ -311,8 +311,9 @@ def parse_version(version: str) -> tuple[str, str]:
     return base_version, dev_suffix
 
 
-def update_ops_version(file: str, new_version: str):
+def update_ops_version(new_version: str):
     """Update the ops version in the specified file."""
+    file = VERSION_FILES['ops']
     file_path = Path(file)
     content = file_path.read_text()
     updated = re.sub(
@@ -321,55 +322,71 @@ def update_ops_version(file: str, new_version: str):
         content,
     )
     file_path.write_text(updated)
+    logger.info(f'Updated {file} to release version: {updated}')
 
 
-def update_pyproject_version(file: str, new_version: str):
+def bump_and_add_dev_suffix(module: str, version_regex: str):
+    """Bump and add a '.dev0' suffix to the version."""
+    file = VERSION_FILES[module]
+    file_path = Path(file)
+    content = file_path.read_text()
+    match = re.search(version_regex, content)
+    if not match:
+        raise ValueError(f'Could not find version string in {file_path}')
+    version_str = match.group(1)
+    current_version, dev_suffix = parse_version(version_str)
+    if dev_suffix:
+        raise ValueError(f'Version already has dev suffix: {current_version}')
+    new_version = bump_minor_version(current_version) + '.dev0'
+    updated = re.sub(
+        OPS_VERSION_STR,
+        f"version: str = '{new_version}'",
+        content,
+    )
+    file_path.write_text(updated)
+    logger.info(f'Updated {file} to release version: {new_version}')
+
+
+def update_testing_pyproject_version():
     """Update the pyproject version in the specified file."""
+    file = VERSION_FILES['testing']
+    file_path = Path(file)
+    content = file_path.read_text()
+    match = re.search(PYPROJECT_VERSION_STR, content)
+    if not match:
+        raise ValueError(f'Could not find version string in {file_path}')
+    version_str = match.group(1)
+    current_version, dev_suffix = parse_version(version_str)
+    if not dev_suffix:
+        raise ValueError(f'Version does not have dev suffix: {current_version}')
+    new_version = current_version  # Remove dev suffix, keep base version
+    updated = re.sub(PYPROJECT_VERSION_STR, f'version = "{new_version}"', file_path.read_text())
+    file_path.write_text(updated)
+    logger.info(f'Updated {file} to release version: {new_version}')
+
+
+def update_tracing_pyproject_version(new_version: str):
+    """Update the pyproject version in the specified file."""
+    file = VERSION_FILES['tracing']
     file_path = Path(file)
     content = file_path.read_text()
     updated = re.sub(PYPROJECT_VERSION_STR, f'version = "{new_version}"', content)
     file_path.write_text(updated)
+    logger.info(f'Updated {file} to release version: {updated}')
 
 
 def update_versions_for_release(version: str):
     """Update version files to the specified release version."""
-    for file in VERSION_FILES:
-        if 'ops' in file:
-            update_ops_version(file, version)
-        else:
-            update_pyproject_version(file, version)
-        logger.info(f'Updated {file} to release version: {version}')
+    update_ops_version(version)
+    update_testing_pyproject_version()
+    update_tracing_pyproject_version(version)
 
 
 def update_versions_for_post_release():
     """Update version files to the post-release version with '.dev0' suffix."""
-    for file in VERSION_FILES:
-        file_path = Path(file)
-
-        # Check the current version and add '.dev0' suffix.
-        if 'ops' in file:
-            content = file_path.read_text()
-            match = re.search(OPS_VERSION_STR, content)
-            if not match:
-                raise ValueError(f'Could not find version string in {file}')
-            version_str = match.group(1)
-        else:
-            content = file_path.read_text()
-            match = re.search(PYPROJECT_VERSION_STR, content)
-            if not match:
-                raise ValueError(f'Could not find version string in {file}')
-            version_str = match.group(1)
-
-        current_version, dev_suffix = parse_version(version_str)
-        if dev_suffix:
-            raise ValueError(f'Version already has dev suffix: {current_version}')
-
-        new_version = bump_minor_version(current_version) + '.dev0'
-        if 'ops' in file:
-            update_ops_version(file, new_version)
-        else:
-            update_pyproject_version(file, new_version)
-        logger.info(f'Updated {file} to post-release version: {new_version}')
+    bump_and_add_dev_suffix('ops', OPS_VERSION_STR)
+    bump_and_add_dev_suffix('testing', PYPROJECT_VERSION_STR)
+    bump_and_add_dev_suffix('tracing', PYPROJECT_VERSION_STR)
 
 
 def countdown(msg: str, t: int):
