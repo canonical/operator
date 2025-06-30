@@ -191,6 +191,8 @@ class Runtime:
             """The charm's event sources, but wrapped."""
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
+        WrappedEvents.__qualname__ = charm_type.on.__class__.__qualname__
+        WrappedEvents.__module__ = charm_type.on.__class__.__module__
 
         class WrappedCharm(charm_type):
             """The test charm's type, but with events wrapped."""
@@ -198,6 +200,8 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
+        WrappedCharm.__qualname__ = charm_type.__qualname__
+        WrappedCharm.__module__ = charm_type.__module__
         return typing.cast('Type[CharmType]', WrappedCharm)
 
     @contextmanager
@@ -323,6 +327,8 @@ class Runtime:
             logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops  # noqa: F811
 
+            ops = None
+
             try:
                 ops = Ops(
                     state=output_state,
@@ -345,6 +351,9 @@ class Runtime:
                 raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
 
             finally:
+                if ops:
+                    ops.destroy()
+                    context.trace_data.extend(ops.trace_data)
                 for key in tuple(os.environ):
                     if key not in previous_env:
                         del os.environ[key]
