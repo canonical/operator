@@ -82,10 +82,10 @@ def get_latest_version(repo: github.Repository.Repository, branch_name: str) -> 
     return None
 
 
-def bump_version(version: str) -> str:
-    """Bump patch version."""
+def bump_minor_version(version: str) -> str:
+    """Bump minor version."""
     major, minor, patch = map(int, version.split('.'))
-    return f'{major}.{minor}.{patch + 1}'
+    return f'{major}.{minor + 1}.{patch}'
 
 
 def get_new_version(owner: str, repo: github.Repository.Repository, branch_name: str) -> str:
@@ -101,7 +101,7 @@ def get_new_version(owner: str, repo: github.Repository.Repository, branch_name:
         logger.info('No version tags found in branch "{branch_name}".')
         suggested_version = ''
     else:
-        suggested_version = bump_version(latest_version)
+        suggested_version = bump_minor_version(latest_version)
         logger.info(f'Latest version in branch "{branch_name}": {latest_version}')
         logger.info(f'Suggested new version: {suggested_version}')
 
@@ -244,10 +244,10 @@ def get_title_and_summary(auto_generated_title: str) -> tuple[str, str]:
     return title, summary
 
 
-def update_release(release: github.GitRelease.GitRelease, title: str, notes: str):
+def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
     try:
-        release.update_release(name=title, message=notes)
+        release.update_release(name=title, message=notes, draft=True)
         logger.info('Release title and notes updated.')
     except Exception as e:
         print(f'Error creating release: {e}')
@@ -364,7 +364,7 @@ def update_versions_for_post_release():
         if dev_suffix:
             raise ValueError(f'Version already has dev suffix: {current_version}')
 
-        new_version = bump_version(current_version) + '.dev0'
+        new_version = bump_minor_version(current_version) + '.dev0'
         if 'ops' in file:
             update_ops_version(file, new_version)
         else:
@@ -399,8 +399,8 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
         exit(1)
 
 
-def release(owner: str, repo_name: str, branch: str):
-    """Create a release, update changelog, and create a PR for the release."""
+def draft_release(owner: str, repo_name: str, branch: str):
+    """Create a draft release, update changelog, and create a PR for the release."""
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
 
@@ -421,7 +421,7 @@ def release(owner: str, repo_name: str, branch: str):
     if not title:
         title = tag
     notes = f'{summary}\n{notes}'
-    update_release(release, title, notes)
+    update_draft_release(release, title, notes)
 
     changes = format_changes(categories, tag)
     update_changes_file(changes, 'CHANGES.md')
@@ -442,6 +442,26 @@ def release(owner: str, repo_name: str, branch: str):
         base=branch,
     )
     logger.info(f'Created PR: {pr.html_url}')
+
+
+def publish_draft_release(owner: str, repo_name: str):
+    """Publish the draft release."""
+    org = gh_client.get_organization(owner)
+    repo = org.get_repo(repo_name)
+
+    releases = repo.get_releases()
+    draft = None
+    for release in releases:
+        if release.draft:
+            draft = release
+            break
+
+    if not draft:
+        logger.error('No draft release found. Please create a draft release first.')
+        return
+
+    logger.info(f'Publishing draft release: {draft.title} {draft.html_url}')
+    draft.update_release(name=draft.title, message=draft.body, draft=False)
 
 
 def post_release(owner: str, repo_name: str, branch: str):
@@ -486,13 +506,37 @@ if __name__ == '__main__':
     )
     parser.add_argument('--branch', '-b', help='Branch to create the release from', default='main')
     parser.add_argument(
+        '--publish',
+        action='store_true',
+        help='After drafting a release and merging the version bump PR, publish the release',
+    )
+    parser.add_argument(
         '--post-release',
         action='store_true',
         help='After release, bump version and add .dev0 suffix',
     )
     args = parser.parse_args()
 
-    if not args.post_release:
-        release(owner=args.owner, repo_name=args.repo, branch=args.branch)
-    else:
+    if not args.publish and not args.post_release:
+        draft_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
+        logger.info(
+            'Draft release created. Please merge the version bump PR and then run this script '
+            'with --publish to publish the release.'
+        )
+        exit(0)
+
+    if args.publish:
+        publish_draft_release(owner=args.owner, repo_name=args.repo)
+        logger.info(
+            'Draft release published. Please run this script with --post-release '
+            'to update the version files.'
+        )
+        exit(0)
+
+    if args.post_release:
         post_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
+        logger.info(
+            'Post-release actions completed. Please check and merge the created PR '
+            'for version updates.'
+        )
+        exit(0)
