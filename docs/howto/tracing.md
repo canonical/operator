@@ -2,7 +2,7 @@
 # Tracing how-to
 ## Introduction
 
-This document shows you how to trace your charm code and send the traces to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
+This document describes how to trace your charm code and send the trace data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
 ### Why trace your charms
 
@@ -12,16 +12,20 @@ Trace data is structured and contextual; {ref}`this helps users <tracing-users>`
 
 ### What is traced
 
-#### What ops and charm libs provide
+The responsibility to instrument the Python code is divided between Ops, charm libraries and charms.
 
-Ops contains own instrumentation, unit and integration tests for it.
-- The {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` first-party charm library class comes with validation at object init time, so that charms and charm libraries don't have to test that.
-- Likewise, buffering and export logic is already tested as part of Ops, and charms should not write integration
+#### What Ops and charm libraries provide
+
+Ops contains own instrumentation, as well as unit and integration tests for it.
+
+- Ops creates the root span and a separate span when calling each observer, and these can be relied on in your tests.
+- Ops creates spans for every Juju hook tool invocation and every Pebble operation, so you typically don't have to.
+- The {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` first-party charm library validates its arguments during object construction, and would trip on misconfiguration in any Scenario or integration test, so that charms don't have to test object instantiation explicitly.
+- Buffering and export logic is already tested as part of Ops, and charms need not write integration
 tests to cover these.
-- Ops creates the root span and a span when calling each observer, these can be relied on in your unit tests.
-- Ops creates spans for Juju hook tool invocations and Pebble operations, so you typically don't have to.
 
 Charm libraries should instrument their logic at coarse granularity, and add attributes or events with logical information:
+- the library object `__init__`, unless it's trivial, as that helps the charm authors.
 - spawned processed, that is `subprocess.*` calls with enough details what is being run, excluding sensitive data like the contents of keys or passwords
 - outbound HTTP or RPC requests, as well as requests to own workload or peers, that is `requests.*` or `httpx.*` calls
 - important operations or operations that are intended to take time, like `bcrypt.hashpw()` or `ec.generate_private_key()`
@@ -104,7 +108,55 @@ juju deploy my-charm
 juju integrate my-charm tempo
 ```
 
+(custom-spans-and-events)=
+### Custom spans and events
+
+- At the top of your charm file, `import opentelemetry.trace`.
+- After the imports in your charm file, create the tracer object as
+  `tracer = opentelemetry.trace.get_tracer(name)` where the name
+   could be your charm name, or Python module `__name__`.
+- Around some important charm code, use
+  `tracer.start_as_current_span(name)` to create a custom span.
+- At some important point in the charm code, use
+  `opentelemetry.trace.get_current_span().add_event(name, attributes)` to create
+  a custom OpenTelemetry event.
+
+```{tip}
+Prefer using the OpenTelemetry `start_as_current_span` primitive as a context manager
+over a decorator. While both are supported, the context manager is more ergonomic,
+allows exposing the resulting span, and doesn't pollute exception stack traces.
+```
+
+For example, to add a custom span for the `migrate_db` method in this workload module,
+with an event for each retry:
+
+```python
+import opentelemetry.trace
+
+tracer = opentelemetry.trace.get_tracer(__name__)
+
+class Workload:
+    ...
+    def migrate_db(self):
+        with tracer.start_as_current_span('migrate-db') as span:
+            for attempt in range(3):
+                try:
+                    subprocess.check_output('/path/to/migrate.sh')
+                except subprocess.CalledProcessError:
+                    span.add_event('db-migrate-failed', {'attempt': attempt})
+                    time.sleep(10 ** attempt)
+                else:
+                    break
+            else:
+                logger.error('Could not migrate the database')
+            ...
+```
+
+
 ### Fixme more
+
+Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
+options, and API details.
 
 
 ### Replace the charm_tracing library
@@ -136,19 +188,23 @@ A (dummy) charm to test the charm lib.
 - See the [Custom spans and events](custom-spans-and-events) section above to
   create OpenTelemetry spans and events in the key places in your charm library.
 
+<!--
 ## Include tracing in a new charm
+-->
 
+<!--
 ## View the trace data
 
 > Hints:
 How to install COS (link), relate your app to COS, where to point browser,
 screenshot of a trace in Grafana, some pointer about what’s on the screenshot
 and how manual instrumentation (above) connects to that.
+-->
 
 ## Test the feature
 
 > Hints:
-A note that ops and charm libs are already covered, maybe there's
+A note that ops and charm libraries are already covered, maybe there's
 nothing left for the charm to do.
 Relation setup is already validated by other tests.
 
@@ -201,6 +257,7 @@ my_span.name == ...
 
 Finally, the specifics of your custom instrumentation ...
 
+<!--
 ### Write integration tests
 
 > Hints:
@@ -208,65 +265,7 @@ Against the tracing-integration-tester charm (example)
 Against Tempo
 Links to COS documentation
 > Against grafana-agent -- don't use that any more
-
-## Best practices
-
-### Division of responsibilities
-
----
-
-`ops[tracing]` provides the first party charm tracing library,
-`ops.tracing.Tracing`, allowing you to observe and instrument your charm's
-execution using OpenTelemetry.
-
-Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
-options, and API details.
-
-## Getting started
-
-(custom-spans-and-events)=
-## Custom spans and events
-
-- At the top of your charm file, `import opentelemetry.trace`.
-- After the imports in your charm file, create the tracer object as
-  `tracer = opentelemetry.trace.get_tracer(name)` where the name
-   could be your charm name, or Python module `__name__`.
-- Around some important charm code, use
-  `tracer.start_as_current_span(name)` to create a custom span.
-- At some important point in the charm code, use
-  `opentelemetry.trace.get_current_span().add_event(name, attributes)` to create
-  a custom OpenTelemetry event.
-
-```{tip}
-Prefer using the OpenTelemetry `start_as_current_span` primitive as a context manager
-over a decorator. While both are supported, the context manager is more ergonomic,
-allows exposing the resulting span, and doesn't pollute exception stack traces.
-```
-
-For example, to add a custom span for the `migrate_db` method in this workload module,
-with an event for each retry:
-
-```python
-import opentelemetry.trace
-
-tracer = opentelemetry.trace.get_tracer(__name__)
-
-class Workload:
-    ...
-    def migrate_db(self):
-        with tracer.start_as_current_span('migrate-db') as span:
-            for attempt in range(3):
-                try:
-                    subprocess.check_output('/path/to/migrate.sh')
-                except subprocess.CalledProcessError:
-                    span.add_event('db-migrate-failed', {'attempt': attempt})
-                    time.sleep(10 ** attempt)
-                else:
-                    break
-            else:
-                logger.error('Could not migrate the database')
-            ...
-```
+-->
 
 ## Lower-level API
 
