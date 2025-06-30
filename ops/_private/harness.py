@@ -1975,8 +1975,8 @@ class Harness(Generic[CharmType]):
         this will trigger ``collect_app_status``, and set the application status if any
         statuses were added.
 
-        Tests should normally call this and then assert that ``self.app.status``
-        or ``self.unit.status`` is the value expected.
+        Tests should normally call this and then assert that ``self.model.app.status``
+        or ``self.model.unit.status`` is the value expected.
 
         Evaluation is not "additive"; this method resets the added statuses before
         triggering each collect-status event.
