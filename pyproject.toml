@@ -26,7 +26,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==7.24.0.dev0",
+    "ops-scenario==8.0.0.dev0",
 ]
 tracing = [
     "ops-tracing==3.0.0.dev0",
