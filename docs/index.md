@@ -11,7 +11,7 @@ explanation/index
 ```
 
 ```{important}
-This is the documentation for version 2 of Ops, which stopped being actively developed in June 2025.
+This is the documentation for version 2 of Ops, which stopped being actively developed in June 2025. Ops 2 will continue to receive security and critical bug fixes.
 
 - If your charm needs to support Python 3.8 (Ubuntu 20.04), use Ops 2.
 - Otherwise, use Ops 3.
