@@ -26,14 +26,14 @@ tests to cover these.
 
 Charm libraries should instrument their logic at coarse granularity, and add attributes or events with logical information:
 - the library object `__init__`, unless it's trivial, as that helps the charm authors.
-- spawned processed, that is `subprocess.*` calls with enough details what is being run, excluding sensitive data like the contents of keys or passwords
+- spawned processes, that is `subprocess.*` calls with enough detail on what is being run, excluding sensitive data like the contents of keys or passwords
 - outbound HTTP or RPC requests, as well as requests to own workload or peers, that is `requests.*` or `httpx.*` calls
 - important operations or operations that are intended to take time, like `bcrypt.hashpw()` or `ec.generate_private_key()`
 
 ### What your charm needs to do
 
 Charms authors should note that relatively little, if anything, needs to be instrumented in the charm code:
-- decisions, such as fail-over
+- workload decisions, such as failing over from primary to replica
 - external or long processes, like `subprocess.*`, `requests.*` or call to a Python module specific to your workload
 - points where important values can be exposed as attributes
 - additional context for other instrumentation, like doing A for remote app B in a provider charm
