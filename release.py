@@ -365,7 +365,7 @@ def update_ops_version(ops_version: str, testing_version: str):
     ops_src_file_path = Path(ops_src_file)
     content = ops_src_file_path.read_text()
     updated = re.sub(
-        r'version: str = \'' + VERSION_REGEX + "'",
+        r'^version: str = \'' + VERSION_REGEX + "'$",
         f"version: str = '{ops_version}'",
         content,
     )
@@ -387,6 +387,10 @@ def update_ops_version(ops_version: str, testing_version: str):
         f'ops-tracing=={ops_version}',
         updated,
     )
+    # Fail if nothing is changed.
+    if content == updated:
+        logger.error(f'No changes made to {ops_pyproject_file}. Check the versions.')
+        exit(1)
     ops_pyproject_file_path.write_text(updated)
     logger.info(f'Updated {ops_pyproject_file} to ops {ops_version} testing {testing_version}')
 
@@ -406,6 +410,10 @@ def update_testing_version(ops_version: str, testing_version: str):
         f'ops=={ops_version}',
         updated,
     )
+    # Fail if nothing is changed.
+    if content == updated:
+        logger.error(f'No changes made to {file}. Check the versions.')
+        exit(1)
     file_path.write_text(updated)
     logger.info(f'Updated {file} to ops {ops_version} testing {testing_version}')
 
@@ -425,6 +433,10 @@ def update_tracing_version(ops_version: str):
         f'ops=={ops_version}',
         updated,
     )
+    # Fail if nothing is changed.
+    if content == updated:
+        logger.error(f'No changes made to {file}. Check the versions.')
+        exit(1)
     file_path.write_text(updated)
     logger.info(f'Updated {file} to version {ops_version}')
 
@@ -721,6 +733,27 @@ def publish_draft_release(owner: str, repo_name: str):
 
 def post_release(owner: str, repo_name: str, branch: str):
     """Post-release actions: update version files and create a PR."""
+    new_branch = 'post-release'
+    local_branch = subprocess.run(
+        ['/usr/bin/git', 'branch', '--list', new_branch],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    remote_branch = subprocess.run(
+        ['/usr/bin/git', 'ls-remote', '--heads', 'origin', new_branch],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    exist = local_branch or remote_branch
+    if exist:
+        logger.error(
+            f'Branch "{new_branch}" already exists in the current repository. '
+            'Please double check and delete it first before post release'
+        )
+        exit(1)
+
     subprocess.run(['/usr/bin/git', 'fetch', 'upstream'], check=True)
     subprocess.run(['/usr/bin/git', 'checkout', branch], check=True)
     subprocess.run(['/usr/bin/git', 'merge', f'upstream/{branch}'], check=True)
@@ -730,7 +763,6 @@ def post_release(owner: str, repo_name: str, branch: str):
 
     update_versions_for_post_release(repo, branch)
 
-    new_branch = 'post-release'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
     for file in VERSION_FILES.values():
         subprocess.run(['/usr/bin/git', 'add', file], check=True)
