@@ -296,7 +296,7 @@ When describing a generic behaviour:
 ### Code blocks
 
 - Consistency: the styles of code blocks and terminal output samples should be the same, at least within the same document.
-- Preferred style: Use triple-backtick followed by language or `{code-block}` when showing files. Use `{terminal}` (`.rst` style) when showing commands or terminal output. Avoid using triple-backtick followed by language or `{code-block}` for commands or terminal output, unless it's consistent with the existing content in the same document.
+- Preferred style: Use triple-backtick followed by language when showing code. Use `{terminal}` (`.rst` style) when showing commands or terminal output. Avoid using triple-backtick followed by language or `{code-block}` for commands or terminal output, unless it's consistent with the existing content in the same document.
 - Highlighting: Use `:emphasize-lines: 8-10` with `{code-block}` for highlighting lines in relatively long code blocks when necessary. Don't add an inconsistent `{code-block}` just so that you can highlight lines in commands or terminal output. Instead, use `{terminal}` along with helpful words and comments.
 
 For more information, see [MyST Code and Code-blocks](https://mystmd.org/guide/code).
