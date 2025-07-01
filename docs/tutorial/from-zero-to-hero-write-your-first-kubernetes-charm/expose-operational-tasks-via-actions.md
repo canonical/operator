@@ -33,10 +33,10 @@ Open the `charmcraft.yaml` file and add to it a block defining an action, as bel
 ```yaml
 actions:
   get-db-info:
-    description: Fetches Database authentication information
+    description: Fetches database authentication information
     params:
       show-password:
-        description: "Show username and password in output information"
+        description: Show username and password in output information
         type: boolean
         default: False
 ```
@@ -48,7 +48,7 @@ Open the `src/charm.py` file.
 In the  charm  `__init__` method, add an action event observer, as below. As you can see, the name of the event consists of the name defined in the `charmcraft.yaml` file (`get-db-info`) and the word `action`.
 
 ```python
-# Events on charm actions that are run via 'juju run'
+# Events on charm actions that are run via 'juju run'.
 framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
 ```
 
@@ -58,13 +58,16 @@ If we are not able to get the data (for example, if the charm has not yet been i
 
 ```python
 def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
-    """This method is called when "get_db_info" action is called. It shows information about
+    """Return information about the integrated database.
+
+    This method is called when "get_db_info" action is called. It shows information about
     database access points by calling the `fetch_postgres_relation_data` method and creates
     an output dictionary containing the host, port, if show_password is True, then include
     username, and password of the database.
+
     If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
-    Learn more about actions at https://juju.is/docs/sdk/actions
+    Learn more about actions at https://ops.readthedocs.io/en/latest/howto/manage-actions.html
     """
     show_password = event.params['show-password']  # see charmcraft.yaml
     db_data = self.fetch_postgres_relation_data()
@@ -76,12 +79,10 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
         'db-port': db_data.get('db_port', None),
     }
     if show_password:
-        output.update(
-            {
-                'db-username': db_data.get('db_username', None),
-                'db-password': db_data.get('db_password', None),
-            }
-        )
+        output.update({
+            'db-username': db_data.get('db_username', None),
+            'db-password': db_data.get('db_password', None),
+        })
     event.set_results(output)
 ```
 
@@ -142,27 +143,27 @@ Let's add a test to check the behaviour of the `get_db_info` action that we just
 def test_get_db_info_action():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
+        endpoint='database',
+        interface='postgresql_client',
+        remote_app_name='postgresql-k8s',
         remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
+            'endpoints': 'example.com:5432',
+            'username': 'foo',
+            'password': 'bar',
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
         leader=True,
     )
 
-    ctx.run(ctx.on.action("get-db-info", params={"show-password": False}), state_in)
+    ctx.run(ctx.on.action('get-db-info', params={'show-password': False}), state_in)
 
     assert ctx.action_results == {
-        "db-host": "example.com",
-        "db-port": "5432",
+        'db-host': 'example.com',
+        'db-port': '5432',
     }
 ```
 

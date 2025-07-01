@@ -294,7 +294,15 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
-            return tuple(f'{self.app_name}/{unit_id}' for unit_id in relation.peers_data)
+            # The current unit should never be in `peers_data`, and there is a
+            # consistency check to enforce that, but in case something has gone
+            # wrong, filter it out to match Juju's behaviour.
+            this_unit = int(self.unit_name.split('/')[-1])
+            return tuple(
+                f'{self.app_name}/{unit_id}'
+                for unit_id in relation.peers_data
+                if unit_id != this_unit
+            )
         remote_name = self.relation_remote_app_name(relation_id)
         return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
@@ -835,6 +843,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                 level=level,
                 startup=info.startup,
                 status=status,
+                successes=info.successes,
                 failures=info.failures,
                 threshold=info.threshold,
                 change_id=info.change_id,

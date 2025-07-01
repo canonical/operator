@@ -14,9 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # pylibjuju does not currently support Juju 4.x
+        # pylibjuju does not support Juju 4.x
+        # We need to migrate the test to use Jubilant for Juju>2.
         juju-channel: ['2.9/stable', '3/stable']
-        charmcraft-channel: ['2.x/stable', '3.x/stable']
+        charmcraft-channel: ['3.x/stable']
         preset: ['machine', 'microk8s']
 
     steps:
@@ -31,11 +32,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb  # v6.1.0
 
-      - name: Install tox
-        run: pip install tox~=4.2
+      - run: uv tool install tox --with tox-uv
 
       - name: Run smoke tests
         run: tox -e smoke

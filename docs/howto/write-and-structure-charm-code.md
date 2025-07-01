@@ -16,7 +16,7 @@ charm, or ``<base charm name>-operators`` when the repository will hold
 multiple related charms. For the charm name, see
 {external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
 ```
-    
+
 In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
@@ -176,8 +176,7 @@ Arrange the methods of this class in the following order:
    For example, `def _on_pebble_ready(...)` instead of `def on_pebble_ready(...)`.
 3. Other helper methods, which may be private or public.
 
-```{admonition} Best practice
-:class: hint
+```{tip}
 
 If an event handler needs to pass event data to a helper method, extract the relevant data
 from the event object and pass that data to the helper method. Don't pass the event object itself.
@@ -286,7 +285,7 @@ class DemoServerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on_collect_unit_status, self._on_collect_status)
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # Observe other events...
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -322,8 +321,8 @@ class DemoServerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on_collect_app_status, self._on_collect_app_status)
-        framework.observe(self.on_collect_unit_status, self._on_collect_unit_status)
+        framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+        framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         # Observe other events...
 
     def _on_collect_app_status(self, event: ops.CollectStatusEvent):

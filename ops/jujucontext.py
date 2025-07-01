@@ -27,7 +27,7 @@ from .jujuversion import JujuVersion
 class _JujuContext:
     """_JujuContext collects information from environment variables named 'JUJU_*'.
 
-    Source: https://juju.is/docs/juju/charm-environment-variables.
+    Source: https://documentation.ubuntu.com/juju/3.6/reference/hook/#hook-execution.
     The HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398.
     Only a subset of the above source, because these are what are used in ops.
     """
@@ -226,6 +226,10 @@ class _JujuContext:
                 else None
             ),
             unit_name=env.get('JUJU_UNIT_NAME', ''),
-            version=JujuVersion(env['JUJU_VERSION']),
+            # The meter-status-changed event, triggered by `juju set-meter-status`,
+            # does not set JUJU_VERSION, but all other events do. When we drop support
+            # for Juju 2 and Juju 3 we can change this to always expect JUJU_VERSION,
+            # as that event no longer exists in Juju 4.
+            version=JujuVersion(env.get('JUJU_VERSION', '0.0.0')),
             workload_name=env.get('JUJU_WORKLOAD_NAME') or None,
         )

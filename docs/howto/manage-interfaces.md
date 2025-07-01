@@ -13,19 +13,6 @@ Suppose that your interface specification has the following data model:
 
 These are the steps you need to take in order to  register it with [`charm-relation-interfaces`](#charm-relation-interfaces).
 
-
-```{dropdown} Expand to preview some example results
-
-- [A bare-minimum example](https://github.com/IronCore864/charm-relation-interfaces/tree/my-fancy-database/interfaces/my_fancy_database/v0)
-- [A more realistic example](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v1): 
-   - As you can see from the [`interface.yaml`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface.yaml) file, the [`canonical/traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) plays the provider role in the interface.
-   - The schema of this interface is defined in [`schema.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/schema.py).
-   - You can find out more information about this interface in the [README](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/README.md).
-
-
-```
-
-
 ### 1. Clone (a fork of) [the `charm-relation-interfaces` repo](https://github.com/canonical/charm-relation-interfaces) and set up an interface specification folder
 
 ```bash
@@ -214,6 +201,12 @@ units_data : {
 
 Finally, open a pull request to the `charm-relation-interfaces` repo and drive it to completion, addressing any feedback or concerns that the maintainers may have.
 
+## Example
+
+For an example of a registered interface, see [`ingress`](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v1):
+   - As you can see from the [`interface.yaml`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface.yaml) file, the [`canonical/traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) plays the provider role in the interface.
+   - The schema of this interface is defined in [`schema.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/schema.py).
+   - You can find out more information about this interface in the [README](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/README.md).
 
 (write-tests-for-an-interface)=
 ## Write tests for an interface
@@ -459,7 +452,7 @@ For reference, [here](https://github.com/IronCore864/my-fancy-database-operator)
 
 ### Troubleshooting and debugging the tests
 
-#### Your charm is missing some configurations/mocks
+#### Your charm is missing some configuration or mocks
 
 Solution to this is to add the missing mocks/patches to the `interface_tester` fixture in `conftest.py`.
 Essentially, you need to make it so that the charm runtime 'thinks' that everything is normal and ready to process and accept the interface you are testing.

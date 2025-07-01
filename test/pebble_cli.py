@@ -16,9 +16,9 @@
 
 Usage examples:
 
-python -m test.pebble_cli -h
-python -m test.pebble_cli --socket=pebble_dir/.pebble.socket system-info
-PEBBLE=pebble_dir python -m test.pebble_cli system-info
+python3 -m test.pebble_cli -h
+python3 -m test.pebble_cli --socket=pebble_dir/.pebble.socket system-info
+PEBBLE=pebble_dir python3 -m test.pebble_cli system-info
 """
 
 from __future__ import annotations
@@ -35,7 +35,13 @@ from ops._private import timeconv
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--socket', help='pebble socket path, default $PEBBLE/.pebble.socket')
+    parser.add_argument(
+        '--socket',
+        help=(
+            'pebble socket path, default $PEBBLE/.pebble.socket or '
+            '/var/lib/pebble/default/.pebble.socket'
+        ),
+    )
     subparsers = parser.add_subparsers(dest='command', metavar='command')
 
     p = subparsers.add_parser('abort', help='abort a change by ID')
@@ -163,11 +169,11 @@ def main():
 
     socket_path = args.socket
     if socket_path is None:
-        pebble_env = os.getenv('PEBBLE')
-        if not pebble_env:
-            print('cannot create Pebble client (set PEBBLE or specify --socket)', file=sys.stderr)
-            sys.exit(1)
+        pebble_env = os.getenv('PEBBLE') or '/var/lib/pebble/default'
         socket_path = os.path.join(pebble_env, '.pebble.socket')
+        if not os.path.exists(socket_path):
+            print(f'Pebble socket not found: {socket_path}')
+            sys.exit(1)
 
     client = pebble.Client(socket_path=socket_path)
 

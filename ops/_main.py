@@ -25,6 +25,8 @@ import warnings
 from pathlib import Path
 from typing import Any, Union, cast
 
+import opentelemetry.trace
+
 from . import charm as _charm
 from . import framework as _framework
 from . import model as _model
@@ -213,7 +215,7 @@ class _Dispatcher:
         state-get) are not available. As such, we change how we interact with
         Juju.
         """
-        return self.event_name in ('collect_metrics',)
+        return self.event_name in ('collect_metrics', 'meter_status_changed')
 
 
 def _should_use_controller_storage(
@@ -307,7 +309,8 @@ class _Manager:
         self.dispatcher.run_any_legacy_hook()
 
         self.framework = self._make_framework(self.dispatcher)
-        self.charm = self._charm_class(self.framework)
+        with self.framework._event_context('__init__'):
+            self.charm = self._charm_class(self.framework)
 
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)
@@ -365,14 +368,24 @@ class _Manager:
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
-
         if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
 
         model = _model.Model(
-            self._charm_meta, self._model_backend, broken_relation_id=broken_relation_id
+            self._charm_meta,
+            self._model_backend,
+            broken_relation_id=broken_relation_id,
+            # In a RelationDeparted event, the unit is not included in the Juju
+            # `relation-list` output, but the charm still has access to the remote
+            # relation data. To provide the charm with a mechanism for getting
+            # access to that data, we include the remote unit in Relation.units.
+            # In other relation events (such as RelationChanged) the unit will
+            # already be in the set via `relation-list` - adding it via this extra
+            # mechanism will not change the final set, and is simpler than only
+            # adding it in specific events.
+            remote_unit_name=self._juju_context.remote_unit_name,
         )
         store = self._make_storage(dispatcher)
         framework = _framework.Framework(
@@ -400,8 +413,11 @@ class _Manager:
 
         # Emit the Juju event.
         self._emit_charm_event(self.dispatcher.event_name)
-        # Emit collect-status events.
-        _charm._evaluate_status(self.charm)
+        # Emit collect-status events. In a restricted context, we can't run
+        # is-leader, so can't do the full evaluation. Skip it rather than
+        # only running the unit status.
+        if not self.dispatcher.is_restricted_context():
+            _charm._evaluate_status(self.charm)
 
     def _get_event_to_emit(self, event_name: str) -> _framework.BoundEvent | None:
         try:
@@ -434,6 +450,12 @@ class _Manager:
 
         args, kwargs = self._get_event_args(event_to_emit)
         logger.debug('Emitting Juju event %s.', event_name)
+        # If tracing is set up, log the trace id so that tools like jhack can pick it up.
+        # If tracing is not set up, span is non-recording and trace is zero.
+        trace_id = opentelemetry.trace.get_current_span().get_span_context().trace_id
+        if trace_id:
+            # Note that https://github.com/canonical/jhack depends on exact string format.
+            logger.debug("Starting root trace with id='%s'.", hex(trace_id)[2:])
         event_to_emit.emit(*args, **kwargs)
 
     def _commit(self):
@@ -444,7 +466,7 @@ class _Manager:
         """Perform any necessary cleanup before the framework is closed."""
         # Provided for child classes - nothing needs to be done in the base.
 
-    def _destroy(self):
+    def destroy(self):
         """Finalise the manager."""
         from . import tracing  # break circular import
 
@@ -476,4 +498,4 @@ def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None 
         sys.exit(e.exit_code)
     finally:
         if manager:
-            manager._destroy()
+            manager.destroy()

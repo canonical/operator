@@ -91,7 +91,7 @@ When Pebble receives a request to access the metrics endpoint, Pebble will verif
 
 > See more:
 > - {ref}`make-your-charm-configurable`
-> - {ref}`manage-configurations`
+> - {ref}`manage-configuration`
 > - {ref}`manage-secrets`
 
 ## Deploy the charm and grant access to the user secret
