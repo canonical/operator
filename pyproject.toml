@@ -133,6 +133,7 @@ aggressive = 3
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
+# FIXME
 target-version = "py38"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
