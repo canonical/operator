@@ -2,7 +2,7 @@
 name = "ops"
 description = "The Python library behind great charms"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==7.23.0.dev0",
+    "ops-scenario==8.0.0.dev0",
 ]
 tracing = [
-    "ops-tracing==2.23.0.dev0",
+    "ops-tracing==3.0.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -133,6 +133,7 @@ aggressive = 3
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
+# FIXME
 target-version = "py38"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
@@ -321,7 +322,7 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
 exclude = ["tracing/*"]
 extraPaths = ["testing", "tracing"]
-pythonVersion = "3.8" # check no python > 3.8 features are used
+pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = false
