@@ -28,6 +28,17 @@ from .model import _ModelBackend
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs and warnings to Juju via juju-log."""
 
+    DEFAULT_FORMATTING = None
+    VERBOSE_FORMATTING = '%(name)s:%(lineno)-5d %(message)s'
+
+    @classmethod
+    def set_formatting(cls, format: str | None = DEFAULT_FORMATTING):
+        """Adjust the log format output."""
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, cls):
+                handler.setFormatter(logging.Formatter(format or cls.DEFAULT_FORMATTING))
+
     def __init__(self, model_backend: _ModelBackend, level: int = logging.DEBUG):
         super().__init__(level)
         self.model_backend = model_backend

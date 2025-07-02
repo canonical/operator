@@ -82,6 +82,38 @@ class TestLogging:
         calls = backend.calls(clear=True)
         assert calls == [result]
 
+    @pytest.mark.parametrize(
+        'message,result',
+        [
+            ('critical', ('CRITICAL', 'critical')),
+            ('error', ('ERROR', 'error')),
+            ('warning', ('WARNING', 'warning')),
+            ('info', ('INFO', 'info')),
+            ('debug', ('DEBUG', 'debug')),
+        ],
+    )
+    def test_verbose_logging(
+        self,
+        backend: FakeModelBackend,
+        logger: logging.Logger,
+        message: str,
+        result: tuple[str, str],
+    ):
+        ops.log.setup_root_logging(backend)
+        ops.log.JujuLogHandler.set_formatting(ops.log.JujuLogHandler.VERBOSE_FORMATTING)
+        assert logger.level == logging.DEBUG
+        assert isinstance(logger.handlers[-1], ops.log.JujuLogHandler)
+
+        method = getattr(logger, message)
+        method(message)
+        calls = backend.calls(clear=True)
+        level, message = result
+        expected = re.compile(rf'{logger.name}:\d+\s+{message}')
+
+        actual_level, actual_message = calls[0]
+        assert level == actual_level
+        assert expected.match(actual_message)
+
     def test_handler_filtering(self, backend: FakeModelBackend, logger: logging.Logger):
         logger.setLevel(logging.INFO)
         logger.addHandler(ops.log.JujuLogHandler(backend, logging.WARNING))
