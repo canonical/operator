@@ -1,3 +1,13 @@
+# 3.0.0 - 02 July 2025
+
+## Documentation
+
+* Be consistent with recommending self.app and self.unit (#1856)
+
+## CI
+
+* Hotfix, publish job for ops-tracing (#1865)
+
 # 2.23.0 - 30 June 2025
 
 ## Features
