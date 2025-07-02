@@ -1467,12 +1467,12 @@ class CharmBase(Object):
 
     @property
     def app(self) -> model.Application:
-        """Application that this unit is part of."""
+        """The application that this unit is part of."""
         return self.framework.model.app
 
     @property
     def unit(self) -> model.Unit:
-        """Unit that this execution is responsible for."""
+        """The current unit."""
         return self.framework.model.unit
 
     @property
