@@ -39,6 +39,7 @@ jobs:
         run: pip install tox~=4.2 uv~=0.6
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        if: ${{ !(matrix.disabled) }}
         run: |
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
