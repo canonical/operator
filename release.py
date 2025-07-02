@@ -111,13 +111,16 @@ def get_new_tag_for_release(
     """
     latest_tag = get_latest_release_tag(repo, branch_name)
 
+    suggested_tag = ''
     if not latest_tag:
         logger.info(f'No version tag found in branch "{branch_name}"')
-        suggested_tag = ''
     else:
         logger.info(f'Latest tag in branch "{branch_name}": {latest_tag}')
-        suggested_tag = bump_minor_version(latest_tag)
-        logger.info(f'Suggested new version: {suggested_tag}')
+        if not re.match(r'^\d+\.\d+\.\d+$', latest_tag):
+            logger.info('Latest tag is not in format X.Y.Z.')
+        else:
+            suggested_tag = bump_minor_version(latest_tag)
+            logger.info(f'Suggested new version: {suggested_tag}')
 
     while True:
         user_input = input(
@@ -160,17 +163,24 @@ def create_draft_release(
     repo: github.Repository.Repository, tag: str, branch: str
 ) -> github.GitRelease.GitRelease | None:
     """Create a draft release with auto-generated notes."""
-    try:
-        release = repo.create_git_release(
-            tag=tag,
-            name=tag,
-            draft=True,
-            generate_release_notes=True,
-            target_commitish=branch,
-        )
-        return release
-    except Exception as e:
-        logging.error(f'Error creating release: {e}')
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            release = repo.create_git_release(
+                tag=tag,
+                name=tag,
+                draft=True,
+                generate_release_notes=True,
+                target_commitish=branch,
+            )
+            return release
+        except Exception as e:
+            logger.error(f'Attempt {attempt} failed to create release: {e}')
+        if attempt == max_retries:
+            raise
+        time.sleep(1)
+
+    return None
 
 
 def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, str]]], str | None]:
@@ -277,11 +287,17 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
 
 def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
-    try:
-        release.update_release(name=title, message=notes, draft=True)
-        logger.info('Release title and notes updated.')
-    except Exception as e:
-        print(f'Error updating release: {e}')
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            release.update_release(name=title, message=notes, draft=True)
+            break
+        except Exception as e:
+            logger.error(f'Attempt {attempt} failed to update release: {e}')
+        if attempt == max_retries:
+            raise
+        time.sleep(1)
+    logger.info('Release title and notes updated.')
 
 
 def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
@@ -365,9 +381,10 @@ def update_ops_version(ops_version: str, testing_version: str):
     ops_src_file_path = Path(ops_src_file)
     content = ops_src_file_path.read_text()
     updated = re.sub(
-        r'^version: str = \'' + VERSION_REGEX + "'$",
+        r'^version: str = \'' + VERSION_REGEX + r'\'$',
         f"version: str = '{ops_version}'",
         content,
+        flags=re.MULTILINE,
     )
     ops_src_file_path.write_text(updated)
     logger.info(f'Updated {ops_src_file} to version {ops_version}')
