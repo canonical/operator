@@ -396,3 +396,19 @@ In the post, outline the key improvements both in `ops` and `ops-scenario`.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
+
+# Updating the Ops version for Charmcraft profiles
+
+First set up a development version of Charmcraft per their CONTRIBUTING.md
+
+Then for each profile (`kubernetes` and `machine`):
+
+1. Update Ops version in pyproject.toml.j2
+2. Make a directory called generated-temp
+3. Run `charmcraft init` inside generated-temp, specifying the profile
+    Use the development version of Charmcraft
+4. Run `uv lock`
+5. Copy the contents of uv.lock to uv.lock.j2, replacing generated-temp by `{{ name }}`
+6. Delete the generated-temp dir
+
+Commit the changed files
