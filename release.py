@@ -591,8 +591,8 @@ def get_new_scenario_version_post_release() -> str:
 
     Can be overridden with a user-provided version.
     """
-    suggested_version, _ = parse_scenario_version()
-    suggested_version += '.dev0'
+    current_version, _ = parse_scenario_version()
+    suggested_version = bump_minor_version(current_version) + '.dev0'
     logger.info(f'Suggested new scenario version: {suggested_version}')
 
     while True:
