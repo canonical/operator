@@ -1,5 +1,7 @@
 # 3.0.0 - 02 July 2025
 
+The minimum version of Python for Ops 3.x is 3.10.
+
 ## Documentation
 
 * Be consistent with recommending self.app and self.unit (#1856)
