@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - '2.*'
+      - '3.*'
 
 permissions: {}
 
