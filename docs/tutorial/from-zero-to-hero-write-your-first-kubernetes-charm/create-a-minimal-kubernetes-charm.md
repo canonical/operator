@@ -389,27 +389,27 @@ Congratulations, you've successfully created a minimal Kubernetes charm!
 
 1. Run:
 
-    ```text
-    kubectl get namespaces
-    ```
+```text
+kubectl get namespaces
+```
 
-    You should see that Juju has created a namespace called `welcome-k8s`.
+You should see that Juju has created a namespace called `welcome-k8s`.
 
-2. Run:
+2. Try:
 
-    ```text
-    kubectl -n welcome-k8s get pods
-    ```
+```text
+kubectl -n welcome-k8s get pods
+```
 
-    You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
+You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
 
-    ```text
-    NAME                             READY   STATUS    RESTARTS   AGE
-    modeloperator-5df6588d89-ghxtz   1/1     Running   2          19m
-    demo-api-charm-0                 2/2     Running   0          39m
-    ```
+```text
+NAME                             READY   STATUS    RESTARTS   AGE
+modeloperator-5df6588d89-ghxtz   1/1     Running   2          19m
+demo-api-charm-0                 2/2     Running   0          39m
+```
 
-3. Run:
+3. Check also:
 
 ```text
 kubectl -n welcome-k8s describe pod demo-api-charm-0
