@@ -25,13 +25,29 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+testing = [
+    "ops-scenario==7.23.0",
+]
+tracing = [
+    "ops-tracing==2.23.0",
+]
+# Empty for now, because Harness is bundled with the base install, but allow
+# specifying the extra to ease transition later.
+harness = []
+
+[dependency-groups]
+lint = [
+    "ruff==0.11.2",
+    "codespell==2.4.1",
+]
 docs = [
+    "ops[testing,tracing]",
     "canonical-sphinx-extensions",
     "furo",
     "linkify-it-py",
-    "myst-parser",
+    "myst-parser; python_version >= \"3.10\"",
     "pyspelling",
-    "sphinx ~= 8.0.0",
+    "sphinx ~= 8.0.0; python_version >= \"3.10\"",
     "sphinx-autobuild",
     "sphinx-copybutton",
     "sphinx-design",
@@ -40,15 +56,37 @@ docs = [
     "sphinxcontrib-jquery",
     "sphinxext-opengraph",
 ]
-testing = [
-    "ops-scenario==7.22.0.dev0",
+static = [
+    "ops[testing,tracing]",
+    "pyright==1.1.385",
+    "typing_extensions~=4.2",
 ]
-tracing = [
-    "ops-tracing==2.22.0.dev0",
+unit = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "jsonpatch~=1.33",
+    "pydantic~=2.10",
+    "eval-type-backport~=0.2; python_version < \"3.10\"",
 ]
-# Empty for now, because Harness is bundled with the base install, but allow
-# specifying the extra to ease transition later.
-harness = []
+xdist = [
+    "pytest-xdist~=3.6",
+]
+coverage = [
+    "coverage[toml]~=7.0",
+]
+benchmark = [
+    "pytest-benchmark~=5.0; python_version >= \"3.9\"",
+]
+integration = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "pytest-operator~=0.23",
+    "jubilant~=1.2",
+    "minio~=7.2",
+    "httpx~=0.28",
+    "juju>=2.9,<4",
+    "build",  # Until #1814 and #1813 are done
+]
 
 [project.urls]
 "Homepage" = "https://ops.readthedocs.io/en/latest/"
@@ -62,6 +100,14 @@ requires = [
     "setuptools>=60",
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.uv.workspace]
+members = ["tracing", "testing"]
+
+[tool.uv.sources]
+ops = { workspace = true }
+ops-scenario = { workspace = true }
+ops-tracing = { workspace = true }
 
 [tool.setuptools.packages.find]
 include = ["ops"]
@@ -93,6 +139,9 @@ extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
+exclude = [
+    "examples/*/lib/*",  # Ignore libs fetched during our testing (or by a charmer)
+]
 
 [tool.ruff.lint]
 select = [
@@ -175,7 +224,10 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
-exclude = ["tracing/ops_tracing/vendor/*"]
+exclude = [
+    "tracing/ops_tracing/vendor/*",
+    "examples/*/lib/*",  # Ignore libs fetched during our testing (or by a charmer)
+]
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [

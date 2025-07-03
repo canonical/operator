@@ -58,9 +58,9 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
     port = self.config['server-port']  # See charmcraft.yaml
 
     if port == 22:
-        self.unit.status = ops.BlockedStatus('invalid port number, 22 is reserved for SSH')
+        self.unit.status = ops.BlockedStatus('Invalid port number, 22 is reserved for SSH')
         return
-    
+
     logger.debug('New application port is requested: %s', port)
     self._update_layer_and_restart()
 ```
@@ -73,7 +73,7 @@ A charm does not know which configuration option has been changed. Thus, make su
 In the `__init__` function, add a new attribute to define a container object for your workload:
 
 ```python
-# see 'containers' in charmcraft.yaml
+# See 'containers' in charmcraft.yaml.
 self.container = self.unit.get_container('demo-server')
 ```
 
@@ -86,12 +86,12 @@ def _update_layer_and_restart(self) -> None:
     You'll need to specify the right entrypoint and environment
     configuration for your specific workload. Tip: you can see the
     standard entrypoint of an existing container using docker inspect
-    Learn more about interacting with Pebble at https://juju.is/docs/sdk/pebble
+    Learn more about interacting with Pebble at
+        https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
         https://documentation.ubuntu.com/pebble/how-to/use-layers/
     """
-
-    # Learn more about statuses at:
+    # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
     self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
     try:
@@ -104,21 +104,20 @@ def _update_layer_and_restart(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
         self.unit.status = ops.ActiveStatus()
-    except (ops.pebble.APIError, ops.pebble.ConnectionError):
+    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
+        logger.info('Unable to connect to Pebble: %s', e)
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
 Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={self.config['server-port']}"`.
 
 ```python
-command = ' '.join(
-    [
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        f"--port={self.config['server-port']}",
-    ]
-)
+command = ' '.join([
+    'uvicorn',
+    'api_demo_server.app:app',
+    '--host=0.0.0.0',
+    f'--port={self.config["server-port"]}',
+])
 ```
 
 As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
@@ -191,14 +190,20 @@ First, we'll add a test that sets the port in the input state and asserts that t
 ```python
 def test_config_changed():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={"server-port": 8080},
+        config={'server-port': 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert "--port=8080" in state_out.get_container(container.name).layers["fastapi_demo"].services["fastapi-service"].command
+    command = (
+        state_out.get_container(container.name)
+        .layers['fastapi_demo']
+        .services['fastapi-service']
+        .command
+    )
+    assert '--port=8080' in command
 ```
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
@@ -206,15 +211,15 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={"server-port": 22},
+        config={'server-port': 22},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        "Invalid port number, 22 is reserved for SSH"
+        'Invalid port number, 22 is reserved for SSH'
     )
 ```
 

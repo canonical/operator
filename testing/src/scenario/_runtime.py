@@ -191,6 +191,8 @@ class Runtime:
             """The charm's event sources, but wrapped."""
 
         WrappedEvents.__name__ = charm_type.on.__class__.__name__
+        WrappedEvents.__qualname__ = charm_type.on.__class__.__qualname__
+        WrappedEvents.__module__ = charm_type.on.__class__.__module__
 
         class WrappedCharm(charm_type):
             """The test charm's type, but with events wrapped."""
@@ -198,6 +200,8 @@ class Runtime:
             on = WrappedEvents()
 
         WrappedCharm.__name__ = charm_type.__name__
+        WrappedCharm.__qualname__ = charm_type.__qualname__
+        WrappedCharm.__module__ = charm_type.__module__
         return typing.cast('Type[CharmType]', WrappedCharm)
 
     @contextmanager
@@ -296,7 +300,7 @@ class Runtime:
         """
         from ._consistency_checker import check_consistency  # avoid cycles
 
-        check_consistency(state, event, self._charm_spec, self._juju_version)
+        check_consistency(state, event, self._charm_spec, self._juju_version, self._unit_id)
 
         charm_type = self._charm_spec.charm_type
         logger.info(f'Preparing to fire {event.name} on {charm_type.__name__}')
@@ -323,6 +327,8 @@ class Runtime:
             logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops  # noqa: F811
 
+            ops = None
+
             try:
                 ops = Ops(
                     state=output_state,
@@ -340,11 +346,14 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
-                raise UncaughtCharmError(
-                    f'Uncaught exception ({type(e)}) in operator/charm code: {e!r}',
-                ) from e
+                # The following is intentionally on one long line, so that the last line of pdb
+                # output shows the error message (pdb shows the "raise" line).
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
 
             finally:
+                if ops:
+                    ops.destroy()
+                    context.trace_data.extend(ops.trace_data)
                 for key in tuple(os.environ):
                     if key not in previous_env:
                         del os.environ[key]
@@ -435,7 +444,12 @@ def capture_events(
     Framework._emit = _wrapped_emit  # type: ignore
     Framework.reemit = _wrapped_reemit
 
-    yield captured
-
-    Framework._emit = _real_emit
-    Framework.reemit = _real_reemit
+    # A finally block is needed here in case the code raises an exception that
+    # isn't a subclass of Exception (like SystemExit or KeyboardInterrupt).
+    # Those are captured by the exec() code that uses this context manager, but
+    # ones outside of Exception are not.
+    try:
+        yield captured
+    finally:
+        Framework._emit = _real_emit
+        Framework.reemit = _real_reemit

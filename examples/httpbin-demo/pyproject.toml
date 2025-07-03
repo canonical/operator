@@ -1,0 +1,3 @@
+# Static checks configuration
+[tool.pyright]
+include = ["src/*.py"]

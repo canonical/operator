@@ -14,7 +14,7 @@ Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 Manage storage <manage-storage>
 Manage resources <manage-resources>
 Manage actions <manage-actions>
-Manage configurations <manage-configurations>
+Manage configuration <manage-configuration>
 Manage relations <manage-relations>
 Manage leadership changes <manage-leadership-changes>
 Manage libraries <manage-libraries>

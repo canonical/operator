@@ -39,9 +39,10 @@ def assert_inconsistent(
     event: '_Event',
     charm_spec: '_CharmSpec',
     juju_version='3.0',
+    unit_id=0,
 ):
     with pytest.raises(InconsistentScenarioError):
-        check_consistency(state, event, charm_spec, juju_version)
+        check_consistency(state, event, charm_spec, juju_version, unit_id)
 
 
 def assert_consistent(
@@ -49,8 +50,9 @@ def assert_consistent(
     event: '_Event',
     charm_spec: '_CharmSpec',
     juju_version='3.0',
+    unit_id=0,
 ):
-    check_consistency(state, event, charm_spec, juju_version)
+    check_consistency(state, event, charm_spec, juju_version, unit_id)
 
 
 def test_base():
@@ -769,4 +771,26 @@ def test_storedstate_consistency():
                 'name': 'foo',
             },
         ),
+    )
+
+
+@pytest.mark.parametrize('unit_id', (0, 1, 42))
+def test_own_unit_in_peers_data_consistency(unit_id: int):
+    assert_consistent(
+        State(relations={PeerRelation('foo', peers_data={unit_id + 1: {'foo': 'bar'}})}),
+        _Event('start'),
+        _CharmSpec(MyCharm, {'peers': {'foo': {'interface': 'bar'}}}),
+        unit_id=unit_id,
+    )
+    assert_inconsistent(
+        State(
+            relations={
+                PeerRelation(
+                    'foo', peers_data={unit_id: {'foo': 'bar'}, unit_id + 1: {'foo': 'baz'}}
+                )
+            }
+        ),
+        _Event('start'),
+        _CharmSpec(MyCharm, {'peers': {'foo': {'interface': 'bar'}}}),
+        unit_id=unit_id,
     )

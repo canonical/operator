@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import contextvars
+import copy
 import dataclasses
 import datetime
 import enum
@@ -52,8 +53,10 @@ from typing import (
     MutableMapping,
     TextIO,
     TypedDict,
+    TypeVar,
     Union,
     get_args,
+    get_type_hints,
 )
 
 from . import charm as _charm
@@ -117,6 +120,9 @@ logger = logging.getLogger(__name__)
 MAX_LOG_LINE_LEN = 131071  # Max length of strings to pass to subshell.
 
 
+_T = TypeVar('_T')
+
+
 class Model:
     """Represents the Juju Model as seen from this unit.
 
@@ -129,13 +135,19 @@ class Model:
         meta: _charm.CharmMeta,
         backend: _ModelBackend,
         broken_relation_id: int | None = None,
+        remote_unit_name: str | None = None,
     ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
         relations: dict[str, _charm.RelationMeta] = meta.relations
         self._relations = RelationMapping(
-            relations, self.unit, self._backend, self._cache, broken_relation_id=broken_relation_id
+            relations,
+            self.unit,
+            self._backend,
+            self._cache,
+            broken_relation_id=broken_relation_id,
+            _remote_unit=self._cache.get(Unit, remote_unit_name) if remote_unit_name else None,
         )
         self._config = ConfigData(self._backend)
         resources: Iterable[str] = meta.resources
@@ -147,17 +159,17 @@ class Model:
 
     @property
     def unit(self) -> Unit:
-        """The unit that is running this code.
+        """The current unit. Equivalent to :attr:`CharmBase.unit`.
 
-        Use :meth:`get_unit` to get an arbitrary unit by name.
+        To get a unit by name, use :meth:`get_unit`.
         """
         return self._unit
 
     @property
     def app(self) -> Application:
-        """The application this unit is a part of.
+        """The application that this unit is part of. Equivalent to :attr:`CharmBase.app`.
 
-        Use :meth:`get_app` to get an arbitrary application by name.
+        To get an application by name, use :meth:`get_app`.
         """
         return self._unit.app
 
@@ -226,22 +238,22 @@ class Model:
         return self._backend._juju_context.version
 
     def get_unit(self, unit_name: str) -> Unit:
-        """Get an arbitrary unit by name.
-
-        Use :attr:`unit` to get the current unit.
+        """Get a unit by name.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
+
+        To get the current unit, use :attr:`CharmBase.unit` or :attr:`unit`.
         """
         return self._cache.get(Unit, unit_name)
 
     def get_app(self, app_name: str) -> Application:
         """Get an application by name.
 
-        Use :attr:`app` to get this charm's application.
-
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
+
+        To get the application that this unit is part of, use :attr:`CharmBase.app` or :attr:`app`.
         """
         return self._cache.get(Application, app_name)
 
@@ -368,9 +380,10 @@ class Application:
     """Represents a named application in the model.
 
     This might be this charm's application, or might be an application this charm is integrated
-    with. Charmers should not instantiate Application objects directly, but should use
-    :attr:`Model.app` to get the application this unit is part of, or
-    :meth:`Model.get_app` if they need a reference to a given application.
+    with.
+
+    Don't instantiate Application objects directly. To get the application that this unit is
+    part of, use :attr:`CharmBase.app`. To get an application by name, use :meth:`Model.get_app`.
     """
 
     name: str
@@ -414,7 +427,7 @@ class Application:
 
         Example::
 
-            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
+            self.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -544,6 +557,9 @@ class Unit:
 
     This might be the current unit, another unit of the charm's application, or a unit of
     another application that the charm is integrated with.
+
+    Don't instantiate Unit objects directly. To get the current unit, use :attr:`CharmBase.unit`.
+    To get a unit by name, use :meth:`Model.get_unit`.
     """
 
     name: str
@@ -597,7 +613,7 @@ class Unit:
 
         Example::
 
-            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
+            self.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
@@ -909,16 +925,18 @@ class RelationMapping(Mapping[str, List['Relation']]):
         backend: _ModelBackend,
         cache: _ModelCache,
         broken_relation_id: int | None,
+        _remote_unit: Unit | None = None,
     ):
         self._peers: set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
                 self._peers.add(name)
         self._our_unit = our_unit
+        self._remote_unit = _remote_unit
         self._backend = backend
         self._cache = cache
         self._broken_relation_id = broken_relation_id
-        self._data: _RelationMapping_Raw = {r: None for r in relations_meta}
+        self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
     def __contains__(self, key: str):
         return key in self._data
@@ -938,7 +956,13 @@ class RelationMapping(Mapping[str, List['Relation']]):
                 if rid == self._broken_relation_id:
                     continue
                 relation = Relation(
-                    relation_name, rid, is_peer, self._our_unit, self._backend, self._cache
+                    relation_name,
+                    rid,
+                    is_peer,
+                    self._our_unit,
+                    self._backend,
+                    self._cache,
+                    _remote_unit=self._remote_unit,
                 )
                 relation_list.append(relation)
         return relation_list
@@ -973,6 +997,7 @@ class RelationMapping(Mapping[str, List['Relation']]):
                     self._backend,
                     self._cache,
                     active=False,
+                    _remote_unit=self._remote_unit,
                 )
         relations = self[relation_name]
         num_related = len(relations)
@@ -1706,6 +1731,8 @@ class Relation:
     ``relation-broken`` event associated with this relation.
     """
 
+    _remote_unit: Unit | None
+
     def __init__(
         self,
         relation_name: str,
@@ -1715,12 +1742,14 @@ class Relation:
         backend: _ModelBackend,
         cache: _ModelCache,
         active: bool = True,
+        _remote_unit: Unit | None = None,
     ):
         self.name = relation_name
         self.id = relation_id
         self.units: set[Unit] = set()
         self.active = active
         self._backend = backend
+        self._cache = cache
 
         # For peer relations, both the remote and the local app are the same.
         app = our_unit.app if is_peer else None
@@ -1747,6 +1776,15 @@ class Relation:
         self.app = typing.cast('Application', app)
         self.data = RelationData(self, our_unit, backend)
 
+        # In relation-departed `relation-list` doesn't include the remote unit,
+        # but the data should still be available.
+        if (
+            _remote_unit is not None
+            and not is_peer
+            and _remote_unit.name.startswith(f'{self.app.name}/')
+        ):
+            self.units.add(_remote_unit)
+
         self._remote_model: RemoteModel | None = None
 
     def __repr__(self):
@@ -1766,6 +1804,164 @@ class Relation:
             d = self._backend.relation_model_get(self.id)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
+
+    def load(
+        self,
+        cls: type[_T],
+        src: Unit | Application,
+        *args: Any,
+        decoder: Callable[[str], Any] | None = None,
+        **kwargs: Any,
+    ) -> _T:
+        """Load the data for this relation into an instance of a data class.
+
+        The raw Juju relation data is passed to the data class's ``__init__``
+        method as keyword arguments, with values decoded using the provided
+        decoder function, or :func:`json.loads` if no decoder is provided.
+
+        For example::
+
+            data = event.relation.load(DatabaseModel, event.app)
+            secret_id = data.credentials
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only fields in
+        the Juju relation data that have a matching field in the class are
+        passed as arguments. Pydantic fields that have an ``alias``, or
+        dataclasses that have a ``metadata{'alias'=}``, will expect the Juju
+        relation data field to have the alias name, but will set the attribute
+        on the class to the field name.
+
+        For example::
+
+            class Data(pydantic.BaseModel):
+                # This field is called 'secret-id' in the Juju relation data.
+                secret_id: str = pydantic.Field(alias='secret-id')
+
+            def _observer(self, event: ops.RelationEvent):
+                data = event.relation.load(Data, event.app)
+                secret = self.model.get_secret(data.secret_id)
+
+        Any additional positional or keyword arguments will be passed through to
+        the data class ``__init__``.
+
+        Args:
+            cls: A class, typically a Pydantic `BaseModel` subclass or a
+                dataclass, that will accept the Juju relation data as keyword
+                arguments, and raise ``ValueError`` if validation fails.
+            src: The source of the data to load. This can be either a
+                :class:`Unit` or :class:`Application` instance.
+            decoder: An optional callable that will be used to decode each field
+                before loading into the class. If not provided,
+                :func:`json.loads` will be used.
+            args: positional arguments to pass through to the data class.
+            kwargs: keyword arguments to pass through to the data class.
+
+        Returns:
+            An instance of the data class that was provided as ``cls`` with the
+            current relation data values.
+        """
+        try:
+            fields = _charm._juju_fields(cls)
+        except ValueError:
+            fields = None
+        data: dict[str, Any] = copy.deepcopy(kwargs)
+        if decoder is None:
+            decoder = json.loads
+        for key, value in sorted(self.data[src].items()):
+            value = decoder(value)
+            if fields is None:
+                data[key] = value
+            elif key in fields:
+                data[fields[key]] = value
+        return cls(*args, **data)
+
+    def save(
+        self,
+        obj: object,
+        dst: Unit | Application,
+        *,
+        encoder: Callable[[Any], str] | None = None,
+    ):
+        """Save the data from the provided object to the Juju relation data.
+
+        For example::
+
+            relation = self.model.get_relation('tracing')
+            data = TracingRequirerData(receivers=['otlp_http'])
+            relation.save(data, self.app)
+
+        For dataclasses and Pydantic ``BaseModel`` subclasses, only the class's
+        fields will be saved through to the relation data. Pydantic fields that
+        have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``,
+        will have the object's value saved to the Juju relation data with the
+        alias as the key. For other classes, all of the object's attributes that
+        have a class type annotation and value set on the object will be saved
+        through to the relation data.
+
+        For example::
+
+            class TransferData(pydantic.BaseModel):
+                source: pydantic.AnyHttpUrl = pydantic.Field(alias='from')
+                destination: pydantic.AnyHttpUrl = pydantic.Field(alias='to')
+
+            def _add_transfer(self):
+                data = TransferData(
+                    source='https://a.example.com',
+                    destination='https://b.example.com',
+                )
+                relation = self.model.get_relation('mover')
+                # data.source will be stored under the Juju relation key 'from'
+                # data.destination will be stored under the Juju relation key 'to'
+                relation.save(data, self.unit)
+
+        Args:
+            obj: an object with attributes to save to the relation data, typically
+                a Pydantic ``BaseModel`` subclass or dataclass.
+            dst: The destination in which to save the data to save. This
+                can be either a :class:`Unit` or :class:`Application` instance.
+            encoder: An optional callable that will be used to encode each field
+                before passing to Juju. If not provided, :func:`json.dumps` will
+                be used.
+
+        Raises:
+            RelationDataTypeError: if the encoder does not return a string.
+            RelationNotFoundError: if the relation does not exist.
+            RelationDataAccessError: if the charm does not have permission to
+                write to the relation data.
+        """
+        if encoder is None:
+            encoder = json.dumps
+
+        # Determine the fields, which become the Juju keys, and the values for
+        # each field.
+        fields: dict[str, str] = {}  # Class attribute name: Juju key.
+        if dataclasses.is_dataclass(obj):
+            assert not isinstance(obj, type)  # dataclass instance, not class.
+            for field in dataclasses.fields(obj):
+                alias = field.metadata.get('alias', field.name)
+                fields[field.name] = alias
+            values = dataclasses.asdict(obj)
+        elif hasattr(obj.__class__, 'model_fields'):
+            # Pydantic models:
+            for name, field in obj.__class__.model_fields.items():  # type: ignore
+                # Pydantic takes care of the alias.
+                fields[field.alias or name] = field.alias or name  # type: ignore
+            values = obj.model_dump(mode='json', by_alias=True, exclude_defaults=False)  # type: ignore
+        else:
+            # If we could not otherwise determine the fields for the class,
+            # store all the fields that have type annotations. If a charm needs
+            # a more specific set of fields, then it should use a dataclass or
+            # Pydantic model instead.
+            try:
+                fields = {k: k for k in get_type_hints(obj.__class__)}
+            except TypeError:
+                # Most likely Python 3.8. It's not as good, but use __annotations__.
+                fields = {k: k for k in obj.__class__.__annotations__}
+            values = {field: getattr(obj, field) for field in fields}
+
+        # Encode each value, and then pass it over to Juju.
+        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
+        self.data[dst].update(data)
 
 
 class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
@@ -2182,7 +2378,7 @@ class Resources:
 
     def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._paths: dict[str, Path | None] = {name: None for name in names}
+        self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
         """Fetch the resource from the controller or store.
@@ -2233,9 +2429,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
-        self._storage_map: _StorageDictType = {
-            storage_name: None for storage_name in storage_names
-        }
+        self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
     def __contains__(self, key: str):
         return key in self._storage_map
@@ -2631,12 +2825,14 @@ class Container:
             make_dirs: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
-            user_id: User ID (UID) for file.
-            user: Username for file. User's UID must match user_id if both are
-                specified.
-            group_id: Group ID (GID) for file.
-            group: Group name for file. Group's GID must match group_id if
-                both are specified.
+            user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
+            user: Username for file. User's UID must match ``user_id`` if both are
+                specified. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
+            group_id: Group ID (GID) for file. May only be specified with ``user_id`` or ``user``.
+            group: Group name for file. Group's GID must match ``group_id`` if
+                both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.push(
             str(path),
@@ -2961,12 +3157,15 @@ class Container:
             make_parents: If True, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
-            user_id: User ID (UID) for directory.
-            user: Username for directory. User's UID must match user_id if
-                both are specified.
+            user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
+                is provided, the group is set to the user's default group.
+            user: Username for directory. User's UID must match ``user_id`` if
+                both are specified. If neither ``group_id`` nor ``group`` is provided,
+                the group is set to the user's default group.
             group_id: Group ID (GID) for directory.
-            group: Group name for directory. Group's GID must match group_id
-                if both are specified.
+                May only be specified with ``user_id`` or ``user``.
+            group: Group name for directory. Group's GID must match ``group_id``
+                if both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.make_dir(
             str(path),
@@ -4071,7 +4270,9 @@ class LazyCheckInfo:
 
     name: str
     level: pebble.CheckLevel | str | None
+    startup: pebble.CheckStartup
     status: pebble.CheckStatus | str
+    successes: int | None
     failures: int
     threshold: int
     change_id: pebble.ChangeID | None

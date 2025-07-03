@@ -118,6 +118,7 @@ else:
             UnknownStatus,
             WaitingStatus,
             errors,
+            layer_from_rockcraft,
         )
 
         # This can be imported in the group above after Scenario exposes it at the top level.
@@ -166,6 +167,7 @@ else:
             'UnknownStatus',
             'WaitingStatus',
             'errors',
+            'layer_from_rockcraft',
         ])
 
         # Until Scenario uses the ops._private.harness.ActionFailed, we need to

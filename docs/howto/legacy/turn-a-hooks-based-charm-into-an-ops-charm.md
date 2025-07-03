@@ -91,9 +91,7 @@ If we remove that section, run `charmcraft pack`, and then attempt to deploy the
 Processing error: Failed to copy '/root/stage/src': no such file or directory.
 ```
 
-### The plan
-
-````{dropdown} Detour: exploration of a lazy approach which turns out to be a bad idea.
+### An approach to avoid
 
 The minimal-effort solution in this case could be to create a file `/src/charm.py` and translate the built-in `self.on` event hooks to subprocess calls to the Bash event hooks as-they-are. Roughly:
 
@@ -115,7 +113,7 @@ if __name__ == "__main__":
     main(ops.Microsample)
 
 ```
-This is obviously horrible, but we can verify that it actually works and it is a useful exercise to verify that the only difference between the hooks-based charm and this Ops charm is the syntax by which the developer has to map hook names to handler scripts. 
+Relying on `popen` is _not_ how Ops is supposed to be used. However, this code will work, and it demonstrates the core principle of mapping hook names to handler code.
 
 ```{important}
 
@@ -130,7 +128,7 @@ A more detailed explanation of this process is worthy of its own how-to guide, s
 
 ```
 
-````
+### A better plan
 
 It is in our interest to move the handler logic for each `/hooks/<hook_name>` to `Microsample._on_<hook_name>`, for several reasons:
 - We can avoid code duplication by accessing shared data via the CharmBase interface provided through `self`. 

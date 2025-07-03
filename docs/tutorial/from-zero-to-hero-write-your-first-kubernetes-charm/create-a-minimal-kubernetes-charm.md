@@ -59,7 +59,6 @@ title: |
   demo-fastapi-k8s
 description: |
   This is a demo charm built on top of a small Python FastAPI server.
-  This charm can be integrated with the PostgreSQL charm and COS Lite bundle (Canonical Observability Stack).
 summary: |
   FastAPI Demo charm for Kubernetes
 ```
@@ -110,7 +109,7 @@ Create a file called `requirements.txt`. This is a  file that describes all the 
 In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
 
 ```
-ops >= 2.11
+ops>2,<4
 ```
 
 
@@ -384,7 +383,9 @@ You should see a JSON string with the version of the application:
 {"version":"1.0.0"}
 ```
 
-To inspect your deployment further:
+Congratulations, you've successfully created a minimal Kubernetes charm!
+
+### Inspect your deployment further
 
 1. Run:
 
@@ -410,13 +411,11 @@ To inspect your deployment further:
 
 3. Run:
 
-    ```text
-    kubectl -n welcome-k8s describe pod demo-api-charm-0
-    ```
+```text
+kubectl -n welcome-k8s describe pod demo-api-charm-0
+```
 
-    In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
-
-**Congratulations, you've successfully created a minimal Kubernetes charm!** 
+In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
 
 (write-unit-tests-for-your-charm)=
 ## Write unit tests for your charm
@@ -469,13 +468,12 @@ deps =
     ops[testing]
     -r {tox_root}/requirements.txt
 commands =
-    coverage run --source={[vars]src_path} \
-                 -m pytest \
-                 --tb native \
-                 -v \
-                 -s \
-                 {posargs} \
-                 {[vars]tests_path}/unit
+    coverage run --source={[vars]src_path} -m pytest \
+        -v \
+        -s \
+        --tb native \
+        {[vars]tests_path}/unit \
+        {posargs}
     coverage report
 ```
 > Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
@@ -525,7 +523,7 @@ def test_pebble_layer():
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
-    # Check the unit status is active
+    # Check the unit is active:
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
@@ -594,12 +592,13 @@ deps =
     pytest-operator
     -r {tox_root}/requirements.txt
 commands =
-    pytest -v \
-           -s \
-           --tb native \
-           --log-cli-level=INFO \
-           {posargs} \
-           {[vars]tests_path}/integration
+    pytest \
+        -v \
+        -s \
+        --tb native \
+        --log-cli-level=INFO \
+        {[vars]tests_path}/integration \
+        {posargs}
 ```
 
 If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.
@@ -637,7 +636,7 @@ APP_NAME = METADATA['name']
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before any relations/configurations take place.
+    Assert on the unit status before integration or configuration.
     """
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm('.')
