@@ -397,18 +397,31 @@ The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
 
-# Updating the Ops version for Charmcraft profiles
+## Updating the Ops versions for Charmcraft profiles
 
-First set up a development version of Charmcraft per their CONTRIBUTING.md
+The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` files.
 
-Then for each profile (`kubernetes` and `machine`):
+First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
 
-1. Update Ops version in pyproject.toml.j2
-2. Make a directory called generated-temp
-3. Run `charmcraft init` inside generated-temp, specifying the profile
-    Use the development version of Charmcraft
-4. Run `uv lock`
-5. Copy the contents of uv.lock to uv.lock.j2, replacing generated-temp by `{{ name }}`
-6. Delete the generated-temp dir
+If you get stuck, read Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md).
 
-Commit the changed files
+Next, do the following for the `kubernetes` profile:
+
+1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the `dependencies` key.
+2. At the repo root, create a directory called `generated-temp`.
+3. Inside `generated-temp`, run:
+    ```text
+    CHARMCRAFT_DEVELOPER=1 python -m charmcraft init --profile=kubernetes
+    ```
+4. Inside `generated-temp`, run `uv lock`.
+5. Copy `generated-temp/uv.lock` to `charmcraft/templates/init-kubernetes/uv.lock.j2`, overwriting the existing file.
+6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
+7. Delete the `generated-temp` directory.
+
+Repeat these steps for the `machine` profile, then commit your changes.
+
+You should have changed these files:
+* charmcraft/templates/init-kubernetes/pyproject.toml.j2
+* charmcraft/templates/init-kubernetes/uv.lock.j2
+* charmcraft/templates/init-machine/pyproject.toml.j2
+* charmcraft/templates/init-machine/uv.lock.j2
