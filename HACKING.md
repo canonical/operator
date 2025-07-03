@@ -418,9 +418,9 @@ Next, do the following for the `kubernetes` profile:
 6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
 7. Delete the `generated-temp` directory.
 
-Repeat these steps for the `machine` profile, then commit your changes.
+You also need to update the `machine` templates. Run a diff between `charmcraft/templates/init-kubernetes/pyproject.toml.j2` and `charmcraft/templates/init-machine/pyproject.toml.j2`. If the files match, copy `pyproject.toml.j2` and `uv.lock.js` from the `kubernetes` profile to the `machine` profile. Otherwise, repeat the full process for the `machine` profile.
 
-You should have changed these files:
+Commit your changes. You should have changed these files:
 * charmcraft/templates/init-kubernetes/pyproject.toml.j2
 * charmcraft/templates/init-kubernetes/uv.lock.j2
 * charmcraft/templates/init-machine/pyproject.toml.j2
