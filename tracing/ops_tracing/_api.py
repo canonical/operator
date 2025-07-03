@@ -116,7 +116,7 @@ class Tracing(ops.Object):
             if relation.interface_name != 'tracing':
                 raise ValueError(
                     f"{tracing_relation_name=} {relation.interface_name=} when 'tracing' is"
-                    ' expected'
+                    f' expected'
                 )
 
             self._tracing = TracingEndpointRequirer(
@@ -145,7 +145,7 @@ class Tracing(ops.Object):
                 if relation.interface_name != 'certificate_transfer':
                     raise ValueError(
                         f'{ca_relation_name=} {relation.interface_name=} when'
-                        " 'certificate_transfer' is expected"
+                        f" 'certificate_transfer' is expected"
                     )
 
                 self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
