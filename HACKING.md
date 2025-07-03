@@ -397,7 +397,7 @@ The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
 
-## Updating the Ops versions for Charmcraft profiles
+## Updating the Ops versions in the Charmcraft profiles
 
 The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
 
