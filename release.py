@@ -788,7 +788,7 @@ def post_release(owner: str, repo_name: str, branch: str):
     )
     subprocess.run(['/usr/bin/git', 'push', 'origin', new_branch], check=True)
     pr = repo.create_pull(
-        title='Post Release',
+        title='chore: adjust versions after release',
         body='This PR updates the version files after the release.',
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
         base=branch,
