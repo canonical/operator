@@ -399,15 +399,15 @@ have to offer.
 
 ## Updating the Ops versions for Charmcraft profiles
 
-The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` files.
+The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
 
 First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
 
-If you get stuck, read Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md).
+> See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
 
 Next, do the following for the `kubernetes` profile:
 
-1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the `dependencies` key.
+1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the Ops version specifier.
 2. At the repo root, create a directory called `generated-temp`.
 3. Inside `generated-temp`, run:
     ```text
