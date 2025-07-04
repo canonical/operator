@@ -61,7 +61,7 @@ class _JujuContext:
     If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
     """
 
-    debug_at: set[str] = dataclasses.field(default_factory=set)  # pyright: ignore[reportUnknownVariableType]
+    debug_at: set[str] = dataclasses.field(default_factory=set[str])
     """Where you want to stop when debugging.
 
     For example 'all' (from JUJU_DEBUG_AT).
