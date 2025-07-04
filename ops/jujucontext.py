@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, TypedDict
 
 from .jujuversion import JujuVersion
 
@@ -185,25 +185,35 @@ class _JujuContext:
 
     @classmethod
     def from_dict(cls, env: Mapping[str, Any]) -> _JujuContext:
-        kwargs = {
-            var.removeprefix('JUJU_').lower(): value
-            for var in (
-                'JUJU_ACTION_NAME',
-                'JUJU_ACTION_UUID',
-                'JUJU_DISPATCH_PATH',
-                'JUJU_MODEL_NAME',
-                'JUJU_MODEL_UUID',
-                'JUJU_NOTICE_ID',
-                'JUJU_NOTICE_KEY',
-                'JUJU_NOTICE_TYPE',
-                'JUJU_PEBBLE_CHECK_NAME',
-                'JUJU_SECRET_ID',
-                'JUJU_SECRET_LABEL',
-                'JUJU_UNIT_NAME',
-                'JUJU_WORKLOAD_NAME',
-            )
-            if (value := env.get(var))
-        }
+        kwargs: _JujuContextKwargs = {}
+        # simple keys that copy the environment variable without modification
+        if juju_action_name := env.get('JUJU_ACTION_NAME'):
+            kwargs['action_name'] = juju_action_name
+        if juju_action_uuid := env.get('JUJU_ACTION_UUID'):
+            kwargs['action_uuid'] = juju_action_uuid
+        if juju_dispatch_path := env.get('JUJU_DISPATCH_PATH'):
+            kwargs['dispatch_path'] = juju_dispatch_path
+        if juju_model_name := env.get('JUJU_MODEL_NAME'):
+            kwargs['model_name'] = juju_model_name
+        if juju_model_uuid := env.get('JUJU_MODEL_UUID'):
+            kwargs['model_uuid'] = juju_model_uuid
+        if juju_notice_id := env.get('JUJU_NOTICE_ID'):
+            kwargs['notice_id'] = juju_notice_id
+        if juju_notice_key := env.get('JUJU_NOTICE_KEY'):
+            kwargs['notice_key'] = juju_notice_key
+        if juju_notice_type := env.get('JUJU_NOTICE_TYPE'):
+            kwargs['notice_type'] = juju_notice_type
+        if juju_pebble_check_name := env.get('JUJU_PEBBLE_CHECK_NAME'):
+            kwargs['pebble_check_name'] = juju_pebble_check_name
+        if juju_secret_id := env.get('JUJU_SECRET_ID'):
+            kwargs['secret_id'] = juju_secret_id
+        if juju_secret_label := env.get('JUJU_SECRET_LABEL'):
+            kwargs['secret_label'] = juju_secret_label
+        if juju_unit_name := env.get('JUJU_UNIT_NAME'):
+            kwargs['unit_name'] = juju_unit_name
+        if juju_workload_name := env.get('JUJU_WORKLOAD_NAME'):
+            kwargs['workload_name'] = juju_workload_name
+        # keys that do something a little fancier
         if juju_charm_dir := env.get('JUJU_CHARM_DIR'):
             kwargs['charm_dir'] = Path(juju_charm_dir).resolve()
         if 'JUJU_DEBUG' in env:
@@ -227,3 +237,30 @@ class _JujuContext:
         if juju_version := env.get('JUJU_VERSION'):
             kwargs['version'] = JujuVersion(juju_version)
         return _JujuContext(**kwargs)
+
+
+class _JujuContextKwargs(TypedDict, total=False):
+    action_name: str
+    action_uuid: str
+    charm_dir: Path
+    debug: bool
+    debug_at: set[str]
+    dispatch_path: str
+    model_name: str
+    model_uuid: str
+    notice_id: str
+    notice_key: str
+    notice_type: str
+    pebble_check_name: str
+    relation_departing_unit_name: str
+    relation_name: str
+    relation_id: int
+    remote_app_name: str
+    remote_unit_name: str
+    secret_id: str
+    secret_label: str
+    secret_revision: int
+    storage_name: str
+    unit_name: str
+    version: JujuVersion
+    workload_name: str
