@@ -35,6 +35,19 @@ jobs:
           CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
+      - name: Install yq
+        run: sudo snap install yq
+
+      - name: Add 'git' as a build package 
+      - run: |
+          cd examples/httpbin-demo
+          if yq 'has("parts")' charmcraft.yaml; then
+            echo "'parts' already exists in charmcraft.yaml"
+            exit 1
+          fi
+          yq -i '.parts.charm.build-packages = ["git"]' charmcraft.yaml
+          cat charmcraft.yaml
+
       - name: Set up LXD
         uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
         with:
