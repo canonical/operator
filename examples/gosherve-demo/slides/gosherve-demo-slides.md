@@ -334,18 +334,6 @@ class GosherveConfig:
                 f'Invalid redirect-map URL: {self.redirect_map}. '
                 "It must start with 'http' or 'https'."
             )
-        try:
-            with urllib.request.urlopen(self.redirect_map) as response:  # noqa: S310
-                content_type = response.headers.get('Content-Type', '')
-                if 'application/json' not in content_type:
-                    raise ValueError(
-                        f'Invalid redirect-map URL: {self.redirect_map}. '
-                        f"Content-Type is '{content_type}', expected 'application/json'."
-                    )
-        except Exception as e:
-            raise ValueError(
-                f'Failed to validate redirect-map URL {self.redirect_map!r}: {e}'
-            ) from e
 ```
 
 ---
@@ -794,29 +782,8 @@ $ juju status --watch 1s
 
 ```python
 @pytest.mark.parametrize('config', [None, {'redirect-map': 'https://example.com/routes'}])
-def test_gosherve_layer(
-    monkeypatch: pytest.MonkeyPatch, config: dict[str, str | int | float | bool] | None
-):
+def test_gosherve_layer(config: dict[str, str | int | float | bool] | None):
     """Test that the layer has the right environment."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': 'application/json'}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
     state_in = testing.State.from_context(ctx, config=config)
     state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -848,27 +815,8 @@ def test_gosherve_layer(
 
 ```python
 @pytest.mark.parametrize('event_name', ['config_changed', 'pebble_ready'])
-def test_on_config_changed(monkeypatch: pytest.MonkeyPatch, event_name: str):
+def test_on_config_changed(event_name: str):
     """Test the config-changed and pebble-ready hooks."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': 'application/json'}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
 
     # Trigger a config-changed hook. Since there was no plan initially, the
@@ -901,37 +849,32 @@ $ tox -e unit
 [...]
 hello-kubecon-example/examples/gosherve-demo/tests/unit
 ================================================================================== test session starts ===================================================================================
-platform linux -- Python 3.13.0, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/operator/hello-kubecon-example/examples/gosherve-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/operator/hello-kubecon-example/examples/gosherve-demo
-configfile: pyproject.toml
-collected 13 items
+[...]
+collected 11 items
 
 tests/unit/test_charm.py::test_gosherve_layer[None] PASSED
 tests/unit/test_charm.py::test_gosherve_layer[config1] PASSED
 tests/unit/test_charm.py::test_on_config_changed[config_changed] PASSED
 tests/unit/test_charm.py::test_on_config_changed[pebble_ready] PASSED
 tests/unit/test_charm.py::test_on_config_changed_container_not_ready PASSED
-tests/unit/test_charm.py::test_config_values[application/json-http://-True] PASSED
-tests/unit/test_charm.py::test_config_values[application/json-https://-True] PASSED
-tests/unit/test_charm.py::test_config_values[application/json-file:///-False] PASSED
-tests/unit/test_charm.py::test_config_values[text/html-https://-False] PASSED
-tests/unit/test_charm.py::test_no_config[config0] PASSED
-tests/unit/test_charm.py::test_no_config[config1] PASSED
+tests/unit/test_charm.py::test_config_values[http://-True] PASSED
+tests/unit/test_charm.py::test_config_values[https://-True] PASSED
+tests/unit/test_charm.py::test_config_values[file:///-False] PASSED
+tests/unit/test_charm.py::test_no_config PASSED
 tests/unit/test_charm.py::test_on_install PASSED
 tests/unit/test_charm.py::test_pull_site_action PASSED
 
-=================================================================================== 13 passed in 1.93s ===================================================================================
+=================================================================================== 11 passed in 1.12s ===================================================================================
 unit: commands[1]> coverage report
 Name                       Stmts   Miss Branch BrPart  Cover   Missing
 ----------------------------------------------------------------------
-src/charm.py                  55      5      6      0    92%   119-126
+src/charm.py                  48      5      4      0    90%   109-116
 tests/__init__.py              0      0      0      0   100%
-tests/unit/test_charm.py     106      0      2      0   100%
+tests/unit/test_charm.py      61      0      2      0   100%
 ----------------------------------------------------------------------
-TOTAL                        161      5      8      0    97%
-  unit: OK (3.08=setup[0.04]+cmd[2.81,0.23] seconds)
-  congratulations :) (3.20 seconds)
+TOTAL                        109      5      6      0    96%
+  unit: OK (2.04=setup[0.04]+cmd[1.82,0.18] seconds)
+  congratulations :) (2.13 seconds)
 ```
 
 ---

@@ -40,18 +40,6 @@ class GosherveConfig:
                 f'Invalid redirect-map URL: {self.redirect_map}. '
                 "It must start with 'http' or 'https'."
             )
-        try:
-            with urllib.request.urlopen(self.redirect_map) as response:  # noqa: S310
-                content_type = response.headers.get('Content-Type', '')
-                if 'application/json' not in content_type:
-                    raise ValueError(
-                        f'Invalid redirect-map URL: {self.redirect_map}. '
-                        f"Content-Type is '{content_type}', expected 'application/json'."
-                    )
-        except Exception as e:
-            raise ValueError(
-                f'Failed to validate redirect-map URL {self.redirect_map!r}: {e}'
-            ) from e
 
 
 class HelloKubeconCharm(ops.CharmBase):

@@ -5,9 +5,6 @@
 
 """Unit tests for the Gosherve demo charm."""
 
-import urllib.request
-from typing import Any
-
 import ops
 import pytest
 from ops import testing
@@ -16,29 +13,8 @@ from charm import HelloKubeconCharm
 
 
 @pytest.mark.parametrize('config', [None, {'redirect-map': 'https://example.com/routes'}])
-def test_gosherve_layer(
-    monkeypatch: pytest.MonkeyPatch, config: dict[str, str | int | float | bool] | None
-):
+def test_gosherve_layer(config: dict[str, str | int | float | bool] | None):
     """Test that the layer has the right environment."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': 'application/json'}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
     state_in = testing.State.from_context(ctx, config=config)
     state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -65,27 +41,8 @@ def test_gosherve_layer(
 
 
 @pytest.mark.parametrize('event_name', ['config_changed', 'pebble_ready'])
-def test_on_config_changed(monkeypatch: pytest.MonkeyPatch, event_name: str):
+def test_on_config_changed(event_name: str):
     """Test the config-changed and pebble-ready hooks."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': 'application/json'}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
 
     # Trigger a config-changed hook. Since there was no plan initially, the
@@ -107,27 +64,8 @@ def test_on_config_changed(monkeypatch: pytest.MonkeyPatch, event_name: str):
     )
 
 
-def test_on_config_changed_container_not_ready(monkeypatch: pytest.MonkeyPatch):
+def test_on_config_changed_container_not_ready():
     """Test the config-changed hook when the container is not ready."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': 'application/json'}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
 
     # Trigger a config-changed hook. Since the container is not ready, it should
@@ -141,37 +79,15 @@ def test_on_config_changed_container_not_ready(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.parametrize(
-    'content_type,protocol,success',
+    'protocol,success',
     [
-        ('application/json', 'http://', True),
-        ('application/json', 'https://', True),
-        ('application/json', 'file:///', False),
-        ('text/html', 'https://', False),
+        ('http://', True),
+        ('https://', True),
+        ('file:///', False),
     ],
 )
-def test_config_values(
-    monkeypatch: pytest.MonkeyPatch, content_type: str, protocol: str, success: bool
-):
+def test_config_values(protocol: str, success: bool):
     """Test that the charm blocks if the redirect-map is invalid."""
-
-    class MockResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(
-            self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
-        ) -> None:
-            pass
-
-        @property
-        def headers(self):
-            return {'Content-Type': content_type}
-
-    def mock_urlopen(*args: Any, **kwargs: Any):
-        return MockResponse()
-
-    monkeypatch.setattr(urllib.request, 'urlopen', mock_urlopen)
-
     ctx = testing.Context(HelloKubeconCharm)
     state_in = testing.State.from_context(
         ctx, config={'redirect-map': f'{protocol}example.com/routes'}
@@ -186,11 +102,10 @@ def test_config_values(
         assert '_Abort' in str(exc_info.value)
 
 
-@pytest.mark.parametrize('config', [{}, {'redirect-map': ''}])
-def test_no_config(config):
+def test_no_config():
     """Test that the charm blocks if the redirect-map is missing."""
     ctx = testing.Context(HelloKubeconCharm)
-    state_in = testing.State.from_context(ctx, config=config)
+    state_in = testing.State.from_context(ctx, config={'redirect-map': ''})
     # TODO: this is not a great testing experience. Can we improve it?
     with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.config_changed(), state_in)
