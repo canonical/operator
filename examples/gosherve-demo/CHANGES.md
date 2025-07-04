@@ -3,6 +3,9 @@
 This charm is an updated version of the "Hello Kubecon" charm created by Jon
 Seager. The following changes were made to align with current charming practice.
 
+* Renamed the charm to `gosherve-demo-k8s` - slightly more generic, and uses the
+  current practice of appending `-k8s` to Kubernetes charms, and avoids clashing
+  with the existing charm in Charmhub.
 * Unified `charmcraft.yaml`: the `metadata.yaml`, `actions.yaml`, and
   `config.yaml` files were merged into the `charmcraft.yaml` file.
 * Dev tooling was updated to use `ruff` and `pyright`, with `tox` (and `tox-uv`)

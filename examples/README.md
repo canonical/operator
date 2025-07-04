@@ -26,11 +26,11 @@ This directory contains charms that you can pack and deploy locally, to help lea
     ```
     charmcraft fetch-libs
     charmcraft pack
-    juju deploy ./gosherve-demo_ubuntu-24.04-amd64.charm --resource gosherve-image=jnsgruk/gosherve:latest
+    juju deploy ./gosherve-demo-k8s_amd64.charm --resource gosherve-image=jnsgruk/gosherve:latest
     juju deploy traefik-k8s --trust
     juju config traefik-k8s external_hostname=juju.local
     juju config traefik-k8s routing_mode=subdomain
-    juju relate hello-kubecon traefik-k8s
+    juju relate gosherve-demo-k8s traefik-k8s
     juju status
     echo "<traefik-k8s-address> dev-hello-kubecon.juju.local" | sudo tee -a /etc/hosts
     ```
