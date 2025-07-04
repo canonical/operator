@@ -41,7 +41,7 @@ jobs:
       - name: Add 'git' as a build package 
         run: |
           cd examples/httpbin-demo
-          if yq 'has("parts")' charmcraft.yaml; then
+          if yq -e 'has("parts")' charmcraft.yaml; then
             echo "'parts' already exists in charmcraft.yaml"
             exit 1
           fi
