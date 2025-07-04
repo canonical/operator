@@ -69,7 +69,7 @@ author = 'Canonical Ltd.'
 # You might want to include a version number here.
 # To not display any title, set this option to an empty string.
 project_version = '2.23'
-html_title = project + ' ' + project_version + ' documentation'
+html_title = f'{project} {project_version} documentation'
 
 # The default value uses the current year as the copyright year.
 #
