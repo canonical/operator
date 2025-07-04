@@ -187,12 +187,12 @@ class _JujuContext:
     @classmethod
     def from_dict(cls, env: Mapping[str, Any]) -> _JujuContext:
         kwargs: _JujuContextKwargs = {}
-        # simple keys that copy the environment variable without modification
+        # Simple keys that copy the environment variable value without modification.
         simple_keys: tuple[SimpleKeys, ...] = typing.get_args(SimpleKeys)
         for key in simple_keys:
             if val := env.get(f'JUJU_{key.upper()}'):
                 kwargs[key] = val
-        # keys that do something a little fancier
+        # Keys that do something a little fancier.
         if juju_charm_dir := env.get('JUJU_CHARM_DIR'):
             kwargs['charm_dir'] = Path(juju_charm_dir).resolve()
         if 'JUJU_DEBUG' in env:
