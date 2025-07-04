@@ -1,0 +1,63 @@
+# Copyright 2021 Jon Seager
+# See LICENSE file for licensing details.
+
+name: gosherve-demo-k8s
+summary: |
+  A demonstration charm for Kubecon Operator Day 2021.
+description: |
+  A basic demonstration charm that hosts a placeholder webpage with links
+  to various Juju/Ops pages. Hosted using a small, custom
+  webserver written in Go (https://github.com/jnsgruk/gosherve). Illustrates
+  the use of charm workloads, actions, config, storage and relations.
+
+assumes:
+  - k8s-api
+
+containers:
+  gosherve:
+    resource: gosherve-image
+    mounts:
+      - storage: webroot
+        location: /srv
+
+resources:
+  gosherve-image:
+    type: oci-image
+    description: OCI image for gosherve
+
+storage:
+  webroot:
+    type: filesystem
+    location: /srv
+
+requires:
+  ingress:
+    interface: ingress
+    limit: 1
+    optional: false
+
+charm-libs:
+  - lib: traefik_k8s.ingress
+    version: "1"
+
+type: "charm"
+base: ubuntu@24.04
+platforms:
+  amd64:
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+config:
+  options:
+    redirect-map:
+      default: "https://github.com/canonical/operator/tree/main/examples/gosherve-demo/demo-routes"
+      description: A URL pointing to a list of redirects for Gosherve.
+      type: string
+
+actions:
+  pull-site:
+    description: Unpack latest version of website from remote source.
