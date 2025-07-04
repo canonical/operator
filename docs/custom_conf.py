@@ -129,7 +129,7 @@ html_context = {
     # Change to the GitHub URL for your project
     'github_url': 'https://github.com/canonical/operator',
     # Change to the branch for this version of the documentation
-    'github_version': 'main',
+    'github_version': '2.23-maintenance',
     # Change to the folder that contains the documentation
     # (usually "/" or "/docs/")
     'github_folder': '/docs/',
@@ -149,7 +149,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['display_github'] = True
     html_context['github_user'] = 'canonical'
     html_context['github_repo'] = 'operator'
-    html_context['github_version'] = 'main'
+    html_context['github_version'] = '2.23-maintenance'
     html_context['slug'] = 'operator'
 
 # If your project is on documentation.ubuntu.com, specify the project
