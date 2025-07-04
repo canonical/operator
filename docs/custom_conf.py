@@ -62,13 +62,14 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 ############################################################
 
 # Product name
-project = 'The ops library'
+project = 'Ops'
 author = 'Canonical Ltd.'
 
 # The title you want to display for the documentation in the sidebar.
 # You might want to include a version number here.
 # To not display any title, set this option to an empty string.
-html_title = project + ' documentation'
+project_version = '2.23'
+html_title = f'{project} {project_version} documentation'
 
 # The default value uses the current year as the copyright year.
 #
@@ -128,7 +129,7 @@ html_context = {
     # Change to the GitHub URL for your project
     'github_url': 'https://github.com/canonical/operator',
     # Change to the branch for this version of the documentation
-    'github_version': 'main',
+    'github_version': '2.23-maintenance',
     # Change to the folder that contains the documentation
     # (usually "/" or "/docs/")
     'github_folder': '/docs/',
@@ -148,7 +149,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['display_github'] = True
     html_context['github_user'] = 'canonical'
     html_context['github_repo'] = 'operator'
-    html_context['github_version'] = 'main'
+    html_context['github_version'] = '2.23-maintenance'
     html_context['slug'] = 'operator'
 
 # If your project is on documentation.ubuntu.com, specify the project
