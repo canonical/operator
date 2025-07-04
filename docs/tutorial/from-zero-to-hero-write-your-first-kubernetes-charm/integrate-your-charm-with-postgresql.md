@@ -19,7 +19,7 @@ This document is part of a  series, and we recommend you follow it in sequence. 
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
 git checkout 02_make_your_charm_configurable
-git checkout -b 03_integrate_with_psql 
+git checkout -b 03_integrate_with_psql
 ```
 
 ````
@@ -109,7 +109,7 @@ and not
 from lib.charms.data_platform_libs...
 ```
 
-The former is not resolvable by default but everything works fine when the charm is deployed. Why? Because the `dispatch` script in the packed charm sets the `PYTHONPATH` environment variable to include the `lib` directory when it executes your `src/charm.py` code. This tells Python it can check the `lib` directory when looking for modules and packages at import time. 
+The former is not resolvable by default but everything works fine when the charm is deployed. Why? Because the `dispatch` script in the packed charm sets the `PYTHONPATH` environment variable to include the `lib` directory when it executes your `src/charm.py` code. This tells Python it can check the `lib` directory when looking for modules and packages at import time.
 
 If you're experiencing issues with your IDE or just trying to run the `charm.py` file on your own, make sure to set/update `PYTHONPATH` to include `lib` directory as well.
 
@@ -125,7 +125,7 @@ export PYTHONPATH=lib:$PYTHONPATH
 ### Add relation event observers
 
 Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
-  
+
 
 ```python
 # The 'relation_name' comes from the 'charmcraft.yaml file'.
@@ -181,11 +181,12 @@ Our application consumes database authentication information in the form of envi
 @property
 def _pebble_layer(self) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
+    config = self.load_config(FastAPIConfig)
     command = ' '.join([
         'uvicorn',
         'api_demo_server.app:app',
         '--host=0.0.0.0',
-        f'--port={self.config["server-port"]}',
+        f'--port={config.server_port}',
     ])
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
@@ -242,7 +243,7 @@ def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
 
 The diagram below illustrates the workflow for the case where the database relation exists and for the case where it does not:
 
-![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png) 
+![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png)
 
 ## Update the unit status to reflect the relation state
 
@@ -261,9 +262,10 @@ And define a method that does the various checks, adding appropriate statuses. T
 
 ```python
 def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-    port = self.config['server-port']
-    if port == 22:
-        event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
+    try:
+        self.load_config(FastAPIConfig)
+    except ValueError as e:
+        event.add_status(ops.BlockedStatus(str(e)))
     if not self.model.get_relation('database'):
         # We need the user to do 'juju integrate'.
         event.add_status(ops.BlockedStatus('Waiting for database relation'))
@@ -281,23 +283,18 @@ def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     event.add_status(ops.ActiveStatus())
 ```
 
-We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). In `_on_config_changed`, change the port 22 check to:
+We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). In `_update_layer_and_restart`, remove the lines:
 
 ```python
-    if port == 22:
-        # The collect-status handler will set the status to blocked.
-        logger.debug('Invalid port number: 22 is reserved for SSH')
-        return
-```
-
-And remove the following lines from `_update_layer_and_restart`:
-
-```python
-    self.unit.status = ops.ActiveStatus()
+self.unit.status = ops.ActiveStatus()
 ```
 
 ```python
-    self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+```
+
+```python
+self.unit.status = ops.BlockedStatus(str(e))
 ```
 
 ## Validate your charm
@@ -341,20 +338,20 @@ Model        Controller           Cloud/Region        Version  SLA          Time
 charm-model  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm  0.0.9    active      1  demo-api-charm             1  10.152.183.233  no       
+demo-api-charm  0.0.9    active      1  demo-api-charm             1  10.152.183.233  no
 postgresql-k8s           active      1  postgresql-k8s  14/stable      29  10.152.183.195  no       Primary
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.90         
+demo-api-charm/0*  active    idle   10.1.157.90
 postgresql-k8s/0*  active    idle   10.1.157.92         Primary
 
 Relation provider              Requirer                       Interface          Type     Message
-postgresql-k8s:database        demo-api-charm:database        postgresql_client  regular  
-postgresql-k8s:database-peers  postgresql-k8s:database-peers  postgresql_peers   peer     
-postgresql-k8s:restart         postgresql-k8s:restart         rolling_op         peer 
+postgresql-k8s:database        demo-api-charm:database        postgresql_client  regular
+postgresql-k8s:database-peers  postgresql-k8s:database-peers  postgresql_peers   peer
+postgresql-k8s:restart         postgresql-k8s:restart         rolling_op         peer
 ```
 
-The relation appears to be up and running, but we should also test that it's working as intended. First, let's try to write something to the database by posting some name to the database via API using `curl` as below -- where `10.1.157.90` is a pod IP and `8000` is our app port. You can repeat the command for multiple names. 
+The relation appears to be up and running, but we should also test that it's working as intended. First, let's try to write something to the database by posting some name to the database via API using `curl` as below -- where `10.1.157.90` is a pod IP and `8000` is our app port. You can repeat the command for multiple names.
 
 ```text
 curl -X 'POST' \
@@ -519,7 +516,7 @@ When it's done, the output should show two passing tests:
 ...
   demo-api-charm/0 [idle] waiting: Waiting for database relation
 INFO     juju.model:model.py:2759 Waiting for model:
-  demo-api-charm/0 [idle] active: 
+  demo-api-charm/0 [idle] active:
 PASSED
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 INFO     pytest_operator.plugin:plugin.py:783 Model status:
@@ -528,12 +525,12 @@ Model            Controller       Cloud/Region        Version  SLA          Time
 test-charm-2ara  main-controller  microk8s/localhost  3.1.5    unsupported  09:45:56+02:00
 
 App             Version  Status  Scale  Charm           Channel    Rev  Address        Exposed  Message
-demo-api-charm  1.0.1    active      1  demo-api-charm               0  10.152.183.99  no       
-postgresql-k8s  14.7     active      1  postgresql-k8s  14/stable   73  10.152.183.50  no       
+demo-api-charm  1.0.1    active      1  demo-api-charm               0  10.152.183.99  no
+postgresql-k8s  14.7     active      1  postgresql-k8s  14/stable   73  10.152.183.50  no
 
 Unit               Workload  Agent  Address       Ports  Message
-demo-api-charm/0*  active    idle   10.1.208.77          
-postgresql-k8s/0*  active    idle   10.1.208.107         
+demo-api-charm/0*  active    idle   10.1.208.77
+postgresql-k8s/0*  active    idle   10.1.208.107
 
 INFO     pytest_operator.plugin:plugin.py:789 Juju error logs:
 
