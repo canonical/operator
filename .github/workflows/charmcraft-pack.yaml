@@ -10,23 +10,16 @@ permissions: {}
 
 jobs:
   charmcraft-pack:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  # Not ubuntu-latest?
 
-    strategy:
-      matrix:
-        include: []
-#          - charm-repo: jnsgruk/hello-kubecon
-#            commit: eb3225860cc7db0e071d0ea6cd4a01b47e66b1e5  # 2025-03-27T12:05:21Z
     steps:
-      - name: Checkout test charm repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          repository: ${{ matrix.charm-repo }}
           persist-credentials: false
-          ref: ${{ matrix.commit }}
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          cd examples/httpbin-demo
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           if [ -z "$CLONE_SHA" ]
           then
