@@ -3,7 +3,7 @@
 
 > <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Observe your charm with COS Lite </small>
 >
-> **See previous: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`** 
+> **See previous: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`**
 
 
 ````{important}
@@ -23,7 +23,7 @@ In a production deployment it is essential to observe and monitor the health of 
 
 Our application is prepared for that -- as you might recall, it uses [`starlette-exporter`](https://pypi.org/project/starlette-exporter/) to generate real-time application metrics and to expose them via a `/metrics` endpoint that is designed to be scraped by [Prometheus](https://prometheus.io/). As a charm developer, you'll want to use that to make your charm observable.
 
-In the charming universe, what you would do is deploy the existing [Canonical Observability Stack (COS) lite bundle](https://charmhub.io/cos-lite) -- a convenient collection of charms that includes all of [Prometheus](https://charmhub.io/prometheus-k8s), [Loki](https://charmhub.io/loki-k8s), and [Grafana](https://charmhub.io/grafana-k8s) -- and then integrate your charm with Prometheus to collect real-time application metrics; with Loki to collect application logs; and with Grafana to create dashboards and visualise collected data. 
+In the charming universe, what you would do is deploy the existing [Canonical Observability Stack (COS) lite bundle](https://charmhub.io/cos-lite) -- a convenient collection of charms that includes all of [Prometheus](https://charmhub.io/prometheus-k8s), [Loki](https://charmhub.io/loki-k8s), and [Grafana](https://charmhub.io/grafana-k8s) -- and then integrate your charm with Prometheus to collect real-time application metrics; with Loki to collect application logs; and with Grafana to create dashboards and visualise collected data.
 
 In this part of the tutorial we will follow this process to collect various metrics and logs about your application and visualise them on a dashboard.
 
@@ -104,16 +104,21 @@ First, at the top of the file, import the `prometheus_scrape` library:
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 ```
 
-Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated. 
+Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated.
 
 ```python
 # Provide a metrics endpoint for Prometheus to scrape.
-self._prometheus_scraping = MetricsEndpointProvider(
-    self,
-    relation_name='metrics-endpoint',
-    jobs=[{'static_configs': [{'targets': [f'*:{self.config["server-port"]}']}]}],
-    refresh_event=self.on.config_changed,
-)
+try:
+    config = self.load_config(FastAPIConfig)
+except ValueError as e:
+    logger.warning('Unable to add metrics: invalid configuration: %s', e)
+else:
+    self._prometheus_scraping = MetricsEndpointProvider(
+        self,
+        relation_name='metrics-endpoint',
+        jobs=[{'static_configs': [{'targets': [f'*:{config.server_port}']}]}],
+        refresh_event=self.on.config_changed,
+    )
 ```
 
 Congratulations, your charm is ready to be integrated with Prometheus!
@@ -199,12 +204,12 @@ We probably shouldn't link to a file on Discourse any more. Do we want to have t
 
 -->
 
-Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:  
+Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
 [FastAPI-Monitoring.json.tmpl|attachment](https://github.com/canonical/juju-sdk-tutorial-k8s/raw/refs/heads/05_cos_integration/src/grafana_dashboards/FastAPI-Monitoring.json.tmpl). Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
 
 ```{important}
 
-**How to build a Grafana dashboard is beyond the scope of this tutorial. However, if you'd like to get a quick idea:** The dashboard template file was created by manually building a Grafana dashboard using the Grafana web UI, then exporting it to a JSON file and updating the `datasource` `uid` for Prometheus and Loki from constant values to the dynamic variables `"${prometheusds}"` and `"${lokids}"`, respectively. 
+**How to build a Grafana dashboard is beyond the scope of this tutorial. However, if you'd like to get a quick idea:** The dashboard template file was created by manually building a Grafana dashboard using the Grafana web UI, then exporting it to a JSON file and updating the `datasource` `uid` for Prometheus and Loki from constant values to the dynamic variables `"${prometheusds}"` and `"${lokids}"`, respectively.
 
 ```
 
@@ -236,7 +241,7 @@ juju refresh \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
-Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below. 
+Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
 
 ### Deploy COS Lite
 
@@ -254,7 +259,7 @@ juju deploy cos-lite --trust
 
 ### Expose the application relation endpoints
 
-Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the relation points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below. 
+Once all the COS Lite applications are deployed and settled down (you can monitor this by using `juju status --watch 2s`),  expose the relation points you are interested in for your charm -- `loki:logging`, `grafana-dashboard`, and `metrics-endpoint` -- as below.
 
 ```text
 juju offer prometheus:metrics-endpoint
@@ -277,7 +282,7 @@ tutorial-controller  admin/cos-lite.prometheus  admin   prometheus_scrape:metric
 tutorial-controller  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
-As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `charm-model` model. 
+As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `charm-model` model.
 
 ## Integrate your charm with COS Lite
 
@@ -295,7 +300,7 @@ juju integrate demo-api-charm admin/cos-lite.prometheus
 ```{important}
 
 The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes (MicroK8s) network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
-``` 
+```
 
 First, run:
 
@@ -310,12 +315,12 @@ Model     Controller            Cloud/Region        Version  SLA          Timest
 cos-lite  tutorial-controller  microk8s/localhost  3.0.0    unsupported  18:05:07+01:00
 
 App           Version  Status   Scale  Charm             Channel  Rev  Address         Exposed  Message
-alertmanager  0.23.0   active       1  alertmanager-k8s  stable    36  10.152.183.70   no       
-catalogue              active       1  catalogue-k8s     stable     4  10.152.183.19   no       
-grafana       9.2.1    active       1  grafana-k8s       stable    52  10.152.183.132  no       
-loki          2.4.1    active       1  loki-k8s          stable    47  10.152.183.207  no       
-prometheus    2.33.5   active       1  prometheus-k8s    stable    79  10.152.183.196  no       
-traefik                active       1  traefik-k8s       stable    93  10.152.183.83   no  
+alertmanager  0.23.0   active       1  alertmanager-k8s  stable    36  10.152.183.70   no
+catalogue              active       1  catalogue-k8s     stable     4  10.152.183.19   no
+grafana       9.2.1    active       1  grafana-k8s       stable    52  10.152.183.132  no
+loki          2.4.1    active       1  loki-k8s          stable    47  10.152.183.207  no
+prometheus    2.33.5   active       1  prometheus-k8s    stable    79  10.152.183.196  no
+traefik                active       1  traefik-k8s       stable    93  10.152.183.83   no
 ```
 
 From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
@@ -328,8 +333,8 @@ Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps repre
 Now open a terminal on your host machine and run:
 
 ```text
-multipass info charm-dev 
-``` 
+multipass info charm-dev
+```
 
 This should result in an output similar to the one below:
 
@@ -361,7 +366,7 @@ sudo ip route add 10.152.183.0/24 via 10.112.13.157
 
 In a terminal inside your VM, do all of the following:
 
-First, run `juju status` again to retrieve the IP address of your Grafana service.  For us it is `http://10.152.183.132:3000` (see the output above). 
+First, run `juju status` again to retrieve the IP address of your Grafana service.  For us it is `http://10.152.183.132:3000` (see the output above).
 
 Now, use `juju run` to retrieve your Grafana password, as shown below.
 
@@ -375,7 +380,7 @@ Now, on your host machine, open a web browser, enter the Grafana IP address, and
 
 In your Grafana web page, do all of the following:
 
-Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm. 
+Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm.
 
 <!--
 Open following URL (replace to your IP address):
@@ -401,7 +406,7 @@ curl 10.1.157.94:8000/error
 
 where `10.1.157.94` is the IP of our application unit (pod).
 
-<!--Now, generate some data that you can then visualise on the dashboard. Let's call a couple of API endpoints on our application. 
+<!--Now, generate some data that you can then visualise on the dashboard. Let's call a couple of API endpoints on our application.
 -->
 
 In a while you should see the following data appearing on the dashboard:
@@ -414,7 +419,7 @@ In a while you should see the following data appearing on the dashboard:
 
 ```{important}
 
-If you are interested in the Prometheus metrics produced by your application that were used to build these dashboards you can run following command in your VM: `curl <your app pod IP>:8000/metrics`  
+If you are interested in the Prometheus metrics produced by your application that were used to build these dashboards you can run following command in your VM: `curl <your app pod IP>:8000/metrics`
 Also, you can reach Prometheus in your web browser (similar to Grafana) at `http://<Prometheus pod IP>:9090/graph` .
 ```
 

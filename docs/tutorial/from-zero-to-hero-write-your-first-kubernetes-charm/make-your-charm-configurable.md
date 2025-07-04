@@ -3,7 +3,7 @@
 
 > <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Make your charm configurable</small>
 >
-> **See previous: {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`** 
+> **See previous: {ref}`Create a minimal Kubernetes charm <create-a-minimal-kubernetes-charm>`**
 
 ````{important}
 
@@ -13,22 +13,22 @@ This document is part of a  series, and we recommend you follow it in sequence. 
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
 git checkout 01_create_minimal_charm
-git checkout -b 02_make_your_charm_configurable 
+git checkout -b 02_make_your_charm_configurable
 ```
 
 ````
 
-A charm might have a specific configuration that the charm developer might want to expose to the charm user so that the latter can change specific settings during runtime. 
+A charm might have a specific configuration that the charm developer might want to expose to the charm user so that the latter can change specific settings during runtime.
 
-As a charm developer, it is thus important to know how to make your charm configurable. 
+As a charm developer, it is thus important to know how to make your charm configurable.
 
-This can be done by defining a charm configuration in a file called `charmcraft.yaml` and then adding configuration event handlers ('hooks') in the `src/charm.py` file. 
+This can be done by defining a charm configuration in a file called `charmcraft.yaml` and then adding configuration event handlers ('hooks') in the `src/charm.py` file.
 
 In this part of the tutorial you will update your charm to make it possible for a charm user to change the port on which the workload application is available.
 
 ## Define the configuration options
 
-To begin with, let's define the options that will be available for configuration. 
+To begin with, let's define the options that will be available for configuration.
 
 In the `charmcraft.yaml` file you created earlier, define a configuration option, as below. The name of your configurable option is going to be `server-port`.  The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
 
@@ -41,6 +41,31 @@ config:
       type: int
 ```
 
+## Define a configuration class
+
+Open your `src/charm.py` file, and add a configuration class that matches the configuration you added in `charmcraft.yaml`:
+
+```python
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class FastAPIConfig:
+    """Configuration for the FastAPI demo charm.
+
+    Note that this configuration is also defined in charmcraft.yaml
+    """
+
+    server_port: int = 8000
+    """Default port on which FastAPI is available."""
+
+    def __post_init__(self):
+        """Validate the configuration."""
+        if self.server_port == 22:
+            raise ValueError('Invalid port number, 22 is reserved for SSH')
+```
+
+You will also need to add `import dataclasses` in the imports at the top of the file.
+
+Now that we have defined the configuration with a Python class, IDEs will use it to provide hints when we are accessing the configuration, and static type checkers are able to validate that we are using the config options correctly.
+
 ## Define the configuration event handlers
 
 Open your `src/charm.py` file.
@@ -51,23 +76,16 @@ In the `__init__` function, add an observer for the `config_changed` event and p
 framework.observe(self.on.config_changed, self._on_config_changed)
 ```
 
-Now, define the handler, as below. First, read the `self.config` attribute to get the new value of the setting. Then, validate that this value is allowed (or block the charm otherwise). Next, let's log the value to the logger. Finally, since configuring something like a port affects the way we call our workload application, we also need to update our Pebble configuration, which we will do via a newly created method `_update_layer_and_restart` that we will define shortly.
+Now, define the handler, as below. Since configuring something like a port affects the way we call our workload application, we need to update our Pebble configuration, which we will do via a newly created method `_update_layer_and_restart` that we will define shortly.
 
 ```python
-def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-    port = self.config['server-port']  # See charmcraft.yaml
-
-    if port == 22:
-        self.unit.status = ops.BlockedStatus('Invalid port number, 22 is reserved for SSH')
-        return
-
-    logger.debug('New application port is requested: %s', port)
+def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
     self._update_layer_and_restart()
 ```
 
 ```{caution}
 
-A charm does not know which configuration option has been changed. Thus, make sure to validate all the values. This is especially important since multiple values can be changed in one call.
+A charm does not know which configuration option has been changed. Thus, make sure to validate all the values. This is especially important since multiple values can be changed in one call. Using a config class simplifies this, as all validation should be done when the config object is created.
 ```
 
 In the `__init__` function, add a new attribute to define a container object for your workload:
@@ -104,26 +122,48 @@ def _update_layer_and_restart(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
         self.unit.status = ops.ActiveStatus()
+    except ValueError as e:
+        logger.error('Configuration error: %s', e)
+        self.unit.status = ops.BlockedStatus(str(e))
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info('Unable to connect to Pebble: %s', e)
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
-Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={self.config['server-port']}"`.
+When the config is loaded as part of creating the Pebble layer, if it is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the issue and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+
+Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={config.server_port}"`.
 
 ```python
-command = ' '.join([
-    'uvicorn',
-    'api_demo_server.app:app',
-    '--host=0.0.0.0',
-    f'--port={self.config["server-port"]}',
-])
+@property
+def _pebble_layer(self) -> ops.pebble.Layer:
+    config = self.load_config(FastAPIConfig)
+    """A Pebble layer for the FastAPI demo services."""
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        f'--port={config.server_port}',
+    ])
+    pebble_layer: ops.pebble.LayerDict = {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
+            self.pebble_service_name: {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
+            }
+        },
+    }
+    return ops.pebble.Layer(pebble_layer)
 ```
 
 As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
 
 ```python
-def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
+def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
     self._update_layer_and_restart()
 ```
 
@@ -156,7 +196,7 @@ Now, let's validate that the app is actually running and reachable on the new po
 ```text
 curl 10.1.157.74:5000/version
 ```
- 
+
 You should see JSON string with the version of the application: `{"version":"1.0.0"}`
 
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
@@ -166,7 +206,7 @@ juju config demo-api-charm server-port=22
 juju status
 ```
 
-As expected, the application is indeed in the `blocked` state: 
+As expected, the application is indeed in the `blocked` state:
 
 ```text
 Model        Controller           Cloud/Region        Version  SLA          Timestamp

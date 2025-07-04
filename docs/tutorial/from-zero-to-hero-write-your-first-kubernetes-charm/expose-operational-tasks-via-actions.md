@@ -13,12 +13,12 @@ This document is part of a  series, and we recommend you follow it in sequence. 
 git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
 cd juju-sdk-tutorial-k8s
 git checkout 03_integrate_with_psql
-git checkout -b  04_create_actions 
+git checkout -b  04_create_actions
 ```
 
 ````
 
-A charm should ideally cover all the complex operational logic within the code, to help avoid the need for manual human intervention. 
+A charm should ideally cover all the complex operational logic within the code, to help avoid the need for manual human intervention.
 
 Unfortunately, that is not always possible. As a charm developer, it is thus useful to know that you can also expose charm operational tasks to the charm user by defining special methods called `actions`.
 
@@ -40,6 +40,22 @@ actions:
         type: boolean
         default: False
 ```
+
+## Define an action class
+
+Open your `src/charm.py` file, and add an action class that matches the definition you used in `charmcraft.yaml`:
+
+```python
+# Note that this action is also defined in charmcraft.yaml
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class GetDbInfoAction:
+    """Fetches database authentication information."""
+
+    show_password: bool
+    """Show username and password in output information."""
+```
+
+Now that we have defined the action with a Python class, IDEs will use it to provide hints when we are accessing the action parameters, and static type checkers are able to validate that we are using the parameters correctly.
 
 ## Define the action event handlers
 
@@ -69,7 +85,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     Learn more about actions at https://ops.readthedocs.io/en/latest/howto/manage-actions.html
     """
-    show_password = event.params['show-password']  # see charmcraft.yaml
+    params = event.load_params(GetDbInfoAction, errors='fail')
     db_data = self.fetch_postgres_relation_data()
     if not db_data:
         event.fail('No database connected')
@@ -99,7 +115,7 @@ juju refresh \
 ```
 
 Next, test that the basic action invocation works:
- 
+
 ```text
 juju run demo-api-charm/0 get-db-info
 ```
