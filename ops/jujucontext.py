@@ -32,19 +32,21 @@ class _JujuContext:
     Only a subset of the above source, because these are what are used in ops.
     """
 
-    action_name: str | None
+    action_name: str | None = None
     """The action's name.
 
     For example 'backup' (from JUJU_ACTION_NAME).
     """
 
-    action_uuid: str | None
+    action_uuid: str | None = None
     """The action's uuid.
 
     For example '1' (from JUJU_ACTION_UUID).
     """
 
-    charm_dir: Path
+    charm_dir: Path = dataclasses.field(
+        default_factory=lambda: Path(f'{__file__}/../../..').resolve()
+    )
     """The root directory of the charm where it is running.
 
     For example '/var/lib/juju/agents/unit-bare-0/charm' (from JUJU_CHARM_DIR).
@@ -53,129 +55,129 @@ class _JujuContext:
     default (assuming the '$JUJU_CHARM_DIR/lib/op/main.py' structure).
     """
 
-    debug: bool
+    debug: bool = False
     """Debug mode.
 
     If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
     """
 
-    debug_at: set[str]
+    debug_at: set[str] = dataclasses.field(default_factory=set)  # pyright: ignore[reportUnknownVariableType]
     """Where you want to stop when debugging.
 
     For example 'all' (from JUJU_DEBUG_AT).
     """
 
-    dispatch_path: str
+    dispatch_path: str = ''
     """The dispatch path in the format of 'actions/do-something'.
 
     For example 'hooks/workload-pebble-ready' (from JUJU_DISPATCH_PATH).
     """
 
-    model_name: str
+    model_name: str = ''
     """The name of the model.
 
     For example 'foo' (from JUJU_MODEL_NAME).
     """
 
-    model_uuid: str
+    model_uuid: str = ''
     """The uuid of the model.
 
     For example 'cdac5656-2423-4388-8f30-41854b4cca7d' (from JUJU_MODEL_UUID).
     """
 
-    notice_id: str | None
+    notice_id: str | None = None
     """The ID of the notice.
 
     For example '1', (from JUJU_NOTICE_ID).
     """
 
-    notice_key: str | None
+    notice_key: str | None = None
     """The key of the notice.
 
     For example 'example.com/a', (from JUJU_NOTICE_KEY).
     """
 
-    notice_type: str | None
+    notice_type: str | None = None
     """The type of the notice.
 
     For example 'custom' (from JUJU_NOTICE_TYPE).
     """
 
-    pebble_check_name: str | None
+    pebble_check_name: str | None = None
     """The name of the pebble check.
 
     For example 'http-check' (from JUJU_PEBBLE_CHECK_NAME).
     """
 
-    relation_departing_unit_name: str | None
+    relation_departing_unit_name: str | None = None
     """The unit that is departing a relation.
 
     For example 'remote/42' (from JUJU_DEPARTING_UNIT).
     """
 
-    relation_name: str | None
+    relation_name: str | None = None
     """The name of the relation.
 
     For example 'database' (from JUJU_RELATION).
     """
 
-    relation_id: int | None
+    relation_id: int | None = None
     """The id of the relation.
 
     For example 1 (integer) if the original environment variable's value is 'database:1'
     (from JUJU_RELATION_ID).
     """
 
-    remote_app_name: str | None
+    remote_app_name: str | None = None
     """The name of the remote app.
 
     For example 'remoteapp1' (from JUJU_REMOTE_APP).
     """
 
-    remote_unit_name: str | None
+    remote_unit_name: str | None = None
     """The name of the remote unit.
 
     For example 'remoteapp1/0' (from JUJU_REMOTE_UNIT).
     """
 
-    secret_id: str | None
+    secret_id: str | None = None
     """The ID of the secret.
 
     For example 'secret:dcc7aa9c-7202-4da6-8d5f-0fbbaa4e1a41' (from JUJU_SECRET_ID).
     """
 
-    secret_label: str | None
+    secret_label: str | None = None
     """The label of the secret.
 
     For example 'db-password' (from JUJU_SECRET_LABEL).
     """
 
-    secret_revision: int | None
+    secret_revision: int | None = None
     """The revision of the secret.
 
     For example 42 (integer) (from JUJU_SECRET_REVISION).
     """
 
-    storage_name: str | None
+    storage_name: str | None = None
     """The storage name.
 
     For example 'my-storage' if the original environment variable's value is 'my-storage/1'
     (from JUJU_STORAGE_ID).
     """
 
-    unit_name: str
+    unit_name: str = ''
     """The name of the unit.
 
     For example 'myapp/0' (from JUJU_UNIT_NAME).
     """
 
-    version: JujuVersion
+    version: JujuVersion = dataclasses.field(default_factory=lambda: JujuVersion('0.0.0'))
     """The version of Juju.
 
     For example '3.4.0' (from JUJU_VERSION).
     """
 
-    workload_name: str | None
+    workload_name: str | None = None
     """The name of the workload.
 
     For example 'workload' (from JUJU_WORKLOAD_NAME).
