@@ -6,8 +6,9 @@ from tempfile import TemporaryDirectory
 import pytest
 
 import ops
+from ops._main import _Abort
 
-from scenario import Context
+from scenario import Context, ActiveStatus
 from scenario.state import Relation, State, _CharmSpec, _Event
 from scenario._runtime import Runtime, UncaughtCharmError
 
@@ -134,3 +135,27 @@ def test_juju_version_is_set_in_environ():
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, juju_version=version)
     ctx.run(ctx.on.start(), State())
+
+
+@pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
+def test_ops_raises_abort(exit_code: int):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: ops.StartEvent):
+            self.unit.status = ops.ActiveStatus()
+            # Charms can't actually do this (_Abort is private), but this is
+            # simpler than causing the framework to raise it.
+            raise _Abort(exit_code)
+
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    if exit_code == 0:
+        state_out = ctx.run(ctx.on.start(), State())
+        assert {e.handle.kind for e in ctx.emitted_events} == {'start'}
+        assert state_out.unit_status == ActiveStatus()
+    else:
+        with pytest.raises(_Abort) as exc:
+            ctx.run(ctx.on.start(), State())
+        assert exc.value.exit_code == exit_code
