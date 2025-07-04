@@ -17,8 +17,9 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeAlias
 
 from .jujuversion import JujuVersion
 
@@ -61,7 +62,7 @@ class _JujuContext:
     If true, write logs to stderr as well as to juju-log (from JUJU_DEBUG).
     """
 
-    debug_at: set[str] = dataclasses.field(default_factory=set)
+    debug_at: set[str] = dataclasses.field(default_factory=set[str])
     """Where you want to stop when debugging.
 
     For example 'all' (from JUJU_DEBUG_AT).
@@ -185,51 +186,77 @@ class _JujuContext:
 
     @classmethod
     def from_dict(cls, env: Mapping[str, Any]) -> _JujuContext:
-        return _JujuContext(
-            action_name=env.get('JUJU_ACTION_NAME') or None,
-            action_uuid=env.get('JUJU_ACTION_UUID') or None,
-            charm_dir=(
-                Path(env['JUJU_CHARM_DIR']).resolve()
-                if env.get('JUJU_CHARM_DIR')
-                else Path(f'{__file__}/../../..').resolve()
-            ),
-            debug='JUJU_DEBUG' in env,
-            debug_at=(
-                {x.strip() for x in env['JUJU_DEBUG_AT'].split(',')}
-                if env.get('JUJU_DEBUG_AT')
-                else set()
-            ),
-            dispatch_path=env.get('JUJU_DISPATCH_PATH', ''),
-            model_name=env.get('JUJU_MODEL_NAME', ''),
-            model_uuid=env.get('JUJU_MODEL_UUID', ''),
-            notice_id=env.get('JUJU_NOTICE_ID') or None,
-            notice_key=env.get('JUJU_NOTICE_KEY') or None,
-            notice_type=env.get('JUJU_NOTICE_TYPE') or None,
-            pebble_check_name=env.get('JUJU_PEBBLE_CHECK_NAME') or None,
-            relation_departing_unit_name=env.get('JUJU_DEPARTING_UNIT') or None,
-            relation_name=env.get('JUJU_RELATION') or None,
-            relation_id=(
-                int(env['JUJU_RELATION_ID'].split(':')[-1])
-                if env.get('JUJU_RELATION_ID')
-                else None
-            ),
-            remote_app_name=env.get('JUJU_REMOTE_APP') or None,
-            remote_unit_name=env.get('JUJU_REMOTE_UNIT') or None,
-            secret_id=env.get('JUJU_SECRET_ID') or None,
-            secret_label=env.get('JUJU_SECRET_LABEL') or None,
-            secret_revision=(
-                int(env['JUJU_SECRET_REVISION']) if env.get('JUJU_SECRET_REVISION') else None
-            ),
-            storage_name=(
-                env.get('JUJU_STORAGE_ID', '').split('/')[0]
-                if env.get('JUJU_STORAGE_ID')
-                else None
-            ),
-            unit_name=env.get('JUJU_UNIT_NAME', ''),
-            # The meter-status-changed event, triggered by `juju set-meter-status`,
-            # does not set JUJU_VERSION, but all other events do. When we drop support
-            # for Juju 2 and Juju 3 we can change this to always expect JUJU_VERSION,
-            # as that event no longer exists in Juju 4.
-            version=JujuVersion(env.get('JUJU_VERSION', '0.0.0')),
-            workload_name=env.get('JUJU_WORKLOAD_NAME') or None,
-        )
+        kwargs: _JujuContextKwargs = {}
+        # Simple keys that copy the environment variable value without modification.
+        simple_keys: tuple[SimpleKeys, ...] = typing.get_args(SimpleKeys)
+        for key in simple_keys:
+            if val := env.get(f'JUJU_{key.upper()}'):
+                kwargs[key] = val
+        # Keys that do something a little fancier.
+        if juju_charm_dir := env.get('JUJU_CHARM_DIR'):
+            kwargs['charm_dir'] = Path(juju_charm_dir).resolve()
+        if 'JUJU_DEBUG' in env:
+            kwargs['debug'] = True
+        if juju_debug_at := env.get('JUJU_DEBUG_AT'):
+            kwargs['debug_at'] = {x.strip() for x in juju_debug_at.split(',')}
+        if juju_departing_unit := env.get('JUJU_DEPARTING_UNIT'):
+            kwargs['relation_departing_unit_name'] = juju_departing_unit
+        if juju_relation := env.get('JUJU_RELATION'):
+            kwargs['relation_name'] = juju_relation
+        if juju_relation_id := env.get('JUJU_RELATION_ID'):
+            kwargs['relation_id'] = int(juju_relation_id.split(':')[-1])
+        if juju_remote_app := env.get('JUJU_REMOTE_APP'):
+            kwargs['remote_app_name'] = juju_remote_app
+        if juju_remote_unit := env.get('JUJU_REMOTE_UNIT'):
+            kwargs['remote_unit_name'] = juju_remote_unit
+        if juju_secret_revision := env.get('JUJU_SECRET_REVISION'):
+            kwargs['secret_revision'] = int(juju_secret_revision)
+        if juju_storage_id := env.get('JUJU_STORAGE_ID'):
+            kwargs['storage_name'] = juju_storage_id.partition('/')[0]
+        if juju_version := env.get('JUJU_VERSION'):
+            kwargs['version'] = JujuVersion(juju_version)
+        return _JujuContext(**kwargs)
+
+
+class _JujuContextKwargs(typing.TypedDict, total=False):
+    action_name: str
+    action_uuid: str
+    charm_dir: Path
+    debug: bool
+    debug_at: set[str]
+    dispatch_path: str
+    model_name: str
+    model_uuid: str
+    notice_id: str
+    notice_key: str
+    notice_type: str
+    pebble_check_name: str
+    relation_departing_unit_name: str
+    relation_name: str
+    relation_id: int
+    remote_app_name: str
+    remote_unit_name: str
+    secret_id: str
+    secret_label: str
+    secret_revision: int
+    storage_name: str
+    unit_name: str
+    version: JujuVersion
+    workload_name: str
+
+
+SimpleKeys: TypeAlias = typing.Literal[
+    'action_name',
+    'action_uuid',
+    'dispatch_path',
+    'model_name',
+    'model_uuid',
+    'notice_id',
+    'notice_key',
+    'notice_type',
+    'pebble_check_name',
+    'secret_id',
+    'secret_label',
+    'unit_name',
+    'workload_name',
+]
