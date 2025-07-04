@@ -62,7 +62,7 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 ############################################################
 
 # Product name
-project = 'The ops library'
+project = 'Ops'
 author = 'Canonical Ltd.'
 
 # The title you want to display for the documentation in the sidebar.
