@@ -17,8 +17,9 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
 from pathlib import Path
-from typing import Any, Mapping, TypedDict
+from typing import Any, Mapping, TypeAlias
 
 from .jujuversion import JujuVersion
 
@@ -187,32 +188,10 @@ class _JujuContext:
     def from_dict(cls, env: Mapping[str, Any]) -> _JujuContext:
         kwargs: _JujuContextKwargs = {}
         # simple keys that copy the environment variable without modification
-        if juju_action_name := env.get('JUJU_ACTION_NAME'):
-            kwargs['action_name'] = juju_action_name
-        if juju_action_uuid := env.get('JUJU_ACTION_UUID'):
-            kwargs['action_uuid'] = juju_action_uuid
-        if juju_dispatch_path := env.get('JUJU_DISPATCH_PATH'):
-            kwargs['dispatch_path'] = juju_dispatch_path
-        if juju_model_name := env.get('JUJU_MODEL_NAME'):
-            kwargs['model_name'] = juju_model_name
-        if juju_model_uuid := env.get('JUJU_MODEL_UUID'):
-            kwargs['model_uuid'] = juju_model_uuid
-        if juju_notice_id := env.get('JUJU_NOTICE_ID'):
-            kwargs['notice_id'] = juju_notice_id
-        if juju_notice_key := env.get('JUJU_NOTICE_KEY'):
-            kwargs['notice_key'] = juju_notice_key
-        if juju_notice_type := env.get('JUJU_NOTICE_TYPE'):
-            kwargs['notice_type'] = juju_notice_type
-        if juju_pebble_check_name := env.get('JUJU_PEBBLE_CHECK_NAME'):
-            kwargs['pebble_check_name'] = juju_pebble_check_name
-        if juju_secret_id := env.get('JUJU_SECRET_ID'):
-            kwargs['secret_id'] = juju_secret_id
-        if juju_secret_label := env.get('JUJU_SECRET_LABEL'):
-            kwargs['secret_label'] = juju_secret_label
-        if juju_unit_name := env.get('JUJU_UNIT_NAME'):
-            kwargs['unit_name'] = juju_unit_name
-        if juju_workload_name := env.get('JUJU_WORKLOAD_NAME'):
-            kwargs['workload_name'] = juju_workload_name
+        simple_keys: tuple[SimpleKeys, ...] = typing.get_args(SimpleKeys)
+        for key in simple_keys:
+            if val := env.get(f'JUJU_{key.upper()}'):
+                kwargs[key] = val
         # keys that do something a little fancier
         if juju_charm_dir := env.get('JUJU_CHARM_DIR'):
             kwargs['charm_dir'] = Path(juju_charm_dir).resolve()
@@ -239,7 +218,7 @@ class _JujuContext:
         return _JujuContext(**kwargs)
 
 
-class _JujuContextKwargs(TypedDict, total=False):
+class _JujuContextKwargs(typing.TypedDict, total=False):
     action_name: str
     action_uuid: str
     charm_dir: Path
@@ -264,3 +243,20 @@ class _JujuContextKwargs(TypedDict, total=False):
     unit_name: str
     version: JujuVersion
     workload_name: str
+
+
+SimpleKeys: TypeAlias = typing.Literal[
+    'action_name',
+    'action_uuid',
+    'dispatch_path',
+    'model_name',
+    'model_uuid',
+    'notice_id',
+    'notice_key',
+    'notice_type',
+    'pebble_check_name',
+    'secret_id',
+    'secret_label',
+    'unit_name',
+    'workload_name',
+]
