@@ -20,3 +20,17 @@ This directory contains charms that you can pack and deploy locally, to help lea
     charmcraft pack
     juju deploy ./httpbin-demo_ubuntu-22.04-amd64.charm --resource httpbin-image=kennethreitz/httpbin
     ```
+
+- **[gosherve-demo](gosherve-demo)** - A Kubernetes charm for [jnsgruk/gosherve](https://github.com/jnsgruk/gosherve) that illustrates the use of charm workloads, actions, config, storage and relations. To try the charm:
+
+    ```
+    charmcraft fetch-libs
+    charmcraft pack
+    juju deploy ./gosherve-demo_ubuntu-24.04-amd64.charm --resource gosherve-image=jnsgruk/gosherve:latest
+    juju deploy traefik-k8s --trust
+    juju config traefik-k8s external_hostname=juju.local
+    juju config traefik-k8s routing_mode=subdomain
+    juju relate hello-kubecon traefik-k8s
+    juju status
+    echo "<traefik-k8s-address> dev-hello-kubecon.juju.local" | sudo tee -a /etc/hosts
+    ```
