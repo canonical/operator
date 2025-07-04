@@ -39,7 +39,7 @@ jobs:
         run: sudo snap install yq
 
       - name: Add 'git' as a build package 
-      - run: |
+        run: |
           cd examples/httpbin-demo
           if yq 'has("parts")' charmcraft.yaml; then
             echo "'parts' already exists in charmcraft.yaml"
