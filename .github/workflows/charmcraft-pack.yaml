@@ -44,4 +44,6 @@ jobs:
         run: sudo snap install charmcraft --classic
 
       - name: Pack the charm
-        run: sudo charmcraft pack --verbose
+        run: |
+          cd examples/httpbin-demo
+          sudo charmcraft pack --verbose
