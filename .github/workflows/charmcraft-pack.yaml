@@ -36,7 +36,7 @@ jobs:
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Install yq
-        run: sudo snap install yq
+        run: snap install yq
 
       - name: Add 'git' as a build package 
         run: |
@@ -59,4 +59,4 @@ jobs:
       - name: Pack the charm
         run: |
           cd examples/httpbin-demo
-          sudo charmcraft pack --verbose
+          charmcraft pack --verbose
