@@ -135,7 +135,7 @@ def _update_layer_and_restart(self) -> None:
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
 
-Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={port}"`, using the port passed to the method.
+Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
 ```python
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
