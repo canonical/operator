@@ -41,11 +41,11 @@ jobs:
       - name: Add 'git' as a build package 
         run: |
           cd examples/httpbin-demo
-          if yq -e 'has("parts")' charmcraft.yaml; then
+          if yq --exit-status 'has("parts")' charmcraft.yaml; then
             echo "'parts' already exists in charmcraft.yaml"
             exit 1
           fi
-          yq -i '.parts.charm.build-packages = ["git"]' charmcraft.yaml
+          yq --inplace '.parts.charm.build-packages = ["git"]' charmcraft.yaml
           cat charmcraft.yaml
 
       - name: Set up LXD
