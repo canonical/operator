@@ -10,27 +10,27 @@ Assuming you are familiar with Juju, you will know that to start using a charm y
 -->
 
 <!--
-If you are familiar with  Juju, as we assume here, you'll know that, to start using a charm, you run `juju deploy`, and also that, when you do that on a Kubernetes-type cloud, this triggers all of the following: 
+If you are familiar with  Juju, as we assume here, you'll know that, to start using a charm, you run `juju deploy`, and also that, when you do that on a Kubernetes-type cloud, this triggers all of the following:
 -->
 
 As you already know from your knowledge of Juju, when you deploy a Kubernetes charm, the following things happen:
 
-1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`. 
-1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready. 
-1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble. 
-1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations. 
+1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`.
+1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
+1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble.
+1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations.
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
 <!--the container for the unit agent and the charm is named 'charm'-->
 <!--PIETRO'S ORIGINAL WORDING:
-1. Typically, at this point the charm will configure and start its workload (through pebble calls) and begin operations. 
+1. Typically, at this point the charm will configure and start its workload (through pebble calls) and begin operations.
 -->
 
 <!--Pebble is a lightweight, API-driven process supervisor designed to give workload containers something akin to an `init` system that will allow the charm container to interact with it. -->
 <!--The charm already knows how to contact Pebble (because the information can be predicted from the container name).
 <!--
-Conceptually, a charm is code that instructs Juju to deploy and manage an application in the cloud. For every Kubernetes charm Juju will deploy a pod with two containers, one for the Juju agent and the charm code and one for the application workload. The communication between these containers, and the orchestration of the local service processes for the workload application, both happen via Pebble, a lightweight API-driven process supervisor. For a visual representation of the deployment see the picture below. 
+Conceptually, a charm is code that instructs Juju to deploy and manage an application in the cloud. For every Kubernetes charm Juju will deploy a pod with two containers, one for the Juju agent and the charm code and one for the application workload. The communication between these containers, and the orchestration of the local service processes for the workload application, both happen via Pebble, a lightweight API-driven process supervisor. For a visual representation of the deployment see the picture below.
 -->
 
 All  subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
@@ -41,7 +41,7 @@ All  subsequent workload management happens in the same way -- the Juju controll
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
 
- - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and 
+ - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
 - executable files (like the `src/charm.py` file that we will see shortly) where you will use Ops-enriched Python to write all the logic of your charm.
 
 
@@ -77,7 +77,7 @@ Third, describe the workload container, as below. Below, `demo-server` is the na
 containers:
   demo-server:
     resource: demo-server-image
-``` 
+```
 
 
 Fourth, describe the workload container resources, as below. The name of the resource below, `demo-server-image`, is the one you defined above.
@@ -100,10 +100,10 @@ resources:
 ## Define the charm initialisation and application services
 
 <!--
-The recommended way to develop charms is by using a Python library called Ops (`ops`) (also known as the Charmed Operator Framework, as in 'the framework for building charmed operators'). 
+The recommended way to develop charms is by using a Python library called Ops (`ops`) (also known as the Charmed Operator Framework, as in 'the framework for building charmed operators').
 -->
 
-Create a file called `requirements.txt`. This is a  file that describes all the required external Python dependencies that will be used by your charm. 
+Create a file called `requirements.txt`. This is a  file that describes all the required external Python dependencies that will be used by your charm.
 
 
 In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
@@ -208,7 +208,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload
     # Add initial Pebble config layer using the Pebble API
-    container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
+    container.add_layer('fastapi_demo', self._get_pebble_layer(), combine=True)
     # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
     container.replan()
     # Learn more about statuses at
@@ -216,7 +216,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-The custom Pebble layer that you just added is defined in the  `self._pebble_layer` property. Update this property to match your application, as follows:
+The custom Pebble layer that you just added is defined in the  `self._get_pebble_layer()` method. Update this method to match your application, as follows:
 
 In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute :
 
@@ -224,11 +224,10 @@ In the `__init__` method of your charm class, name your service to `fastapi-serv
 self.pebble_service_name = 'fastapi-service'
 ```
 
-Finally, define  the `pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
+Finally, define  the `_get_pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
 
 ```python
-@property
-def _pebble_layer(self) -> ops.pebble.Layer:
+def _get_pebble_layer(self) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
     command = ' '.join([
         'uvicorn',
@@ -275,7 +274,7 @@ type: charm
 ```
 
 
-Also add the block below. This declares that your charm will build and run charm on Ubuntu 22.04. 
+Also add the block below. This declares that your charm will build and run charm on Ubuntu 22.04.
 
 ```
 bases:
@@ -321,7 +320,7 @@ If packing failed - perhaps you forgot to make the charm.py executable earlier -
 
 ```{important}
 
-**Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents. 
+**Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents.
 
 ```
 
@@ -365,19 +364,19 @@ Model        Controller           Cloud/Region        Version  SLA          Time
 welcome-k8s  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           active      1  demo-api-charm             1  10.152.183.215  no       
+demo-api-charm           active      1  demo-api-charm             1  10.152.183.215  no
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.73  
+demo-api-charm/0*  active    idle   10.1.157.73
 ```
 
-Now, validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.  
+Now, validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
 
 ```
 curl 10.1.157.73:8000/version
 ```
 
-You should see a JSON string with the version of the application: 
+You should see a JSON string with the version of the application:
 
 ```
 {"version":"1.0.0"}
@@ -534,12 +533,12 @@ def test_pebble_layer():
 In your Multipass Ubuntu VM shell, run your test:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e unit     
+ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
 ```
 
 The result should be similar to the following output:
 
-```text                                             
+```text
 unit: install_deps> python -I -m pip install 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/juju-sdk-tutorial-k8s/requirements.txt
 unit: commands[0]> coverage run --source=/home/ubuntu/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/juju-sdk-tutorial-k8s/tests/unit
 =================================================================== test session starts ===================================================================
@@ -709,6 +708,6 @@ INFO     pytest_operator.plugin:plugin.py:1025 Forgetting model main...
 For the full code see: [01_create_minimal_charm](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/01_create_minimal_charm)
 
 For a comparative view of the code before and after our edits see:
-[Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)  
+[Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)
 
 >**See next: {ref}`Make your charm configurable <make-your-charm-configurable>`**
