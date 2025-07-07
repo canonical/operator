@@ -29,7 +29,7 @@ The module includes:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+    on testing charms, see `Testing <https://ops.readthedocs.io/en/latest/explanation/testing.html>`_.
 """
 
 # ruff: noqa: F401 (unused import)
@@ -118,6 +118,7 @@ else:
             UnknownStatus,
             WaitingStatus,
             errors,
+            layer_from_rockcraft,
         )
 
         # This can be imported in the group above after Scenario exposes it at the top level.
@@ -166,6 +167,7 @@ else:
             'UnknownStatus',
             'WaitingStatus',
             'errors',
+            'layer_from_rockcraft',
         ])
 
         # Until Scenario uses the ops._private.harness.ActionFailed, we need to

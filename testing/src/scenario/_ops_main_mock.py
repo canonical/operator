@@ -127,14 +127,16 @@ class Ops(_Manager):
         self.context = context
         self.charm_spec = charm_spec
         self.store = None
+        self.trace_data = []
 
         try:
             import ops_tracing._mock  # break circular import
 
             self._tracing_mock = ops_tracing._mock.patch_tracing()
-            self._tracing_mock.__enter__()
+            self._tracing_exporter = self._tracing_mock.__enter__()
         except ImportError:
             self._tracing_mock = None
+            self._tracing_exporter = None
 
         model_backend = _MockModelBackend(
             state=state,
@@ -269,7 +271,10 @@ class Ops(_Manager):
         stored_state = self.store.get_stored_states()
         self.state = dataclasses.replace(self.state, deferred=deferred, stored_states=stored_state)
 
-    def _destroy(self):
-        super()._destroy()
+    def destroy(self):
+        # Must be run first, so that ops._main trace span is finished and can be read back.
+        super().destroy()
         if self._tracing_mock:
+            assert self._tracing_exporter
+            self.trace_data = self._tracing_exporter.get_finished_spans()
             self._tracing_mock.__exit__(None, None, None)

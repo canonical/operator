@@ -14,9 +14,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
+from opentelemetry.trace import get_tracer_provider
 
 import ops_tracing
 from ops_tracing import _backend
@@ -24,27 +25,24 @@ from ops_tracing._buffer import Destination
 
 
 def test_unset_destination(setup_tracing: None):
-    exporter = _backend.get_exporter()
-    assert exporter
+    assert _backend._exporter
     ops_tracing.set_destination(None, None)
-    assert exporter.buffer.load_destination() == Destination(None, None)
+    assert _backend._exporter.buffer.load_destination() == Destination(None, None)
 
 
 def test_set_destination(setup_tracing: None):
-    exporter = _backend.get_exporter()
-    assert exporter
+    assert _backend._exporter
     ops_tracing.set_destination('http://example.com', None)
-    assert exporter.buffer.load_destination() == Destination('http://example.com', None)
+    assert _backend._exporter.buffer.load_destination() == Destination('http://example.com', None)
 
 
 def test_set_destination_again(setup_tracing: None):
-    exporter = _backend.get_exporter()
-    assert exporter
+    assert _backend._exporter
 
     with patch.object(
-        exporter.buffer,
+        _backend._exporter.buffer,
         'save_destination',
-        wraps=exporter.buffer.save_destination,
+        wraps=_backend._exporter.buffer.save_destination,
     ) as mock_dst:
         ops_tracing.set_destination('http://example.com/foo', None)
         ops_tracing.set_destination('http://example.com/foo', None)
@@ -54,7 +52,25 @@ def test_set_destination_again(setup_tracing: None):
 
 @pytest.mark.parametrize('url', ['file:///etc/passwd', 'gopher://aaa'])
 def test_set_destination_invalid_url(setup_tracing: None, url: str):
-    exporter = _backend.get_exporter()
-    assert exporter
+    assert _backend._exporter
     with pytest.raises(ValueError):
         ops_tracing.set_destination(url, None)
+
+
+def test_juju_topology_labels(setup_tracing: None):
+    get_tracer_provider()
+    assert {**get_tracer_provider()._resource._attributes} == {  # type: ignore
+        'telemetry.sdk.language': 'python',
+        'telemetry.sdk.name': 'opentelemetry',
+        'telemetry.sdk.version': ANY,
+        'service.namespace': '4242',
+        'service.namespace.name': 'test-model',
+        'service.name': 'testapp',
+        'service.instance.id': '42',
+        'charm': 'testcharm',
+        'charm_type': 'DummyCharm',
+        'juju_model': 'test-model',
+        'juju_model_uuid': '4242',
+        'juju_application': 'testapp',
+        'juju_unit': 'testapp/42',
+    }

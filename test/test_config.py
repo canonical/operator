@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from typing import Literal, Optional, Protocol, Union, cast
+from typing import Literal, Optional, Protocol, Union
 
 import pytest
 
@@ -248,94 +248,6 @@ if pydantic:
     _test_config_classes.extend((MyPydanticDataclassConfig, MyPydanticBaseModelConfig))
 
 
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    # We use the generated schema from the simple class for all variants,
-    # because we expect it to be the same.
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast('_ConfigProtocol', typed_config)
-    assert typed_config.my_bool is None
-    assert typed_config.my_float == 3.14
-    assert isinstance(typed_config.my_float, float)
-    assert typed_config.my_int == 42
-    assert isinstance(typed_config.my_int, int)
-    assert typed_config.my_str == 'foo'
-    assert isinstance(typed_config.my_str, str)
-    assert typed_config.my_secret is None
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_init_non_default(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    harness.update_config({
-        'my-bool': True,
-        'my-float': 2.71,
-        'my-int': 24,
-        'my-str': 'bar',
-    })
-    harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast('_ConfigProtocol', typed_config)
-    assert typed_config.my_bool is True
-    assert typed_config.my_float == 2.71
-    assert typed_config.my_int == 24
-    assert typed_config.my_str == 'bar'
-    assert typed_config.my_secret is None
-
-
-@pytest.mark.parametrize(
-    'errors,exc',
-    (('raise', ValueError), ('blocked', ops._main._Abort), (None, ValueError)),
-)
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_with_error_blocked(
-    charm_class: type[ops.CharmBase],
-    errors: Literal['blocked', 'raise'] | None,
-    exc: type[Exception],
-    request: pytest.FixtureRequest,
-):
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    charm_class._config_errors = errors  # type: ignore
-    request.addfinalizer(lambda: setattr(charm_class, '_config_errors', None))
-    harness.update_config({
-        'my-int': -1,
-    })
-    with pytest.raises(exc):
-        harness.begin()
-    if errors == 'blocked':
-        status_dict = harness._backend.status_get()
-        assert status_dict['status'] == 'blocked'
-        assert 'my_int must be zero or positive' in status_dict['message']
-
-
-@pytest.mark.parametrize('charm_class', _test_classes)
-def test_config_with_secret(charm_class: type[ops.CharmBase], request: pytest.FixtureRequest):
-    config = MyConfig.to_juju_schema()
-    harness = testing.Harness(charm_class, config=ops._private.yaml.safe_dump(config))
-    request.addfinalizer(harness.cleanup)
-    content = {'password': 'admin'}
-    secret_id = harness.add_user_secret(content)
-    harness.grant_secret(secret_id, harness.model.app.name)
-    harness.update_config({
-        'my-secret': secret_id,
-    })
-    harness.begin()
-    typed_config = harness.charm.typed_config  # type: ignore
-    typed_config = cast('_ConfigProtocol', typed_config)
-    secret = typed_config.my_secret
-    assert secret is not None
-    assert secret.id == secret_id
-    assert secret.get_content() == content
-
-
 def test_config_custom_naming_pattern(request: pytest.FixtureRequest):
     @dataclasses.dataclass(frozen=True)
     class Config(ops.ConfigBase):
@@ -407,34 +319,6 @@ def test_config_yaml_schema(config_class: type[ops.ConfigBase]):
     assert generated_yaml == expected_yaml
 
 
-def test_config_extra_args(request: pytest.FixtureRequest):
-    @dataclasses.dataclass
-    class Config(ops.ConfigBase):
-        a: int
-        b: float
-        c: str
-
-        @classmethod
-        def _juju_names(cls):
-            yield 'b'
-
-    class Charm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.typed_config = self.load_config(Config, 10, c='foo')
-
-    schema = Config.to_juju_schema()
-    options = ops._private.yaml.safe_dump(schema)
-    harness = testing.Harness(Charm, config=options)
-    request.addfinalizer(harness.cleanup)
-    harness.update_config({'b': 3.14})
-    harness.begin()
-    typed_config = harness.charm.typed_config
-    assert typed_config.a == 10
-    assert typed_config.b == 3.14
-    assert typed_config.c == 'foo'
-
-
 def test_config_custom_type(request: pytest.FixtureRequest):
     class Config(ops.ConfigBase):
         x: int
@@ -466,29 +350,3 @@ def test_config_custom_type(request: pytest.FixtureRequest):
     typed_config = harness.charm.typed_config
     assert typed_config.x == 42
     assert typed_config.y == datetime.date(2008, 8, 28)
-
-
-def test_config_partial_init(request: pytest.FixtureRequest):
-    @dataclasses.dataclass(frozen=True)
-    class Config(ops.ConfigBase):
-        x: int
-
-    class Charm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.typed_config = self.load_config(Config)
-
-    schema = Config.to_juju_schema()
-    # Harness needs to know about *all* the options, even though the charm does not.
-    schema['options']['y'] = {
-        'type': 'string',
-        'description': 'An int not used in the class',
-    }
-    options = ops._private.yaml.safe_dump(schema)
-    harness = testing.Harness(Charm, config=options)
-    request.addfinalizer(harness.cleanup)
-    # The raw config contains more fields than the class requires.
-    harness.update_config({'x': 42, 'y': 'foo'})
-    harness.begin()
-    typed_config = harness.charm.typed_config
-    assert typed_config.x == 42

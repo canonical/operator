@@ -81,6 +81,7 @@ class Charm(ops.CharmBase):
             on_secret_rotate=[],
             on_secret_expired=[],
             on_custom=[],
+            on_collect_status=[],
             # Observed event type names per invocation. A list is used to preserve the
             # order in which charm handlers have observed the events.
             observed_event_types=[],
@@ -127,6 +128,8 @@ class Charm(ops.CharmBase):
             self.framework.observe(self.on.warn_action, self._on_warn_action)
 
         self.framework.observe(self.on.collect_metrics, self._on_collect_metrics)
+        self.framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         self.framework.observe(self.on.custom, self._on_custom)
 
         if os.getenv('TRY_EXCEPTHOOK', False):
@@ -296,6 +299,12 @@ class Charm(ops.CharmBase):
         self._stored.on_collect_metrics.append(type(event).__name__)
         self._stored.observed_event_types.append(type(event).__name__)
         event.add_metrics({'foo': 42}, {'bar': '4.2'})
+
+    def _on_collect_app_status(self, _: ops.CollectStatusEvent):
+        self._stored.on_collect_status.append('collect_app_status')
+
+    def _on_collect_unit_status(self, _: ops.CollectStatusEvent):
+        self._stored.on_collect_status.append('collect_unit_status')
 
     def _on_custom(self, event: MyCharmEvents):
         self._stored.on_custom.append(type(event).__name__)

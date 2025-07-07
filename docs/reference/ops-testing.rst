@@ -66,7 +66,7 @@ A test consists of three broad steps:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Charm SDK | Testing <https://juju.is/docs/sdk/testing>`_.
+    on testing charms, see :doc:`/explanation/testing`.
 
 
 ..
@@ -124,3 +124,4 @@ A test consists of three broad steps:
 .. autoclass:: ops.testing.errors.ActionMissingFromContextError
 .. autoclass:: ops.testing.errors.NoObserverError
 .. autoclass:: ops.testing.errors.BadOwnerPath
+.. automethod:: ops.testing.layer_from_rockcraft

@@ -7,6 +7,7 @@ on:
       # will likely be publishing at least three packages: ops, ops-scenario,
       # and ops-harness.
       - '2.*'
+      - '3.*'
 
 permissions: {}
 
@@ -30,7 +31,7 @@ jobs:
       - name: Build
         run: python -m build
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.2.3
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'dist/*'
       - name: Publish

@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - '2.*'
+      - '3.*'
 
 permissions: {}
 
@@ -27,7 +28,7 @@ jobs:
         run: python -m build
         working-directory: ./testing
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.2.3
+        uses: actions/attest-build-provenance@v2
         with:
           subject-path: 'testing/dist/*'
       - name: Publish

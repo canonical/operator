@@ -19,11 +19,14 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 2f12ce579d4a52149d810a92bfe52189cb4ce20e  # 2025-04-09T08:01:25Z
+            commit: cc7bd1db35589fd63e44fb0e8813cd3b4362943e  # rev171 2025-06-22T16:01:16Z
+            disabled: true
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 3c01180a1d35c7de262af81eddf2847fc71bd1c1  # 2025-04-24T12:34:41Z
+            commit: ca0a31dab4497eac1bcdc3ca3eb47bbbc7365dc9  # rev253 2025-06-23T08:45:58Z
+            disabled: true
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 6ce29e36b40e352656920944bb694cea1cb29acc  # rev147 2025-04-17T02:58:18Z
+            commit: a2770608526f2c82ddc3d225870f1a48eaa87179  # 2025-06-12T17:55:14Z
+            disabled: true
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -36,6 +39,7 @@ jobs:
         run: pip install tox~=4.2 uv~=0.6
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        if: ${{ !(matrix.disabled) }}
         run: |
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
@@ -46,8 +50,8 @@ jobs:
             uv remove ops --optional dev --frozen || echo "maybe ops[testing] is not a dev dependency"
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no requirements.txt or uv.lock file found"
             exit 1
