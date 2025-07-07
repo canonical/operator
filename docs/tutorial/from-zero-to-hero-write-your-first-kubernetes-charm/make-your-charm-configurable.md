@@ -76,7 +76,7 @@ In the `__init__` function, add an observer for the `config_changed` event and p
 framework.observe(self.on.config_changed, self._on_config_changed)
 ```
 
-Now, define the handler, as below. Since configuring something like a port affects the way we call our workload application, we need to update our Pebble configuration, which we will do via a newly created method `_update_layer_and_restart` that we will define shortly.
+Now, define the handler, as below. Since configuring something like a port affects the way we call our workload application, we need to update our Pebble configuration.
 
 ```python
 def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
