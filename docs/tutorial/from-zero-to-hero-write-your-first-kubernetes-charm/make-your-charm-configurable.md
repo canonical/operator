@@ -224,7 +224,7 @@ Congratulations, you now know how to make your charm configurable!
 
 ## Write unit tests
 
-Since we added a new feature to configure `server-port` and use it in the `_pebble_layer` dynamically, we should write tests for the feature.
+Since we added a new feature to configure `server-port` and use it in the Pebble layer dynamically, we should write tests for the feature.
 
 First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
 
