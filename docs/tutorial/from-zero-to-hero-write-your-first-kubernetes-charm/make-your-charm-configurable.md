@@ -61,7 +61,7 @@ class FastAPIConfig:
 
 Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
 
-Now that we have defined the configuration with a Python class, IDEs will use it to provide hints when we are accessing the configuration, and static type checkers are able to validate that we are using the config option correctly.
+We'll use [](CharmBase.load_config) to create an instance of your config class from the Juju config data. This allows IDEs to provide hints when we are accessing the configuration, and static type checkers are able to validate that we are using the config option correctly.
 
 ## Define the configuration event handlers
 
