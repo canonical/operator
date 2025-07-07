@@ -246,7 +246,7 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
 Now, let's define this method such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
 
 ```python
-def app_environment(self) -> dict[str, str]:
+def get_app_environment(self) -> dict[str, str]:
     """Prepare environment variables for the application.
 
     This property method creates a dictionary containing environment variables
