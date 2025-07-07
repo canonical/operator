@@ -161,7 +161,7 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
     for data in relations.values():
         if not data:
             continue
-        logger.info('New PSQL database endpoint is %s', data['endpoints'])
+        logger.info('New database endpoint is %s', data['endpoints'])
         host, port = data['endpoints'].split(':')
         db_data = {
             'db_host': host,
@@ -175,18 +175,59 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
 
 ### Share the authentication information with your application
 
-Our application consumes database authentication information in the form of environment variables. Let's update the Pebble service definition with an `environment` key and let's set this key to a dynamic value -- the class property `self.app_environment`. Your `_pebble_layer` property should look as below:
+Our application consumes database authentication information in the form of environment variables. Let's update the Pebble service definition with an `environment` key and let's set this key to a dynamic value. Update the `_update_layer_and_restart()` method to read in the environment and pass it in when creating the Pebble layer:
 
 ```python
-@property
-def _pebble_layer(self) -> ops.pebble.Layer:
+def _update_layer_and_restart(self) -> None:
+    """Define and start a workload using the Pebble API.
+
+    You'll need to specify the right entrypoint and environment
+    configuration for your specific workload. Tip: you can see the
+    standard entrypoint of an existing container using docker inspect
+    Learn more about interacting with Pebble at
+        https://ops.readthedocs.io/en/latest/reference/pebble.html
+    Learn more about Pebble layers at
+        https://documentation.ubuntu.com/pebble/how-to/use-layers/
+    """
+    # Learn more about statuses at
+    # https://documentation.ubuntu.com/juju/3.6/reference/status/
+    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    try:
+        config = self.load_config(FastAPIConfig)
+    except ValueError as e:
+        logger.error('Configuration error: %s', e)
+        return
+    env = self.get_app_environment()
+    try:
+        self.container.add_layer(
+            'fastapi_demo',
+            self._get_pebble_layer(config.server_port, env),
+            combine=True,
+        )
+        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
+
+        # Tell Pebble to incorporate the changes, including restarting the
+        # service if required.
+        self.container.replan()
+        logger.info(f"Replanned with '{self.pebble_service_name}' service")
+    except ValueError as e:
+        logger.error('Configuration error: %s', e)
+    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
+        logger.info('Unable to connect to Pebble: %s', e)
+```
+
+We've also removed three `self.unit.status = ` lines. We'll handle replacing those shortly.
+
+Now, update your `_get_pebble_layer()` method to use the passed environment:
+
+```python
+def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
     """A Pebble layer for the FastAPI demo services."""
-    config = self.load_config(FastAPIConfig)
     command = ' '.join([
         'uvicorn',
         'api_demo_server.app:app',
         '--host=0.0.0.0',
-        f'--port={config.server_port}',
+        f'--port={port}',
     ])
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
@@ -197,17 +238,16 @@ def _pebble_layer(self) -> ops.pebble.Layer:
                 'summary': 'fastapi demo',
                 'command': command,
                 'startup': 'enabled',
-                'environment': self.app_environment,
+                'environment': environment,
             }
         },
     }
     return ops.pebble.Layer(pebble_layer)
 ```
 
-Now, let's define this property such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
+Now, let's define this method such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
 
 ```python
-@property
 def app_environment(self) -> dict[str, str]:
     """Prepare environment variables for the application.
 
@@ -283,7 +323,7 @@ def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     event.add_status(ops.ActiveStatus())
 ```
 
-We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). In `_update_layer_and_restart`, remove the lines:
+We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_update_layer_and_restart`, remove the lines:
 
 ```python
 self.unit.status = ops.ActiveStatus()

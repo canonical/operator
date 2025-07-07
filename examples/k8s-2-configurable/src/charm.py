@@ -27,12 +27,10 @@ import ops
 logger = logging.getLogger(__name__)
 
 
+# Note that this configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
-    """Configuration for the FastAPI demo charm.
-
-    Note that this configuration is also defined in charmcraft.yaml
-    """
+    """Configuration for the FastAPI demo charm."""
 
     server_port: int = 8000
     """Default port on which FastAPI is available."""
@@ -75,7 +73,15 @@ class FastAPIDemoCharm(ops.CharmBase):
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
         try:
-            self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
+            config = self.load_config(FastAPIConfig)
+        except ValueError as e:
+            logger.error('Configuration error: %s', e)
+            self.unit.status = ops.BlockedStatus(str(e))
+            return
+        try:
+            self.container.add_layer(
+                'fastapi_demo', self._get_pebble_layer(config.server_port), combine=True
+            )
             logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
             # Tell Pebble to incorporate the changes, including restarting the
@@ -84,22 +90,17 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
             self.unit.status = ops.ActiveStatus()
-        except ValueError as e:
-            logger.error('Configuration error: %s', e)
-            self.unit.status = ops.BlockedStatus(str(e))
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info('Unable to connect to Pebble: %s', e)
             self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 
-    @property
-    def _pebble_layer(self) -> ops.pebble.Layer:
-        config = self.load_config(FastAPIConfig)
+    def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         """A Pebble layer for the FastAPI demo services."""
         command = ' '.join([
             'uvicorn',
             'api_demo_server.app:app',
             '--host=0.0.0.0',
-            f'--port={config.server_port}',
+            f'--port={port}',
         ])
         pebble_layer: ops.pebble.LayerDict = {
             'summary': 'FastAPI demo service',
