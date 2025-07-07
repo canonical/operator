@@ -359,12 +359,12 @@ juju status --watch 1s
 
 When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod.
 
-```
-Model        Controller           Cloud/Region        Version  SLA          Timestamp
-welcome-k8s  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:38:19+01:00
+```text
+Model        Controller  Cloud/Region        Version  SLA          Timestamp
+welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           active      1  demo-api-charm             1  10.152.183.215  no
+demo-api-charm           active      1  demo-api-charm             0  10.152.183.215  no
 
 Unit               Workload  Agent  Address      Ports  Message
 demo-api-charm/0*  active    idle   10.1.157.73
@@ -403,9 +403,9 @@ kubectl -n welcome-k8s get pods
 You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
 
 ```text
-NAME                             READY   STATUS    RESTARTS        AGE
-modeloperator-5df6588d89-ghxtz   1/1     Running   3 (7d2h ago)    13d
-demo-api-charm-0                 2/2     Running   0               7d2h
+NAME                             READY   STATUS    RESTARTS   AGE
+modeloperator-5df6588d89-ghxtz   1/1     Running   0          10m
+demo-api-charm-0                 2/2     Running   0          10m
 ```
 
 3. Check also:
@@ -539,26 +539,25 @@ ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
 The result should be similar to the following output:
 
 ```text
-unit: install_deps> python -I -m pip install 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/juju-sdk-tutorial-k8s/requirements.txt
-unit: commands[0]> coverage run --source=/home/ubuntu/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/juju-sdk-tutorial-k8s/tests/unit
-=================================================================== test session starts ===================================================================
-platform linux -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/juju-sdk-tutorial-k8s/.tox/unit/bin/python
+unit: install_deps> python -I -m pip install cosl 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/fastapi-demo/requirements.txt
+unit: commands[0]> coverage run --source=/home/ubuntu/fastapi-demo/src -m pytest -v -s --tb native /home/ubuntu/fastapi-demo/tests/unit
+==================================================================================== test session starts =====================================================================================
+platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
 cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/juju-sdk-tutorial-k8s
-configfile: pyproject.toml
+rootdir: /home/ubuntu/fastapi-demo
 collected 1 item
 
 tests/unit/test_charm.py::test_pebble_layer PASSED
 
-==================================================================== 1 passed in 0.11s ====================================================================
+===================================================================================== 1 passed in 0.19s ======================================================================================
 unit: commands[1]> coverage report
-Name           Stmts   Miss Branch BrPart  Cover   Missing
-----------------------------------------------------------
-src/charm.py      18      0      0      0   100%
-----------------------------------------------------------
-TOTAL             18      0      0      0   100%
-  unit: OK (2.12=setup[1.82]+cmd[0.26,0.04] seconds)
-  congratulations :) (2.14 seconds)
+Name           Stmts   Miss  Cover
+----------------------------------
+src/charm.py      17      0   100%
+----------------------------------
+TOTAL             17      0   100%
+  unit: OK (12.33=setup[11.76]+cmd[0.50,0.07] seconds)
+  congratulations :) (12.42 seconds)
 ```
 
 Congratulations, you have written your first unit test!
@@ -651,6 +650,55 @@ async def test_build_and_deploy(ops_test: OpsTest):
 The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
 
 The result should be similar to the following output:
+
+```text
+integration: install_deps> python -I -m pip install juju pytest pytest-operator -r /home/ubuntu/fastapi-demo/requirements.txt
+integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
+==================================================================================== test session starts =====================================================================================
+platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python
+cachedir: .tox/integration/.pytest_cache
+rootdir: /home/ubuntu/fastapi-demo
+plugins: operator-0.43.1, asyncio-0.21.2
+asyncio: mode=Mode.STRICT
+collected 1 item
+
+tests/integration/test_charm.py::test_build_and_deploy
+--------------------------------------------------------------------------------------- live log setup ---------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:762 Adding model microk8s:test-charm-2q7l on cloud microk8s
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
+--------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-2q7l0
+INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
+INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 20.87s
+INFO     juju.model:__init__.py:3254 Waiting for model:
+  demo-api-charm (missing)
+INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
+PASSED
+------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:951 Model status:
+
+Model            Controller  Cloud/Region        Version  SLA          Timestamp
+test-charm-2q7l  microk8s    microk8s/localhost  3.6.8    unsupported  07:44:31+08:00
+
+App             Version  Status  Scale  Charm           Channel  Rev  Address        Exposed  Message
+demo-api-charm           active      1  demo-api-charm             0  10.152.183.57  no
+
+Unit               Workload  Agent  Address      Ports  Message
+demo-api-charm/0*  active    idle   10.1.157.91
+
+INFO     pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+
+INFO     pytest_operator.plugin:plugin.py:1063 Resetting model test-charm-2q7l...
+INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications demo-api-charm
+INFO     pytest_operator.plugin:plugin.py:1068 Not waiting on reset to complete.
+INFO     pytest_operator.plugin:plugin.py:1039 Forgetting model main...
+
+
+===================================================================================== 1 passed in 51.25s =====================================================================================
+  integration: OK (83.78=setup[31.75]+cmd[52.02] seconds)
+  congratulations :) (83.82 seconds)
+```
 
 ```bash
 integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/juju-sdk-tutorial-k8s/tests/integration
