@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   charmcraft-pack:
-    runs-on: ubuntu-22.04  # Not ubuntu-latest?
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
