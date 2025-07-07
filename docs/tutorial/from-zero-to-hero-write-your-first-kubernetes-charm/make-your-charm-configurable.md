@@ -130,7 +130,7 @@ def _update_layer_and_restart(self) -> None:
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
-When the config is loaded as part of creating the Pebble layer, if it is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the issue and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
 
 Now, crucially, update the `_pebble_layer` property to make the layer definition dynamic, as shown below. This will replace the static port `8000` with `f"--port={config.server_port}"`.
 
