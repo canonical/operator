@@ -203,7 +203,7 @@ We probably shouldn't link to a file on Discourse any more. Do we want to have t
 -->
 
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
-[FastAPI-Monitoring.json.tmpl|attachment](https://raw.githubusercontent.com/canonical/operator/refs/heads/main/examples/k8s-5-observe/grafana_dashboards/FastAPI-Monitoring.json.tmpl). Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
+[FastAPI-Monitoring.json.tmpl](https://raw.githubusercontent.com/canonical/operator/refs/heads/main/examples/k8s-5-observe/grafana_dashboards/FastAPI-Monitoring.json.tmpl). Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
 
 ```{important}
 
