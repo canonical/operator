@@ -52,22 +52,15 @@ _JUJU_TYPES: Final[Mapping[str, str]] = {
     'int': 'int',
     'float': 'float',
     'str': 'string',
-    "<class 'bool'>": 'boolean',
-    "<class 'int'>": 'int',
-    "<class 'float'>": 'float',
-    "<class 'str'>": 'string',
     'ops.Secret': 'secret',
     'ops.model.Secret': 'secret',
-    "<class 'ops.Secret'>": 'secret',
-    "<class 'ops.model.Secret'>": 'secret',
 }
 
 
 def get_default_value(cls: type[object], name: str) -> Any:
     """Get the default value for a class attribute."""
-    # Dataclasses:
-    if hasattr(cls, '__dataclass_fields__'):
-        field = {f.name: f for f in dataclasses.fields(cls)}[name]  # type: ignore
+    if dataclasses.is_dataclass(cls):
+        field = {f.name: f for f in dataclasses.fields(cls)}[name]
         # This might be a Pydantic dataclass using a Pydantic.Field object.
         field_default = (  # type: ignore
             field.default.default  # type: ignore
@@ -106,23 +99,6 @@ def attr_to_juju_type(cls: type[object], name: str, default: Any = None) -> str:
         raw_hint = get_type_hints(cls)[name]
     except KeyError:
         pass
-    except TypeError:
-        # In Python 3.8, this fails even though __future__ annotations is
-        # used. Provide a reasonable effort fallback.
-        hint = cls.__annotations__.get(name)
-        if hint and '|' in hint:
-            hints = {h.strip() for h in hint.split('|')}
-            try:
-                hints.remove('None')
-            except ValueError:
-                pass
-            if len(hints) > 1:
-                return 'string'
-            hint = hints.pop()
-        if hint and hint.startswith('Optional['):
-            hint = hint[9:-1]
-        if hint:
-            return _JUJU_TYPES[str(hint)]
     else:
         # Collapse Optional[] and Union[] and so on to the simpler form.
         if get_origin(raw_hint):
@@ -156,7 +132,7 @@ def juju_schema_from_model_fields(cls: type[object]) -> dict[str, Any]:
         if field.default is not None:  # type: ignore
             option['default'] = field.default  # type: ignore
         if field.annotation in (bool, int, float, str, Secret):  # type: ignore
-            hint = _JUJU_TYPES[field.annotation.__name__]  # type: ignore
+            hint = _JUJU_TYPES[field.annotation.__name__]
         else:
             hint = field.annotation  # type: ignore
             if get_origin(hint):
