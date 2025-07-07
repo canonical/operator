@@ -50,7 +50,7 @@ Open your `src/charm.py` file, and add a configuration class that matches the co
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm.
 
-    Note that this configuration is also defined in charmcraft.yaml
+    This configuration is also defined in charmcraft.yaml
     """
 
     server_port: int = 8000
