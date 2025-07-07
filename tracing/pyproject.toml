@@ -48,7 +48,7 @@ dev = [
     "ruff ~= 0.9",
 ]
 testing = [
-    "pytest ~= 8.3.4",
+    "pytest ~= 8.4",
 ]
 
 [build-system]
