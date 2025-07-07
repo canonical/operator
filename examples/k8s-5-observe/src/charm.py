@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm.
 
-    Note that this configuration is also defined in charmcraft.yaml
+    That this configuration is also defined in charmcraft.yaml
     """
 
     server_port: int = 8000
