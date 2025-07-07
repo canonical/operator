@@ -128,8 +128,6 @@ class FastAPIDemoCharm(ops.CharmBase):
             # service if required.
             self.container.replan()
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
-        except ValueError as e:
-            logger.error('Configuration error: %s', e)
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info('Unable to connect to Pebble: %s', e)
 
