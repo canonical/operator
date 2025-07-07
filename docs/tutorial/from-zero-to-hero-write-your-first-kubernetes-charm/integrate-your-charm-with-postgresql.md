@@ -236,7 +236,7 @@ def app_environment(self) -> dict[str, str]:
 Finally, let's define the method that is called on the database created event:
 
 ```python
-def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
+def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
     """Event is fired when postgres database is created."""
     self._update_layer_and_restart()
 ```

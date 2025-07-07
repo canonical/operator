@@ -105,7 +105,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
+    def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
         """Event is fired when postgres database is created."""
         self._update_layer_and_restart()
 
