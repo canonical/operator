@@ -8,13 +8,11 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 04_create_actions
-git checkout -b 05_cos_integration
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-4-action
 ```
 
 ````
@@ -425,6 +423,4 @@ Also, you can reach Prometheus in your web browser (similar to Grafana) at `http
 
 ## Review the final code
 
-For the full code see: [05_cos_integration](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/05_cos_integration)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/04_create_actions...05_cos_integration)
+For the full code, see our [k8s-5-observe](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe) example charm.

@@ -13,13 +13,11 @@ Please add a link to `fetch-lib` documentation in the charmcraft docs, and maybe
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 02_make_your_charm_configurable
-git checkout -b 03_integrate_with_psql
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-2-configurable
 ```
 
 ````
@@ -589,8 +587,6 @@ Congratulations, with this integration test you have verified that your charms r
 
 ## Review the final code
 
-For the full code see: [03_integrate_with_psql](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/03_integrate_with_psql)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/02_make_your_charm_configurable...04_integrate_with_psql)
+For the full code,  see our [k8s-3-postgresql](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) example charm.
 
 > **See next: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`**

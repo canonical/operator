@@ -7,13 +7,11 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 03_integrate_with_psql
-git checkout -b  04_create_actions
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-3-postgresql
 ```
 
 ````
@@ -218,8 +216,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code see: [04_create_actions](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_create_actions)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/03_integrate_with_psql...04_create_actions)
+For the full code, see our [k8s-4-action](https://github.com/canonical/operator/tree/main/examples/k8s-4-action) example charm.
 
 > **See next: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**

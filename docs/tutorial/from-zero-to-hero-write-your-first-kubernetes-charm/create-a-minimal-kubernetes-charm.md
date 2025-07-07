@@ -705,9 +705,6 @@ INFO     pytest_operator.plugin:plugin.py:1025 Forgetting model main...
 
 ## Review the final code
 
-For the full code see: [01_create_minimal_charm](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/01_create_minimal_charm)
-
-For a comparative view of the code before and after our edits see:
-[Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)
+For the full code, see our [k8s-1-minimal](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal) example charm.
 
 >**See next: {ref}`Make your charm configurable <make-your-charm-configurable>`**

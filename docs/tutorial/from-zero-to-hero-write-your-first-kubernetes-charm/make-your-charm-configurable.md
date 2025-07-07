@@ -7,13 +7,11 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 01_create_minimal_charm
-git checkout -b 02_make_your_charm_configurable
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-1-minimal
 ```
 
 ````
@@ -267,8 +265,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code see: [02_make_your_charm_configurable](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/02_make_your_charm_configurable)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_charm...02_make_your_charm_configurable)
+For the full code, see our [k8s-2-configurable](https://github.com/canonical/operator/tree/main/examples/k8s-2-configurable) example charm.
 
 > **See next: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`**
