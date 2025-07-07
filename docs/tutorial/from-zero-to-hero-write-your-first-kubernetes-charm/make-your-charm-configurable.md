@@ -46,7 +46,6 @@ config:
 Open your `src/charm.py` file, and add a configuration class that matches the configuration you added in `charmcraft.yaml`:
 
 ```python
-# This configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm."""

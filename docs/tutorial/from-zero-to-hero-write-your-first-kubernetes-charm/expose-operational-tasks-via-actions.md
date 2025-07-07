@@ -46,7 +46,6 @@ actions:
 Open your `src/charm.py` file, and add an action class that matches the definition you used in `charmcraft.yaml`:
 
 ```python
-# Note that this action is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class GetDbInfoAction:
     """Fetches database authentication information."""
