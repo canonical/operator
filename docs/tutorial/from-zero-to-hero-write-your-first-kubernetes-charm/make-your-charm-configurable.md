@@ -83,6 +83,8 @@ def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
     self._update_layer_and_restart()
 ```
 
+We'll define `_update_layer_and_restart` shortly.
+
 ```{caution}
 
 A charm does not know which configuration option has been changed. Thus, make sure to validate all the values. This is especially important since multiple values can be changed in one call. Using a config class simplifies this, as all validation should be done when the config object is created.
