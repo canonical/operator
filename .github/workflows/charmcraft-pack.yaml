@@ -36,7 +36,7 @@ jobs:
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Install yq
-        run: snap install yq
+        run: sudo snap install yq
 
       - name: Add 'git' as a build package 
         run: |
