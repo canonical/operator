@@ -55,7 +55,7 @@ class GetDbInfoAction:
     """Show username and password in output information."""
 ```
 
-Now that we have defined the action with a Python class, IDEs will use it to provide hints when we are accessing the action parameters, and static type checkers are able to validate that we are using the parameters correctly.
+Now that we have defined the action with a Python class, IDEs will use it to provide hints when we are accessing the action parameter, and static type checkers are able to validate that we are using the parameter correctly.
 
 ## Define the action event handlers
 
