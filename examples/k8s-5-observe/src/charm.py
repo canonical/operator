@@ -255,7 +255,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         for data in relations.values():
             if not data:
                 continue
-            logger.info('New PSQL database endpoint is %s', data['endpoints'])
+            logger.info('New database endpoint is %s', data['endpoints'])
             host, port = data['endpoints'].split(':')
             db_data = {
                 'db_host': host,
