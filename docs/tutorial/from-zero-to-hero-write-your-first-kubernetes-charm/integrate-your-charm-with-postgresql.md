@@ -566,33 +566,7 @@ INFO     juju.model:__init__.py:2301 Deploying ch:amd64/jammy/postgresql-k8s-495
 INFO     juju.model:__init__.py:3254 Waiting for model:
   demo-api-charm/0 [idle] blocked: Waiting for database relation
 PASSED
-------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:951 Model status:
-
-Model            Controller  Cloud/Region        Version  SLA          Timestamp
-test-charm-l5a2  microk8s    microk8s/localhost  3.6.8    unsupported  11:07:06+08:00
-
-App             Version  Status   Scale  Charm           Channel    Rev  Address         Exposed  Message
-demo-api-charm           active       1  demo-api-charm               0  10.152.183.126  no
-postgresql-k8s           waiting      1  postgresql-k8s  14/stable  495  10.152.183.204  no       installing agent
-
-Unit               Workload  Agent  Address       Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.106
-postgresql-k8s/0*  running   idle   10.1.157.108
-
-INFO     pytest_operator.plugin:plugin.py:957 Juju error logs:
-
-
-INFO     pytest_operator.plugin:plugin.py:1063 Resetting model test-charm-l5a2...
-INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications postgresql-k8s
-INFO     pytest_operator.plugin:plugin.py:1068 Not waiting on reset to complete.
-INFO     pytest_operator.plugin:plugin.py:1039 Forgetting model main...
-
-
-=============================================================================== 2 passed in 110.70s (0:01:50) ================================================================================
-  integration: OK (112.36=setup[0.08]+cmd[112.28] seconds)
-  congratulations :) (112.48 seconds)
+...
 ```
 
 Congratulations, with this integration test you have verified that your charms relation to PostgreSQL works as well!
