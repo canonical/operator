@@ -108,26 +108,26 @@ def _update_layer_and_restart(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
-        try:
-            config = self.load_config(FastAPIConfig)
-        except ValueError as e:
-            logger.error('Configuration error: %s', e)
-            self.unit.status = ops.BlockedStatus(str(e))
-            return
-        try:
-            self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
-            logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
+    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    try:
+        config = self.load_config(FastAPIConfig)
+    except ValueError as e:
+        logger.error('Configuration error: %s', e)
+        self.unit.status = ops.BlockedStatus(str(e))
+        return
+    try:
+        self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
+        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
-            # Tell Pebble to incorporate the changes, including restarting the
-            # service if required.
-            self.container.replan()
-            logger.info(f"Replanned with '{self.pebble_service_name}' service")
+        # Tell Pebble to incorporate the changes, including restarting the
+        # service if required.
+        self.container.replan()
+        logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
-            self.unit.status = ops.ActiveStatus()
-        except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-            logger.info('Unable to connect to Pebble: %s', e)
-            self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+        self.unit.status = ops.ActiveStatus()
+    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
+        logger.info('Unable to connect to Pebble: %s', e)
+        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
@@ -135,27 +135,27 @@ When the config is loaded as part of creating the Pebble layer, if the config is
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
 ```python
-    def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join([
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
-        ])
-        pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
-                self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
-                }
-            },
-        }
-        return ops.pebble.Layer(pebble_layer)
+def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
+    """A Pebble layer for the FastAPI demo services."""
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        f'--port={port}',
+    ])
+    pebble_layer: ops.pebble.LayerDict = {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
+            self.pebble_service_name: {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
+            }
+        },
+    }
+    return ops.pebble.Layer(pebble_layer)
 ```
 
 As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
