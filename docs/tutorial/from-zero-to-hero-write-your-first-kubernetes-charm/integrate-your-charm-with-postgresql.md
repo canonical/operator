@@ -370,21 +370,22 @@ juju status --relations --watch 1s
 You should see both applications get to the `active` status, and also that the `postgresql-k8s` charm has a relation to the `demo-api-charm` over the `postgresql_client` interface, as below:
 
 ```text
-Model        Controller           Cloud/Region        Version  SLA          Timestamp
-charm-model  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:50:39+01:00
+Model        Controller  Cloud/Region        Version  SLA          Timestamp
+welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  13:50:39+01:00
 
-App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm  0.0.9    active      1  demo-api-charm             1  10.152.183.233  no
-postgresql-k8s           active      1  postgresql-k8s  14/stable      29  10.152.183.195  no       Primary
+App             Version  Status  Scale  Charm           Channel    Rev  Address         Exposed  Message
+demo-api-charm           active      1  demo-api-charm               2  10.152.183.233  no
+postgresql-k8s  14.15    active      1  postgresql-k8s  14/stable  495  10.152.183.195  no
 
 Unit               Workload  Agent  Address      Ports  Message
 demo-api-charm/0*  active    idle   10.1.157.90
 postgresql-k8s/0*  active    idle   10.1.157.92         Primary
 
-Relation provider              Requirer                       Interface          Type     Message
+Integration provider           Requirer                       Interface          Type     Message
 postgresql-k8s:database        demo-api-charm:database        postgresql_client  regular
 postgresql-k8s:database-peers  postgresql-k8s:database-peers  postgresql_peers   peer
 postgresql-k8s:restart         postgresql-k8s:restart         rolling_op         peer
+postgresql-k8s:upgrade         postgresql-k8s:upgrade         upgrade            peer
 ```
 
 The relation appears to be up and running, but we should also test that it's working as intended. First, let's try to write something to the database by posting some name to the database via API using `curl` as below -- where `10.1.157.90` is a pod IP and `8000` is our app port. You can repeat the command for multiple names.
@@ -549,38 +550,65 @@ To make things faster, use the `--model=<existing model name>` to inform `pytest
 When it's done, the output should show two passing tests:
 
 ```text
-...
-  demo-api-charm/0 [idle] waiting: Waiting for database relation
-INFO     juju.model:model.py:2759 Waiting for model:
-  demo-api-charm/0 [idle] active:
+integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
+==================================================================================== test session starts =====================================================================================
+platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python
+cachedir: .tox/integration/.pytest_cache
+rootdir: /home/ubuntu/fastapi-demo
+plugins: operator-0.43.1, asyncio-0.21.2
+asyncio: mode=Mode.STRICT
+collected 2 items
+
+tests/integration/test_charm.py::test_build_and_deploy
+--------------------------------------------------------------------------------------- live log setup ---------------------------------------------------------------------------------------
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
+INFO     pytest_operator.plugin:plugin.py:762 Adding model microk8s:test-charm-l5a2 on cloud microk8s
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHSession received from the controller
+WARNING  juju.client.connection:connection.py:858 unexpected facade SSHTunneler received from the controller
+--------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-l5a20
+INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
+INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 34.47s
+INFO     juju.model:__init__.py:3254 Waiting for model:
+  demo-api-charm (missing)
+INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
+INFO     juju.model:__init__.py:3254 Waiting for model:
+  demo-api-charm/0 [idle] blocked: Waiting for database relation
 PASSED
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:783 Model status:
+tests/integration/test_charm.py::test_database_integration
+--------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
+INFO     juju.model:__init__.py:2301 Deploying ch:amd64/jammy/postgresql-k8s-495
+INFO     juju.model:__init__.py:3254 Waiting for model:
+  demo-api-charm/0 [idle] blocked: Waiting for database relation
+PASSED
+------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------
+INFO     pytest_operator.plugin:plugin.py:951 Model status:
 
-Model            Controller       Cloud/Region        Version  SLA          Timestamp
-test-charm-2ara  main-controller  microk8s/localhost  3.1.5    unsupported  09:45:56+02:00
+Model            Controller  Cloud/Region        Version  SLA          Timestamp
+test-charm-l5a2  microk8s    microk8s/localhost  3.6.8    unsupported  11:07:06+08:00
 
-App             Version  Status  Scale  Charm           Channel    Rev  Address        Exposed  Message
-demo-api-charm  1.0.1    active      1  demo-api-charm               0  10.152.183.99  no
-postgresql-k8s  14.7     active      1  postgresql-k8s  14/stable   73  10.152.183.50  no
+App             Version  Status   Scale  Charm           Channel    Rev  Address         Exposed  Message
+demo-api-charm           active       1  demo-api-charm               0  10.152.183.126  no
+postgresql-k8s           waiting      1  postgresql-k8s  14/stable  495  10.152.183.204  no       installing agent
 
 Unit               Workload  Agent  Address       Ports  Message
-demo-api-charm/0*  active    idle   10.1.208.77
-postgresql-k8s/0*  active    idle   10.1.208.107
+demo-api-charm/0*  active    idle   10.1.157.106
+postgresql-k8s/0*  running   idle   10.1.157.108
 
-INFO     pytest_operator.plugin:plugin.py:789 Juju error logs:
-
-
-INFO     pytest_operator.plugin:plugin.py:877 Resetting model test-charm-2ara...
-INFO     pytest_operator.plugin:plugin.py:866    Destroying applications demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:866    Destroying applications postgresql-k8s
-INFO     pytest_operator.plugin:plugin.py:882 Not waiting on reset to complete.
-INFO     pytest_operator.plugin:plugin.py:855 Forgetting main...
+INFO     pytest_operator.plugin:plugin.py:957 Juju error logs:
 
 
-========================================================================================================================================================================== 2 passed in 290.23s (0:04:50) ==========================================================================================================================================================================
-  integration: OK (291.01=setup[0.04]+cmd[290.97] seconds)
-  congratulations :) (291.05 seconds)
+INFO     pytest_operator.plugin:plugin.py:1063 Resetting model test-charm-l5a2...
+INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications demo-api-charm
+INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications postgresql-k8s
+INFO     pytest_operator.plugin:plugin.py:1068 Not waiting on reset to complete.
+INFO     pytest_operator.plugin:plugin.py:1039 Forgetting model main...
+
+
+=============================================================================== 2 passed in 110.70s (0:01:50) ================================================================================
+  integration: OK (112.36=setup[0.08]+cmd[112.28] seconds)
+  congratulations :) (112.48 seconds)
 ```
 
 Congratulations, with this integration test you have verified that your charms relation to PostgreSQL works as well!
