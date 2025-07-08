@@ -550,23 +550,7 @@ To make things faster, use the `--model=<existing model name>` to inform `pytest
 When it's done, the output should show two passing tests:
 
 ```text
-integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
-==================================================================================== test session starts =====================================================================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python
-cachedir: .tox/integration/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-plugins: operator-0.43.1, asyncio-0.21.2
-asyncio: mode=Mode.STRICT
-collected 2 items
-
-tests/integration/test_charm.py::test_build_and_deploy
---------------------------------------------------------------------------------------- live log setup ---------------------------------------------------------------------------------------
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
-INFO     pytest_operator.plugin:plugin.py:762 Adding model microk8s:test-charm-l5a2 on cloud microk8s
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHSession received from the controller
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHTunneler received from the controller
---------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
+...
 INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-l5a20
 INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
 INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 34.47s
