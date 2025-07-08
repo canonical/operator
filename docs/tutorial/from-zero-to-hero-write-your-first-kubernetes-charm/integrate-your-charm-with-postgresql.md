@@ -478,7 +478,7 @@ Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a dat
 
 Now run `tox -e unit` to make sure all test cases pass.
 
-## Write an integration test
+## Write integration tests
 
 Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
