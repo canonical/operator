@@ -274,20 +274,20 @@ juju find-offers cos-lite
 You should something similar to the output below:
 
 ```text
-Store                 URL                        Access  Interfaces
-tutorial-controller  admin/cos-lite.loki        admin   loki_push_api:logging
-tutorial-controller  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
-tutorial-controller  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
+Store     URL                        Access  Interfaces
+microk8s  admin/cos-lite.loki        admin   loki_push_api:logging
+microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
+microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
-As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `charm-model` model.
+As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `welcome-k8s` model.
 
 ## Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
 ```text
-juju switch charm-model
+juju switch welcome-k8s
 juju integrate demo-api-charm admin/cos-lite.grafana
 juju integrate demo-api-charm admin/cos-lite.loki
 juju integrate demo-api-charm admin/cos-lite.prometheus
@@ -309,16 +309,16 @@ juju status -m cos-lite
 This should result in an output similar to the one below:
 
 ```text
-Model     Controller            Cloud/Region        Version  SLA          Timestamp
-cos-lite  tutorial-controller  microk8s/localhost  3.0.0    unsupported  18:05:07+01:00
+Model     Controller  Cloud/Region        Version  SLA          Timestamp
+cos-lite  microk8s    microk8s/localhost  3.6.8    unsupported  18:05:07+01:00
 
-App           Version  Status   Scale  Charm             Channel  Rev  Address         Exposed  Message
-alertmanager  0.23.0   active       1  alertmanager-k8s  stable    36  10.152.183.70   no
-catalogue              active       1  catalogue-k8s     stable     4  10.152.183.19   no
-grafana       9.2.1    active       1  grafana-k8s       stable    52  10.152.183.132  no
-loki          2.4.1    active       1  loki-k8s          stable    47  10.152.183.207  no
-prometheus    2.33.5   active       1  prometheus-k8s    stable    79  10.152.183.196  no
-traefik                active       1  traefik-k8s       stable    93  10.152.183.83   no
+App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
+alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no
+catalogue              active      1  catalogue-k8s     1/stable        84  10.152.183.19   no
+grafana       9.5.3    active      1  grafana-k8s       1/stable       146  10.152.183.132  no
+loki          2.9.6    active      1  loki-k8s          1/stable       194  10.152.183.207  no
+prometheus    2.52.0   active      1  prometheus-k8s    1/stable       247  10.152.183.196  no
+traefik       2.11.0   active      1  traefik-k8s       latest/stable  236  10.152.183.83   no       Serving at 10.223.2.63
 ```
 
 From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
@@ -369,7 +369,7 @@ First, run `juju status` again to retrieve the IP address of your Grafana servic
 Now, use `juju run` to retrieve your Grafana password, as shown below.
 
 ```text
-juju run grafana/0  -m cos-lite get-admin-password --wait 1m
+juju run grafana/0 -m cos-lite get-admin-password --wait 1m
 ```
 
 Now, on your host machine, open a web browser, enter the Grafana IP address, and use the username "admin" and your Grafana password to log in.
@@ -388,7 +388,7 @@ http://10.152.183.132:3000/?orgId=1&search=open
 Click on `FastAPI Monitoring`
 -->
 
-Next, in the `Juju model` drop down field, select `charm-model`.
+Next, in the `Juju model` drop down field, select `welcome-k8s`.
 
 Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
 
