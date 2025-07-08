@@ -569,7 +569,7 @@ PASSED
 ...
 ```
 
-Congratulations, with this integration test you have verified that your charms relation to PostgreSQL works as well!
+Congratulations, with these integration tests you have verified that your charm's relation to PostgreSQL works as well!
 
 ## Review the final code
 
