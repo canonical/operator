@@ -219,6 +219,13 @@ demo-api-charm/0*  blocked   idle   10.1.157.74         Invalid port number, 22 
 
 Congratulations, you now know how to make your charm configurable!
 
+Before continuing, reset the port to `8000` and check that the application is in `active` status:
+
+```text
+juju config demo-api-charm server-port=8000
+juju status
+```
+
 ## Write unit tests
 
 Since we added a new feature to configure `server-port` and use it in the Pebble layer dynamically, we should write tests for the feature.
