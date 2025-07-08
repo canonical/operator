@@ -120,11 +120,11 @@ juju run demo-api-charm/0 get-db-info
 It might take a few seconds, but soon you should see an output similar to the one below, showing the database host and port:
 
 ```text
-Running operation 13 with 1 task
-  - task 14 on unit-demo-api-charm-0
+Running operation 1 with 1 task
+  - task 2 on unit-demo-api-charm-0
 
-Waiting for task 14...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+Waiting for task 2...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-port: "5432"
 ```
 
@@ -135,12 +135,13 @@ juju run demo-api-charm/0 get-db-info show-password=True
 ```
 
 The output should now include the username and the password:
-```
-Running operation 15 with 1 task
-  - task 16 on unit-demo-api-charm-0
 
-Waiting for task 16...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+```text
+Running operation 3 with 1 task
+  - task 4 on unit-demo-api-charm-0
+
+Waiting for task 4...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-password: RGv80aF9WAJJtExn
 db-port: "5432"
 db-username: relation_id_4
