@@ -54,7 +54,7 @@ class MyCharm(ops.CharmBase):
 
     def __init__(self, framework):
         super().__init__(framework)
-        self._stored.set_default('expensive_value', None)
+        self._stored.set_default(expensive_value=None)
 ```
 
 > See more: [](ops.StoredState)
