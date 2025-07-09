@@ -30,6 +30,7 @@ from ops import (
     PreCommitEvent,
 )
 from ops.jujucontext import _JujuContext
+from ops._main import _Abort
 from ops._private.harness import ActionFailed
 
 from .errors import NoObserverError, UncaughtCharmError
@@ -345,6 +346,10 @@ class Runtime:
 
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
+            except _Abort as e:
+                # If ops raised _Abort(0) then we want to treat that as normal completion.
+                if e.exit_code != 0:
+                    raise
             except Exception as e:
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
