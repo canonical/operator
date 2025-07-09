@@ -7,13 +7,11 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 03_integrate_with_psql
-git checkout -b  04_create_actions
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-3-postgresql
 ```
 
 ````
@@ -122,11 +120,11 @@ juju run demo-api-charm/0 get-db-info
 It might take a few seconds, but soon you should see an output similar to the one below, showing the database host and port:
 
 ```text
-Running operation 13 with 1 task
-  - task 14 on unit-demo-api-charm-0
+Running operation 1 with 1 task
+  - task 2 on unit-demo-api-charm-0
 
-Waiting for task 14...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+Waiting for task 2...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-port: "5432"
 ```
 
@@ -137,12 +135,13 @@ juju run demo-api-charm/0 get-db-info show-password=True
 ```
 
 The output should now include the username and the password:
-```
-Running operation 15 with 1 task
-  - task 16 on unit-demo-api-charm-0
 
-Waiting for task 16...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+```text
+Running operation 3 with 1 task
+  - task 4 on unit-demo-api-charm-0
+
+Waiting for task 4...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-password: RGv80aF9WAJJtExn
 db-port: "5432"
 db-username: relation_id_4
@@ -218,8 +217,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code see: [04_create_actions](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_create_actions)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/03_integrate_with_psql...04_create_actions)
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-4-action).
 
 > **See next: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**

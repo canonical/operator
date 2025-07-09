@@ -7,13 +7,11 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 01_create_minimal_charm
-git checkout -b 02_make_your_charm_configurable
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-1-minimal
 ```
 
 ````
@@ -110,26 +108,26 @@ def _update_layer_and_restart(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
-        try:
-            config = self.load_config(FastAPIConfig)
-        except ValueError as e:
-            logger.error('Configuration error: %s', e)
-            self.unit.status = ops.BlockedStatus(str(e))
-            return
-        try:
-            self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
-            logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
+    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    try:
+        config = self.load_config(FastAPIConfig)
+    except ValueError as e:
+        logger.error('Configuration error: %s', e)
+        self.unit.status = ops.BlockedStatus(str(e))
+        return
+    try:
+        self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
+        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
-            # Tell Pebble to incorporate the changes, including restarting the
-            # service if required.
-            self.container.replan()
-            logger.info(f"Replanned with '{self.pebble_service_name}' service")
+        # Tell Pebble to incorporate the changes, including restarting the
+        # service if required.
+        self.container.replan()
+        logger.info(f"Replanned with '{self.pebble_service_name}' service")
 
-            self.unit.status = ops.ActiveStatus()
-        except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-            logger.info('Unable to connect to Pebble: %s', e)
-            self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+        self.unit.status = ops.ActiveStatus()
+    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
+        logger.info('Unable to connect to Pebble: %s', e)
+        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
@@ -137,27 +135,27 @@ When the config is loaded as part of creating the Pebble layer, if the config is
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
 ```python
-    def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join([
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
-        ])
-        pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
-                self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
-                }
-            },
-        }
-        return ops.pebble.Layer(pebble_layer)
+def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
+    """A Pebble layer for the FastAPI demo services."""
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        f'--port={port}',
+    ])
+    pebble_layer: ops.pebble.LayerDict = {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
+            self.pebble_service_name: {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
+            }
+        },
+    }
+    return ops.pebble.Layer(pebble_layer)
 ```
 
 As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
@@ -209,17 +207,24 @@ juju status
 As expected, the application is indeed in the `blocked` state:
 
 ```text
-Model        Controller           Cloud/Region        Version  SLA          Timestamp
-charm-model  tutorial-controller  microk8s/localhost  3.0.0    unsupported  18:19:24+01:00
+Model        Controller  Cloud/Region        Version  SLA          Timestamp
+welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  18:19:24+01:00
 
 App             Version  Status   Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           blocked      1  demo-api-charm             2  10.152.183.215  no       invalid port number, 22 is reserved for SSH
+demo-api-charm           blocked      1  demo-api-charm             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  blocked   idle   10.1.157.74         invalid port number, 22 is reserved for SSH
+demo-api-charm/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
 ```
 
 Congratulations, you now know how to make your charm configurable!
+
+Before continuing, reset the port to `8000` and check that the application is in `active` status:
+
+```text
+juju config demo-api-charm server-port=8000
+juju status
+```
 
 ## Write unit tests
 
@@ -267,8 +272,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code see: [02_make_your_charm_configurable](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/02_make_your_charm_configurable)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/01_create_minimal_charm...02_make_your_charm_configurable)
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-2-configurable).
 
 > **See next: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`**
