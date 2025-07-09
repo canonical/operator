@@ -702,6 +702,6 @@ INFO     pytest_operator.plugin:plugin.py:1039 Forgetting model main...
 
 ## Review the final code
 
-For the full code, see our [k8s-1-minimal](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal) example charm.
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal).
 
 >**See next: {ref}`Make your charm configurable <make-your-charm-configurable>`**

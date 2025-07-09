@@ -217,6 +217,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code, see our [k8s-4-action](https://github.com/canonical/operator/tree/main/examples/k8s-4-action) example charm.
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-4-action).
 
 > **See next: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**

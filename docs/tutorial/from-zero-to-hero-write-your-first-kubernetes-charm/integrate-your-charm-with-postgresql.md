@@ -573,6 +573,6 @@ Congratulations, with this integration test you have verified that your charm's 
 
 ## Review the final code
 
-For the full code,  see our [k8s-3-postgresql](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) example charm.
+For the full code,  see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql).
 
 > **See next: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`**

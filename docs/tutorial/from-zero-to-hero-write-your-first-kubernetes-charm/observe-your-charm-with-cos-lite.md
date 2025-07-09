@@ -423,4 +423,4 @@ Also, you can reach Prometheus in your web browser (similar to Grafana) at `http
 
 ## Review the final code
 
-For the full code, see our [k8s-5-observe](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe) example charm.
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe).

@@ -272,6 +272,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code, see our [k8s-2-configurable](https://github.com/canonical/operator/tree/main/examples/k8s-2-configurable) example charm.
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-2-configurable).
 
 > **See next: {ref}`Integrate your charm with PostgreSQL <integrate-your-charm-with-postgresql>`**
