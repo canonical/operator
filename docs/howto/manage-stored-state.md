@@ -97,7 +97,7 @@ def test_charm_sets_stored_state():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
-    ss = state_out.get_stored_state("_stored", owner_path="mycharm")
+    ss = state_out.get_stored_state("_stored", owner_path="MyCharm")
     assert ss.content["expensive_value"] == 42
 
 def test_charm_logs_stored_state():
