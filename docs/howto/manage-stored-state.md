@@ -11,8 +11,7 @@ the charm machine or (for Kubernetes charms) container - for state that should
 have the same lifetime as the machine or container, and storing state in a Juju
 peer relation - for state that should have the same lifetime as the application.
 
-```{admonition} Best practice
-:class: hint
+```{tip}
 
 Write your charm to be stateless, where possible.
 ```
