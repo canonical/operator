@@ -21,8 +21,6 @@ import logging
 import os
 import re
 import subprocess
-import time
-import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -30,31 +28,11 @@ import github
 import github.GitRelease
 import github.Repository
 
-
-class SymbolFormatter(logging.Formatter):
-    """Custom logging formatter to use symbols for log levels."""
-
-    from typing import ClassVar
-
-    levels: ClassVar[dict[str, str]] = {
-        'DEBUG': '🐛',
-        'INFO': 'ℹ️',  # noqa: RUF001
-        'WARNING': '⚠️',
-        'ERROR': '❌',
-        'CRITICAL': '🔥',
-    }
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Format the log record with symbols for level."""
-        level = self.levels.get(record.levelname, '#')
-        message = record.getMessage()
-        return f'{level} {message}'
-
-
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('release')
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
-handler.setFormatter(SymbolFormatter())
+handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
@@ -68,11 +46,11 @@ gh_client = github.Github(auth=auth)
 
 VERSION_REGEX = r'(\d+\.\d+\.\d+(?:\.dev\d+)?)'
 VERSION_FILES = {
-    'ops/src': 'ops/version.py',
-    'ops/pyproject': 'pyproject.toml',
-    'testing': 'testing/pyproject.toml',
-    'tracing': 'tracing/pyproject.toml',
-    'uvlock': 'uv.lock',
+    'ops/src': Path('ops/version.py'),
+    'ops/pyproject': Path('pyproject.toml'),
+    'testing': Path('testing/pyproject.toml'),
+    'tracing': Path('tracing/pyproject.toml'),
+    'uvlock': Path('uv.lock'),
 }
 
 
@@ -122,12 +100,10 @@ def get_new_tag_for_release(
             suggested_tag = bump_minor_version(latest_tag)
             logger.info(f'Suggested new version: {suggested_tag}')
 
+    tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
+    prompt = f"Input the new tag for the release{tag_prompt}, or 'c' to cancel:\n"
     while True:
-        user_input = input(
-            f'Input tag to release (press enter to use the suggested tag '
-            f"{suggested_tag or 'required'}), or 'c' to cancel: "
-        ).strip()
-
+        user_input = input(prompt).strip()
         if user_input.lower() == 'c':
             logger.warning('Release canceled.')
             exit(0)
@@ -163,24 +139,18 @@ def create_draft_release(
     repo: github.Repository.Repository, tag: str, branch: str
 ) -> github.GitRelease.GitRelease | None:
     """Create a draft release with auto-generated notes."""
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        try:
-            release = repo.create_git_release(
-                tag=tag,
-                name=tag,
-                draft=True,
-                generate_release_notes=True,
-                target_commitish=branch,
-            )
-            return release
-        except Exception as e:
-            logger.error(f'Attempt {attempt} failed to create release: {e}')
-        if attempt == max_retries:
-            raise
-        time.sleep(1)
-
-    return None
+    try:
+        release = repo.create_git_release(
+            tag=tag,
+            name=tag,
+            draft=True,
+            generate_release_notes=True,
+            target_commitish=branch,
+        )
+        return release
+    except Exception as e:
+        logger.error(f'Failed to create release: {e}')
+        return None
 
 
 def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, str]]], str | None]:
@@ -209,16 +179,12 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     full_changelog_line = None
 
     for line in release_notes.splitlines():
-        line = line.strip()
-        if line.startswith('* '):
-            match = re.match(r'\* (\w+): (.*) by @\w+ in (.*)', line)
-            if match:
-                category = match.group(1)
-                description = match.group(2).strip()
-                description = description[0].upper() + description[1:]
-                pr_link = match.group(3).strip()
-                if category in categories:
-                    categories[category].append((description, pr_link))
+        if match := re.match(r'^\* (\w+): (.*) by @\w+ in (.*)', line.strip()):
+            category = match.group(1)
+            description = match.group(2).strip().capitalize()
+            pr_link = match.group(3).strip()
+            if category in categories:
+                categories[category].append((description, pr_link))
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
 
@@ -233,21 +199,16 @@ def format_release_notes(
     Results in a Markdown formatted string with sections for each commit type.
     If `full_changelog` is provided, it is appended at the end.
     """
-    res = "## What's Changed\n\n"
-
+    lines = ["## What's Changed", '', '']  # Initialize lines.
     for commit_type, items in categories.items():
         if items:
-            res += f'### {commit_type_to_category(commit_type)}\n'
-
+            lines.append(f'### {commit_type_to_category(commit_type)}')  # Add category header.
             for description, pr_link in items:
-                res += f'* {description} in {pr_link}\n'
-
-            res += '\n'
-
+                lines.append(f'* {description} in {pr_link}')  # Add commit description.
+            lines.append('')  # Add a blank line after each category.
     if full_changelog:
-        res += full_changelog
-
-    return res
+        lines.append(full_changelog)  # Append the full changelog.
+    return '\n'.join(lines)  # Join the lines with newline characters.
 
 
 def print_release_notes(notes: str):
@@ -287,17 +248,11 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
 
 def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        try:
-            release.update_release(name=title, message=notes, draft=True)
-            break
-        except Exception as e:
-            logger.error(f'Attempt {attempt} failed to update release: {e}')
-        if attempt == max_retries:
-            raise
-        time.sleep(1)
-    logger.info('Release title and notes updated.')
+    try:
+        release.update_release(name=title, message=notes, draft=True)
+        logger.info('Release title and notes updated.')
+    except Exception as e:
+        logger.error(f'Failed to update release: {e}')
 
 
 def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
@@ -328,16 +283,9 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
 
 def update_changes_file(changes: str, file: str):
     """Update the changes file with new release notes."""
-    existing_content = ''
-    if os.path.exists(file):
-        with open(file) as f:
-            existing_content = f.read()
-
-    new_content = changes + existing_content
-
-    with open(file, 'w') as f:
-        f.write(new_content)
-
+    file_path = Path(file)
+    existing_content = file_path.read_text() if file_path.exists() else ''
+    file_path.write_text(changes + existing_content)
     logger.info(f'Updated {file} with new release notes.')
 
 
@@ -377,85 +325,83 @@ def parse_version(version: str) -> tuple[str, str]:
 def update_ops_version(ops_version: str, testing_version: str):
     """Update the ops version in version.py and pyproject.toml."""
     # version.py
-    ops_src_file = VERSION_FILES['ops/src']
-    ops_src_file_path = Path(ops_src_file)
+    ops_src_file_path = VERSION_FILES['ops/src']
     content = ops_src_file_path.read_text()
     updated = re.sub(
-        r'^version: str = \'' + VERSION_REGEX + r'\'$',
+        rf"^version: str = '{VERSION_REGEX}'$",
         f"version: str = '{ops_version}'",
         content,
         flags=re.MULTILINE,
     )
     ops_src_file_path.write_text(updated)
-    logger.info(f'Updated {ops_src_file} to version {ops_version}')
+    logger.info(f'Updated {ops_src_file_path} to version {ops_version}')
 
     # pyproject.toml
     # Update both ops-scenario and ops-tracing versions.
-    ops_pyproject_file = VERSION_FILES['ops/pyproject']
-    ops_pyproject_file_path = Path(ops_pyproject_file)
+    ops_pyproject_file_path = VERSION_FILES['ops/pyproject']
     content = ops_pyproject_file_path.read_text()
     updated = re.sub(
-        r'ops-scenario==' + VERSION_REGEX,
+        rf'ops-scenario=={VERSION_REGEX}',
         f'ops-scenario=={testing_version}',
         content,
     )
     updated = re.sub(
-        r'ops-tracing==' + VERSION_REGEX,
+        rf'ops-tracing=={VERSION_REGEX}',
         f'ops-tracing=={ops_version}',
         updated,
     )
     # Fail if nothing is changed.
     if content == updated:
-        logger.error(f'No changes made to {ops_pyproject_file}. Check the versions.')
+        logger.error(f'No changes made to {ops_pyproject_file_path}. Check the versions.')
         exit(1)
     ops_pyproject_file_path.write_text(updated)
-    logger.info(f'Updated {ops_pyproject_file} to ops {ops_version} testing {testing_version}')
+    logger.info(
+        f'Updated {ops_pyproject_file_path} to ops {ops_version} testing {testing_version}'
+    )
 
 
 def update_testing_version(ops_version: str, testing_version: str):
     """Update the testing pyproject version."""
-    file = VERSION_FILES['testing']
-    file_path = Path(file)
+    file_path = VERSION_FILES['testing']
     content = file_path.read_text()
     updated = re.sub(
-        r'version = "' + VERSION_REGEX + '"',
+        rf'version = "{VERSION_REGEX}"',
         f'version = "{testing_version}"',
         content,
     )
     updated = re.sub(
-        r'ops==' + VERSION_REGEX,
+        rf'ops=={VERSION_REGEX}',
         f'ops=={ops_version}',
         updated,
     )
     # Fail if nothing is changed.
     if content == updated:
-        logger.error(f'No changes made to {file}. Check the versions.')
+        logger.error(f'No changes made to {file_path}. Check the versions.')
         exit(1)
     file_path.write_text(updated)
-    logger.info(f'Updated {file} to ops {ops_version} testing {testing_version}')
+    logger.info(f'Updated {file_path} to ops {ops_version} testing {testing_version}')
 
 
 def update_tracing_version(ops_version: str):
     """Update the tracing pyproject version."""
-    file = VERSION_FILES['tracing']
-    file_path = Path(file)
+    file_path = VERSION_FILES['tracing']
     content = file_path.read_text()
     updated = re.sub(
-        r'version = "' + VERSION_REGEX + '"',
+        rf'version = "{VERSION_REGEX}"',
         f'version = "{ops_version}"',
         content,
     )
     updated = re.sub(
-        r'ops==' + VERSION_REGEX,
+        rf'ops=={VERSION_REGEX}',
         f'ops=={ops_version}',
         updated,
     )
     # Fail if nothing is changed.
     if content == updated:
-        logger.error(f'No changes made to {file}. Check the versions.')
+        logger.error(f'No changes made to {file_path}. Check the versions.')
         exit(1)
     file_path.write_text(updated)
-    logger.info(f'Updated {file} to version {ops_version}')
+    logger.info(f'Updated {file_path} to version {ops_version}')
 
 
 def update_uv_lock():
@@ -465,12 +411,11 @@ def update_uv_lock():
 
 def parse_scenario_version():
     """Parse the current scenario version from pyproject.toml."""
-    file = VERSION_FILES['testing']
-    file_path = Path(file)
+    file_path = VERSION_FILES['testing']
     content = file_path.read_text()
-    match = re.search(r'version = "' + VERSION_REGEX + '"', content)
+    match = re.search(rf'version = "{VERSION_REGEX}"', content)
     if not match:
-        raise ValueError(f'Could not find version string in {file}')
+        raise ValueError(f'Could not find version string in {file_path}')
     version_str = match.group(1)
     base_version, dev_suffix = parse_version(version_str)
     return base_version, dev_suffix
@@ -641,15 +586,6 @@ def update_versions_for_post_release(repo: github.Repository.Repository, branch_
     update_uv_lock()
 
 
-def countdown(msg: str, t: int):
-    """Countdown timer to show before exiting."""
-    while t:
-        timer = f'00:{t:02d}'
-        print(f'{msg}: {timer}', end='\r')
-        time.sleep(1)
-        t -= 1
-
-
 def check_update_charm_pins_prs(repo: github.Repository.Repository):
     """Check for open PRs that update charm pins."""
     prs = repo.get_pulls(state='open')
@@ -663,9 +599,6 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
             logger.info(
                 f'Note that there are {len(open_prs) - 1} more open update charm pins PRs.'
             )
-        countdown('Exiting and opening the charm pins PR in: ', 3)
-        webbrowser.open(pr.html_url)
-        exit(1)
 
 
 def draft_release(owner: str, repo_name: str, branch: str):
@@ -700,7 +633,7 @@ def draft_release(owner: str, repo_name: str, branch: str):
 
     new_branch = f'release-prep-{tag}'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    changed_files = ['CHANGES.md', *VERSION_FILES.values()]
+    changed_files = ['CHANGES.md', *[str(path) for path in VERSION_FILES.values()]]
     for file in changed_files:
         subprocess.run(['/usr/bin/git', 'add', file], check=True)
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
@@ -712,40 +645,6 @@ def draft_release(owner: str, repo_name: str, branch: str):
         base=branch,
     )
     logger.info(f'Created PR: {pr.html_url}')
-    countdown('Opening the PR in: ', 3)
-    webbrowser.open(pr.html_url)
-
-
-def publish_draft_release(owner: str, repo_name: str):
-    """Publish the draft release."""
-    org = gh_client.get_organization(owner)
-    repo = org.get_repo(repo_name)
-
-    releases = repo.get_releases()
-    draft = None
-    for release in releases:
-        if release.draft:
-            draft = release
-            break
-
-    if not draft:
-        logger.error('No draft release found. Please create a draft release first.')
-        return
-
-    while True:
-        confirm = (
-            input(f"Confirm publishing draft release '{draft.html_url}'? [y/N]: ").strip().lower()
-        )
-
-        if confirm.lower() == 'n':
-            logger.warning('Release publish canceled.')
-            exit(0)
-
-        if confirm == 'y':
-            break
-
-    logger.info(f'Publishing draft release: {draft.title} {draft.html_url}')
-    draft.update_release(name=draft.title, message=draft.body, draft=False)
 
 
 def post_release(owner: str, repo_name: str, branch: str):
@@ -781,7 +680,7 @@ def post_release(owner: str, repo_name: str, branch: str):
     update_versions_for_post_release(repo, branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    for file in VERSION_FILES.values():
+    for file in [str(path) for path in VERSION_FILES.values()]:
         subprocess.run(['/usr/bin/git', 'add', file], check=True)
     subprocess.run(
         ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True
@@ -794,8 +693,6 @@ def post_release(owner: str, repo_name: str, branch: str):
         base=branch,
     )
     logger.info(f'Created PR: {pr.html_url}')
-    countdown('Opening the PR in: ', 3)
-    webbrowser.open(pr.html_url)
 
 
 if __name__ == '__main__':
@@ -809,29 +706,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--owner',
         '-o',
-        help='Owner name (e.g. "Canonical")',
-        default='Canonical',
+        help='Owner name (e.g. "canonical")',
+        default='canonical',
     )
     parser.add_argument('--branch', '-b', help='Branch to create the release from', default='main')
-    parser.add_argument(
-        '--publish',
-        action='store_true',
-        help='After drafting a release and merging the version bump PR, publish the release',
-    )
     parser.add_argument(
         '--post-release',
         action='store_true',
         help='After release, bump version and add .dev0 suffix',
     )
     args = parser.parse_args()
-
-    if args.publish:
-        publish_draft_release(owner=args.owner, repo_name=args.repo)
-        logger.info(
-            'Draft release published. Please run this script with --post-release '
-            'to update the version files.'
-        )
-        exit(0)
 
     if args.post_release:
         post_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
@@ -843,6 +727,6 @@ if __name__ == '__main__':
 
     draft_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
     logger.info(
-        'Draft release created. Please merge the version bump PR and then run this script '
-        'with --publish to publish the release.'
+        'Draft release created. Please merge the version bump PR, publish the draft release, then'
+        'run this script with --post-release to perform post-release actions.'
     )
