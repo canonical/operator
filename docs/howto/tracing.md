@@ -1,5 +1,5 @@
-(how-to-tracing)=
-# How to trace charm code
+(trace-your-charm)=
+# How to trace your charm
 ## Introduction
 
 This document describes how to trace your charm code and send the trace data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
@@ -12,15 +12,15 @@ Trace data is structured and contextual; {ref}`this helps users <tracing-users>`
 
 ### What is traced
 
-The responsibility to instrument the Python code is divided between Ops, charm libraries and charms.
+The responsibility to instrument the Python code is divided between Ops, charm libraries, and charms.
 
 #### What Ops and charm libraries provide
 
 Ops contains its own instrumentation, as well as unit and integration tests for it.
 
-- Ops creates the root span and a separate span when calling each observer, and these can be relied on in your tests.
+- Ops creates the root span and a separate span when calling each observer, which provide context for your instrumentation and can be used to scope trace data assertions in your unit tests.
 - Ops creates spans for every Juju hook tool invocation and every Pebble operation, so you typically don't have to.
-- The {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` first-party charm library validates its arguments during object construction, and would trip on misconfiguration in any Scenario or integration test, so that charms don't have to test object instantiation explicitly.
+- The [ops.tracing.Tracing](ops_tracing.Tracing) first-party charm library validates its arguments during object construction, and would trip on misconfiguration in a unit or integration test.
 - Buffering and export logic is already tested as part of Ops, and charms need not write integration
 tests to cover these.
 
@@ -34,22 +34,13 @@ Charm libraries should instrument their logic at coarse granularity, and add att
 
 Charm authors should note that relatively little, if anything, needs to be instrumented in the charm code:
 - workload decisions, such as failing over from primary to replica
-- external or long processes, like `subprocess.*`, `requests.*` or call to a Python module specific to your workload
+- external or long processes, like `subprocess.*`, `requests.*` or calls to a Python module specific to your workload
 - points where important values can be exposed as attributes
 - additional context for other instrumentation, like doing A for remote app B in a provider charm
 
-In a simple case, all the charm author needs to do is to instantiate {py:class}`ops.tracing.Tracing <ops_tracing.Tracing>` in the charm's `__init__` and provide it with relation names.
+In a simple case, all the charm author needs to do is to instantiate the [ops.tracing.Tracing](ops_tracing.Tracing) class in the charm's `__init__` and provide it with relation name(s).
 
 ## Add tracing to an existing charm
-
-<!--
-> Hints:
-Updating an Existing Charm
-Charm age and versions of library dependencies:
-New enough Ops
-Scenario tests
-A word about integration tests
--->
 
 ### To enable basic tracing
 
@@ -84,9 +75,10 @@ class MyCharm(ops.CharmBase):
 
 At this point, Ops will trace:
 - The `ops.main()` call
-- Events that Ops emits, including all the Juju events
+- Observer invocations for the Juju event
+- Observer invocations for custom and life-cycle events
 - Ops calls that inspect and update Juju (also called "hook tools")
-- Pebble API access by the charm code
+- Pebble API access
 
 ### Try it out
 
@@ -154,11 +146,11 @@ class Workload:
             ...
 ```
 
-Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
+Refer to the [](ops_tracing) reference for the canonical usage example, configuration
 options, and API details.
 
 
-### Replace the charm_tracing library
+### Migrate from the charm_tracing library
 
 - In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
   `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
@@ -174,37 +166,9 @@ Note that the `charm_tracing` charm library auto-instruments all public function
 of the decorated charm class. `ops[tracing]` doesn't do that, and you are expected
 to create custom spans and events using the OpenTelemetry API where that makes sense.
 
-<!--
-## Trace a charm library
-
-> Hints:
-OTEL API usage.
-A (dummy) charm to test the charm lib.
-
-- At the top of your charm library, `import opentelemetry.trace`.
-- After the imports in your charm library, create the tracer object as
-  `tracer = opentelemetry.trace.get_tracer(name)` where the name could be your
-  charm library name, or Python module `__name__`.
-- See the [Custom spans and events](custom-spans-and-events) section above to
-  create OpenTelemetry spans and events in the key places in your charm library.
--->
-
-<!--
-## Include tracing in a new charm
--->
-
-<!--
-## View the trace data
-
-> Hints:
-How to install COS (link), relate your app to COS, where to point browser,
-screenshot of a trace in Grafana, some pointer about what's on the screenshot
-and how manual instrumentation (above) connects to that.
--->
-
 ## Test the feature
 
-A note that ops and charm libraries are already covered, maybe there's
+FIXME A note that ops and charm libraries are already covered, maybe there's
 nothing left for the charm to do.
 
 Relation setup is already validated by the fact that your charm doesn't crash in other tests.
@@ -214,8 +178,8 @@ It's easier to cover this with unit tests.
 
 ### Write unit tests
 
-The {py:attr}`trace_data <ops.testing.Context.trace_data>` attribute
-of the {py:class}`ops.testing.Context` class of the testing framework 
+The [trace_data](ops.testing.Context.trace_data) attribute
+of the [](ops.testing.Context) class of the testing framework 
 contains the list of finished spans.
 
 The following example demonstrates how to get the root span, created by Ops itself.
@@ -226,7 +190,7 @@ ctx.run(ctx.on.start(), State())
 main_span = next(s for s in ctx.trace_data if s.name == 'ops.main')
 ```
 
-The spans are OpenTelemetry objects in memory, allowing more focused examination, here a check that span A is a parent of span B.
+The spans are OpenTelemetry objects in memory, allowing more focused examination; here is a check that span A is a parent of span B.
 
 ```py
 span_a = ...
@@ -247,7 +211,7 @@ def ancestors(span: ReadableSpan) -> Generator[ReadableSpan]:
 assert span_a in list(ancestors(span_c))
 ```
 
-You can disambiguate spans using their {py:class}`instrumentation_scope <opentelemetry.sdk.util.instrumentation.InstrumentationScope>` property.
+You can disambiguate spans using their [instrumentation_scope](opentelemetry.sdk.util.instrumentation.InstrumentationScope) property.
 
 ```py
 # Spans from Ops
@@ -258,16 +222,6 @@ ops_span.name == ...
 my_span.instrumentation_scope.name == "my-charm"
 my_span.name == ...
 ```
-
-<!--
-### Write integration tests
-
-> Hints:
-Against the tracing-integration-tester charm (example)
-Against Tempo
-Links to COS documentation
-> Against grafana-agent -- don't use that any more
--->
 
 ## Lower-level API
 
