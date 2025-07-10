@@ -250,8 +250,8 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
 def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
     try:
-        release.update_release(name=title, message=notes, draft=True)
-        logger.info('Release title and notes updated.')
+        release = release.update_release(name=title, message=notes, draft=True)
+        logger.info(f'Release updated: {release.html_url}.')
     except Exception as e:
         logger.error(f'Failed to update release: {e}')
 
