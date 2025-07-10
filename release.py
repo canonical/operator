@@ -57,14 +57,16 @@ def get_latest_release_tag(repo: github.Repository.Repository, branch_name: str)
     """Get the latest release tag from the repository."""
     releases = repo.get_releases()
 
+    maintenance_branch_version = (
+        branch_name.removesuffix('-maintenance') if branch_name.endswith('-maintenance') else None
+    )
+
     for release in releases:
         if release.draft:
             continue
 
-        if 'maintenance' in branch_name:
-            version = branch_name.split('-')[0]
-            if version not in release.tag_name:
-                continue
+        if maintenance_branch_version and maintenance_branch_version not in release.tag_name:
+            continue
 
         return release.tag_name
 
@@ -680,14 +682,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.post_release:
-        post_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
+        post_release(owner=args.owner, repo_name=args.repo, base_branch=args.branch)
         logger.info(
             'Post-release actions completed. Please check and merge the created PR '
             'for version updates.'
         )
         exit(0)
 
-    draft_release(owner=args.owner, repo_name=args.repo, branch=args.branch)
+    draft_release(owner=args.owner, repo_name=args.repo, base_branch=args.branch)
     logger.info(
         'Draft release created. Please merge the version bump PR, publish the draft release, then'
         'run this script with --post-release to perform post-release actions.'
