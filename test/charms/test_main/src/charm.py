@@ -28,6 +28,13 @@ sys.path.append('lib')
 
 logger = logging.getLogger()
 
+# Note for ops developers: juju-log doesn't go anywhere useful much of the time
+# during unit tests, and test_main failures that subprocess out are often
+# difficult to debug. Uncomment this line to get more informative errors when
+# running the tests.
+# When uncommented the test_hook_and_dispatch_with_failing_hook test will fail.
+# logger.addHandler(logging.StreamHandler(sys.stderr))
+
 
 class CustomEvent(ops.EventBase):
     pass
