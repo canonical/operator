@@ -30,15 +30,14 @@ import github.Repository
 
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('release')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
 if 'GITHUB_TOKEN' not in os.environ:
-    logger.critical('Environment variable GITHUB_TOKEN not set.')
-    exit(1)
+    raise SystemExit('Environment variable GITHUB_TOKEN not set.')
 
 auth = github.Auth.Token(os.environ['GITHUB_TOKEN'])
 gh_client = github.Github(auth=auth)
@@ -181,9 +180,9 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     for line in release_notes.splitlines():
         if match := re.match(r'^\* (\w+): (.*) by @\w+ in (.*)', line.strip()):
             category = match.group(1)
-            description = match.group(2).strip().capitalize()
-            pr_link = match.group(3).strip()
             if category in categories:
+                description = match.group(2).strip().capitalize()
+                pr_link = match.group(3).strip()
                 categories[category].append((description, pr_link))
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
@@ -322,6 +321,19 @@ def parse_version(version: str) -> tuple[str, str]:
     return base_version, dev_suffix
 
 
+def update_pyproject_versions(path: Path, version: str, deps: dict[str, str]) -> None:
+    """Update versions in pyproject.toml."""
+    content = path.read_text()
+    updated = re.sub(rf'version = "{VERSION_REGEX}"', f'version = "{version}"', content)
+    for pkg, pkg_version in deps.items():
+        updated = re.sub(rf'{pkg}=={VERSION_REGEX}', f'{pkg}=={pkg_version}', updated)
+    if content == updated:
+        logger.error(f'No changes made to {path}. Check the versions.')
+        exit(1)
+    path.write_text(updated)
+    logger.info(f'Updated {path} to version {version}')
+
+
 def update_ops_version(ops_version: str, testing_version: str):
     """Update the ops version in version.py and pyproject.toml."""
     # version.py
@@ -336,72 +348,22 @@ def update_ops_version(ops_version: str, testing_version: str):
     ops_src_file_path.write_text(updated)
     logger.info(f'Updated {ops_src_file_path} to version {ops_version}')
 
-    # pyproject.toml
-    # Update both ops-scenario and ops-tracing versions.
-    ops_pyproject_file_path = VERSION_FILES['ops/pyproject']
-    content = ops_pyproject_file_path.read_text()
-    updated = re.sub(
-        rf'ops-scenario=={VERSION_REGEX}',
-        f'ops-scenario=={testing_version}',
-        content,
-    )
-    updated = re.sub(
-        rf'ops-tracing=={VERSION_REGEX}',
-        f'ops-tracing=={ops_version}',
-        updated,
-    )
-    # Fail if nothing is changed.
-    if content == updated:
-        logger.error(f'No changes made to {ops_pyproject_file_path}. Check the versions.')
-        exit(1)
-    ops_pyproject_file_path.write_text(updated)
-    logger.info(
-        f'Updated {ops_pyproject_file_path} to ops {ops_version} testing {testing_version}'
+    # pyproject.toml, update both ops-scenario and ops-tracing versions.
+    update_pyproject_versions(
+        VERSION_FILES['ops/pyproject'],
+        testing_version,
+        deps={'ops-scenario': testing_version, 'ops-tracing': ops_version},
     )
 
 
 def update_testing_version(ops_version: str, testing_version: str):
     """Update the testing pyproject version."""
-    file_path = VERSION_FILES['testing']
-    content = file_path.read_text()
-    updated = re.sub(
-        rf'version = "{VERSION_REGEX}"',
-        f'version = "{testing_version}"',
-        content,
-    )
-    updated = re.sub(
-        rf'ops=={VERSION_REGEX}',
-        f'ops=={ops_version}',
-        updated,
-    )
-    # Fail if nothing is changed.
-    if content == updated:
-        logger.error(f'No changes made to {file_path}. Check the versions.')
-        exit(1)
-    file_path.write_text(updated)
-    logger.info(f'Updated {file_path} to ops {ops_version} testing {testing_version}')
+    update_pyproject_versions(VERSION_FILES['testing'], testing_version, deps={'ops': ops_version})
 
 
 def update_tracing_version(ops_version: str):
     """Update the tracing pyproject version."""
-    file_path = VERSION_FILES['tracing']
-    content = file_path.read_text()
-    updated = re.sub(
-        rf'version = "{VERSION_REGEX}"',
-        f'version = "{ops_version}"',
-        content,
-    )
-    updated = re.sub(
-        rf'ops=={VERSION_REGEX}',
-        f'ops=={ops_version}',
-        updated,
-    )
-    # Fail if nothing is changed.
-    if content == updated:
-        logger.error(f'No changes made to {file_path}. Check the versions.')
-        exit(1)
-    file_path.write_text(updated)
-    logger.info(f'Updated {file_path} to version {ops_version}')
+    update_pyproject_versions(VERSION_FILES['tracing'], ops_version, deps={'ops': ops_version})
 
 
 def update_uv_lock():
@@ -601,15 +563,15 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
             )
 
 
-def draft_release(owner: str, repo_name: str, branch: str):
+def draft_release(owner: str, repo_name: str, base_branch: str):
     """Create a draft release, update changelog, and create a PR for the release."""
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
 
     check_update_charm_pins_prs(repo)
 
-    tag = get_new_tag_for_release(owner, repo, branch)
-    release = create_draft_release(repo, tag, branch)
+    tag = get_new_tag_for_release(owner, repo, base_branch)
+    release = create_draft_release(repo, tag, base_branch)
     if not release:
         logger.error('Failed to create draft release.')
         exit(1)
@@ -642,12 +604,12 @@ def draft_release(owner: str, repo_name: str, branch: str):
         title=f'chore: update changelog and versions for {tag} release',
         body=f'This PR prepares the release of version {tag}.',
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
-        base=branch,
+        base=base_branch,
     )
     logger.info(f'Created PR: {pr.html_url}')
 
 
-def post_release(owner: str, repo_name: str, branch: str):
+def post_release(owner: str, repo_name: str, base_branch: str):
     """Post-release actions: update version files and create a PR."""
     new_branch = 'post-release'
     local_branch = subprocess.run(
@@ -671,13 +633,13 @@ def post_release(owner: str, repo_name: str, branch: str):
         exit(1)
 
     subprocess.run(['/usr/bin/git', 'fetch', 'upstream'], check=True)
-    subprocess.run(['/usr/bin/git', 'checkout', branch], check=True)
-    subprocess.run(['/usr/bin/git', 'merge', f'upstream/{branch}'], check=True)
+    subprocess.run(['/usr/bin/git', 'checkout', base_branch], check=True)
+    subprocess.run(['/usr/bin/git', 'merge', f'upstream/{base_branch}'], check=True)
 
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
 
-    update_versions_for_post_release(repo, branch)
+    update_versions_for_post_release(repo, base_branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
     for file in [str(path) for path in VERSION_FILES.values()]:
@@ -690,7 +652,7 @@ def post_release(owner: str, repo_name: str, branch: str):
         title='chore: adjust versions after release',
         body='This PR updates the version files after the release.',
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
-        base=branch,
+        base=base_branch,
     )
     logger.info(f'Created PR: {pr.html_url}')
 
