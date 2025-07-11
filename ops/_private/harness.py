@@ -3713,7 +3713,9 @@ class _TestingPebbleClient:
                     f'not {data.__class__.__name__}'
                 )
             else:
-                return io.StringIO(typing.cast('str', data))
+                # pyright doesn't understand that data must be str at this point, but ty does.
+                assert isinstance(data, str)
+                return io.StringIO(data)
 
     def exec(
         self,

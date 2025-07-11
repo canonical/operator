@@ -229,9 +229,7 @@ class Ops(_Manager):
                     return storage
         return obj
 
-    def _get_event_args(
-        self, bound_event: ops.framework.BoundEvent
-    ) -> tuple[list[Any], dict[str, Any]]:
+    def _get_event_args(self, bound_event: ops.BoundEvent) -> tuple[list[Any], dict[str, Any]]:
         # For custom events, if the caller provided us with explicit args, we
         # merge them with the Juju ones (to handle libraries subclassing the
         # Juju events). We also handle converting from Scenario to ops types,

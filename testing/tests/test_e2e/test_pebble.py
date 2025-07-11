@@ -347,6 +347,7 @@ def test_exec_wait_error(charm_cls):
         proc = container.exec(['foo'])
         with pytest.raises(ExecError) as exc_info:
             proc.wait_output()
+        assert isinstance(exc_info.value, ExecError)
         assert exc_info.value.stdout == 'hello pebble'
 
 
@@ -476,7 +477,10 @@ def test_pebble_check_failed():
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({'checks': {'http-check': {'override': 'replace', 'startup': 'enabled'}}})
+    layer = pebble.Layer({
+        'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+    })
+    assert layer.checks['http-check'].threshold is not None
     check = CheckInfo(
         'http-check',
         successes=3,
@@ -508,7 +512,10 @@ def test_pebble_check_recovered():
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({'checks': {'http-check': {'override': 'replace', 'startup': 'enabled'}}})
+    layer = pebble.Layer({
+        'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+    })
+    assert layer.checks['http-check'].threshold is not None
     check = CheckInfo(
         'http-check',
         successes=None,
@@ -532,7 +539,7 @@ def test_pebble_check_failed_two_containers():
     bar_infos = []
 
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_failed, self._on_foo_check_failed)
             framework.observe(self.on.bar_pebble_check_failed, self._on_bar_check_failed)
@@ -545,7 +552,10 @@ def test_pebble_check_failed_two_containers():
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}})
 
-    layer = pebble.Layer({'checks': {'http-check': {'override': 'replace', 'startup': 'enabled'}}})
+    layer = pebble.Layer({
+        'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+    })
+    assert layer.checks['http-check'].threshold is not None
     check = CheckInfo(
         'http-check',
         failures=7,
@@ -637,7 +647,10 @@ def test_pebble_stop_check():
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
 
-    layer = pebble.Layer({'checks': {'chk1': {'override': 'replace', 'startup': 'enabled'}}})
+    layer = pebble.Layer({
+        'checks': {'chk1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+    })
+    assert layer.checks['chk1'].threshold is not None
     info_in = CheckInfo(
         'chk1',
         status=pebble.CheckStatus.UP,
@@ -667,7 +680,10 @@ def test_pebble_replan_checks():
             container.replan()
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({'checks': {'chk1': {'override': 'replace', 'startup': 'enabled'}}})
+    layer = pebble.Layer({
+        'checks': {'chk1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
+    })
+    assert layer.checks['chk1'].threshold is not None
     info_in = CheckInfo(
         'chk1',
         status=pebble.CheckStatus.INACTIVE,
@@ -718,7 +734,9 @@ def test_pebble_replan_checks():
         },
     ],
 )
-def test_add_layer_merge_check(new_layer_name: str, combine: bool, new_layer_dict: pebble.Layer):
+def test_add_layer_merge_check(
+    new_layer_name: str, combine: bool, new_layer_dict: pebble.LayerDict
+):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -740,6 +758,7 @@ def test_add_layer_merge_check(new_layer_name: str, combine: bool, new_layer_dic
             }
         }
     })
+    assert layer_in.checks['server-ready'].threshold is not None
     check_in = CheckInfo(
         'server-ready',
         level=layer_in.checks['server-ready'].level,

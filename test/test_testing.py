@@ -4951,6 +4951,7 @@ class TestTestingPebbleClient:
         # Restart service takes a list of names, but it is really easy to
         # accidentally pass just a name.
         with pytest.raises(TypeError):
+            # This should have a type:ignore, but pyright gets that wrong (ty gets it right).
             client.restart_services('unknown')
 
     def test_restart_service_no_services(self, client: _TestingPebbleClient):

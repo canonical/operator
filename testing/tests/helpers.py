@@ -14,9 +14,10 @@ from typing import (
 import jsonpatch
 
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
+from scenario.state import _Event
 
 if TYPE_CHECKING:  # pragma: no cover
-    from scenario.state import CharmType, State, _Event
+    from scenario.state import CharmType, State
 
     _CT = TypeVar('_CT', bound=Type[CharmType])
 
@@ -45,13 +46,14 @@ def trigger(
     )
     if isinstance(event, str):
         if event.startswith('relation_'):
-            assert len(state.relations) == 1, 'shortcut only works with one relation'
+            assert len(tuple(state.relations)) == 1, 'shortcut only works with one relation'
             event = getattr(ctx.on, event)(tuple(state.relations)[0])
         elif event.startswith('pebble_'):
-            assert len(state.containers) == 1, 'shortcut only works with one container'
+            assert len(tuple(state.containers)) == 1, 'shortcut only works with one container'
             event = getattr(ctx.on, event)(tuple(state.containers)[0])
         else:
             event = getattr(ctx.on, event)()
+    assert isinstance(event, _Event)
     with ctx(event, state=state) as mgr:
         if pre_event:
             pre_event(mgr.charm)

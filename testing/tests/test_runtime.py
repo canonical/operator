@@ -158,4 +158,5 @@ def test_ops_raises_abort(exit_code: int):
     else:
         with pytest.raises(_Abort) as exc:
             ctx.run(ctx.on.start(), State())
+        assert isinstance(exc.value, _Abort)
         assert exc.value.exit_code == exit_code

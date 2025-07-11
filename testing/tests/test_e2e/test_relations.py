@@ -51,6 +51,7 @@ def mycharm():
         def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
+                assert callable(MyCharm._call)
                 MyCharm._call(self, event)
 
     return MyCharm
@@ -344,6 +345,7 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
             assert charm.model.get_relation('foo') is None
             assert e.relation.app.name == remote_app_name
         else:
+            assert charm.model.get_relation('foo').app is not None
             assert charm.model.get_relation('foo').app.name == remote_app_name
 
     mycharm._call = callback
