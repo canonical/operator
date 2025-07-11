@@ -25,6 +25,6 @@ Manage opened ports <manage-opened-ports>
 Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
 Manage metrics <manage-metrics>
-Trace the charm code <trace-the-charm-code>
+Trace the charm code <tracing>
 Legacy how-to guides <legacy/index>
 ```
