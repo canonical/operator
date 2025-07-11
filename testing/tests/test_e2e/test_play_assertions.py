@@ -8,6 +8,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
 from scenario.state import Relation, State
+from scenario.state import BlockedStatus as TestingBlockedStatus
 from ..helpers import jsonpatch_delta, trigger
 
 
@@ -33,7 +34,7 @@ def mycharm():
 
 def test_charm_heals_on_start(mycharm):
     def pre_event(charm):
-        pre_event._called = True
+        pre_event._called = True  # type: ignore
         assert charm.unit.status == BlockedStatus('foo')
         assert not charm.called
 
@@ -42,13 +43,15 @@ def test_charm_heals_on_start(mycharm):
             charm.unit.status = ActiveStatus('yabadoodle')
 
     def post_event(charm):
-        post_event._called = True
+        post_event._called = True  # type: ignore
         assert charm.unit.status == ActiveStatus('yabadoodle')
         assert charm.called
 
     mycharm._call = call
 
-    initial_state = State(config={'foo': 'bar'}, leader=True, unit_status=BlockedStatus('foo'))
+    initial_state = State(
+        config={'foo': 'bar'}, leader=True, unit_status=TestingBlockedStatus('foo')
+    )
 
     out = trigger(
         initial_state,

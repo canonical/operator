@@ -226,7 +226,7 @@ class Runtime:
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
-        metadata_files_present: dict[Path | str | None] = {
+        metadata_files_present: dict[Path, str | None] = {
             file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
@@ -350,6 +350,9 @@ class Runtime:
                 # If ops raised _Abort(0) then we want to treat that as normal completion.
                 if e.exit_code != 0:
                     raise
+                # If _Abort was raised before we created the instance, we can't get the state, so
+                # still want to fail.
+                assert ops is not None
             except Exception as e:
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
