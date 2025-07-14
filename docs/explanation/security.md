@@ -57,6 +57,7 @@ If a charm is integrated with a tracing receiver, this introduces the risk of ou
 * Charms should follow best practices for writing secure Python code.
 * Charms should have workflows that statically check for security issues (such as [ruff](https://docs.astral.sh/ruff/linter/), [bandit](https://bandit.readthedocs.io/en/latest/index.html), and [zizmor](https://docs.zizmor.sh/)).
 * Charm authors should exercise caution when considering adding dependencies to their charms.
+* Write the exact dependencies of the charm into a lock file (using `uv lock`, `poetry lock`, and so on) and commit that lock file to source control.
 * Charm repositories should have tooling that automatically detects outdated dependencies, particularly missing security updates.
 * For Kubernetes charms, run the charm as a non-root user when possible (via the {external+charmcraft:ref}`charm-user key in charmcraft.yaml <charmcraft-yaml-key-charm-user>` and specifying the `uid` and `gid` for containers).
 * Charm authors should harden their workloads by default.
