@@ -310,7 +310,7 @@ def test_model_positional_arguments():
 
 def test_container_positional_arguments():
     with pytest.raises(TypeError):
-        Container('', '')  # type: ignore
+        Container('', True)
 
 
 def test_container_default_values():

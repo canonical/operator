@@ -104,7 +104,6 @@ def test_action_event_outputs(mycharm, res_value):
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
         ctx.run(ctx.on.action('foo'), State())
-    assert isinstance(exc_info.value, ActionFailed)
     assert exc_info.value.message == 'failed becozz'
     assert ctx.action_results == {'my-res': res_value}
     assert ctx.action_logs == ['log1', 'log2']
@@ -125,7 +124,6 @@ def test_action_continues_after_fail():
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
         ctx.run(ctx.on.action('foo'), State())
-    assert isinstance(exc_info.value, ActionFailed)
     assert exc_info.value.message == 'oh no!'
     assert ctx.action_logs == ['starting']
     assert ctx.action_results == {'initial': 'result', 'final': 'result'}

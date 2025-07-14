@@ -347,7 +347,6 @@ def test_exec_wait_error(charm_cls):
         proc = container.exec(['foo'])
         with pytest.raises(ExecError) as exc_info:
             proc.wait_output()
-        assert isinstance(exc_info.value, ExecError)
         assert exc_info.value.stdout == 'hello pebble'
 
 
