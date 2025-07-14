@@ -2101,6 +2101,8 @@ class Client:
     connection attempt to Pebble; used by ``urllib.request.OpenerDirector.open``. It's not for
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
+
+    The ``app_id`` parameter is used purely for logging purposes, and may be None if not required.
     """
 
     _chunk_size = 8192
@@ -2111,6 +2113,7 @@ class Client:
         opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
+        app_id: str | None = None,
     ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
@@ -2120,6 +2123,7 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
+        self.app_id = app_id
 
     @classmethod
     def _get_default_opener(cls, socket_path: str) -> urllib.request.OpenerDirector:
@@ -2212,6 +2216,20 @@ class Client:
             raise ConnectionError(e.reason) from e
 
         return response
+
+    # This matches the function of the same name in ops.log. It's repeated here,
+    # because ops.pebble doesn't know anything about ops.
+    def _security_event(self, event: str, *, level: str, description: str):
+        """Send a structured security event log, as defined by SEC0045."""
+        data = {
+            'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'type': 'security',
+            'appid': self.app_id or 'pebble',
+            'level': level,
+            'event': event,
+            'description': description,
+        }
+        logger.log(getattr(logging, level.upper()), json.dumps(data))
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
@@ -3404,6 +3422,32 @@ class Client:
 
             body = {'action': 'replace', 'identities': identities_dict}
             self._request('POST', '/v1/identities', body=body)
+            for username, identity in identities_dict.items():
+                if identity is None:
+                    self._security_event(
+                        f'user_updated:{os.getuid()},{username}',
+                        level='INFO',
+                        description=f'Removing identity {username!r} from Pebble.',
+                    )
+                    continue
+                if 'local' in identity:
+                    user_id = identity['local'].get('user-id', 'unknown')
+                else:
+                    user_id = 'unknown'
+                if identity.get('basic') and identity.get('local'):
+                    identity_type = 'basic,local'
+                elif identity.get('basic'):
+                    identity_type = 'basic'
+                elif identity.get('local'):
+                    identity_type = 'local'
+                else:
+                    identity_type = 'unknown'
+                self._security_event(
+                    f'user_added:{os.getuid()},{username},'
+                    f'attributes[{identity["access"]}, {identity_type}, {user_id}]',
+                    level='INFO',
+                    description=f'Added or updated identity {username!r} in Pebble.',
+                )
 
     def remove_identities(self, identities: Iterable[str]) -> None:
         """Remove the named identities in Pebble.
@@ -3417,6 +3461,12 @@ class Client:
             identities_dict = {name: None for name in identities}
             body = {'action': 'remove', 'identities': identities_dict}
             self._request('POST', '/v1/identities', body=body)
+            for username in identities:
+                self._security_event(
+                    f'user_updated:{os.getuid()},{username}',
+                    level='INFO',
+                    description=f'Removing identity {username!r} from Pebble.',
+                )
 
 
 class _FilesParser:

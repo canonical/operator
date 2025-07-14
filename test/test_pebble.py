@@ -1384,6 +1384,7 @@ class MockClient(pebble.Client):
         self.responses: list[typing.Any] = []
         self.timeout = 5
         self.websockets: dict[typing.Any, MockWebsocket] = {}
+        self.app_id = 'pebble-tests'
 
     def _request(
         self,

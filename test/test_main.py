@@ -18,6 +18,7 @@ import abc
 import dataclasses
 import importlib.util
 import io
+import json
 import logging
 import os
 import re
@@ -28,7 +29,7 @@ import tempfile
 import typing
 import warnings
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -68,6 +69,7 @@ class EventSpec:
     remote_app: str | None = None
     remote_unit: str | None = None
     model_name: str | None = None
+    model_uuid: str | None = None
     set_in_env: dict[str, str] | None = None
     workload_name: str | None = None
     notice_id: str | None = None
@@ -414,6 +416,8 @@ class _TestMain(abc.ABC):
             event_dir = 'hooks'
         if event_spec.model_name is not None:
             env['JUJU_MODEL_NAME'] = event_spec.model_name
+        if event_spec.model_uuid is not None:
+            env['JUJU_MODEL_UUID'] = event_spec.model_uuid
 
         self._call_event(fake_script, Path(event_dir, event_filename), env)
         return self._read_and_clear_state(event_spec.event_name, env)
@@ -759,6 +763,9 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
+        # Remove the security events.
+        calls.pop(1)
+        calls.pop(-1)
 
         assert calls == expected
 
@@ -775,6 +782,9 @@ class _TestMain(abc.ABC):
         )
 
         calls = fake_script.calls()
+        # Remove the security events.
+        calls.pop(1)
+        calls.pop(-1)
 
         custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
@@ -862,15 +872,25 @@ class _TestMain(abc.ABC):
         if not re.match(pattern, warning_message):
             pytest.fail(f'Warning was not sent to debug-log: {calls!r}')
 
+    @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
-    def test_excepthook(self, fake_script: FakeScript):
+    def test_excepthook(self, _: MagicMock, fake_script: FakeScript):
         with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(
                 fake_script,
-                EventSpec(ops.InstallEvent, 'install', set_in_env={'TRY_EXCEPTHOOK': '1'}),
+                EventSpec(
+                    ops.InstallEvent,
+                    'install',
+                    set_in_env={'TRY_EXCEPTHOOK': '1'},
+                    model_uuid='1234',
+                ),
             )
 
-        calls = [' '.join(i) for i in fake_script.calls()]
+        calls = fake_script.calls()
+        sec_start = calls.pop(1)
+        sec_crash = calls.pop(-1)
+        sec_end = calls.pop(-2)
+        calls = [' '.join(i) for i in calls]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
         assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
@@ -884,6 +904,25 @@ class _TestMain(abc.ABC):
             calls[0],
         )
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
+
+        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'DEBUG', '--']
+        assert sec_crash[:-1] == ['juju-log', '--log-level', 'ERROR', '--']
+        data_start = json.loads(sec_start[-1])
+        data_crash = json.loads(sec_crash[-1])
+        data_end = json.loads(sec_end[-1])
+        for data in (data_start, data_crash, data_end):
+            assert data['type'] == 'security'
+            assert data['appid'] == '1234'
+            assert 'datetime' in data
+        assert data_start['description'] == 'Starting ops framework for Charm'
+        assert data_start['event'] == 'sys_startup:1000'
+        assert (
+            data_crash['description']
+            == "Uncaught exception in charm code: RuntimeError('failing as requested')."
+        )
+        assert data_crash['event'] == 'sys_crash:RuntimeError'
+        assert data_end['description'] == 'Stopping ops framework'
+        assert data_end['event'] == 'sys_shutdown:1000'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_sets_model_name(self, fake_script: FakeScript):
@@ -933,15 +972,19 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'blocked'
         assert state.status_message == 'help meeee'
 
+    @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(
         self,
+        _: MagicMock,
         request: pytest.FixtureRequest,
         fake_script: FakeScript,
     ):
         fake_script_hooks = FakeScript(request, self.hooks_dir)
         fake_script_hooks.write('install', 'exit 0')
-        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
+        state = self._simulate_event(
+            fake_script, EventSpec(ops.InstallEvent, 'install', model_uuid='1234')
+        )
         assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
@@ -970,8 +1013,21 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
+        sec_start = calls.pop(1)
+        sec_end = calls.pop(-1)
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
+        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'DEBUG', '--']
+        data_start = json.loads(sec_start[-1])
+        data_end = json.loads(sec_end[-1])
+        for data in (data_start, data_end):
+            assert data['type'] == 'security'
+            assert data['appid'] == '1234'
+            assert 'datetime' in data
+        assert data_start['description'] == 'Starting ops framework for Charm'
+        assert data_start['event'] == 'sys_startup:1000'
+        assert data_end['description'] == 'Stopping ops framework'
+        assert data_end['event'] == 'sys_shutdown:1000'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_non_executable_hook_and_dispatch(self, fake_script: FakeScript):
@@ -1001,7 +1057,10 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-4))
+        # Remove the security events.
+        calls.pop(1)
+        calls.pop(-1)
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1036,6 +1095,9 @@ class _TestMain(abc.ABC):
             ],
             ['juju-log', '--log-level', 'WARNING', '--', f'Legacy {hook} exited with status 42.'],
         ]
+        # Remove the security events.
+        calls.pop(1)
+        calls.pop(-1)
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1104,6 +1166,8 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
+        # Remove the security events.
+        calls = [c for c in calls if c[0] != 'juju-log' or '"security"' not in c[-1]]
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected

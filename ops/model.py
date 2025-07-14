@@ -61,6 +61,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
+from .log import _security_event
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -3421,6 +3422,19 @@ class _ModelBackend:
             try:
                 result = subprocess.run(args, **kwargs)  # type: ignore
             except subprocess.CalledProcessError as e:
+                if 'access denied' in e.stderr.lower():
+                    if args[0] in ('juju-log', 'action-fail', 'action-set'):
+                        loggable_args = ['<arguments stripped>']
+                    else:
+                        loggable_args = args[1:]
+                    _security_event(
+                        f'authz_fail:{args[0]}',
+                        level='WARNING',
+                        description=f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
+                        f'The command exited with code: {e.returncode}. '
+                        f'Arguments were: {loggable_args!r}. '
+                        f'Unit {"is" if self.is_leader() else "is not"} leader.',
+                    )
                 raise ModelError(e.stderr) from e
             if return_output:
                 if result.stdout is None:  # type: ignore
@@ -3756,7 +3770,7 @@ class _ModelBackend:
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
-        return pebble.Client(socket_path=socket_path)
+        return pebble.Client(socket_path=socket_path, app_id=self._juju_context.model_uuid)
 
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.
@@ -3819,6 +3833,13 @@ class _ModelBackend:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
             if 'not found' in str(e):
+                _security_event(
+                    f'authz_fail:{args[0]}',
+                    level='WARNING',
+                    description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
+                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
+                    f'Unit {"is" if self.is_leader() else "is not"} leader.',
+                )
                 raise SecretNotFoundError() from e
             raise
 
@@ -3951,6 +3972,11 @@ class _ModelBackend:
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
+        _security_event(
+            f'sys_restart:{os.getuid()}',
+            level='INFO',
+            description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
+        )
         if now:
             self._run('juju-reboot', '--now')
             # Juju will kill the Charm process, and in testing no code after

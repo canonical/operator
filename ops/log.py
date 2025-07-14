@@ -16,13 +16,17 @@
 
 from __future__ import annotations
 
+import datetime
+import json
 import logging
+import os
 import sys
 import types
 import typing
 import warnings
 
-from .model import _ModelBackend
+if typing.TYPE_CHECKING:
+    from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
@@ -87,5 +91,37 @@ def setup_root_logging(
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
             print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
+        _security_event(
+            f'sys_crash:{etype.__name__}',
+            level='ERROR',
+            description=f'Uncaught exception in charm code: {value!r}.',
+        )
 
     sys.excepthook = except_hook
+
+
+def _security_event(event: str, *, level: str, description: str):
+    """Send a structured security event log to Juju, as defined by SEC0045.
+
+    Args:
+        event: the name of the event, in the format described by OWASP
+          https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
+        level: log level, such as 'DEBUG', 'INFO', or 'ERROR'
+        description: a free-form description of the event, meant for human
+          consumption. Includes additional details of the event that do not
+          fit in the event name.
+    """
+    logger = logging.getLogger(__name__)
+    data: dict[str, typing.Any] = {
+        # This duplicates the timestamp that will be in the Juju log, but is
+        # included so that applications that are pulling out only the structured
+        # data can still see the time of the event.
+        'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        # Similarly, this duplicates the level at which this is logged to Juju.
+        'level': level,
+        'type': 'security',
+        'appid': os.environ.get('JUJU_MODEL_UUID', 'unknown'),
+        'event': event,
+        'description': description,
+    }
+    logger.log(getattr(logging, level.upper()), json.dumps(data))
