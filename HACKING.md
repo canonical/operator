@@ -2,9 +2,8 @@ We welcome contributions to Ops! Before you start work on a contribution, please
 
 # Setting up a Dev Environment
 
-To work in the framework itself you will need Python >= 3.8. Linting, testing,
-and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/).
+To work in the framework itself you will need Python >= 3.10. Linting, testing,
+and docs automation is performed using [`tox`](https://tox.readthedocs.io/en/latest/).
 
 First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 
@@ -109,7 +108,7 @@ If your changes are in a Git branch, you can simply replace your `ops` version
 in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like:
 
 ```
-#ops ~= 2.9
+#ops ~= 3.0
 git+https://github.com/{your-username}/operator@{your-branch-name}
 ```
 
@@ -219,7 +218,7 @@ Test environments are managed with [tox](https://tox.wiki/) and executed with
 [pytest](https://pytest.org), with coverage measured by
 [coverage](https://coverage.readthedocs.io/).
 Static type checking is done using [pyright](https://github.com/microsoft/pyright),
-and extends the Python 3.8 type hinting support through the
+and extends the Python 3.10 type hinting support through the
 [typing_extensions](https://pypi.org/project/typing-extensions/) package.
 
 Formatting uses [Ruff](https://docs.astral.sh/ruff/).
@@ -245,7 +244,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 4. The "Release Title" is the full version numbers of ops and ops-scenario,
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
-   For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
+   For example: `3.1.0 Support for the Juju foobar feature`
 5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for `ops`.
 6. Leave the previous tag choice on `auto`.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
@@ -256,7 +255,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 9. Format the auto-generated release notes according to the `CHANGES.md` section below,
    and add it to `CHANGES.md`.
 10. Change the versions for `ops`, `ops-scenario` and `ops-tracing` to the versions
-   being released: `ops==2.xx.y, ops-tracing==2.xx.y, ops-scenario==7.xx.y`.
+   being released: `ops==3.x.y, ops-tracing==3.x.y, ops-scenario==8.x.y`.
    We use both [semantic versioning](https://semver.org/) and lockstep releases, so if
    one library requires a version bump, the other will too. There will be a total of
    seven changes:
@@ -284,8 +283,8 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
     and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 15. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
-   For example, if 2.90.0 is the next expected `ops` version, use
-   `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
+   For example, if 3.1.0 is the next expected `ops` version, use
+   `ops==3.1.0.dev0 ops-tracing==3.1.0.dev0 ops-scenario==8.1.0.dev0`.
    There will be a total of seven changes:
     - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
     - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
@@ -310,7 +309,7 @@ view of the log will be included at the end of the GitHub release notes when
 the "Generate Release Notes" button is used, in the form:
 
 ```
-**Full Changelog**: https://github.com/canonical/operator/compare/2.17.0...2.18.0
+**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
 ```
 
 These changes include both `ops` and `ops-scenario`. If someone needs to see
