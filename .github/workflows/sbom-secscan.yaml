@@ -23,7 +23,7 @@ jobs:
           - name: Checkout security scanner
             uses: actions/checkout@v4
             with:
-              repository: tonyandrewmeyer/sbomber
+              repository: canonical/sbomber
               path: scanner
               token: ${{ secrets.SBOMBER_TOKEN }}
               persist-credentials: false
