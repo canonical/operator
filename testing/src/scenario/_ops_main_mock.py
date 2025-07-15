@@ -12,7 +12,9 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
+    Generic,
     Sequence,
+    cast,
 )
 
 import ops
@@ -23,6 +25,7 @@ from ops.framework import _event_regex
 from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 
+from .context import Context
 from .errors import BadOwnerPath, NoObserverError
 from .logger import logger as scenario_logger
 from .mocking import _MockModelBackend
@@ -111,7 +114,7 @@ class UnitStateDB:
             db.save_snapshot(stored_state._handle_path, stored_state.content)
 
 
-class Ops(_Manager):
+class Ops(_Manager, Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
     def __init__(
@@ -127,6 +130,7 @@ class Ops(_Manager):
         self.context = context
         self.charm_spec = charm_spec
         self.store = None
+        self.captured_events: list[ops.EventBase] = []
         self.trace_data = []
 
         try:
@@ -162,6 +166,34 @@ class Ops(_Manager):
             config_metadata = None
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
+
+    def _make_framework(self, dispatcher: _Dispatcher):
+        # See ops._main._Manager.make_framework for details - the only change
+        # here is that we use the CapturingFramework class, passing in the
+        # context.
+        if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
+            broken_relation_id = self._juju_context.relation_id
+        else:
+            broken_relation_id = None
+
+        model = ops.Model(
+            self._charm_meta,
+            self._model_backend,
+            broken_relation_id=broken_relation_id,
+            remote_unit_name=self._juju_context.remote_unit_name,
+        )
+        store = self._make_storage(dispatcher)
+        framework = CapturingFramework(
+            store,
+            self._charm_root,
+            self._charm_meta,
+            model,
+            event_name=dispatcher.event_name,
+            juju_debug_at=self._juju_context.debug_at,
+            context=self.context,
+        )
+        framework.set_breakpointhook()
+        return framework
 
     def _setup_root_logging(self):
         # The warnings module captures this in _showwarning_orig, but we
@@ -278,3 +310,41 @@ class Ops(_Manager):
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()
             self._tracing_mock.__exit__(None, None, None)
+
+
+class CapturingFramework(ops.Framework):
+    def __init__(self, *args: Any, context: Context[CharmType], **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._context = context
+
+    def _emit(self, event: ops.EventBase):
+        if self._context.capture_framework_events or not isinstance(
+            event,
+            (ops.PreCommitEvent, ops.CommitEvent, ops.CollectStatusEvent),
+        ):
+            # Dump/undump the event to ensure any custom attributes are (re)set by restore().
+            event.restore(event.snapshot())
+            self._context.emitted_events.append(event)
+
+        return super()._emit(event)
+
+    def _reemit(self, single_event_path: str | None = None):
+        if not self._context.capture_deferred_events or single_event_path is not None:
+            return super()._reemit(single_event_path)
+
+        # Load all notices from storage as events.
+        for event_path, _, _ in self._storage.notices(single_event_path):
+            event_handle = ops.Handle.from_path(event_path)
+            try:
+                event = self.load_snapshot(event_handle)
+            except ops.NoTypeError:
+                continue
+            event = cast('ops.EventBase', event)
+            event.deferred = False
+            self._forget(event)  # prevent tracking conflicts
+
+            # Dump/undump the event to ensure any custom attributes are (re)set by restore().
+            event.restore(event.snapshot())
+            self._context.emitted_events.append(event)
+
+        return super()._reemit(single_event_path)

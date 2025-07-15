@@ -15,20 +15,10 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Type,
-    TypeVar,
 )
 
 import yaml
-from ops import (
-    CollectStatusEvent,
-    pebble,
-    CommitEvent,
-    EventBase,
-    Framework,
-    Handle,
-    NoTypeError,
-    PreCommitEvent,
-)
+from ops import pebble
 from ops.jujucontext import _JujuContext
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
@@ -275,16 +265,6 @@ class Runtime:
             typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
 
     @contextmanager
-    def _exec_ctx(self, ctx: Context):
-        """python 3.8 compatibility shim"""
-        with self._virtual_charm_root() as temporary_charm_root:
-            with capture_events(
-                include_deferred=ctx.capture_deferred_events,
-                include_framework=ctx.capture_framework_events,
-            ) as captured:
-                yield (temporary_charm_root, captured)
-
-    @contextmanager
     def exec(
         self,
         state: State,
@@ -310,7 +290,7 @@ class Runtime:
         output_state = copy.deepcopy(state)
 
         logger.info(' - generating virtual charm root')
-        with self._exec_ctx(context) as (temporary_charm_root, captured):
+        with self._virtual_charm_root() as temporary_charm_root:
             logger.info(' - preparing env')
             env = self._get_event_env(
                 state=state,
@@ -365,96 +345,5 @@ class Runtime:
                 os.environ.update(previous_env)
                 logger.info(' - exited ops.main')
 
-        context.emitted_events.extend(captured)
         logger.info('event dispatched. done.')
         context._set_output_state(ops.state)
-
-
-_T = TypeVar('_T', bound=EventBase)
-
-
-@contextmanager
-def capture_events(
-    *types: type[EventBase],
-    include_framework: bool = False,
-    include_deferred: bool = True,
-):
-    """Capture all events of type `*types` (using instance checks).
-
-    Arguments exposed so that you can define your own fixtures if you want to.
-
-    Example::
-    >>> from ops import StartEvent
-    >>> from scenario import Event, State
-    >>> from charm import MyCustomEvent, MyCharm  # noqa
-    >>>
-    >>> def test_my_event():
-    >>>     with capture_events(StartEvent, MyCustomEvent) as captured:
-    >>>         trigger(State(), ("start", MyCharm, meta=MyCharm.META)
-    >>>
-    >>>     assert len(captured) == 2
-    >>>     e1, e2 = captured
-    >>>     assert isinstance(e2, MyCustomEvent)
-    >>>     assert e2.custom_attr == 'foo'
-    """
-    allowed_types = types or (EventBase,)
-
-    captured: list[EventBase] = []
-    _real_emit = Framework._emit
-    _real_reemit = Framework.reemit
-
-    def _wrapped_emit(self: Framework, evt: EventBase):
-        if not include_framework and isinstance(
-            evt,
-            (PreCommitEvent, CommitEvent, CollectStatusEvent),
-        ):
-            return _real_emit(self, evt)
-
-        if isinstance(evt, allowed_types):
-            # dump/undump the event to ensure any custom attributes are (re)set by restore()
-            evt.restore(evt.snapshot())
-            captured.append(evt)
-
-        return _real_emit(self, evt)
-
-    def _wrapped_reemit(self: Framework):
-        # Framework calls reemit() before emitting the main juju event. We intercept that call
-        # and capture all events in storage.
-
-        if not include_deferred:
-            return _real_reemit(self)
-
-        # load all notices from storage as events.
-        for event_path, _, _ in self._storage.notices():
-            event_handle = Handle.from_path(event_path)
-            try:
-                event = self.load_snapshot(event_handle)
-            except NoTypeError:
-                continue
-            event = typing.cast('EventBase', event)
-            event.deferred = False
-            self._forget(event)  # prevent tracking conflicts
-
-            if not include_framework and isinstance(
-                event,
-                (PreCommitEvent, CommitEvent),
-            ):
-                continue
-
-            if isinstance(event, allowed_types):
-                captured.append(event)
-
-        return _real_reemit(self)
-
-    Framework._emit = _wrapped_emit  # type: ignore
-    Framework.reemit = _wrapped_reemit
-
-    # A finally block is needed here in case the code raises an exception that
-    # isn't a subclass of Exception (like SystemExit or KeyboardInterrupt).
-    # Those are captured by the exec() code that uses this context manager, but
-    # ones outside of Exception are not.
-    try:
-        yield captured
-    finally:
-        Framework._emit = _real_emit
-        Framework.reemit = _real_reemit
