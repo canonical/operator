@@ -11,8 +11,7 @@ the charm machine or (for Kubernetes charms) container - for state that should
 have the same lifetime as the machine or container, and storing state in a Juju
 peer relation - for state that should have the same lifetime as the application.
 
-```{admonition} Best practice
-:class: hint
+```{tip}
 
 Write your charm to be stateless, where possible.
 ```
@@ -54,7 +53,7 @@ class MyCharm(ops.CharmBase):
 
     def __init__(self, framework):
         super().__init__(framework)
-        self._stored.set_default('expensive_value', None)
+        self._stored.set_default(expensive_value=None)
 ```
 
 > See more: [](ops.StoredState)
@@ -98,7 +97,7 @@ def test_charm_sets_stored_state():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
-    ss = state_out.get_stored_state("_stored", owner_path="mycharm")
+    ss = state_out.get_stored_state("_stored", owner_path="MyCharm")
     assert ss.content["expensive_value"] == 42
 
 def test_charm_logs_stored_state():
