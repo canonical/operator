@@ -12,6 +12,8 @@ The one case where Ops uses cryptography is for sending trace data, when a certi
 
 Hardening a charm that uses Ops is done in the same way as any other charm: no extra hardening steps are required as a result of using Ops.
 
+> See also: {external+juju:ref}`Juju | Harden your deployment <harden-your-deployment>`
+
 ## Charm unit databases
 
 Ops stores state in a sqlite3 database named `.unit-state.db`. This database includes [](ops.StoredState) objects and the defer notice queue.
