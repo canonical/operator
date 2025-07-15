@@ -6,19 +6,23 @@
 
 Ops uses almost no cryptographic technology. Communication with Juju is done via reading environment variables ({external+juju:ref}`Hook <hook>`) and running processes in the charm environment ({external+juju:ref}`Hook command <list-of-hook-commands>`). There is no use of hashing or digital signatures.
 
-The one case where Ops uses cryptography is for sending trace data, when a certificates provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing - security considerations](#ops_tracing_security) for more details.
+The one case where Ops uses cryptography is for sending trace data, when a certificate authority provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing security](#ops_tracing_security) for more details.
 
 ## Hardening
 
 Hardening a charm that uses Ops is done in the same way as any other charm: no extra hardening steps are required as a result of using Ops.
 
-## The charm unit databases
+## Charm unit databases
 
-Ops stores state ([](ops.StoredState) objects and the defer notice queue) in a sqlite3 database alongside the charm (the unit's machine for machine charms, and the charm container for Kubernetes charms). The database is named `.unit-state.db` and is in the charm directory (this is set by Juju in the `JUJU_CHARM_DIR` environment variable, and typically looks like `/var/lib/juju/agents/unit-my-unit-0/charm`). Ops sets the permissions for the database to allow only reading and writing by the user running the charm. You shouldn't try to edit this file or change its permissions.
+Ops stores state in a sqlite3 database named `.unit-state.db`. This database includes [](ops.StoredState) objects and the defer notice queue.
 
-Ops buffers tracing data in a sqlite3 database named `.tracing-data.db` in the same directory as the state database. Trace data is stored in this database only if the `tracing` extra is not installed, but even if tracing has not been enabled through an integration with a trace receiver (this allows collecting traces prior to the integration).
+The state database is in the charm directory, which is set by Juju in the `JUJU_CHARM_DIR` environment variable and typically looks like `/var/lib/juju/agents/unit-my-unit-0/charm`. For a machine charm, this directory is on the unit's machine. For a Kubernetes charm, this directory is in the charm container.
 
-For example:
+Ops sets the permissions for the state database to allow only reading and writing by the user running the charm. You shouldn't try to edit this file or change its permissions.
+
+Ops buffers tracing data in a sqlite3 database named `.tracing-data.db` in the same directory as the state database. Trace data is stored in this database only if the `tracing` extra is installed. When `tracing` is installed, Ops buffers tracing data even if tracing has not been enabled through an integration with a trace receiver (this allows collecting traces prior to the integration).
+
+For example, the permissions of the databases are:
 
 ```text
 -rw-r--r--  1 root root  32K Jul 13 23:48 .tracing-data.db
@@ -31,11 +35,11 @@ When testing an event with [](ops.testing.Context), the mocked unit state databa
 
 ## Security updates
 
-We strongly recommend pinning `ops` (and `ops[harness,testing,tracing]` in your dev dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0` (bump the minor number to be high enough that you get all the features that the charm uses).
+We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your dev dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
 
 Your charm repository should have tooling configured so that any dependencies with security updates are detected automatically (such as [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/)), prompting to you re-lock so that the charm will be built with the latest version.
 
-For information about supported versions and how to report security issues, please see [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md).
+For information about supported versions and how to report security issues, see [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md).
 
 ## Risks
 
@@ -52,8 +56,9 @@ If a charm is integrated with a tracing receiver, this introduces the risk of ou
 
 * Never include any sensitive data in logs.
 * Never include any sensitive data in traces.
+* Never include any sensitive data in exceptions.
 * Use {external+juju:ref}`Juju secrets <secret>` for storing and sharing sensitive data.
-* Juju users that integrate a charm with a tracing receiver should also integrate with a certificate provider, to ensure all traces are sent via HTTPS.
+* Juju users that integrate a charm with a tracing receiver should also integrate with a certificate authority provider, to ensure all traces are sent via HTTPS.
 * Charms should follow best practices for writing secure Python code.
 * Charms should have workflows that statically check for security issues (such as [ruff](https://docs.astral.sh/ruff/linter/), [bandit](https://bandit.readthedocs.io/en/latest/index.html), and [zizmor](https://docs.zizmor.sh/)).
 * Charm authors should exercise caution when considering adding dependencies to their charms.
