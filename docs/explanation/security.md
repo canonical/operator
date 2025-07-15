@@ -43,14 +43,14 @@ For information about supported versions and how to report security issues, see 
 
 ## Risks
 
-Using Ops does not introduce any new security risks to charms, unless the charm is integrated with a tracing receiver. It does expand the impact of the Juju risk of an attacker gaining access to the filesystem of the charm:
+Ops inherits the risks of Juju executing charms (for example, injecting data into the charm context or through the use of hook commands). Charm authors should be familiar with {external+juju:ref}`Juju security <juju-security>` and {external+pebble:ref}` Pebble security <security>`.
+
+If a charm is integrated with a tracing receiver, Ops introduces the risk of outgoing traces being intercepted. Traces should not include any sensitive data, but intercepted traces can provide information about the structure of the charm and the events that the charm has processed. In addition, an attacker that blocked trace data could hide malicious activity.
+
+Otherwise, Ops doesn't introduce any new security risks. Ops does expand the impact of the Juju risk of an attacker gaining access to the filesystem of the charm:
 
 * Access to the deferred notice queue provides information about events that could not be immediately processed (this includes the event name and the event context provided in the hook environment at the time).
 * Access to trace data provides detailed information about the implementation of the charm and the events that it has processed. This is particularly the case when tracing has not been configured, as the charm will have a large amount of buffered trace data stored (when tracing is active, this will be regularly sent to the trace receiver and removed from the local database).
-
-Ops inherits all the risks of Juju executing charms (for example, injecting data into the charm context or through the use of hook commands). Charm authors should be familiar with {external+juju:ref}`Juju security <juju-security>` and {external+pebble:ref}` Pebble security <security>`.
-
-If a charm is integrated with a tracing receiver, this introduces the risk of outgoing traces being intercepted. Traces should not include any sensitive data, but intercepted traces can provide information about the structure of the charm and the events that the charm has processed, and blocking trace data can hide malicious activity.
 
 ## Good practices
 
