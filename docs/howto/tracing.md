@@ -42,10 +42,10 @@ In a simple case, all the charm author needs to do is to instantiate the [ops.tr
 
 ## Add tracing to an existing charm
 
-### To enable basic tracing
+### Enable built-in tracing
 
 - In `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
-- In `charmcraft.yaml`, declare the relations for tracing and (optionally) certificate_transfer interfaces, for example:
+- In `charmcraft.yaml`, declare the relations for `tracing` and (optionally) `certificate_transfer` interfaces, for example:
 
 ```yaml
 requires:
@@ -80,8 +80,6 @@ At this point, Ops will trace:
 - Ops calls that inspect and update Juju (also called "hook tools")
 - Pebble API access
 
-### Try it out
-
 This provides coarse-grained tracing, focused on the boundaries between the
 charm code and the external processes.
 
@@ -92,10 +90,10 @@ database on the unit. Ops allocates a reasonable amount of storage for the buffe
 When the charm is successfully integrated with the `tracing` provider,
 the buffered traces and new traces will be sent to the tracing destination.
 
-For example, to send traces to [Grafana Tempo](https://grafana.com/docs/tempo/latest/) from
-a charm named `my-charm`, assuming that
-[Charmed Tempo HA](https://discourse.charmhub.io/t/charmed-tempo-ha/15531) has already been
-deployed:
+### Try it out
+
+For example, to send traces to [Grafana Tempo](https://charmhub.io/topics/charmed-tempo-ha) from
+a charm named `my-charm`, assuming that Charmed Tempo HA has already been deployed:
 
 ```bash
 juju deploy my-charm
@@ -103,7 +101,7 @@ juju integrate my-charm tempo
 ```
 
 (custom-spans-and-events)=
-### Custom spans and events
+### Add custom instrumentation
 
 - At the top of your charm file, `import opentelemetry.trace`.
 - After the imports in your charm file, create the tracer object as
@@ -149,7 +147,6 @@ class Workload:
 Refer to the [](ops_tracing) reference for the canonical usage example, configuration
 options, and API details.
 
-
 ### Migrate from the charm_tracing library
 
 - In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
@@ -168,9 +165,6 @@ to create custom spans and events using the OpenTelemetry API where that makes s
 
 ## Test the feature
 
-FIXME A note that ops and charm libraries are already covered, maybe there's
-nothing left for the charm to do.
-
 Relation setup is already validated by the fact that your charm doesn't crash in other tests.
 
 If you've added custom instrumentation, it is because something important is recorded.
@@ -178,7 +172,7 @@ It's easier to cover this with unit tests.
 
 ### Write unit tests
 
-The [trace_data](ops.testing.Context.trace_data) attribute
+The [trace\_data](ops.testing.Context.trace_data) attribute
 of the [](ops.testing.Context) class of the testing framework 
 contains the list of finished spans.
 
