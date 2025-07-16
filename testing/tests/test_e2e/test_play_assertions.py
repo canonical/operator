@@ -8,7 +8,7 @@ from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
 from scenario.state import Relation, State
-from scenario.state import BlockedStatus as TestingBlockedStatus
+from scenario.state import BlockedStatus as ScenarioBlockedStatus
 from ..helpers import jsonpatch_delta, trigger
 
 
@@ -48,7 +48,7 @@ def test_charm_heals_on_start(mycharm):
     mycharm._call = call
 
     initial_state = State(
-        config={'foo': 'bar'}, leader=True, unit_status=TestingBlockedStatus('foo')
+        config={'foo': 'bar'}, leader=True, unit_status=ScenarioBlockedStatus('foo')
     )
 
     out = trigger(
