@@ -576,7 +576,7 @@ def test_set_label_on_get():
 
 def test_no_additional_positional_arguments():
     with pytest.raises(TypeError):
-        Secret({}, {}, None)  # type: ignore
+        Secret({}, {})
 
 
 def test_default_values():
