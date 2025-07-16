@@ -34,7 +34,6 @@ def mycharm():
 
 def test_charm_heals_on_start(mycharm):
     def pre_event(charm):
-        pre_event._called = True  # type: ignore
         assert charm.unit.status == BlockedStatus('foo')
         assert not charm.called
 
@@ -43,7 +42,6 @@ def test_charm_heals_on_start(mycharm):
             charm.unit.status = ActiveStatus('yabadoodle')
 
     def post_event(charm):
-        post_event._called = True  # type: ignore
         assert charm.unit.status == ActiveStatus('yabadoodle')
         assert charm.called
 
