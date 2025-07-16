@@ -15,6 +15,7 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _Event,
     _next_storage_index,
     Address,
     BindAddress,
@@ -64,7 +65,7 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call = None
+        _call: Callable[[MyCharm, _Event], None] | None = None
         called = False
         on = MyCharmEvents()
 
@@ -76,8 +77,7 @@ def mycharm():
         def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
-                assert callable(MyCharm._call)
-                MyCharm._call(self, event)
+                self._call(event)
 
     return MyCharm
 
