@@ -2220,7 +2220,10 @@ def _record_calls(cls: Any):
     return cls
 
 
-def _copy_docstrings(source_cls: Any):
+_T = TypeVar('_T')
+
+
+def _copy_docstrings(source_cls: type[object]) -> Callable[[_T], _T]:
     """Copy the docstrings from source_cls to target_cls.
 
     Use this as:
