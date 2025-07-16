@@ -342,17 +342,16 @@ class Runtime:
                     juju_context=juju_context,
                 )
 
-                yield ops
+                try:
+                    yield ops
+                except _Abort as e:
+                    # If ops raised _Abort(0) within the charm code then we want to treat that as
+                    # normal completion.
+                    if e.exit_code != 0:
+                        raise
 
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
-            except _Abort as e:
-                # If ops raised _Abort(0) then we want to treat that as normal completion.
-                if e.exit_code != 0:
-                    raise
-                # If _Abort was raised before we created the instance, we can't get the state, so
-                # still want to fail.
-                assert ops is not None
             except Exception as e:
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
