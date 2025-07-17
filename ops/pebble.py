@@ -1940,8 +1940,6 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
             # Received "end" command (EOF signal), stop thread
             break
 
-        # pyright doesn't understand that this must be bytes now, but ty does.
-        assert isinstance(chunk, bytes)
         if encoding is not None:
             chunk = chunk.decode(encoding)
         writer.write(chunk)
