@@ -70,7 +70,7 @@ Otherwise, Ops doesn't introduce any new security risks. Ops does expand the imp
 * Use {external+juju:ref}`Juju secrets <secret>` for storing and sharing sensitive data.
 * Juju users that integrate a charm with a tracing receiver should also integrate with a certificate authority provider, to ensure all traces are sent via HTTPS.
 * Charms should follow best practices for writing secure Python code.
-* Charms should have workflows that statically check for security issues (such as [ruff](https://docs.astral.sh/ruff/linter/), [bandit](https://bandit.readthedocs.io/en/latest/index.html), and [zizmor](https://docs.zizmor.sh/)).
+* Charms should have workflows that statically check for security issues (such as [ruff](https://docs.astral.sh/ruff/linter/) and [zizmor](https://docs.zizmor.sh/)).
 * Charm authors should exercise caution when considering adding dependencies to their charms.
 * Write the exact dependencies of the charm into a lock file (using `uv lock`, `poetry lock`, and so on) and commit that lock file to source control.
 * Charm repositories should have tooling that automatically detects outdated dependencies, particularly missing security updates.
