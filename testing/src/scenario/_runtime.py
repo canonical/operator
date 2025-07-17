@@ -226,7 +226,7 @@ class Runtime:
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
 
-        metadata_files_present: dict[Path | str | None] = {
+        metadata_files_present: dict[Path, str | None] = {
             file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
             for file in (metadata_yaml, config_yaml, actions_yaml)
         }
@@ -342,14 +342,16 @@ class Runtime:
                     juju_context=juju_context,
                 )
 
-                yield ops
+                try:
+                    yield ops
+                except _Abort as e:
+                    # If ops raised _Abort(0) within the charm code then we want to treat that as
+                    # normal completion.
+                    if e.exit_code != 0:
+                        raise
 
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
-            except _Abort as e:
-                # If ops raised _Abort(0) then we want to treat that as normal completion.
-                if e.exit_code != 0:
-                    raise
             except Exception as e:
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
