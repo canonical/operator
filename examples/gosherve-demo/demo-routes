@@ -1,0 +1,13 @@
+ops-repo https://github.com/canonical/operator/
+ops https://ops.readthedocs.io/
+juju https://juju.is
+juju-docs https://documentation.ubuntu.com/juju/3.6/
+jubilant https://canonical-jubilant.readthedocs-hosted.com/
+charmcraft https://canonical-charmcraft.readthedocs-hosted.com/en/stable/
+charmcraft-yaml https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/
+pebble-layer https://documentation.ubuntu.com/pebble/reference/layer-specification/
+concierge https://github.com/canonical/concierge/
+jhack https://github.com/canonical/jhack/
+discourse https://discourse.charmhub.io/
+matrix https://matrix.to/#/#charmhub-charmdev:ubuntu.com
+charmhub https://charmhub.io/
