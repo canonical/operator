@@ -332,7 +332,7 @@ reportPrivateUsage = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
 reportUnnecessaryTypeIgnoreComment = "error"
-disableBytesTypePromotions = false
+disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]

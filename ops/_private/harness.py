@@ -3587,7 +3587,7 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source.read(0), bytes)  # type: ignore
+                is_binary = isinstance(source.read(0), bytes)
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
@@ -3716,8 +3716,6 @@ class _TestingPebbleClient:
                     f'not {data.__class__.__name__}'
                 )
             else:
-                # pyright doesn't understand that data must be str at this point, but ty does.
-                assert isinstance(data, str)
                 return io.StringIO(data)
 
     def exec(
