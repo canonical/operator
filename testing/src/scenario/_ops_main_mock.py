@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import logging
 import marshal
 import re
@@ -167,33 +168,9 @@ class Ops(_Manager, Generic[CharmType]):
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
 
-    def _make_framework(self, dispatcher: _Dispatcher):
-        # See ops._main._Manager.make_framework for details - the only change
-        # here is that we use the CapturingFramework class, passing in the
-        # context.
-        if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
-            broken_relation_id = self._juju_context.relation_id
-        else:
-            broken_relation_id = None
-
-        model = ops.Model(
-            self._charm_meta,
-            self._model_backend,
-            broken_relation_id=broken_relation_id,
-            remote_unit_name=self._juju_context.remote_unit_name,
-        )
-        store = self._make_storage(dispatcher)
-        framework = CapturingFramework(
-            store,
-            self._charm_root,
-            self._charm_meta,
-            model,
-            event_name=dispatcher.event_name,
-            juju_debug_at=self._juju_context.debug_at,
-            context=self.context,
-        )
-        framework.set_breakpointhook()
-        return framework
+    @property
+    def _framework_class(self):
+        return functools.partial(CapturingFramework, context=self.context)
 
     def _setup_root_logging(self):
         # The warnings module captures this in _showwarning_orig, but we

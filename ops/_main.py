@@ -268,6 +268,8 @@ class _Manager:
       - graceful teardown of the storage
     """
 
+    _framework_class = _framework.Framework
+
     def __init__(
         self,
         charm_class: type[_charm.CharmBase],
@@ -388,7 +390,7 @@ class _Manager:
             remote_unit_name=self._juju_context.remote_unit_name,
         )
         store = self._make_storage(dispatcher)
-        framework = _framework.Framework(
+        framework = self._framework_class(
             store,
             self._charm_root,
             self._charm_meta,
