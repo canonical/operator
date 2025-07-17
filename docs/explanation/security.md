@@ -16,8 +16,6 @@ Ops communicates with Juju by reading environment variables and running processe
 > - {external+juju:ref}`Juju | Hook <hook>`
 > - {external+juju:ref}`Juju |Hook command <list-of-hook-commands>`
 
-The one case where Ops uses cryptography is for sending trace data, when a certificate authority provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing security](#ops_tracing_security) for more details.
-
 ## Hardening
 
 Hardening a charm that uses Ops is done in the same way as any other charm: no extra hardening steps are required as a result of using Ops.
