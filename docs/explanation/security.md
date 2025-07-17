@@ -4,7 +4,17 @@
 
 ## Cryptographic technology
 
-Ops uses almost no cryptographic technology. Communication with Juju is done via reading environment variables ({external+juju:ref}`Hook <hook>`) and running processes in the charm environment ({external+juju:ref}`Hook command <list-of-hook-commands>`). There is no use of hashing or digital signatures.
+The only case where Ops uses cryptography is for sending trace data, when a certificate authority provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing security](#ops_tracing_security) for more details.
+
+There is no use of hashing or digital signatures.
+
+## Inter-process communication
+
+Ops communicates with Juju by reading environment variables and running processes in the charm environment (hook commands).
+
+> See also:
+> - {external+juju:ref}`Juju | Hook <hook>`
+> - {external+juju:ref}`Juju |Hook command <list-of-hook-commands>`
 
 The one case where Ops uses cryptography is for sending trace data, when a certificate authority provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing security](#ops_tracing_security) for more details.
 
