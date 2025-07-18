@@ -119,7 +119,7 @@ class Workload:
             ...
 ```
 
-Refer to the [](#ops_tracing) reference for the canonical usage example, configuration
+Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
 options, and API details.
 
 ### Migrate from the charm_tracing library
