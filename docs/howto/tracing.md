@@ -1,44 +1,17 @@
 (trace-your-charm)=
 # How to trace your charm
-## Introduction
 
 This document describes how to trace your charm code and send the trace data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
-### Why trace your charms
+Observability transforms a Juju deployment from a black box to a real-time system: trace data is structured and contextual; [this helps users](#tracing-users) understand the application's behaviour at different points in your charm's lifecycle.
 
-Observability transforms a Juju deployment from a black box to a real-time system.
+The responsibility to instrument the Python code is divided between [Ops, charm libraries, and charms](#tracing-division-of-responsibilities).
 
-Trace data is structured and contextual; {ref}`this helps users <tracing-users>` understand the application's behaviour at different points in your charm's lifecycle.
+## Summary
 
-### What is traced
+To start instrumenting your charm code, you'll instantiate `ops.tracing.Tracing` in the charm's `__init__` method and provide it with relation names. Depending on the charm, you might also need to instrument: workflow decisions, external calls, and important attributes.
 
-The responsibility to instrument the Python code is divided between Ops, charm libraries, and charms.
-
-#### What Ops and charm libraries provide
-
-Ops contains its own instrumentation, as well as unit and integration tests for it.
-
-- Ops creates the root span and a separate span when calling each observer, which provide context for your instrumentation and can be used to scope trace data assertions in your unit tests.
-- Ops creates spans for every Juju hook tool invocation and every Pebble operation, so you typically don't have to.
-- The [ops.tracing.Tracing](ops_tracing.Tracing) first-party charm library validates its arguments during object construction, and would trip on misconfiguration in a unit or integration test.
-- Buffering and export logic is already tested as part of Ops, and charms need not write integration
-tests to cover these.
-
-Charm libraries should instrument their logic at coarse granularity, and add attributes or events with logical information:
-- the library object `__init__`, unless it's trivial, as that helps the charm authors
-- spawned processes, that is `subprocess.*` calls with enough detail on what is being run, excluding sensitive data like the contents of keys or passwords
-- outbound HTTP or RPC requests, as well as requests to own workload or peers, that is `requests.*` or `httpx.*` calls
-- important operations or operations that are intended to take time, like `bcrypt.hashpw()` or `ec.generate_private_key()`
-
-### What your charm needs to do
-
-Charm authors should note that relatively little, if anything, needs to be instrumented in the charm code:
-- workload decisions, such as failing over from primary to replica
-- external or long processes, like `subprocess.*`, `requests.*` or calls to a Python module specific to your workload
-- points where important values can be exposed as attributes
-- additional context for other instrumentation, like doing A for remote app B in a provider charm
-
-In a simple case, all the charm author needs to do is to instantiate the [ops.tracing.Tracing](ops_tracing.Tracing) class in the charm's `__init__` and provide it with relation name(s).
+Ops provides instrumentation for general functionality, while libraries may also provide instrumentation. To find out what a library provides, check the library's documentation.
 
 ## Add tracing to an existing charm
 
@@ -100,6 +73,8 @@ juju deploy my-charm
 juju integrate my-charm tempo
 ```
 
+At this point, trace data is sent to Tempo, and you can view it in Grafana, assuming that this Tempo instance is [added as a data source](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/).
+
 (custom-spans-and-events)=
 ### Add custom instrumentation
 
@@ -144,7 +119,7 @@ class Workload:
             ...
 ```
 
-Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
+Refer to the [](#ops_tracing) reference for the canonical usage example, configuration
 options, and API details.
 
 ### Migrate from the charm_tracing library
@@ -165,12 +140,10 @@ to create custom spans and events using the OpenTelemetry API where that makes s
 
 ## Test the feature
 
-Relation setup is already validated by the fact that your charm doesn't crash in other tests.
+### Write unit tests
 
 If you've added custom instrumentation, it is because something important is recorded.
-It's easier to cover this with unit tests.
-
-### Write unit tests
+Let's validate that in a unit test.
 
 The [trace\_data](ops.testing.Context.trace_data) attribute
 of the [](ops.testing.Context) class of the testing framework 
