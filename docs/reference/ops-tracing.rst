@@ -26,6 +26,8 @@ resources attributes are also set:
 - ``juju_application`` the application name, like ``user_db``.
 - ``juju_unit`` the unit name, like ``user_db/0``.
 
+.. _ops_tracing_security:
+
 Security considerations
 -----------------------
 
