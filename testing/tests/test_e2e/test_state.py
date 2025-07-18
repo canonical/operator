@@ -15,6 +15,7 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _Event,
     _next_storage_index,
     Address,
     BindAddress,
@@ -64,7 +65,7 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call = None
+        _call: Callable[[MyCharm, _Event], None] | None = None
         called = False
         on = MyCharmEvents()
 
@@ -76,7 +77,7 @@ def mycharm():
         def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
-                MyCharm._call(self, event)
+                self._call(event)
 
     return MyCharm
 
@@ -208,6 +209,7 @@ def test_relation_get(mycharm):
 def test_relation_set(mycharm):
     def event_handler(charm: CharmBase, _):
         rel = charm.model.get_relation('foo')
+        assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
@@ -308,7 +310,7 @@ def test_model_positional_arguments():
 
 def test_container_positional_arguments():
     with pytest.raises(TypeError):
-        Container('', '')
+        Container('', True)
 
 
 def test_container_default_values():
@@ -522,9 +524,10 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
         SubordinateRelation,
     ],
 )
-def test_state_immutable_with_changed_data_relation(relation_type, mycharm):
+def test_state_immutable_with_changed_data_relation(relation_type: type[RelationBase], mycharm):
     def event_handler(charm: CharmBase, _):
         rel = charm.model.get_relation(relation_type.__name__)
+        assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
@@ -771,11 +774,14 @@ def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
         assert layer_check.override == check['override']
         layer_check_level = layer_check.level
         if hasattr(layer_check_level, 'value'):
+            assert isinstance(layer_check_level, ops.pebble.CheckLevel)
             layer_check_level = layer_check_level.value
         assert layer_check_level == check.get('level', ops.pebble.CheckLevel.UNSET.value)
         if 'exec' in check:
+            assert layer_check.exec is not None and 'command' in check['exec']
             assert layer_check.exec['command'] == check['exec']['command']
         if 'tcp' in check:
+            assert layer_check.tcp is not None and 'port' in check['tcp']
             assert layer_check.tcp['port'] == check['tcp']['port']
 
 
@@ -787,7 +793,7 @@ def test_layer_from_rockcraft_safe():
         f.write(dangerous_yaml)
         f.flush()
         rockcraft_path = f.name
-        with pytest.raises(yaml.error.YAMLError):
+        with pytest.raises(yaml.YAMLError):
             layer_from_rockcraft(rockcraft_path)
 
 
@@ -812,15 +818,19 @@ def test_state_from_context():
     )
     state = State.from_context(ctx)
     assert state.config == {'foo': 'bar'}
+    assert isinstance(state.containers, frozenset)
     assert len(state.containers) == 1
     assert state.get_container('container').can_connect
+    assert isinstance(state.relations, frozenset)
     assert len(state.relations) == 4
     assert state.get_relations('peer')[0].interface == 'friend'
     assert state.get_relations('relreq')[0].interface == 'across'
     assert state.get_relations('relpro')[0].interface == 'around'
     assert state.get_relations('sub')[0].interface == 'below'
+    assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
     assert tuple(state.storages)[0].name == 'storage'
+    assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
 
@@ -857,17 +867,21 @@ def test_state_from_context_extend():
     )
     assert state.leader is True
     assert state.config == {'foo': 'baz'}
+    assert isinstance(state.containers, frozenset)
     assert len(state.containers) == 2
     assert state.get_container('container').can_connect
     assert not state.get_container('other-container').can_connect
+    assert isinstance(state.relations, frozenset)
     assert len(state.relations) == 5
     assert state.get_relations('peer')[0].interface == 'friend'
     assert state.get_relations('relreq')[0].interface == 'across'
     assert state.get_relations('relpro')[0].interface == 'around'
     assert state.get_relations('sub')[0].interface == 'below'
     assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
+    assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
     assert tuple(state.storages)[0].name == 'storage'
+    assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
     assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
@@ -984,11 +998,11 @@ def test_state_from_non_sets(iterable: Callable[..., Any]):
         relations=iterable({relation}),
         stored_states=iterable({stored_state}),
     )
-    assert len(state.containers) == 2
     assert isinstance(state.containers, frozenset)
-    assert len(state.relations) == 5
+    assert len(state.containers) == 2
     assert isinstance(state.relations, frozenset)
-    assert len(state.storages) == 1
+    assert len(state.relations) == 5
     assert isinstance(state.storages, frozenset)
-    assert len(state.stored_states) == 1
+    assert len(state.storages) == 1
     assert isinstance(state.stored_states, frozenset)
+    assert len(state.stored_states) == 1

@@ -156,6 +156,7 @@ def test_ops_raises_abort(exit_code: int):
         assert {e.handle.kind for e in ctx.emitted_events} == {'start'}
         assert state_out.unit_status == ActiveStatus()
     else:
-        with pytest.raises(_Abort) as exc:
+        with pytest.raises(UncaughtCharmError) as exc:
             ctx.run(ctx.on.start(), State())
-        assert exc.value.exit_code == exit_code
+        assert isinstance(exc.value.__cause__, _Abort)
+        assert exc.value.__cause__.exit_code == exit_code
