@@ -40,6 +40,39 @@ containers:
         location: /var/cache
 ```
 
+When you use storage mounts with Juju, they will be automatically mounted into the charm container at either:
+
+* the specified location based on the storage section of `charmcraft.yaml`, or
+* the default location `/var/lib/juju/storage/<storage-name>/<num>`, where num is zero for 'normal'/singular storages or an integer ID for storages that support multiple attachments.
+
+However, Charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code - for example:
+
+```python
+...
+storage = self.model.storages['my-storage'][0]
+root = storage.location
+
+fname = 'foo.txt'
+fpath = root / fname
+with fpath.open('w') as f:
+    f.write('config info')
+...
+```
+
+For a Kubernetes charm, your charm code should communicate the storage location to the workload rather than hard-coding the storage path in the container itself. One method is passing the mount path via a file using the Container API:
+
+```python
+def _on_mystorage_storage_attached(self, event: ops.StorageAttachedEvent):
+    # Get the mount path from the charm metadata:
+    container_meta = self.meta.containers['my-container']
+    storage_path = container_meta.mounts['my-storage'].location
+    # Push the path to the workload container:
+    c = self.unit.get_container('my-container')
+    c.push('/my-app-config/storage-path.cfg', storage_path)
+
+    ... # tell workload service to reload config/restart, etc.
+```
+
 ### Observe the `storage-attached` event and define an event handler
 
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the `storage-attached` event associated with your storage and pair that with an event handler, typically a holistic one. For example:
@@ -99,9 +132,19 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
 Juju only supports adding multiple instances of the same storage volume on machine charms. Kubernetes charms may only have a single instance of each volume.
 ```
 
-If the charm needs additional units of a storage, it can request that with the `storages.request`
-method. The storage must be defined in the metadata as allowing multiple, for
-example:
+While Juju provides an `add-storage` command, this does not 'grow' existing storage instances/mounts like you might expect. Rather, it works by increasing the number of storage instances available/mounted for storages configured with the multiple parameter. Handling storage scaling (add / detach) is done by handling `['<name>'].storage_attached` and `['<name>'].storage_detaching` events. For example, with the following in your `charmcraft.yaml` file:
+
+```yaml
+storage:
+    my-storage:
+        type: filesystem
+        multiple:
+            range: 1-10
+```
+
+Juju will deploy the application with the minimum of the range (1 storage instance). Running `juju add-storage <unit> my-storage=32G,2` will add two additional instances to this storage. Adding storage does not modify existing storage mounts. This would generate two separate storage-attached events that should be handled.
+
+If the *charm* needs additional units of a storage, it can request that with the `storages.request` method. The storage must be defined in the metadata as allowing multiple, for example:
 
 ```yaml
 storage:
