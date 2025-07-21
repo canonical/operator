@@ -26,6 +26,10 @@ Hardening a charm that uses Ops is done in the same way as any other charm: no e
 
 Ops stores state in a sqlite3 database named `.unit-state.db`. This database includes [](ops.StoredState) objects and the defer notice queue.
 
+> See also:
+>  - [](#storedstate-uses-limitations)
+>  - [](#how-and-when-to-defer-events)
+
 The state database is in the charm directory, which is set by Juju in the `JUJU_CHARM_DIR` environment variable and typically looks like `/var/lib/juju/agents/unit-my-unit-0/charm`. For a machine charm, this directory is on the unit's machine. For a Kubernetes charm, this directory is in the charm container.
 
 Ops sets the permissions for the state database to allow only reading and writing by the user running the charm. You shouldn't try to edit this file or change its permissions.
