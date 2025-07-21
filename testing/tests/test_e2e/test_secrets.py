@@ -432,6 +432,7 @@ def test_grant_nonowner(mycharm):
         secret = charm.model.get_secret(id=secret_id)
         secret = charm.model.get_secret(label='mylabel')
         foo = charm.model.get_relation('foo')
+        assert foo is not None
 
         with pytest.raises(ModelError):
             secret.grant(relation=foo)
@@ -575,7 +576,7 @@ def test_set_label_on_get():
 
 def test_no_additional_positional_arguments():
     with pytest.raises(TypeError):
-        Secret({}, {}, None)
+        Secret({}, {})
 
 
 def test_default_values():

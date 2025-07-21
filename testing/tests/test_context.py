@@ -18,7 +18,8 @@ def test_run():
     state = State()
 
     with patch.object(ctx, '_run') as p:
-        ctx._output_state = 'foo'  # would normally be set within the _run call scope
+        # This would normally be set within the _run call scope.
+        ctx._output_state = 'foo'  # type: ignore
         output = ctx.run(ctx.on.start(), state)
         assert output == 'foo'
 
@@ -37,7 +38,8 @@ def test_run_action():
     expected_id = _next_action_id(update=False)
 
     with patch.object(ctx, '_run') as p:
-        ctx._output_state = 'foo'  # would normally be set within the _run call scope
+        # This would normally be set within the _run call scope.
+        ctx._output_state = 'foo'  # type: ignore
         output = ctx.run(ctx.on.action('do-foo'), state)
         assert output == 'foo'
 

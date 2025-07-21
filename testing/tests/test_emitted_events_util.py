@@ -3,10 +3,8 @@ from __future__ import annotations
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
 from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
-from scenario import State
+from scenario import Context, State
 from scenario.state import _Event
-from scenario._runtime import capture_events
-from .helpers import trigger
 
 
 class Foo(EventBase):
@@ -34,9 +32,10 @@ class MyCharm(CharmBase):
 
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
-    with capture_events(include_framework=True) as emitted:
-        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
+    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    ctx.run(ctx.on.start(), State())
 
+    emitted = ctx.emitted_events
     assert len(emitted) == 5
     assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)
@@ -46,24 +45,21 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
 
 
 def test_capture_juju_evt():
-    with capture_events() as emitted:
-        trigger(State(), 'start', MyCharm, meta=MyCharm.META)
+    ctx = Context(MyCharm, meta=MyCharm.META)
+    ctx.run(ctx.on.start(), State())
 
+    emitted = ctx.emitted_events
     assert len(emitted) == 2
     assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)
 
 
 def test_capture_deferred_evt():
-    # todo: this test should pass with ops < 2.1 as well
-    with capture_events() as emitted:
-        trigger(
-            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
-            'start',
-            MyCharm,
-            meta=MyCharm.META,
-        )
+    ctx = Context(MyCharm, meta=MyCharm.META, capture_deferred_events=True)
+    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
+    ctx.run(ctx.on.start(), State(deferred=deferred))
 
+    emitted = ctx.emitted_events
     assert len(emitted) == 3
     assert isinstance(emitted[0], Foo)
     assert isinstance(emitted[1], StartEvent)
@@ -71,15 +67,11 @@ def test_capture_deferred_evt():
 
 
 def test_capture_no_deferred_evt():
-    # todo: this test should pass with ops < 2.1 as well
-    with capture_events(include_deferred=False) as emitted:
-        trigger(
-            State(deferred=[_Event('foo').deferred(handler=MyCharm._on_foo)]),
-            'start',
-            MyCharm,
-            meta=MyCharm.META,
-        )
+    ctx = Context(MyCharm, meta=MyCharm.META)
+    deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
+    ctx.run(ctx.on.start(), State(deferred=deferred))
 
+    emitted = ctx.emitted_events
     assert len(emitted) == 2
     assert isinstance(emitted[0], StartEvent)
     assert isinstance(emitted[1], Foo)

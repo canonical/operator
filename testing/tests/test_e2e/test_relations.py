@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import ops
 import pytest
 from ops.charm import (
@@ -18,6 +20,7 @@ from scenario import Context
 from scenario.errors import UncaughtCharmError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _Event,
     PeerRelation,
     Relation,
     RelationBase,
@@ -39,7 +42,7 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call = None
+        _call: Callable[[MyCharm, _Event], None] | None = None
         called = False
         on = MyCharmEvents()
 
@@ -51,7 +54,7 @@ def mycharm():
         def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
-                MyCharm._call(self, event)
+                self._call(event)
 
     return MyCharm
 
@@ -344,6 +347,7 @@ def test_relation_events(mycharm, evt_name, remote_app_name):
             assert charm.model.get_relation('foo') is None
             assert e.relation.app.name == remote_app_name
         else:
+            assert charm.model.get_relation('foo').app is not None
             assert charm.model.get_relation('foo').app.name == remote_app_name
 
     mycharm._call = callback
