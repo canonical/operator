@@ -45,7 +45,7 @@ When you use storage mounts with Juju, they will be automatically mounted into t
 * the specified location based on the storage section of `charmcraft.yaml`, or
 * the default location `/var/lib/juju/storage/<storage-name>/<num>`, where num is zero for 'normal'/singular storages or an integer ID for storages that support multiple attachments.
 
-However, Charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code - for example:
+However, charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code. For example:
 
 ```python
 ...
@@ -59,7 +59,7 @@ with fpath.open('w') as f:
 ...
 ```
 
-For a Kubernetes charm, your charm code should communicate the storage location to the workload rather than hard-coding the storage path in the container itself. One method is passing the mount path via a file using the Container API:
+For a Kubernetes charm, your charm code should communicate the storage location to the workload rather than hard-coding the storage path in the container itself. For example, use [`Container.push`](ops.Container.push) to write the mount path to a configuration file:
 
 ```python
 def _on_mystorage_storage_attached(self, event: ops.StorageAttachedEvent):
@@ -132,7 +132,7 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
 Juju only supports adding multiple instances of the same storage volume on machine charms. Kubernetes charms may only have a single instance of each volume.
 ```
 
-While Juju provides an `add-storage` command, this does not 'grow' existing storage instances/mounts like you might expect. Rather, it works by increasing the number of storage instances available/mounted for storages configured with the multiple parameter. Handling storage scaling (add / detach) is done by handling `['<name>'].storage_attached` and `['<name>'].storage_detaching` events. For example, with the following in your `charmcraft.yaml` file:
+While Juju provides an `add-storage` command, this does not 'grow' existing storage instances/mounts like you might expect. Rather, it works by increasing the number of storage instances available/mounted for storages configured with the multiple parameter. Handling storage scaling is done by handling `['<name>'].storage_attached` and `['<name>'].storage_detaching` events. For example, with the following in your `charmcraft.yaml` file:
 
 ```yaml
 storage:
