@@ -75,4 +75,4 @@ Otherwise, Ops doesn't introduce any new security risks. Ops does expand the imp
 * Write the exact dependencies of the charm into a lock file (using `uv lock`, `poetry lock`, or similar tool) and commit that lock file to source control.
 * Charm repositories should have tooling that automatically detects outdated dependencies, particularly missing security updates.
 * For Kubernetes charms, run the charm as a non-root user when possible (via the {external+charmcraft:ref}`charm-user key in charmcraft.yaml <charmcraft-yaml-key-charm-user>` and specifying the `uid` and `gid` for containers).
-* Charm authors should harden their workloads by default.
+* Charm authors should harden their workloads by default. For example, see charm guidance for [postgresql-k8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/security/), [kubeflow](https://discourse.charmhub.io/t/security/15935), or workload hardening guidance such as [Wordpress](https://developer.wordpress.org/advanced-administration/security/hardening/).
