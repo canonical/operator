@@ -60,7 +60,7 @@ def test_get_cloud_spec_error():
 
 
 def test_get_cloud_spec_untrusted():
-    cloud_spec = ops.CloudSpec(type='lxd', name='localhost')
+    cloud_spec = scenario.CloudSpec(type='lxd', name='localhost')
     ctx = scenario.Context(MyCharm, meta={'name': 'foo'})
     state = scenario.State(
         model=scenario.Model(name='lxd-model', type='lxd', cloud_spec=cloud_spec),

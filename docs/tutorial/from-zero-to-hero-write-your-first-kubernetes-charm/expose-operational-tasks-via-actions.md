@@ -7,18 +7,16 @@
 
 ````{important}
 
-This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous branches:
+This document is part of a  series, and we recommend you follow it in sequence.  However, you can also jump straight in by checking out the code from the previous chapter:
 
 ```text
-git clone https://github.com/canonical/juju-sdk-tutorial-k8s.git
-cd juju-sdk-tutorial-k8s
-git checkout 03_integrate_with_psql
-git checkout -b  04_create_actions 
+git clone https://github.com/canonical/operator.git
+cd operator/examples/k8s-3-postgresql
 ```
 
 ````
 
-A charm should ideally cover all the complex operational logic within the code, to help avoid the need for manual human intervention. 
+A charm should ideally cover all the complex operational logic within the code, to help avoid the need for manual human intervention.
 
 Unfortunately, that is not always possible. As a charm developer, it is thus useful to know that you can also expose charm operational tasks to the charm user by defining special methods called `actions`.
 
@@ -40,6 +38,21 @@ actions:
         type: boolean
         default: False
 ```
+
+## Define an action class
+
+Open your `src/charm.py` file, and add an action class that matches the definition you used in `charmcraft.yaml`:
+
+```python
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class GetDbInfoAction:
+    """Fetches database authentication information."""
+
+    show_password: bool
+    """Show username and password in output information."""
+```
+
+We'll use [](ActionEvent.load_params) to create an instance of your config class from the Juju action event. This allows IDEs to provide hints when we are accessing the action parameter, and static type checkers are able to validate that we are using the parameter correctly.
 
 ## Define the action event handlers
 
@@ -69,7 +82,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     Learn more about actions at https://ops.readthedocs.io/en/latest/howto/manage-actions.html
     """
-    show_password = event.params['show-password']  # see charmcraft.yaml
+    params = event.load_params(GetDbInfoAction, errors='fail')
     db_data = self.fetch_postgres_relation_data()
     if not db_data:
         event.fail('No database connected')
@@ -78,7 +91,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
         'db-host': db_data.get('db_host', None),
         'db-port': db_data.get('db_port', None),
     }
-    if show_password:
+    if params.show_password:
         output.update({
             'db-username': db_data.get('db_username', None),
             'db-password': db_data.get('db_password', None),
@@ -99,7 +112,7 @@ juju refresh \
 ```
 
 Next, test that the basic action invocation works:
- 
+
 ```text
 juju run demo-api-charm/0 get-db-info
 ```
@@ -107,11 +120,11 @@ juju run demo-api-charm/0 get-db-info
 It might take a few seconds, but soon you should see an output similar to the one below, showing the database host and port:
 
 ```text
-Running operation 13 with 1 task
-  - task 14 on unit-demo-api-charm-0
+Running operation 1 with 1 task
+  - task 2 on unit-demo-api-charm-0
 
-Waiting for task 14...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+Waiting for task 2...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-port: "5432"
 ```
 
@@ -122,12 +135,13 @@ juju run demo-api-charm/0 get-db-info show-password=True
 ```
 
 The output should now include the username and the password:
-```
-Running operation 15 with 1 task
-  - task 16 on unit-demo-api-charm-0
 
-Waiting for task 16...
-db-host: postgresql-k8s-primary.model2.svc.cluster.local
+```text
+Running operation 3 with 1 task
+  - task 4 on unit-demo-api-charm-0
+
+Waiting for task 4...
+db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
 db-password: RGv80aF9WAJJtExn
 db-port: "5432"
 db-username: relation_id_4
@@ -203,8 +217,6 @@ Run `tox -e unit` to check that all tests pass.
 
 ## Review the final code
 
-For the full code see: [04_create_actions](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_create_actions)
-
-For a comparative view of the code before and after this doc see: [Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/03_integrate_with_psql...04_create_actions)
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-4-action).
 
 > **See next: {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>`**

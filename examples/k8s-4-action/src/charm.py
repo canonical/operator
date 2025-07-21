@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 
 # Import the 'data_interfaces' library.
@@ -29,6 +30,29 @@ import ops
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
+
+
+# Note that this configuration is also defined in charmcraft.yaml
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class FastAPIConfig:
+    """Configuration for the FastAPI demo charm."""
+
+    server_port: int = 8000
+    """Default port on which FastAPI is available."""
+
+    def __post_init__(self):
+        """Validate the configuration."""
+        if self.server_port == 22:
+            raise ValueError('Invalid port number, 22 is reserved for SSH')
+
+
+# Note that this action is also defined in charmcraft.yaml
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class GetDbInfoAction:
+    """Fetches database authentication information."""
+
+    show_password: bool
+    """Show username and password in output information."""
 
 
 class FastAPIDemoCharm(ops.CharmBase):
@@ -52,24 +76,17 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Events on charm actions that are run via 'juju run'.
         framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
 
-    def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
+    def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
         self._update_layer_and_restart()
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-        port = self.config['server-port']  # See charmcraft.yaml
-
-        if port == 22:
-            # The collect-status handler will set the status to blocked.
-            logger.debug('Invalid port number: 22 is reserved for SSH')
-            return
-
-        logger.debug('New application port is requested: %s', port)
+    def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
         self._update_layer_and_restart()
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-        port = self.config['server-port']
-        if port == 22:
-            event.add_status(ops.BlockedStatus('Invalid port number, 22 is reserved for SSH'))
+        try:
+            self.load_config(FastAPIConfig)
+        except ValueError as e:
+            event.add_status(ops.BlockedStatus(str(e)))
         if not self.model.get_relation('database'):
             # We need the user to do 'juju integrate'.
             event.add_status(ops.BlockedStatus('Waiting for database relation'))
@@ -86,7 +103,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
+    def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
         """Event is fired when postgres database is created."""
         self._update_layer_and_restart()
 
@@ -102,7 +119,7 @@ class FastAPIDemoCharm(ops.CharmBase):
 
         Learn more about actions at https://ops.readthedocs.io/en/latest/howto/manage-actions.html
         """
-        show_password = event.params['show-password']  # see charmcraft.yaml
+        params = event.load_params(GetDbInfoAction, errors='fail')
         db_data = self.fetch_postgres_relation_data()
         if not db_data:
             event.fail('No database connected')
@@ -111,7 +128,7 @@ class FastAPIDemoCharm(ops.CharmBase):
             'db-host': db_data.get('db_host', None),
             'db-port': db_data.get('db_port', None),
         }
-        if show_password:
+        if params.show_password:
             output.update({
                 'db-username': db_data.get('db_username', None),
                 'db-password': db_data.get('db_password', None),
@@ -133,26 +150,33 @@ class FastAPIDemoCharm(ops.CharmBase):
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
         try:
-            self.container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
+            config = self.load_config(FastAPIConfig)
+        except ValueError as e:
+            logger.error('Configuration error: %s', e)
+            return
+        env = self.get_app_environment()
+        try:
+            self.container.add_layer(
+                'fastapi_demo',
+                self._get_pebble_layer(config.server_port, env),
+                combine=True,
+            )
             logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
             # Tell Pebble to incorporate the changes, including restarting the
             # service if required.
             self.container.replan()
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
-
-            self.unit.status = ops.ActiveStatus()
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info('Unable to connect to Pebble: %s', e)
 
-    @property
-    def _pebble_layer(self) -> ops.pebble.Layer:
+    def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
         """A Pebble layer for the FastAPI demo services."""
         command = ' '.join([
             'uvicorn',
             'api_demo_server.app:app',
             '--host=0.0.0.0',
-            f'--port={self.config["server-port"]}',
+            f'--port={port}',
         ])
         pebble_layer: ops.pebble.LayerDict = {
             'summary': 'FastAPI demo service',
@@ -163,14 +187,13 @@ class FastAPIDemoCharm(ops.CharmBase):
                     'summary': 'fastapi demo',
                     'command': command,
                     'startup': 'enabled',
-                    'environment': self.app_environment,
+                    'environment': environment,
                 }
             },
         }
         return ops.pebble.Layer(pebble_layer)
 
-    @property
-    def app_environment(self) -> dict[str, str]:
+    def get_app_environment(self) -> dict[str, str]:
         """Prepare environment variables for the application.
 
         This property method creates a dictionary containing environment variables

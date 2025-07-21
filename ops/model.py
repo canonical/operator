@@ -1781,6 +1781,10 @@ class Relation:
         if (
             _remote_unit is not None
             and not is_peer
+            # In practice, the "self.app will not be None" statement above is not
+            # necessarily true. Once https://bugs.launchpad.net/juju/+bug/1960934
+            # is resolved, we should be able to remove the next line.
+            and self.app is not None
             and _remote_unit.name.startswith(f'{self.app.name}/')
         ):
             self.units.add(_remote_unit)
