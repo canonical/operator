@@ -57,4 +57,4 @@ jobs:
             uses: actions/upload-artifact@v4
             with:
               name: secscan-report-upload-${{ matrix.manifest }}
-              path: ./scanner/reports/*.json
+              path: ./scanner/reports/
