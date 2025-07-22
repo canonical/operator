@@ -11,7 +11,7 @@ jobs:
         strategy:
           fail-fast: false
           matrix:
-            manifest: [.sbomber-manifest-sdist.yaml, .sbomber-manifest-wheel.yaml]
+            manifest: [sdist, wheel]
 
         name: SBOM generation
         runs-on: [self-hosted, self-hosted-linux-amd64-jammy-private-endpoint-medium]
@@ -41,7 +41,7 @@ jobs:
           - name: Prepare the artifacts
             run: |
               cd scanner
-              ./sbomber prepare ../${{ matrix.manifest }}
+              ./sbomber prepare ../.sbomber-manifest-${{ matrix.manifest }}.yaml
           - name: Submit the artifacts
             run: |
               cd scanner
@@ -56,5 +56,5 @@ jobs:
           - name: Upload reports
             uses: actions/upload-artifact@v4
             with:
-              name: secscan-report-upload
+              name: secscan-report-upload-${{ matrix.manifest }}
               path: ./scanner/reports/*.json
