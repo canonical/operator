@@ -4,8 +4,7 @@ clients:
       department: charm_engineering
       email: tony.meyer@canonical.com
       team: charm_tech
-  secscan:
-    - include_id_params: true
+  secscan: {}
 
 
 artifacts:
