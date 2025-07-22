@@ -23,8 +23,8 @@ jobs:
           - name: Install dependencies
             run: |
               sudo apt-get update
-              sudo apt-get install libapt-pkg-dev
-              sudo apt install python3-apt
+              sudo apt-get install -y libapt-pkg-dev
+              sudo apt install -y python3-apt
           - name: Checkout security scanner
             uses: actions/checkout@v4
             with:
