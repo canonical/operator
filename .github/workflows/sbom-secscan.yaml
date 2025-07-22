@@ -21,7 +21,10 @@ jobs:
             with:
               persist-credentials: false
           - name: Install dependencies
-            run: sudo apt install python3-apt
+            run: |
+              sudo apt-get update
+              sudo apt-get install libapt-pkg-dev
+              sudo apt install python3-apt
           - name: Checkout security scanner
             uses: actions/checkout@v4
             with:
