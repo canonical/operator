@@ -11,33 +11,6 @@ clients:
 artifacts:
   - name: 'ops'
     type: 'wheel'
-    version: '2.23.0'
-    ssdlc_params:
-        name: 'ops'
-        version: '2.23.0'
-        channel: 'stable'
-        cycle: '25.10'
-
-  - name: 'ops-scenario'
-    type: 'wheel'
-    version: '7.23.0'
-    ssdlc_params:
-        name: 'ops-scenario'
-        version: '7.23.0'
-        channel: 'stable'
-        cycle: '25.10'
-
-  - name: 'ops-tracing'
-    type: 'wheel'
-    version: '2.23.0'
-    ssdlc_params:
-        name: 'ops-tracing'
-        version: '2.23.0'
-        channel: 'stable'
-        cycle: '25.10'
-
-  - name: 'ops'
-    type: 'wheel'
     version: '3.0.0'
     ssdlc_params:
         name: 'ops'
