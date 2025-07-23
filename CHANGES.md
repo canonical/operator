@@ -1,3 +1,69 @@
+# 3.0.0 - 02 July 2025
+
+The minimum version of Python for Ops 3.x is 3.10.
+
+## Documentation
+
+* Be consistent with recommending self.app and self.unit (#1856)
+
+## CI
+
+* Hotfix, publish job for ops-tracing (#1865)
+
+# 2.23.0 - 30 June 2025
+
+## Features
+
+* Support for config schema as Python classes (#1741)
+* Support for action parameter schema as Python classes (#1756)
+* Ops[tracing] compatibility with jhack (#1806)
+* Support for relation data schema as Python classes (#1701)
+* Add CheckInfo.successes field and .has_run property (#1819)
+* Provide a method to create a testing.State from a testing.Context (#1797)
+* Expose trace data in testing (#1842)
+* Add a helper to generate a Layer from rockcraft.yaml (#1831)
+
+## Fixes
+
+* Correctly load an empty Juju config options map (#1778)
+* Fix type annotation of container check_infos in ops.testing (#1784)
+* Restrict the version of a dependency, opentelemetry-sdk (#1794)
+* Remote unit data is available in relation-departed (#1364)
+* Juju allows access to the remote app databag in relation-broken, so Harness should too (#1787)
+* Don't use private OpenTelemetry API (#1798)
+* Do not return this unit in a mocked peer relation (#1828)
+* Testing.PeerRelation properly defaults to no peers (#1832)
+* In meter-status-changed JUJU_VERSION is not set (#1840)
+* Only provide the units belonging to the app in Relation.units (#1837)
+
+## Documentation
+
+* Remove two best practices, and drop two to tips (#1758)
+* Update link to Charmcraft for managing app config (#1763)
+* Update link to Juju documentation for setting up deployment (#1781)
+* Fix external OTLP link (#1786)
+* Distribute the ops-scenario README content across the ops docs (#1773)
+* Improve testing.errors.UncaughtCharmError message (#1795)
+* In the "manage the charm version" how-to, give an example of using override-build (#1802)
+* Small adjustments to the 'how to trace charm code' doc (#1792)
+* Replace Harness example and fix links in README (#1820)
+* Add httpbin charm from Charmcraft as an example charm (#1743)
+* Fix on_collect mistake in sample code (#1829)
+* Update code in K8s tutorial, with source in repo (part 2) (#1734)
+* Update Loki section on charming zero-to-hero tutorial (#1847)
+* Remove expandable boxes of text (#1844)
+* Improve httpbin charm by removing defer() and adding collect_status (#1833)
+* Move {posargs} to the end of pytest command lines in tox.ini (#1854)
+
+## CI
+
+* Install the ops[tracing] dependencies for the TIOBE action (#1761)
+* Add ops-scenario and ops-tracing as explicit installs for TIOBE (#1764)
+* Persist credentials for update-charm-pins workflow (#1766)
+* Stop smoke testing Charmcraft 2 (#1782)
+* Use Charmcraft 3.x for smoke testing 20.04 and 22.04 (#1821)
+* Enable xdist for the 'unit' tox environments (#1830)
+
 # 2.22.0 - 29 May 2025
 
 ## Features

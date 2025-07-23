@@ -1628,7 +1628,7 @@ class TestMultipartParser:
                 bodies.append(b'')  # noqa: B023
                 bodies_done.append(False)  # noqa: B023
 
-            def handle_body(data: bytes, done: bool = False):
+            def handle_body(data: bytearray, done: bool = False):
                 bodies[-1] += data  # noqa: B023
                 bodies_done[-1] = done  # noqa: B023
 

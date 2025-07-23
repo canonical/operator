@@ -159,17 +159,17 @@ class Model:
 
     @property
     def unit(self) -> Unit:
-        """The unit that is running this code.
+        """The current unit. Equivalent to :attr:`CharmBase.unit`.
 
-        Use :meth:`get_unit` to get an arbitrary unit by name.
+        To get a unit by name, use :meth:`get_unit`.
         """
         return self._unit
 
     @property
     def app(self) -> Application:
-        """The application this unit is a part of.
+        """The application that this unit is part of. Equivalent to :attr:`CharmBase.app`.
 
-        Use :meth:`get_app` to get an arbitrary application by name.
+        To get an application by name, use :meth:`get_app`.
         """
         return self._unit.app
 
@@ -238,22 +238,22 @@ class Model:
         return self._backend._juju_context.version
 
     def get_unit(self, unit_name: str) -> Unit:
-        """Get an arbitrary unit by name.
-
-        Use :attr:`unit` to get the current unit.
+        """Get a unit by name.
 
         Internally this uses a cache, so asking for the same unit two times will
         return the same object.
+
+        To get the current unit, use :attr:`CharmBase.unit` or :attr:`unit`.
         """
         return self._cache.get(Unit, unit_name)
 
     def get_app(self, app_name: str) -> Application:
         """Get an application by name.
 
-        Use :attr:`app` to get this charm's application.
-
         Internally this uses a cache, so asking for the same application two times will
         return the same object.
+
+        To get the application that this unit is part of, use :attr:`CharmBase.app` or :attr:`app`.
         """
         return self._cache.get(Application, app_name)
 
@@ -380,9 +380,10 @@ class Application:
     """Represents a named application in the model.
 
     This might be this charm's application, or might be an application this charm is integrated
-    with. Charmers should not instantiate Application objects directly, but should use
-    :attr:`Model.app` to get the application this unit is part of, or
-    :meth:`Model.get_app` if they need a reference to a given application.
+    with.
+
+    Don't instantiate Application objects directly. To get the application that this unit is
+    part of, use :attr:`CharmBase.app`. To get an application by name, use :meth:`Model.get_app`.
     """
 
     name: str
@@ -426,7 +427,7 @@ class Application:
 
         Example::
 
-            self.model.app.status = ops.BlockedStatus('I need a human to come help me')
+            self.app.status = ops.BlockedStatus('I need a human to come help me')
         """
         if not self._is_our_app:
             return UnknownStatus()
@@ -556,6 +557,9 @@ class Unit:
 
     This might be the current unit, another unit of the charm's application, or a unit of
     another application that the charm is integrated with.
+
+    Don't instantiate Unit objects directly. To get the current unit, use :attr:`CharmBase.unit`.
+    To get a unit by name, use :meth:`Model.get_unit`.
     """
 
     name: str
@@ -609,7 +613,7 @@ class Unit:
 
         Example::
 
-            self.model.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
+            self.unit.status = ops.MaintenanceStatus('reconfiguring the frobnicators')
         """
         if not self._is_our_unit:
             return UnknownStatus()
@@ -1777,6 +1781,10 @@ class Relation:
         if (
             _remote_unit is not None
             and not is_peer
+            # In practice, the "self.app will not be None" statement above is not
+            # necessarily true. Once https://bugs.launchpad.net/juju/+bug/1960934
+            # is resolved, we should be able to remove the next line.
+            and self.app is not None
             and _remote_unit.name.startswith(f'{self.app.name}/')
         ):
             self.units.add(_remote_unit)

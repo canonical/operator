@@ -44,7 +44,7 @@ The `ops.testing` framework provides `State`, which mocks inputs and outputs. Th
 
 ### Examples
 
-- [Prometheus K8s charm unit tests](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/scenario/test_alert_expression_labels.py)
+- [Ubuntu manpages charm unit tests](https://github.com/canonical/ubuntu-manpages-operator/blob/main/tests/unit/test_charm.py)
 
 (interface-tests)=
 ## Interface testing
@@ -63,7 +63,7 @@ Interface tests also:
 - Enable alternative implementations of an interface to validate themselves against the contractual specification stored in `charm-relation-interfaces`.
 - Help verify compliance with multiple versions of an interface.
 
-An interface test has the following pattern: 
+An interface test has the following pattern:
 
 1) **Given** - An initial state of the relation over the interface under test.
 2) **When** - A specific relation event fires.
@@ -130,8 +130,8 @@ basepython = python3.10
 
 It builds a fixture called `ops_test` that helps you interact with Juju through constructs that wrap around [`python-libjuju` ](https://pypi.org/project/juju/).
 
-> See more: 
-> - [`pytest-operator` > `ops_test`](https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md#ops_test) 
+> See more:
+> - [`pytest-operator` > `ops_test`](https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md#ops_test)
 > - [`pytest` > Fixtures](https://docs.pytest.org/en/6.2.x/fixture.html)
 
 It also provides convenient markers and command line parameters (e.g., the `@pytest.mark.skip_if_deployed` marker in combination with the `--no-deploy` configuration helps you skip, e.g., a deployment test in the case where you already have a deployment).

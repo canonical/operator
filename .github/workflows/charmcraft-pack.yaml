@@ -10,23 +10,16 @@ permissions: {}
 
 jobs:
   charmcraft-pack:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        include:
-          - charm-repo: jnsgruk/hello-kubecon
-            commit: eb3225860cc7db0e071d0ea6cd4a01b47e66b1e5  # 2025-03-27T12:05:21Z
     steps:
-      - name: Checkout test charm repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          repository: ${{ matrix.charm-repo }}
           persist-credentials: false
-          ref: ${{ matrix.commit }}
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          cd examples/httpbin-demo
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           if [ -z "$CLONE_SHA" ]
           then
@@ -42,6 +35,19 @@ jobs:
           CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
+      - name: Install yq
+        run: sudo snap install yq
+
+      - name: Add 'git' as a build package 
+        run: |
+          cd examples/httpbin-demo
+          if yq --exit-status 'has("parts")' charmcraft.yaml; then
+            echo "'parts' already exists in charmcraft.yaml"
+            exit 1
+          fi
+          yq --inplace '.parts.charm.build-packages = ["git"]' charmcraft.yaml
+          cat charmcraft.yaml
+
       - name: Set up LXD
         uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
         with:
@@ -51,4 +57,6 @@ jobs:
         run: sudo snap install charmcraft --classic
 
       - name: Pack the charm
-        run: sudo charmcraft pack --verbose
+        run: |
+          cd examples/httpbin-demo
+          charmcraft pack --verbose
