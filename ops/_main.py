@@ -299,7 +299,7 @@ class _Manager:
         self._setup_root_logging()
 
         _log_security_event(
-            'DEBUG',
+            'TRACE',
             _SecurityEventSystem.SYS_STARTUP,
             str(os.getuid()),
             description=f'Starting ops framework for {charm_class.__name__}',
@@ -486,7 +486,7 @@ def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None 
         if manager:
             manager._destroy()
         _log_security_event(
-            'DEBUG',
+            'TRACE',
             _SecurityEventSystem.SYS_SHUTDOWN,
             str(os.getuid()),
             description='Stopping ops framework',

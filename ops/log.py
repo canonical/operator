@@ -93,15 +93,16 @@ def setup_root_logging(
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
             print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
         _log_security_event(
-            f'sys_crash:{etype.__name__}',
-            level='ERROR',
+            'ERROR',
+            _SecurityEventSystem.SYS_CRASH,
+            etype.__name__,
             description=f'Uncaught exception in charm code: {value!r}.',
         )
 
     sys.excepthook = except_hook
 
 
-class _SecurityEventAuthN(enum.Enum, str):
+class _SecurityEventAuthN(enum.Enum):
     """Security event names for authentication events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -121,7 +122,7 @@ class _SecurityEventAuthN(enum.Enum, str):
     AUTHN_TOKEN_DELETE = 'authn_token_delete'  # noqa: S105
 
 
-class _SecurityEventAuthZ(enum.Enum, str):
+class _SecurityEventAuthZ(enum.Enum):
     """Security event names for system events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -132,7 +133,7 @@ class _SecurityEventAuthZ(enum.Enum, str):
     AUTHZ_ADMIN = 'authz_admin'
 
 
-class _SecurityEventCrypt(enum.Enum, str):
+class _SecurityEventCrypt(enum.Enum):
     """Security event names for cryptographic events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -142,7 +143,7 @@ class _SecurityEventCrypt(enum.Enum, str):
     CRYPT_ENCRYPT_FAIL = 'crypt_encrypt_fail'
 
 
-class _SecurityEventExcess(enum.Enum, str):
+class _SecurityEventExcess(enum.Enum):
     """Security event names for excess events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -151,7 +152,7 @@ class _SecurityEventExcess(enum.Enum, str):
     EXCESS_RATE_LIMIT_EXCEEDED = 'excess_rate_limit_exceeded'
 
 
-class _SecurityEventUpload(enum.Enum, str):
+class _SecurityEventUpload(enum.Enum):
     """Security event names for upload events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -163,7 +164,7 @@ class _SecurityEventUpload(enum.Enum, str):
     UPLOAD_DELETE = 'upload_delete'
 
 
-class _SecurityEventInput(enum.Enum, str):
+class _SecurityEventInput(enum.Enum):
     """Security event names for input events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -172,7 +173,7 @@ class _SecurityEventInput(enum.Enum, str):
     INPUT_VALIDATION_FAIL = 'input_validation_fail'
 
 
-class _SecurityEventMalicious(enum.Enum, str):
+class _SecurityEventMalicious(enum.Enum):
     """Security event names for malicious events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -185,7 +186,7 @@ class _SecurityEventMalicious(enum.Enum, str):
     MALICIOUS_DIRECT_REFERENCE = 'malicious_direct_reference'
 
 
-class _SecurityEventPrivilege(enum.Enum, str):
+class _SecurityEventPrivilege(enum.Enum):
     """Security event names for privilege and permissions events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -194,7 +195,7 @@ class _SecurityEventPrivilege(enum.Enum, str):
     PRIVILEGE_PERMISSIONS_CHANGED = 'privilege_permissions_changed'
 
 
-class _SecurityEventSensitive(enum.Enum, str):
+class _SecurityEventSensitive(enum.Enum):
     """Security event names for sensitive data events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -206,7 +207,7 @@ class _SecurityEventSensitive(enum.Enum, str):
     SENSITIVE_DELETE = 'sensitive_delete'
 
 
-class _SecurityEventSequence(enum.Enum, str):
+class _SecurityEventSequence(enum.Enum):
     """Security event names for sequence events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -215,7 +216,7 @@ class _SecurityEventSequence(enum.Enum, str):
     SEQUENCE_FAIL = 'sequence_fail'
 
 
-class _SecurityEventSession(enum.Enum, str):
+class _SecurityEventSession(enum.Enum):
     """Security event names for session events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -227,7 +228,7 @@ class _SecurityEventSession(enum.Enum, str):
     SESSION_USE_AFTER_EXPIRE = 'session_use_after_expire'
 
 
-class _SecurityEventSystem(enum.Enum, str):
+class _SecurityEventSystem(enum.Enum):
     """Security event names for system events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -241,7 +242,7 @@ class _SecurityEventSystem(enum.Enum, str):
     SYS_MONITOR_ENABLED = 'sys_monitor_enabled'
 
 
-class _SecurityEventUser(enum.Enum, str):
+class _SecurityEventUser(enum.Enum):
     """Security event names for user events.
 
     See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
@@ -271,8 +272,9 @@ _SecurityEvent = typing.Union[
 
 
 def _log_security_event(
+    # These are the Juju log event levels, which is why there is TRACE and not CRITICAL.
     level: typing.Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'],
-    event_type: _SecurityEvent,
+    event_type: _SecurityEvent | str,
     event: str,
     *,
     description: str,
@@ -280,10 +282,10 @@ def _log_security_event(
     """Send a structured security event log to Juju, as defined by SEC0045.
 
     Args:
-        event_type: the event prefix, in the format described by OWASP
+        level: log level, such as 'DEBUG', 'INFO', or 'ERROR'
+        event_type: the event type, in the format described by OWASP
           https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
         event: the name of the event, in the format described by OWASP
-        level: log level, such as 'DEBUG', 'INFO', or 'ERROR'
         description: a free-form description of the event, meant for human
           consumption. Includes additional details of the event that do not
           fit in the event name.
@@ -293,6 +295,7 @@ def _log_security_event(
         f'{os.environ.get("JUJU_MODEL_UUID", "unknown")}'
         f'-{os.environ.get("JUJU_UNIT_NAME", "unknown")}'
     )
+    type = event_type.value if hasattr(event_type, 'value') else event_type
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
         # included so that applications that are pulling out only the structured
@@ -302,7 +305,7 @@ def _log_security_event(
         'level': level,
         'type': 'security',
         'appid': app_id,
-        'event': f'{event_type}:{event}',
+        'event': f'{type}:{event}',
         'description': description,
     }
     logger.log(getattr(logging, level.upper()), '%s', json.dumps(data))

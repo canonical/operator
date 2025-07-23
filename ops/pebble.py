@@ -2042,6 +2042,10 @@ class BasicIdentity:
         """Convert this basic identity to its dict representation."""
         return {'password': self.password}
 
+    def __str__(self) -> str:
+        # Return asterisks to avoid leaking the password in logs
+        return f"{self.__class__.__name__}(password='*****')"
+
 
 @dataclasses.dataclass
 class Identity:
@@ -2102,7 +2106,11 @@ class Client:
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
 
-    The ``app_id`` parameter is used purely for logging purposes, and may be None if not required.
+    The ``security_event_logger`` parameter is used to log security events. If not provided, events
+    will be logged to the `pebble.security` logger. The signature of the logger function is::
+
+        def security_event_logger(level: str, event_type: str, event: str, *, description: str):
+
     """
 
     _chunk_size = 8192
@@ -2113,7 +2121,7 @@ class Client:
         opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
-        app_id: str | None = None,
+        security_event_logger: Callable[[str, str, str, str], None] | None = None,
     ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
@@ -2123,7 +2131,28 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
-        self.app_id = app_id
+        if security_event_logger is None:
+
+            def default_security_event_logger(
+                level: str, event_type: str, event: str, *, description: str
+            ):
+                data = json.dumps({
+                    'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    'type': 'security',
+                    'appid': 'pebble',
+                    'level': level,
+                    'event': f'{event_type}:{event}',
+                    'description': description,
+                })
+                logging.getLogger('pebble.security').log(
+                    getattr(logging, level.upper(), logging.INFO),
+                    '%s',
+                    data,
+                )
+
+            security_event_logger = default_security_event_logger  # type: ignore
+        assert security_event_logger is not None
+        self._log_security_event: Callable[[str, str, str, str], None] = security_event_logger
 
     @classmethod
     def _get_default_opener(cls, socket_path: str) -> urllib.request.OpenerDirector:
@@ -2216,20 +2245,6 @@ class Client:
             raise ConnectionError(e.reason) from e
 
         return response
-
-    # This matches the function of the same name in ops.log. It's repeated here,
-    # because ops.pebble doesn't know anything about ops.
-    def _security_event(self, event: str, *, level: str, description: str):
-        """Send a structured security event log, as defined by SEC0045."""
-        data = {
-            'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'type': 'security',
-            'appid': self.app_id or 'pebble',
-            'level': level,
-            'event': event,
-            'description': description,
-        }
-        logger.log(getattr(logging, level.upper()), json.dumps(data))
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
@@ -3424,32 +3439,17 @@ class Client:
             self._request('POST', '/v1/identities', body=body)
             for username, identity in identities_dict.items():
                 if identity is None:
-                    self._security_event(
-                        f'user_updated:{os.getuid()},{username}',
-                        level='INFO',
+                    self._log_security_event(
+                        'INFO',
+                        'user_updated',
+                        f'{os.getuid()},{username}',
                         description=f'Removing identity {username!r} from Pebble.',
                     )
                     continue
-                if 'local' in identity:
-                    user_id = identity['local'].get('user-id', 'unknown')
-                else:
-                    user_id = 'unknown'
-                if identity.get('basic') and identity.get('local'):
-                    identity_type = 'basic,local'
-                elif identity.get('basic'):
-                    identity_type = 'basic'
-                elif identity.get('local'):
-                    identity_type = 'local'
-                else:
-                    identity_type = 'unknown'
-                event = (
-                    f'user_added:'
-                    f'{os.getuid()},{username},'
-                    f'attributes[{identity["access"]}, {identity_type}, {user_id}]'
-                )
-                self._security_event(
-                    event,
-                    level='INFO',
+                self._log_security_event(
+                    'INFO',
+                    'user_added',
+                    f'{os.getuid()},{username},attributes[{identity}]',
                     description=f'Added or updated identity {username!r} in Pebble.',
                 )
 
@@ -3466,9 +3466,10 @@ class Client:
             body = {'action': 'remove', 'identities': identities_dict}
             self._request('POST', '/v1/identities', body=body)
             for username in identities:
-                self._security_event(
-                    f'user_updated:{os.getuid()},{username}',
-                    level='INFO',
+                self._log_security_event(
+                    'INFO',
+                    'user_updated',
+                    f'{os.getuid()},{username}',
                     description=f'Removing identity {username!r} from Pebble.',
                 )
 
