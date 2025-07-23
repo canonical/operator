@@ -270,11 +270,17 @@ _SecurityEvent = typing.Union[
 ]
 
 
-def _log_security_event(event_prefix: _SecurityEvent, event: str, *, level: str, description: str):
+def _log_security_event(
+    level: typing.Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'],
+    event_type: _SecurityEvent,
+    event: str,
+    *,
+    description: str,
+):
     """Send a structured security event log to Juju, as defined by SEC0045.
 
     Args:
-        event_prefix: the event prefix, in the format described by OWASP
+        event_type: the event prefix, in the format described by OWASP
           https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
         event: the name of the event, in the format described by OWASP
         level: log level, such as 'DEBUG', 'INFO', or 'ERROR'
@@ -296,7 +302,7 @@ def _log_security_event(event_prefix: _SecurityEvent, event: str, *, level: str,
         'level': level,
         'type': 'security',
         'appid': app_id,
-        'event': f'{event_prefix}:{event}',
+        'event': f'{event_type}:{event}',
         'description': description,
     }
     logger.log(getattr(logging, level.upper()), '%s', json.dumps(data))

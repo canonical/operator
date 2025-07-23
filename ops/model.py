@@ -3436,9 +3436,9 @@ class _ModelBackend:
                     else:
                         loggable_args = args[1:]
                     _log_security_event(
+                        'WARNING',
                         _SecurityEventAuthZ.AUTHZ_FAIL,
                         args[0],
-                        level='WARNING',
                         description=f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
                         f'The command exited with code: {e.returncode}. '
                         f'Arguments were: {loggable_args!r}. '
@@ -3841,12 +3841,17 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
-            if 'not found' not in str(e) and 'permission denied' not in str(e):
+            authz_messages = (
+                'access denied',
+                'permission denied',
+                'not the leader',
+            )
+            if not any(message in str(e).lower() for message in authz_messages):
                 raise
             _log_security_event(
+                'WARNING',
                 _SecurityEventAuthZ.AUTHZ_FAIL,
                 args[0],
-                level='WARNING',
                 description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
                 f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
                 f'Unit {"is" if self.is_leader() else "is not"} leader.',
@@ -3983,9 +3988,9 @@ class _ModelBackend:
 
     def reboot(self, now: bool = False):
         _log_security_event(
+            'INFO',
             _SecurityEventSystem.SYS_RESTART,
             str(os.getuid()),
-            level='INFO',
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )
         if now:
