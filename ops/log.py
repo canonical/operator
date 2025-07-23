@@ -289,7 +289,7 @@ def _log_security_event(
     """Send a structured security event log to Juju, as defined by SEC0045.
 
     Args:
-        level: log level, either 'INFO', 'WARN', or 'CRITICAL'
+        level: log level of the security event (this is not the same as the Juju log level)
         event_type: the event type, in the format described by OWASP
           https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
         event: the name of the event, in the format described by OWASP
