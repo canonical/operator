@@ -953,13 +953,13 @@ class _TestMain(abc.ABC):
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
 
         assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-        assert sec_crash[:-1] == ['juju-log', '--log-level', 'ERROR', '--']
+        assert sec_crash[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data_start = json.loads(sec_start[-1])
         data_crash = json.loads(sec_crash[-1])
         data_end = json.loads(sec_end[-1])
         for data in (data_start, data_crash, data_end):
             assert data['type'] == 'security'
-            assert data['appid'] == '1234'
+            assert data['appid'] == '1234:test_main/0'
             assert 'datetime' in data
         assert data_start['description'] == 'Starting ops framework for Charm'
         assert data_start['event'] == 'sys_startup:1000'
@@ -1064,12 +1064,12 @@ class _TestMain(abc.ABC):
         sec_end = calls.pop(-1)
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
-        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'DEBUG', '--']
+        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data_start = json.loads(sec_start[-1])
         data_end = json.loads(sec_end[-1])
         for data in (data_start, data_end):
             assert data['type'] == 'security'
-            assert data['appid'] == '1234'
+            assert data['appid'] == '1234:test_main/0'
             assert 'datetime' in data
         assert data_start['description'] == 'Starting ops framework for Charm'
         assert data_start['event'] == 'sys_startup:1000'

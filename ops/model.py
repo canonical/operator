@@ -3632,20 +3632,20 @@ class _ModelBackend:
                     'cannot write relation settings',
                 )
                 if any(message in e.stderr.lower() for message in authz_messages):
-                    if args[0] in ('juju-log', 'action-fail', 'action-set'):
-                        # These commands may have sensitive data in their arguments, and do not
-                        # support reading the data from a file.
-                        loggable_args = ['<arguments stripped>']
-                    else:
-                        loggable_args = args[1:]
+                    # These commands may have sensitive data in their arguments, and do not
+                    # support reading the data from a file.
+                    log_args = args[0] not in ('juju-log', 'action-fail', 'action-set')
+                    description = (
+                        f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
+                        f'The command exited with code: {e.returncode}. '
+                        f'Arguments were: {log_args!r}. ' if log_args else ''
+                        f'Unit {"is" if self.is_leader() else "is not"} leader.'
+                    )  # fmt: skip
                     _log_security_event(
                         'CRITICAL',
                         _SecurityEventAuthZ.AUTHZ_FAIL,
                         args[0],
-                        description=f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
-                        f'The command exited with code: {e.returncode}. '
-                        f'Arguments were: {loggable_args!r}. '
-                        f'Unit {"is" if self.is_leader() else "is not"} leader.',
+                        description=description,
                     )
                 raise ModelError(e.stderr) from e
             if return_output:
@@ -4050,13 +4050,16 @@ class _ModelBackend:
                 'not the leader',
             )
             if any(message in str(e).lower() for message in authz_messages):
+                description = (
+                    f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
+                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
+                    f'Unit {"is" if self.is_leader() else "is not"} leader.'
+                )
                 _log_security_event(
                     'CRITICAL',
                     _SecurityEventAuthZ.AUTHZ_FAIL,
                     args[0],
-                    description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
-                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
-                    f'Unit {"is" if self.is_leader() else "is not"} leader.',
+                    description=description,
                 )
             if 'not found' in str(e):
                 raise SecretNotFoundError() from e
