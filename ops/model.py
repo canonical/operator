@@ -3846,17 +3846,18 @@ class _ModelBackend:
                 'permission denied',
                 'not the leader',
             )
-            if not any(message in str(e).lower() for message in authz_messages):
-                raise
-            _log_security_event(
-                'CRITICAL',
-                _SecurityEventAuthZ.AUTHZ_FAIL,
-                args[0],
-                description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
-                f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
-                f'Unit {"is" if self.is_leader() else "is not"} leader.',
-            )
-            raise SecretNotFoundError() from e
+            if any(message in str(e).lower() for message in authz_messages):
+                _log_security_event(
+                    'CRITICAL',
+                    _SecurityEventAuthZ.AUTHZ_FAIL,
+                    args[0],
+                    description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
+                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
+                    f'Unit {"is" if self.is_leader() else "is not"} leader.',
+                )
+            if 'not found' in str(e):
+                raise SecretNotFoundError() from e
+            raise
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         args: list[str] = []
