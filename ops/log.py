@@ -298,10 +298,8 @@ def _log_security_event(
           fit in the event name.
     """
     logger = logging.getLogger(__name__)
-    app_id = (
-        f'{os.environ.get("JUJU_MODEL_UUID", "unknown")}'
-        f'-{os.environ.get("JUJU_UNIT_NAME", "unknown")}'
-    )
+    env = os.environ
+    app_id = f'{env.get("JUJU_MODEL_UUID", "unknown")}-{env.get("JUJU_UNIT_NAME", "unknown")}'
     type = event_type if isinstance(event_type, str) else event_type.value
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
