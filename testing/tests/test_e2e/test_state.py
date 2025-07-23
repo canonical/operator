@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import copy
+import tempfile
 from dataclasses import asdict, replace
-from typing import Any
+from typing import Any, Callable, Iterable, Generator
+
+import yaml
 
 import ops
 import pytest
@@ -12,6 +15,8 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
+    _Event,
+    _next_storage_index,
     Address,
     BindAddress,
     CheckInfo,
@@ -23,6 +28,7 @@ from scenario.state import (
     Notice,
     PeerRelation,
     Relation,
+    RelationBase,
     Resource,
     Secret,
     State,
@@ -30,7 +36,9 @@ from scenario.state import (
     StoredState,
     SubordinateRelation,
     TCPPort,
+    layer_from_rockcraft,
 )
+from scenario.context import Context
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
@@ -57,7 +65,7 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call = None
+        _call: Callable[[MyCharm, _Event], None] | None = None
         called = False
         on = MyCharmEvents()
 
@@ -69,7 +77,7 @@ def mycharm():
         def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
-                MyCharm._call(self, event)
+                self._call(event)
 
     return MyCharm
 
@@ -201,6 +209,7 @@ def test_relation_get(mycharm):
 def test_relation_set(mycharm):
     def event_handler(charm: CharmBase, _):
         rel = charm.model.get_relation('foo')
+        assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
@@ -301,7 +310,7 @@ def test_model_positional_arguments():
 
 def test_container_positional_arguments():
     with pytest.raises(TypeError):
-        Container('', '')
+        Container('', True)
 
 
 def test_container_default_values():
@@ -515,9 +524,10 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
         SubordinateRelation,
     ],
 )
-def test_state_immutable_with_changed_data_relation(relation_type, mycharm):
+def test_state_immutable_with_changed_data_relation(relation_type: type[RelationBase], mycharm):
     def event_handler(charm: CharmBase, _):
         rel = charm.model.get_relation(relation_type.__name__)
+        assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
@@ -649,3 +659,350 @@ def test_state_immutable_with_changed_data_stored_state():
     )
     assert not stored_state_in.content
     assert 'seen' in stored_state_out.content
+
+
+@pytest.mark.parametrize(
+    'rockcraft',
+    [
+        pytest.param({'summary': 'Empty Layer'}, id='empty-layer'),
+        pytest.param(
+            {'summary': 'Layer with description', 'description': 'This is a test layer.'},
+            id='layer-with-description',
+        ),
+        pytest.param(
+            {
+                'summary': 'Layer with a service',
+                'services': {'srv1': {'override': 'replace', 'command': 'echo hello'}},
+            },
+            id='layer-with-service',
+        ),
+        pytest.param(
+            {
+                'summary': 'Layer with a check',
+                'checks': {'chk1': {'override': 'merge', 'exec': {'command': 'echo hello'}}},
+            },
+            id='layer-with-check',
+        ),
+        # This is from the example in the Rockcraft documentation:
+        # https://documentation.ubuntu.com/rockcraft/en/latest/reference/rockcraft.yaml/
+        # (with an extra service and two checks added).
+        pytest.param(
+            {
+                'name': 'hello',
+                'title': 'Hello World',
+                'summary': 'A Hello World rock',
+                'description': 'This is an example of a Rockcraft project for a Hello World rock.',
+                'version': 'latest',
+                'base': 'bare',
+                'build-base': 'ubuntu@22.04',
+                'license': 'Apache-2.0',
+                'run-user': '_daemon_',
+                'environment': {
+                    'FOO': 'bar',
+                },
+                'services': {
+                    'hello': {
+                        'override': 'replace',
+                        'command': '/usr/bin/hello -t',
+                        'environment': {
+                            'VAR1': 'value',
+                            'VAR2': 'other value',
+                        },
+                    },
+                    'hello-echo': {
+                        'override': 'replace',
+                        'command': 'echo hello',
+                    },
+                },
+                'checks': {
+                    'chk1': {
+                        'override': 'merge',
+                        'exec': {
+                            'command': '/usr/bin/hello -c',
+                        },
+                    },
+                    'chk2': {
+                        'override': 'merge',
+                        'level': 'ready',
+                        'tcp': {
+                            'port': 8000,
+                        },
+                    },
+                },
+                'platforms': {
+                    'amd64': {},
+                    'armhf': {
+                        'build-on': ['armhf', 'arm64'],
+                    },
+                    'ibm': {
+                        'build-on': ['s390x'],
+                        'build-for': 's390x',
+                    },
+                },
+                'parts': {
+                    'hello': {
+                        'plugin': 'nil',
+                        'stage-packages': ['hello'],
+                    },
+                },
+            },
+            id='rockcraft-doc-example',
+        ),
+    ],
+)
+def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
+        yaml.safe_dump(rockcraft, f)
+        rockcraft_path = f.name
+        layer = layer_from_rockcraft(rockcraft_path)
+    assert layer.summary == rockcraft['summary']
+    if 'description' in rockcraft:
+        assert rockcraft['description'] in layer.description
+        assert rockcraft_path in layer.description
+    assert len(layer.services) == len(rockcraft.get('services', {}))
+    for service_name, service in rockcraft.get('services', {}).items():
+        assert service_name in layer.services
+        layer_service = layer.services[service_name]
+        assert layer_service.command == service['command']
+        assert layer_service.override == service['override']
+        if 'environment' in service:
+            assert layer_service.environment == service['environment']
+    assert len(layer.checks) == len(rockcraft.get('checks', {}))
+    for check_name, check in rockcraft.get('checks', {}).items():
+        assert check_name in layer.checks
+        layer_check = layer.checks[check_name]
+        assert layer_check.override == check['override']
+        layer_check_level = layer_check.level
+        if hasattr(layer_check_level, 'value'):
+            assert isinstance(layer_check_level, ops.pebble.CheckLevel)
+            layer_check_level = layer_check_level.value
+        assert layer_check_level == check.get('level', ops.pebble.CheckLevel.UNSET.value)
+        if 'exec' in check:
+            assert layer_check.exec is not None and 'command' in check['exec']
+            assert layer_check.exec['command'] == check['exec']['command']
+        if 'tcp' in check:
+            assert layer_check.tcp is not None and 'port' in check['tcp']
+            assert layer_check.tcp['port'] == check['tcp']['port']
+
+
+def test_layer_from_rockcraft_safe():
+    dangerous_yaml = """
+    !!python/object/apply:os.system ["echo unsafe"]
+    """
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
+        f.write(dangerous_yaml)
+        f.flush()
+        rockcraft_path = f.name
+        with pytest.raises(yaml.YAMLError):
+            layer_from_rockcraft(rockcraft_path)
+
+
+def test_state_from_context():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    state = State.from_context(ctx)
+    assert state.config == {'foo': 'bar'}
+    assert isinstance(state.containers, frozenset)
+    assert len(state.containers) == 1
+    assert state.get_container('container').can_connect
+    assert isinstance(state.relations, frozenset)
+    assert len(state.relations) == 4
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert isinstance(state.storages, frozenset)
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert isinstance(state.stored_states, frozenset)
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+
+
+def test_state_from_context_extend():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(
+        Charm, meta=meta, config={'options': {'foo': {'type': 'string', 'default': 'bar'}}}
+    )
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        config={'foo': 'baz'},
+        leader=True,
+        containers={container},
+        relations={relation},
+        stored_states={stored_state},
+    )
+    assert state.leader is True
+    assert state.config == {'foo': 'baz'}
+    assert isinstance(state.containers, frozenset)
+    assert len(state.containers) == 2
+    assert state.get_container('container').can_connect
+    assert not state.get_container('other-container').can_connect
+    assert isinstance(state.relations, frozenset)
+    assert len(state.relations) == 5
+    assert state.get_relations('peer')[0].interface == 'friend'
+    assert state.get_relations('relreq')[0].interface == 'across'
+    assert state.get_relations('relpro')[0].interface == 'around'
+    assert state.get_relations('sub')[0].interface == 'below'
+    assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
+    assert isinstance(state.storages, frozenset)
+    assert len(state.storages) == 1
+    assert tuple(state.storages)[0].name == 'storage'
+    assert isinstance(state.stored_states, frozenset)
+    assert len(state.stored_states) == 1
+    assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
+    assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
+
+
+def test_state_from_context_merge_config():
+    ctx = Context(
+        ops.CharmBase,
+        meta={'name': 'alex'},
+        config={'options': {'foo': {'type': 'string', 'default': 'str'}}},
+    )
+    state = State.from_context(ctx, config={'bar': 'baz'})
+    assert state.config == {'foo': 'str', 'bar': 'baz'}
+
+
+@pytest.mark.parametrize(
+    'rel_type,endpoint',
+    [(Relation, 'relreq'), (PeerRelation, 'peer'), (SubordinateRelation, 'sub')],
+)
+def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], endpoint: str):
+    meta = {
+        'name': 'sam',
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+    }
+    rel = rel_type(endpoint, local_app_data={'a': 'b'})
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, relations={rel})
+    # We should have the relation passed in, that has data, not an empty one
+    # from the context.
+    assert state.get_relation(rel.id).local_app_data == {'a': 'b'}
+
+
+def test_state_from_context_skip_exiting_container():
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+    }
+    notice = Notice('example.com/notice')
+    container = Container(name='container', notices=[notice])
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, containers={container})
+    # We should have the container passed in, that has notices and has the
+    # default of can_connect=False, not the one from the context.
+    assert state.get_container(container.name).notices == [notice]
+    assert state.get_container(container.name).can_connect is False
+
+
+def test_state_from_context_skip_exiting_storage():
+    meta = {
+        'name': 'sam',
+        'storage': {'storage': {}},
+    }
+    next_index = _next_storage_index(update=False)
+    storage = Storage(name='storage')
+    assert storage.index == next_index
+    next_index = _next_storage_index(update=False)
+    ctx = Context(ops.CharmBase, meta=meta)
+    state = State.from_context(ctx, storages={storage})
+    # We should have the storage passed in. If the context created a new one,
+    # the index would have increased.
+    assert state.get_storage(storage.name, index=storage.index) == storage
+    assert _next_storage_index(update=False) == next_index
+
+
+def test_state_from_context_skip_exiting_stored_state():
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    meta = {
+        'name': 'sam',
+    }
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    ctx = Context(Charm, meta=meta)
+    state = State.from_context(ctx, stored_states={stored_state})
+    # We should have the stored state passed in, that has content, not an empty
+    # one from the context.
+    assert state.get_stored_state(
+        stored_state.name, owner_path=stored_state.owner_path
+    ).content == {'foo': 'bar'}
+
+
+def _make_generator(items: Iterable[Any]) -> Generator[Any]:
+    return (item for item in items)
+
+
+@pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
+def test_state_from_non_sets(iterable: Callable[..., Any]):
+    meta = {
+        'name': 'sam',
+        'containers': {'container': {}},
+        'peers': {'peer': {'interface': 'friend'}},
+        'requires': {
+            'relreq': {'interface': 'across'},
+            'sub': {'interface': 'below', 'scope': 'container'},
+        },
+        'provides': {'relpro': {'interface': 'around'}},
+        'storage': {'storage': {}},
+    }
+
+    class Charm(ops.CharmBase):
+        _stored = ops.StoredState()
+
+    ctx = Context(Charm, meta=meta)
+    container = Container(name='other-container', can_connect=False)
+    relation = Relation('db', remote_app_data={'a': 'b'})
+    stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
+    state = State.from_context(
+        ctx,
+        containers=iterable({container}),
+        relations=iterable({relation}),
+        stored_states=iterable({stored_state}),
+    )
+    assert isinstance(state.containers, frozenset)
+    assert len(state.containers) == 2
+    assert isinstance(state.relations, frozenset)
+    assert len(state.relations) == 5
+    assert isinstance(state.storages, frozenset)
+    assert len(state.storages) == 1
+    assert isinstance(state.stored_states, frozenset)
+    assert len(state.stored_states) == 1

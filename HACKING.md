@@ -1,14 +1,37 @@
+We welcome contributions to Ops! Before you start work on a contribution, please also read [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 # Setting up a Dev Environment
 
-To work in the framework itself you will need Python >= 3.8. Linting, testing,
-and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/), which you should install.
-For improved performance on the tests, ensure that you have PyYAML
-installed with the correct extensions:
+To work in the framework itself you will need Python >= 3.10. Linting, testing,
+and docs automation is performed using [`tox`](https://tox.readthedocs.io/en/latest/).
+
+First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 
 ```sh
-apt-get install libyaml-dev
-pip install --force-reinstall --no-cache-dir pyyaml
+sudo snap install astral-uv --classic
+```
+
+Then install `tox` with extensions, as well as a range of Python versions:
+
+```sh
+uv tool install tox --with tox-uv
+uv tool update-shell
+```
+
+You can validate that you have a working installation by running:
+
+```sh
+tox --version
+4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
+registered plugins:
+    tox-uv-1.26.0 at /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox_uv/plugin.py with uv==0.7.12
+```
+
+For improved performance on the tests, install the library that allows
+PyYAML to use C speedups:
+
+```sh
+sudo apt-get install libyaml-dev
 ```
 
 # Testing
@@ -26,9 +49,6 @@ tox -e unit -- test/test_charm.py
 # Format the code using Ruff
 tox -e format
 
-# Compile the requirements.txt file for docs
-tox -e docs-deps
-
 # Generate a local copy of the Sphinx docs in docs/_build
 tox -e docs
 
@@ -36,22 +56,17 @@ tox -e docs
 tox -e unit -- -k <pattern>
 ```
 
-For more in depth debugging, you can enter any of `tox`'s created virtualenvs
-provided they have been run at least once and do fun things - e.g. run
-`pytest` directly:
+For more in depth debugging, you can enter the virtualenv so that you can run
+`pytest` or other tools directly:
 
 ```sh
-# Enter the linting virtualenv
-source .tox/lint/bin/activate
-
-...
-
-# Enter the unit testing virtualenv and run tests
-source .tox/unit/bin/activate
+uv sync --all-groups
+source .venv/bin/activate
 pytest
-...
-
 ```
+
+Likewise, use this virtualenv to enable Python type hints and language server if
+you use an editor from the console or specify it as interpreter path in an IDE.
 
 ## Pebble Tests
 
@@ -93,7 +108,7 @@ If your changes are in a Git branch, you can simply replace your `ops` version
 in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like:
 
 ```
-#ops ~= 2.9
+#ops ~= 3.0
 git+https://github.com/{your-username}/operator@{your-branch-name}
 ```
 
@@ -160,126 +175,6 @@ your charm to a controller using that version of Juju. For example, with microk8
 We rely on automation to [update charm pins](.github/actions/update-charm-pins/) of
 a bunch of charms that use the operator framework. The script can be run locally too.
 
-# Contributing
-
-Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
-
-For coding style, we follow [PEP 8](https://peps.python.org/pep-0008/) as well as a team [Python style guide](./STYLE.md). Please be complete with docstrings and keep them informative for _users_,
-as the [ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html)
-is automatically generated from Python docstrings.
-
-For more advice about contributing documentation, see [Contributing documentation](#contributing-documentation).
-
-Pull requests should have a short title that follows the
-[conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
-
-* chore
-* ci
-* docs
-* feat
-* fix
-* perf
-* refactor
-* revert
-* test
-
-Some examples:
-
-* feat: add the ability to observe change-updated events
-* fix!: correct the type hinting for config data
-* docs: clarify how to use mounts in ops.testing.Container
-* ci: adjust the workflow that publishes ops-scenario
-
-Note that the commit messages to the PR's branch do not need to follow the
-conventional commit format, as these will be squashed into a single commit to `main`
-using the PR title as the commit message.
-
-We consider Ops too small a project to use scopes, so we don't use them.
-
-## Copyright
-
-The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt).
-New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)).
-The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
-
-# Contributing documentation
-
-The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
-are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/)
-for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
-
-To contribute docs:
-
-1. Fork this repo and edit the relevant source files:
-   * Tutorials - [`/docs/tutorial`](./docs/tutorial)
-   * How-to guides - [`/docs/howto`](./docs/howto)
-   * Reference - Automatically generated from Python docstrings
-   * Explanation - [`/docs/explanation`](./docs/explanation)
-2. [Build the documentation locally](#how-to-build-the-documentation-locally),
-   to check that everything looks right
-3. [Propose your changes using a pull request](#contributing)
-
-When you create the pull request, GitHub automatically builds a preview of the docs.
-To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of
-the pull request page, then click **Details**. You can use the preview to double check
-that everything looks right.
-
-## How to write great documentation
-
-- Use short sentences, ideally with one or two clauses.
-- Use headings to split the doc into sections. Make sure that the purpose of each section is clear from its heading.
-- Avoid a long introduction. Assume that the reader is only going to scan the first paragraph and the headings.
-- Avoid background context unless it's essential for the reader to understand.
-
-Recommended tone:
-- Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
-- Use "we" to include the reader in what you're explaining.
-- Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
-
-## How to build the documentation locally
-
-To build the docs and open them in your browser:
-
-```sh
-tox -e docs
-open docs/_build/html/index.html
-```
-
-Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
-
-```sh
-tox -e docs-live
-```
-
-## How to document version dependencies
-
-We don't publish separate documentation for separate versions of ops.
-The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html)
-are always for the in-development (main branch) of ops, and do not include
-any notes indicating changes or additions across ops versions.
-We encourage all charmers to promptly upgrade to the latest version of ops,
-and to refer to the release notes and changelog for learning about changes.
-
-We do note when features behave differently when using different versions of Juju.
-
-In docstrings:
-
-* Use `.. jujuadded:: x.y` to indicate that the feature is only available
-  when using version x.y (or higher) of Juju.
-* Use `..jujuchanged:: x.y` when the feature's behaviour _in ops_ changes.
-* Use `..jujuremoved:: x.y` when the feature will be available in ops
-  but not in that version (or later) of Juju.
-
-Similar directives also work in MyST Markdown. For example:
-
-````markdown
-```{jujuadded} x.y
-Summary
-```
-````
-
-Unmarked features are assumed to work and be available in the current LTS version of Juju.
-
 # Maintaining the documentation
 
 ## How to Pull in Style Changes
@@ -307,7 +202,7 @@ To pull in new dependency changes from the starter pack, change to the starter p
 make html
 ```
 
-Then, compare the generated file `.sphinx/requirements.txt`and the `project.optional-dependencies.docs` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
+Then, compare the generated file `.sphinx/requirements.txt` and the `docs` declaration in the `dependency-groups` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
 
 # Dependencies
 
@@ -323,7 +218,7 @@ Test environments are managed with [tox](https://tox.wiki/) and executed with
 [pytest](https://pytest.org), with coverage measured by
 [coverage](https://coverage.readthedocs.io/).
 Static type checking is done using [pyright](https://github.com/microsoft/pyright),
-and extends the Python 3.8 type hinting support through the
+and extends the Python 3.10 type hinting support through the
 [typing_extensions](https://pypi.org/project/typing-extensions/) package.
 
 Formatting uses [Ruff](https://docs.astral.sh/ruff/).
@@ -349,7 +244,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 4. The "Release Title" is the full version numbers of ops and ops-scenario,
    in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
    and a brief summary of the main changes in the release.
-   For example: `2.3.12 Bug fixes for the Juju foobar feature when using Python 3.12`
+   For example: `3.1.0 Support for the Juju foobar feature`
 5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for `ops`.
 6. Leave the previous tag choice on `auto`.
 7. Use the "Generate Release Notes" button to get a copy of the changes into the
@@ -360,7 +255,7 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
 9. Format the auto-generated release notes according to the `CHANGES.md` section below,
    and add it to `CHANGES.md`.
 10. Change the versions for `ops`, `ops-scenario` and `ops-tracing` to the versions
-   being released: `ops==2.xx.y, ops-tracing==2.xx.y, ops-scenario==7.xx.y`.
+   being released: `ops==3.x.y, ops-tracing==3.x.y, ops-scenario==8.x.y`.
    We use both [semantic versioning](https://semver.org/) and lockstep releases, so if
    one library requires a version bump, the other will too. There will be a total of
    seven changes:
@@ -368,14 +263,11 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
     - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
     - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
-11. Run `uvx -p 3.11 tox -e docs-deps` to recompile the `requirements.txt` file
-   used for docs (in case dependencies have been updated in `pyproject.toml`)
-   using the same Python version as specified in the `docs/.readthedocs.yaml` file.
-12. Add, commit, and push, and open a PR to get the `CHANGES.md` update, version bumps,
-   and doc requirement bumps into main (and get it merged).
-13. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
+11. Add, commit, and push, and open a PR to get the `CHANGES.md` update and version
+   bumps into main (and get it merged).
+12. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
    If the tests don't pass at the tip of the main branch, do not release.
-14. When you are ready, click "Publish". GitHub will create the additional tag.
+13. When you are ready, click "Publish". GitHub will create the additional tag.
 
     Pushing the tags will trigger automatic builds for the Python packages and
     publish them to PyPI ([ops](https://pypi.org/project/ops/) and
@@ -388,11 +280,11 @@ To make a release of the `ops` and/or `ops-scenario` packages, do the following:
     (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
 
     You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-15. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
+14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
     and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-16. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
-   For example, if 2.90.0 is the next expected `ops` version, use
-   `ops==2.90.0.dev0 ops-tracing==2.90.0.dev0 ops-scenario==7.90.0.dev0`.
+15. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
+   For example, if 3.1.0 is the next expected `ops` version, use
+   `ops==3.1.0.dev0 ops-tracing==3.1.0.dev0 ops-scenario==8.1.0.dev0`.
    There will be a total of seven changes:
     - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
     - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
@@ -417,7 +309,7 @@ view of the log will be included at the end of the GitHub release notes when
 the "Generate Release Notes" button is used, in the form:
 
 ```
-**Full Changelog**: https://github.com/canonical/operator/compare/2.17.0...2.18.0
+**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
 ```
 
 These changes include both `ops` and `ops-scenario`. If someone needs to see
@@ -503,3 +395,32 @@ In the post, outline the key improvements both in `ops` and `ops-scenario`.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
+
+## Updating the Ops versions in the Charmcraft profiles
+
+The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
+
+First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
+
+> See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
+
+Next, do the following for the `kubernetes` profile:
+
+1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the Ops version specifier.
+2. At the repo root, create a directory called `generated-temp`.
+3. Inside `generated-temp`, run:
+    ```text
+    CHARMCRAFT_DEVELOPER=1 python -m charmcraft init --profile=kubernetes
+    ```
+4. Inside `generated-temp`, run `uv lock`.
+5. Copy `generated-temp/uv.lock` to `charmcraft/templates/init-kubernetes/uv.lock.j2`, overwriting the existing file.
+6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
+7. Delete the `generated-temp` directory.
+
+For the `machine` profile, modify the Ops version specifier in `charmcraft/templates/init-machine/pyproject.toml.j2`. Then run a diff between `.../init-machine/pyproject.toml.j2` and `.../init-kubernetes/pyproject.toml.j2`. If the files match, copy `uv.lock.j2` from the `kubernetes` profile to the `machine` profile. Otherwise, repeat the full process for the `machine` profile.
+
+Commit your changes. You should have changed these files:
+* charmcraft/templates/init-kubernetes/pyproject.toml.j2
+* charmcraft/templates/init-kubernetes/uv.lock.j2
+* charmcraft/templates/init-machine/pyproject.toml.j2
+* charmcraft/templates/init-machine/uv.lock.j2

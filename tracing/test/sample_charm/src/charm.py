@@ -14,7 +14,10 @@
 
 from __future__ import annotations
 
+import opentelemetry.trace
 import ops
+
+tracer = opentelemetry.trace.get_tracer('sample charm')
 
 
 class SampleCharm(ops.CharmBase):
@@ -29,7 +32,8 @@ class SampleCharm(ops.CharmBase):
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
-        event.add_status(ops.ActiveStatus())
+        with tracer.start_as_current_span('my collect status'):
+            event.add_status(ops.ActiveStatus())
 
 
 if __name__ == '__main__':

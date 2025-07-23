@@ -10,9 +10,9 @@ specific `State` exists in, and the events that can be executed on that `State`.
 from __future__ import annotations
 
 import functools
+import pathlib
 import tempfile
 from contextlib import contextmanager
-from pathlib import Path
 from typing import (
     Generic,
     TYPE_CHECKING,
@@ -53,6 +53,7 @@ if TYPE_CHECKING:  # pragma: no cover
         State,
         _EntityStatus,
     )
+    from opentelemetry.sdk.trace import ReadableSpan
 
 logger = scenario_logger.getChild('runtime')
 
@@ -135,7 +136,7 @@ class Manager(Generic[CharmType]):
             self.run()
         # guaranteed to be set: run was either called before, or right above
         assert self.ops
-        self.ops._destroy()
+        self.ops.destroy()
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -441,6 +442,7 @@ class Context(Generic[CharmType]):
     - :attr:`emitted_events`
     - :attr:`action_logs`
     - :attr:`action_results`
+    - :attr:`trace_data`
 
     This allows you to write assertions not only on the output state, but also, to some
     extent, on the path the charm took to get there.
@@ -468,22 +470,104 @@ class Context(Generic[CharmType]):
             with ctx(ctx.on.start(), State()) as manager:
                 manager.charm._some_private_setup()
                 manager.run()
+                assert manager.charm._some_private_attribute == "bar"
+
+    Note that you can't call ``run()`` multiple times. The context 'pauses' ops
+    right before emitting the event, but otherwise this is a regular test; you
+    can't emit multiple events in a single charm execution.
     """
 
     juju_log: list[JujuLogLine]
     """A record of what the charm has sent to juju-log"""
     app_status_history: list[_EntityStatus]
-    """A record of the app statuses the charm has set"""
+    """A record of the app statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the app
+    status history like so::
+
+        ctx = Context(MyCharm)
+        state_out = ctx.run(ctx.on.start(), State())
+        assert ctx.app_status_history == [
+            UnknownStatus(),
+            MaintenanceStatus('...'),
+        ]
+        assert state_out.app_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the app status history.
+    """
     unit_status_history: list[_EntityStatus]
-    """A record of the unit statuses the charm has set"""
+    """A record of the unit statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the unit
+    status history like so::
+
+        ctx = Context(MyCharm)
+        state_out = ctx.run(ctx.on.start(), State())
+        assert ctx.unit_status_history == [
+            UnknownStatus(),
+            MaintenanceStatus('...'),
+            WaitingStatus('...'),
+        ]
+        assert state_out.unit_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the unit status history.
+
+    Also note that, unless you initialise the State with a preexisting status,
+    the first status in the history will always be ``unknown``.
+    """
     workload_version_history: list[str]
-    """A record of the workload versions the charm has set"""
+    """A record of the workload versions the charm has set.
+
+    Assert that the charm has set one or more workload versions during a hook
+    execution::
+
+        ctx = Context(MyCharm)
+        ctx.run(ctx.on.start(), State())
+        assert ctx.workload_version_history == ['1', '1.2', '1.5']
+
+    Note that the *current* version is **not** in the version history.
+    """
     removed_secret_revisions: list[int]
     """A record of the secret revisions the charm has removed"""
     emitted_events: list[ops.EventBase]
-    """A record of the events (including custom) that the charm has processed"""
+    """A record of the events (including custom) that the charm has processed.
+
+    You can configure which events will be captured by passing the following
+    arguments to ``Context``:
+
+    -  `capture_deferred_events`: If you want to include re-emitted deferred events.
+    -  `capture_framework_events`: If you want to include Ops framework events.
+
+    For example::
+
+        def test_emitted():
+            ctx = Context(
+                MyCharm,
+                capture_deferred_events=True,
+                capture_framework_events=True,
+            )
+            deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
+            ctx.run(ctx.on.start(), State(deferred=[deferred]))
+
+            assert len(ctx.emitted_events) == 5
+            assert [e.handle.kind for e in ctx.emitted_events] == [
+                'update_status',
+                'start',
+                'collect_unit_status',
+                'pre_commit',
+                'commit',
+            ]
+    """
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
+    trace_data: list[ReadableSpan]
+    """Trace data generated during the last run.
+
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
+    order of this list. Rather, tests could validate parent/child relationships or containment by
+    start and end timestamps.
+    """
+
     action_logs: list[str]
     """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
 
@@ -494,6 +578,17 @@ class Context(Generic[CharmType]):
 
     This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
     """
+    charm_root: str | pathlib.Path | None
+    """The charm root directory to use when executing the charm.
+
+    Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
+    YAML is copied to the charm root. If ``charm_root`` is None, then a temporary directory is
+    created and used. To set up the charm root directory with other files, pass in the location of
+    the directory to use. If a ``charm_root`` is provided, the tests are also able to inspect the
+    content of the directory after the event has run, unlike the temporary directory, which is
+    automatically deleted after the run.
+    """
+
     on: CharmEvents
     """The events that this charm can respond to.
 
@@ -507,7 +602,7 @@ class Context(Generic[CharmType]):
         *,
         actions: dict[str, Any] | None = None,
         config: dict[str, Any] | None = None,
-        charm_root: str | Path | None = None,
+        charm_root: str | pathlib.Path | None = None,
         juju_version: str = _DEFAULT_JUJU_VERSION,
         capture_deferred_events: bool = False,
         capture_framework_events: bool = False,
@@ -589,6 +684,7 @@ class Context(Generic[CharmType]):
         self.removed_secret_revisions: list[int] = []
         self.emitted_events: list[ops.EventBase] = []
         self.requested_storages: dict[str, int] = {}
+        self.trace_data = []
 
         # set by Runtime.exec() in self._run()
         self._output_state: State | None = None
@@ -606,11 +702,11 @@ class Context(Generic[CharmType]):
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
-        return Path(self._tmp.name) / 'containers' / container_name
+        return pathlib.Path(self._tmp.name) / 'containers' / container_name
 
-    def _get_storage_root(self, name: str, index: int) -> Path:
+    def _get_storage_root(self, name: str, index: int) -> pathlib.Path:
         """Get the path to a tempdir where this storage's simulated root will live."""
-        storage_root = Path(self._tmp.name) / 'storages' / f'{name}-{index}'
+        storage_root = pathlib.Path(self._tmp.name) / 'storages' / f'{name}-{index}'
         # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root

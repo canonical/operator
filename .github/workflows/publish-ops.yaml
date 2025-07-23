@@ -7,6 +7,7 @@ on:
       # will likely be publishing at least three packages: ops, ops-scenario,
       # and ops-harness.
       - '2.*'
+      - '3.*'
 
 permissions: {}
 

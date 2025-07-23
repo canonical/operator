@@ -62,13 +62,13 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
 ############################################################
 
 # Product name
-project = 'The ops library'
+project = 'Ops'
 author = 'Canonical Ltd.'
 
 # The title you want to display for the documentation in the sidebar.
 # You might want to include a version number here.
 # To not display any title, set this option to an empty string.
-html_title = project + ' documentation'
+html_title = f'{project} documentation'
 
 # The default value uses the current year as the copyright year.
 #
@@ -304,6 +304,7 @@ intersphinx_mapping = {
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
+    'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
 }
 
 # -- General configuration ---------------------------------------------------
@@ -330,6 +331,7 @@ nitpick_ignore = [
     ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
+    ('py:class', '_StateKwargs'),
     ('py:class', '_StorageMetaDict'),
     ('py:class', '_TaskDict'),
     ('py:class', '_TextOrBinaryIO'),
@@ -340,14 +342,17 @@ nitpick_ignore = [
     ('py:class', 'CharmType'),
     ('py:class', 'LocalIdentityDict'),
     ('py:class', 'IdentityDict'),
+    ('py:class', 'ReadableSpan'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),
+    ('py:class', 'ops.charm._T'),
     ('py:class', 'ops.model._AddressDict'),
     ('py:class', 'ops.model._GenericLazyMapping'),
     ('py:class', 'ops.model._ModelBackend'),
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
+    ('py:class', 'ops.model._T'),
     ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),

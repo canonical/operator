@@ -103,6 +103,7 @@ from .state import (
     UnitID,
     UnknownStatus,
     WaitingStatus,
+    layer_from_rockcraft,
 )
 
 __all__ = [
@@ -148,4 +149,5 @@ __all__ = [
     'UnitID',
     'UnknownStatus',
     'WaitingStatus',
+    'layer_from_rockcraft',
 ]

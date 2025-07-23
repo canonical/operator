@@ -2220,7 +2220,10 @@ def _record_calls(cls: Any):
     return cls
 
 
-def _copy_docstrings(source_cls: Any):
+_T = TypeVar('_T')
+
+
+def _copy_docstrings(source_cls: type[object]) -> Callable[[_T], _T]:
     """Copy the docstrings from source_cls to target_cls.
 
     Use this as:
@@ -2475,13 +2478,6 @@ class _TestingModelBackend:
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_set must be a boolean')
-
-        if 'relation_broken' in self._hook_is_running and not self.relation_remote_app_name(
-            relation_id
-        ):
-            raise RuntimeError(
-                'remote-side relation data cannot be accessed during a relation-broken event'
-            )
 
         if relation_id not in self._relation_data_raw:
             raise RelationNotFoundError(relation_id)
@@ -3592,7 +3588,7 @@ class _TestingPebbleClient:
                 file_path.write_bytes(source)
             else:
                 # If source is binary, open file in binary mode and ignore encoding param
-                is_binary = isinstance(source.read(0), bytes)  # type: ignore
+                is_binary = isinstance(source.read(0), bytes)
                 open_mode = 'wb' if is_binary else 'w'
                 open_encoding = None if is_binary else encoding
                 with file_path.open(open_mode, encoding=open_encoding) as f:
@@ -3721,7 +3717,7 @@ class _TestingPebbleClient:
                     f'not {data.__class__.__name__}'
                 )
             else:
-                return io.StringIO(typing.cast('str', data))
+                return io.StringIO(data)
 
     def exec(
         self,

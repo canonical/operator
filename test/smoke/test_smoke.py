@@ -29,17 +29,6 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
-CHARMCRAFT2_YAML = """
-type: "charm"
-bases:
-  - build-on:
-    - name: "ubuntu"
-      channel: "{base}"
-    run-on:
-    - name: "ubuntu"
-      channel: "{base}"
-"""
-
 CHARMCRAFT3_YAML = """
 type: "charm"
 base: ubuntu@{base}
@@ -82,8 +71,8 @@ def pack(charm_dir: pathlib.Path):
 @pytest.mark.parametrize(
     'base,charmcraft_version,name',
     (
-        ('20.04', 2, 'focal'),
-        ('22.04', 2, 'jammy'),
+        ('20.04', 3, 'focal'),
+        ('22.04', 3, 'jammy'),
         ('24.04', 3, 'noble'),
     ),
 )
@@ -100,7 +89,6 @@ async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name
         pytest.skip(f'charmcraft version {available_charmcraft_version} is too old for this test')
         return
     charmcraft_yaml = {
-        2: CHARMCRAFT2_YAML,
         3: CHARMCRAFT3_YAML,
     }[charmcraft_version].format(base=base)
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:

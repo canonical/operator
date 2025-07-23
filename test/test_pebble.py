@@ -1293,6 +1293,7 @@ class TestCheckInfo:
         assert check.name == 'chk1'
         assert check.level == pebble.CheckLevel.READY
         assert check.status == pebble.CheckStatus.UP
+        assert check.successes is None
         assert check.failures == 0
         assert check.threshold == 3
         assert check.change_id is None
@@ -1302,12 +1303,14 @@ class TestCheckInfo:
             level=pebble.CheckLevel.READY,
             startup=pebble.CheckStartup.ENABLED,
             status=pebble.CheckStatus.INACTIVE,
+            successes=5,
             threshold=3,
             change_id=pebble.ChangeID(''),
         )
         assert check.name == 'chk1'
         assert check.level == pebble.CheckLevel.READY
         assert check.status == pebble.CheckStatus.INACTIVE
+        assert check.successes == 5
         assert check.failures == 0
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('')
@@ -1317,6 +1320,7 @@ class TestCheckInfo:
             level=pebble.CheckLevel.ALIVE,
             startup=pebble.CheckStartup.DISABLED,
             status=pebble.CheckStatus.DOWN,
+            successes=7,
             failures=5,
             threshold=3,
             change_id=pebble.ChangeID('10'),
@@ -1324,6 +1328,7 @@ class TestCheckInfo:
         assert check.name == 'chk2'
         assert check.level == pebble.CheckLevel.ALIVE
         assert check.status == pebble.CheckStatus.DOWN
+        assert check.successes == 7
         assert check.failures == 5
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('10')
@@ -1338,6 +1343,7 @@ class TestCheckInfo:
         assert check.name == 'chk3'
         assert check.level == pebble.CheckLevel.UNSET
         assert check.status == pebble.CheckStatus.UP
+        assert check.successes is None
         assert check.failures == 0
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('28')
@@ -1346,6 +1352,7 @@ class TestCheckInfo:
             'name': 'chk4',
             'status': 'down',
             'startup': 'enabled',
+            'successes': 0,
             'failures': 3,
             'threshold': 3,
             'change-id': '42',
@@ -1353,6 +1360,7 @@ class TestCheckInfo:
         assert check.name == 'chk4'
         assert check.level == pebble.CheckLevel.UNSET
         assert check.status == pebble.CheckStatus.DOWN
+        assert check.successes == 0
         assert check.failures == 3
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('42')
@@ -1361,6 +1369,7 @@ class TestCheckInfo:
             'name': 'chk5',
             'status': 'down',
             'startup': 'enabled',
+            'successes': 7,
             'failures': 3,
             'threshold': 3,
             'change-id': '',
@@ -1368,9 +1377,40 @@ class TestCheckInfo:
         assert check.name == 'chk5'
         assert check.level == pebble.CheckLevel.UNSET
         assert check.status == pebble.CheckStatus.INACTIVE  # Empty change-id means inactive.
+        assert check.successes == 7
         assert check.failures == 3
         assert check.threshold == 3
         assert check.change_id == pebble.ChangeID('')
+
+    @pytest.mark.parametrize(
+        'successes,failures,has_run',
+        [
+            (0, 0, False),
+            (0, 1, True),
+            (1, 0, True),
+            (1, 1, True),
+        ],
+    )
+    def test_has_run(self, successes: int, failures: int, has_run: bool):
+        check = pebble.CheckInfo(
+            name='chk1',
+            level=pebble.CheckLevel.READY,
+            status=pebble.CheckStatus.UP,
+            successes=successes,
+            failures=failures,
+        )
+        assert check.has_run == has_run
+
+    def test_has_run_not_implemented(self):
+        check = pebble.CheckInfo(
+            name='chk1',
+            level=pebble.CheckLevel.READY,
+            status=pebble.CheckStatus.UP,
+            successes=None,
+            failures=3,
+        )
+        with pytest.raises(NotImplementedError):
+            check.has_run
 
 
 _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
@@ -1589,7 +1629,7 @@ class TestMultipartParser:
                 bodies.append(b'')  # noqa: B023
                 bodies_done.append(False)  # noqa: B023
 
-            def handle_body(data: bytes, done: bool = False):
+            def handle_body(data: bytearray, done: bool = False):
                 bodies[-1] += data  # noqa: B023
                 bodies_done[-1] = done  # noqa: B023
 
@@ -2922,6 +2962,7 @@ bad path\r
                     'name': 'chk2',
                     'level': 'alive',
                     'status': 'down',
+                    'successes': 7,
                     'failures': 5,
                     'threshold': 3,
                     'change-id': '3',
@@ -2936,12 +2977,14 @@ bad path\r
         assert checks[0].name == 'chk1'
         assert checks[0].level == pebble.CheckLevel.UNSET
         assert checks[0].status == pebble.CheckStatus.UP
+        assert checks[0].successes is None
         assert checks[0].failures == 0
         assert checks[0].threshold == 2
         assert checks[0].change_id == pebble.ChangeID('1')
         assert checks[1].name == 'chk2'
         assert checks[1].level == pebble.CheckLevel.ALIVE
         assert checks[1].status == pebble.CheckStatus.DOWN
+        assert checks[1].successes == 7
         assert checks[1].failures == 5
         assert checks[1].threshold == 3
         assert checks[1].change_id == pebble.ChangeID('3')

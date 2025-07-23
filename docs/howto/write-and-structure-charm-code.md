@@ -285,7 +285,7 @@ class DemoServerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on_collect_unit_status, self._on_collect_status)
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # Observe other events...
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
@@ -321,8 +321,8 @@ class DemoServerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on_collect_app_status, self._on_collect_app_status)
-        framework.observe(self.on_collect_unit_status, self._on_collect_unit_status)
+        framework.observe(self.on.collect_app_status, self._on_collect_app_status)
+        framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         # Observe other events...
 
     def _on_collect_app_status(self, event: ops.CollectStatusEvent):

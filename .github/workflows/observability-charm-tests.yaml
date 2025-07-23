@@ -19,11 +19,11 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 2257e3fc46e3162a092b3de70807d4b9f76e7380  # rev165 2025-05-26T08:00:33Z
+            commit: cc7bd1db35589fd63e44fb0e8813cd3b4362943e  # rev171 2025-06-22T16:01:16Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 8581f7ea55f688a1d01c3501a88133540b1cce6d  # rev250 2025-05-26T16:06:26Z
+            commit: ca0a31dab4497eac1bcdc3ca3eb47bbbc7365dc9  # rev253 2025-06-23T08:45:58Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: d6640a4637edc68272df7d13f2e7a96fbbb08851  # rev153 2025-05-23T09:21:31Z
+            commit: a2770608526f2c82ddc3d225870f1a48eaa87179  # 2025-06-12T17:55:14Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -36,20 +36,17 @@ jobs:
         run: pip install tox~=4.2 uv~=0.6
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        if: ${{ !(matrix.disabled) }}
         run: |
-          if [ -e "requirements.txt" ]; then
-            sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-            sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
-          elif [ -e "uv.lock" ]; then
+          if [ -e "uv.lock" ]; then
             uv remove ops --optional dev --frozen || echo "maybe ops[testing] is not a dev dependency"
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
           else
-            echo "Error: no requirements.txt or uv.lock file found"
+            echo "Error: no uv.lock file found"
             exit 1
           fi
 

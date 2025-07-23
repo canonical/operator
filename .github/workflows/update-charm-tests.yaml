@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+          persist-credentials: true
 
       - uses: ./.github/actions/update-charm-pins
         with:
@@ -23,7 +24,6 @@ jobs:
           workflows: |-
             .github/workflows/db-charm-tests.yaml
             .github/workflows/hello-charm-tests.yaml
-            .github/workflows/charmcraft-pack.yaml
             .github/workflows/observability-charm-tests.yaml
           gh-pat: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
 

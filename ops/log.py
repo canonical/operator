@@ -94,7 +94,9 @@ def setup_root_logging(
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    def except_hook(etype: type[BaseException], value: BaseException, tb: types.TracebackType):
+    def except_hook(
+        etype: type[BaseException], value: BaseException, tb: types.TracebackType | None
+    ):
         logger.error('Uncaught exception while in charm code:', exc_info=(etype, value, tb))
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)

@@ -16,6 +16,8 @@
 
 """Kubernetes charm for a demo app."""
 
+from __future__ import annotations
+
 import logging
 
 import ops
@@ -29,8 +31,8 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
         self.pebble_service_name = 'fastapi-service'
+        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         """Define and start a workload using the Pebble API.
@@ -46,15 +48,14 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer('fastapi_demo', self._pebble_layer, combine=True)
+        container.add_layer('fastapi_demo', self._get_pebble_layer(), combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.ActiveStatus()
 
-    @property
-    def _pebble_layer(self) -> ops.pebble.Layer:
+    def _get_pebble_layer(self) -> ops.pebble.Layer:
         """A Pebble layer for the FastAPI demo services."""
         command = ' '.join([
             'uvicorn',
