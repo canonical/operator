@@ -3424,6 +3424,8 @@ class _ModelBackend:
             except subprocess.CalledProcessError as e:
                 if 'access denied' in e.stderr.lower():
                     if args[0] in ('juju-log', 'action-fail', 'action-set'):
+                        # These commands may have sensitive data in their arguments, and do not
+                        # support reading the data from a file.
                         loggable_args = ['<arguments stripped>']
                     else:
                         loggable_args = args[1:]
