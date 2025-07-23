@@ -299,4 +299,4 @@ def _log_security_event(event_prefix: _SecurityEvent, event: str, *, level: str,
         'event': f'{event_prefix}:{event}',
         'description': description,
     }
-    logger.log(getattr(logging, level.upper()), json.dumps(data))
+    logger.log(getattr(logging, level.upper()), '%s', json.dumps(data))
