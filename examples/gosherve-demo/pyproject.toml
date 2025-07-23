@@ -1,0 +1,146 @@
+[project]
+name = "gosherve-k8s-operator"
+version = "2.0.0"
+requires-python = ">=3.12"
+authors = [{name="Jon Seager"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "ops~=3.0",
+]
+
+[dependency-groups]
+lint = [
+    "ruff==0.11.2",
+    "codespell==2.4.1",
+]
+static = [
+    "ops[testing,tracing]",
+    "pyright==1.1.385",
+]
+unit = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "coverage[toml]~=7.0",
+]
+integration = [
+    "ops[testing,tracing]",
+    "pytest~=8.0",
+    "jubilant~=1.2",
+]
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+# Formatting tools configuration
+[tool.autopep8]
+max-line-length = 99
+ignore = ["W503"]
+recursive = true
+jobs = -1
+aggressive = 3
+
+# Linting tools configuration
+[tool.ruff]
+line-length = 99
+target-version = "py312"
+
+# Ruff formatter configuration
+[tool.ruff.format]
+quote-style = "single"
+exclude = [
+    "lib/*",  # Ignore libs fetched during our testing (or by a charmer)
+]
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001",
+    # pep8-naming
+    "N",
+    # flake8-builtins
+    "A",
+    # flake8-copyright
+    "CPY",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # Ruff specific
+    "RUF",
+    # Perflint
+    "PERF",
+    # pyflakes-docstrings
+    "D",
+    # flake8-future-annotations
+    "FA",
+    # flake8-type-checking
+    "TC",
+]
+ignore = [
+    # Move application import into a type-checking block
+    "TC001",
+    # Move third-party import into a type-checking block
+    "TC002",
+    # Move standard library import into a type-checking block
+    "TC003",
+    # Use of `assert` detected
+    "S101",
+
+    # Use contextlib.suppress() instead of try/except: pass
+    "SIM105",
+    # Use a single `with` statement with multiple contexts instead of nested `with` statements
+    "SIM117",
+
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in `__init__`
+    "D107",
+
+    # Manual dict comprehension.
+    "PERF403",
+]
+exclude = [
+    "lib/*",  # Ignore libs fetched during our testing (or by a charmer)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
+
+[tool.pyright]
+include = ["src/*.py", "tests/unit/*.py", "tests/integration/*.py"]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = "error"
+stubPath = ""
+
+[tool.codespell]
+skip = '.venv,venv'
+quiet-level = 3
