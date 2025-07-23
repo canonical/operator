@@ -3,9 +3,11 @@
 
 This document describes how to trace your charm code and send the trace data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
-Observability transforms a Juju deployment from a black box to a real-time system: trace data is structured and contextual; [this helps users](#tracing-users) understand the application's behaviour at different points in your charm's lifecycle.
+Observability transforms a Juju deployment from a black box to a real-time system. Trace data is structured and contextual, which helps users understand the application's behaviour at different points in your charm's lifecycle.
 
-The responsibility to instrument the Python code is divided between [Ops, charm libraries, and charms](#tracing-division-of-responsibilities).
+The responsibility to instrument the Python code is divided between Ops, charm libraries, and charms.
+
+> See also: [](#tracing)
 
 ## Summary
 
