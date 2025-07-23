@@ -22,4 +22,7 @@ jobs:
         with:
           enable-cache: false
       - run: uv build --all
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*'
       - uses: pypa/gh-action-pypi-publish@release/v1
