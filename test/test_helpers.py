@@ -79,6 +79,19 @@ def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> list
     return calls  # type: ignore
 
 
+def calls_without_security_event_logging(calls: list[list[str]]) -> list[list[str]]:
+    """Filter out calls that are security events."""
+    return [
+        call
+        for call in calls
+        if not (
+            call
+            and call[:3] == ['juju-log', '--log-level', 'TRACE', '--']
+            and '"type": "security"' in call[3]
+        )
+    ]
+
+
 def create_framework(request: pytest.FixtureRequest, *, meta: ops.CharmMeta | None = None):
     env_backup = os.environ.copy()
     os.environ['PATH'] = os.pathsep.join([

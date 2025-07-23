@@ -36,10 +36,11 @@ import pytest
 import ops
 from ops._main import _should_use_controller_storage
 from ops.jujucontext import _JujuContext
+from ops.log import TRACE
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
-from .test_helpers import FakeScript
+from .test_helpers import FakeScript, calls_without_security_event_logging
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -763,9 +764,7 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        # Remove the security events.
-        calls.pop(1)
-        calls.pop(-1)
+        calls = calls_without_security_event_logging(calls)
 
         assert calls == expected
 
@@ -782,9 +781,7 @@ class _TestMain(abc.ABC):
         )
 
         calls = fake_script.calls()
-        # Remove the security events.
-        calls.pop(1)
-        calls.pop(-1)
+        calls = calls_without_security_event_logging(calls)
 
         custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
@@ -875,16 +872,20 @@ class _TestMain(abc.ABC):
     @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
     def test_excepthook(self, _: MagicMock, fake_script: FakeScript):
-        with pytest.raises(subprocess.CalledProcessError):
-            self._simulate_event(
-                fake_script,
-                EventSpec(
-                    ops.InstallEvent,
-                    'install',
-                    set_in_env={'TRY_EXCEPTHOOK': '1'},
-                    model_uuid='1234',
-                ),
-            )
+        try:
+            logging.getLogger().setLevel(TRACE)
+            with pytest.raises(subprocess.CalledProcessError):
+                self._simulate_event(
+                    fake_script,
+                    EventSpec(
+                        ops.InstallEvent,
+                        'install',
+                        set_in_env={'TRY_EXCEPTHOOK': '1'},
+                        model_uuid='1234',
+                    ),
+                )
+        finally:
+            logging.getLogger().setLevel(logging.INFO)
 
         calls = fake_script.calls()
         sec_start = calls.pop(1)
@@ -905,7 +906,7 @@ class _TestMain(abc.ABC):
         )
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
 
-        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'DEBUG', '--']
+        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         assert sec_crash[:-1] == ['juju-log', '--log-level', 'ERROR', '--']
         data_start = json.loads(sec_start[-1])
         data_crash = json.loads(sec_crash[-1])
@@ -1058,9 +1059,7 @@ class _TestMain(abc.ABC):
         ]
         calls = fake_script.calls()
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-4))
-        # Remove the security events.
-        calls.pop(1)
-        calls.pop(-1)
+        calls = calls_without_security_event_logging(calls)
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1095,9 +1094,7 @@ class _TestMain(abc.ABC):
             ],
             ['juju-log', '--log-level', 'WARNING', '--', f'Legacy {hook} exited with status 42.'],
         ]
-        # Remove the security events.
-        calls.pop(1)
-        calls.pop(-1)
+        calls = calls_without_security_event_logging(calls)
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1166,8 +1163,7 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        # Remove the security events.
-        calls = [c for c in calls if c[0] != 'juju-log' or '"security"' not in c[-1]]
+        calls = calls_without_security_event_logging(calls)
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected

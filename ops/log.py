@@ -30,6 +30,10 @@ if typing.TYPE_CHECKING:
     from .model import _ModelBackend
 
 
+TRACE: typing.Final[int] = 5
+"""The TRACE log level, which is lower than DEBUG."""
+
+
 class JujuLogHandler(logging.Handler):
     """A handler for sending logs and warnings to Juju via juju-log."""
 
@@ -68,6 +72,9 @@ def setup_root_logging(
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
 
+    # Juju supports logging at TRACE level.
+    logging.addLevelName(TRACE, 'TRACE')
+
     def custom_showwarning(
         message: Warning | str,
         category: type[Warning],
@@ -93,7 +100,7 @@ def setup_root_logging(
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
             print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
         _log_security_event(
-            'ERROR',
+            'WARN',
             _SecurityEventSystem.SYS_CRASH,
             etype.__name__,
             description=f'Uncaught exception in charm code: {value!r}.',
@@ -272,8 +279,8 @@ _SecurityEvent = typing.Union[
 
 
 def _log_security_event(
-    # These are the Juju log event levels, which is why there is TRACE and not CRITICAL.
-    level: typing.Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'],
+    # These are the OWASP log levels, which are not the same as the Juju or Python log levels.
+    level: typing.Literal['INFO', 'WARN', 'CRITICAL'],
     event_type: _SecurityEvent | str,
     event: str,
     *,
@@ -282,7 +289,7 @@ def _log_security_event(
     """Send a structured security event log to Juju, as defined by SEC0045.
 
     Args:
-        level: log level, such as 'DEBUG', 'INFO', or 'ERROR'
+        level: log level, either 'INFO', 'WARN', or 'CRITICAL'
         event_type: the event type, in the format described by OWASP
           https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
         event: the name of the event, in the format described by OWASP
@@ -295,17 +302,17 @@ def _log_security_event(
         f'{os.environ.get("JUJU_MODEL_UUID", "unknown")}'
         f'-{os.environ.get("JUJU_UNIT_NAME", "unknown")}'
     )
-    type = event_type.value if hasattr(event_type, 'value') else event_type
+    type = event_type if isinstance(event_type, str) else event_type.value
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
         # included so that applications that are pulling out only the structured
         # data can still see the time of the event.
         'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        # Similarly, this duplicates the level at which this is logged to Juju.
+        # Note that the Juju log level is not the same as the event level.
         'level': level,
         'type': 'security',
         'appid': app_id,
         'event': f'{type}:{event}',
         'description': description,
     }
-    logger.log(getattr(logging, level.upper()), '%s', json.dumps(data))
+    logger.log(TRACE, '%s', json.dumps(data))

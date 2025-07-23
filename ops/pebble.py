@@ -2086,6 +2086,10 @@ class Identity:
         return result
 
 
+class _SecurityEventLogger(Protocol):
+    def __call__(self, level: str, event_type: str, event: str, *, description: str) -> None: ...
+
+
 class Client:
     """Pebble API client.
 
@@ -2121,7 +2125,7 @@ class Client:
         opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
-        security_event_logger: Callable[[str, str, str, str], None] | None = None,
+        security_event_logger: _SecurityEventLogger | None = None,
     ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
@@ -2150,9 +2154,9 @@ class Client:
                     data,
                 )
 
-            security_event_logger = default_security_event_logger  # type: ignore
+            security_event_logger = default_security_event_logger
         assert security_event_logger is not None
-        self._log_security_event: Callable[[str, str, str, str], None] = security_event_logger
+        self._log_security_event: _SecurityEventLogger = security_event_logger
 
     @classmethod
     def _get_default_opener(cls, socket_path: str) -> urllib.request.OpenerDirector:
@@ -3440,14 +3444,14 @@ class Client:
             for username, identity in identities_dict.items():
                 if identity is None:
                     self._log_security_event(
-                        'INFO',
+                        'WARN',
                         'user_updated',
                         f'{os.getuid()},{username}',
                         description=f'Removing identity {username!r} from Pebble.',
                     )
                     continue
                 self._log_security_event(
-                    'INFO',
+                    'WARN',
                     'user_added',
                     f'{os.getuid()},{username},attributes[{identity}]',
                     description=f'Added or updated identity {username!r} in Pebble.',
@@ -3467,7 +3471,7 @@ class Client:
             self._request('POST', '/v1/identities', body=body)
             for username in identities:
                 self._log_security_event(
-                    'INFO',
+                    'WARN',
                     'user_updated',
                     f'{os.getuid()},{username}',
                     description=f'Removing identity {username!r} from Pebble.',

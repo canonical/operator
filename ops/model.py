@@ -3436,7 +3436,7 @@ class _ModelBackend:
                     else:
                         loggable_args = args[1:]
                     _log_security_event(
-                        'WARNING',
+                        'CRITICAL',
                         _SecurityEventAuthZ.AUTHZ_FAIL,
                         args[0],
                         description=f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
@@ -3852,7 +3852,7 @@ class _ModelBackend:
             if not any(message in str(e).lower() for message in authz_messages):
                 raise
             _log_security_event(
-                'WARNING',
+                'CRITICAL',
                 _SecurityEventAuthZ.AUTHZ_FAIL,
                 args[0],
                 description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
@@ -3991,7 +3991,7 @@ class _ModelBackend:
 
     def reboot(self, now: bool = False):
         _log_security_event(
-            'INFO',
+            'WARN',
             _SecurityEventSystem.SYS_RESTART,
             str(os.getuid()),
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
