@@ -61,7 +61,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
-from .log import _security_event
+from .log import _log_security_event, _SecurityEventAuthZ, _SecurityEventSystem
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -3427,8 +3427,9 @@ class _ModelBackend:
                         loggable_args = ['<arguments stripped>']
                     else:
                         loggable_args = args[1:]
-                    _security_event(
-                        f'authz_fail:{args[0]}',
+                    _log_security_event(
+                        _SecurityEventAuthZ.AUTHZ_FAIL,
+                        args[0],
                         level='WARNING',
                         description=f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
                         f'The command exited with code: {e.returncode}. '
@@ -3833,8 +3834,9 @@ class _ModelBackend:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
             if 'not found' in str(e):
-                _security_event(
-                    f'authz_fail:{args[0]}',
+                _log_security_event(
+                    _SecurityEventAuthZ.AUTHZ_FAIL,
+                    args[0],
                     level='WARNING',
                     description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
                     f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
@@ -3972,8 +3974,9 @@ class _ModelBackend:
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
-        _security_event(
-            f'sys_restart:{os.getuid()}',
+        _log_security_event(
+            _SecurityEventSystem.SYS_RESTART,
+            str(os.getuid()),
             level='INFO',
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )

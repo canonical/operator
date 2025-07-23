@@ -31,7 +31,7 @@ from . import model as _model
 from . import storage as _storage
 from ._private import tracer
 from .jujucontext import _JujuContext
-from .log import _security_event, setup_root_logging
+from .log import _log_security_event, _SecurityEventSystem, setup_root_logging
 from .version import version
 
 CHARM_STATE_FILE = '.unit-state.db'
@@ -298,8 +298,9 @@ class _Manager:
         # Do this as early as possible to be sure to catch the most logs.
         self._setup_root_logging()
 
-        _security_event(
-            f'sys_startup:{os.getuid()}',
+        _log_security_event(
+            _SecurityEventSystem.SYS_STARTUP,
+            str(os.getuid()),
             level='DEBUG',
             description=f'Starting ops framework for {charm_class.__name__}',
         )
@@ -484,8 +485,9 @@ def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None 
     finally:
         if manager:
             manager._destroy()
-        _security_event(
-            f'sys_shutdown:{os.getuid()}',
+        _log_security_event(
+            _SecurityEventSystem.SYS_SHUTDOWN,
+            str(os.getuid()),
             level='DEBUG',
             description='Stopping ops framework',
         )
