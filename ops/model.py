@@ -3835,17 +3835,17 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
-            if 'not found' in str(e):
-                _log_security_event(
-                    _SecurityEventAuthZ.AUTHZ_FAIL,
-                    args[0],
-                    level='WARNING',
-                    description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
-                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
-                    f'Unit {"is" if self.is_leader() else "is not"} leader.',
-                )
-                raise SecretNotFoundError() from e
-            raise
+            if 'not found' not in str(e) and 'permission denied' not in str(e):
+                raise
+            _log_security_event(
+                _SecurityEventAuthZ.AUTHZ_FAIL,
+                args[0],
+                level='WARNING',
+                description=f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
+                f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
+                f'Unit {"is" if self.is_leader() else "is not"} leader.',
+            )
+            raise SecretNotFoundError() from e
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         args: list[str] = []
