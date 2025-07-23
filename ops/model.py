@@ -3779,10 +3779,7 @@ class _ModelBackend:
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
-        return pebble.Client(
-            socket_path=socket_path,
-            security_event_logger=_log_security_event,  # type: ignore
-        )
+        return pebble.Client(socket_path=socket_path, security_event_logger=_log_security_event)
 
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.

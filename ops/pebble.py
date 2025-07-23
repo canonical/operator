@@ -2087,7 +2087,14 @@ class Identity:
 
 
 class _SecurityEventLogger(Protocol):
-    def __call__(self, level: str, event_type: str, event: str, *, description: str) -> None: ...
+    def __call__(
+        self,
+        level: Literal['INFO', 'WARN', 'CRITICAL'],
+        event_type: str,
+        event: str,
+        *,
+        description: str,
+    ) -> None: ...
 
 
 class Client:
@@ -2113,7 +2120,13 @@ class Client:
     The ``security_event_logger`` parameter is used to log security events. If not provided, events
     will be logged to the `pebble.security` logger. The signature of the logger function is::
 
-        def security_event_logger(level: str, event_type: str, event: str, *, description: str):
+        def security_event_logger(
+            level: Literal['INFO', 'WARN', 'CRITICAL'],
+            event_type: str,
+            event: str,
+            *,
+            description: str,
+        ):
 
     """
 
