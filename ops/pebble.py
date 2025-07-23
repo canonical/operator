@@ -2043,7 +2043,6 @@ class BasicIdentity:
         return {'password': self.password}
 
     def __str__(self) -> str:
-        # Return asterisks to avoid leaking the password.
         return f"{self.__class__.__name__}(password='*****')"
 
 
