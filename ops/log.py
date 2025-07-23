@@ -283,6 +283,10 @@ def _log_security_event(event_prefix: _SecurityEvent, event: str, *, level: str,
           fit in the event name.
     """
     logger = logging.getLogger(__name__)
+    app_id = (
+        f'{os.environ.get("JUJU_MODEL_UUID", "unknown")}'
+        f'-{os.environ.get("JUJU_UNIT_NAME", "unknown")}'
+    )
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
         # included so that applications that are pulling out only the structured
@@ -291,7 +295,7 @@ def _log_security_event(event_prefix: _SecurityEvent, event: str, *, level: str,
         # Similarly, this duplicates the level at which this is logged to Juju.
         'level': level,
         'type': 'security',
-        'appid': os.environ.get('JUJU_MODEL_UUID', 'unknown'),
+        'appid': app_id,
         'event': f'{event_prefix}:{event}',
         'description': description,
     }
