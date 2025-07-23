@@ -3422,7 +3422,13 @@ class _ModelBackend:
             try:
                 result = subprocess.run(args, **kwargs)  # type: ignore
             except subprocess.CalledProcessError as e:
-                if 'access denied' in e.stderr.lower():
+                authz_messages = (
+                    'access denied',
+                    'permission denied',
+                    'not the leader',
+                    'cannot write relation settings',
+                )
+                if any(message in e.stderr.lower() for message in authz_messages):
                     if args[0] in ('juju-log', 'action-fail', 'action-set'):
                         # These commands may have sensitive data in their arguments, and do not
                         # support reading the data from a file.
