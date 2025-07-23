@@ -3442,9 +3442,13 @@ class Client:
                     identity_type = 'local'
                 else:
                     identity_type = 'unknown'
+                event = (
+                    f'user_added:'
+                    f'{os.getuid()},{username},'
+                    f'attributes[{identity["access"]}, {identity_type}, {user_id}]'
+                )
                 self._security_event(
-                    f'user_added:{os.getuid()},{username},'
-                    f'attributes[{identity["access"]}, {identity_type}, {user_id}]',
+                    event,
                     level='INFO',
                     description=f'Added or updated identity {username!r} in Pebble.',
                 )
