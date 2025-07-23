@@ -375,19 +375,30 @@ class _Manager:
         else:
             broken_relation_id = None
 
+        # In a RelationDeparted event, the unit is not included in the Juju
+        # `relation-list` output, but the charm still has access to the remote
+        # relation data. To provide the charm with a mechanism for getting
+        # access to that data, we include the remote unit in Relation.units.
+        # We also expect it to be available in RelationBroken events, so ensure
+        # that it's available then as well. For other relation events, the unit
+        # will either already be in the set via `relation-list` (such as in a
+        # RelationChanged event) or correctly not in the list yet because the
+        # relation has not been rully set up (such as in a RelationJoined event).
+        if self._juju_context.dispatch_path.endswith((
+            '-relation-departed',
+            '_relation_departed',
+            '-relation-broken',
+            '_relation_broken',
+        )):
+            remote_unit_name = self._juju_context.remote_unit_name
+        else:
+            remote_unit_name = None
+
         model = _model.Model(
             self._charm_meta,
             self._model_backend,
             broken_relation_id=broken_relation_id,
-            # In a RelationDeparted event, the unit is not included in the Juju
-            # `relation-list` output, but the charm still has access to the remote
-            # relation data. To provide the charm with a mechanism for getting
-            # access to that data, we include the remote unit in Relation.units.
-            # In other relation events (such as RelationChanged) the unit will
-            # already be in the set via `relation-list` - adding it via this extra
-            # mechanism will not change the final set, and is simpler than only
-            # adding it in specific events.
-            remote_unit_name=self._juju_context.remote_unit_name,
+            remote_unit_name=remote_unit_name,
         )
         store = self._make_storage(dispatcher)
         framework = self._framework_class(
