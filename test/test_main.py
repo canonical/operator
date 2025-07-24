@@ -36,7 +36,6 @@ import pytest
 import ops
 from ops._main import _should_use_controller_storage
 from ops.jujucontext import _JujuContext
-from ops.log import TRACE
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
@@ -918,20 +917,16 @@ class _TestMain(abc.ABC):
     @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
     def test_excepthook(self, _: MagicMock, fake_script: FakeScript):
-        try:
-            logging.getLogger().setLevel(TRACE)
-            with pytest.raises(subprocess.CalledProcessError):
-                self._simulate_event(
-                    fake_script,
-                    EventSpec(
-                        ops.InstallEvent,
-                        'install',
-                        set_in_env={'TRY_EXCEPTHOOK': '1'},
-                        model_uuid='1234',
-                    ),
-                )
-        finally:
-            logging.getLogger().setLevel(logging.INFO)
+        with pytest.raises(subprocess.CalledProcessError):
+            self._simulate_event(
+                fake_script,
+                EventSpec(
+                    ops.InstallEvent,
+                    'install',
+                    set_in_env={'TRY_EXCEPTHOOK': '1'},
+                    model_uuid='1234',
+                ),
+            )
 
         calls = fake_script.calls()
         sec_start = calls.pop(1)

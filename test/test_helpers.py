@@ -85,9 +85,9 @@ def calls_without_security_event_logging(calls: list[list[str]]) -> list[list[st
         call
         for call in calls
         if not (
-            len(call) == 4
-            and call[:3] == ['juju-log', '--log-level', 'TRACE', '--']
-            and '"type": "security"' in call[3]
+            len(call) == 5
+            and call[:4] == ['juju-log', '--log-level', 'TRACE', '--']
+            and '"type": "security"' in call[4]
         )
     ]
 

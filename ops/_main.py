@@ -507,7 +507,7 @@ def main(charm_class: type[_charm.CharmBase], use_juju_for_storage: bool | None 
         sys.exit(e.exit_code)
     finally:
         if manager:
-            manager._destroy()
+            manager.destroy()
         _log_security_event(
             'WARN',
             _SecurityEventSystem.SYS_SHUTDOWN,

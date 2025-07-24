@@ -20,7 +20,6 @@ import datetime
 import enum
 import json
 import logging
-import os
 import sys
 import types
 import typing
@@ -28,10 +27,6 @@ import warnings
 
 if typing.TYPE_CHECKING:
     from .model import _ModelBackend
-
-
-TRACE: typing.Final[int] = 5
-"""The TRACE log level, which is lower than DEBUG."""
 
 
 class JujuLogHandler(logging.Handler):
@@ -71,9 +66,6 @@ def setup_root_logging(
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(JujuLogHandler(model_backend))
-
-    # Juju supports logging at TRACE level.
-    logging.addLevelName(TRACE, 'TRACE')
 
     def custom_showwarning(
         message: Warning | str,
@@ -300,8 +292,24 @@ def _log_security_event(
           fit in the event name.
     """
     logger = logging.getLogger(__name__)
-    env = os.environ
-    app_id = f'{env.get("JUJU_MODEL_UUID", "unknown")}-{env.get("JUJU_UNIT_NAME", "unknown")}'
+    for juju_handler in logger.handlers:
+        if isinstance(juju_handler, JujuLogHandler):
+            model_backend = juju_handler.model_backend
+            juju_context = model_backend._juju_context
+            app_id = f'{juju_context.model_uuid}-{juju_context.unit_name}'
+            juju_log = model_backend.juju_log
+            break
+    else:
+        warnings.warn(
+            'JujuLogHandler is not set up for the logger. '
+            'Call setup_root_logging() before logging security events.',
+            RuntimeWarning,
+        )
+        app_id = 'charm'
+
+        def juju_log(level: str, message: str):
+            logger.debug(message)
+
     type = event_type if isinstance(event_type, str) else event_type.value
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
@@ -315,4 +323,4 @@ def _log_security_event(
         'event': f'{type}:{event}',
         'description': description,
     }
-    logger.log(TRACE, '%s', json.dumps(data))
+    juju_log('TRACE', json.dumps(data))
