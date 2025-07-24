@@ -238,9 +238,7 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
             break
         lines.append(line)
 
-    summary = '\n'.join(lines).strip()
-    summary = summary.lstrip('\n')
-    summary = summary.rstrip('\n') + '\n'
+    summary = '\n'.join(lines).strip() + '\n'
 
     return title, summary
 
