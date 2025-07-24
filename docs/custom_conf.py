@@ -343,6 +343,7 @@ nitpick_ignore = [
     ('py:class', 'LocalIdentityDict'),
     ('py:class', 'IdentityDict'),
     ('py:class', 'ReadableSpan'),
+    ('py:class', 'ops.pebble._SecurityEventLogger'),
     ('py:obj', 'ops._private.harness.CharmType'),
     ('py:class', 'ops._private.harness.CharmType'),
     ('py:class', 'ops.charm._ContainerBaseDict'),

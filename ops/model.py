@@ -64,6 +64,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
+from .log import _log_security_event, _SecurityEventAuthZ, _SecurityEventSystem
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -3624,6 +3625,28 @@ class _ModelBackend:
             try:
                 result = subprocess.run(args, **kwargs)  # type: ignore
             except subprocess.CalledProcessError as e:
+                authz_messages = (
+                    'access denied',
+                    'permission denied',
+                    'not the leader',
+                    'cannot write relation settings',
+                )
+                if any(message in e.stderr.lower() for message in authz_messages):
+                    # These commands may have sensitive data in their arguments, and do not
+                    # support reading the data from a file.
+                    log_args = args[0] not in ('juju-log', 'action-fail', 'action-set')
+                    description = (
+                        f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
+                        f'The command exited with code: {e.returncode}. '
+                        f'Arguments were: {log_args!r}. ' if log_args else ''
+                        f'Unit {"is" if self.is_leader() else "is not"} leader.'
+                    )  # fmt: skip
+                    _log_security_event(
+                        'CRITICAL',
+                        _SecurityEventAuthZ.AUTHZ_FAIL,
+                        args[0],
+                        description=description,
+                    )
                 raise ModelError(e.stderr) from e
             if return_output:
                 if result.stdout is None:  # type: ignore
@@ -3959,7 +3982,7 @@ class _ModelBackend:
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
-        return pebble.Client(socket_path=socket_path)
+        return pebble.Client(socket_path=socket_path, security_event_logger=_log_security_event)
 
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.
@@ -4021,6 +4044,23 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
+            authz_messages = (
+                'access denied',
+                'permission denied',
+                'not the leader',
+            )
+            if any(message in str(e).lower() for message in authz_messages):
+                description = (
+                    f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
+                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
+                    f'Unit {"is" if self.is_leader() else "is not"} leader.'
+                )
+                _log_security_event(
+                    'CRITICAL',
+                    _SecurityEventAuthZ.AUTHZ_FAIL,
+                    args[0],
+                    description=description,
+                )
             if 'not found' in str(e):
                 raise SecretNotFoundError() from e
             raise
@@ -4154,6 +4194,12 @@ class _ModelBackend:
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
+        _log_security_event(
+            'WARN',
+            _SecurityEventSystem.SYS_RESTART,
+            str(os.getuid()),
+            description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
+        )
         if now:
             self._run('juju-reboot', '--now')
             # Juju will kill the Charm process, and in testing no code after
