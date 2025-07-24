@@ -11,7 +11,7 @@ This is an explanatory doc covering how charm authors might track local state in
 
 ## A trivial example
 
-We'll begin by setting up a simple scenario. A charm author would like to charm up a (made up) service called `ExampleBlog`. The ideal cloud service is stateless and immutable, but `ExampleBlog` has some state: it can run in either a `production` mode or a `test` mode. 
+We'll begin by setting up a simple scenario. A charm author would like to charm up a (made up) service called `ExampleBlog`. The ideal cloud service is stateless and immutable, but `ExampleBlog` has some state: it can run in either a `production` mode or a `test` mode.
 
 The standard way to set ExampleBlog's mode is to write either the string `test` or `production` to `/etc/example_blog/mode`, then restart the service. Leaving aside whether this is *advisable* behavior, this is how `ExampleBlog` works, and an `ExampleBlog` veteran user would expect a `ExampleBlog` charm to allow them to toggle modes by writing to that config file. (I sense a patch to upstream brewing, but let's assume, for our example, that we can't dynamically load the config).
 
