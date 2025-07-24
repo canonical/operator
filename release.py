@@ -17,12 +17,12 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import logging
 import os
+import pathlib
 import re
 import subprocess
-from datetime import datetime
-from pathlib import Path
 
 import github
 import github.GitRelease
@@ -45,11 +45,11 @@ gh_client = github.Github(auth=auth)
 
 VERSION_REGEX = r'(\d+\.\d+\.\d+(?:\.dev\d+)?)'
 VERSION_FILES = {
-    'ops/src': Path('ops/version.py'),
-    'ops/pyproject': Path('pyproject.toml'),
-    'testing': Path('testing/pyproject.toml'),
-    'tracing': Path('tracing/pyproject.toml'),
-    'uvlock': Path('uv.lock'),
+    'ops/src': pathlib.Path('ops/version.py'),
+    'ops/pyproject': pathlib.Path('pyproject.toml'),
+    'testing': pathlib.Path('testing/pyproject.toml'),
+    'tracing': pathlib.Path('tracing/pyproject.toml'),
+    'uvlock': pathlib.Path('uv.lock'),
 }
 
 
@@ -75,8 +75,8 @@ def get_latest_release_tag(repo: github.Repository.Repository, branch_name: str)
 
 def bump_minor_version(version: str) -> str:
     """Bump minor version."""
-    major, minor, patch = map(int, version.split('.'))
-    return f'{major}.{minor + 1}.{patch}'
+    major, minor, _ = map(int, version.split('.'))
+    return f'{major}.{minor + 1}.0'
 
 
 def get_new_tag_for_release(
@@ -102,14 +102,11 @@ def get_new_tag_for_release(
             logger.info(f'Suggested new version: {suggested_tag}')
 
     tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
-    prompt = f"Input the new tag for the release{tag_prompt}, or 'c' to cancel:\n"
+    prompt = f'Input the new tag for the release{tag_prompt}\n'
     while True:
         user_input = input(prompt).strip()
-        if user_input.lower() == 'c':
-            logger.warning('Release canceled.')
-            exit(0)
 
-        new_tag = user_input if user_input else suggested_tag
+        new_tag = user_input or suggested_tag
 
         if not new_tag:
             logger.error('Error: No tag specified and no suggestion available')
@@ -123,7 +120,7 @@ def get_new_tag_for_release(
         logger.warning(f'Check out the releases page: {release_page} before confirming!')
 
         confirm = (
-            input(f"Confirm creating tag '{new_tag}' on branch '{branch_name}'? [y/N]: ")
+            input(f'Confirm creating tag {new_tag!r} on branch {branch_name!r}? [y/N]: ')
             .strip()
             .lower()
         )
@@ -140,18 +137,14 @@ def create_draft_release(
     repo: github.Repository.Repository, tag: str, branch: str
 ) -> github.GitRelease.GitRelease | None:
     """Create a draft release with auto-generated notes."""
-    try:
-        release = repo.create_git_release(
-            tag=tag,
-            name=tag,
-            draft=True,
-            generate_release_notes=True,
-            target_commitish=branch,
-        )
-        return release
-    except Exception as e:
-        logger.error(f'Failed to create release: {e}')
-        return None
+    release = repo.create_git_release(
+        tag=tag,
+        name=tag,
+        draft=True,
+        generate_release_notes=True,
+        target_commitish=branch,
+    )
+    return release
 
 
 def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, str]]], str | None]:
@@ -186,6 +179,11 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
                 description = match.group(2).strip().capitalize()
                 pr_link = match.group(3).strip()
                 categories[category].append((description, pr_link))
+            else:
+                logger.warning(
+                    f'Unexpected category {category} found in the auto-generated release notes'
+                )
+
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
 
@@ -249,11 +247,8 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
 
 def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
-    try:
-        release = release.update_release(name=title, message=notes, draft=True)
-        logger.info(f'Release updated: {release.html_url}.')
-    except Exception as e:
-        logger.error(f'Failed to update release: {e}')
+    release = release.update_release(name=title, message=notes, draft=True)
+    logger.info(f'Release updated: {release.html_url}.')
 
 
 def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
@@ -263,28 +258,26 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
     The content is a Markdown formatted string with sections for each commit type.
     Each item is formatted as a bullet point with the description and PR number in parentheses.
     """
-    today = datetime.now().strftime('%d %B %Y')
-    res = f'# {tag} - {today}\n\n'
+    today = datetime.datetime.now().strftime('%d %B %Y')
+    lines = [f'# {tag} - {today}\n']  # Initialize lines with the header.
 
     for commit_type, items in categories.items():
         if items:
-            res += f'## {commit_type_to_category(commit_type)}\n\n'
-
+            lines.append(f'## {commit_type_to_category(commit_type)}\n')
             for description, pr_link in items:
                 pr_num = '?'
                 match = re.match(r'https?://[^ ]+/pull/(\d+)', pr_link)
                 if match:
                     pr_num = match.group(1)
-                res += f'* {description} (#{pr_num})\n'
+                lines.append(f'* {description} (#{pr_num})')
+            lines.append('\n')  # Add a blank line after each category.
 
-            res += '\n'
-
-    return res
+    return '\n'.join(lines)  # Join the lines with newline characters.
 
 
 def update_changes_file(changes: str, file: str):
     """Update the changes file with new release notes."""
-    file_path = Path(file)
+    file_path = pathlib.Path(file)
     existing_content = file_path.read_text() if file_path.exists() else ''
     file_path.write_text(changes + existing_content)
     logger.info(f'Updated {file} with new release notes.')
@@ -323,7 +316,7 @@ def parse_version(version: str) -> tuple[str, str]:
     return base_version, dev_suffix
 
 
-def update_pyproject_versions(path: Path, version: str, deps: dict[str, str]) -> None:
+def update_pyproject_versions(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
     """Update versions in pyproject.toml."""
     content = path.read_text()
     updated = re.sub(rf'version = "{VERSION_REGEX}"', f'version = "{version}"', content)
@@ -385,51 +378,19 @@ def parse_scenario_version():
     return base_version, dev_suffix
 
 
-def get_new_scenario_version_for_release() -> str:
-    """Get a new version for scenario.
+def get_new_scenario_version(ops_version: str) -> str:
+    """Get a new version for scenario based on ops verwsion.
 
-    Default value is generated by removing the ".dev0" suffix from the current scenario version.
-
-    Can be overridden with a user-provided version.
+    We want the scenario version to always be exactly ops major version+5,
+    like ops 3.1.2 -> scenario 8.1.2.
     """
-    suggested_version, _ = parse_scenario_version()
-    logger.info(f'Suggested new scenario version: {suggested_version}')
-
-    while True:
-        user_input = input(
-            f'Input new scenario version (press enter to use the suggested version '
-            f"{suggested_version or 'required'}), or 'c' to cancel: "
-        ).strip()
-
-        if user_input.lower() == 'c':
-            logger.warning('Scenario version creation canceled.')
-            exit(0)
-
-        suggested_version = user_input if user_input else suggested_version
-
-        if not suggested_version:
-            logger.error('Error: No version specified and no suggestion available')
-            continue
-
-        if not re.match(r'^\d+\.\d+\.\d+$', suggested_version):
-            logger.error('Error: Version must be in format X.Y.Z')
-            continue
-
-        confirm = (
-            input(f"Confirm using scenario version '{suggested_version}'? [y/N]: ").strip().lower()
-        )
-
-        if confirm == 'y':
-            break
-
-        logger.info("Let's try again...")
-
-    return suggested_version
+    major, minor, patch, dev0 = ops_version.split('.')
+    return f'{int(major) + 5}.{minor}.{patch}.{dev0}'
 
 
 def update_versions_for_release(tag: str):
     """Update version files to the specified release version."""
-    scenario_version = get_new_scenario_version_for_release()
+    scenario_version = get_new_scenario_version(tag)
     update_ops_version(tag, scenario_version)
     update_testing_version(tag, scenario_version)
     update_tracing_version(tag)
@@ -439,111 +400,34 @@ def update_versions_for_release(tag: str):
 def get_new_version_post_release(repo: github.Repository.Repository, branch_name: str) -> str:
     """Get the new version after the release.
 
-    Default value is generated by bumping the minor version of the latest release's tag
+    The value is generated by bumping the minor version of the latest release's tag
     and adding the '.dev0' suffix.
-
-    Can be overridden with a user-provided version.
     """
     latest_version = get_latest_release_tag(repo, branch_name)
 
     if latest_version is None:
-        logger.info('No version tags found in branch "{branch_name}".')
-        suggested_version = ''
-    else:
-        logger.info(f'Latest version in branch "{branch_name}": {latest_version}')
+        logger.error('No version tags found in branch "{branch_name}".')
+        exit(1)
 
-        # Check if the latest version is in SEMVER, in case it has a suffix.
-        if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
-            logger.warning(
-                f'Latest version "{latest_version}" must be in format '
-                f'X.Y.Z. Please input the new version manually (remember to add the .dev0 suffix).'
-            )
-            suggested_version = ''
-        else:
-            suggested_version = bump_minor_version(latest_version) + '.dev0'
-            logger.info(f'Suggested new version: {suggested_version}')
+    logger.info(f'Latest version in branch "{branch_name}": {latest_version}')
 
-    while True:
-        user_input = input(
-            f'Input post release version (press enter to use suggested version '
-            f"{suggested_version or 'required'}), or 'c' to cancel: "
-        ).strip()
-
-        if user_input.lower() == 'c':
-            logger.warning('Post release canceled.')
-            exit(0)
-
-        new_version = user_input if user_input else suggested_version
-
-        if not new_version:
-            logger.error('Error: No version specified and no suggestion available')
-            continue
-
-        confirm = (
-            input(f"Confirm using version '{new_version}' for post release'? [y/N]: ")
-            .strip()
-            .lower()
+    # Check if the latest version is in SEMVER, in case it has a suffix like 3.0.0.post1.
+    if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
+        logger.error(
+            f'Latest version "{latest_version}" must be in format '
+            f'X.Y.Z. Please input the new version manually (remember to add the .dev0 suffix).'
         )
+        exit(1)
 
-        if confirm == 'y':
-            break
-
-        logger.info("Let's try again...")
-
+    new_version = bump_minor_version(latest_version) + '.dev0'
+    logger.info(f'Suggested new version: {new_version}')
     return new_version
-
-
-def get_new_scenario_version_post_release() -> str:
-    """Get a new post release version for scenario.
-
-    Default value is generated by bumping the current minor version and add the .dev0 suffix.
-
-    Can be overridden with a user-provided version.
-    """
-    current_version, _ = parse_scenario_version()
-    suggested_version = bump_minor_version(current_version) + '.dev0'
-    logger.info(f'Suggested new scenario version: {suggested_version}')
-
-    while True:
-        user_input = input(
-            f'Input post release scenario version (press enter to use suggested version '
-            f"{suggested_version or 'required'}), or 'c' to cancel: "
-        ).strip()
-
-        if user_input.lower() == 'c':
-            logger.warning('Post release canceled.')
-            exit(0)
-
-        suggested_version = user_input if user_input else suggested_version
-
-        if not suggested_version:
-            logger.error('Error: No version specified and no suggestion available')
-            continue
-
-        if not re.match(r'^\d+\.\d+\.\d+\.dev\d+$', suggested_version):
-            logger.error('Error: Version must be in format X.Y.Z.devN')
-            continue
-
-        confirm = (
-            input(
-                f"Confirm using scenario version '{suggested_version}' for post release? [y/N]: "
-            )
-            .strip()
-            .lower()
-        )
-
-        if confirm == 'y':
-            break
-
-        logger.info("Let's try again...")
-
-    return suggested_version
 
 
 def update_versions_for_post_release(repo: github.Repository.Repository, branch_name: str):
     """Update version files to the post-release version with '.dev0' suffix."""
     ops_version = get_new_version_post_release(repo, branch_name)
-    scenario_version = get_new_scenario_version_post_release()
+    scenario_version = get_new_scenario_version(ops_version)
     update_ops_version(ops_version, scenario_version)
     update_testing_version(ops_version, scenario_version)
     update_tracing_version(ops_version)
@@ -563,9 +447,10 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
             logger.info(
                 f'Note that there are {len(open_prs) - 1} more open update charm pins PRs.'
             )
+            exit(1)
 
 
-def draft_release(owner: str, repo_name: str, base_branch: str):
+def draft_release(owner: str, repo_name: str, base_branch: str, fork_remote: str):
     """Create a draft release, update changelog, and create a PR for the release."""
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
@@ -598,10 +483,9 @@ def draft_release(owner: str, repo_name: str, base_branch: str):
     new_branch = f'release-prep-{tag}'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
     changed_files = ['CHANGES.md', *[str(path) for path in VERSION_FILES.values()]]
-    for file in changed_files:
-        subprocess.run(['/usr/bin/git', 'add', file], check=True)
+    subprocess.run(['/usr/bin/git', 'add', *changed_files], check=True)
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
-    subprocess.run(['/usr/bin/git', 'push', 'origin', new_branch], check=True)
+    subprocess.run(['/usr/bin/git', 'push', fork_remote, new_branch], check=True)
     pr = repo.create_pull(
         title=f'chore: update changelog and versions for {tag} release',
         body=f'This PR prepares the release of version {tag}.',
@@ -611,7 +495,9 @@ def draft_release(owner: str, repo_name: str, base_branch: str):
     logger.info(f'Created PR: {pr.html_url}')
 
 
-def post_release(owner: str, repo_name: str, base_branch: str):
+def post_release(
+    owner: str, repo_name: str, base_branch: str, canonical_remote: str, fork_remote: str
+):
     """Post-release actions: update version files and create a PR."""
     new_branch = 'post-release'
     local_branch = subprocess.run(
@@ -621,7 +507,7 @@ def post_release(owner: str, repo_name: str, base_branch: str):
         check=True,
     ).stdout.strip()
     remote_branch = subprocess.run(
-        ['/usr/bin/git', 'ls-remote', '--heads', 'origin', new_branch],
+        ['/usr/bin/git', 'ls-remote', '--heads', fork_remote, new_branch],
         capture_output=True,
         text=True,
         check=True,
@@ -634,9 +520,9 @@ def post_release(owner: str, repo_name: str, base_branch: str):
         )
         exit(1)
 
-    subprocess.run(['/usr/bin/git', 'fetch', 'upstream'], check=True)
+    subprocess.run(['/usr/bin/git', 'fetch', canonical_remote], check=True)
     subprocess.run(['/usr/bin/git', 'checkout', base_branch], check=True)
-    subprocess.run(['/usr/bin/git', 'merge', f'upstream/{base_branch}'], check=True)
+    subprocess.run(['/usr/bin/git', 'merge', f'{canonical_remote}/{base_branch}'], check=True)
 
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
@@ -644,12 +530,12 @@ def post_release(owner: str, repo_name: str, base_branch: str):
     update_versions_for_post_release(repo, base_branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    for file in [str(path) for path in VERSION_FILES.values()]:
-        subprocess.run(['/usr/bin/git', 'add', file], check=True)
+    files = [str(path) for path in VERSION_FILES.values()]
+    subprocess.run(['/usr/bin/git', 'add', *files], check=True)
     subprocess.run(
         ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True
     )
-    subprocess.run(['/usr/bin/git', 'push', 'origin', new_branch], check=True)
+    subprocess.run(['/usr/bin/git', 'push', fork_remote, new_branch], check=True)
     pr = repo.create_pull(
         title='chore: adjust versions after release',
         body='This PR updates the version files after the release.',
@@ -673,6 +559,18 @@ if __name__ == '__main__':
         help='Owner name (e.g. "canonical")',
         default='canonical',
     )
+    parser.add_argument(
+        '--canonical-remote',
+        '-c',
+        help='Remote name of canonical/operator (e.g. "upstream")',
+        default='upstream',
+    )
+    parser.add_argument(
+        '--fork-remote',
+        '-f',
+        help='Remote name of the forked operator repo (e.g. "origin")',
+        default='origin',
+    )
     parser.add_argument('--branch', '-b', help='Branch to create the release from', default='main')
     parser.add_argument(
         '--post-release',
@@ -682,15 +580,26 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.post_release:
-        post_release(owner=args.owner, repo_name=args.repo, base_branch=args.branch)
+        post_release(
+            owner=args.owner,
+            repo_name=args.repo,
+            base_branch=args.branch,
+            canonical_remote=args.canonical_remote,
+            fork_remote=args.fork_remote,
+        )
         logger.info(
             'Post-release actions completed. Please check and merge the created PR '
             'for version updates.'
         )
         exit(0)
 
-    draft_release(owner=args.owner, repo_name=args.repo, base_branch=args.branch)
+    draft_release(
+        owner=args.owner,
+        repo_name=args.repo,
+        base_branch=args.branch,
+        fork_remote=args.fork_remote,
+    )
     logger.info(
-        'Draft release created. Please merge the version bump PR, publish the draft release, then'
-        'run this script with --post-release to perform post-release actions.'
+        'Draft release created. Please merge the version bump PR, review and publish the draft'
+        'release, then run this script with --post-release to perform post-release actions.'
     )
