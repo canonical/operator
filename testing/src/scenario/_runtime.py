@@ -48,19 +48,15 @@ class Runtime:
 
     def __init__(
         self,
+        app_name: str,
         charm_spec: _CharmSpec[CharmType],
         charm_root: str | Path | None = None,
         juju_version: str = '3.0.0',
-        app_name: str | None = None,
         unit_id: int | None = 0,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
         self._charm_root = charm_root
-
-        app_name = app_name or self._charm_spec.meta.get('name')
-        if not app_name:
-            raise ValueError('invalid metadata: mandatory "name" field is missing.')
 
         self._app_name = app_name
         self._unit_id = unit_id
