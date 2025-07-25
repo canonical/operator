@@ -234,38 +234,41 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-1. Make sure your forked `canonical/operator` repo's main branch is up-to-date with upstream, the staging area is clean, and you are at the main branch and at the root directory of the forked repo.
-2. Draft a release: Run: `tox -e draft-release`.
+1. Draft a release: Run: `tox -e draft-release`.
 
     > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
     > 
     > If you have different settings, add parameters accordingly. For example, the following command assumes your forked remote name is `mine`, and `canonical/operator` remote name is `origin`:
     > 
     > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
+    > 
+    > If you want to make a release on another branch, for example, on "2.23-maintenance", run:
+    > 
+    > `tox -e draft-release -- --branch 2.23-maintenance`
 
-3. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
-4. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
-5. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
+2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
+3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+4. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
 
     > Pushing the tags will trigger automatic builds for the Python packages and
-    > publish them to PyPI ([ops](https://pypi.org/project/ops/) and
-    > [ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled
-    > via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
+    > publish them to PyPI ([ops](https://pypi.org/project/ops/) 
+    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and 
+    > [ops-tracing](https://pypi.org/project/ops-tracing/)).
     > Note that it sometimes take a bit of time for the new releases to show up.
     > 
     > See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
     > [.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
-    > (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
     >
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
-    and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-7. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
+5. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
+[Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+6. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
 
-    > This assumes the same defaults as mentioned in step 2.
+    > This assumes the same defaults as mentioned in step 1.
     > 
     > Add parameters accordingly if your setup differs.
-8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
+
+7. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 ## Release Documentation
 

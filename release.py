@@ -448,8 +448,13 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
             exit(1)
 
 
-def draft_release(owner: str, repo_name: str, base_branch: str, fork_remote: str):
+def draft_release(
+    owner: str, repo_name: str, base_branch: str, canonical_remote: str, fork_remote: str
+):
     """Create a draft release, update changelog, and create a PR for the release."""
+    subprocess.run(['/usr/bin/git', 'checkout', 'main'], check=True)
+    subprocess.run(['/usr/bin/git', 'pull', canonical_remote, 'main'], check=True)
+
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
 
@@ -595,6 +600,7 @@ if __name__ == '__main__':
         owner=args.owner,
         repo_name=args.repo,
         base_branch=args.branch,
+        canonical_remote=args.canonical_remote,
         fork_remote=args.fork_remote,
     )
     logger.info(
