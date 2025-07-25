@@ -3,7 +3,7 @@ name: ops Integration Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '42 7 25 * *'
+    - cron: '42 7 25 * *'
 
 permissions: {}
 
@@ -32,4 +32,5 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
-      - run: uvx tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
+      - run: uv tool install tox --with tox-uv
+      - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
