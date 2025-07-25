@@ -666,8 +666,8 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self._app_name = app_name
-        self._unit_id = unit_id
+        self.app_name = app_name
+        self.unit_id = unit_id
         self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
 
@@ -828,8 +828,8 @@ class Context(Generic[CharmType]):
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
-            app_name=self._app_name,
-            unit_id=self._unit_id,
+            app_name=self.app_name,
+            unit_id=self.unit_id,
         )
         with runtime.exec(
             state=state,
