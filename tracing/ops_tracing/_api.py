@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 
+import opentelemetry.trace
 import ops
 
 from ._buffer import Destination
@@ -31,6 +32,7 @@ from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
 )
 
 logger = logging.getLogger(__name__)
+tracer = opentelemetry.trace.get_tracer('ops.tracing')
 
 
 class Tracing(ops.Object):
@@ -91,68 +93,70 @@ class Tracing(ops.Object):
         ca_data: str | None = None,
     ):
         """Initialise the tracing service."""
-        super().__init__(charm, f'{tracing_relation_name}+{ca_relation_name}')
-        self.charm = charm
-        self.tracing_relation_name = tracing_relation_name
-        self.ca_relation_name = ca_relation_name
-        self.ca_data = ca_data
+        with tracer.start_as_current_span('ops.tracing.Tracing'):
+            super().__init__(charm, f'{tracing_relation_name}+{ca_relation_name}')
+            self.charm = charm
+            self.tracing_relation_name = tracing_relation_name
+            self.ca_relation_name = ca_relation_name
+            self.ca_data = ca_data
 
-        if ca_relation_name is not None and ca_data is not None:
-            raise ValueError('At most one of ca_relation_name, ca_data is allowed')
+            if ca_relation_name is not None and ca_data is not None:
+                raise ValueError('At most one of ca_relation_name, ca_data is allowed')
 
-        # Validate the arguments manually to raise exceptions with helpful messages.
-        relation = self.charm.meta.relations.get(tracing_relation_name)
-        if not relation:
-            raise ValueError(f'{tracing_relation_name=} is not declared in charm metadata')
-
-        if relation.role is not ops.RelationRole.requires:
-            raise ValueError(
-                f"{tracing_relation_name=} {relation.role=} when 'requires' is expected"
-            )
-
-        if relation.interface_name != 'tracing':
-            raise ValueError(
-                f"{tracing_relation_name=} {relation.interface_name=} when 'tracing' is expected"
-            )
-
-        self._tracing = TracingEndpointRequirer(
-            self.charm,
-            tracing_relation_name,
-            protocols=['otlp_http'],
-        )
-
-        for event in (
-            self.charm.on.start,
-            self.charm.on.upgrade_charm,
-            self._tracing.on.endpoint_changed,
-            self._tracing.on.endpoint_removed,
-        ):
-            self.framework.observe(event, self._reconcile)
-
-        if ca_relation_name:
-            relation = self.charm.meta.relations.get(ca_relation_name)
+            # Validate the arguments manually to raise exceptions with helpful messages.
+            relation = self.charm.meta.relations.get(tracing_relation_name)
             if not relation:
-                raise ValueError(f'{ca_relation_name=} is not declared in charm metadata')
+                raise ValueError(f'{tracing_relation_name=} is not declared in charm metadata')
 
             if relation.role is not ops.RelationRole.requires:
                 raise ValueError(
-                    f"{ca_relation_name=} {relation.role=} when 'requires' is expected"
-                )
-            if relation.interface_name != 'certificate_transfer':
-                raise ValueError(
-                    f"{ca_relation_name=} {relation.interface_name=} when 'certificate_transfer' "
-                    'is expected'
+                    f"{tracing_relation_name=} {relation.role=} when 'requires' is expected"
                 )
 
-            self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
+            if relation.interface_name != 'tracing':
+                raise ValueError(
+                    f"{tracing_relation_name=} {relation.interface_name=} when 'tracing' is"
+                    f' expected'
+                )
+
+            self._tracing = TracingEndpointRequirer(
+                self.charm,
+                tracing_relation_name,
+                protocols=['otlp_http'],
+            )
 
             for event in (
-                self._certificate_transfer.on.certificate_set_updated,
-                self._certificate_transfer.on.certificates_removed,
+                self.charm.on.start,
+                self.charm.on.upgrade_charm,
+                self._tracing.on.endpoint_changed,
+                self._tracing.on.endpoint_removed,
             ):
                 self.framework.observe(event, self._reconcile)
-        else:
-            self._certificate_transfer = None
+
+            if ca_relation_name:
+                relation = self.charm.meta.relations.get(ca_relation_name)
+                if not relation:
+                    raise ValueError(f'{ca_relation_name=} is not declared in charm metadata')
+
+                if relation.role is not ops.RelationRole.requires:
+                    raise ValueError(
+                        f"{ca_relation_name=} {relation.role=} when 'requires' is expected"
+                    )
+                if relation.interface_name != 'certificate_transfer':
+                    raise ValueError(
+                        f'{ca_relation_name=} {relation.interface_name=} when'
+                        f" 'certificate_transfer' is expected"
+                    )
+
+                self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
+
+                for event in (
+                    self._certificate_transfer.on.certificate_set_updated,
+                    self._certificate_transfer.on.certificates_removed,
+                ):
+                    self.framework.observe(event, self._reconcile)
+            else:
+                self._certificate_transfer = None
 
     def _reconcile(self, _event: ops.EventBase):
         dst = self._get_destination()

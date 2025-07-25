@@ -28,6 +28,8 @@ def test_trace_data():
     assert {s.name for s in ctx.trace_data} == {
         # The entry point and root span.
         'ops.main',
+        # The first-party charm library.
+        'ops.tracing.Tracing',
         # Start event emitted on this charm.
         'start: TracedCharm',
         # Start event emitted on the first party charm lib.

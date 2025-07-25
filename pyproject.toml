@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.0.0",
+    "ops-scenario==8.1.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.0.0",
+    "ops-tracing==3.1.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -63,7 +63,7 @@ static = [
 ]
 unit = [
     "ops[testing,tracing]",
-    "pytest~=8.0",
+    "pytest~=8.4",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
     "eval-type-backport~=0.2; python_version < \"3.10\"",
@@ -79,7 +79,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
-    "pytest~=8.0",
+    "pytest~=8.4",
     "pytest-operator~=0.23",
     "jubilant~=1.2",
     "minio~=7.2",
@@ -335,7 +335,7 @@ reportPrivateUsage = false
 reportUnnecessaryIsInstance = false
 reportUnnecessaryComparison = false
 reportUnnecessaryTypeIgnoreComment = "error"
-disableBytesTypePromotions = false
+disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]

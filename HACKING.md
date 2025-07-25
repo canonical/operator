@@ -2,9 +2,8 @@ We welcome contributions to Ops! Before you start work on a contribution, please
 
 # Setting up a Dev Environment
 
-To work in the framework itself you will need Python >= 3.8. Linting, testing,
-and docs automation is performed using
-[`tox`](https://tox.readthedocs.io/en/latest/).
+To work in the framework itself you will need Python >= 3.10. Linting, testing,
+and docs automation is performed using [`tox`](https://tox.readthedocs.io/en/latest/).
 
 First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 
@@ -109,7 +108,7 @@ If your changes are in a Git branch, you can simply replace your `ops` version
 in `requirements.txt` (or `pyproject.toml`) with a reference to the branch, like:
 
 ```
-#ops ~= 2.9
+#ops ~= 3.0
 git+https://github.com/{your-username}/operator@{your-branch-name}
 ```
 
@@ -219,7 +218,7 @@ Test environments are managed with [tox](https://tox.wiki/) and executed with
 [pytest](https://pytest.org), with coverage measured by
 [coverage](https://coverage.readthedocs.io/).
 Static type checking is done using [pyright](https://github.com/microsoft/pyright),
-and extends the Python 3.8 type hinting support through the
+and extends the Python 3.10 type hinting support through the
 [typing_extensions](https://pypi.org/project/typing-extensions/) package.
 
 Formatting uses [Ruff](https://docs.astral.sh/ruff/).
@@ -234,7 +233,7 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-1. Draft a release: Run: `tox -e draft-release`.
+1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo. It doesn't matter which branch you are at, the script will check out and pull the main branch.
 
     > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
     > 
@@ -242,7 +241,7 @@ the build frontend is [build](https://pypi.org/project/build/).
     > 
     > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
     > 
-    > If you want to make a release on another branch, for example, on "2.23-maintenance", run:
+    > By default, the script makes a release on the main branch. If you want to make a release on another branch, for example, on "2.23-maintenance" (you do not need to switch to this branch in your forked repo), run it with the "--branch" parameter:
     > 
     > `tox -e draft-release -- --branch 2.23-maintenance`
 
@@ -250,16 +249,18 @@ the build frontend is [build](https://pypi.org/project/build/).
 3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
 4. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
 
+    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+
     > Pushing the tags will trigger automatic builds for the Python packages and
     > publish them to PyPI ([ops](https://pypi.org/project/ops/) 
     > ,[ops-scenario](https://pypi.org/project/ops-scenario), and 
     > [ops-tracing](https://pypi.org/project/ops-tracing/)).
     > Note that it sometimes take a bit of time for the new releases to show up.
     > 
-    > See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
-    > [.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
+    > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+
 5. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 6. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
@@ -288,7 +289,7 @@ view of the log will be included at the end of the GitHub release notes when
 the "Generate Release Notes" button is used, in the form:
 
 ```
-**Full Changelog**: https://github.com/canonical/operator/compare/2.17.0...2.18.0
+**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
 ```
 
 These changes include both `ops` and `ops-scenario`. If someone needs to see
@@ -374,3 +375,32 @@ In the post, outline the key improvements both in `ops` and `ops-scenario`.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
+
+## Updating the Ops versions in the Charmcraft profiles
+
+The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
+
+First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
+
+> See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
+
+Next, do the following for the `kubernetes` profile:
+
+1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the Ops version specifier.
+2. At the repo root, create a directory called `generated-temp`.
+3. Inside `generated-temp`, run:
+    ```text
+    CHARMCRAFT_DEVELOPER=1 python -m charmcraft init --profile=kubernetes
+    ```
+4. Inside `generated-temp`, run `uv lock`.
+5. Copy `generated-temp/uv.lock` to `charmcraft/templates/init-kubernetes/uv.lock.j2`, overwriting the existing file.
+6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
+7. Delete the `generated-temp` directory.
+
+For the `machine` profile, modify the Ops version specifier in `charmcraft/templates/init-machine/pyproject.toml.j2`. Then run a diff between `.../init-machine/pyproject.toml.j2` and `.../init-kubernetes/pyproject.toml.j2`. If the files match, copy `uv.lock.j2` from the `kubernetes` profile to the `machine` profile. Otherwise, repeat the full process for the `machine` profile.
+
+Commit your changes. You should have changed these files:
+* charmcraft/templates/init-kubernetes/pyproject.toml.j2
+* charmcraft/templates/init-kubernetes/uv.lock.j2
+* charmcraft/templates/init-machine/pyproject.toml.j2
+* charmcraft/templates/init-machine/uv.lock.j2

@@ -218,10 +218,10 @@ _ServiceInfoDict = TypedDict(
 
 
 class _BodyHandler(Protocol):
-    def __call__(self, data: bytes, done: bool = False) -> None: ...
+    def __call__(self, data: bytearray, done: bool = False) -> None: ...
 
 
-_HeaderHandler = Callable[[bytes], None]
+_HeaderHandler = Callable[[bytearray], None]
 
 # tempfile.NamedTemporaryFile has an odd interface because of that
 # 'name' attribute, so we need to make a Protocol for it.
@@ -230,7 +230,7 @@ _HeaderHandler = Callable[[bytes], None]
 class _Tempfile(Protocol):
     name = ''
 
-    def write(self, data: bytes): ...
+    def write(self, data: bytearray): ...
 
     def close(self): ...
 
@@ -1941,7 +1941,7 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
             break
 
         if encoding is not None:
-            chunk = typing.cast('bytes', chunk).decode(encoding)
+            chunk = chunk.decode(encoding)
         writer.write(chunk)
 
 
@@ -2761,7 +2761,7 @@ class Client:
         elif isinstance(source, bytes):
             source_io: _AnyStrFileLikeIO = io.BytesIO(source)
         else:
-            source_io: _AnyStrFileLikeIO = source  # type: ignore
+            source_io: _AnyStrFileLikeIO = source
         boundary = binascii.hexlify(os.urandom(16))
         path_escaped = path.replace('"', '\\"').encode('utf-8')
         content_type = f'multipart/form-data; boundary="{boundary.decode("utf-8")}"'
@@ -3482,7 +3482,7 @@ class _FilesParser:
         # these, so we'll prime the parser buffer with that missing sequence.
         self._parser.feed(b'\r\n')
 
-    def _process_header(self, data: bytes):
+    def _process_header(self, data: bytearray):
         parser = email.parser.BytesFeedParser()
         parser.feed(data)
         self._headers = parser.close()
@@ -3502,7 +3502,7 @@ class _FilesParser:
 
         self._part_type = typing.cast('Literal["response", "files"]', name)
 
-    def _process_body(self, data: bytes, done: bool = False):
+    def _process_body(self, data: bytearray, done: bool = False):
         if self._part_type == 'response':
             self._response_data.extend(data)
             if done:
@@ -3653,15 +3653,15 @@ class _MultipartParser:
                         return  # terminal boundary reached
                 elif safe_bound > self._pos:
                     # write partial body data
-                    data = self._buf[self._pos : safe_bound]
+                    partial_data = self._buf[self._pos : safe_bound]
                     self._pos = safe_bound
-                    self._handle_body(data)
+                    self._handle_body(partial_data)
                     return  # waiting for more data
                 else:
                     return  # waiting for more data
 
 
-def _next_part_boundary(buf: bytes, marker: bytes, start: int = 0) -> tuple[int, int, bool]:
+def _next_part_boundary(buf: bytearray, marker: bytes, start: int = 0) -> tuple[int, int, bool]:
     """Returns the index of the next boundary marker in buf beginning at start.
 
     Returns:
