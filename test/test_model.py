@@ -4442,6 +4442,20 @@ def test_departing_unit_in_relations():
 @pytest.mark.skipif(
     not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
 )
+def test_no_inject_unit_in_relation_joined():
+    ctx = ops.testing.Context(
+        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
+    )
+    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    state_in = ops.testing.State(relations={rel})
+    with ctx(ctx.on.relation_joined(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0'}
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
 def test_relation_has_correct_units():
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
