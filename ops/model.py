@@ -1792,6 +1792,8 @@ class Relation:
 
         self.data = RelationData(self, our_unit, backend, remote_unit)
 
+        self.data = RelationData(self, our_unit, backend)
+
         self._remote_model: RemoteModel | None = None
 
     def __repr__(self):
