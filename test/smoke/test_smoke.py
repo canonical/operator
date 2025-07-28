@@ -71,7 +71,6 @@ def pack(charm_dir: pathlib.Path):
 @pytest.mark.parametrize(
     'base,charmcraft_version,name',
     (
-        ('20.04', 3, 'focal'),
         ('22.04', 3, 'jammy'),
         ('24.04', 3, 'noble'),
     ),
