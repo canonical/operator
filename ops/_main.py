@@ -370,24 +370,30 @@ class _Manager:
     def _make_framework(self, dispatcher: _Dispatcher):
         # If we are in a RelationBroken event, we want to know which relation is
         # broken within the model, not only in the event's `.relation` attribute.
-        if self._juju_context.dispatch_path.endswith(('-relation-broken', '_relation_broken')):
+        if dispatcher.event_name.endswith('_relation_broken'):
             broken_relation_id = self._juju_context.relation_id
         else:
             broken_relation_id = None
+
+        # In a RelationDeparted event, the unit is not included in the Juju
+        # `relation-list` output, but the charm still has access to the remote
+        # relation data. To provide the charm with a mechanism for getting
+        # access to that data, we include the remote unit in Relation.units.
+        # We also expect it to be available in RelationBroken events, so ensure
+        # that it's available then as well. For other relation events, the unit
+        # will either already be in the set via `relation-list` (such as in a
+        # RelationChanged event) or correctly not in the list yet because the
+        # relation has not been fully set up (such as in a RelationJoined event).
+        if dispatcher.event_name.endswith(('_relation_departed', '_relation_broken')):
+            remote_unit_name = self._juju_context.remote_unit_name
+        else:
+            remote_unit_name = None
 
         model = _model.Model(
             self._charm_meta,
             self._model_backend,
             broken_relation_id=broken_relation_id,
-            # In a RelationDeparted event, the unit is not included in the Juju
-            # `relation-list` output, but the charm still has access to the remote
-            # relation data. To provide the charm with a mechanism for getting
-            # access to that data, we include the remote unit in Relation.units.
-            # In other relation events (such as RelationChanged) the unit will
-            # already be in the set via `relation-list` - adding it via this extra
-            # mechanism will not change the final set, and is simpler than only
-            # adding it in specific events.
-            remote_unit_name=self._juju_context.remote_unit_name,
+            remote_unit_name=remote_unit_name,
         )
         store = self._make_storage(dispatcher)
         framework = self._framework_class(

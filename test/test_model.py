@@ -4421,6 +4421,29 @@ class TestGetCloudSpec:
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
 
 
+def test_departing_unit_data_available(fake_script: FakeScript):
+    fake_script.write('relation-ids', """echo '["db0:1"]'""")
+    fake_script.write('relation-list', """echo '["db/0"]'""")
+    fake_script.write('relation-get', """echo '{"db": "data"}'""")
+
+    model = ops.model.Model(
+        ops.charm.CharmMeta({'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}),
+        ops.model._ModelBackend('myapp/0'),
+        remote_unit_name='db/1',
+    )
+    relation = model.get_relation('db')
+    assert relation is not None
+    for unit in relation.units:
+        assert relation.data[unit] == {'db': 'data'}
+    calls = fake_script.calls(clear=True)
+    assert calls[:2] == [
+        ['relation-ids', 'db', '--format=json'],
+        ['relation-list', '-r', '1', '--format=json'],
+    ]
+    assert ['relation-get', '-r', '1', '-', 'db/0', '--format=json'] in calls
+    assert ['relation-get', '-r', '1', '-', 'db/1', '--format=json'] in calls
+
+
 @pytest.mark.skipif(
     not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
 )
@@ -4429,14 +4452,32 @@ def test_departing_unit_in_relations():
         ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
     )
     # In this mocked Juju data, only unit/0 is included.
-    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    rel = ops.testing.Relation('db', remote_units_data={0: {}, 1: {}}, remote_app_name='db')
     state_in = ops.testing.State(relations={rel})
     # We simulate a relation-departed event where the departing unit is unit/1.
     with ctx(ctx.on.relation_departed(rel, remote_unit=1), state_in) as mgr:
         mgr.run()
         # The departing unit, unit/1, should be in the .units set for the relation
         # even though it was not in the mocked Juju data.
-        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
+        relation = mgr.charm.model.relations['db'][0]
+        assert {unit.name for unit in relation.units} == {'db/0', 'db/1'}
+        # We should also be able to get the data.
+        for unit in relation.units:
+            assert relation.data[unit] == {}
+
+
+@pytest.mark.skipif(
+    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
+)
+def test_no_inject_unit_in_relation_joined():
+    ctx = ops.testing.Context(
+        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
+    )
+    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
+    state_in = ops.testing.State(relations={rel})
+    with ctx(ctx.on.relation_joined(rel, remote_unit=1), state_in) as mgr:
+        mgr.run()
+        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0'}
 
 
 @pytest.mark.skipif(
