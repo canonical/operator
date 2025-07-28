@@ -200,16 +200,16 @@ def format_release_notes(
     Results in a Markdown formatted string with sections for each commit type.
     If `full_changelog` is provided, it is appended at the end.
     """
-    lines = ["## What's Changed", '']  # Initialize lines.
+    lines = ["## What's Changed", '']
     for commit_type, items in categories.items():
         if items:
-            lines.append(f'### {commit_type_to_category(commit_type)}')  # Add category header.
+            lines.append(f'### {commit_type_to_category(commit_type)}')
             for description, pr_link in items:
-                lines.append(f'* {description} in {pr_link}')  # Add commit description.
-            lines.append('')  # Add a blank line after each category.
+                lines.append(f'* {description} in {pr_link}')
+            lines.append('')
     if full_changelog:
-        lines.append(full_changelog)  # Append the full changelog.
-    return '\n'.join(lines)  # Join the lines with newline characters.
+        lines.append(full_changelog)
+    return '\n'.join(lines)
 
 
 def print_release_notes(notes: str):
@@ -259,8 +259,7 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
     Each item is formatted as a bullet point with the description and PR number in parentheses.
     """
     today = datetime.datetime.now().strftime('%d %B %Y')
-    lines = [f'# {tag} - {today}\n']  # Initialize lines with the header.
-
+    lines = [f'# {tag} - {today}\n']
     for commit_type, items in categories.items():
         if items:
             lines.append(f'## {commit_type_to_category(commit_type)}\n')
@@ -270,9 +269,8 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
                 if match:
                     pr_num = match.group(1)
                 lines.append(f'* {description} (#{pr_num})')
-            lines.append('\n')  # Add a blank line after each category.
-
-    return '\n'.join(lines)  # Join the lines with newline characters.
+            lines.append('\n')
+    return '\n'.join(lines)
 
 
 def update_changes_file(changes: str, file: str):
@@ -366,7 +364,7 @@ def update_uv_lock():
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
-def parse_scenario_version():
+def parse_scenario_version() -> tuple[str, str]:
     """Parse the current scenario version from pyproject.toml."""
     file_path = VERSION_FILES['testing']
     content = file_path.read_text()
