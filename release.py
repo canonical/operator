@@ -65,7 +65,9 @@ def get_latest_release_tag(repo: github.Repository.Repository, branch_name: str)
         if release.draft:
             continue
 
-        if maintenance_branch_version and maintenance_branch_version not in release.tag_name:
+        if maintenance_branch_version and not release.tag_name.startswith(
+            maintenance_branch_version
+        ):
             continue
 
         return release.tag_name
@@ -198,7 +200,7 @@ def format_release_notes(
     Results in a Markdown formatted string with sections for each commit type.
     If `full_changelog` is provided, it is appended at the end.
     """
-    lines = ["## What's Changed", '', '']  # Initialize lines.
+    lines = ["## What's Changed", '']  # Initialize lines.
     for commit_type, items in categories.items():
         if items:
             lines.append(f'### {commit_type_to_category(commit_type)}')  # Add category header.
@@ -380,10 +382,12 @@ def get_new_scenario_version(ops_version: str) -> str:
     """Get a new version for scenario based on ops verwsion.
 
     We want the scenario version to always be exactly ops major version+5,
-    like ops 3.1.2 -> scenario 8.1.2.
+    like ops 3.1.2 -> scenario 8.1.2, and ops 3.1.2.dev0 -> scenario 8.1.2.dev0.
     """
-    major, minor, patch, dev0 = ops_version.split('.')
-    return f'{int(major) + 5}.{minor}.{patch}.{dev0}'
+    base_version, dev_suffix = parse_version(ops_version)
+    major, minor, patch = base_version.split('.')
+    dev = dev_suffix if dev_suffix else ''
+    return f'{int(major) + 5}.{minor}.{patch}{dev}'
 
 
 def update_versions_for_release(tag: str):
@@ -503,29 +507,25 @@ def post_release(
 ):
     """Post-release actions: update version files and create a PR."""
     new_branch = 'post-release'
-    local_branch = subprocess.run(
-        ['/usr/bin/git', 'branch', '--list', new_branch],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    remote_branch = subprocess.run(
-        ['/usr/bin/git', 'ls-remote', '--heads', fork_remote, new_branch],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    exist = local_branch or remote_branch
-    if exist:
+    local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
+    remote_branch = subprocess.check_output(
+        [
+            '/usr/bin/git',
+            'ls-remote',
+            '--heads',
+            fork_remote,
+            new_branch,
+        ]
+    )
+    if local_branch or remote_branch:
         logger.error(
-            f'Branch "{new_branch}" already exists in the current repository. '
+            f'Branch "{new_branch}" already exists.'
             'Please double check and delete it first before post release'
         )
         exit(1)
 
-    subprocess.run(['/usr/bin/git', 'fetch', canonical_remote], check=True)
     subprocess.run(['/usr/bin/git', 'checkout', base_branch], check=True)
-    subprocess.run(['/usr/bin/git', 'merge', f'{canonical_remote}/{base_branch}'], check=True)
+    subprocess.run(['/usr/bin/git', 'pull', canonical_remote, base_branch], check=True)
 
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
