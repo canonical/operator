@@ -508,15 +508,13 @@ def post_release(
     """Post-release actions: update version files and create a PR."""
     new_branch = 'post-release'
     local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
-    remote_branch = subprocess.check_output(
-        [
-            '/usr/bin/git',
-            'ls-remote',
-            '--heads',
-            fork_remote,
-            new_branch,
-        ]
-    )
+    remote_branch = subprocess.check_output([
+        '/usr/bin/git',
+        'ls-remote',
+        '--heads',
+        fork_remote,
+        new_branch,
+    ])
     if local_branch or remote_branch:
         logger.error(
             f'Branch "{new_branch}" already exists.'
