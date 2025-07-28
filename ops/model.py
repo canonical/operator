@@ -1774,7 +1774,6 @@ class Relation:
 
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend)
 
         # In relation-departed `relation-list` doesn't include the remote unit,
         # but the data should still be available.
@@ -1788,6 +1787,8 @@ class Relation:
             and _remote_unit.name.startswith(f'{self.app.name}/')
         ):
             self.units.add(_remote_unit)
+
+        self.data = RelationData(self, our_unit, backend)
 
         self._remote_model: RemoteModel | None = None
 
