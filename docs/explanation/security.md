@@ -2,6 +2,8 @@
 
 # Security
 
+When producing security documentation for your charm, it's important to consider the security aspects of the charm's dependencies. If there are any security questions that aren't answered here in terms of the use of cryptographic technology, security risks, hardening, and good practice, with regards to Ops, please reach out to the Charm Tech team, and we'll do our best to assist.
+
 ## Cryptographic technology
 
 The only case where Ops uses cryptography is for sending trace data, when a certificate authority provider has been integrated with the charm. This is done using HTTPS, using either TLS 1.2 or 1.3, using the implementation provided by the standard library of the Python that is executing the charm. See [tracing security](#ops_tracing_security) for more details.
