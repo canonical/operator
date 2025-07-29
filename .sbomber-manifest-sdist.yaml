@@ -10,30 +10,28 @@ clients:
 artifacts:
   - name: 'ops'
     type: 'sdist'
-    version: '3.0.0'
     compression: 'gz'
     ssdlc_params:
         name: 'ops'
-        version: '3.0.0'
+        version: ''
         channel: 'stable'
         cycle: '25.10'
 
   - name: 'ops-scenario'
     type: 'sdist'
-    version: '8.0.0'
     compression: 'gz'
     ssdlc_params:
         name: 'ops-scenario'
-        version: '8.0.0'
+        version: ''
         channel: 'stable'
         cycle: '25.10'
 
   - name: 'ops-tracing'
     type: 'sdist'
-    version: '3.0.0'
+    version: ''
     compression: 'gz'
     ssdlc_params:
         name: 'ops-tracing'
-        version: '3.0.0'
+        version: ''
         channel: 'stable'
         cycle: '25.10'
