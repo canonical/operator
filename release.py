@@ -81,6 +81,12 @@ def bump_minor_version(version: str) -> str:
     return f'{major}.{minor + 1}.0'
 
 
+def bump_patch_version(version: str) -> str:
+    """Bump patch version."""
+    major, minor, patch = map(int, version.split('.'))
+    return f'{major}.{minor}.{patch + 1}'
+
+
 def get_new_tag_for_release(
     owner: str, repo: github.Repository.Repository, branch_name: str
 ) -> str:
@@ -100,7 +106,14 @@ def get_new_tag_for_release(
         if not re.match(r'^\d+\.\d+\.\d+$', latest_tag):
             logger.info('Latest tag is not in format X.Y.Z.')
         else:
-            suggested_tag = bump_minor_version(latest_tag)
+            if branch_name.endswith('-maintenance'):
+                logger.info(
+                    'Branch is a maintenance branch, bumping patch version of the latest tag.'
+                )
+                suggested_tag = bump_patch_version(latest_tag)
+            else:
+                logger.info('Branch is main, bumping minor version of the latest tag.')
+                suggested_tag = bump_minor_version(latest_tag)
             logger.info(f'Suggested new version: {suggested_tag}')
 
     tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
@@ -419,7 +432,12 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
         )
         exit(1)
 
-    new_version = bump_minor_version(latest_version) + '.dev0'
+    if branch_name.endswith('-maintenance'):
+        logger.info('Branch is a maintenance branch, bumping patch version of the latest tag.')
+        new_version = bump_patch_version(latest_version) + '.dev0'
+    else:
+        logger.info('Branch is main, bumping minor version of the latest tag.')
+        new_version = bump_minor_version(latest_version) + '.dev0'
     logger.info(f'Suggested new version: {new_version}')
     return new_version
 
@@ -454,8 +472,14 @@ def draft_release(
     owner: str, repo_name: str, base_branch: str, canonical_remote: str, fork_remote: str
 ):
     """Create a draft release, update changelog, and create a PR for the release."""
-    subprocess.run(['/usr/bin/git', 'checkout', 'main'], check=True)
-    subprocess.run(['/usr/bin/git', 'pull', canonical_remote, 'main'], check=True)
+    local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', base_branch])
+    if local_branch:
+        subprocess.run(['/usr/bin/git', 'checkout', base_branch], check=True)
+        subprocess.run(['/usr/bin/git', 'pull', canonical_remote, base_branch], check=True)
+    else:
+        subprocess.run(
+            ['/usr/bin/git', 'checkout', '--track', f'{fork_remote}/{base_branch}'], check=True
+        )
 
     org = gh_client.get_organization(owner)
     repo = org.get_repo(repo_name)
