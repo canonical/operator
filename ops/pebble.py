@@ -2116,17 +2116,6 @@ class Identity:
         return result
 
 
-class _SecurityEventLogger(Protocol):
-    def __call__(
-        self,
-        level: Literal['INFO', 'WARN', 'CRITICAL'],
-        event_type: str,
-        event: str,
-        *,
-        description: str,
-    ) -> None: ...
-
-
 class Client:
     """Pebble API client.
 
