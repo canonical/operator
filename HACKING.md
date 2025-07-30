@@ -233,7 +233,9 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo. It doesn't matter which branch you are at, the script will check out and pull the main branch.
+Before you start, make sure you are at the main branch of your forked operator repo, and your main branch is up-to-date. This is to ensure the release automation script is the latest.
+
+1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
     > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
     > 
@@ -267,7 +269,7 @@ the build frontend is [build](https://pypi.org/project/build/).
 
     > This assumes the same defaults as mentioned in step 1.
     > 
-    > Add parameters accordingly if your setup differs.
+    > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 7. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
