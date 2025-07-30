@@ -1,3 +1,43 @@
+# 3.1.0 - 30 July 2025
+
+## Features
+
+* Release automation script (#1855)
+* Add app_name and unit_id attributes to testing.context (#1920)
+## Fixes
+
+* If an event ends with _abort(0) tests should behave as if it ended successfully (#1887)
+* If self.app is not actually set avoid a new crash location (#1897)
+* Only add the remote unit for departed and broken relation events, fix ordering (#1918)
+* Add the remote unit to relation.data but not relation.units (#1925)
+## Documentation
+
+* Use load_config in the httpbin example charm (#1852)
+* Update HACKING.md with how to bump `ops` version in Charmcraft profiles (#1872)
+* Change title of docs site (#1890)
+* Use config and action classes in the Kubernetes tutorial (#1891)
+* Reference example charms from K8s tutorial and fix consistency (#1898)
+* Update style guide (#1720)
+* Fix issues in how-to guide for stored state (#1901)
+* Link out to the 12-factor tutorials from the tutorial index page (#1902)
+* Replace broken link in testing explanation (#1913)
+* Expand the storage how-to with content from Juju docs scheduled for removal (#1915)
+* Ops tracing how to (#1853)
+* Add a security explanation doc (#1904)
+
+
+## Tests
+
+* Replace Python version to 3.10 for observability charm tests (#1914)
+## CI
+
+* Use httpbin demo charm for the Charmcraft pack test (#1895)
+* Move TIOBE workflow to self-hosted runners (#1912)
+* Add SBOM generation and secscan workflow (#1906)
+* Build and publish in one step (#1857)
+* Update the name and email when updating the charm pins (#1924)
+* Drop smoke test against 20.04 (#1923)
+
 # 3.0.0 - 02 July 2025
 
 The minimum version of Python for Ops 3.x is 3.10.
