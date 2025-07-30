@@ -269,7 +269,7 @@ Before you start, make sure you are at the main branch of your forked operator r
 
     > This assumes the same defaults as mentioned in step 1.
     > 
-    > Add parameters accordingly if your setup differs, for example, if you are releasing on a maintenance branch.
+    > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 7. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
