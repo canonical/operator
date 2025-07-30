@@ -291,7 +291,7 @@ def _log_security_event(
           consumption. Includes additional details of the event that do not
           fit in the event name.
     """
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger()
     for juju_handler in logger.handlers:
         if isinstance(juju_handler, JujuLogHandler):
             model_backend = juju_handler.model_backend
