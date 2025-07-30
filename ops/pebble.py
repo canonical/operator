@@ -2135,18 +2135,6 @@ class Client:
     connection attempt to Pebble; used by ``urllib.request.OpenerDirector.open``. It's not for
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
-
-    The ``security_event_logger`` parameter is used to log security events. If not provided, events
-    will be logged to the `pebble.security` logger. The signature of the logger function is::
-
-        def security_event_logger(
-            level: Literal['INFO', 'WARN', 'CRITICAL'],
-            event_type: str,
-            event: str,
-            *,
-            description: str,
-        ):
-
     """
 
     _chunk_size = 8192
