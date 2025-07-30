@@ -263,15 +263,16 @@ Before you start, make sure you are at the main branch of your forked operator r
     >
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
-5. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
+5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-6. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
+7. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
     > 
     > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
-7. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
+8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 ## Release Documentation
 

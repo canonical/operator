@@ -27,3 +27,6 @@ jobs:
         with:
           subject-path: 'dist/*'
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  secscan:
+    uses: ./.github/workflows/sbom-secscan.yaml
