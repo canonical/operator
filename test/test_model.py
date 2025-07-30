@@ -4421,84 +4421,27 @@ class TestGetCloudSpec:
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
 
 
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
-def test_departing_unit_in_relations():
-    ctx = ops.testing.Context(
-        ops.CharmBase, meta={'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}}
-    )
-    # In this mocked Juju data, only unit/0 is included.
-    rel = ops.testing.Relation('db', remote_units_data={0: {}}, remote_app_name='db')
-    state_in = ops.testing.State(relations={rel})
-    # We simulate a relation-departed event where the departing unit is unit/1.
-    with ctx(ctx.on.relation_departed(rel, remote_unit=1), state_in) as mgr:
-        mgr.run()
-        # The departing unit, unit/1, should be in the .units set for the relation
-        # even though it was not in the mocked Juju data.
-        assert {unit.name for unit in mgr.charm.model.relations['db'][0].units} == {'db/0', 'db/1'}
+def test_departing_unit_data_available(fake_script: FakeScript):
+    fake_script.write('relation-ids', """echo '["db0:1"]'""")
+    fake_script.write('relation-list', """echo '["db/0"]'""")
+    fake_script.write('relation-get', """echo '{"db": "data"}'""")
 
-
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
-def test_relation_has_correct_units():
-    class Charm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on['db'].relation_changed, self._on_peer_relation_changed)
-            framework.observe(self.on['peer'].relation_changed, self._on_peer_relation_changed)
-
-        def _on_peer_relation_changed(self, event: ops.RelationChangedEvent):
-            self.event = event
-
-    ctx = ops.testing.Context(
-        Charm,
-        meta={
-            'name': 'mycharm',
-            'requires': {'db': {'interface': 'db'}, 'ingress': {'interface': 'ingress'}},
-            'peers': {'peer': {'interface': 'gossip'}},
-        },
-    )
-    rel1 = ops.testing.Relation(
-        'db', remote_units_data={1: {}, 2: {}, 3: {}}, remote_app_name='test-db'
-    )
-    rel2 = ops.testing.Relation(
-        'ingress', remote_units_data={4: {}, 6: {}}, remote_app_name='test-ingress'
-    )
-    peer = ops.testing.PeerRelation('peer', peers_data={1: {}, 2: {}})
-    state_in = ops.testing.State(relations={rel1, rel2, peer})
-
-    def unit_names(relation: ops.Relation):
-        return {unit.name for unit in relation.units}
-
-    with ctx(ctx.on.relation_changed(peer, remote_unit=1), state_in) as mgr:
-        mgr.run()
-        assert unit_names(mgr.charm.event.relation) == {'mycharm/1', 'mycharm/2'}
-        assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
-        assert unit_names(mgr.charm.model.relations['db'][0]) == {
-            'test-db/1',
-            'test-db/2',
-            'test-db/3',
-        }
-        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
-            'test-ingress/4',
-            'test-ingress/6',
-        }
-
-    with ctx(ctx.on.relation_changed(rel1, remote_unit=1), state_in) as mgr:
-        mgr.run()
-        assert unit_names(mgr.charm.event.relation) == {'test-db/1', 'test-db/2', 'test-db/3'}
-        assert unit_names(mgr.charm.model.relations['peer'][0]) == {'mycharm/1', 'mycharm/2'}
-        assert unit_names(mgr.charm.model.relations['db'][0]) == {
-            'test-db/1',
-            'test-db/2',
-            'test-db/3',
-        }
-        assert unit_names(mgr.charm.model.relations['ingress'][0]) == {
-            'test-ingress/4',
-            'test-ingress/6',
-        }
+    meta = ops.charm.CharmMeta({'name': 'mycharm', 'requires': {'db': {'interface': 'db'}}})
+    backend = ops.model._ModelBackend('myapp/0')
+    model = ops.model.Model(meta, backend, remote_unit_name='db/1')
+    relation = model.get_relation('db')
+    assert relation is not None
+    for unit in relation.units:
+        assert relation.data[unit] == {'db': 'data'}
+    unit = model.get_unit('db/1')
+    assert relation.data[unit] == {'db': 'data'}
+    calls = fake_script.calls(clear=True)
+    assert calls[:2] == [
+        ['relation-ids', 'db', '--format=json'],
+        ['relation-list', '-r', '1', '--format=json'],
+    ]
+    assert ['relation-get', '-r', '1', '-', 'db/0', '--format=json'] in calls
+    assert ['relation-get', '-r', '1', '-', 'db/1', '--format=json'] in calls
 
 
 if __name__ == '__main__':
