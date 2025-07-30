@@ -3122,7 +3122,6 @@ class _TestingPebbleClient:
         self._last_notice_id = 0
         self._changes: dict[str, pebble.Change] = {}
         self._check_infos: dict[str, pebble.CheckInfo] = {}
-        self._log_security_event = lambda *args, **kwargs: None  # type: ignore
 
     def _handle_exec(self, command_prefix: Sequence[str], handler: ExecHandler):
         prefix = tuple(command_prefix)

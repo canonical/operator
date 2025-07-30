@@ -1424,7 +1424,6 @@ class MockClient(pebble.Client):
         self.responses: list[typing.Any] = []
         self.timeout = 5
         self.websockets: dict[typing.Any, MockWebsocket] = {}
-        self._log_security_event = lambda *args, **kwargs: None  # type: ignore
 
     def _request(
         self,
