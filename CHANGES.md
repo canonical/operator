@@ -2,15 +2,13 @@
 
 ## Fixes
 
-* Add the remote unit to relation.data but not relation.units (#1928)
-
+* Add the remote unit to `Relation.data` but not `Relation.units` (#1928)
 
 ## Documentation
 
-* Be consistent with recommending self.app and self.unit (#1856)
+* Be consistent with recommending `self.app` and `self.unit` (#1856)
 * Add notice about ops 2 and ops 3 (#1867)
 * Update title and edit links for ops 2.23 docs (#1885)
-
 
 ## CI
 
