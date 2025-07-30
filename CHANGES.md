@@ -1,3 +1,21 @@
+# 2.23.1 - 30 July 2025
+
+## Fixes
+
+* Add the remote unit to relation.data but not relation.units (#1928)
+
+
+## Documentation
+
+* Be consistent with recommending self.app and self.unit (#1856)
+* Add notice about ops 2 and ops 3 (#1867)
+* Update title and edit links for ops 2.23 docs (#1885)
+
+
+## CI
+
+* Hotfix, publish job for ops-tracing (#1865)
+
 # 2.23.0 - 30 June 2025
 
 ## Features
