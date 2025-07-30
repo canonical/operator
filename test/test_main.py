@@ -1001,11 +1001,9 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'blocked'
         assert state.status_message == 'help meeee'
 
-    @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
     def test_hook_and_dispatch(
         self,
-        _: MagicMock,
         request: pytest.FixtureRequest,
         fake_script: FakeScript,
     ):
