@@ -39,7 +39,7 @@ from ops.jujucontext import _JujuContext
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
-from .test_helpers import FakeScript, calls_without_security_event_logging
+from .test_helpers import FakeScript
 
 # This relies on the expected repository structure to find a path to
 # source of the charm under test.
@@ -809,7 +809,6 @@ class _TestMain(abc.ABC):
             ['add-metric', '--labels', 'bar=4.2', 'foo=42'],
         ]
         calls = fake_script.calls()
-        calls = calls_without_security_event_logging(calls)
 
         assert calls == expected
 
@@ -826,7 +825,6 @@ class _TestMain(abc.ABC):
         )
 
         calls = fake_script.calls()
-        calls = calls_without_security_event_logging(calls)
 
         custom_event_prefix = 'Emitting custom event <CustomEvent via Charm/on/custom'
         expected = [
@@ -928,11 +926,7 @@ class _TestMain(abc.ABC):
                 ),
             )
 
-        calls = fake_script.calls()
-        sec_start = calls.pop(1)
-        sec_crash = calls.pop(-1)
-        sec_end = calls.pop(-2)
-        calls = [' '.join(i) for i in calls]
+        calls = [' '.join(i) for i in fake_script.calls()]
 
         assert calls.pop(0) == ' '.join(VERSION_LOGLINE)
         assert 'Using local storage: not a Kubernetes podspec charm' in calls.pop(0)
@@ -945,26 +939,19 @@ class _TestMain(abc.ABC):
             r'RuntimeError: failing as requested',
             calls[0],
         )
+        sec_crash = calls.pop(1)
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
 
-        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-        assert sec_crash[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-        data_start = json.loads(sec_start[-1])
-        data_crash = json.loads(sec_crash[-1])
-        data_end = json.loads(sec_end[-1])
-        for data in (data_start, data_crash, data_end):
-            assert data['type'] == 'security'
-            assert data['appid'] == '1234:test_main/0'
-            assert 'datetime' in data
-        assert data_start['description'] == 'Starting ops framework for Charm'
-        assert data_start['event'] == 'sys_startup:1000'
+        assert sec_crash.startswith('juju-log --log-level TRACE --')
+        data_crash = json.loads(sec_crash.rsplit('--', 1)[-1])
+        assert data_crash['type'] == 'security'
+        assert data_crash['appid'] == '1234-test_main/0'
+        assert 'datetime' in data_crash
         assert (
             data_crash['description']
             == "Uncaught exception in charm code: RuntimeError('failing as requested')."
         )
         assert data_crash['event'] == 'sys_crash:RuntimeError'
-        assert data_end['description'] == 'Stopping ops framework'
-        assert data_end['event'] == 'sys_shutdown:1000'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_sets_model_name(self, fake_script: FakeScript):
@@ -1024,9 +1011,7 @@ class _TestMain(abc.ABC):
     ):
         fake_script_hooks = FakeScript(request, self.hooks_dir)
         fake_script_hooks.write('install', 'exit 0')
-        state = self._simulate_event(
-            fake_script, EventSpec(ops.InstallEvent, 'install', model_uuid='1234')
-        )
+        state = self._simulate_event(fake_script, EventSpec(ops.InstallEvent, 'install'))
         assert isinstance(state, ops.BoundStoredState)
 
         # the script was called, *and*, the .on. was called
@@ -1055,21 +1040,8 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        sec_start = calls.pop(1)
-        sec_end = calls.pop(-1)
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
-        assert sec_start[:-1] == sec_end[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-        data_start = json.loads(sec_start[-1])
-        data_end = json.loads(sec_end[-1])
-        for data in (data_start, data_end):
-            assert data['type'] == 'security'
-            assert data['appid'] == '1234:test_main/0'
-            assert 'datetime' in data
-        assert data_start['description'] == 'Starting ops framework for Charm'
-        assert data_start['event'] == 'sys_startup:1000'
-        assert data_end['description'] == 'Stopping ops framework'
-        assert data_end['event'] == 'sys_shutdown:1000'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_non_executable_hook_and_dispatch(self, fake_script: FakeScript):
@@ -1099,8 +1071,7 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-4))
-        calls = calls_without_security_event_logging(calls)
+        assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1135,7 +1106,6 @@ class _TestMain(abc.ABC):
             ],
             ['juju-log', '--log-level', 'WARNING', '--', f'Legacy {hook} exited with status 42.'],
         ]
-        calls = calls_without_security_event_logging(calls)
         assert calls == expected
 
     @pytest.mark.usefixtures('setup_charm')
@@ -1204,7 +1174,6 @@ class _TestMain(abc.ABC):
             ['is-leader', '--format=json'],
         ]
         calls = fake_script.calls()
-        calls = calls_without_security_event_logging(calls)
         assert 'Initializing SQLite local storage: ' in ' '.join(calls.pop(-3))
 
         assert calls == expected
