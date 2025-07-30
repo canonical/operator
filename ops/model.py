@@ -2773,7 +2773,14 @@ class Container:
         if not check_names:
             raise TypeError('stop-checks expected at least 1 argument, got 0')
 
-        return self._pebble.stop_checks(check_names)
+        stopped_checks = self._pebble.stop_checks(check_names)
+        _log_security_event(
+            'WARN',
+            _SecurityEventSystem.SYS_MONITOR_DISABLED,
+            f'{os.getuid()},{",".join(check_names)}',
+            description=f'Asked to stop checks {check_names}, stopped checks {stopped_checks}',
+        )
+        return stopped_checks
 
     @typing.overload
     def pull(self, path: str | PurePath, *, encoding: None) -> BinaryIO: ...
