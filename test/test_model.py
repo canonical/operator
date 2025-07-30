@@ -18,12 +18,15 @@ import datetime
 import io
 import ipaddress
 import json
+import logging
 import os
 import pathlib
 import re
+import sys
 import tempfile
 import typing
 import unittest
+import warnings
 from collections import OrderedDict
 from textwrap import dedent
 from typing import Mapping
@@ -37,6 +40,7 @@ from ops import pebble
 from ops._private import yaml
 from ops.jujucontext import _JujuContext
 from ops.jujuversion import JujuVersion
+from ops.log import JujuLogHandler, setup_root_logging
 from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
@@ -49,6 +53,25 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
 @pytest.fixture
 def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+
+
+@pytest.fixture
+def root_logging():
+    context = _JujuContext(model_uuid='1234', unit_name='myapp/0')
+    backend = ops.model._ModelBackend('myapp/0', 'testing-model', juju_context=context)
+    orig_hook = sys.excepthook
+    orig_show = warnings.showwarning
+    logger = logging.getLogger()
+    orig_level = logger.level
+    setup_root_logging(backend)
+    yield
+    sys.excepthook = orig_hook
+    warnings.showwarning = orig_show
+    logger.setLevel(orig_level)
+    for h in logger.handlers:
+        if isinstance(h, JujuLogHandler):
+            logger.removeHandler(h)
+            break
 
 
 class TestModel:
@@ -2021,6 +2044,35 @@ containers:
         with pytest.raises(RuntimeError):
             container.get_check('c1')
 
+    def test_start_checks(self, container: ops.Container):
+        container.pebble.responses.append(['c1'])  # type: ignore
+        assert container.start_checks('c1', 'c2') == ['c1']
+        assert container.pebble.requests == [('start_checks', ('c1', 'c2'))]  # type: ignore
+
+    def test_stop_checks(
+        self,
+        container: ops.Container,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('juju-log', 'exit 0')
+        container.pebble.responses.append(['c1'])  # type: ignore
+        container.stop_checks('c1', 'c2')
+        assert container.pebble.requests == [('stop_checks', ('c1', 'c2'))]  # type: ignore
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(sec_log[-1])
+        assert data['level'] == 'WARN'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'sys_monitor_disabled:1001,c1,c2'
+        assert data['description'] == 'Asked to stop checks c1,c2 - stopped checks c1'
+        assert 'datetime' in data
+        assert calls == []
+
     def test_pull(self, container: ops.Container):
         container.pebble.responses.append('dummy1')  # type: ignore
         got = container.pull('/path/1')
@@ -2341,6 +2393,14 @@ class MockPebbleClient:
 
     def get_checks(self, level: str | None = None, names: str | None = None):
         self.requests.append(('get_checks', level, names))
+        return self.responses.pop(0)
+
+    def start_checks(self, *checks: str):
+        self.requests.append(('start_checks', *checks))
+        return self.responses.pop(0)
+
+    def stop_checks(self, *checks: str):
+        self.requests.append(('stop_checks', *checks))
         return self.responses.pop(0)
 
     def pull(self, path: str, *, encoding: str = 'utf-8'):
@@ -4239,17 +4299,45 @@ class TestPorts:
 
 
 class TestUnit:
-    def test_reboot(self, fake_script: FakeScript, fake_juju_version: None):
-        model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+    @staticmethod
+    def _verify_security_event_data(data: dict[str, str]):
+        assert data['level'] == 'WARN'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'sys_restart:1001'
+        assert data['description'] == "Rebooting unit 'myapp/0' in model 'testing-model'"
+        assert 'datetime' in data
+
+    def test_reboot(
+        self,
+        fake_script: FakeScript,
+        fake_juju_version: None,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        backend = ops.model._ModelBackend('myapp/0', 'testing-model')
+        model = ops.model.Model(ops.charm.CharmMeta(), backend)
         unit = model.unit
         fake_script.write('juju-reboot', 'exit 0')
+        fake_script.write('juju-log', 'exit 0')
         unit.reboot()
-        assert fake_script.calls(clear=True) == [
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        sec_data = json.loads(sec_log[-1])
+        self._verify_security_event_data(sec_data)
+        assert calls == [
             ['juju-reboot', ''],
         ]
         with pytest.raises(SystemExit):
             unit.reboot(now=True)
-        assert fake_script.calls(clear=True) == [
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        sec_data = json.loads(sec_log[-1])
+        self._verify_security_event_data(sec_data)
+        assert calls == [
             ['juju-reboot', '--now'],
         ]
 
