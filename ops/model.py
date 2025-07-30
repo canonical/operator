@@ -2774,11 +2774,15 @@ class Container:
             raise TypeError('stop-checks expected at least 1 argument, got 0')
 
         stopped_checks = self._pebble.stop_checks(check_names)
+        description = (
+            f'Asked to stop checks {",".join(check_names)} - '
+            f'stopped checks {",".join(stopped_checks)}'
+        )
         _log_security_event(
             'WARN',
             _SecurityEventSystem.SYS_MONITOR_DISABLED,
             f'{os.getuid()},{",".join(check_names)}',
-            description=f'Asked to stop checks {check_names}, stopped checks {stopped_checks}',
+            description=description,
         )
         return stopped_checks
 
