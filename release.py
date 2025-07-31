@@ -100,9 +100,9 @@ def get_new_tag_for_release(
 
     suggested_tag = ''
     if not latest_tag:
-        logger.info(f'No version tag found in branch "{branch_name}"')
+        logger.info('No version tag found in branch %r', branch_name)
     else:
-        logger.info(f'Latest tag in branch "{branch_name}": {latest_tag}')
+        logger.info('Latest tag in branch %r: %s', branch_name, latest_tag)
         if not re.match(r'^\d+\.\d+\.\d+$', latest_tag):
             logger.info('Latest tag is not in format X.Y.Z.')
         else:
@@ -114,7 +114,7 @@ def get_new_tag_for_release(
             else:
                 logger.info('Branch is main, bumping minor version of the latest tag.')
                 suggested_tag = bump_minor_version(latest_tag)
-            logger.info(f'Suggested new version: {suggested_tag}')
+            logger.info('Suggested new version: %s', suggested_tag)
 
     tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
     prompt = f'Input the new tag for the release{tag_prompt}\n'
@@ -132,7 +132,7 @@ def get_new_tag_for_release(
             continue
 
         release_page = f'https://github.com/{owner}/{repo.name}/releases'
-        logger.warning(f'Check out the releases page: {release_page} before confirming!')
+        logger.warning('Check out the releases page: %s before confirming!', release_page)
 
         confirm = (
             input(f'Confirm creating tag {new_tag!r} on branch {branch_name!r}? [y/N]: ')
@@ -239,7 +239,7 @@ def print_release_notes(notes: str):
 
 def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str, str]:
     """Ask user to input the release title and summary."""
-    logger.info(f'The automatically generated title is: {release.title}')
+    logger.info('The automatically generated title is: %s', release.title)
     title = input('Enter release title, press Enter to keep the auto-generated title:\n> ').strip()
     if not title:
         title = release.title
@@ -261,7 +261,7 @@ def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str,
 def update_draft_release(release: github.GitRelease.GitRelease, title: str, notes: str):
     """Update the release with the provided title and notes."""
     release = release.update_release(name=title, message=notes, draft=True)
-    logger.info(f'Release updated: {release.html_url}.')
+    logger.info('Release updated: %s', release.html_url)
 
 
 def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
@@ -291,7 +291,7 @@ def update_changes_file(changes: str, file: str):
     file_path = pathlib.Path(file)
     existing_content = file_path.read_text() if file_path.exists() else ''
     file_path.write_text(changes + existing_content)
-    logger.info(f'Updated {file} with new release notes.')
+    logger.info('Updated %s with new release notes.', file)
 
 
 def commit_type_to_category(commit_type: str) -> str:
@@ -334,10 +334,10 @@ def update_pyproject_versions(path: pathlib.Path, version: str, deps: dict[str, 
     for pkg, pkg_version in deps.items():
         updated = re.sub(rf'{pkg}=={VERSION_REGEX}', f'{pkg}=={pkg_version}', updated)
     if content == updated:
-        logger.error(f'No changes made to {path}. Check the versions.')
+        logger.error('No changes made to %s. Check the versions.', path)
         exit(1)
     path.write_text(updated)
-    logger.info(f'Updated {path} to version {version}')
+    logger.info('Updated %s to version %s', path, version)
 
 
 def update_ops_version(ops_version: str, testing_version: str):
@@ -352,7 +352,7 @@ def update_ops_version(ops_version: str, testing_version: str):
         flags=re.MULTILINE,
     )
     ops_src_file_path.write_text(updated)
-    logger.info(f'Updated {ops_src_file_path} to version {ops_version}')
+    logger.info('Updated %s to version %s', ops_src_file_path, ops_version)
 
     # pyproject.toml, update both ops-scenario and ops-tracing versions.
     update_pyproject_versions(
@@ -419,16 +419,17 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
     latest_version = get_latest_release_tag(repo, branch_name)
 
     if latest_version is None:
-        logger.error('No version tags found in branch "{branch_name}".')
+        logger.error('No version tags found in branch %r.', branch_name)
         exit(1)
 
-    logger.info(f'Latest version in branch "{branch_name}": {latest_version}')
+    logger.info('Latest version in branch %r: %s', branch_name, latest_version)
 
     # Check if the latest version is in SEMVER, in case it has a suffix like 3.0.0.post1.
     if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
         logger.error(
-            f'Latest version "{latest_version}" must be in format '
-            f'X.Y.Z. Please input the new version manually (remember to add the .dev0 suffix).'
+            'Latest version %r must be in format '
+            'X.Y.Z. Please input the new version manually (remember to add the .dev0 suffix).',
+            latest_version,
         )
         exit(1)
 
@@ -438,7 +439,7 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
     else:
         logger.info('Branch is main, bumping minor version of the latest tag.')
         new_version = bump_minor_version(latest_version) + '.dev0'
-    logger.info(f'Suggested new version: {new_version}')
+    logger.info('Suggested new version: %s', new_version)
     return new_version
 
 
@@ -460,10 +461,10 @@ def check_update_charm_pins_prs(repo: github.Repository.Repository):
         logger.info('Please merge "update charm pins" PRs first:')
         pr = open_prs[0]
         pr_url = f'#{pr.number} - {pr.html_url}'
-        logger.info(f'  {pr_url}')
+        logger.info('  %s', pr_url)
         if len(open_prs) > 1:
             logger.info(
-                f'Note that there are {len(open_prs) - 1} more open update charm pins PRs.'
+                'Note that there are %s more open update charm pins PRs.', len(open_prs) - 1
             )
             exit(1)
 
@@ -491,7 +492,7 @@ def draft_release(
     if not release:
         logger.error('Failed to create draft release.')
         exit(1)
-    logger.info(f'Draft release created: {release.html_url}.')
+    logger.info('Draft release created: %s', release.html_url)
 
     categories, full_changelog = parse_release_notes(release.body)
     notes = format_release_notes(categories, full_changelog)
@@ -521,7 +522,7 @@ def draft_release(
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
         base=base_branch,
     )
-    logger.info(f'Created PR: {pr.html_url}')
+    logger.info('Created PR: %s', pr.html_url)
 
 
 def post_release(
@@ -539,8 +540,8 @@ def post_release(
     ])
     if local_branch or remote_branch:
         logger.error(
-            f'Branch "{new_branch}" already exists.'
-            'Please double check and delete it first before post release'
+            'Branch %r already exists.Please double check and delete it first before post release',
+            new_branch,
         )
         exit(1)
 
@@ -565,7 +566,7 @@ def post_release(
         head=f'{gh_client.get_user().login}:{new_branch}',  # "your_username:new_branch"
         base=base_branch,
     )
-    logger.info(f'Created PR: {pr.html_url}')
+    logger.info('Created PR: %s', pr.html_url)
 
 
 if __name__ == '__main__':
