@@ -39,7 +39,7 @@ dependencies = [
 [project.urls]
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://documentation.ubuntu.com/ops/2.23/"
+"Documentation" = "https://documentation.ubuntu.com/ops/2.x/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 

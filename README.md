@@ -6,7 +6,7 @@ The `ops` library is a Python framework for developing and testing Kubernetes an
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - Version 2.23 of `ops` requires Python 3.8 or above.
-> - Read our [docs](https://documentation.ubuntu.com/ops/2.23/) for tutorials, how-to guides, the library reference, and more.
+> - Read our [docs](https://documentation.ubuntu.com/ops/2.x/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 
@@ -150,6 +150,6 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ## Next steps
 
-- Read the [docs](https://documentation.ubuntu.com/ops/2.23/).
+- Read the [docs](https://documentation.ubuntu.com/ops/2.x/).
 - Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and join our [chat](https://matrix.to/#/#charmhub-ops:ubuntu.com) and [forum](https://discourse.charmhub.io/) or [open an issue](https://github.com/canonical/operator/issues).
 - Read our [CONTRIBUTING guide](https://github.com/canonical/operator/blob/main/HACKING.md) and contribute!
