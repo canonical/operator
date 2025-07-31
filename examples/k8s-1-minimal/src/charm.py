@@ -41,7 +41,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         environment configuration for your specific workload.
 
         Learn more about interacting with Pebble at
-            https://ops.readthedocs.io/en/latest/reference/pebble.html
+            https://documentation.ubuntu.com/ops/latest/reference/pebble.html
         Learn more about Pebble layers at
             https://documentation.ubuntu.com/pebble/how-to/use-layers/
         """

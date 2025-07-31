@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # Learn more about testing at
-# https://ops.readthedocs.io/en/latest/explanation/testing.html
+# https://documentation.ubuntu.com/ops/latest/explanation/testing.html
 
 from __future__ import annotations
 

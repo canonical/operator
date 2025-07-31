@@ -1,7 +1,7 @@
 # ops-scenario, the unit testing framework for ops charms
 
 `ops-scenario` is a Python library that provides state-transition testing for
-[Ops](https://ops.readthedocs.io) charms. These tests are higher level than
+[Ops]("https://documentation.ubuntu.com/ops/latest/") charms. These tests are higher level than
 typical unit tests, but run at similar speeds and are the recommended approach
 for testing charms within requiring a full [Juju](https://juju.is) installation.
 
@@ -93,16 +93,16 @@ package.
 
 ## Documentation
 
- * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://ops.readthedocs.io/en/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
+ * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://documentation.ubuntu.com/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
    unit tests at the end of each chapter.
  * When you need to write a test that involves specific ops functionality,
-   refer to our [how-to guides](https://ops.readthedocs.io/en/latest/howto/index.html)
+   refer to our [how-to guides](https://documentation.ubuntu.com/ops/latest/howto/index.html)
    which all conclude with examples of tests of the ops functionality.
- * Use our extensive [reference documentation](https://ops.readthedocs.io/en/latest/reference/ops-testing.html#ops-testing) when you need to know how each `testing` object works. These
+ * Use our extensive [reference documentation](https://documentation.ubuntu.com/ops/latest/reference/ops-testing.html#ops-testing) when you need to know how each `testing` object works. These
    docs are also available via the standard Python `help()` functionality and in
    your IDE.
 
-[**Read the full documentation**](https://ops.readthedocs.io/)
+[**Read the full documentation**]("https://documentation.ubuntu.com/ops/latest/")
 
 ## Community
 
