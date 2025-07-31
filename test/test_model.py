@@ -29,7 +29,7 @@ import unittest
 import warnings
 from collections import OrderedDict
 from textwrap import dedent
-from typing import Mapping
+from typing import Any, Mapping
 from unittest import mock
 
 import pytest
@@ -3709,6 +3709,64 @@ class TestSecrets:
             ['secret-get', 'secret://modeluuid/125', '--format=json'],
         ]
 
+    @pytest.mark.parametrize(
+        'hook_command,method,kwargs',
+        [
+            ('secret-add', 'unit.add_secret', {'content': {'password': 'xxxx'}}),
+            ('secret-get', 'get_secret', {'id': '123'}),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'failure',
+        [
+            'access denied',
+            'permission denied',
+            'not the leader',
+        ],
+    )
+    @pytest.mark.parametrize('is_leader', [True, False])
+    def test_secret_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+        failure: str,
+        hook_command: str,
+        method: str,
+        kwargs: dict[str, Any],
+        is_leader: bool,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write(hook_command, f"""echo 'ERROR: {failure}' >&2 && exit 1""")
+        fake_script.write('is-leader', 'echo true' if is_leader else 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        if '.' in method:
+            attr_name, method = method.split('.', 1)
+            attr = getattr(model, attr_name)
+        else:
+            attr = model
+        with pytest.raises(ops.ModelError):
+            getattr(attr, method)(**kwargs)
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the secret or is-leader call.
+        calls.pop(0)
+        calls.pop(0)
+        assert len(calls) == 1
+        assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(calls[0][-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == f'authz_fail:{hook_command}'
+        assert f"failed with error: 'ERROR: {failure}'" in data['description']
+        assert 'exited with code: 1' in data['description']
+        if is_leader:
+            assert 'Unit is leader' in data['description']
+        else:
+            assert 'Unit is not leader' in data['description']
+        assert 'datetime' in data
+
 
 class TestSecretInfo:
     def test_init(self):
@@ -4395,6 +4453,10 @@ class TestLazyNotice:
 
 
 class TestCloudCredential:
+    @pytest.fixture()
+    def model(self, fake_juju_version: None):
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
     def test_from_dict(self):
         d = {
             'auth-type': 'certificate',
@@ -4414,6 +4476,36 @@ class TestCloudCredential:
         assert cloud_cred.auth_type == d['auth-type']
         assert cloud_cred.attributes == d['attrs']
         assert cloud_cred.redacted == d['redacted']
+
+    def test_credential_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        message = 'cannot access cloud credentials: permission denied'
+        fake_script.write('credential-get', f"""echo 'ERROR: {message}' >&2 && exit 1""")
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError):
+            model.get_cloud_spec()
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the credential-get or is-leader call.
+        calls.pop(0)
+        calls.pop(0)
+        assert len(calls) == 1
+        assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(calls[0][-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'authz_fail:credential-get'
+        assert f"failed with error: 'ERROR: {message}'" in data['description']
+        assert 'exited with code: 1' in data['description']
+        assert 'Unit is leader' in data['description']
+        assert 'datetime' in data
 
 
 class TestCloudSpec:
@@ -4507,6 +4599,60 @@ class TestGetCloudSpec:
         with pytest.raises(ops.ModelError) as excinfo:
             model.get_cloud_spec()
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
+
+
+class TestStatus:
+    @pytest.fixture()
+    def model(self, fake_juju_version: None):
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_set_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        # Ops does its own leadership check, which
+        with pytest.raises(RuntimeError):
+            model.app.status = ops.ActiveStatus()
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the is-leader call.
+        calls.pop(0)
+        assert len(calls) == 1
+        self._validate_security_log(calls[0], 'status-set')
+
+    def test_get_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(RuntimeError):
+            _ = model.app.status
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the is-leader call.
+        calls.pop(0)
+        assert len(calls) == 1
+        self._validate_security_log(calls[0], 'status-get')
+
+    @staticmethod
+    def _validate_security_log(call: list[str], hook: str):
+        assert call[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(call[-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == f'authz_fail:{hook}'
+        assert 'application status when not leader' in data['description']
+        assert 'datetime' in data
 
 
 @pytest.mark.skipif(
