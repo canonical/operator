@@ -154,7 +154,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
-slug = ''
+slug = 'ops'
 
 ############################################################
 ### Redirects
