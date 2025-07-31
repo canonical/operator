@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.1.0.dev0",
+    "ops-scenario==8.2.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.1.0.dev0",
+    "ops-tracing==3.2.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -86,6 +86,9 @@ integration = [
     "httpx~=0.28",
     "juju>=2.9,<4",
     "build",  # Until #1814 and #1813 are done
+]
+release = [
+    "pygithub~=2.6",
 ]
 
 [project.urls]

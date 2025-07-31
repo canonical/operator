@@ -233,63 +233,46 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-To make a release of the `ops` and/or `ops-scenario` packages, do the following:
+Before you start, make sure you are at the main branch of your forked operator repo, and your main branch is up-to-date. This is to ensure the release automation script is the latest.
 
-1. Check if there's a `chore: update charm pins` auto-generated PR in the queue.
-   If it looks good, merge it and check that tests still pass. If needed, you
-   can re-trigger the `Update Charm Pins` workflow manually to ensure latest
-   charms and ops get tested.
-2. Visit the [releases page on GitHub](https://github.com/canonical/operator/releases).
-3. Click "Draft a new release"
-4. The "Release Title" is the full version numbers of ops and ops-scenario,
-   in the form `ops <major>.<minor>.<patch> and ops-scenario <major>.<minor>.<patch>`
-   and a brief summary of the main changes in the release.
-   For example: `3.1.0 Support for the Juju foobar feature`
-5. Have the release create a new tag, in the form `<major>.<minor>.<patch>` for `ops`.
-6. Leave the previous tag choice on `auto`.
-7. Use the "Generate Release Notes" button to get a copy of the changes into the
-   notes field.
-8. Format the auto-generated release notes according to the 'Release Documentation'
-   section below, save the release notes as a draft, and have someone else in the
-   Charm-Tech team proofread it.
-9. Format the auto-generated release notes according to the `CHANGES.md` section below,
-   and add it to `CHANGES.md`.
-10. Change the versions for `ops`, `ops-scenario` and `ops-tracing` to the versions
-   being released: `ops==3.x.y, ops-tracing==3.x.y, ops-scenario==8.x.y`.
-   We use both [semantic versioning](https://semver.org/) and lockstep releases, so if
-   one library requires a version bump, the other will too. There will be a total of
-   seven changes:
-    - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
-    - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
-    - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
-    - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
-11. Add, commit, and push, and open a PR to get the `CHANGES.md` update and version
-   bumps into main (and get it merged).
-12. Wait until the tests pass after the PR is merged. It takes around 10 minutes.
-   If the tests don't pass at the tip of the main branch, do not release.
-13. When you are ready, click "Publish". GitHub will create the additional tag.
+1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
-    Pushing the tags will trigger automatic builds for the Python packages and
-    publish them to PyPI ([ops](https://pypi.org/project/ops/) and
-    [ops-scenario](https://pypi.org/project/ops-scenario)) (authorisation is handled
-    via a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) relationship).
-    Note that it sometimes take a bit of time for the new releases to show up.
+    > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
+    > 
+    > If you have different settings, add parameters accordingly. For example, the following command assumes your forked remote name is `mine`, and `canonical/operator` remote name is `origin`:
+    > 
+    > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
+    > 
+    > By default, the script makes a release on the main branch. If you want to make a release on another branch, for example, on "2.23-maintenance" (you do not need to switch to this branch in your forked repo), run it with the "--branch" parameter:
+    > 
+    > `tox -e draft-release -- --branch 2.23-maintenance`
 
-    See [.github/workflows/publish-ops.yaml](.github/workflows/publish-ops.yaml) and
-    [.github/workflows/publish-ops-scenario.yaml](.github/workflows/publish-ops-scenario.yaml) for details.
-    (Note that the versions in the YAML refer to versions of the GitHub actions, not the versions of the ops  library.)
+2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
+3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+4. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
 
-    You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
-14. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42)
-    and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-15. Open a PR to change the version strings to the expected next version, with ".dev0" appended.
-   For example, if 3.1.0 is the next expected `ops` version, use
-   `ops==3.1.0.dev0 ops-tracing==3.1.0.dev0 ops-scenario==8.1.0.dev0`.
-   There will be a total of seven changes:
-    - in [pyroject.toml for `ops`](pyproject.toml), the required versions for `ops-scenario` and `ops-tracing`
-    - in [ops/version.py for `ops`](ops/version.py), the version declared in the `version` variable
-    - in [pyproject.toml for `ops-scenario`](testing/pyproject.toml), the `version` attribute and the required version for `ops`
-    - in [pyproject.toml for `ops-tracing`](tracing/pyproject.toml), the `version` attribute and the required version for `ops`
+    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+
+    > Pushing the tags will trigger automatic builds for the Python packages and
+    > publish them to PyPI ([ops](https://pypi.org/project/ops/) 
+    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and 
+    > [ops-tracing](https://pypi.org/project/ops-tracing/)).
+    > Note that it sometimes take a bit of time for the new releases to show up.
+    > 
+    > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
+    >
+    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+
+5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
+[Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+7. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
+
+    > This assumes the same defaults as mentioned in step 1.
+    > 
+    > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
+
+8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 ## Release Documentation
 

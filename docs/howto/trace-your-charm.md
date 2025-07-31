@@ -1,19 +1,26 @@
-(trace-the-charm-code)=
-# Trace the charm code
+(trace-your-charm)=
+# How to trace your charm
 
-`ops[tracing]` provides the first party charm tracing library,
-`ops.tracing.Tracing`, allowing you to observe and instrument your charm's
-execution using OpenTelemetry.
+This document describes how to trace your charm code and send the trace data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
-Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
-options, and API details.
+Observability transforms a Juju deployment from a black box to a real-time system. Trace data is structured and contextual, which helps users understand the application's behaviour at different points in your charm's lifecycle.
 
-## Getting started
+The responsibility to instrument the Python code is divided between Ops, charm libraries, and charms.
 
-To enable basic tracing:
+> See also: [](#tracing)
+
+## Summary
+
+To start instrumenting your charm code, you'll instantiate `ops.tracing.Tracing` in the charm's `__init__` method and provide it with relation names. Depending on the charm, you might also need to instrument: workflow decisions, external calls, and important attributes.
+
+Ops provides instrumentation for general functionality, while libraries may also provide instrumentation. To find out what a library provides, check the library's documentation.
+
+## Add tracing to an existing charm
+
+### Enable built-in tracing
 
 - In `pyproject.toml` or `requirements.txt`, add `ops[tracing]` as a dependency
-- In `charmcraft.yaml`, declare the relations for tracing and (optionally) certificate_transfer interfaces, for example:
+- In `charmcraft.yaml`, declare the relations for `tracing` and (optionally) `certificate_transfer` interfaces, for example:
 
 ```yaml
 requires:
@@ -43,9 +50,10 @@ class MyCharm(ops.CharmBase):
 
 At this point, Ops will trace:
 - The `ops.main()` call
-- Events that Ops emits, including all the Juju events
+- Observer invocations for the Juju event
+- Observer invocations for custom and life-cycle events
 - Ops calls that inspect and update Juju (also called "hook tools")
-- Pebble API access by the charm code
+- Pebble API access
 
 This provides coarse-grained tracing, focused on the boundaries between the
 charm code and the external processes.
@@ -57,20 +65,20 @@ database on the unit. Ops allocates a reasonable amount of storage for the buffe
 When the charm is successfully integrated with the `tracing` provider,
 the buffered traces and new traces will be sent to the tracing destination.
 
-For Kubernetes charms, if the container is recreated, any buffered traces will be lost.
+### Try it out
 
-For example, to send traces to [Grafana Tempo](https://grafana.com/docs/tempo/latest/) from
-a charm named `my-charm`, assuming that
-[Charmed Tempo HA](https://discourse.charmhub.io/t/charmed-tempo-ha/15531) has already been
-deployed:
+For example, to send traces to [Grafana Tempo](https://charmhub.io/topics/charmed-tempo-ha) from
+a charm named `my-charm`, assuming that Charmed Tempo HA has already been deployed:
 
 ```bash
 juju deploy my-charm
 juju integrate my-charm tempo
 ```
 
+At this point, trace data is sent to Tempo, and you can view it in Grafana, assuming that this Tempo instance is [added as a data source](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/).
+
 (custom-spans-and-events)=
-## Custom spans and events
+### Add custom instrumentation
 
 - At the top of your charm file, `import opentelemetry.trace`.
 - After the imports in your charm file, create the tracer object as
@@ -113,16 +121,10 @@ class Workload:
             ...
 ```
 
-## Adding tracing to charm libraries
+Refer to the {ref}`ops_tracing` reference for the canonical usage example, configuration
+options, and API details.
 
-- At the top of your charm library, `import opentelemetry.trace`.
-- After the imports in your charm library, create the tracer object as
-  `tracer = opentelemetry.trace.get_tracer(name)` where the name could be your
-  charm library name, or Python module `__name__`.
-- See the [Custom spans and events](custom-spans-and-events) section above to
-  create OpenTelemetry spans and events in the key places in your charm library.
-
-## Migrating from the charm\_tracing charm library
+### Migrate from the charm_tracing library
 
 - In your charm's `pyproject.toml` or `requirements.txt`, remove the dependencies:
   `opentelemetry-sdk`, `opentelemetry-proto`, `opentelemetry-exporter-*`,
@@ -137,6 +139,58 @@ class Workload:
 Note that the `charm_tracing` charm library auto-instruments all public functions
 of the decorated charm class. `ops[tracing]` doesn't do that, and you are expected
 to create custom spans and events using the OpenTelemetry API where that makes sense.
+
+## Test the feature
+
+### Write unit tests
+
+If you've added custom instrumentation, it is because something important is recorded.
+Let's validate that in a unit test.
+
+The [trace\_data](ops.testing.Context.trace_data) attribute
+of the [](ops.testing.Context) class of the testing framework 
+contains the list of finished spans.
+
+The following example demonstrates how to get the root span, created by Ops itself.
+
+```py
+ctx = Context(YourCharm)
+ctx.run(ctx.on.start(), State())
+main_span = next(s for s in ctx.trace_data if s.name == 'ops.main')
+```
+
+The spans are OpenTelemetry objects in memory, allowing more focused examination; here is a check that span A is a parent of span B.
+
+```py
+span_a = ...
+span_b = ...
+assert span_a.context is span_b.parent
+```
+
+Or that span A is an ancestor of span C, which allows you to validate that an important logical thing C was done during some well-known process A: an Ops event representing the Juju event or a custom event, or some manually instrumented function.
+
+```py
+spans_by_id = {s.context.span_id: s for s in ctx.trace_data}
+
+def ancestors(span: ReadableSpan) -> Generator[ReadableSpan]:
+    while span.parent:
+        span = spans_by_id[span.parent.span_id]
+        yield span
+
+assert span_a in list(ancestors(span_c))
+```
+
+You can disambiguate spans using their [instrumentation_scope](opentelemetry.sdk.util.instrumentation.InstrumentationScope) property.
+
+```py
+# Spans from Ops
+ops_span.instrumentation_scope.name == "ops"
+ops_span.name == ...
+
+# tracer = opentelemetry.trace.get_tracer("my-charm")
+my_span.instrumentation_scope.name == "my-charm"
+my_span.name == ...
+```
 
 ## Lower-level API
 
@@ -153,8 +207,8 @@ The destination is persisted in the unit's tracing database, next to the tracing
 Thus, a delta charm would only call this function when some relation or configuration
 value is changed.
 
-At the same time, calling this function with the same data is a no-op.
-A reconciler charm may therefore safely call it unconditionally.
+At the same time, calling this function with the same arguments is a no-op.
+A charm that follows the reconciler pattern may therefore safely call it unconditionally.
 
 The `url` parameter must be the full endpoint URL, like `http://localhost/v1/traces`.
 

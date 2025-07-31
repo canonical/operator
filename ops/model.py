@@ -1787,7 +1787,6 @@ class Relation:
 
         # self.app will not be None and always be set because of the fallback mechanism above.
         self.app = typing.cast('Application', app)
-        self.data = RelationData(self, our_unit, backend)
 
         # In relation-departed `relation-list` doesn't include the remote unit,
         # but the data should still be available.
@@ -1800,7 +1799,11 @@ class Relation:
             and self.app is not None
             and _remote_unit.name.startswith(f'{self.app.name}/')
         ):
-            self.units.add(_remote_unit)
+            remote_unit = _remote_unit
+        else:
+            remote_unit = None
+
+        self.data = RelationData(self, our_unit, backend, remote_unit)
 
         self._remote_model: RemoteModel | None = None
 
@@ -1996,7 +1999,13 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
     :attr:`Relation.data`
     """
 
-    def __init__(self, relation: Relation, our_unit: Unit, backend: _ModelBackend):
+    def __init__(
+        self,
+        relation: Relation,
+        our_unit: Unit,
+        backend: _ModelBackend,
+        remote_unit: Unit | None = None,
+    ):
         self.relation = weakref.proxy(relation)
         self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
@@ -2010,6 +2019,9 @@ class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
             self._data.update({
                 self.relation.app: RelationDataContent(self.relation, self.relation.app, backend),
             })
+        # The unit might be departing or broken, so not in relation-list, but accessible.
+        if remote_unit is not None and remote_unit not in self._data:
+            self._data[remote_unit] = RelationDataContent(self.relation, remote_unit, backend)
 
     def __contains__(self, key: Unit | Application):
         return key in self._data
