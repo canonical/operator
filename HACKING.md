@@ -233,7 +233,13 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-Before you start, make sure you are at the main branch of your forked operator repo, and your main branch is up-to-date. This is to ensure the release automation script is the latest.
+Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
+
+Alternatively, you can also create a classic token. To do so, go to GitHub -> Settings -> Developer Settings -> Personal access tokens -> Tokens (classic), and click "Generate new token (classic)" (shortcut: click [this link](https://github.com/settings/tokens/new)), and under "Select scopes", "repo", select "repo:status" and "public_repo". Then, set the environment variable `GITHUB_TOKEN` with the newly generated token.
+
+> Note: A fine-grained token will not work because if the owner is your GitHub account, it can't create a PR on the canonical repo, and if the owner is Canonical, it can't push to your forked repo. 
+
+Then, check out the main branch of your forked operator repo and pull upstream to ensure the release automation script is the latest.
 
 1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
@@ -249,7 +255,7 @@ Before you start, make sure you are at the main branch of your forked operator r
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
 3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
-4. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
+4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
@@ -273,6 +279,10 @@ Before you start, make sure you are at the main branch of your forked operator r
     > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
+
+After making the release, delete the two newly created branches `release-prep-*` and `post-release-*` both locally and in the origin.
+
+If the release automation script fails at a certain step, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
 
 ## Release Documentation
 
