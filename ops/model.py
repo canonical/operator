@@ -64,7 +64,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
-from .log import _log_security_event, _SecurityEventAuthZ, _SecurityEventSystem
+from .log import _log_security_event, _SecurityEvent
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -436,7 +436,7 @@ class Application:
         if not self._backend.is_leader():
             _log_security_event(
                 'CRITICAL',
-                _SecurityEventAuthZ.AUTHZ_FAIL,
+                _SecurityEvent.AUTHZ_FAIL,
                 'status-get',
                 description='Attempted to get application status when not leader.',
             )
@@ -462,7 +462,7 @@ class Application:
         if not self._backend.is_leader():
             _log_security_event(
                 'CRITICAL',
-                _SecurityEventAuthZ.AUTHZ_FAIL,
+                _SecurityEvent.AUTHZ_FAIL,
                 'status-set',
                 description='Attempted to set application status when not leader.',
             )
@@ -2792,7 +2792,7 @@ class Container:
         )
         _log_security_event(
             'WARN',
-            _SecurityEventSystem.SYS_MONITOR_DISABLED,
+            _SecurityEvent.SYS_MONITOR_DISABLED,
             f'{os.getuid()},{",".join(check_names)}',
             description=description,
         )
@@ -3670,7 +3670,7 @@ class _ModelBackend:
                     )
                     _log_security_event(
                         'CRITICAL',
-                        _SecurityEventAuthZ.AUTHZ_FAIL,
+                        _SecurityEvent.AUTHZ_FAIL,
                         base_cmd,
                         description=description,
                     )
@@ -4206,7 +4206,7 @@ class _ModelBackend:
     def reboot(self, now: bool = False):
         _log_security_event(
             'WARN',
-            _SecurityEventSystem.SYS_RESTART,
+            _SecurityEvent.SYS_RESTART,
             str(os.getuid()),
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )
