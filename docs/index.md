@@ -11,12 +11,12 @@ explanation/index
 ```
 
 ```{important}
-This is the documentation for version 2 of Ops, which stopped being actively developed in June 2025. Ops 2 will continue to receive security and critical bug fixes.
+This is the documentation for version 2.x of Ops, which stopped being actively developed in June 2025. Ops 2.x will continue to receive security and critical bug fixes.
 
-- If your charm needs to support Python 3.8 (Ubuntu 20.04), use Ops 2.
+- If your charm needs to support Python 3.8 (Ubuntu 20.04), use Ops 2.x.
 - Otherwise, use Ops 3.
 
-Ops 3 removed support for Python 3.8, but is otherwise compatible with Ops 2. See the [latest documentation](https://documentation.ubuntu.com/ops/latest/).
+Ops 3 removed support for Python 3.8, but is otherwise compatible with Ops 2.x. See the [latest documentation](https://documentation.ubuntu.com/ops/latest/).
 ```
 
 The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
