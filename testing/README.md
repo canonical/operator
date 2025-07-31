@@ -1,7 +1,7 @@
 # ops-scenario, the unit testing framework for ops charms
 
 `ops-scenario` is a Python library that provides state-transition testing for
-[Ops]("https://documentation.ubuntu.com/ops/latest/") charms. These tests are higher level than
+[Ops](https://documentation.ubuntu.com/ops/latest/) charms. These tests are higher level than
 typical unit tests, but run at similar speeds and are the recommended approach
 for testing charms within requiring a full [Juju](https://juju.is) installation.
 
@@ -102,7 +102,7 @@ package.
    docs are also available via the standard Python `help()` functionality and in
    your IDE.
 
-[**Read the full documentation**]("https://documentation.ubuntu.com/ops/latest/")
+[**Read the full documentation**](https://documentation.ubuntu.com/ops/latest/)
 
 ## Community
 
