@@ -434,6 +434,12 @@ class Application:
             return UnknownStatus()
 
         if not self._backend.is_leader():
+            _log_security_event(
+                'CRITICAL',
+                _SecurityEventAuthZ.AUTHZ_FAIL,
+                'status-get',
+                description='Attempted to get application status when not leader.',
+            )
             raise RuntimeError('cannot get application status as a non-leader unit')
 
         if self._status:
@@ -454,6 +460,12 @@ class Application:
             raise RuntimeError(f'cannot set status for a remote application {self}')
 
         if not self._backend.is_leader():
+            _log_security_event(
+                'CRITICAL',
+                _SecurityEventAuthZ.AUTHZ_FAIL,
+                'status-set',
+                description='Attempted to set application status when not leader.',
+            )
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
@@ -3645,17 +3657,21 @@ class _ModelBackend:
                 if any(message in e.stderr.lower() for message in authz_messages):
                     # These commands may have sensitive data in their arguments, and do not
                     # support reading the data from a file.
-                    log_args = args[0] not in ('juju-log', 'action-fail', 'action-set')
+                    if args[0] in ('juju-log', 'action-fail', 'action-set'):
+                        log_args = f'Arguments were: {args[1:]!r}. '
+                    else:
+                        log_args = ''
+                    base_cmd = os.path.basename(args[0])
                     description = (
-                        f'Hook command {args[0]!r} failed with error: {e.stderr!r}. '
+                        f'Hook command {base_cmd!r} failed with error: {e.stderr.strip()!r}. '
                         f'The command exited with code: {e.returncode}. '
-                        f'Arguments were: {log_args!r}. ' if log_args else ''
                         f'Unit {"is" if self.is_leader() else "is not"} leader.'
-                    )  # fmt: skip
+                        f'{log_args}'
+                    )
                     _log_security_event(
                         'CRITICAL',
                         _SecurityEventAuthZ.AUTHZ_FAIL,
-                        args[0],
+                        base_cmd,
                         description=description,
                     )
                 raise ModelError(e.stderr) from e
@@ -4055,23 +4071,6 @@ class _ModelBackend:
         try:
             return self._run(*args, return_output=return_output, use_json=use_json)
         except ModelError as e:
-            authz_messages = (
-                'access denied',
-                'permission denied',
-                'not the leader',
-            )
-            if any(message in str(e).lower() for message in authz_messages):
-                description = (
-                    f'Hook-tool {args[0]!r} failed with error: {e.args[0]!r}. '
-                    f'Arguments were: {args[1:]!r}. '  # This never includes the secret content.
-                    f'Unit {"is" if self.is_leader() else "is not"} leader.'
-                )
-                _log_security_event(
-                    'CRITICAL',
-                    _SecurityEventAuthZ.AUTHZ_FAIL,
-                    args[0],
-                    description=description,
-                )
             if 'not found' in str(e):
                 raise SecretNotFoundError() from e
             raise
