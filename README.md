@@ -5,8 +5,8 @@
 The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://charmhub.io/). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
-> - The latest version of `ops` requires Python 3.8 or above.
-> - Read our [docs](https://ops.readthedocs.io/en/latest/) for tutorials, how-to guides, the library reference, and more.
+> - Version 2.23 of `ops` requires Python 3.8 or above.
+> - Read our [docs](https://documentation.ubuntu.com/ops/2.23/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 
@@ -150,6 +150,6 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ## Next steps
 
-- Read the [docs](https://ops.readthedocs.io/en/latest/).
+- Read the [docs](https://documentation.ubuntu.com/ops/2.23/).
 - Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and join our [chat](https://matrix.to/#/#charmhub-ops:ubuntu.com) and [forum](https://discourse.charmhub.io/) or [open an issue](https://github.com/canonical/operator/issues).
 - Read our [CONTRIBUTING guide](https://github.com/canonical/operator/blob/main/HACKING.md) and contribute!

@@ -89,10 +89,10 @@ integration = [
 ]
 
 [project.urls]
-"Homepage" = "https://ops.readthedocs.io/en/latest/"
+"Homepage" = "https://documentation.ubuntu.com/ops/2.23/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://ops.readthedocs.io"
+"Documentation" = "https://documentation.ubuntu.com/ops/2.23/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
