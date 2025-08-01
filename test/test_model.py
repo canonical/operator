@@ -40,7 +40,7 @@ from ops import pebble
 from ops._private import yaml
 from ops.jujucontext import _JujuContext
 from ops.jujuversion import JujuVersion
-from ops.log import JujuLogHandler, setup_root_logging
+from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
 from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
@@ -63,8 +63,10 @@ def root_logging():
     orig_show = warnings.showwarning
     logger = logging.getLogger()
     orig_level = logger.level
+    _get_juju_log_and_app_id.cache_clear()
     setup_root_logging(backend)
     yield
+    _get_juju_log_and_app_id.cache_clear()
     sys.excepthook = orig_hook
     warnings.showwarning = orig_show
     logger.setLevel(orig_level)
