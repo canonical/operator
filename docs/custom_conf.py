@@ -150,7 +150,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['github_user'] = 'canonical'
     html_context['github_repo'] = 'operator'
     html_context['github_version'] = '2.23-maintenance'
-    html_context['slug'] = 'operator'
+    html_context['slug'] = 'ops'
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
