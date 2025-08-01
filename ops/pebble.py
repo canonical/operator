@@ -2073,6 +2073,9 @@ class BasicIdentity:
         """Convert this basic identity to its dict representation."""
         return {'password': self.password}
 
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(password='*****')"
+
 
 @dataclasses.dataclass
 class Identity:

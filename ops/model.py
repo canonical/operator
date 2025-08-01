@@ -64,6 +64,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
+from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -433,6 +434,12 @@ class Application:
             return UnknownStatus()
 
         if not self._backend.is_leader():
+            _log_security_event(
+                _SecurityEventLevel.CRITICAL,
+                _SecurityEvent.AUTHZ_FAIL,
+                'status-get',
+                description='Attempted to get application status when not leader',
+            )
             raise RuntimeError('cannot get application status as a non-leader unit')
 
         if self._status:
@@ -453,6 +460,12 @@ class Application:
             raise RuntimeError(f'cannot set status for a remote application {self}')
 
         if not self._backend.is_leader():
+            _log_security_event(
+                _SecurityEventLevel.CRITICAL,
+                _SecurityEvent.AUTHZ_FAIL,
+                'status-set',
+                description='Attempted to set application status when not leader.',
+            )
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
@@ -2784,7 +2797,15 @@ class Container:
         if not check_names:
             raise TypeError('stop-checks expected at least 1 argument, got 0')
 
-        return self._pebble.stop_checks(check_names)
+        stopped_checks = self._pebble.stop_checks(check_names)
+        for check in stopped_checks:
+            _log_security_event(
+                _SecurityEventLevel.WARN,
+                _SecurityEvent.SYS_MONITOR_DISABLED,
+                f'{os.getuid()},{check}',
+                description=f'Stopped check {check}',
+            )
+        return stopped_checks
 
     @typing.overload
     def pull(self, path: str | PurePath, *, encoding: None) -> BinaryIO: ...
@@ -3636,6 +3657,7 @@ class _ModelBackend:
             try:
                 result = subprocess.run(args, **kwargs)  # type: ignore
             except subprocess.CalledProcessError as e:
+                self._check_for_security_event(args[0], e.returncode, e.stderr)
                 raise ModelError(e.stderr) from e
             if return_output:
                 if result.stdout is None:  # type: ignore
@@ -3646,6 +3668,28 @@ class _ModelBackend:
                         return json.loads(text)  # type: ignore
                     else:
                         return text  # type: ignore
+
+    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+        authz_messages = (
+            'access denied',
+            'permission denied',
+            'not the leader',
+            'cannot write relation settings',
+        )
+        if not any(message in stderr.lower() for message in authz_messages):
+            return
+        base_cmd = os.path.basename(cmd)
+        leadership = ' (as leader)' if self.is_leader() else ''
+        description = (
+            f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
+            f'{stderr.strip()!r}. '
+        )
+        _log_security_event(
+            _SecurityEventLevel.CRITICAL,
+            _SecurityEvent.AUTHZ_FAIL,
+            base_cmd,
+            description=description,
+        )
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:
@@ -4166,6 +4210,12 @@ class _ModelBackend:
         return Port(protocol_lit, int(port))
 
     def reboot(self, now: bool = False):
+        _log_security_event(
+            _SecurityEventLevel.WARN,
+            _SecurityEvent.SYS_RESTART,
+            str(os.getuid()),
+            description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
+        )
         if now:
             self._run('juju-reboot', '--now')
             # Juju will kill the Charm process, and in testing no code after

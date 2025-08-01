@@ -10,6 +10,7 @@ import pytest
 from ops import PebbleCustomNoticeEvent, PebbleReadyEvent, pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
+from ops.log import _get_juju_log_and_app_id
 from ops.pebble import ExecError, Layer, ServiceStartup, ServiceStatus
 
 from scenario import Context
@@ -634,7 +635,15 @@ def test_pebble_start_check():
     assert chk1_info.status == pebble.CheckStatus.UP
 
 
-def test_pebble_stop_check():
+@pytest.fixture
+def reset_security_logging():
+    """Ensure that we get a fresh juju-log for the security logging."""
+    _get_juju_log_and_app_id.cache_clear()
+    yield
+    _get_juju_log_and_app_id.cache_clear()
+
+
+def test_pebble_stop_check(reset_security_logging: None):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)

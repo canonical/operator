@@ -18,15 +18,18 @@ import datetime
 import io
 import ipaddress
 import json
+import logging
 import os
 import pathlib
 import re
+import sys
 import tempfile
 import typing
 import unittest
+import warnings
 from collections import OrderedDict
 from textwrap import dedent
-from typing import Mapping
+from typing import Any, Mapping
 from unittest import mock
 
 import pytest
@@ -37,6 +40,7 @@ from ops import pebble
 from ops._private import yaml
 from ops.jujucontext import _JujuContext
 from ops.jujuversion import JujuVersion
+from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
 from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
@@ -49,6 +53,27 @@ def fake_script(request: pytest.FixtureRequest) -> FakeScript:
 @pytest.fixture
 def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('JUJU_VERSION', '0.0.0')
+
+
+@pytest.fixture
+def root_logging():
+    context = _JujuContext(model_uuid='1234', unit_name='myapp/0')
+    backend = ops.model._ModelBackend('myapp/0', 'testing-model', juju_context=context)
+    orig_hook = sys.excepthook
+    orig_show = warnings.showwarning
+    logger = logging.getLogger()
+    orig_level = logger.level
+    _get_juju_log_and_app_id.cache_clear()
+    setup_root_logging(backend)
+    yield
+    _get_juju_log_and_app_id.cache_clear()
+    sys.excepthook = orig_hook
+    warnings.showwarning = orig_show
+    logger.setLevel(orig_level)
+    for h in logger.handlers:
+        if isinstance(h, JujuLogHandler):
+            logger.removeHandler(h)
+            break
 
 
 class TestModel:
@@ -972,8 +997,9 @@ class TestModel:
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         harness.set_leader(False)
-        with pytest.raises(RuntimeError):
-            harness.model.app.status
+        with pytest.warns(RuntimeWarning):
+            with pytest.raises(RuntimeError):
+                harness.model.app.status
 
         with pytest.raises(RuntimeError):
             harness.model.app.status = ops.ActiveStatus()
@@ -1177,7 +1203,8 @@ class TestModel:
         assert model.juju_version == version
         assert isinstance(model.juju_version, ops.JujuVersion)
         # Make sure it's not being loaded from the environment.
-        assert JujuVersion.from_environ() == '0.0.0'
+        with pytest.warns(DeprecationWarning):
+            assert JujuVersion.from_environ() == '0.0.0'
 
     def test_relation_remote_model(self, fake_script: FakeScript, fake_juju_version: None):
         fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
@@ -2021,6 +2048,36 @@ containers:
         with pytest.raises(RuntimeError):
             container.get_check('c1')
 
+    def test_start_checks(self, container: ops.Container):
+        container.pebble.responses.append(['c1'])  # type: ignore
+        assert container.start_checks('c1', 'c2') == ['c1']
+        assert container.pebble.requests == [('start_checks', ('c1', 'c2'))]  # type: ignore
+
+    def test_stop_checks(
+        self,
+        container: ops.Container,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('juju-log', 'exit 0')
+        container.pebble.responses.append(['c1'])  # type: ignore
+        container.stop_checks('c1', 'c2')
+        assert container.pebble.requests == [('stop_checks', ('c1', 'c2'))]  # type: ignore
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(sec_log[-1])
+        assert data['level'] == 'WARN'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'sys_monitor_disabled:1001,c1'
+        assert data['description'] == 'Stopped check c1'
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
+        assert calls == []
+
     def test_pull(self, container: ops.Container):
         container.pebble.responses.append('dummy1')  # type: ignore
         got = container.pull('/path/1')
@@ -2341,6 +2398,14 @@ class MockPebbleClient:
 
     def get_checks(self, level: str | None = None, names: str | None = None):
         self.requests.append(('get_checks', level, names))
+        return self.responses.pop(0)
+
+    def start_checks(self, *checks: str):
+        self.requests.append(('start_checks', *checks))
+        return self.responses.pop(0)
+
+    def stop_checks(self, *checks: str):
+        self.requests.append(('stop_checks', *checks))
         return self.responses.pop(0)
 
     def pull(self, path: str, *, encoding: str = 'utf-8'):
@@ -3649,6 +3714,61 @@ class TestSecrets:
             ['secret-get', 'secret://modeluuid/125', '--format=json'],
         ]
 
+    @pytest.mark.parametrize(
+        'hook_command,method,kwargs',
+        [
+            ('secret-add', 'unit.add_secret', {'content': {'password': 'xxxx'}}),
+            ('secret-get', 'get_secret', {'id': '123'}),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'failure',
+        [
+            'access denied',
+            'permission denied',
+            'not the leader',
+        ],
+    )
+    @pytest.mark.parametrize('is_leader', [True, False])
+    def test_secret_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+        failure: str,
+        hook_command: str,
+        method: str,
+        kwargs: dict[str, Any],
+        is_leader: bool,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write(hook_command, f"""echo 'ERROR: {failure}' >&2 && exit 1""")
+        fake_script.write('is-leader', 'echo true' if is_leader else 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        if '.' in method:
+            attr_name, method = method.split('.', 1)
+            attr = getattr(model, attr_name)
+        else:
+            attr = model
+        with pytest.raises(ops.ModelError):
+            getattr(attr, method)(**kwargs)
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the secret or is-leader call.
+        calls.pop(0)
+        calls.pop(0)
+        assert len(calls) == 1
+        assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(calls[0][-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == f'authz_fail:{hook_command}'
+        leadership = '(as leader)' if is_leader else ''
+        assert f"{leadership} failed with code 1: 'ERROR: {failure}'" in data['description']
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
+
 
 class TestSecretInfo:
     def test_init(self):
@@ -4239,17 +4359,46 @@ class TestPorts:
 
 
 class TestUnit:
-    def test_reboot(self, fake_script: FakeScript, fake_juju_version: None):
-        model = ops.model.Model(ops.charm.CharmMeta(), ops.model._ModelBackend('myapp/0'))
+    @staticmethod
+    def _verify_security_event_data(data: dict[str, str]):
+        assert data['level'] == 'WARN'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'sys_restart:1001'
+        assert data['description'] == "Rebooting unit 'myapp/0' in model 'testing-model'"
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
+
+    def test_reboot(
+        self,
+        fake_script: FakeScript,
+        fake_juju_version: None,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        backend = ops.model._ModelBackend('myapp/0', 'testing-model')
+        model = ops.model.Model(ops.charm.CharmMeta(), backend)
         unit = model.unit
         fake_script.write('juju-reboot', 'exit 0')
+        fake_script.write('juju-log', 'exit 0')
         unit.reboot()
-        assert fake_script.calls(clear=True) == [
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        sec_data = json.loads(sec_log[-1])
+        self._verify_security_event_data(sec_data)
+        assert calls == [
             ['juju-reboot', ''],
         ]
         with pytest.raises(SystemExit):
             unit.reboot(now=True)
-        assert fake_script.calls(clear=True) == [
+        calls = fake_script.calls(clear=True)
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        sec_data = json.loads(sec_log[-1])
+        self._verify_security_event_data(sec_data)
+        assert calls == [
             ['juju-reboot', '--now'],
         ]
 
@@ -4307,6 +4456,10 @@ class TestLazyNotice:
 
 
 class TestCloudCredential:
+    @pytest.fixture()
+    def model(self, fake_juju_version: None):
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
     def test_from_dict(self):
         d = {
             'auth-type': 'certificate',
@@ -4326,6 +4479,35 @@ class TestCloudCredential:
         assert cloud_cred.auth_type == d['auth-type']
         assert cloud_cred.attributes == d['attrs']
         assert cloud_cred.redacted == d['redacted']
+
+    def test_credential_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        message = 'cannot access cloud credentials: permission denied'
+        fake_script.write('credential-get', f"""echo 'ERROR: {message}' >&2 && exit 1""")
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError):
+            model.get_cloud_spec()
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the credential-get or is-leader call.
+        calls.pop(0)
+        calls.pop(0)
+        assert len(calls) == 1
+        assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(calls[0][-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'authz_fail:credential-get'
+        assert f"failed with code 1: 'ERROR: {message}'" in data['description']
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
 
 class TestCloudSpec:
@@ -4419,6 +4601,61 @@ class TestGetCloudSpec:
         with pytest.raises(ops.ModelError) as excinfo:
             model.get_cloud_spec()
         assert str(excinfo.value) == 'ERROR cannot access cloud credentials\n'
+
+
+class TestStatus:
+    @pytest.fixture()
+    def model(self, fake_juju_version: None):
+        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_set_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        # Ops does its own leadership check, which
+        with pytest.raises(RuntimeError):
+            model.app.status = ops.ActiveStatus()
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the is-leader call.
+        calls.pop(0)
+        assert len(calls) == 1
+        self._validate_security_log(calls[0], 'status-set')
+
+    def test_get_failure_log(
+        self,
+        fake_script: FakeScript,
+        model: ops.Model,
+        root_logging: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(os, 'getuid', lambda: 1001)
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(RuntimeError):
+            _ = model.app.status
+        calls = fake_script.calls(clear=True)
+        # For this test we aren't interested in the is-leader call.
+        calls.pop(0)
+        assert len(calls) == 1
+        self._validate_security_log(calls[0], 'status-get')
+
+    @staticmethod
+    def _validate_security_log(call: list[str], hook: str):
+        assert call[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(call[-1])
+        assert data['level'] == 'CRITICAL'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == f'authz_fail:{hook}'
+        assert 'application status when not leader' in data['description']
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
 
 def test_departing_unit_data_available(fake_script: FakeScript):
