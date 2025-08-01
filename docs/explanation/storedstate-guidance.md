@@ -19,7 +19,7 @@ Here's a simplified charm code snippet that will allow us to toggle the state of
 
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
-    mode = self.model.config['mode']
+    mode = self.config['mode']
     if mode not in ('production', 'test'):
         self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r})
         return
@@ -43,7 +43,7 @@ def __init__(self, framework: ops.Framework):
     self._stored.set_default(current_mode='test')
 
 def _on_config_changed(self, event):
-    mode = self.model.config['mode']
+    mode = self.config['mode']
     if self._stored.current_mode == mode:
         return
     if mode not in ('production', 'test'):
@@ -76,7 +76,7 @@ In our example code, for instance, we might think about the fact that `config_ch
 
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
-    mode = self.model.config['mode']
+    mode = self.config['mode']
     if mode not in ('production', 'test'):
         self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r})
         return
