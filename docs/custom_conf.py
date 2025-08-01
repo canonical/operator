@@ -68,7 +68,7 @@ author = 'Canonical Ltd.'
 # The title you want to display for the documentation in the sidebar.
 # You might want to include a version number here.
 # To not display any title, set this option to an empty string.
-project_version = '2.23'
+project_version = '2.x'
 html_title = f'{project} {project_version} documentation'
 
 # The default value uses the current year as the copyright year.
@@ -150,7 +150,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['github_user'] = 'canonical'
     html_context['github_repo'] = 'operator'
     html_context['github_version'] = '2.23-maintenance'
-    html_context['slug'] = 'operator'
+    html_context['slug'] = 'ops'
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
