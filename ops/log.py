@@ -95,7 +95,7 @@ def setup_root_logging(
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
             print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
         _log_security_event(
-            'WARN',
+            _SecurityEventLevel.WARN,
             _SecurityEvent.SYS_CRASH,
             etype.__name__,
             description=f'Uncaught exception in charm code: {value!r}.',
@@ -114,6 +114,18 @@ class _SecurityEvent(enum.Enum):
     SYS_RESTART = 'sys_restart'
     SYS_CRASH = 'sys_crash'
     SYS_MONITOR_DISABLED = 'sys_monitor_disabled'
+
+
+class _SecurityEventLevel(enum.Enum):
+    """Security event levels.
+
+    These are the OWASP log levels, which are not the same as the Juju or Python log levels.
+    See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
+    """
+
+    INFO = 'INFO'
+    WARN = 'WARN'
+    CRITICAL = 'CRITICAL'
 
 
 @functools.cache
@@ -140,8 +152,7 @@ def _get_juju_log_and_app_id():
 
 
 def _log_security_event(
-    # These are the OWASP log levels, which are not the same as the Juju or Python log levels.
-    level: typing.Literal['INFO', 'WARN', 'CRITICAL'],
+    level: _SecurityEventLevel | str,
     event_type: _SecurityEvent | str,
     event_data: str,
     *,
@@ -166,7 +177,7 @@ def _log_security_event(
         # data can still see the time of the event.
         'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         # Note that the Juju log level is not the same as the event level.
-        'level': level,
+        'level': level if isinstance(level, str) else level.value,
         'type': 'security',
         'appid': app_id,
         'event': f'{type}:{event_data}',

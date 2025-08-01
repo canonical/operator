@@ -64,7 +64,7 @@ from . import pebble
 from ._private import timeconv, tracer, yaml
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
-from .log import _log_security_event, _SecurityEvent
+from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -435,7 +435,7 @@ class Application:
 
         if not self._backend.is_leader():
             _log_security_event(
-                'CRITICAL',
+                _SecurityEventLevel.CRITICAL,
                 _SecurityEvent.AUTHZ_FAIL,
                 'status-get',
                 description='Attempted to get application status when not leader',
@@ -461,7 +461,7 @@ class Application:
 
         if not self._backend.is_leader():
             _log_security_event(
-                'CRITICAL',
+                _SecurityEventLevel.CRITICAL,
                 _SecurityEvent.AUTHZ_FAIL,
                 'status-set',
                 description='Attempted to set application status when not leader.',
@@ -2804,7 +2804,7 @@ class Container:
             else:
                 description = f'Failed to stop check {check}'
             _log_security_event(
-                'WARN',
+                _SecurityEventLevel.WARN,
                 _SecurityEvent.SYS_MONITOR_DISABLED,
                 f'{os.getuid()},{check}',
                 description=description,
@@ -3689,7 +3689,7 @@ class _ModelBackend:
             f'{stderr.strip()!r}. '
         )
         _log_security_event(
-            'CRITICAL',
+            _SecurityEventLevel.CRITICAL,
             _SecurityEvent.AUTHZ_FAIL,
             base_cmd,
             description=description,
@@ -4215,7 +4215,7 @@ class _ModelBackend:
 
     def reboot(self, now: bool = False):
         _log_security_event(
-            'WARN',
+            _SecurityEventLevel.WARN,
             _SecurityEvent.SYS_RESTART,
             str(os.getuid()),
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
