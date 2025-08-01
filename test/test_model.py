@@ -995,14 +995,12 @@ class TestModel:
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         harness.set_leader(False)
-        # We haven't set up logging, but this triggers a security event.
         with pytest.warns(RuntimeWarning):
             with pytest.raises(RuntimeError):
                 harness.model.app.status
 
-        with pytest.warns(RuntimeWarning):
-            with pytest.raises(RuntimeError):
-                harness.model.app.status = ops.ActiveStatus()
+        with pytest.raises(RuntimeError):
+            harness.model.app.status = ops.ActiveStatus()
 
     def test_set_unit_status_invalid(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(ops.InvalidStatusError):
@@ -2066,17 +2064,16 @@ containers:
         container.stop_checks('c1', 'c2')
         assert container.pebble.requests == [('stop_checks', ('c1', 'c2'))]  # type: ignore
         calls = fake_script.calls(clear=True)
-        for check, description in (('c1', 'Stopped check c1'), ('c2', 'Failed to stop check c2')):
-            sec_log = calls.pop(0)
-            assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-            data = json.loads(sec_log[-1])
-            assert data['level'] == 'WARN'
-            assert data['type'] == 'security'
-            assert data['appid'] == '1234-myapp/0'
-            assert data['event'] == f'sys_monitor_disabled:1001,{check}'
-            assert data['description'] == description
-            timestamp = datetime.datetime.fromisoformat(data['datetime'])
-            assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
+        sec_log = calls.pop(0)
+        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+        data = json.loads(sec_log[-1])
+        assert data['level'] == 'WARN'
+        assert data['type'] == 'security'
+        assert data['appid'] == '1234-myapp/0'
+        assert data['event'] == 'sys_monitor_disabled:1001,c1'
+        assert data['description'] == 'Stopped check c1'
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
         assert calls == []
 
     def test_pull(self, container: ops.Container):
