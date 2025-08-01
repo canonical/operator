@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime
 import enum
+import functools
 import json
 import logging
 import sys
@@ -115,11 +116,34 @@ class _SecurityEvent(enum.Enum):
     SYS_MONITOR_DISABLED = 'sys_monitor_disabled'
 
 
+@functools.cache
+def _get_juju_log_and_app_id():
+    logger = logging.getLogger()
+    for juju_handler in logger.handlers:
+        if isinstance(juju_handler, JujuLogHandler):
+            model_backend = juju_handler.model_backend
+            juju_context = model_backend._juju_context
+            app_id = f'{juju_context.model_uuid}-{juju_context.unit_name}'
+            juju_log = model_backend.juju_log
+            return juju_log, app_id
+
+    warnings.warn(
+        'JujuLogHandler is not set up for the logger. '
+        'Call setup_root_logging() before logging security events.',
+        RuntimeWarning,
+    )
+
+    def juju_log(level: str, message: str):
+        logger.debug(message)
+
+    return juju_log, 'charm'
+
+
 def _log_security_event(
     # These are the OWASP log levels, which are not the same as the Juju or Python log levels.
     level: typing.Literal['INFO', 'WARN', 'CRITICAL'],
     event_type: _SecurityEvent | str,
-    event: str,
+    event_data: str,
     *,
     description: str,
 ):
@@ -129,30 +153,12 @@ def _log_security_event(
         level: log level of the security event (this is not the same as the Juju log level)
         event_type: the event type, in the format described by OWASP
           https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
-        event: the name of the event, in the format described by OWASP
+        event_data: the name of the event, in the format described by OWASP
         description: a free-form description of the event, meant for human
           consumption. Includes additional details of the event that do not
           fit in the event name.
     """
-    logger = logging.getLogger()
-    for juju_handler in logger.handlers:
-        if isinstance(juju_handler, JujuLogHandler):
-            model_backend = juju_handler.model_backend
-            juju_context = model_backend._juju_context
-            app_id = f'{juju_context.model_uuid}-{juju_context.unit_name}'
-            juju_log = model_backend.juju_log
-            break
-    else:
-        warnings.warn(
-            'JujuLogHandler is not set up for the logger. '
-            'Call setup_root_logging() before logging security events.',
-            RuntimeWarning,
-        )
-        app_id = 'charm'
-
-        def juju_log(level: str, message: str):
-            logger.debug(message)
-
+    juju_log, app_id = _get_juju_log_and_app_id()
     type = event_type if isinstance(event_type, str) else event_type.value
     data: dict[str, typing.Any] = {
         # This duplicates the timestamp that will be in the Juju log, but is
@@ -163,7 +169,7 @@ def _log_security_event(
         'level': level,
         'type': 'security',
         'appid': app_id,
-        'event': f'{type}:{event}',
+        'event': f'{type}:{event_data}',
         'description': description,
     }
     juju_log('TRACE', json.dumps(data))

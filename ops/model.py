@@ -438,7 +438,7 @@ class Application:
                 'CRITICAL',
                 _SecurityEvent.AUTHZ_FAIL,
                 'status-get',
-                description='Attempted to get application status when not leader.',
+                description='Attempted to get application status when not leader',
             )
             raise RuntimeError('cannot get application status as a non-leader unit')
 
@@ -2798,16 +2798,17 @@ class Container:
             raise TypeError('stop-checks expected at least 1 argument, got 0')
 
         stopped_checks = self._pebble.stop_checks(check_names)
-        description = (
-            f'Asked to stop checks {",".join(check_names)} - '
-            f'stopped checks {",".join(stopped_checks)}'
-        )
-        _log_security_event(
-            'WARN',
-            _SecurityEvent.SYS_MONITOR_DISABLED,
-            f'{os.getuid()},{",".join(check_names)}',
-            description=description,
-        )
+        for check in check_names:
+            if check in stopped_checks:
+                description = f'Stopped check {check}'
+            else:
+                description = f'Failed to stop check {check}'
+            _log_security_event(
+                'WARN',
+                _SecurityEvent.SYS_MONITOR_DISABLED,
+                f'{os.getuid()},{check}',
+                description=description,
+            )
         return stopped_checks
 
     @typing.overload
@@ -3660,32 +3661,7 @@ class _ModelBackend:
             try:
                 result = subprocess.run(args, **kwargs)  # type: ignore
             except subprocess.CalledProcessError as e:
-                authz_messages = (
-                    'access denied',
-                    'permission denied',
-                    'not the leader',
-                    'cannot write relation settings',
-                )
-                if any(message in e.stderr.lower() for message in authz_messages):
-                    # These commands may have sensitive data in their arguments, and do not
-                    # support reading the data from a file.
-                    if args[0] in ('juju-log', 'action-fail', 'action-set'):
-                        log_args = f'Arguments were: {args[1:]!r}. '
-                    else:
-                        log_args = ''
-                    base_cmd = os.path.basename(args[0])
-                    description = (
-                        f'Hook command {base_cmd!r} failed with error: {e.stderr.strip()!r}. '
-                        f'The command exited with code: {e.returncode}. '
-                        f'Unit {"is" if self.is_leader() else "is not"} leader.'
-                        f'{log_args}'
-                    )
-                    _log_security_event(
-                        'CRITICAL',
-                        _SecurityEvent.AUTHZ_FAIL,
-                        base_cmd,
-                        description=description,
-                    )
+                self._check_for_security_event(args[0], e.returncode, e.stderr)
                 raise ModelError(e.stderr) from e
             if return_output:
                 if result.stdout is None:  # type: ignore
@@ -3696,6 +3672,28 @@ class _ModelBackend:
                         return json.loads(text)  # type: ignore
                     else:
                         return text  # type: ignore
+
+    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+        authz_messages = (
+            'access denied',
+            'permission denied',
+            'not the leader',
+            'cannot write relation settings',
+        )
+        if not any(message in stderr.lower() for message in authz_messages):
+            return
+        base_cmd = os.path.basename(cmd)
+        leadership = ' (as leader)' if self.is_leader() else ''
+        description = (
+            f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
+            f'{stderr.strip()!r}. '
+        )
+        _log_security_event(
+            'CRITICAL',
+            _SecurityEvent.AUTHZ_FAIL,
+            base_cmd,
+            description=description,
+        )
 
     @staticmethod
     def _is_relation_not_found(model_error: Exception) -> bool:

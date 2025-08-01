@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import datetime
 import importlib.util
 import io
 import json
@@ -946,7 +947,10 @@ class _TestMain(abc.ABC):
         data_crash = json.loads(sec_crash.rsplit('--', 1)[-1])
         assert data_crash['type'] == 'security'
         assert data_crash['appid'] == '1234-test_main/0'
-        assert 'datetime' in data_crash
+        crash_timestamp = datetime.datetime.fromisoformat(data_crash['datetime'])
+        assert (
+            datetime.datetime.now(datetime.timezone.utc) - crash_timestamp
+        ).total_seconds() < 60
         assert (
             data_crash['description']
             == "Uncaught exception in charm code: RuntimeError('failing as requested')."

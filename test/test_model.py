@@ -2062,15 +2062,17 @@ containers:
         container.stop_checks('c1', 'c2')
         assert container.pebble.requests == [('stop_checks', ('c1', 'c2'))]  # type: ignore
         calls = fake_script.calls(clear=True)
-        sec_log = calls.pop(0)
-        assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
-        data = json.loads(sec_log[-1])
-        assert data['level'] == 'WARN'
-        assert data['type'] == 'security'
-        assert data['appid'] == '1234-myapp/0'
-        assert data['event'] == 'sys_monitor_disabled:1001,c1,c2'
-        assert data['description'] == 'Asked to stop checks c1,c2 - stopped checks c1'
-        assert 'datetime' in data
+        for check, description in (('c1', 'Stopped check c1'), ('c2', 'Failed to stop check c2')):
+            sec_log = calls.pop(0)
+            assert sec_log[:-1] == ['juju-log', '--log-level', 'TRACE', '--']
+            data = json.loads(sec_log[-1])
+            assert data['level'] == 'WARN'
+            assert data['type'] == 'security'
+            assert data['appid'] == '1234-myapp/0'
+            assert data['event'] == f'sys_monitor_disabled:1001,{check}'
+            assert data['description'] == description
+            timestamp = datetime.datetime.fromisoformat(data['datetime'])
+            assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
         assert calls == []
 
     def test_pull(self, container: ops.Container):
@@ -3759,13 +3761,10 @@ class TestSecrets:
         assert data['type'] == 'security'
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == f'authz_fail:{hook_command}'
-        assert f"failed with error: 'ERROR: {failure}'" in data['description']
-        assert 'exited with code: 1' in data['description']
-        if is_leader:
-            assert 'Unit is leader' in data['description']
-        else:
-            assert 'Unit is not leader' in data['description']
-        assert 'datetime' in data
+        leadership = '(as leader)' if is_leader else ''
+        assert f"{leadership} failed with code 1: 'ERROR: {failure}'" in data['description']
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
 
 class TestSecretInfo:
@@ -4364,7 +4363,8 @@ class TestUnit:
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == 'sys_restart:1001'
         assert data['description'] == "Rebooting unit 'myapp/0' in model 'testing-model'"
-        assert 'datetime' in data
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
     def test_reboot(
         self,
@@ -4502,10 +4502,9 @@ class TestCloudCredential:
         assert data['type'] == 'security'
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == 'authz_fail:credential-get'
-        assert f"failed with error: 'ERROR: {message}'" in data['description']
-        assert 'exited with code: 1' in data['description']
-        assert 'Unit is leader' in data['description']
-        assert 'datetime' in data
+        assert f"failed with code 1: 'ERROR: {message}'" in data['description']
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
 
 class TestCloudSpec:
@@ -4652,7 +4651,8 @@ class TestStatus:
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == f'authz_fail:{hook}'
         assert 'application status when not leader' in data['description']
-        assert 'datetime' in data
+        timestamp = datetime.datetime.fromisoformat(data['datetime'])
+        assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
 
 def test_departing_unit_data_available(fake_script: FakeScript):
