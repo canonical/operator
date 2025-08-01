@@ -91,7 +91,9 @@ tox -e docs-live
 
 ## How to document version dependencies
 
-We don't publish separate documentation for separate versions of Ops. The published docs at [documentation.ubuntu.com/ops](https://documentation.ubuntu.com/ops/latest/) are always for the in-development (main branch) of Ops, and do not include any notes indicating changes or additions across Ops versions. We encourage all charmers to promptly upgrade to the latest version of Ops, and to refer to the release notes and changelog for learning about changes.
+We publish separate documentation for each major version of Ops. We generally only make improvements to the latest version of the docs, and only backport changes that are applicable only to the older version, or are critical for charming.
+
+The published docs at [documentation.ubuntu.com/ops](https://documentation.ubuntu.com/ops/latest/) are always for the in-development (main branch) of Ops, and do not include any notes indicating changes or additions across Ops versions. We encourage all charmers to promptly upgrade to the latest version of Ops, and to refer to the release notes and changelog for learning about changes.
 
 We do note when features behave differently when using different versions of Juju.
 
