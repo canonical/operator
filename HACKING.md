@@ -235,9 +235,7 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
 
-Alternatively, you can also create a classic token. To do so, go to GitHub -> Settings -> Developer Settings -> Personal access tokens -> Tokens (classic), and click "Generate new token (classic)" (shortcut: click [this link](https://github.com/settings/tokens/new)), and under "Select scopes", "repo", select "repo:status" and "public_repo". Then, set the environment variable `GITHUB_TOKEN` with the newly generated token.
-
-> Note: A fine-grained token will not work because if the owner is your GitHub account, it can't create a PR on the canonical repo, and if the owner is Canonical, it can't push to your forked repo. 
+Alternatively, you can also create a personal access token. To do so, go to GitHub -> Settings -> Developer Settings -> Personal access tokens -> Fine-grained tokens, and click "Generate new token" (shortcut: click [this link](https://github.com/settings/personal-access-tokens/new)). For "Resource owner", choose "canonical". For "Expiration", choose a desired setting (maximum is 366 days). Under "Repository access", choose "Only select repositories" and select "canonical/operator". Under "Permissions", click "Add permissions", select "Contents" and "Pull requests", then set the access to both of them to "Read and write" (since we need to create draft releases and PRs); note that "Metadata" will be chosen automatically as well. Click "Generate token", then set the environment variable `GITHUB_TOKEN` with it.
 
 Then, check out the main branch of your forked operator repo and pull upstream to ensure the release automation script is the latest.
 
@@ -280,9 +278,7 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
-After making the release, delete the two newly created branches `release-prep-*` and `post-release-*` both locally and in the origin.
-
-If the release automation script fails at a certain step, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
+If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
 
 ## Release Documentation
 
