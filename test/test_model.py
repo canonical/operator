@@ -995,11 +995,14 @@ class TestModel:
         harness: ops.testing.Harness[ops.CharmBase],
     ):
         harness.set_leader(False)
-        with pytest.raises(RuntimeError):
-            harness.model.app.status
+        # We haven't set up logging, but this triggers a security event.
+        with pytest.warns(RuntimeWarning):
+            with pytest.raises(RuntimeError):
+                harness.model.app.status
 
-        with pytest.raises(RuntimeError):
-            harness.model.app.status = ops.ActiveStatus()
+        with pytest.warns(RuntimeWarning):
+            with pytest.raises(RuntimeError):
+                harness.model.app.status = ops.ActiveStatus()
 
     def test_set_unit_status_invalid(self, harness: ops.testing.Harness[ops.CharmBase]):
         with pytest.raises(ops.InvalidStatusError):
@@ -1200,7 +1203,8 @@ class TestModel:
         assert model.juju_version == version
         assert isinstance(model.juju_version, ops.JujuVersion)
         # Make sure it's not being loaded from the environment.
-        assert JujuVersion.from_environ() == '0.0.0'
+        with pytest.warns(DeprecationWarning):
+            assert JujuVersion.from_environ() == '0.0.0'
 
     def test_relation_remote_model(self, fake_script: FakeScript, fake_juju_version: None):
         fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
