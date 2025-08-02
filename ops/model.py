@@ -2222,7 +2222,8 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 class ConfigData(_GenericLazyMapping['bool | int | float | str']):
     """Configuration data.
 
-    This class should not be instantiated directly. It should be accessed via :attr:`Model.config`.
+    Don't instantiate ConfigData objects directly. To get configuration data for the application
+    that this unit is part of, use :meth:`CharmBase.load_config` or :attr:`CharmBase.config`.
     """
 
     def __init__(self, backend: _ModelBackend):
