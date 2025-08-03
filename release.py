@@ -103,7 +103,7 @@ def get_new_tag_for_release(
     if not latest_tag:
         logger.info('No version tag found in branch %r', branch_name)
     else:
-        logger.info('Latest tag in branch %r: %s', branch_name, latest_tag)
+        logger.info('Latest tag in branch %s: %s', branch_name, latest_tag)
         if not re.match(r'^\d+\.\d+\.\d+$', latest_tag):
             logger.info('Latest tag is not in format X.Y.Z.')
         else:
