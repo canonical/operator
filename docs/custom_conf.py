@@ -92,7 +92,7 @@ copyright = '%s, %s' % (datetime.date.today().year, author)  # noqa: A001
 # don't know yet)
 # NOTE: If no ogp_* variable is defined (e.g. if you remove this section) the
 # sphinxext.opengraph extension will be disabled.
-ogp_site_url = 'https://ops.readthedocs.io/en/latest/'
+ogp_site_url = 'https://documentation.ubuntu.com/ops/latest/'
 # The documentation website name (usually the same as the product name)
 ogp_site_name = project
 # The URL of an image or logo that is used in the preview
@@ -153,7 +153,7 @@ if os.environ.get('READTHEDOCS', '') == 'True':
 
 # If your project is on documentation.ubuntu.com, specify the project
 # slug (for example, "lxd") here.
-slug = ''
+slug = 'ops'
 
 ############################################################
 ### Redirects

@@ -23,6 +23,7 @@ import os
 import pathlib
 import re
 import subprocess
+import sys
 
 import github
 import github.GitRelease
@@ -117,7 +118,7 @@ def get_new_tag_for_release(
             logger.info('Suggested new version: %s', suggested_tag)
 
     tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
-    prompt = f'Input the new tag for the release{tag_prompt}\n'
+    prompt = f'\033[1mInput the new tag for the release{tag_prompt}:\n> \033[0m'
     while True:
         user_input = input(prompt).strip()
 
@@ -135,7 +136,10 @@ def get_new_tag_for_release(
         logger.warning('Check out the releases page: %s before confirming!', release_page)
 
         confirm = (
-            input(f'Confirm creating tag {new_tag!r} on branch {branch_name!r}? [y/N]: ')
+            input(
+                f'\033[1mConfirm creating tag {new_tag!r} on branch {branch_name!r}? '
+                f'[y/N]: \n> \033[0m'
+            )
             .strip()
             .lower()
         )
@@ -191,13 +195,10 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
         if match := re.match(r'^\* (\w+): (.*) by @\w+ in (.*)', line.strip()):
             category = match.group(1)
             if category in categories:
-                description = match.group(2).strip().capitalize()
+                description = match.group(2).strip()
+                description = description[0].upper() + description[1:]
                 pr_link = match.group(3).strip()
                 categories[category].append((description, pr_link))
-            else:
-                logger.warning(
-                    f'Unexpected category {category} found in the auto-generated release notes'
-                )
 
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
@@ -230,6 +231,8 @@ def print_release_notes(notes: str):
 
     So that user can review them and use them to write the title and summary.
     """
+    sys.stdout.flush()
+    sys.stderr.flush()
     print('=' * 80)
     print('Formatted release notes:')
     print('=' * 80)
@@ -240,11 +243,16 @@ def print_release_notes(notes: str):
 def input_title_and_summary(release: github.GitRelease.GitRelease) -> tuple[str, str]:
     """Ask user to input the release title and summary."""
     logger.info('The automatically generated title is: %s', release.title)
-    title = input('Enter release title, press Enter to keep the auto-generated title:\n> ').strip()
+    title = input(
+        '\033[1mEnter release title, press Enter to keep the auto-generated title:\n> \033[0m'
+    ).strip()
     if not title:
         title = release.title
 
-    print("\nEnter release summary (multi-line supported; type '.' on a new line to finish):")
+    print(
+        '\n\033[1mEnter release summary (multi-line supported; type "." on a new line '
+        'to finish):\n> \033[0m'
+    )
 
     lines: list[str] = []
     while True:
@@ -282,8 +290,8 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
                 if match:
                     pr_num = match.group(1)
                 lines.append(f'* {description} (#{pr_num})')
-            lines.append('\n')
-    return '\n'.join(lines)
+            lines.append('')
+    return '\n'.join(lines) + '\n'
 
 
 def update_changes_file(changes: str, file: str):
@@ -478,8 +486,10 @@ def draft_release(
         subprocess.run(['/usr/bin/git', 'checkout', base_branch], check=True)
         subprocess.run(['/usr/bin/git', 'pull', canonical_remote, base_branch], check=True)
     else:
+        subprocess.run(['/usr/bin/git', 'fetch', canonical_remote], check=True)
         subprocess.run(
-            ['/usr/bin/git', 'checkout', '--track', f'{fork_remote}/{base_branch}'], check=True
+            ['/usr/bin/git', 'checkout', '--track', f'{canonical_remote}/{base_branch}'],
+            check=True,
         )
 
     org = gh_client.get_organization(owner)
@@ -529,7 +539,10 @@ def post_release(
     owner: str, repo_name: str, base_branch: str, canonical_remote: str, fork_remote: str
 ):
     """Post-release actions: update version files and create a PR."""
-    new_branch = 'post-release'
+    org = gh_client.get_organization(owner)
+    repo = org.get_repo(repo_name)
+    tag = get_latest_release_tag(repo, base_branch)
+    new_branch = f'post-release-{tag}'
     local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
     remote_branch = subprocess.check_output([
         '/usr/bin/git',
@@ -625,6 +638,6 @@ if __name__ == '__main__':
         fork_remote=args.fork_remote,
     )
     logger.info(
-        'Draft release created. Please merge the version bump PR, review and publish the draft'
+        'Draft release created. Please merge the version bump PR, review and publish the draft '
         'release, then run this script with --post-release to perform post-release actions.'
     )

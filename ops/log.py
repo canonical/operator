@@ -16,13 +16,18 @@
 
 from __future__ import annotations
 
+import datetime
+import enum
+import functools
+import json
 import logging
 import sys
 import types
 import typing
 import warnings
 
-from .model import _ModelBackend
+if typing.TYPE_CHECKING:
+    from .model import _ModelBackend
 
 
 class JujuLogHandler(logging.Handler):
@@ -89,5 +94,93 @@ def setup_root_logging(
         if exc_stderr:
             print(f'Uncaught {etype.__name__} in charm code: {value}', file=sys.stderr)
             print('Use `juju debug-log` to see the full traceback.', file=sys.stderr)
+        _log_security_event(
+            _SecurityEventLevel.WARN,
+            _SecurityEvent.SYS_CRASH,
+            etype.__name__,
+            description=f'Uncaught exception in charm code: {value!r}.',
+        )
 
     sys.excepthook = except_hook
+
+
+class _SecurityEvent(enum.Enum):
+    """Security event names.
+
+    See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
+    """
+
+    AUTHZ_FAIL = 'authz_fail'
+    SYS_RESTART = 'sys_restart'
+    SYS_CRASH = 'sys_crash'
+    SYS_MONITOR_DISABLED = 'sys_monitor_disabled'
+
+
+class _SecurityEventLevel(enum.Enum):
+    """Security event levels.
+
+    These are the OWASP log levels, which are not the same as the Juju or Python log levels.
+    See https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html
+    """
+
+    INFO = 'INFO'
+    WARN = 'WARN'
+    CRITICAL = 'CRITICAL'
+
+
+@functools.cache
+def _get_juju_log_and_app_id():
+    logger = logging.getLogger()
+    for juju_handler in logger.handlers:
+        if isinstance(juju_handler, JujuLogHandler):
+            model_backend = juju_handler.model_backend
+            juju_context = model_backend._juju_context
+            app_id = f'{juju_context.model_uuid}-{juju_context.unit_name}'
+            juju_log = model_backend.juju_log
+            return juju_log, app_id
+
+    warnings.warn(
+        'JujuLogHandler is not set up for the logger. '
+        'Call setup_root_logging() before logging security events.',
+        RuntimeWarning,
+    )
+
+    def juju_log(level: str, message: str):
+        logger.debug(message)
+
+    return juju_log, 'charm'
+
+
+def _log_security_event(
+    level: _SecurityEventLevel | str,
+    event_type: _SecurityEvent | str,
+    event_data: str,
+    *,
+    description: str,
+):
+    """Send a structured security event log to Juju, as defined by SEC0045.
+
+    Args:
+        level: log level of the security event (this is not the same as the Juju log level)
+        event_type: the event type, in the format described by OWASP
+          https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary
+        event_data: the name of the event, in the format described by OWASP
+        description: a free-form description of the event, meant for human
+          consumption. Includes additional details of the event that do not
+          fit in the event name.
+    """
+    juju_log, app_id = _get_juju_log_and_app_id()
+    type = event_type if isinstance(event_type, str) else event_type.value
+    data: dict[str, typing.Any] = {
+        # This duplicates the timestamp that will be in the Juju log, but is
+        # included so that applications that are pulling out only the structured
+        # data can still see the time of the event.
+        'datetime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        # Note that the Juju log level is not the same as the event level.
+        'level': level if isinstance(level, str) else level.value,
+        'type': 'security',
+        'appid': app_id,
+        'event': f'{type}:{event_data}',
+        'description': description,
+    }
+    juju_log('TRACE', json.dumps(data))

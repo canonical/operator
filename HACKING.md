@@ -233,7 +233,11 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 # Publishing a Release
 
-Before you start, make sure you are at the main branch of your forked operator repo, and your main branch is up-to-date. This is to ensure the release automation script is the latest.
+Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
+
+Alternatively, you can also create a personal access token. To do so, go to GitHub -> Settings -> Developer Settings -> Personal access tokens -> Fine-grained tokens, and click "Generate new token" (shortcut: click [this link](https://github.com/settings/personal-access-tokens/new)). For "Resource owner", choose "canonical". For "Expiration", choose a desired setting (maximum is 366 days). Under "Repository access", choose "Only select repositories" and select "canonical/operator". Under "Permissions", click "Add permissions", select "Contents" and "Pull requests", then set the access to both of them to "Read and write" (since we need to create draft releases and PRs); note that "Metadata" will be chosen automatically as well. Click "Generate token", then set the environment variable `GITHUB_TOKEN` with it.
+
+Then, check out the main branch of your forked operator repo and pull upstream to ensure the release automation script is the latest.
 
 1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
@@ -249,7 +253,7 @@ Before you start, make sure you are at the main branch of your forked operator r
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
 3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
-4. Go to the GitHub releases page, edit the latest draft release, and click "Publish release". GitHub will create the additional tag.
+4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
@@ -266,13 +270,15 @@ Before you start, make sure you are at the main branch of your forked operator r
 5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
 6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
-7. Post release: At the root directory of your forked `canonical/operator` repo, without the need to fetch, change branch, or anything else, run: `tox -e post-release`.
+7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
     > 
     > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
+
+If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
 
 ## Release Documentation
 

@@ -5,8 +5,8 @@
 The `ops` library is a Python framework for developing and testing Kubernetes and machine [charms](https://charmhub.io/). While charms can be written in any language, `ops` defines the latest standard, and charmers are encouraged to use Python with `ops` for all charms. The library is an official component of the Charm SDK, itself a part of [the Juju universe](https://juju.is/).
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
-> - The latest version of `ops` requires Python 3.8 or above.
-> - Read our [docs](https://ops.readthedocs.io/en/latest/) for tutorials, how-to guides, the library reference, and more.
+> - The latest version of `ops` requires Python 3.10 or above.
+> - Read our [docs](https://documentation.ubuntu.com/ops/latest/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 
@@ -73,7 +73,7 @@ class OpsExampleCharm(ops.CharmBase):
         environment configuration for your specific workload.
 
         Learn more about interacting with Pebble at
-            https://ops.readthedocs.io/en/latest/reference/pebble.html
+            https://documentation.ubuntu.com/ops/latest/reference/pebble.html
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
@@ -86,7 +86,7 @@ class OpsExampleCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-> See more: [`ops.PebbleReadyEvent`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.PebbleReadyEvent)
+> See more: [`ops.PebbleReadyEvent`](https://documentation.ubuntu.com/ops/latest/reference/ops.html#ops.PebbleReadyEvent)
 
 - The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a unit test:
 
@@ -127,7 +127,7 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing`](https://ops.readthedocs.io/en/latest/reference/ops-testing.html)
+> See more: [`ops.testing`](https://documentation.ubuntu.com/ops/latest/reference/ops-testing.html)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
@@ -150,6 +150,6 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ## Next steps
 
-- Read the [docs](https://ops.readthedocs.io/en/latest/).
+- Read the [docs](https://documentation.ubuntu.com/ops/latest/).
 - Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and join our [chat](https://matrix.to/#/#charmhub-ops:ubuntu.com) and [forum](https://discourse.charmhub.io/) or [open an issue](https://github.com/canonical/operator/issues).
 - Read our [CONTRIBUTING guide](https://github.com/canonical/operator/blob/main/HACKING.md) and contribute!

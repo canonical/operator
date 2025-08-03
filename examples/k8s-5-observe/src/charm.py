@@ -138,7 +138,7 @@ class FastAPIDemoCharm(ops.CharmBase):
 
         If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
-        Learn more about actions at https://ops.readthedocs.io/en/latest/howto/manage-actions.html
+        Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions.html
         """
         params = event.load_params(GetDbInfoAction, errors='fail')
         db_data = self.fetch_postgres_relation_data()
@@ -163,7 +163,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         configuration for your specific workload. Tip: you can see the
         standard entrypoint of an existing container using docker inspect
         Learn more about interacting with Pebble at
-            https://ops.readthedocs.io/en/latest/reference/pebble.html
+            https://documentation.ubuntu.com/ops/latest/reference/pebble.html
         Learn more about Pebble layers at
             https://documentation.ubuntu.com/pebble/how-to/use-layers/
         """
