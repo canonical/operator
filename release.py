@@ -540,7 +540,7 @@ def post_release(
     ])
     if local_branch or remote_branch:
         logger.error(
-            'Branch %r already exists.Please double check and delete it first before post release',
+            'Branch %r already exists. Please double check and delete it first before post release',
             new_branch,
         )
         exit(1)
