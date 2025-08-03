@@ -435,8 +435,8 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
     # Check if the latest version is in SEMVER, in case it has a suffix like 3.0.0.post1.
     if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
         logger.error(
-            'Latest version %r must be in format '
-            'X.Y.Z. Please input the new version manually (remember to add the .dev0 suffix).',
+            'Latest version %r must be in format X.Y.Z. '
+            'Please input the new version manually (including the .dev0 suffix).',
             latest_version,
         )
         exit(1)
@@ -553,7 +553,8 @@ def post_release(
     ])
     if local_branch or remote_branch:
         logger.error(
-            'Branch %r already exists. Please double check and delete it first before post release',
+            'Branch %r already exists. '
+            'Please double check and delete it first before post release',
             new_branch,
         )
         exit(1)
