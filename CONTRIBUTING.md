@@ -35,7 +35,7 @@ To help us review your changes, please rebase your pull request onto the `main` 
 
 # Tests
 
-Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://documentation.ubuntu.com/ops/latest/reference/ops-testing.html) instead of legacy [ops.testing.Harness](https://documentation.ubuntu.com/ops/latest/reference/ops-testing-harness.html) tests.
+Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/) instead of legacy [ops.testing.Harness](https://documentation.ubuntu.com/ops/latest/reference/ops-testing-harness/) tests.
 
 Tests for Ops should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
 
@@ -43,7 +43,7 @@ Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testi
 
 # Coding style
 
-We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://documentation.ubuntu.com/ops/latest/reference/index.html) is automatically generated from Python docstrings.
+We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://documentation.ubuntu.com/ops/latest/reference/) is automatically generated from Python docstrings.
 
 # Documentation
 
