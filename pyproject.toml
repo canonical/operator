@@ -6,9 +6,10 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
