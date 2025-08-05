@@ -18,6 +18,16 @@ jobs:
         test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
 
     steps:
+      - uses: actions/cache@v4
+        id: snap-cache
+        with:
+          path: /var/cache/snapd
+          key: ${{ runner.os }}-snapd
+      - uses: actions/cache@v4
+        id: apt-cache
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt
       - run: |
            # Work around https://github.com/jnsgruk/concierge/issues/30
            sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
