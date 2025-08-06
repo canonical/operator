@@ -73,7 +73,7 @@ class OpsExampleCharm(ops.CharmBase):
         environment configuration for your specific workload.
 
         Learn more about interacting with Pebble at
-            https://documentation.ubuntu.com/ops/latest/reference/pebble.html
+            https://documentation.ubuntu.com/ops/latest/reference/pebble/
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
@@ -86,7 +86,7 @@ class OpsExampleCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-> See more: [`ops.PebbleReadyEvent`](https://documentation.ubuntu.com/ops/latest/reference/ops.html#ops.PebbleReadyEvent)
+> See more: [`ops.PebbleReadyEvent`](https://documentation.ubuntu.com/ops/latest/reference/ops/#ops.PebbleReadyEvent)
 
 - The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a unit test:
 
@@ -127,7 +127,7 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing`](https://documentation.ubuntu.com/ops/latest/reference/ops-testing.html)
+> See more: [`ops.testing`](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
