@@ -3,9 +3,7 @@ name: ops Smoke Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 7 25 * *'
-  # FIXME temporary for testing only
-  pull_request:
+    - cron: '0 7 25 * *'
 
 permissions: {}
 
