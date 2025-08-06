@@ -831,6 +831,18 @@ wheels = [
 ]
 
 [[package]]
+name = "jubilant-backports"
+version = "1.0.0a1"
+source = { url = "https://github.com/tonyandrewmeyer/jubilant-backports/archive/refs/tags/v1.0.0a1.zip" }
+dependencies = [
+    { name = "jubilant" },
+]
+sdist = { hash = "sha256:cba418714ada697c4650de69233128aa1c4d556c982ef62362767c6aea585690" }
+
+[package.metadata]
+requires-dist = [{ name = "jubilant", specifier = "~=1.2" }]
+
+[[package]]
 name = "juju"
 version = "3.6.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1219,6 +1231,7 @@ docs = [
 integration = [
     { name = "httpx" },
     { name = "jubilant" },
+    { name = "jubilant-backports" },
     { name = "juju" },
     { name = "minio" },
     { name = "ops", extra = ["testing", "tracing"] },
@@ -1271,6 +1284,7 @@ docs = [
 integration = [
     { name = "httpx", specifier = "~=0.28" },
     { name = "jubilant", specifier = "~=1.2" },
+    { name = "jubilant-backports", url = "https://github.com/tonyandrewmeyer/jubilant-backports/archive/refs/tags/v1.0.0a1.zip" },
     { name = "juju", specifier = ">=2.9,<4" },
     { name = "minio", specifier = "~=7.2" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },

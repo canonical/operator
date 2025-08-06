@@ -21,7 +21,7 @@ import os
 import pathlib
 import subprocess
 
-import jubilant
+import jubilant_backports
 import pytest
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def pack(charm_dir: pathlib.Path):
 
 
 @pytest.mark.parametrize('base', ['22.04', '24.04'])
-def test_smoke(juju: jubilant.Juju, base: str):
+def test_smoke(juju: jubilant_backports.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
     available_charmcraft_version = (
         subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
@@ -87,12 +87,12 @@ def test_smoke(juju: jubilant.Juju, base: str):
 
     app = f'smoke{base.replace(".", "")}'
     juju.deploy(charm, app=app, base=f'ubuntu@{base}')
-    juju.wait(lambda status: jubilant.all_active(status, app), timeout=600)
+    juju.wait(lambda status: jubilant_backports.all_active(status, app), timeout=600)
 
 
 @pytest.fixture(scope='module')
 def juju():
-    with jubilant.temp_model() as juju:
+    with jubilant_backports.temp_model() as juju:
         yield juju
 
 
