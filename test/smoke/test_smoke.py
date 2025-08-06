@@ -21,8 +21,8 @@ import os
 import pathlib
 import subprocess
 
+import jubilant
 import pytest
-from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def pack(charm_dir: pathlib.Path):
 
 
 @pytest.mark.parametrize('base', ['22.04', '24.04'])
-async def test_smoke(ops_test: OpsTest, base: str):
+def test_smoke(juju: jubilant.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
     available_charmcraft_version = (
         subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
@@ -85,12 +85,15 @@ async def test_smoke(ops_test: OpsTest, base: str):
         outf.write(charmcraft_yaml)
     charm = pack(pathlib.Path('./test/charms/test_smoke/'))
 
-    app = await ops_test.model.deploy(
-        charm, base=f'ubuntu@{base}', application_name=f'smoke{base.replace(".", "")}'
-    )
-    await ops_test.model.wait_for_idle(timeout=600)
+    app = f'smoke{base.replace(".", "")}'
+    juju.deploy(charm, app=app, base=f'ubuntu@{base}')
+    juju.wait(lambda status: jubilant.all_active(status, app), timeout=600)
 
-    assert app.status == 'active', f"Base ubuntu@{base} failed with '{app.status}' status"
+
+@pytest.fixture(scope='module')
+def juju():
+    with jubilant.temp_model() as juju:
+        yield juju
 
 
 @pytest.fixture
