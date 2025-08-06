@@ -22,16 +22,12 @@ jobs:
         preset: ['machine', 'microk8s']
 
     steps:
-      - name: Install concierge
-        run: sudo snap install --classic concierge
-
-      - name: Install Juju and tools
-        run: >
+      - run: sudo snap install --classic concierge
+      - run: >
           sudo concierge prepare
-            --juju-channel=${{ matrix.juju-channel }}
-            --charmcraft-channel=3.x/stable
-            -p "${{ matrix.preset }}"
-
+          --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
+          -p "${{ matrix.preset }}"
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
