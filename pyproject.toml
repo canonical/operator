@@ -59,7 +59,6 @@ unit = [
     "pytest~=8.4",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
-    "eval-type-backport~=0.2; python_version < \"3.10\"",
 ]
 xdist = [
     "pytest-xdist~=3.6",
@@ -68,13 +67,13 @@ coverage = [
     "coverage[toml]~=7.0",
 ]
 benchmark = [
-    "pytest-benchmark~=5.0; python_version >= \"3.9\"",
+    "pytest-benchmark~=5.0",
 ]
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
     "jubilant~=1.2",
-    "jubilant-backports==1.0.0a1",
+    "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",

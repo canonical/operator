@@ -1271,7 +1271,7 @@ requires-dist = [
 provides-extras = ["testing", "tracing", "harness"]
 
 [package.metadata.requires-dev]
-benchmark = [{ name = "pytest-benchmark", marker = "python_full_version >= '3.9'", specifier = "~=5.0" }]
+benchmark = [{ name = "pytest-benchmark", specifier = "~=5.0" }]
 coverage = [{ name = "coverage", extras = ["toml"], specifier = "~=7.0" }]
 docs = [
     { name = "canonical-sphinx", extras = ["full"] },
@@ -1284,7 +1284,7 @@ docs = [
 integration = [
     { name = "httpx", specifier = "~=0.28" },
     { name = "jubilant", specifier = "~=1.2" },
-    { name = "jubilant-backports", specifier = "==1.0.0a1" },
+    { name = "jubilant-backports" },
     { name = "juju", specifier = ">=2.9,<4" },
     { name = "minio", specifier = "~=7.2" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
@@ -1301,7 +1301,6 @@ static = [
     { name = "typing-extensions", specifier = "~=4.2" },
 ]
 unit = [
-    { name = "eval-type-backport", marker = "python_full_version < '3.10'", specifier = "~=0.2" },
     { name = "jsonpatch", specifier = "~=1.33" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
     { name = "pydantic", specifier = "~=2.10" },
