@@ -21,13 +21,15 @@ jobs:
       - uses: actions/cache@v4
         id: snap-cache
         with:
-          path: /var/snap
-          key: ${{ runner.os }}-snapd
+          path: |
+            /var/snap
+            /var/lib/snapd/cache
+          key: ${{ runner.os }}-snapd-${{ matrix.preset }}
       - uses: actions/cache@v4
         id: apt-cache
         with:
           path: /var/cache/apt
-          key: ${{ runner.os }}-apt
+          key: ${{ runner.os }}-apt-${{ matrix.preset }}
       - name: apt cache hit
         if: steps.apt-cache.outputs.cache-hit == 'true'
         run: echo "======== APT cache hit ========"
