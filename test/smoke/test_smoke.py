@@ -63,17 +63,12 @@ def pack(charm_dir: pathlib.Path):
         dest_name = charm_dir / charm.name
         charm.rename(dest_name)
     # With the way we use charmcraft, we know that there will only be one.
+    assert dest_name
     return dest_name.absolute()
 
 
-@pytest.mark.parametrize(
-    'base,charmcraft_version,name',
-    (
-        ('22.04', 3, 'jammy'),
-        ('24.04', 3, 'noble'),
-    ),
-)
-async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name: str):
+@pytest.mark.parametrize('base', ['22.04', '24.04'])
+async def test_smoke(ops_test: OpsTest, base: str):
     """Verify that we can build and deploy charms from supported bases."""
     available_charmcraft_version = (
         subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
@@ -82,18 +77,16 @@ async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name
         .rsplit()[-1]
         .split('.')
     )
-    if int(available_charmcraft_version[0]) < charmcraft_version:
-        pytest.skip(f'charmcraft version {available_charmcraft_version} is too old for this test')
-        return
-    charmcraft_yaml = {
-        3: CHARMCRAFT3_YAML,
-    }[charmcraft_version].format(base=base)
+    if int(available_charmcraft_version[0]) < 3:
+        pytest.skip('This test requires charmcraft 3')
+
+    charmcraft_yaml = CHARMCRAFT3_YAML.format(base=base)
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
         outf.write(charmcraft_yaml)
     charm = pack(pathlib.Path('./test/charms/test_smoke/'))
 
     app = await ops_test.model.deploy(
-        charm, base=f'ubuntu@{base}', application_name=f'{name}-smoke'
+        charm, base=f'ubuntu@{base}', application_name=f'smoke{base.replace(".", "")}'
     )
     await ops_test.model.wait_for_idle(timeout=600)
 
