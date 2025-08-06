@@ -74,7 +74,7 @@ integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
     "jubilant~=1.2",
-    "jubilant-backports",
+    "jubilant-backports==1.0.0a1",
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",
@@ -103,7 +103,6 @@ members = ["tracing", "testing"]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
-jubilant-backports = { url = "https://github.com/tonyandrewmeyer/jubilant-backports/archive/refs/tags/v1.0.0a1.zip" }
 
 [tool.setuptools.packages.find]
 include = ["ops"]

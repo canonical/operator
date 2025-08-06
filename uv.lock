@@ -833,14 +833,14 @@ wheels = [
 [[package]]
 name = "jubilant-backports"
 version = "1.0.0a1"
-source = { url = "https://github.com/tonyandrewmeyer/jubilant-backports/archive/refs/tags/v1.0.0a1.zip" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jubilant" },
 ]
-sdist = { hash = "sha256:cba418714ada697c4650de69233128aa1c4d556c982ef62362767c6aea585690" }
-
-[package.metadata]
-requires-dist = [{ name = "jubilant", specifier = "~=1.2" }]
+sdist = { url = "https://files.pythonhosted.org/packages/2d/f9/1f7a3f9f691fc47ba1cec4e15c3ea13df29451f6745fae7cbd0cd3b36b1e/jubilant_backports-1.0.0a1.tar.gz", hash = "sha256:03f0788a2301e1a71ebab56bc59515361c37e5686e40a985caba5b2907514e3f", size = 18626, upload-time = "2025-08-02T06:45:18.314Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/12/0e48ff7ecd1a4f313da1b1bc3e22489d8c134469ae3ef65664b37c179e2c/jubilant_backports-1.0.0a1-py3-none-any.whl", hash = "sha256:ff8d73e17afaae4418c588496978ac42ee9eb9d6d4e77ce103102772038796cc", size = 17790, upload-time = "2025-08-02T06:45:16.976Z" },
+]
 
 [[package]]
 name = "juju"
@@ -1284,7 +1284,7 @@ docs = [
 integration = [
     { name = "httpx", specifier = "~=0.28" },
     { name = "jubilant", specifier = "~=1.2" },
-    { name = "jubilant-backports", url = "https://github.com/tonyandrewmeyer/jubilant-backports/archive/refs/tags/v1.0.0a1.zip" },
+    { name = "jubilant-backports", specifier = "==1.0.0a1" },
     { name = "juju", specifier = ">=2.9,<4" },
     { name = "minio", specifier = "~=7.2" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
