@@ -36,7 +36,12 @@ jobs:
         id: snap-cache
         with:
           path: |
-            /var/snap
+            /var/snap/yq
+            /var/snap/rockcraft
+            /var/snap/charmcraft
+            /var/snap/jq
+            /var/snap/kubectl
+            /var/snap/juju
             /var/lib/snapd/cache
           key: ${{ runner.os }}-snapd-${{ matrix.preset }}
       - uses: actions/cache@v4
