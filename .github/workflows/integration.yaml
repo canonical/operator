@@ -22,33 +22,36 @@ jobs:
            # Work around https://github.com/jnsgruk/concierge/issues/30
            sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
            sudo rm -rf /run/containerd
+      - uses: actions/cache/restore@v4
+        id: cache-apt-restore
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-preset-${{ matrix.preset }}
+      - uses: actions/cache/restore@v4
+        id: cache-snap-restore
+        with:
+          path: |
+            /var/snap
+            /var/lib/snapd/cache
+          key: ${{ runner.os }}-snapd-preset-${{ matrix.preset }}
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
           --juju-channel=3/stable
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
-      - uses: actions/cache@v4
+      - uses: actions/cache/save@v4
         id: snap-cache
         with:
           path: |
             /var/snap
             /var/lib/snapd/cache
           key: ${{ runner.os }}-snapd-preset-${{ matrix.preset }}
-
-      - uses: actions/cache@v4
+      - uses: actions/cache/save@v4
         id: apt-cache
         with:
           path: /var/cache/apt
           key: ${{ runner.os }}-apt-preset-${{ matrix.preset }}
-
-      - name: apt cache hit
-        if: steps.apt-cache.outputs.cache-hit == 'true'
-        run: echo "======== APT cache hit ========"
-
-      - name: snap cache hit
-        if: steps.snap-cache.outputs.cache-hit == 'true'
-        run: echo "======== Snap cache hit ========"
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
