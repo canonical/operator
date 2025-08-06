@@ -70,19 +70,9 @@ def pack(charm_dir: pathlib.Path):
 @pytest.mark.parametrize('base', ['22.04', '24.04'])
 def test_smoke(juju: jubilant_backports.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
-    available_charmcraft_version = (
-        subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
-        .stdout.decode()
-        .strip()
-        .rsplit()[-1]
-        .split('.')
-    )
-    if int(available_charmcraft_version[0]) < 3:
-        pytest.skip('This test requires charmcraft 3')
-
-    charmcraft_yaml = CHARMCRAFT3_YAML.format(base=base)
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
-        outf.write(charmcraft_yaml)
+        outf.write(CHARMCRAFT3_YAML.format(base=base))
+
     charm = pack(pathlib.Path('./test/charms/test_smoke/'))
 
     app = f'smoke{base.replace(".", "")}'
