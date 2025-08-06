@@ -24,6 +24,7 @@ jobs:
            sudo rm -rf /run/containerd
       - name: Adjust Snap cache permissions
         run: |
+          sudo mkdir -p /var/lib/snapd/cache  # Create the directory if it doesn't exist
           sudo chown -R $USER:$USER /var/snap
           sudo chown -R $USER:$USER /var/lib/snapd/cache
           sudo chmod -R a+r /var/snap
