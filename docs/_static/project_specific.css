@@ -8,3 +8,13 @@ body {
     -webkit-mask-image: var(--icon-star);
     mask-image: var(--icon-star);
 }
+
+/* For the "related links" block, use the same spacing & sizing as the "contents" block */
+.relatedlinks-title-container {
+    padding: var(--toc-title-padding);
+    padding-top: var(--toc-spacing-vertical);
+}
+.relatedlinks {
+    font-size: var(--toc-font-size);
+    line-height: 1.3;
+}
