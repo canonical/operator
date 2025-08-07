@@ -21,8 +21,8 @@ import os
 import pathlib
 import subprocess
 
+import jubilant_backports
 import pytest
-from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
@@ -63,41 +63,28 @@ def pack(charm_dir: pathlib.Path):
         dest_name = charm_dir / charm.name
         charm.rename(dest_name)
     # With the way we use charmcraft, we know that there will only be one.
+    assert dest_name
     return dest_name.absolute()
 
 
-@pytest.mark.parametrize(
-    'base,charmcraft_version,name',
-    (
-        ('22.04', 3, 'jammy'),
-        ('24.04', 3, 'noble'),
-    ),
-)
-async def test_smoke(ops_test: OpsTest, base: str, charmcraft_version: int, name: str):
+@pytest.mark.parametrize('base', ['22.04', '24.04'])
+def test_smoke(juju: jubilant_backports.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
-    available_charmcraft_version = (
-        subprocess.run(['charmcraft', 'version'], check=True, capture_output=True)  # noqa: S607
-        .stdout.decode()
-        .strip()
-        .rsplit()[-1]
-        .split('.')
-    )
-    if int(available_charmcraft_version[0]) < charmcraft_version:
-        pytest.skip(f'charmcraft version {available_charmcraft_version} is too old for this test')
-        return
-    charmcraft_yaml = {
-        3: CHARMCRAFT3_YAML,
-    }[charmcraft_version].format(base=base)
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
-        outf.write(charmcraft_yaml)
+        outf.write(CHARMCRAFT3_YAML.format(base=base))
+
     charm = pack(pathlib.Path('./test/charms/test_smoke/'))
 
-    app = await ops_test.model.deploy(
-        charm, base=f'ubuntu@{base}', application_name=f'{name}-smoke'
-    )
-    await ops_test.model.wait_for_idle(timeout=600)
+    app = f'smoke{base.replace(".", "")}'
+    # --force is needed to deploy with --series=noble (24.04) on Juju 2.9
+    juju.deploy(charm, app=app, base=f'ubuntu@{base}', force=True)
+    juju.wait(lambda status: jubilant_backports.all_active(status, app), timeout=600)
 
-    assert app.status == 'active', f"Base ubuntu@{base} failed with '{app.status}' status"
+
+@pytest.fixture(scope='module')
+def juju():
+    with jubilant_backports.temp_model() as juju:
+        yield juju
 
 
 @pytest.fixture
