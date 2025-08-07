@@ -608,6 +608,7 @@ class Context(Generic[CharmType]):
         capture_framework_events: bool = False,
         app_name: str | None = None,
         unit_id: int | None = 0,
+        machine_id: int | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -632,7 +633,11 @@ class Context(Generic[CharmType]):
         :arg juju_version: Juju agent version to simulate.
         :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
             defined in the metadata.
-        :arg unit_id: Unit ID that this charm is deployed as.
+        :arg unit_id: Unit ID that this charm is deployed as, surfaced to the charm in the
+            JUJU_UNIT_NAME envvar. Defaults to 0 if unset.
+        :arg machine_id: Juju Machine ID that this charm is deployed onto,
+            surfaced to the charm as the JUJU_MACHINE_ID envvar.
+            Only applicable to machine charms. Unset by default.
         :arg app_trusted: whether the charm has Juju trust (deployed with ``--trust`` or added with
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
@@ -668,6 +673,7 @@ class Context(Generic[CharmType]):
 
         self._app_name = app_name
         self._unit_id = unit_id
+        self._machine_id = machine_id
         self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
 
@@ -830,6 +836,7 @@ class Context(Generic[CharmType]):
             charm_root=self.charm_root,
             app_name=self._app_name,
             unit_id=self._unit_id,
+            machine_id=self._machine_id,
         )
         with runtime.exec(
             state=state,

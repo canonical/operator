@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import patch
 
 import pytest
@@ -60,6 +61,13 @@ def test_app_name(app_name, unit_id):
     with ctx(ctx.on.start(), State()) as mgr:
         assert mgr.charm.app.name == app_name
         assert mgr.charm.unit.name == f'{app_name}/{unit_id}'
+
+@pytest.mark.parametrize('machine_id', (0, None, 42))
+def test_machine_id_envvar(machine_id):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, machine_id=machine_id)
+    os.unsetenv("JUJU_MACHINE_ID") # cleanup env to be sure
+    with ctx(ctx.on.start(), State()):
+        assert os.getenv("JUJU_MACHINE_ID", "None") == str(machine_id)
 
 
 def test_context_manager():

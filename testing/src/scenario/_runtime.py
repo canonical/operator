@@ -63,6 +63,7 @@ class Runtime:
         juju_version: str = '3.0.0',
         app_name: str | None = None,
         unit_id: int | None = 0,
+        machine_id: int | None = None,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -74,6 +75,7 @@ class Runtime:
 
         self._app_name = app_name
         self._unit_id = unit_id
+        self._machine_id = machine_id
 
     def _get_event_env(self, state: State, event: _Event, charm_root: Path):
         """Build the simulated environment the operator framework expects."""
@@ -86,6 +88,9 @@ class Runtime:
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
         }
+
+        if self._machine_id is not None: # could be 0
+            env["JUJU_MACHINE_ID"] = str(self._machine_id)
 
         if event._is_action_event and (action := event.action):
             env.update(
