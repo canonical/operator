@@ -79,12 +79,11 @@ benchmark = [
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.0",
-    "pytest-operator~=0.23",
     "jubilant~=1.2",
+    "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",
-    "build",  # Until #1814 and #1813 are done
 ]
 
 [project.urls]
