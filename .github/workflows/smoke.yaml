@@ -16,7 +16,7 @@ jobs:
       matrix:
         # pylibjuju does not support Juju 4.x
         # We need to migrate the test to use Jubilant for Juju>2.
-        juju-channel: ['2.9/stable', '3/stable']
+        juju-channel: ['2.9/stable', '3/stable', '4/beta']
         charmcraft-channel: ['3.x/stable']
         preset: ['machine', 'microk8s']
 
