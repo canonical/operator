@@ -41,7 +41,6 @@ jobs:
             /var/snap/charmcraft
             /var/snap/jq
             /var/snap/kubectl
-            /var/snap/juju
             /var/lib/snapd/cache
           key: ${{ runner.os }}-snapd-${{ matrix.preset }}
       - uses: actions/cache@v4
@@ -49,10 +48,6 @@ jobs:
         with:
           path: /var/cache/apt
           key: ${{ runner.os }}-apt-${{ matrix.preset }}
-      - name: Adjust snap permissions to ensure concierge can run
-        run: |
-          sudo chown -R $USER:$USER /var/snap
-          sudo chmod -R a+r /var/snap
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
