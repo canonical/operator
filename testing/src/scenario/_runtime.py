@@ -75,8 +75,8 @@ class Runtime:
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
         }
 
-        if self._machine_id is not None: # could be 0
-            env["JUJU_MACHINE_ID"] = str(self._machine_id)
+        if self._machine_id is not None:  # could be 0
+            env['JUJU_MACHINE_ID'] = str(self._machine_id)
 
         if event._is_action_event and (action := event.action):
             env.update(
