@@ -3,7 +3,7 @@ name: ops Smoke Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 7 25 * *'
+    - cron: '0 7 25 * *'
 
 permissions: {}
 
@@ -14,19 +14,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # pylibjuju does not support Juju 4.x
-        # We need to migrate the test to use Jubilant for Juju>2.
         juju-channel: ['2.9/stable', '3/stable', '4/beta']
-        charmcraft-channel: ['3.x/stable']
         preset: ['machine', 'microk8s']
 
     steps:
-      - name: Install concierge
-        run: sudo snap install --classic concierge
-
-      - name: Install Juju and tools
-        run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
-
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
+          -p "${{ matrix.preset }}"
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
