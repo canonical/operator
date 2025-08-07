@@ -93,12 +93,12 @@ package.
 
 ## Documentation
 
- * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://documentation.ubuntu.com/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm.html#write-unit-tests-for-your-charm), following the instructions for adding
+ * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://documentation.ubuntu.com/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm/#write-unit-tests-for-your-charm), following the instructions for adding
    unit tests at the end of each chapter.
  * When you need to write a test that involves specific ops functionality,
-   refer to our [how-to guides](https://documentation.ubuntu.com/ops/latest/howto/index.html)
+   refer to our [how-to guides](https://documentation.ubuntu.com/ops/latest/howto/)
    which all conclude with examples of tests of the ops functionality.
- * Use our extensive [reference documentation](https://documentation.ubuntu.com/ops/latest/reference/ops-testing.html#ops-testing) when you need to know how each `testing` object works. These
+ * Use our extensive [reference documentation](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/#ops-testing) when you need to know how each `testing` object works. These
    docs are also available via the standard Python `help()` functionality and in
    your IDE.
 
