@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import datetime
 import importlib.util
 import io
+import json
 import logging
 import os
 import re
@@ -28,7 +30,7 @@ import tempfile
 import typing
 import warnings
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -68,6 +70,7 @@ class EventSpec:
     remote_app: str | None = None
     remote_unit: str | None = None
     model_name: str | None = None
+    model_uuid: str | None = None
     set_in_env: dict[str, str] | None = None
     workload_name: str | None = None
     notice_id: str | None = None
@@ -414,6 +417,8 @@ class _TestMain(abc.ABC):
             event_dir = 'hooks'
         if event_spec.model_name is not None:
             env['JUJU_MODEL_NAME'] = event_spec.model_name
+        if event_spec.model_uuid is not None:
+            env['JUJU_MODEL_UUID'] = event_spec.model_uuid
 
         self._call_event(fake_script, Path(event_dir, event_filename), env)
         return self._read_and_clear_state(event_spec.event_name, env)
@@ -908,12 +913,18 @@ class _TestMain(abc.ABC):
         if not re.match(pattern, warning_message):
             pytest.fail(f'Warning was not sent to debug-log: {calls!r}')
 
+    @patch('os.getuid', return_value=1000)
     @pytest.mark.usefixtures('setup_charm')
-    def test_excepthook(self, fake_script: FakeScript):
+    def test_excepthook(self, _: MagicMock, fake_script: FakeScript):
         with pytest.raises(subprocess.CalledProcessError):
             self._simulate_event(
                 fake_script,
-                EventSpec(ops.InstallEvent, 'install', set_in_env={'TRY_EXCEPTHOOK': '1'}),
+                EventSpec(
+                    ops.InstallEvent,
+                    'install',
+                    set_in_env={'TRY_EXCEPTHOOK': '1'},
+                    model_uuid='1234',
+                ),
             )
 
         calls = [' '.join(i) for i in fake_script.calls()]
@@ -929,7 +940,22 @@ class _TestMain(abc.ABC):
             r'RuntimeError: failing as requested',
             calls[0],
         )
+        sec_crash = calls.pop(1)
         assert len(calls) == 1, f'expected 1 call, but got extra: {calls[1:]}'
+
+        assert sec_crash.startswith('juju-log --log-level TRACE --')
+        data_crash = json.loads(sec_crash.rsplit('--', 1)[-1])
+        assert data_crash['type'] == 'security'
+        assert data_crash['appid'] == '1234-test_main/0'
+        crash_timestamp = datetime.datetime.fromisoformat(data_crash['datetime'])
+        assert (
+            datetime.datetime.now(datetime.timezone.utc) - crash_timestamp
+        ).total_seconds() < 60
+        assert (
+            data_crash['description']
+            == "Uncaught exception in charm code: RuntimeError('failing as requested')."
+        )
+        assert data_crash['event'] == 'sys_crash:RuntimeError'
 
     @pytest.mark.usefixtures('setup_charm')
     def test_sets_model_name(self, fake_script: FakeScript):

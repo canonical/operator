@@ -1,0 +1,37 @@
+clients:
+  sbom:
+      service_url: https://sbom-request.canonical.com
+      department: charm_engineering
+      email: tony.meyer@canonical.com
+      team: charm_tech
+  secscan: {}
+
+
+artifacts:
+  - name: 'ops'
+    type: 'sdist'
+    compression: 'gz'
+    ssdlc_params:
+        name: 'ops'
+        version: ''
+        channel: 'stable'
+        cycle: '25.10'
+
+  - name: 'ops-scenario'
+    type: 'sdist'
+    compression: 'gz'
+    ssdlc_params:
+        name: 'ops-scenario'
+        version: ''
+        channel: 'stable'
+        cycle: '25.10'
+
+  - name: 'ops-tracing'
+    type: 'sdist'
+    version: ''
+    compression: 'gz'
+    ssdlc_params:
+        name: 'ops-tracing'
+        version: ''
+        channel: 'stable'
+        cycle: '25.10'

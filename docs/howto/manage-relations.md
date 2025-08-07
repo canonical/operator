@@ -199,7 +199,7 @@ To add data to the relation databag, use the [`.data` attribute](ops.Relation.da
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     if relation := self.model.get_relation('ingress'):
-        relation.data[self.app]["domain"] = self.model.config["domain"]
+        relation.data[self.app]["domain"] = self.config["domain"]
 ```
 
 To read data from the relation databag, again use the `.data` attribute, selecting the appropriate databag, and then using it as if it were a regular dictionary.

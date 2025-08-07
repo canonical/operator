@@ -38,7 +38,7 @@ jobs:
       - name: Install yq
         run: sudo snap install yq
 
-      - name: Add 'git' as a build package 
+      - name: Add 'git' as a build package
         run: |
           cd examples/httpbin-demo
           if yq --exit-status 'has("parts")' charmcraft.yaml; then
@@ -60,3 +60,10 @@ jobs:
         run: |
           cd examples/httpbin-demo
           charmcraft pack --verbose
+
+      - name: Archive charmcraft logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charmcraft-logs
+          path: /root/.local/state/charmcraft/log/*.log

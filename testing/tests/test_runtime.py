@@ -49,6 +49,7 @@ def test_event_emission():
         my_charm_type.on.define_event('bar', MyEvt)
 
         runtime = Runtime(
+            'foo',
             _CharmSpec(
                 my_charm_type,
                 meta=meta,
@@ -76,12 +77,12 @@ def test_unit_name(app_name, unit_id):
     my_charm_type = charm_type()
 
     runtime = Runtime(
+        app_name,
         _CharmSpec(
             my_charm_type,
             meta=meta,
         ),
         unit_id=unit_id,
-        app_name=app_name,
     )
 
     with runtime.exec(
@@ -98,6 +99,7 @@ def test_env_clean_on_charm_error():
     my_charm_type = charm_type()
 
     runtime = Runtime(
+        'frank',
         _CharmSpec(
             my_charm_type,
             meta=meta,
@@ -131,7 +133,8 @@ def test_juju_version_is_set_in_environ():
             framework.observe(self.on.start, self._on_start)
 
         def _on_start(self, _: ops.StartEvent):
-            assert ops.JujuVersion.from_environ() == version
+            with pytest.warns(DeprecationWarning):
+                assert ops.JujuVersion.from_environ() == version
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, juju_version=version)
     ctx.run(ctx.on.start(), State())

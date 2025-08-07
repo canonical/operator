@@ -6,9 +6,10 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
@@ -26,10 +27,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.1.0.dev0",
+    "ops-scenario==8.2.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.1.0.dev0",
+    "ops-tracing==3.2.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -42,19 +43,11 @@ lint = [
 ]
 docs = [
     "ops[testing,tracing]",
-    "canonical-sphinx-extensions",
-    "furo",
-    "linkify-it-py",
-    "myst-parser; python_version >= \"3.10\"",
-    "pyspelling",
-    "sphinx ~= 8.0.0; python_version >= \"3.10\"",
-    "sphinx-autobuild",
-    "sphinx-copybutton",
-    "sphinx-design",
-    "sphinx-notfound-page",
-    "sphinx-tabs",
-    "sphinxcontrib-jquery",
-    "sphinxext-opengraph",
+    "canonical-sphinx[full]",
+    "packaging",
+    "sphinxcontrib-svg2pdfconverter[CairoSVG]",
+    "sphinx-last-updated-by-git",
+    "sphinx-sitemap",
 ]
 static = [
     "ops[testing,tracing]",
@@ -66,7 +59,6 @@ unit = [
     "pytest~=8.4",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
-    "eval-type-backport~=0.2; python_version < \"3.10\"",
 ]
 xdist = [
     "pytest-xdist~=3.6",
@@ -75,24 +67,26 @@ coverage = [
     "coverage[toml]~=7.0",
 ]
 benchmark = [
-    "pytest-benchmark~=5.0; python_version >= \"3.9\"",
+    "pytest-benchmark~=5.0",
 ]
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
-    "pytest-operator~=0.23",
     "jubilant~=1.2",
+    "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
     "juju>=2.9,<4",
-    "build",  # Until #1814 and #1813 are done
+]
+release = [
+    "pygithub~=2.6",
 ]
 
 [project.urls]
-"Homepage" = "https://ops.readthedocs.io/en/latest/"
+"Homepage" = "https://documentation.ubuntu.com/ops/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://ops.readthedocs.io"
+"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]

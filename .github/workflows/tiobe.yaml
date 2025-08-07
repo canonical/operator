@@ -3,20 +3,20 @@ name: TIOBE Quality Checks
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 7 1 * *'
+    - cron:  '0 7 * * 0'
 
 permissions: {}
 
 jobs:
   TICS:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, reactive, amd64, tiobe, noble]
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
         # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
       - run: uv tool install tox --with tox-uv
 
       - name: Generate coverage report
@@ -24,8 +24,8 @@ jobs:
 
       - name: Install TIOBE and project dependencies
         run: |
-          uv export --no-emit-project --frozen --no-hashes --group unit --group static > requirements.txt
-          pip install flake8 pylint -e . -r requirements.txt
+          uv export --no-emit-project --frozen --no-hashes --group unit --group static --group release > requirements.txt
+          pip install flake8 pylint -e . -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
         uses: tiobe/tics-github-action@009979693978bfefad2ad15c1020066694968dc7  # v3.4.0

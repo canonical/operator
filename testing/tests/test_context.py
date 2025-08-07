@@ -80,3 +80,15 @@ def test_context_manager():
     with ctx(ctx.on.action('act'), state) as mgr:
         mgr.run()
         assert mgr.charm.meta.name == 'foo'
+
+
+def test_app_name_and_unit_id_default():
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    assert ctx.app_name == 'foo'
+    assert ctx.unit_id == 0
+
+
+def test_app_name_and_unit_id():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, app_name='notfoo', unit_id=42)
+    assert ctx.app_name == 'notfoo'
+    assert ctx.unit_id == 42

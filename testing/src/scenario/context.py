@@ -477,6 +477,12 @@ class Context(Generic[CharmType]):
     can't emit multiple events in a single charm execution.
     """
 
+    app_name: str
+    """The name of the application that this charm is deployed as."""
+
+    unit_id: int
+    """The unit ID that this charm is deployed to."""
+
     juju_log: list[JujuLogLine]
     """A record of what the charm has sent to juju-log"""
     app_status_history: list[_EntityStatus]
@@ -671,8 +677,8 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self._app_name = app_name
-        self._unit_id = unit_id
+        self.app_name = app_name or self.charm_spec.meta.get('name')
+        self.unit_id = unit_id
         self._machine_id = machine_id
         self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
@@ -831,11 +837,11 @@ class Context(Generic[CharmType]):
     @contextmanager
     def _run(self, event: _Event, state: State):
         runtime = Runtime(
+            app_name=self.app_name,
             charm_spec=self.charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
-            app_name=self._app_name,
-            unit_id=self._unit_id,
+            unit_id=self.unit_id,
             machine_id=self._machine_id,
         )
         with runtime.exec(
