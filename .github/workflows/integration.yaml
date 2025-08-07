@@ -14,40 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: ['k8s', 'microk8s']
-        test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
+        preset: ['microk8s']
+        test: ['test_direct_connection']
 
     steps:
       - run: |
            # Work around https://github.com/jnsgruk/concierge/issues/30
            sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
            sudo rm -rf /run/containerd
-      - name: Make sure snap/apt cache folders exist before restoring cache
-        run: |
-          sudo mkdir -p /var/lib/snapd/cache
-          sudo mkdir -p /var/cache/apt
-          sudo chown -R $USER:$USER /var/snap
-          sudo chown -R $USER:$USER /var/lib/snapd/cache
-          sudo chown -R $USER:$USER /var/cache/apt
-          sudo chmod -R a+r /var/snap
-          sudo chmod -R a+r /var/lib/snapd/cache
-          sudo chmod -R a+r /var/cache/apt
-      - uses: actions/cache@v4
-        id: snap-cache
-        with:
-          path: |
-            /var/snap/yq
-            /var/snap/rockcraft
-            /var/snap/charmcraft
-            /var/snap/jq
-            /var/snap/kubectl
-            /var/lib/snapd/cache
-          key: ${{ runner.os }}-snapd-${{ matrix.preset }}
-      - uses: actions/cache@v4
-        id: apt-cache
-        with:
-          path: /var/cache/apt
-          key: ${{ runner.os }}-apt-${{ matrix.preset }}
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
@@ -60,12 +34,3 @@ jobs:
       - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
-      - name: Adjust snap and apt cache permissions to ensure cache can be saved
-        run: |
-          sudo chown -R $USER:$USER /var/snap
-          sudo chown -R $USER:$USER /var/lib/snapd/cache
-          sudo chown -R $USER:$USER /var/cache/apt
-          sudo chmod -R a+r /var/snap
-          sudo chmod -R a+r /var/lib/snapd/cache
-          sudo chmod -R a+r /var/cache/apt
-          

@@ -38,28 +38,18 @@ def juju() -> Generator[jubilant.Juju]:
 def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""
     deploy_tempo(juju)
-    logging.debug('====================== DEBUG: tempo deployed.')
     deploy_tempo_worker(juju)
-    logging.debug('====================== DEBUG: tempo worker deployed.')
     juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
-    logging.debug('====================== DEBUG: minio deployed.')
     juju.deploy('s3-integrator')
-    logging.debug('====================== DEBUG: s3-integrator deployed.')
 
-    logging.debug('====================== DEBUG: integrating tempo/s3.')
     juju.integrate('tempo:s3', 's3-integrator')
-    logging.debug('====================== DEBUG: tempo/s3 integrated.')
 
-    logging.debug('====================== DEBUG: integrating tempo-cluster/tempo-worker.')
     juju.integrate('tempo:tempo-cluster', 'tempo-worker')
-    logging.debug('====================== DEBUG: tempo-cluster/tempo-worker integrated.')
 
-    logging.debug('====================== DEBUG: Juju wait all active minio, all blocked s3.')
     juju.wait(
         lambda status: jubilant.all_active(status, 'minio')
         and jubilant.all_blocked(status, 's3-integrator')
     )
-    logging.debug('====================== DEBUG: Juju wait all active minio, all blocked s3 DONE!.')
 
     address = juju.status().apps['minio'].address
     mc_client = minio.Minio(
@@ -69,24 +59,17 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
         secure=False,
     )
 
-    logging.debug('====================== DEBUG: minio bucket exist test.')
     found = mc_client.bucket_exists('tempo')
     if not found:
-        logging.debug('====================== DEBUG: minio bucket create.')
         mc_client.make_bucket('tempo')
-    logging.debug('====================== DEBUG: minio bucket done.')
 
-    logging.debug('====================== DEBUG: juju config s3-integrator')
     juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
-    logging.debug('====================== DEBUG: juju config s3-integrator done.')
 
-    logging.debug('====================== DEBUG: juju run sync-s3-credentials')
     juju.run(
         's3-integrator/0',
         'sync-s3-credentials',
         {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
     )
-    logging.debug('====================== DEBUG: juju run sync-s3-credentials done.')
 
     # Tempo goes through a cycle of:
     # - update own stateful set
@@ -96,9 +79,7 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     #
     # This process may take a while.
 
-    logging.debug('====================== DEBUG: The last juju wait all active')
     juju.wait(jubilant.all_active)
-    logging.debug('====================== DEBUG: The last juju wait all active done')
 
     yield juju
 
