@@ -1,3 +1,7 @@
+---
+relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/stable/), [Charmlibs](https://canonical-charmlibs.readthedocs-hosted.com/), [Concierge](https://github.com/canonical/concierge), [Jubilant](https://documentation.ubuntu.com/jubilant/), [Juju](https://documentation.ubuntu.com/juju/3.6/), [Pebble](https://documentation.ubuntu.com/pebble/)"
+---
+
 # Ops documentation
 
 ```{toctree}
