@@ -16,7 +16,7 @@ explanation/index
 
 Ops is a Python framework for writing and testing [Juju](https://juju.is/) charms.
 
-The core `ops` package provides an API to respond to Juju events and manage the charm's application. Ops also includes extra packages for testing and tracing.
+The core `ops` package provides an API to respond to Juju events and manage the charm's application. Ops also includes extra packages for testing and tracing charms.
 
 Ops promotes consistent and maintainable charm code. Its APIs help you separate different aspects of the charm, such as managing the application's state and integrating with other charms.
 
