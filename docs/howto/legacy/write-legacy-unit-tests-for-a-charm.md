@@ -66,7 +66,7 @@ When using `Harness.begin()` you are responsible for manually triggering events 
 ...
 # Add a relation and trigger relation-created.
 harness.add_relation('db', 'postgresql') # <relation-name>, <remote-app-name>
-# Add a peer relation and trigger relation-created 
+# Add a peer relation and trigger relation-created
 harness.add_relation('cluster', 'test-app') # <peer-relation-name>, <this-app-name>
 ```
 
@@ -92,7 +92,7 @@ harness.disable_hooks()
 harness.update_config({"foo": "quux"})
 # Re-enable hooks
 harness.enable_hooks()
-# Set the status of the active unit. We'd need "from ops.model import BlockedStatus".
+# Set the status of the active unit. We'd need "from ops import BlockedStatus".
 harness.charm.unit.status = BlockedStatus("Testing")
 ```
 
@@ -135,7 +135,7 @@ def test_logs(harness, caplog):
 
 In `ops` 1.4, functionality was added to the Harness to more accurately track connections to workload containers. As of `ops` 2.0, this behaviour is enabled and simulated by default (prior to 2.0, you had to enable it by setting `ops.testing.SIMULATE_CAN_CONNECT` to True before creating Harness instances).
 
-Containers normally start in a disconnected state, and any interaction with the remote container (push, pull, add_layer, and so on) will raise an `ops.pebble.ConnectionError`. 
+Containers normally start in a disconnected state, and any interaction with the remote container (push, pull, add_layer, and so on) will raise an `ops.pebble.ConnectionError`.
 
 To mark a container as connected,
 you can either call [`harness.set_can_connect(container, True)`](ops.testing.Harness.set_can_connect), or you can call [`harness.container_pebble_ready(container)`](ops.testing.Harness.container_pebble_ready) if you want to mark the container as connected *and* trigger its pebble-ready event.
