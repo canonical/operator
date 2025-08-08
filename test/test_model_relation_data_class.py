@@ -134,7 +134,7 @@ class MyCharm(BaseTestCharm):
 class MyDataclassDatabag:
     foo: str
     bar: int = dataclasses.field(default=0)
-    baz: list[str] = dataclasses.field(default_factory=list)
+    baz: list[str] = dataclasses.field(default_factory=list[str])
     quux: Nested = dataclasses.field(default_factory=Nested)
 
     def __post_init__(self):
