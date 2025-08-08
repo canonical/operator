@@ -16,6 +16,8 @@ parts:
         source: .
         build-packages:
             - cargo
+        charm-binary-python-packages: 
+            - pydantic-core
 
 requires:
     charm-tracing:
