@@ -168,7 +168,7 @@ class TestRealPebble:
         process.wait()
 
         excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
-        with pytest.raises(pebble.ExecError) as excinfo:
+        with pytest.raises(pebble.ExecError[str]) as excinfo:
             process = client.exec(['/bin/sh', '-c', 'exit 42'])
             process.wait()
         assert excinfo.value.exit_code == 42
@@ -185,7 +185,7 @@ class TestRealPebble:
         assert err == b'ERR\n'
 
         excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
-        with pytest.raises(pebble.ExecError) as excinfo:
+        with pytest.raises(pebble.ExecError[str]) as excinfo:
             process = client.exec(['/bin/sh', '-c', 'echo OUT; echo ERR >&2; exit 42'])
             process.wait_output()
         assert excinfo.value.exit_code == 42
