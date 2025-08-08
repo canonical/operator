@@ -287,7 +287,7 @@ exclude = [
     "RUF015",  # Prefer `next` over single element slice
     "SIM115",  # Use a context manager for opening files
 ]
-"tools/tests/*" = [
+"tools/tests_tools/*" = [
     # All documentation linting.
     "D",
 ]

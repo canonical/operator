@@ -107,7 +107,7 @@ def test_config_in_not_mutated(mycharm, cfg_in):
     assert state_out.config == cfg_in
 
 
-def test_config_using_configbase_class():
+def test_config_using_generated_config():
     @dataclasses.dataclass
     class Config:
         a: int

@@ -82,18 +82,18 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
             ):
                 docs[field.name] = field.default.description  # type: ignore
 
-    for cls in cls.mro():
-        if cls is object:
+    for schema_class in cls.mro():
+        if schema_class is object:
             continue
         try:
-            source_code = inspect.getsource(cls)
+            source_code = inspect.getsource(schema_class)
         except OSError:
-            logger.debug('No source code found for %s', cls.__name__)
+            logger.debug('No source code found for %s', schema_class.__name__)
             continue
         try:
             tree = ast.parse(source_code)
         except (SyntaxError, IndentationError):
-            logger.debug('Failed to parse source code for %s', cls.__name__)
+            logger.debug('Failed to parse source code for %s', schema_class.__name__)
             continue
         extractor = AttributeDocstringExtractor()
         extractor.visit(tree)

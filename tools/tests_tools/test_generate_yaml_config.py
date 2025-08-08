@@ -26,10 +26,9 @@ try:
 except ImportError:
     pydantic = None
 
-import ops
-
 import ops_tools
 
+import ops
 
 logger = logging.getLogger(__name__)
 

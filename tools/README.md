@@ -1,15 +1,12 @@
-# Ops charmcraft.yaml generation tooling
+# Ops Tools
 
-The definition of charm configuration options and actions should have a single
-source of truth. Our preference is that truth is in the charm code: this is in
-an expressive language (Python), that allows more complex type definitions and
-validation than possible in the Juju config schema language or action parameter
-JSONSchema. However, Juju and Charmcraft need to find these schema in the
-`charmcraft.yaml` file.
+A collection of tools to use when developing and maintaining Ops charms.
 
-This package provides tooling to generate the appropriate `charmcraft.yaml`
-sections for `config` and `actions` from config and action classes in the charm
-Python code.
+## charmcraft.yaml generation
+
+The definition of charm configuration options and actions should have a single source of truth. Our preference is that truth is in the charm code: this is in an expressive language (Python), that allows more complex type definitions and validation than possible in the Juju config schema language or action parameter JSONSchema. However, Juju and Charmcraft need to find these schema in the `charmcraft.yaml` file.
+
+The package provides tooling to generate the appropriate `charmcraft.yaml` sections for `config` and `actions` from config and action classes in the charm Python code.
 
 For example, the config class:
 
@@ -101,12 +98,4 @@ add-admin-user:
     additionalProperties: false
 ```
 
-The Python classes may be:
-
-* Standard library `dataclasses.dataclass` classes.
-* Pydantic dataclasses.
-* Pydantic `BaseModel` subclasses.
-* Other Python classes, as long as TODO
-
-Type annotations for all classes should use the modern `a | b` and `a | None`
-form, rather than `Union[a, b]` or `Optional[a]`.
+Type annotations for all classes should use the modern `a | b` and `a | None` form, rather than `Union[a, b]` or `Optional[a]`.

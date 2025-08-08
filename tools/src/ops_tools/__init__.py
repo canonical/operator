@@ -18,9 +18,10 @@ Includes tools to:
  * Generate charmcraft.yaml from Python config and action classes.
 """
 
-from ._generate_yaml import OptionDict, action_to_juju_schema, config_to_juju_schema
+from ._generate_yaml import ActionDict, OptionDict, action_to_juju_schema, config_to_juju_schema
 
 __all__ = [
+    'ActionDict',
     'OptionDict',
     'action_to_juju_schema',
     'config_to_juju_schema',

@@ -30,6 +30,7 @@ from typing import (
     get_origin,
     get_type_hints,
 )
+
 from typing_extensions import NotRequired
 
 import ops
@@ -44,6 +45,16 @@ class OptionDict(TypedDict):
     """The Juju option type."""
     description: NotRequired[str]
     default: NotRequired[bool | int | float | str]
+
+
+class ActionDict(TypedDict, total=False):
+    description: str
+    params: dict[str, Any]
+    """A dictionary of parameters for the action."""
+    required: list[str]
+    """A list of required parameters for the action."""
+    additionalProperties: bool
+    """Whether additional properties are allowed in the action parameters."""
 
 
 JUJU_TYPES: Final[Mapping[type, str]] = {
@@ -375,9 +386,8 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     To adjust the YAML, provide a ``to_juju_schema`` method in the class. For
     example, to allow additional properties::
 
-    TODO: the type isn't right here, because we allow changing the name too.
-        def to_juju_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
-            schema['additionalProperties'] = True
+        def to_juju_schema(cls, schema: dict[str, ActionDict]) -> dict[str, ActionDict]:
+            schema['run-backup']['additionalProperties'] = True
             return schema
     """
     # As of March 2025, there are no known charms that are using
@@ -388,8 +398,7 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     if cls.__doc__:
         action['description'] = cls.__doc__
     # Pydantic classes provide this, so we can just get it directly.
-    # The type: ignores are required because we don't want to import pydantic
-    # in this code.
+    # The type: ignores are to avoid importing pydantic.
     if hasattr(cls, 'schema'):
         schema = cls.schema()  # type: ignore
         params = schema['properties']  # type: ignore

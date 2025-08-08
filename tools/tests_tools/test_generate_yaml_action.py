@@ -27,9 +27,7 @@ try:
 except ImportError:
     pydantic = None
 
-import ops
 import ops_tools
-
 
 logger = logging.getLogger(__name__)
 
@@ -121,18 +119,18 @@ if pydantic:
 
 
 @pytest.mark.parametrize('action_class,action_name', _test_action_classes)
-def test_action_yaml_schema(action_class: type[ops.ActionBase], action_name: str):
-    generated_yaml = ops_tools.action_to_juju_schema(action_class)
+def test_action_yaml_schema(action_class: type[object], action_name: str):
+    generated_schema = ops_tools.action_to_juju_schema(action_class)
     if hasattr(action_class, 'schema'):
         # Remove the 'title' property that Pydantic adds to make the schema more
         # consistent with the others for simpler testing.
-        for prop in generated_yaml[action_name]['params'].values():
+        for prop in generated_schema[action_name]['params'].values():
             prop.pop('title', None)
         # Also adjust how `my-list` is specified.
-        assert generated_yaml[action_name]['params']['my-list']['items'] == {'type': 'string'}
-        del generated_yaml[action_name]['params']['my-list']['items']
-        generated_yaml[action_name]['params']['my-list']['default'] = []
-    expected_yaml: dict[str, Any] = {
+        assert generated_schema[action_name]['params']['my-list']['items'] == {'type': 'string'}
+        del generated_schema[action_name]['params']['my-list']['items']
+        generated_schema[action_name]['params']['my-list']['default'] = []
+    expected_schema: dict[str, Any] = {
         action_name: {
             'description': 'An action description.',
             'params': {
@@ -165,7 +163,7 @@ def test_action_yaml_schema(action_class: type[ops.ActionBase], action_name: str
             'additionalProperties': False,
         },
     }
-    assert generated_yaml == expected_yaml
+    assert generated_schema == expected_schema
 
 
 def test_action_yaml_additional_properties():
@@ -175,19 +173,21 @@ def test_action_yaml_additional_properties():
         x: int = 42
 
         @classmethod
-        def to_juju_schema(cls: type[object], schema: dict[str, Any]) -> dict[str, Any]:
+        def to_juju_schema(
+            cls: type[object], schema: dict[str, ops_tools.ActionDict]
+        ) -> dict[str, ops_tools.ActionDict]:
             schema['action-true']['additionalProperties'] = True
             return schema
 
-    generated_yaml = ops_tools.action_to_juju_schema(ActionTrue)
-    expected_yaml = {
+    generated_schema = ops_tools.action_to_juju_schema(ActionTrue)
+    expected_schema = {
         'action-true': {
             'description': 'An action.',
             'params': {'x': {'type': 'integer', 'default': 42}},
             'additionalProperties': True,
         },
     }
-    assert generated_yaml == expected_yaml
+    assert generated_schema == expected_schema
 
     class ActionDefault:
         """An action."""
@@ -195,18 +195,20 @@ def test_action_yaml_additional_properties():
         x: int = 42
 
         @classmethod
-        def to_juju_schema(cls: type[object], schema: dict[str, Any]) -> dict[str, Any]:
+        def to_juju_schema(
+            cls: type[object], schema: dict[str, ops_tools.ActionDict]
+        ) -> dict[str, ops_tools.ActionDict]:
             del schema['action-default']['additionalProperties']
             return schema
 
-    generated_yaml = ops_tools.action_to_juju_schema(ActionDefault)
-    expected_yaml = {
+    generated_schema = ops_tools.action_to_juju_schema(ActionDefault)
+    expected_schema = {
         'action-default': {
             'description': 'An action.',
             'params': {'x': {'type': 'integer', 'default': 42}},
         },
     }
-    assert generated_yaml == expected_yaml
+    assert generated_schema == expected_schema
 
 
 def test_action_class_modification():
@@ -216,19 +218,21 @@ def test_action_class_modification():
         x: int = 42
 
         @classmethod
-        def to_juju_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+        def to_juju_schema(
+            cls, schema: dict[str, ops_tools.ActionDict]
+        ) -> dict[str, ops_tools.ActionDict]:
             schema['action-minimum']['params']['x']['minimum'] = 0
             return schema
 
-    generated_yaml = ops_tools.action_to_juju_schema(ActionMinimum)
-    expected_yaml = {
+    generated_schema = ops_tools.action_to_juju_schema(ActionMinimum)
+    expected_schema = {
         'action-minimum': {
             'description': 'An action.',
             'additionalProperties': False,
             'params': {'x': {'type': 'integer', 'default': 42, 'minimum': 0}},
         },
     }
-    assert generated_yaml == expected_yaml
+    assert generated_schema == expected_schema
 
 
 class Mode(enum.Enum):
