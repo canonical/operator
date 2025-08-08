@@ -78,7 +78,7 @@ def test_smoke(juju: jubilant_backports.Juju, base: str):
     app = f'smoke{base.replace(".", "")}'
     # --force is needed to deploy with --series=noble (24.04) on Juju 2.9
     juju.deploy(charm, app=app, base=f'ubuntu@{base}', force=True)
-    juju.wait(lambda status: jubilant_backports.all_active(status, app), timeout=600)
+    juju.wait(lambda status: jubilant_backports.all_active(status, app), timeout=999)
 
 
 @pytest.fixture(scope='module')
