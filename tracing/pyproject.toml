@@ -1,6 +1,6 @@
 [project]
 name = "ops-tracing"
-version = "3.1.0.dev0"
+version = "3.2.0.dev0"
 description = "The tracing facility for the Ops library."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -31,14 +31,14 @@ classifiers = [
 dependencies = [
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.30",
-    "ops==3.1.0.dev0",
+    "ops==3.2.0.dev0",
     "pydantic",
 ]
 
 [project.urls]
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://ops.readthedocs.io"
+"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 

@@ -31,8 +31,8 @@ jobs:
           # Force-push pin changes to the branch
           echo "New changes in charm pins"
           git --no-pager diff
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
+          git config --global user.name "Prints Charming [bot]"
+          git config --global user.email "ben.hoyt+prints-charming-bot@canonical.com"
           git switch -C auto-update-external-charm-pins
           git commit --allow-empty -am "chore: update charm pins"
           echo "Total changes in charm pins"

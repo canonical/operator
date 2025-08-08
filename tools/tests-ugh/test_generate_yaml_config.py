@@ -100,7 +100,9 @@ if pydantic:
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
         my_str: str = pydantic.Field('foo', description='A string value.')
         my_secret: ops.Secret | None = pydantic.Field(None, description='A user secret.')
-        my_date: datetime.date = pydantic.Field(datetime.date(2023, 9, 4), description='A date value.')
+        my_date: datetime.date = pydantic.Field(
+            datetime.date(2023, 9, 4), description='A date value.'
+        )
 
     class MyPydanticBaseModelConfig(pydantic.BaseModel):
         basic_bool: bool
@@ -112,7 +114,9 @@ if pydantic:
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
         my_str: str = pydantic.Field('foo', description='A string value.')
         my_secret: ops.Secret | None = pydantic.Field(None, description='A user secret.')
-        my_date: datetime.date = pydantic.Field(datetime.date(2023, 9, 4), description='A date value.')
+        my_date: datetime.date = pydantic.Field(
+            datetime.date(2023, 9, 4), description='A date value.'
+        )
 
         class Config:
             arbitrary_types_allowed = True
@@ -162,10 +166,10 @@ def test_config_yaml_schema(config_class: type[object]):
                 'type': 'secret',
                 'description': 'A user secret.',
             },
-           'my-date': {
-               'default': '2023-09-04',
-               'description': 'A date value.',
-               'type': 'string',
+            'my-date': {
+                'default': '2023-09-04',
+                'description': 'A date value.',
+                'type': 'string',
             },
         },
     }

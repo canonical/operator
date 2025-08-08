@@ -3,7 +3,7 @@ name: ops Smoke Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron:  '0 7 25 * *'
+    - cron: '0 7 25 * *'
 
 permissions: {}
 
@@ -14,25 +14,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # pylibjuju does not support Juju 4.x
-        # We need to migrate the test to use Jubilant for Juju>2.
         juju-channel: ['2.9/stable', '3/stable']
-        charmcraft-channel: ['3.x/stable']
         preset: ['machine', 'microk8s']
 
     steps:
-      - name: Install concierge
-        run: sudo snap install --classic concierge
-
-      - name: Install Juju and tools
-        run: sudo concierge prepare --juju-channel=${{ matrix.juju-channel }} --charmcraft-channel=${{ matrix.charmcraft-channel }} -p "${{ matrix.preset }}"
-
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
+          -p "${{ matrix.preset }}"
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba  # v6.3.1
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
 
       - run: uv tool install tox --with tox-uv
 

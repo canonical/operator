@@ -35,7 +35,7 @@ To help us review your changes, please rebase your pull request onto the `main` 
 
 # Tests
 
-Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://ops.readthedocs.io/en/latest/reference/ops-testing.html) instead of legacy [ops.testing.Harness](https://ops.readthedocs.io/en/latest/reference/ops-testing-harness.html) tests.
+Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/) instead of legacy [ops.testing.Harness](https://documentation.ubuntu.com/ops/latest/reference/ops-testing-harness/) tests.
 
 Tests for Ops should go in the test module corresponding to the code. For example, a feature added in `ops/main.py` would go in `test/test_main.py`. However, when adding a large number of logically related tests, consider putting these in their own file, named accordingly. For example, if adding a feature `foo` in `ops/main.py`, the tests might go in `test/test_main_foo.py`.
 
@@ -43,11 +43,11 @@ Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testi
 
 # Coding style
 
-We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://ops.readthedocs.io/en/latest/reference/index.html) is automatically generated from Python docstrings.
+We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://documentation.ubuntu.com/ops/latest/reference/) is automatically generated from Python docstrings.
 
 # Documentation
 
-The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/) for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
+The published docs at [documentation.ubuntu.com/ops](https://documentation.ubuntu.com/ops/latest/) are built automatically from [the top-level `docs` directory](./docs). We use [MyST Markdown](https://mystmd.org/) for most pages and arrange the pages according to [Diátaxis](https://diataxis.fr/).
 
 To contribute docs:
 
@@ -91,7 +91,9 @@ tox -e docs-live
 
 ## How to document version dependencies
 
-We don't publish separate documentation for separate versions of Ops. The published docs at [ops.readthedocs.io](https://ops.readthedocs.io/en/latest/index.html) are always for the in-development (main branch) of Ops, and do not include any notes indicating changes or additions across Ops versions. We encourage all charmers to promptly upgrade to the latest version of Ops, and to refer to the release notes and changelog for learning about changes.
+We publish separate documentation for each major version of Ops. We generally only make improvements to the latest version of the docs. If an older version of Ops changes in a way that's only applicable to that version, we update the older version of the docs. We also update the older version of the docs if there's an improvement that's critical for charming.
+
+The published docs at [documentation.ubuntu.com/ops](https://documentation.ubuntu.com/ops/latest/) are always for the in-development (main branch) of Ops, and do not include any notes indicating changes or additions across Ops versions. We encourage all charmers to promptly upgrade to the latest version of Ops, and to refer to the release notes and changelog for learning about changes.
 
 We do note when features behave differently when using different versions of Juju.
 

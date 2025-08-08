@@ -8,8 +8,8 @@ charm-relation-interfaces
 testing
 tracing
 holistic-vs-delta-charms
-how-and-when-to-defer-events
-storedstate-uses-limitations
+defer-guidance
+security
+storedstate-guidance
 state-transition-testing
 ```
-

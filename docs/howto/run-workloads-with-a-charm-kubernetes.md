@@ -168,7 +168,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
                 "pause": {
                     "override": "merge",
                     "environment": {
-                        "TIMEOUT": self.model.config["timeout"],
+                        "TIMEOUT": self.config["timeout"],
                     },
                 }
             },
