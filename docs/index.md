@@ -10,8 +10,6 @@ reference/index
 explanation/index
 ```
 
-
-
 The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
 
 > [See it on PyPI](https://pypi.org/project/ops/)
@@ -25,9 +23,6 @@ The library provides:
 - {ref}`ops_testing_harness`, the deprecated API for unit testing charms
 
 You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrating with other services, and making the charm easier to test.
-
-
----------
 
 ## In this documentation
 
@@ -68,10 +63,6 @@ You can structure your charm however you like, but with the `ops` library, you g
 ```
 
 ````
-
-
----------
-
 
 ## Project and community
 
