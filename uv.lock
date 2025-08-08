@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.11'",
@@ -1297,7 +1297,7 @@ lint = [
 release = [{ name = "pygithub", specifier = "~=2.6" }]
 static = [
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
-    { name = "pyright", specifier = "==1.1.385" },
+    { name = "pyright", specifier = "~=1.1" },
     { name = "typing-extensions", specifier = "~=4.2" },
 ]
 unit = [
