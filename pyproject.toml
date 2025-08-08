@@ -42,6 +42,7 @@ lint = [
 ]
 docs = [
     "ops[testing,tracing]",
+    "ops-tools",
     "canonical-sphinx-extensions",
     "furo",
     "linkify-it-py",
@@ -58,11 +59,13 @@ docs = [
 ]
 static = [
     "ops[testing,tracing]",
+    "ops-tools",
     "pyright==1.1.385",
     "typing_extensions~=4.2",
 ]
 unit = [
     "ops[testing,tracing]",
+    "ops-tools",
     "pytest~=8.4",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
@@ -79,6 +82,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
+    "ops-tools",
     "pytest~=8.4",
     "pytest-operator~=0.23",
     "jubilant~=1.2",
@@ -102,12 +106,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.uv.workspace]
-members = ["tracing", "testing"]
+members = ["tracing", "testing", "tools"]
 
 [tool.uv.sources]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
+ops-tools = { workspace = true }
 
 [tool.setuptools.packages.find]
 include = ["ops"]
@@ -288,6 +293,10 @@ exclude = [
     "RUF015",  # Prefer `next` over single element slice
     "SIM115",  # Use a context manager for opening files
 ]
+"tools/tests/*" = [
+    # All documentation linting.
+    "D",
+]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
@@ -319,9 +328,9 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "tools/src/*.py", "tools/tests/*.py"]
 exclude = ["tracing/*"]
-extraPaths = ["testing", "tracing"]
+extraPaths = ["testing", "tracing", "tools"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

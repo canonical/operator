@@ -1,0 +1,304 @@
+# Copyright 2025 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import annotations
+
+import dataclasses
+import enum
+import logging
+from typing import Any
+
+import pytest
+
+try:
+    import pydantic
+    import pydantic.dataclasses
+except ImportError:
+    pydantic = None
+
+import ops
+import ops_tools
+
+
+logger = logging.getLogger(__name__)
+
+
+class MyAction:
+    """An action description."""
+
+    my_str: str
+    """A string value."""
+
+    my_bool: bool = False
+    """A Boolean value."""
+
+    my_int: int = 42
+    """A positive integer value."""
+
+    my_float: float = 3.14
+    """A floating point value."""
+
+    my_list: list[str] = []  # noqa: RUF012
+    """A list value."""
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class MyDataclassAction:
+    """An action description."""
+
+    my_str: str
+    """A string value."""
+
+    my_bool: bool = False
+    """A Boolean value."""
+
+    my_int: int = 42
+    """A positive integer value."""
+
+    my_float: float = 3.14
+    """A floating point value."""
+
+    my_list: list[str] = dataclasses.field(default_factory=list)
+    """A list value."""
+
+
+_test_action_classes: list[tuple[type[object], str]] = [
+    (MyAction, 'my-action'),
+    (MyDataclassAction, 'my-dataclass-action'),
+]
+
+if pydantic:
+
+    @pydantic.dataclasses.dataclass(frozen=True)
+    class MyPydanticDataclassAction:
+        """An action description."""
+
+        my_str: str = pydantic.Field(description='A string value.')
+        my_bool: bool = pydantic.Field(False, description='A Boolean value.')
+        my_int: int = pydantic.Field(42, description='A positive integer value.')
+        my_float: float = pydantic.Field(3.14, description='A floating point value.')
+        my_list: list[str] = pydantic.Field(default_factory=list, description='A list value.')
+
+    class MyPydanticBaseModelAction(pydantic.BaseModel):
+        """An action description."""
+
+        my_str: str = pydantic.Field(alias='my-str', description='A string value.')  # type: ignore
+        my_bool: bool = pydantic.Field(
+            False,
+            alias='my-bool',  # type: ignore
+            description='A Boolean value.',
+        )
+        my_int: int = pydantic.Field(42, alias='my-int', description='A positive integer value.')  # type: ignore
+        my_float: float = pydantic.Field(
+            3.14,
+            alias='my-float',  # type: ignore
+            description='A floating point value.',
+        )
+        my_list: list[str] = pydantic.Field(
+            alias='my-list',  # type: ignore
+            default_factory=list,
+            description='A list value.',
+        )
+
+        class Config:
+            frozen = True
+
+    _test_action_classes.extend((
+        (MyPydanticDataclassAction, 'my-pydantic-dataclass-action'),
+        (MyPydanticBaseModelAction, 'my-pydantic-base-model-action'),
+    ))
+
+
+@pytest.mark.parametrize('action_class,action_name', _test_action_classes)
+def test_action_yaml_schema(action_class: type[ops.ActionBase], action_name: str):
+    generated_yaml = ops_tools.action_to_juju_schema(action_class)
+    if hasattr(action_class, 'schema'):
+        # Remove the 'title' property that Pydantic adds to make the schema more
+        # consistent with the others for simpler testing.
+        for prop in generated_yaml[action_name]['params'].values():
+            prop.pop('title', None)
+        # Also adjust how `my-list` is specified.
+        assert generated_yaml[action_name]['params']['my-list']['items'] == {'type': 'string'}
+        del generated_yaml[action_name]['params']['my-list']['items']
+        generated_yaml[action_name]['params']['my-list']['default'] = []
+    expected_yaml: dict[str, Any] = {
+        action_name: {
+            'description': 'An action description.',
+            'params': {
+                'my-bool': {
+                    'type': 'boolean',
+                    'default': False,
+                    'description': 'A Boolean value.',
+                },
+                'my-float': {
+                    'type': 'number',
+                    'default': 3.14,
+                    'description': 'A floating point value.',
+                },
+                'my-int': {
+                    'type': 'integer',
+                    'default': 42,
+                    'description': 'A positive integer value.',
+                },
+                'my-str': {
+                    'type': 'string',
+                    'description': 'A string value.',
+                },
+                'my-list': {
+                    'type': 'array',
+                    'default': [],
+                    'description': 'A list value.',
+                },
+            },
+            'required': ['my-str'],
+            'additionalProperties': False,
+        },
+    }
+    assert generated_yaml == expected_yaml
+
+
+def test_action_yaml_additional_properties():
+    class ActionTrue:
+        """An action."""
+
+        x: int = 42
+
+        @classmethod
+        def to_juju_schema(cls: type[object], schema: dict[str, Any]) -> dict[str, Any]:
+            schema['action-true']['additionalProperties'] = True
+            return schema
+
+    generated_yaml = ops_tools.action_to_juju_schema(ActionTrue)
+    expected_yaml = {
+        'action-true': {
+            'description': 'An action.',
+            'params': {'x': {'type': 'integer', 'default': 42}},
+            'additionalProperties': True,
+        },
+    }
+    assert generated_yaml == expected_yaml
+
+    class ActionDefault:
+        """An action."""
+
+        x: int = 42
+
+        @classmethod
+        def to_juju_schema(cls: type[object], schema: dict[str, Any]) -> dict[str, Any]:
+            del schema['action-default']['additionalProperties']
+            return schema
+
+    generated_yaml = ops_tools.action_to_juju_schema(ActionDefault)
+    expected_yaml = {
+        'action-default': {
+            'description': 'An action.',
+            'params': {'x': {'type': 'integer', 'default': 42}},
+        },
+    }
+    assert generated_yaml == expected_yaml
+
+
+def test_action_class_modification():
+    class ActionMinimum:
+        """An action."""
+
+        x: int = 42
+
+        @classmethod
+        def to_juju_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+            schema['action-minimum']['params']['x']['minimum'] = 0
+            return schema
+
+    generated_yaml = ops_tools.action_to_juju_schema(ActionMinimum)
+    expected_yaml = {
+        'action-minimum': {
+            'description': 'An action.',
+            'additionalProperties': False,
+            'params': {'x': {'type': 'integer', 'default': 42, 'minimum': 0}},
+        },
+    }
+    assert generated_yaml == expected_yaml
+
+
+class Mode(enum.Enum):
+    FULL = 'full'
+    ADD = 'add'
+    REMOVE = 'remove'
+
+
+class Rebalance:
+    """Trigger a rebalance of cluster partitions based on configured goals"""
+
+    mode: Mode
+    """The operation to issue to the balancer."""
+
+
+def test_action_enum():
+    generated_yaml = ops_tools.action_to_juju_schema(Rebalance)
+    expected_yaml = {
+        'rebalance': {
+            'description': 'Trigger a rebalance of cluster partitions based on configured goals',
+            'additionalProperties': False,
+            'required': ['mode'],
+            'params': {
+                'mode': {
+                    'type': 'string',
+                    'description': 'The operation to issue to the balancer.',
+                    'enum': ['full', 'add', 'remove'],
+                },
+            },
+        },
+    }
+    assert generated_yaml == expected_yaml
+
+
+class action: ...  # noqa: N801
+
+
+class Action: ...
+
+
+class AcTioN: ...
+
+
+class TheAction: ...
+
+
+class MYAction: ...
+
+
+class ABC: ...
+
+
+class myAction: ...  # noqa: N801
+
+
+class DoThisThing: ...
+
+
+@pytest.mark.parametrize(
+    'cls,action_name',
+    [
+        (action, 'action'),
+        (Action, 'action'),
+        (AcTioN, 'ac-tio-n'),
+        (TheAction, 'the-action'),
+        (MYAction, 'm-y-action'),
+        (ABC, 'a-b-c'),
+        (myAction, 'my-action'),
+        (DoThisThing, 'do-this-thing'),
+    ],
+)
+def test_action_class_name_to_action_name(cls: type[object], action_name: str):
+    assert list(ops_tools.action_to_juju_schema(cls).keys()) == [action_name]

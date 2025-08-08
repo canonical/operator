@@ -5,6 +5,7 @@ import dataclasses
 import pytest
 
 import ops
+import ops_tools
 
 from scenario.context import Context
 from scenario.state import State
@@ -108,14 +109,10 @@ def test_config_in_not_mutated(mycharm, cfg_in):
 
 def test_config_using_configbase_class():
     @dataclasses.dataclass
-    class Config(ops.ConfigBase):
+    class Config:
         a: int
         b: float
         c: str
-
-        @classmethod
-        def _option_names(cls):
-            yield 'b'
 
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -125,7 +122,7 @@ def test_config_using_configbase_class():
         def _on_config_changed(self, event: ops.ConfigChangedEvent):
             self.typed_config = self.load_config(Config, 10, c='foo')
 
-    schema = Config.to_juju_schema()
+    schema = ops_tools.config_to_juju_schema(Config)
     ctx = Context(Charm, meta={'name': 'foo'}, config=schema)
     with ctx(ctx.on.config_changed(), State(config={'b': 3.14})) as mgr:
         mgr.run()

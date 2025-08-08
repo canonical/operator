@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/ops_tools/__init__.py
+src/ops_tools/_attrdocs.py
+src/ops_tools/_generate_yaml.py
+src/ops_tools.egg-info/PKG-INFO
+src/ops_tools.egg-info/SOURCES.txt
+src/ops_tools.egg-info/dependency_links.txt
+src/ops_tools.egg-info/requires.txt
+src/ops_tools.egg-info/top_level.txt
+tests/test_generate_yaml_action.py
+tests/test_generate_yaml_config.py

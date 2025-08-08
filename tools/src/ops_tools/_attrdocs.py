@@ -82,17 +82,20 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
             ):
                 docs[field.name] = field.default.description  # type: ignore
 
-    try:
-        source_code = inspect.getsource(cls)
-    except OSError:
-        logger.debug('No source code found for %s', cls.__name__)
-        return docs
-    try:
-        tree = ast.parse(source_code)
-    except (SyntaxError, IndentationError):
-        logger.debug('Failed to parse source code for %s', cls.__name__)
-        return docs
-    extractor = AttributeDocstringExtractor()
-    extractor.visit(tree)
-    docs.update(extractor.attribute_docs)
+    for cls in cls.mro():
+        if cls is object:
+            continue
+        try:
+            source_code = inspect.getsource(cls)
+        except OSError:
+            logger.debug('No source code found for %s', cls.__name__)
+            continue
+        try:
+            tree = ast.parse(source_code)
+        except (SyntaxError, IndentationError):
+            logger.debug('Failed to parse source code for %s', cls.__name__)
+            continue
+        extractor = AttributeDocstringExtractor()
+        extractor.visit(tree)
+        docs.update(extractor.attribute_docs)
     return docs
