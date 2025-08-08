@@ -33,6 +33,7 @@ import time
 import typing
 import unittest
 import uuid
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6402,7 +6403,7 @@ class TestHandleExec:
         harness.handle_exec(container, ['foo'], result=10)
 
         excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
-        with pytest.raises(pebble.ExecError[str]) as excinfo:
+        with pytest.raises(pebble.ExecError) as excinfo:  # type: ignore
             container.exec(['foo']).wait()
         assert excinfo.value.exit_code == 10
 

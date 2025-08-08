@@ -3494,8 +3494,9 @@ class TestExec:
         self.add_responses(client, '456', 1)
 
         process = client.exec(['false'])
+        # https://github.com/microsoft/pyright/discussions/10774
         excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
-        with pytest.raises(pebble.ExecError[str]) as excinfo:
+        with pytest.raises(pebble.ExecError) as excinfo:  # type: ignore
             process.wait()
         assert excinfo.value.command == ['false']
         assert excinfo.value.exit_code == 1
