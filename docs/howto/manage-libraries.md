@@ -79,7 +79,7 @@ class DatabaseReadyEvent(ops.EventBase):
 
 class DatabaseRequirerEvents(ops.ObjectEvents):
     """Container for Database Requirer events."""
-    ready = ops.charm.EventSource(DatabaseReadyEvent)
+    ready = ops.EventSource(DatabaseReadyEvent)
 
 
 class DatabaseRequirer(ops.Object):
