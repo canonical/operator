@@ -3269,7 +3269,7 @@ class Container:
         stdin: bytes | BinaryIO | None = None,
         stdout: BinaryIO | None = None,
         stderr: BinaryIO | None = None,
-        encoding: None = None,
+        encoding: None,
         combine_stderr: bool = False,
     ) -> pebble.ExecProcess[bytes]: ...
 
@@ -4373,7 +4373,7 @@ class CloudCredential:
     auth_type: str
     """Authentication type."""
 
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict)
+    attributes: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -4381,7 +4381,7 @@ class CloudCredential:
     can be found here.
     """
 
-    redacted: list[str] = dataclasses.field(default_factory=list)
+    redacted: list[str] = dataclasses.field(default_factory=list[str])
     """A list of redacted secrets."""
 
     @classmethod
@@ -4419,7 +4419,7 @@ class CloudSpec:
     credential: CloudCredential | None = None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: list[str] = dataclasses.field(default_factory=list)
+    ca_certificates: list[str] = dataclasses.field(default_factory=list[str])
     """A list of CA certificates."""
 
     skip_tls_verify: bool = False
