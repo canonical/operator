@@ -92,8 +92,8 @@ harness.disable_hooks()
 harness.update_config({"foo": "quux"})
 # Re-enable hooks
 harness.enable_hooks()
-# Set the status of the active unit. We'd need "from ops import BlockedStatus".
-harness.charm.unit.status = BlockedStatus("Testing")
+# Set the status of the active unit
+harness.charm.unit.status = ops.BlockedStatus("Testing")
 ```
 
 Any of your charm’s properties and methods (including event callbacks) can be accessed using
