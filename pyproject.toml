@@ -83,7 +83,6 @@ integration = [
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
-    "juju>=2.9,<4",
 ]
 
 [project.urls]
