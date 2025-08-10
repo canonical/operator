@@ -5,7 +5,6 @@ description = "The tracing facility for the Ops library."
 requires-python = ">=3.10"
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["../LICENSE.txt"]
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]

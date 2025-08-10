@@ -18,7 +18,6 @@ maintainers = [
 ]
 description = "Python library providing a state-transition testing API for Operator Framework charms."
 license = "Apache-2.0"
-license-files = ["../LICENSE.txt"]
 keywords = ["juju", "test"]
 
 dependencies = [
