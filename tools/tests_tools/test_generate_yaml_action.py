@@ -82,8 +82,8 @@ class MyDataclassAction:
 
 
 _test_action_classes: list[tuple[type[object], str]] = [
-    (MyAction, 'my-action'),
-    (MyDataclassAction, 'my-dataclass-action'),
+    (MyAction, 'my'),
+    (MyDataclassAction, 'my-dataclass'),
 ]
 
 if pydantic:
@@ -133,8 +133,8 @@ if pydantic:
             frozen = True
 
     _test_action_classes.extend((
-        (MyPydanticDataclassAction, 'my-pydantic-dataclass-action'),
-        (MyPydanticBaseModelAction, 'my-pydantic-base-model-action'),
+        (MyPydanticDataclassAction, 'my-pydantic-dataclass'),
+        (MyPydanticBaseModelAction, 'my-pydantic-base-model'),
     ))
 
 
@@ -318,7 +318,7 @@ class DoThisThing: ...
     [
         (oneaction, 'one'),
         (OneAction, 'one'),
-        (oNeAcTioN, 'o-n-e'),
+        (oNeAcTioN, 'o-ne'),
         (TheOneAction, 'the-one'),
         (MYOneAction, 'm-y-one'),
         (ABC, 'a-b-c'),
