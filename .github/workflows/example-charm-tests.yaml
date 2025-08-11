@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  charm-unit-tests:
+  charm-checks:
     runs-on: ubuntu-latest
 
     strategy:
