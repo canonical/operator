@@ -18,7 +18,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "ops", "charms"]
 
 dependencies = [
-    "ops==3.1.0.dev0",
+    "ops==3.2.0.dev0",
     "PyYAML>=6.0.1",
     "typing_extensions~=4.2",
 ]

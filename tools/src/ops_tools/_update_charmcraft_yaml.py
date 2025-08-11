@@ -24,20 +24,27 @@
 
 import argparse
 import importlib
+import re
+from typing import Generator
 
 import yaml
 
 from . import ActionDict, OptionDict, action_to_juju_schema, config_to_juju_schema
 
 
-def get_class_from_module(class_specifier: str) -> type:
+def get_class_from_module(class_specifier: str) -> Generator[type]:
     """Import the specified module and get the class from the top-level namespace."""
-    module_name, class_name = class_specifier.rsplit(':', 1)
+    if ':' in class_specifier:
+        module_name, class_name = class_specifier.rsplit(':', 1)
+    else:
+        module_name = 'src.charm'
+        class_name = class_specifier
     module = importlib.import_module(module_name)
-    cls = getattr(module, class_name, None)
-    if cls is None:
-        raise ImportError(f"Class '{class_name}' not found in module '{module_name}'")
-    return cls
+    for attr in dir(module):
+        if not isinstance(getattr(module, attr), type):
+            continue
+        if re.fullmatch(class_name, attr):
+            yield getattr(module, attr)
 
 
 def main():
@@ -47,21 +54,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        'charmcraft_yaml',
+        '--charmcraft-yaml',
         help='Path to the charmcraft.yaml file to update.',
+        default='charmcraft.yaml',
     )
     parser.add_argument(
         '--config-class',
         action='append',
         help='Python class with config classes (can be specified multiple times). '
-        'For example, "src.charm:Config"',
+        'For example, "src.config:Config". The module defaults to "src.charm".'
+        'The class may be a regular expression.',
         default=[],
     )
     parser.add_argument(
         '--action-class',
         action='append',
         help='Python class with action classes (can be specified multiple times). '
-        'For example, "src.charm:BackupAction"',
+        'For example, "src.backup:BackupAction". The module defaults to "src.charm".'
+        'The class may be a regular expression.',
         default=[],
     )
     args = parser.parse_args()
@@ -69,15 +79,15 @@ def main():
     with open(args.charmcraft_yaml) as raw:
         charmcraft_yaml = yaml.safe_load(raw)
 
-    config: dict[str, dict[str, OptionDict]] = {}
+    config: dict[str, dict[str, OptionDict]] = {'options': {}}
     for class_specifier in args.config_class:
-        cls = get_class_from_module(class_specifier)
-        config.update(config_to_juju_schema(cls))
-    actions: list[dict[str, ActionDict]] = []
+        for cls in get_class_from_module(class_specifier):
+            config['options'].update(config_to_juju_schema(cls)['options'])
+    actions: dict[str, ActionDict] = {}
     for class_specifier in args.action_class:
-        cls = get_class_from_module(class_specifier)
-        actions.append(action_to_juju_schema(cls))
-    actions.sort(key=lambda x: next(iter(x.keys())))  # Sort actions by name.
+        for cls in get_class_from_module(class_specifier):
+            actions.update(action_to_juju_schema(cls))
+    actions = dict(sorted(actions.items()))  # Sort actions by name.
 
     if config:
         charmcraft_yaml['config'] = config
