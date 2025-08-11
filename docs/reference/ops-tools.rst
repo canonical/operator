@@ -1,7 +1,7 @@
-.. _ops-tools:
+.. _ops_tools:
 
-`ops-tools`
+`ops_tools`
 ===========
 
-.. automodule:: ops-tools
+.. automodule:: ops_tools
    :exclude-members: main
