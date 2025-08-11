@@ -24,7 +24,7 @@ jobs:
 
       - name: Install TIOBE and project dependencies
         run: |
-          uv export --no-emit-project --frozen --no-hashes --group unit --group static --group release > requirements.txt
+          uv export --no-emit-project --frozen --no-hashes --group unit --group release > requirements.txt
           pip install flake8 pylint -e . -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
