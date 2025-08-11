@@ -66,19 +66,12 @@ JUJU_TYPES: Final[Mapping[type, str]] = {
 }
 
 # We currently only handle the basic types that we expect to see in real charms.
+# lists and tuples (arrays) are handled without using this mapping.
 JSON_TYPES: Final[Mapping[type, str]] = {
     bool: 'boolean',
     int: 'integer',
     float: 'number',
     str: 'string',
-    list[bool]: 'array',
-    list[int]: 'array',
-    list[float]: 'array',
-    list[str]: 'array',
-    tuple[bool]: 'array',
-    tuple[int]: 'array',
-    tuple[float]: 'array',
-    tuple[str]: 'array',
 }
 
 
@@ -100,10 +93,19 @@ def attr_to_default(cls: type[object], name: str) -> Any:
         if hasattr(field.default, 'default')
         else field.default
     )
-    if field_default is not dataclasses.MISSING:
+    field_default_factory = (  # type: ignore
+        field.default.default_factory  # type: ignore
+        if hasattr(field.default, 'default_factory')
+        else field.default_factory
+    )
+    # A hack to avoid importing Pydantic here.
+    if (
+        'PydanticUndefinedType' not in str(type(field_default))  # type: ignore
+        and field_default is not dataclasses.MISSING
+    ):
         return field_default  # type: ignore
-    if field.default_factory is not dataclasses.MISSING:
-        return field.default_factory()
+    if field_default_factory is not dataclasses.MISSING:
+        return field_default_factory()  # type: ignore
     return default
 
 
@@ -236,12 +238,15 @@ def to_json_schema(cls: type[object]) -> tuple[dict[str, Any], list[str]]:
         param = {}
 
         hint_obj = get_type_hints(cls)[attr]
+        origin = get_origin(hint_obj)
+        args = get_args(hint_obj)
         if isinstance(hint_obj, type) and issubclass(hint_obj, enum.Enum):
             param['type'] = 'string'
             param['enum'] = [m.value for m in hint_obj.__members__.values()]
-        elif isinstance(hint_obj, type) and issubclass(hint_obj, (list, tuple)):
+        elif isinstance(origin, type) and issubclass(origin, (list, tuple)):
             param['type'] = 'array'
-            param['items'] = {'type': attr_to_json_type(cls, attr)}
+            if issubclass(origin, list) and len(args) == 1:
+                param['items'] = {'type': JSON_TYPES.get(args[0], 'string')}
         else:
             param['type'] = attr_to_json_type(cls, attr)
 
@@ -250,11 +255,9 @@ def to_json_schema(cls: type[object]) -> tuple[dict[str, Any], list[str]]:
             required = True
         else:
             required = False
-            if type(default) in (tuple, list):
-                param['items'] = {'type': attr_to_json_type(cls, attr)}
-            else:
-                if type(default) not in (bool, int, float, str):
-                    default = str(default)
+            if type(default) not in (bool, int, float, str, list, tuple):
+                default = str(default)
+            if not issubclass(type(default), (list, tuple)) or len(default) > 0:
                 param['default'] = default
 
         doc = attr_docs.get(attr)
@@ -265,6 +268,7 @@ def to_json_schema(cls: type[object]) -> tuple[dict[str, Any], list[str]]:
         if required:
             required_params.append(json_name)
 
+    required_params.sort()
     return params, required_params
 
 
@@ -401,8 +405,9 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     # The type: ignores are to avoid importing pydantic.
     if hasattr(cls, 'schema'):
         schema = cls.schema()  # type: ignore
-        params = schema['properties']  # type: ignore
-        required_params = schema['required']  # type: ignore
+        params = {key.replace('_', '-'): value for key, value in schema['properties'].items()}  # type: ignore
+        required_params = [key.replace('_', '-') for key in schema['required']]  # type: ignore
+        required_params.sort()  # type: ignore
     else:
         params, required_params = to_json_schema(cls)
     if params:

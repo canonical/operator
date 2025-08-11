@@ -35,7 +35,12 @@ logger = logging.getLogger(__name__)
 class MyAction:
     """An action description."""
 
-    my_str: str
+    basic_bool: bool
+    basic_int: int
+    basic_float: float
+    basic_str: str
+
+    my_str: str = 'foo'
     """A string value."""
 
     my_bool: bool = False
@@ -55,7 +60,12 @@ class MyAction:
 class MyDataclassAction:
     """An action description."""
 
-    my_str: str
+    basic_bool: bool
+    basic_int: int
+    basic_float: float
+    basic_str: str
+
+    my_str: str = 'foo'
     """A string value."""
 
     my_bool: bool = False
@@ -82,7 +92,12 @@ if pydantic:
     class MyPydanticDataclassAction:
         """An action description."""
 
-        my_str: str = pydantic.Field(description='A string value.')
+        basic_bool: bool
+        basic_int: int
+        basic_float: float
+        basic_str: str
+
+        my_str: str = pydantic.Field('foo', description='A string value.')
         my_bool: bool = pydantic.Field(False, description='A Boolean value.')
         my_int: int = pydantic.Field(42, description='A positive integer value.')
         my_float: float = pydantic.Field(3.14, description='A floating point value.')
@@ -91,7 +106,12 @@ if pydantic:
     class MyPydanticBaseModelAction(pydantic.BaseModel):
         """An action description."""
 
-        my_str: str = pydantic.Field(alias='my-str', description='A string value.')  # type: ignore
+        basic_bool: bool
+        basic_int: int
+        basic_float: float
+        basic_str: str
+
+        my_str: str = pydantic.Field('foo', alias='my-str', description='A string value.')  # type: ignore
         my_bool: bool = pydantic.Field(
             False,
             alias='my-bool',  # type: ignore
@@ -126,14 +146,14 @@ def test_action_yaml_schema(action_class: type[object], action_name: str):
         # consistent with the others for simpler testing.
         for prop in generated_schema[action_name]['params'].values():
             prop.pop('title', None)
-        # Also adjust how `my-list` is specified.
-        assert generated_schema[action_name]['params']['my-list']['items'] == {'type': 'string'}
-        del generated_schema[action_name]['params']['my-list']['items']
-        generated_schema[action_name]['params']['my-list']['default'] = []
     expected_schema: dict[str, Any] = {
         action_name: {
             'description': 'An action description.',
             'params': {
+                'basic-bool': {'type': 'boolean'},
+                'basic-float': {'type': 'number'},
+                'basic-int': {'type': 'integer'},
+                'basic-str': {'type': 'string'},
                 'my-bool': {
                     'type': 'boolean',
                     'default': False,
@@ -151,15 +171,16 @@ def test_action_yaml_schema(action_class: type[object], action_name: str):
                 },
                 'my-str': {
                     'type': 'string',
+                    'default': 'foo',
                     'description': 'A string value.',
                 },
                 'my-list': {
                     'type': 'array',
-                    'default': [],
+                    'items': {'type': 'string'},
                     'description': 'A list value.',
                 },
             },
-            'required': ['my-str'],
+            'required': ['basic-bool', 'basic-float', 'basic-int', 'basic-str'],
             'additionalProperties': False,
         },
     }
@@ -221,6 +242,7 @@ def test_action_class_modification():
         def to_juju_schema(
             cls, schema: dict[str, ops_tools.ActionDict]
         ) -> dict[str, ops_tools.ActionDict]:
+            assert 'params' in schema['action-minimum']
             schema['action-minimum']['params']['x']['minimum'] = 0
             return schema
 
