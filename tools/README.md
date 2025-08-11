@@ -8,17 +8,29 @@ The definition of charm configuration options and actions should have a single s
 
 The package provides tooling to generate the appropriate `charmcraft.yaml` sections for `config` and `actions` from config and action classes in the charm Python code.
 
-For example, the config class:
+### Usage
+
+For example, if your charm contains a single config class in `src/charm.py` called `Config` and three actions, which all end with 'Action' (and no other classes have that name):
+
+```bash
+update-charmcraft --config-class Config --action-class '.+Action'
+```
+
+If you have a config class in `src/workload.py` called `WorkloadConfig` and one in `src/charm.py` called `AdditionalConfig`:
+
+```bash
+update-charmcraft --config-class src.workload:WorkloadConfig --config-class src.charm:AdditionalConfig
+```
+
+This command can be included in a pre-commit configuration, or CI workflow, to ensure that the `charmcraft.yaml` file is always in sync with the Python classes.
+
+### Example output
+
+The config class:
 
 ```python
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class MyConfig:
-    my_bool: bool | None = None
-    '''A boolean value.'''
-    my_float: float = 3.14
-    '''A floating point value.'''
-    my_int: int = 42
-    '''An integer value.'''
     my_str: str = "foo"
     '''A string value.'''
     my_secret: ops.Secret | None = None
@@ -28,28 +40,18 @@ class MyConfig:
 would generate this YAML:
 
 ```yaml
-options:
-    my-bool:
-        type: boolean
-        description: A boolean value.
-    my-float:
-        type: float
-        default: 3.14
-        description: A floating point value.
-    my-int:
-        type: int
-        default: 42
-        description: An integer value.
-    my-str:
-        type: string
-        default: foo
-        description: A string value.
-    my-secret:
-        type: secret
-        description: A user secret.
+config:
+    options:
+        my-str:
+            type: string
+            default: foo
+            description: A string value.
+        my-secret:
+            type: secret
+            description: A user secret.
 ```
 
-And the action classes:
+And the action class:
 
 ```python
 class Compression(enum.Enum):
@@ -57,45 +59,32 @@ class Compression(enum.Enum):
     BZ = 'bzip2'
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class RunBackup:
+class RunBackupAction:
     '''Backup the database.'''
 
     filename: str
     '''The name of the backup file.'''
     compression: Compression = Compression.GZ
     '''The type of compression to use.'''
-
-@dataclasses.dataclass(frozen=True, kw_only=True)
-class AddAdminUser:
-    '''Add a new admin user and return their credentials.'''
-
-    username: str
 ```
 
 would generate this YAML:
 
 ```yaml
-run-backup:
-    description: Backup the database.
-    params:
-        filename:
-            type: string
-            description: The name of the backup file.
-        compression:
-            type: string
-            description: The type of compression to use.
-            default: gzip
-            enum: [gzip, bzip2]
-    required: [filename]
-    additionalProperties: false
-
-add-admin-user:
-    description: Add a new admin user and return their credentials.
-    params:
-        username:
-            type: string
-    required: [username]
-    additionalProperties: false
+actions:
+    run-backup:
+        description: Backup the database.
+        params:
+            filename:
+                type: string
+                description: The name of the backup file.
+            compression:
+                type: string
+                description: The type of compression to use.
+                default: gzip
+                enum: [gzip, bzip2]
+        required: [filename]
+        additionalProperties: false
 ```
 
 Type annotations for all classes should use the modern `a | b` and `a | None` form, rather than `Union[a, b]` or `Optional[a]`.
