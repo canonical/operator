@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 class AttributeDocstringExtractor(ast.NodeVisitor):
     def __init__(self):
         self.attribute_docs: dict[str, str] = {}
-        self._last_attr = None
 
     def visit_ClassDef(self, node: ast.ClassDef):  # noqa: N802
         """Visit a class definition and extract attribute docstrings."""
@@ -45,6 +44,7 @@ class AttributeDocstringExtractor(ast.NodeVisitor):
         # We also track any standalone strings, and when we find one we use it
         # for the docstring of the most recent attribute assignments.
         # This isn't perfect - but it should cover the majority of cases.
+        last_attr = None
         for child in node.body:
             if isinstance(child, (ast.Assign, ast.AnnAssign)):
                 target = None  # Make the type checker happy.
@@ -53,14 +53,15 @@ class AttributeDocstringExtractor(ast.NodeVisitor):
                 elif isinstance(child, ast.AnnAssign):
                     target = child.target
                 assert isinstance(target, ast.Name)
-                self._last_attr = target.id
+                last_attr = target.id
             elif (
                 isinstance(child, ast.Expr)
                 and isinstance(child.value, ast.Constant)
-                and self._last_attr
+                and last_attr
+                and isinstance(child.value.value, str)
             ):
-                self.attribute_docs[self._last_attr] = child.value.value
-                self._last_attr = None
+                self.attribute_docs[last_attr] = child.value.value
+                last_attr = None
         self.generic_visit(node)
 
 
