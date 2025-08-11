@@ -40,6 +40,7 @@ class AttributeDocstringExtractor(ast.NodeVisitor):
         self._last_attr = None
 
     def visit_ClassDef(self, node: ast.ClassDef):  # noqa: N802
+        """Visit a class definition and extract attribute docstrings."""
         # We iterate over the class definition, looking for attribute assignments.
         # We also track any standalone strings, and when we find one we use it
         # for the docstring of the most recent attribute assignments.

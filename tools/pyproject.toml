@@ -46,6 +46,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
+[project.scripts]
+update-charmcraft = "ops_tools._update_charmcraft_yaml:main"
+
 [project.urls]
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"

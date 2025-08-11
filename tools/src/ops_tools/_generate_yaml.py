@@ -416,8 +416,10 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
         action['required'] = required_params
     action['additionalProperties'] = False
     # Add a ``-`` after each A-Z character of the class name, and then
-    # lower-case the resulting string.
+    # lower-case the resulting string. Drop any 'action' suffix.
     action_name = re.sub(r'(?<!^)([A-Z])', r'-\1', cls.__name__).lower()
+    if action_name.endswith('action'):
+        action_name = action_name[: -len('action')].rstrip('-')
     if hasattr(cls, 'to_juju_schema'):
         # If the class has a custom `to_juju_schema` method, call it.
         # This allows the class to override the default schema generation.

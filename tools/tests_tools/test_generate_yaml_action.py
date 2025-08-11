@@ -289,25 +289,25 @@ def test_action_enum():
     assert generated_yaml == expected_yaml
 
 
-class action: ...  # noqa: N801
+class oneaction: ...  # noqa: N801
 
 
-class Action: ...
+class OneAction: ...
 
 
-class AcTioN: ...
+class oNeAcTioN: ...  # noqa: N801
 
 
-class TheAction: ...
+class TheOneAction: ...
 
 
-class MYAction: ...
+class MYOneAction: ...
 
 
 class ABC: ...
 
 
-class myAction: ...  # noqa: N801
+class myOneAction: ...  # noqa: N801
 
 
 class DoThisThing: ...
@@ -316,13 +316,13 @@ class DoThisThing: ...
 @pytest.mark.parametrize(
     'cls,action_name',
     [
-        (action, 'action'),
-        (Action, 'action'),
-        (AcTioN, 'ac-tio-n'),
-        (TheAction, 'the-action'),
-        (MYAction, 'm-y-action'),
+        (oneaction, 'one'),
+        (OneAction, 'one'),
+        (oNeAcTioN, 'o-n-e'),
+        (TheOneAction, 'the-one'),
+        (MYOneAction, 'm-y-one'),
         (ABC, 'a-b-c'),
-        (myAction, 'my-action'),
+        (myOneAction, 'my-one'),
         (DoThisThing, 'do-this-thing'),
     ],
 )
