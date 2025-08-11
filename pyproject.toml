@@ -80,7 +80,6 @@ integration = [
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
-    "juju>=2.9,<4",
 ]
 release = [
     "pygithub~=2.6",
@@ -109,7 +108,7 @@ ops-tracing = { workspace = true }
 ops-tools = { workspace = true }
 
 [tool.setuptools.packages.find]
-include = ["ops"]
+include = ["ops", "ops._private", "ops.lib"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
