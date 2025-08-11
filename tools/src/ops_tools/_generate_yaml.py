@@ -277,24 +277,23 @@ def config_to_juju_schema(cls: type[object]) -> dict[str, dict[str, OptionDict]]
 
     For example, with the class::
 
-        @dataclasses.dataclass(frozen=True, kw_only=True)
-        class MyConfig:
-            my_bool: bool | None = None
-            '''A boolean value.'''
-            my_float: float = 3.14
-            '''A floating point value.'''
-            my_int: int = 42
-            '''An integer value.'''
-            my_str: str = "foo"
-            '''A string value.'''
-            my_secret: ops.Secret | None = None
-            '''A user secret.'''
+        class MyConfig(pydantic.BaseModel):
+            my_bool: bool = pydantic.Field(default=False, description='A boolean value.')
+            my_float: float = pydantic.Field(
+                default=3.14, description='A floating point value.'
+            )
+            my_int: int = pydantic.Field(default=42, description='An integer value.')
+            my_str: str = pydantic.Field(default="foo", description='A string value.')
+            my_secret: ops.Secret | None = pydantic.Field(
+                default=None, description='A user secret.'
+            )
 
     ``print(yaml.safe_dump(to_juju_schema(MyConfig)))`` will output::
 
         options:
             my-bool:
                 type: boolean
+                default: false
                 description: A boolean value.
             my-float:
                 type: float
@@ -362,14 +361,14 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
             GZ = 'gzip'
             BZ = 'bzip2'
 
-        @dataclasses.dataclass(frozen=True, kw_only=True)
-        class RunBackup:
+        class RunBackup(pydantic.BaseModel):
             '''Backup the database.'''
 
-            filename: str
-            '''The name of the backup file.'''
-            compression: Compression = Compression.GZ
-            '''The type of compression to use.'''
+            filename: str = pydantic.Field(description='The name of the backup file.')
+            compression: Compression = pydantic.Field(
+                Compression.GZ,
+                description='The type of compression to use.',
+            )
 
     The output will be a dictionary that can be dumped to produce YAML like this::
 
