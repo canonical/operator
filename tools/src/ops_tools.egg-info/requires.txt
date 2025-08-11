@@ -1,3 +1,0 @@
-ops==3.1.0.dev0
-PyYAML>=6.0.1
-typing_extensions~=4.2
