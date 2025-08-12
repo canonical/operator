@@ -14,84 +14,74 @@ reference/index
 explanation/index
 ```
 
+Ops is a Python framework for writing and testing [Juju](https://juju.is/) charms.
 
+The core `ops` package provides an API to respond to Juju events and manage the charm's application. Ops also includes extra packages for testing and tracing charms.
 
-The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
-
-> [See it on PyPI](https://pypi.org/project/ops/)
-
-The library provides:
-
-- {ref}`ops_main_entry_point`, used to initialise and run your charm
-- {ref}`ops`, the API to respond to Juju events and manage the application
-- {ref}`ops_pebble`, the Pebble client, a low-level API for Kubernetes containers
-- {ref}`ops_testing`, the recommended API for unit testing charms
-- {ref}`ops_testing_harness`, the deprecated API for unit testing charms
-
-You can structure your charm however you like, but with the `ops` library, you get a framework that promotes consistency and readability by following best practices. It also helps you organise your code better by separating different aspects of the charm, such as managing the application's state, handling integrating with other services, and making the charm easier to test.
-
-
----------
+Ops promotes consistent and maintainable charm code. Its APIs help you separate different aspects of the charm, such as managing the application's state and integrating with other charms.
 
 ## In this documentation
 
 ````{grid} 1 1 2 2
 
-```{grid-item-card} [Tutorial](tutorial/index)
-:link: tutorial/index
-:link-type: doc
-
-**Start here**: a hands-on introduction to `ops` for new users
+```{grid-item-card} [Tutorials](tutorial/index)
+**Start here:** hands-on introductions to Ops, guiding you through writing charms
+- [Write your first machine charm](tutorial/write-your-first-machine-charm)
+- [Write your first Kubernetes charm](tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/index)
 ```
 
-```{grid-item-card} [How-to guides](/index)
-:link: howto/index
-:link-type: doc
-
+```{grid-item-card} [How-to guides](howto/index)
 **Step-by-step guides** covering key operations and common tasks
+- [Manage charms](howto/manage-charms)
+- [Manage relations](howto/manage-relations)
+- [Run workloads with a Kubernetes charm](howto/run-workloads-with-a-charm-kubernetes)
 ```
 
 ````
-
 
 ````{grid} 1 1 2 2
 :reverse:
 
-```{grid-item-card} [Reference](/index)
-:link: reference/index
-:link-type: doc
-
-**Technical information** - specifications, APIs, architecture
+```{grid-item-card} [Reference](reference/index)
+**Technical information** about Ops APIs
+- [ops](reference/ops)
+- [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing)
+- [ops.pebble](reference/pebble)
 ```
 
-```{grid-item-card} [Explanation](/index)
-:link: explanation/index
-:link-type: doc
-
+```{grid-item-card} [Explanation](explanation/index)
 **Discussion and clarification** of key topics
+- [Testing](explanation/testing)
+- [Tracing](explanation/tracing)
+- [Security](explanation/security)
 ```
 
 ````
 
+## Releases
 
----------
+[Read the release notes](https://github.com/canonical/operator/releases)
 
+Ops releases are tracked in GitHub. To get notified when there's a new release, watch the [Ops repository](https://github.com/canonical/operator).
+
+The `ops` package is [published on PyPI](https://pypi.org/project/ops/).
 
 ## Project and community
 
-Ops is a member of the Ubuntu family. It’s an open source project that warmly welcomes community projects, contributions, suggestions, fixes and constructive feedback.
+Ops is a member of the Ubuntu family. It's an open source project that warmly welcomes community contributions, suggestions, fixes and constructive feedback.
 
-* **[Read our code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)**:
-As a community we adhere to the Ubuntu code of conduct.
+- [Report a bug](https://github.com/canonical/operator/issues)
+- [Contribute](https://github.com/canonical/operator/blob/main/CONTRIBUTING.md)
+- [Code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)
 
-* **[Get support](https://discourse.charmhub.io/)**:
-Discourse is the go-to forum for all questions Ops.
+For support, join [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix. You'll be able to chat with the maintainers of Ops (the Canonical Charm Tech team) and a friendly community of charm developers!
 
-* **[Join our online chat](https://matrix.to/#/#charmhub-charmdev:ubuntu.com)**:
-Meet us in the #charmhub-charmdev channel on Matrix.
+## Looking for more?
 
-* **[Report bugs](https://github.com/canonical/operator/issues)**:
-We want to know about the problems so we can fix them.
+The Ops repository has several [demo charms](https://github.com/canonical/operator/tree/main/examples) that you can experiment with.
 
-* **[Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation)**:
-Get started on GitHub.
+If you're new to charm development, the {external+charmcraft:ref}`Charmcraft tutorials <tutorial>` are a great place to start. The tutorials don't require any experience with Ops. You can learn about Ops after completing one of the tutorials.
+
+To follow along with updates and tips about charm development, join our [Discourse forum](https://discourse.charmhub.io/).
+
+[Learn more about the Juju ecosystem](https://juju.is/docs)
