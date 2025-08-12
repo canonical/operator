@@ -205,6 +205,16 @@ else:
 
 sitemap_show_lastmod = True
 
+# Exclude generated pages from the sitemap:
+
+sitemap_excludes = [
+    '404/',
+    'genindex/',
+    'py-modindex/',
+    '_modules/*',
+    'search/',
+]
+
 #######################
 # Template and asset locations
 #######################
