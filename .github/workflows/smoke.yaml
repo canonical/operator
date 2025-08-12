@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 7 25 * *'
+  # ⚠️ temporary, don't merge this trigger
   pull_request:
 
 permissions: {}
@@ -19,7 +20,6 @@ jobs:
         preset: ['machine', 'microk8s']
 
     steps:
-      - uses: catchpoint/workflow-telemetry-action@v2
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare

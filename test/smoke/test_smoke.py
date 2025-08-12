@@ -34,8 +34,10 @@ platforms:
   amd64:
 parts:
     charm:
-        plugin: charm
+        plugin: uv
         source: .
+        build-snaps:
+            - astral-uv
 """
 
 
