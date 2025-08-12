@@ -317,7 +317,7 @@ def commit_type_to_category(commit_type: str) -> str:
         'test': 'Tests',
         'ci': 'CI',
         'perf': 'Performance',
-        'refact': 'Refactor',
+        'refactor': 'Refactor',
         'revert': 'Revert',
     }
     return mapping.get(commit_type, commit_type.capitalize())
