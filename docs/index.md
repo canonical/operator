@@ -25,7 +25,9 @@ Ops promotes consistent and maintainable charm code. Its APIs help you separate 
 ````{grid} 1 1 2 2
 
 ```{grid-item-card} [Tutorials](tutorial/index)
-**Start here:** a hands-on introduction to Ops, guiding you through writing a machine or Kubernetes charm
+**Start here:** hands-on introductions to Ops, guiding you through writing charms
+- [Write your first machine charm](tutorial/write-your-first-machine-charm)
+- [Write your first Kubernetes charm](tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/index)
 ```
 
 ```{grid-item-card} [How-to guides](howto/index)
