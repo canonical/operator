@@ -1663,7 +1663,7 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict)
+    last_data: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None
@@ -2946,7 +2946,7 @@ class Client:
         stdin: bytes | BinaryIO | None = None,
         stdout: BinaryIO | None = None,
         stderr: BinaryIO | None = None,
-        encoding: None = None,
+        encoding: None,
         combine_stderr: bool = False,
     ) -> ExecProcess[bytes]: ...
 
@@ -3197,7 +3197,7 @@ class Client:
                             newline='',
                         )
 
-            process: ExecProcess[Any] = ExecProcess(
+            process: ExecProcess[Any] = ExecProcess[Any](
                 stdin=process_stdin,  # type: ignore
                 stdout=process_stdout,  # type: ignore
                 stderr=process_stderr,  # type: ignore

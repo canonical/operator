@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        juju-channel: ['2.9/stable', '3/stable']
+        juju-channel: ['2.9/stable', '3/stable', '4/beta']
         preset: ['machine', 'microk8s']
 
     steps:

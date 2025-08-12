@@ -1702,7 +1702,7 @@ class MyDataclassAction:
     my_bool: bool = False
     my_int: int = 42
     my_float: float = 3.14
-    my_list: list[str] = dataclasses.field(default_factory=list)
+    my_list: list[str] = dataclasses.field(default_factory=list[str])
 
     def __post_init__(self):
         if self.my_int < 0:
