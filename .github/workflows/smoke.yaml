@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 7 25 * *'
-  # ⚠️ temporary, don't merge this trigger
-  pull_request:
 
 permissions: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20  # Juju 4 sometimes gets stuck destroying the test model
 
     strategy:
       fail-fast: false
