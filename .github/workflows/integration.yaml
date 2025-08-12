@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '42 7 25 * *'
+  pull_request:
 
 permissions: {}
 
@@ -18,10 +19,6 @@ jobs:
         test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
 
     steps:
-      - run: |
-           # Work around https://github.com/jnsgruk/concierge/issues/30
-           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
-           sudo rm -rf /run/containerd
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
