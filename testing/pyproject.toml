@@ -17,7 +17,7 @@ maintainers = [
     { name = "The Charm Tech team at Canonical Ltd." }
 ]
 description = "Python library providing a state-transition testing API for Operator Framework charms."
-license.text = "Apache-2.0"
+license = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
@@ -29,7 +29,6 @@ requires-python = ">=3.10"
 
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: Apache Software License",
     'Framework :: Pytest',
     'Intended Audience :: Developers',
     'Topic :: Software Development :: Quality Assurance',

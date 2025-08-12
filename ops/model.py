@@ -1710,7 +1710,7 @@ class Relation:
 
     This class should not be instantiated directly, instead use :meth:`Model.get_relation`,
     :attr:`Model.relations`, or :attr:`ops.RelationEvent.relation`. This is principally used by
-    :class:`ops.charm.RelationMeta` to represent the relationships between charms.
+    :class:`ops.RelationMeta` to represent the relationships between charms.
     """
 
     name: str

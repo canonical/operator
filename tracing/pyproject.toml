@@ -4,6 +4,7 @@ version = "3.2.0.dev0"
 description = "The tracing facility for the Ops library."
 requires-python = ">=3.10"
 readme = "README.md"
+license = "Apache-2.0"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
@@ -11,7 +12,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",

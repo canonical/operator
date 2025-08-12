@@ -6,22 +6,22 @@ Suppose you have a hooks-based charm and you decide to rewrite it using the Ops 
 
 The core concept tying hooks to the Ops framework is that hooks are no longer scripts stored in files that are named like the event they are meant to respond to; hooks are, instead, blocks of Python code that are best written as methods of a class. The class represents the charm; the methods, the operator logic to be executed as specific events occur.
 
-Here we'll look at just how to do that. You will learn how to: 
+Here we'll look at just how to do that. You will learn how to:
  - look at a simple hooks-based charm to understand its relationship with the Juju state machine;
 - map that forward to the Ops framework;
 - translate some shell commands to their Ops counterparts;
 - translate some more shell commands by using some handy charm libraries.
- 
+
 
 This guide will refer to a local LXD cloud and a machine charm, but you can easily generalize the approach to Kubernetes.
- 
- 
+
+
 ## Analyse the charm
 
 
 We start by looking at the charm we intend to translate; as an example, we will take [microsample](https://github.com/erik78se/charm-microsample), an educational charm, because it is simple and includes a number of hooks, while implementing little-to-no business logic (the charm does very little).
 
-From the charm root directory we see: 
+From the charm root directory we see:
 
 ```text
 $ tree .
@@ -48,7 +48,7 @@ $ tree .
 └── revision
 ```
 
-By looking at the `hooks` folder, we can already tell that there are two categories of hooks we'll need to port; 
+By looking at the `hooks` folder, we can already tell that there are two categories of hooks we'll need to port;
 - core lifecycle hooks:
   - `config-changed`
   - `install`
@@ -83,7 +83,7 @@ parts:
       - icon.svg
       - metadata.yaml
 ```
-This is a spec required to make charmcraft work in 'legacy mode' and support older charm frameworks, such as the hooks charm we are working with. 
+This is a spec required to make charmcraft work in 'legacy mode' and support older charm frameworks, such as the hooks charm we are working with.
 As such, if we take a look at the packed `.charm` file, we'll see that the files and folders listed in 'prime' are copied over one-to-one in the archive.
 
 If we remove that section, run `charmcraft pack`, and then attempt to deploy the charm, the command will fail with a
@@ -131,7 +131,7 @@ A more detailed explanation of this process is worthy of its own how-to guide, s
 ### A better plan
 
 It is in our interest to move the handler logic for each `/hooks/<hook_name>` to `Microsample._on_<hook_name>`, for several reasons:
-- We can avoid code duplication by accessing shared data via the CharmBase interface provided through `self`. 
+- We can avoid code duplication by accessing shared data via the CharmBase interface provided through `self`.
 - The code is all in one place, easier to maintain.
 - We automatically have one Python object we can test, instead of going back and forth between Bash scripts and Python wrappers.
 
@@ -180,15 +180,15 @@ For `on-start` and `on-stop`, which are simple instructions to `systemctl` to st
 ```
 In a couple of places in the scripts, `sleep 3` calls ensure that the service has some time to come up; however, this might get the charm stuck in the waiting loop if for whatever reason the service does NOT come up, so it is quite risky and we are not going to do that. Instead, we are going to rely on the fact that if other event handlers were to fail because of the service not being up, they would handle that case appropriately (e.g., defer the event if necessary).
 
-The rest of the translation is pretty straightforward. However, it is still useful to note a few things about relations, logging, and environment variables, which we do below. 
+The rest of the translation is pretty straightforward. However, it is still useful to note a few things about relations, logging, and environment variables, which we do below.
 
 #### Wrapping the `website` relation
 
-`ops.model.Relation` provides a neat wrapper for the juju relation object.
+`ops.Relation` provides a neat wrapper for the juju relation object.
 We are going to add a helper method:
 
 ```python
-    def _get_website_relation(self) -> ops.model.Relation:
+    def _get_website_relation(self) -> ops.Relation:
         # WARNING: would return None if called too early, e.g. during install
         return self.model.get_relation("website")
 ```
@@ -203,11 +203,11 @@ That allows us to fetch the Relation wherever we need it and access its contents
         )
 ```
 
-Note how `relation.data` provides an interface to the relation databag (see [](#set-up-a-relation)) and we need to select which part of that bag to access by passing an `ops.model.Unit` instance.
+Note how `relation.data` provides an interface to the relation databag (see [](#set-up-a-relation)) and we need to select which part of that bag to access by passing an `ops.Unit` instance.
 
 #### Logging
 
-Every maintainable charm will have some form of logging integrated; in a few places in the Bash scripts we see calls to a `juju-log` command; we can replace them with simple `logger.log` calls; such as in 
+Every maintainable charm will have some form of logging integrated; in a few places in the Bash scripts we see calls to a `juju-log` command; we can replace them with simple `logger.log` calls; such as in
 ```python
     def _on_website_relation_departed(self, _event):  # noqa
         logger.debug("%s departed website relation", self.unit.name)
@@ -270,13 +270,13 @@ To install:\
 `charmcraft fetch-lib charms.operator_libs_linux.v0.systemd`\
 `charmcraft fetch-lib charms.operator_libs_linux.v1.snap`\
 
-To use, add line to imports:  
+To use, add line to imports:
 `from charms.operator_libs_linux.v0 import systemd` \
 `from charms.operator_libs_linux.v1 import snap`
 
 ```
 
-By inspecting more closely the flow of the events, we realize that not all of the event handlers that we currently subscribe to are necessary. For example, the relation data is going to be set once the relation is joined, but nothing needs to be done when the relation changes or is broken/departed. Since it depends on configurable values, however, we will need to make sure that the `config-changed` handler also keeps the relation data up to date. 
+By inspecting more closely the flow of the events, we realize that not all of the event handlers that we currently subscribe to are necessary. For example, the relation data is going to be set once the relation is joined, but nothing needs to be done when the relation changes or is broken/departed. Since it depends on configurable values, however, we will need to make sure that the `config-changed` handler also keeps the relation data up to date.
 
 Furthermore we can get rid of the `start` handler, since the `snap.ensure()` call will also start the service for us on `install`.  Similarly we can strip away most of the calls in `_on_upgrade_charm` (originally invoking multiple other hooks) and only call `snap.ensure(...)`.
 
