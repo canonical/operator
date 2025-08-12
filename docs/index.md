@@ -24,7 +24,7 @@ Ops promotes consistent and maintainable charm code. Its APIs help you separate 
 
 ````{grid} 1 1 2 2
 
-```{grid-item-card} [Tutorial](tutorial/index)
+```{grid-item-card} [Tutorials](tutorial/index)
 **Start here:** a hands-on introduction to Ops, guiding you through writing a machine or Kubernetes charm
 ```
 
