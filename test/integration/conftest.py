@@ -43,7 +43,6 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     juju.deploy('s3-integrator')
 
     juju.integrate('tempo:s3', 's3-integrator')
-
     juju.integrate('tempo:tempo-cluster', 'tempo-worker')
 
     juju.wait(
@@ -64,7 +63,6 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
         mc_client.make_bucket('tempo')
 
     juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
-
     juju.run(
         's3-integrator/0',
         'sync-s3-credentials',

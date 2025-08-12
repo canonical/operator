@@ -26,9 +26,7 @@ import jubilant
 
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The traced charm is connected to the trace data collector directly."""
-    logging.debug('========= DEBUG: start building tracing charm!!!')
     charm_path = build_tracing_charm()
-    logging.debug('========= DEBUG: tracing charm build done!!!')
     tracing_juju.deploy(charm_path)
     tracing_juju.integrate('test-tracing', 'tempo')
     status = tracing_juju.wait(jubilant.all_active)
