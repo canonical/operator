@@ -1,0 +1,24 @@
+---
+name: Update best practices documentation
+description: Updates the best practices documentation with the latest practices
+branding:
+  icon: activity
+  color: orange
+
+inputs:
+  path-to-ops:
+    description: Path to the local operator repository, relative to repository root
+    required: true
+  path-to-charmcraft:
+    description: Path to the local charmcraft repository, relative to repository root
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - run: python .github/actions/update-best-practice-table/main.py --path-to-ops "${{ inputs.path-to-ops }}" --path-to-charmcraft "${{ inputs.path-to-charmcraft }}" > docs/reference/best-practices.md
+      shell: bash

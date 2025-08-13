@@ -1,0 +1,52 @@
+name: Update Best Practices Doc
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 25 * *' # On the 25th of each month
+
+permissions: {}
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+          persist-credentials: true
+
+      - uses: actions/checkout@v4
+        with:
+          repository: canonical/charmcraft
+          path: charmcraft
+
+      - uses: ./.github/actions/update-best-practice-table
+        with:
+          gh-pat: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+
+      - run: |
+          echo "New changes in best practices"
+          git --no-pager diff
+          git config --global user.name "Prints Charming [bot]"
+          git config --global user.email "ben.hoyt+prints-charming-bot@canonical.com"
+          git switch -C auto-update-best-practice-docs
+          git commit --allow-empty -am "docs: update best practices documentation"
+          echo "Total changes in best practices"
+          git --no-pager diff main HEAD
+          git push -f --set-upstream origin auto-update-best-practice-docs
+      - run: |
+          # Ensure a PR if there are changes, no PR otherwise
+          PR=$(gh pr list --state open --head auto-update-best-practice-docs --json number -q '.[0].number')
+          CHANGES=$(git --no-pager diff --stat main HEAD)
+          echo "Existing PR? $PR"
+          echo "Changes? $CHANGES"
+          if [[ -n "$PR" && -z "$CHANGES" ]]; then
+          echo "Closing #$PR as stale"
+          gh pr close -c stale "$PR";
+          elif [[ -z "$PR" && -n "$CHANGES" ]]; then
+          echo "Opening new PR"
+          gh pr create --base main --head auto-update-best-practice-docs --title "chore: update best practices" --body "This is an automated PR to update the best practices documentation.";
+          fi
+        env:
+            GITHUB_TOKEN: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
