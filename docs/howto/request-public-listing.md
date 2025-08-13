@@ -1,7 +1,7 @@
 (request-public-listing)=
 # How to request public listing on charmhub.io?
 
-TODO: this is mostly just a copy of the repo README, need to convert to a proper how-to.
+**TODO: this is mostly just a copy of the repo README, need to convert to a proper how-to.**
 
 Reviewing charms encourages the involvement of the community. The community refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem. The goals of the review are:
 
@@ -21,7 +21,7 @@ A listing review is *not* code review. The reviewer may be looking at some of th
 
 The specification provides details and summaries of how the review works. However, the overall approach is straightforward:
 
-1. The author requests a review for *one* charm at a time with all prerequisites using a [listing request issue](https://github.com/tonyandrewmeyer/charmhub-listing-review/issues/new) in this repository.
+1. The author requests a review for *one* charm at a time with all prerequisites using a [listing request issue](https://github.com/canonical/charmhub-listing-review/issues/new) in this repository.
 2. The reviewer checks if the prerequisites are met and the pull request is ready.
 3. The public review is carried out as a conversation on the pull request.
 4. The review concludes if the charm is 'publication ready'.
@@ -67,11 +67,11 @@ With respect to test coverage of the charm, note that:
 
 ## Listing requirements
 
-* The charm does what it is meant to do, per the [demo or tutorial]({demo_url}).
-* The [charm's page on Charmhub](https://charmhub.io/{name}) provides a quality impression. The overall appearance looks good and the [documentation]({documentation_link}) looks reasonable.
+* The charm does what it is meant to do, per the demo or tutorial.
+* The charm's page on Charmhub provides a quality impression. The overall appearance looks good and the documentation looks reasonable.
 * The charm has an icon.
-* [Automated releasing]({ci_release_url}) to unstable channels exists
-* [Integration tests]({ci_integration_url}) exist, are run on every change to the default branch, and are passing. At minimum, the tests verify that the charm can be deployed and ends up in a success state, and that the charm can be integrated with at least one example for each 'provides' and 'requires' specified (including optional, excluding tracing) ending up in a success state. The tests should be run with `charmcraft test`
+* Automated releasing to unstable channels exists
+* Integration tests exist, are run on every change to the default branch, and are passing. At minimum, the tests verify that the charm can be deployed and ends up in a success state, and that the charm can be integrated with at least one example for each 'provides' and 'requires' specified (including optional, excluding tracing) ending up in a success state. The tests should be run with `charmcraft test`
 
 A charm's documentation should focus on the charm itself. For workload-specific or Juju-related content, link to the appropriate upstream documentation. A smaller charm can have single-page documentation for its description. A bigger charm should include a full Diátaxis navigation tree. Check that the charm has documentation that covers:
 * How to use the charm, including configuration, limitations, and deviations in behaviour from the “non-charmed” version of the application.
@@ -97,4 +97,4 @@ If you'd like to see the list of requirements and have some automatically checke
 uvx --with=package-name something-or-other-here
 ```
 
-If the charm is ready for review, [open an issue in this repository](https://github.com/tonyandrewmeyer/charmhub-listing-review/issues/new).
+If the charm is ready for review, [open an issue in this repository](https://github.com/canonical/charmhub-listing-review/issues/new).

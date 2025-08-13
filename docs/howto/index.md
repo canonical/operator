@@ -26,6 +26,6 @@ Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
 Manage metrics <manage-metrics>
 Trace your charm <trace-your-charm>
-Request public listing on Charmhub.io
+Request public listing on Charmhub.io <request-public-listing>
 Legacy how-to guides <legacy/index>
 ```
