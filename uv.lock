@@ -1052,7 +1052,6 @@ wheels = [
 name = "ops"
 source = { editable = "." }
 dependencies = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api" },
     { name = "pyyaml" },
     { name = "websocket-client" },
@@ -1113,7 +1112,6 @@ xdist = [
 
 [package.metadata]
 requires-dist = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api", specifier = "~=1.0" },
     { name = "ops-scenario", marker = "extra == 'testing'", editable = "testing" },
     { name = "ops-tracing", marker = "extra == 'tracing'", editable = "tracing" },
