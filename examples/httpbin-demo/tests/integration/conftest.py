@@ -34,4 +34,4 @@ def juju(request: pytest.FixtureRequest):
 @pytest.fixture(scope='session')
 def charm():
     subprocess.check_call(['charmcraft', 'pack'])  # noqa
-    return next(pathlib.Path(".").glob("*.charm"))
+    return next(pathlib.Path('.').glob('*.charm'))
