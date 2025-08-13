@@ -483,26 +483,29 @@ Now run `tox -e unit` to make sure all test cases pass.
 Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
 
 ```python
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+import logging
+from pathlib import Path
+
+import jubilant
+import yaml
+
+logger = logging.getLogger(__name__)
+
+METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+APP_NAME = METADATA['name']
+
+
+def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before integration or configuration.
+    Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm('.')
-    resources = {
-        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
-    }
+    resources = {'httpbin-image': METADATA['resources']['httpbin-image']['upstream-source']}
 
-    # Deploy the charm and wait for blocked/idle status.
-    # The app will not be in active status as this requires a database relation.
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status='blocked', raise_on_blocked=False, timeout=300
-        ),
-    )
+    # Deploy the charm and wait for active/idle status
+    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.wait(jubilant.all_blocked)
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
@@ -510,27 +513,14 @@ Then, let's add another test case to check the integration is successful. For th
 In your `tests/integration/test_charm.py` file add the following test case:
 
 ```python
-@pytest.mark.abort_on_fail
-async def test_database_integration(ops_test: OpsTest):
+def test_database_integration(juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
     """
-    await ops_test.model.deploy(
-        application_name='postgresql-k8s',
-        entity_url='postgresql-k8s',
-        channel='14/stable',
-    )
-    await ops_test.model.integrate(f'{APP_NAME}', 'postgresql-k8s')
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
-    )
-```
-
-```{important}
-
-If you run one test and then the other as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
-
+    juju.deploy('postgresql-k8s', app='postgresql-k8s', channel='14/stable')
+    juju.integrate(APP_NAME, 'postgresql-k8s')
+    juju.wait(jubilant.all_active)
 ```
 
 In your Multipass Ubuntu VM, run the test again:
@@ -540,12 +530,6 @@ ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
 ```
 
 The test may again take some time to run.
-
-```{tip}
-
-To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results.
-
-```
 
 When it's done, the output should show two passing tests:
 
