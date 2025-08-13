@@ -1,5 +1,3 @@
 pyproject.toml
 uv.lock
-*.tar.gz
 *.whl
-*.charm
