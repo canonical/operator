@@ -5,15 +5,16 @@ name: Publish
     tags:
       - '[1-3].*'
 
-permissions:
-  id-token: write
-  attestations: write
-  contents: read
+permissions: {}
 
 jobs:
   build-and-publish:
     name: Build and publish to PyPI
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
     environment: publish-pypi
     steps:
       - uses: actions/checkout@v4
