@@ -570,7 +570,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator) library.
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`jubilant`](https://documentation.ubuntu.com/jubilant/) library.
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
@@ -583,8 +583,7 @@ In your `tox.ini` file, add the following new environment:
 description = Run integration tests
 deps =
     pytest
-    juju
-    pytest-operator
+    jubilant
     -r {tox_root}/requirements.txt
 commands =
     pytest \
