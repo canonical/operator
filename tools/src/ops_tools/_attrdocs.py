@@ -72,19 +72,24 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
         for attr, field in cls.model_fields.items():  # type: ignore
             if hasattr(field, 'description') and field.description:  # type: ignore
                 docs[attr] = field.description  # type: ignore
+        # If we have `model_fields` then we'll assume that this is all of the documentation.
+        return docs
 
     # For Pydantic dataclasses, we expect to have the docstrings in field
     # objects, but there's no "model_fields" attribute.
-    elif hasattr(cls, '__dataclass_fields__'):
-        for field in dataclasses.fields(cls):  # type: ignore
+    elif dataclasses.is_dataclass(cls):
+        for field in dataclasses.fields(cls):
             if (
                 hasattr(field, 'default')
                 and hasattr(field.default, 'description')
                 and field.default.description  # type: ignore
             ):
                 docs[field.name] = field.default.description  # type: ignore
+        # This might be a standard library dataclass, where there aren't
+        # description fields, so we fall through to collect any docstrings from
+        # the code as well.
 
-    for schema_class in cls.mro():
+    for schema_class in reversed(cls.mro()):
         if schema_class is object:
             continue
         try:

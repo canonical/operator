@@ -328,3 +328,42 @@ class DoThisThing: ...
 )
 def test_action_class_name_to_action_name(cls: type[object], action_name: str):
     assert list(ops_tools.action_to_juju_schema(cls).keys()) == [action_name]
+
+
+class BaseAction:
+    """Base action."""
+
+    x: int = 42
+    """X-ray."""
+
+
+class ChildAction(BaseAction):
+    """Derived action."""
+
+    y: str = 'foo'
+    """Yellow."""
+
+
+class GrandchildAction(ChildAction):
+    """Grandchild action."""
+
+    x: int = 24
+    """Xylophone."""
+    z: float = 3.14
+    """Zebra."""
+
+
+def test_action_inherited_classes():
+    generated_schema = ops_tools.action_to_juju_schema(GrandchildAction)
+    expected_schema = {
+        'grandchild': {
+            'description': 'Grandchild action.',
+            'params': {
+                'x': {'type': 'integer', 'default': 24, 'description': 'Xylophone.'},
+                'y': {'type': 'string', 'default': 'foo', 'description': 'Yellow.'},
+                'z': {'type': 'number', 'default': 3.14, 'description': 'Zebra.'},
+            },
+            'additionalProperties': False,
+        },
+    }
+    assert generated_schema == expected_schema

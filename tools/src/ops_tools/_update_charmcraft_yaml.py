@@ -74,6 +74,13 @@ def main():
         'The class may be a regular expression.',
         default=[],
     )
+    parser.add_argument(
+        '--merge',
+        action='store_true',
+        help='Merge the generated config and action sections into the existing charmcraft.yaml '
+        'file instead of overwriting those sections completely.',
+        default=False,
+    )
     args = parser.parse_args()
 
     with open(args.charmcraft_yaml) as raw:
