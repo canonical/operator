@@ -47,7 +47,7 @@ classifiers = [
 ]
 
 [project.scripts]
-update-charmcraft = "ops_tools._update_charmcraft_yaml:main"
+update-charmcraft-schema = "ops_tools._update_charmcraft_yaml:main"
 
 [project.urls]
 "Homepage" = "https://github.com/canonical/operator"

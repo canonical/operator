@@ -13,13 +13,13 @@ The package provides tooling to generate the appropriate `charmcraft.yaml` secti
 For example, if your charm contains a single config class in `src/charm.py` called `Config` and three actions, which all end with 'Action' (and no other classes have that name):
 
 ```bash
-update-charmcraft --config-class Config --action-class '.+Action'
+update-charmcraft-schema --config-class Config --action-class '.+Action'
 ```
 
 If you have a config class in `src/workload.py` called `WorkloadConfig` and one in `src/charm.py` called `AdditionalConfig`:
 
 ```bash
-update-charmcraft --config-class src.workload:WorkloadConfig --config-class src.charm:AdditionalConfig
+update-charmcraft-schema --config-class src.workload:WorkloadConfig --config-class src.charm:AdditionalConfig
 ```
 
 This command can be included in a pre-commit configuration, or CI workflow, to ensure that the `charmcraft.yaml` file is always in sync with the Python classes.
