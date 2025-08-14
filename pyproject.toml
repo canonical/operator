@@ -21,7 +21,6 @@ dependencies = [
     "websocket-client==1.*",
     # Wide version range to preempt conflicts when charms pin a version.
     "opentelemetry-api~=1.0",
-    "importlib-metadata",
 ]
 dynamic = ["version"]
 
@@ -48,12 +47,12 @@ docs = [
     "packaging",
     "sphinxcontrib-svg2pdfconverter[CairoSVG]",
     "sphinx-last-updated-by-git",
-    "sphinx-sitemap",
+    "sphinx-sitemap~=2.8",
 ]
 static = [
     "ops[testing,tracing]",
     "ops-tools",
-    "pyright==1.1.385",
+    "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
 unit = [

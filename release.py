@@ -171,7 +171,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     """Parse auto-generated release notes into categories.
 
     The "New Contributors" section is removed.
-    The PRs are categorized into 'feat', 'fix', 'docs', 'test', and 'ci'.
+    The PRs are categorised by the conventional commit type.
     The full changelog line is returned separately.
 
     Returns:
@@ -189,6 +189,9 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
         'docs': [],
         'test': [],
         'ci': [],
+        'refactor': [],
+        'perf': [],
+        'revert': [],
     }
     full_changelog_line = None
 
@@ -314,6 +317,9 @@ def commit_type_to_category(commit_type: str) -> str:
         'docs': 'Documentation',
         'test': 'Tests',
         'ci': 'CI',
+        'perf': 'Performance',
+        'refactor': 'Refactoring',
+        'revert': 'Reverted',
     }
     return mapping.get(commit_type, commit_type.capitalize())
 

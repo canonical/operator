@@ -577,7 +577,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -1053,7 +1053,6 @@ wheels = [
 name = "ops"
 source = { editable = "." }
 dependencies = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api" },
     { name = "pyyaml" },
     { name = "websocket-client" },
@@ -1117,7 +1116,6 @@ xdist = [
 
 [package.metadata]
 requires-dist = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api", specifier = "~=1.0" },
     { name = "ops-scenario", marker = "extra == 'testing'", editable = "testing" },
     { name = "ops-tracing", marker = "extra == 'tracing'", editable = "tracing" },
@@ -1135,7 +1133,7 @@ docs = [
     { name = "ops-tools", editable = "tools" },
     { name = "packaging" },
     { name = "sphinx-last-updated-by-git" },
-    { name = "sphinx-sitemap" },
+    { name = "sphinx-sitemap", specifier = "~=2.8" },
     { name = "sphinxcontrib-svg2pdfconverter", extras = ["cairosvg"] },
 ]
 integration = [
@@ -1154,7 +1152,7 @@ release = [{ name = "pygithub", specifier = "~=2.6" }]
 static = [
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
     { name = "ops-tools", editable = "tools" },
-    { name = "pyright", specifier = "==1.1.385" },
+    { name = "pyright", specifier = "~=1.1" },
     { name = "typing-extensions", specifier = "~=4.2" },
 ]
 unit = [
@@ -1569,15 +1567,15 @@ wheels = [
 
 [[package]]
 name = "pyright"
-version = "1.1.385"
+version = "1.1.403"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodeenv" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/29/ca/3238db97766ecfd6b2758fb50727a0b433e7b1bb6be0de090ed08b291fff/pyright-1.1.385.tar.gz", hash = "sha256:1bf042b8f080441534aa02101dea30f8fc2efa8f7b6f1ab05197c21317f5bfa7", size = 21971, upload-time = "2024-10-16T09:00:56.771Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/f6/35f885264ff08c960b23d1542038d8da86971c5d8c955cfab195a4f672d7/pyright-1.1.403.tar.gz", hash = "sha256:3ab69b9f41c67fb5bbb4d7a36243256f0d549ed3608678d381d5f51863921104", size = 3913526, upload-time = "2025-07-09T07:15:52.882Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/39/877484412a1079003a7645375b487bd7c422692f4e5b7c2030dea3e83043/pyright-1.1.385-py3-none-any.whl", hash = "sha256:e5b9a1b8d492e13004d822af94d07d235f2c7c158457293b51ab2214c8c5b375", size = 18579, upload-time = "2024-10-16T09:00:55.545Z" },
+    { url = "https://files.pythonhosted.org/packages/49/b6/b04e5c2f41a5ccad74a1a4759da41adb20b4bc9d59a5e08d29ba60084d07/pyright-1.1.403-py3-none-any.whl", hash = "sha256:c0eeca5aa76cbef3fcc271259bbd785753c7ad7bcac99a9162b4c4c7daed23b3", size = 5684504, upload-time = "2025-07-09T07:15:50.958Z" },
 ]
 
 [[package]]
@@ -1959,14 +1957,14 @@ wheels = [
 
 [[package]]
 name = "sphinx-sitemap"
-version = "2.7.2"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "sphinx-last-updated-by-git" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/a7/60e6cce670fcc21d95215bf2e3f3f6455b7bce0ecc8423ce8ffbd044587e/sphinx_sitemap-2.7.2.tar.gz", hash = "sha256:819e028e27579b47efa0e2f863b87136b711c45f13e84730610e80316f6883da", size = 6387, upload-time = "2025-06-27T00:32:31.332Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/0e/e249fdd17c0530c8260191f0020556862b243fa718cf0e6b28d956eafb2c/sphinx_sitemap-2.8.0.tar.gz", hash = "sha256:749d7184a0c7b73d486a232b54b5c1b38a0e2d6f18cf19fb1b033b8162b44a82", size = 6829, upload-time = "2025-08-12T04:54:24.51Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/2f/ae76e120797b42a7e96ed3cccc93bd7b1feb583008f6686fc85d90c774da/sphinx_sitemap-2.7.2-py3-none-any.whl", hash = "sha256:1a6a8dcecb0ffb85fd37678f785cfcc40adfe3eebafb05e678971e5260b117e4", size = 6018, upload-time = "2025-06-27T00:32:30.161Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/ab/3bc6f9ee09b5fd5ae2e5ae1febf41a2ed2bdde452a41c06e78fec0296b5c/sphinx_sitemap-2.8.0-py3-none-any.whl", hash = "sha256:332042cd5b9385f61ec2861dfd550d9bccbdfcff86f6b68c7072cf40c9f16363", size = 6167, upload-time = "2025-08-12T04:54:23.479Z" },
 ]
 
 [[package]]

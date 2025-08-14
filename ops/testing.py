@@ -37,8 +37,6 @@ The module includes:
 
 from __future__ import annotations
 
-import importlib.metadata
-
 from . import charm, framework, model, pebble, storage
 from ._private.harness import (
     ActionFailed,
@@ -73,119 +71,96 @@ __all__ = [
 # If the 'ops.testing' optional extra is installed, make those
 # names available in this namespace.
 try:
-    _version = importlib.metadata.version('ops-scenario')
-except importlib.metadata.PackageNotFoundError:
+    from scenario import (
+        ActiveStatus,
+        Address,
+        AnyJson,
+        BindAddress,
+        BlockedStatus,
+        CharmEvents,
+        CheckInfo,
+        CloudCredential,
+        CloudSpec,
+        Container,
+        Context,
+        DeferredEvent,
+        ErrorStatus,
+        Exec,
+        ICMPPort,
+        JujuLogLine,
+        MaintenanceStatus,
+        Manager,
+        Model,
+        Mount,
+        Network,
+        Notice,
+        PeerRelation,
+        Port,
+        RawDataBagContents,
+        RawSecretRevisionContents,
+        Relation,
+        RelationBase,
+        Resource,
+        Secret,
+        State,
+        Storage,
+        StoredState,
+        SubordinateRelation,
+        TCPPort,
+        UDPPort,
+        UnitID,
+        UnknownStatus,
+        WaitingStatus,
+        errors,
+        layer_from_rockcraft,
+    )
+except ImportError:
     pass
 else:
-    if _version and int(_version.split('.', 1)[0]) >= 7:
-        from scenario import (
-            ActiveStatus,
-            Address,
-            AnyJson,
-            BindAddress,
-            BlockedStatus,
-            CheckInfo,
-            CloudCredential,
-            CloudSpec,
-            Container,
-            Context,
-            DeferredEvent,
-            ErrorStatus,
-            Exec,
-            ICMPPort,
-            JujuLogLine,
-            MaintenanceStatus,
-            Manager,
-            Model,
-            Mount,
-            Network,
-            Notice,
-            PeerRelation,
-            Port,
-            RawDataBagContents,
-            RawSecretRevisionContents,
-            Relation,
-            RelationBase,
-            Resource,
-            Secret,
-            State,
-            Storage,
-            StoredState,
-            SubordinateRelation,
-            TCPPort,
-            UDPPort,
-            UnitID,
-            UnknownStatus,
-            WaitingStatus,
-            errors,
-            layer_from_rockcraft,
-        )
-
-        # This can be imported in the group above after Scenario exposes it at the top level.
-        # https://github.com/canonical/ops-scenario/pull/200
-        from scenario.context import CharmEvents
-
-        # The Scenario unit testing framework.
-        __all__.extend([
-            'ActiveStatus',
-            'Address',
-            'AnyJson',
-            'BindAddress',
-            'BlockedStatus',
-            'CharmEvents',
-            'CheckInfo',
-            'CloudCredential',
-            'CloudSpec',
-            'Container',
-            'Context',
-            'DeferredEvent',
-            'ErrorStatus',
-            'Exec',
-            'ICMPPort',
-            'JujuLogLine',
-            'MaintenanceStatus',
-            'Manager',
-            'Model',
-            'Mount',
-            'Network',
-            'Notice',
-            'PeerRelation',
-            'Port',
-            'RawDataBagContents',
-            'RawSecretRevisionContents',
-            'Relation',
-            'RelationBase',
-            'Resource',
-            'Secret',
-            'State',
-            'Storage',
-            'StoredState',
-            'SubordinateRelation',
-            'TCPPort',
-            'UDPPort',
-            'UnitID',
-            'UnknownStatus',
-            'WaitingStatus',
-            'errors',
-            'layer_from_rockcraft',
-        ])
-
-        # Until Scenario uses the ops._private.harness.ActionFailed, we need to
-        # monkeypatch it in, so that the ops.testing.ActionFailed object is the
-        # one that we expect, even if people are mixing Harness and Scenario.
-        # https://github.com/canonical/ops-scenario/issues/201
-        # This will be the case in the next version of ops-scenario, so this
-        # code can be removed as of the release of ops-scenario after 7.0.5.
-        # Remember to bump the required version of `ops-scenario` in pyproject.toml
-        # at that time as well.
-        try:
-            import scenario._runtime as _runtime
-        except ImportError:
-            import scenario.runtime as _runtime  # type: ignore
-        import scenario.context as _context
-
-        _context.ActionFailed = ActionFailed  # type: ignore[reportPrivateImportUsage]
-        _runtime.ActionFailed = ActionFailed
+    # The Scenario unit testing framework.
+    __all__.extend([
+        'ActiveStatus',
+        'Address',
+        'AnyJson',
+        'BindAddress',
+        'BlockedStatus',
+        'CharmEvents',
+        'CheckInfo',
+        'CloudCredential',
+        'CloudSpec',
+        'Container',
+        'Context',
+        'DeferredEvent',
+        'ErrorStatus',
+        'Exec',
+        'ICMPPort',
+        'JujuLogLine',
+        'MaintenanceStatus',
+        'Manager',
+        'Model',
+        'Mount',
+        'Network',
+        'Notice',
+        'PeerRelation',
+        'Port',
+        'RawDataBagContents',
+        'RawSecretRevisionContents',
+        'Relation',
+        'RelationBase',
+        'Resource',
+        'Secret',
+        'State',
+        'Storage',
+        'StoredState',
+        'SubordinateRelation',
+        'TCPPort',
+        'UDPPort',
+        'UnitID',
+        'UnknownStatus',
+        'WaitingStatus',
+        'errors',
+        'layer_from_rockcraft',
+    ])
 
 # Names exposed for backwards compatibility
 _compatibility_names = [
