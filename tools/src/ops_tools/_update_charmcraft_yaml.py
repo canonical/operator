@@ -97,9 +97,15 @@ def main():
     actions = dict(sorted(actions.items()))  # Sort actions by name.
 
     if config:
-        charmcraft_yaml['config'] = config
+        if args.merge and 'config' in charmcraft_yaml:
+            charmcraft_yaml['config']['options'].update(config['options'])
+        else:
+            charmcraft_yaml['config'] = config
     if actions:
-        charmcraft_yaml['actions'] = actions
+        if args.merge and 'actions' in charmcraft_yaml:
+            charmcraft_yaml['actions'].update(actions)
+        else:
+            charmcraft_yaml['actions'] = actions
 
     with open(args.charmcraft_yaml, 'w') as raw:
         yaml.safe_dump(charmcraft_yaml, raw)
