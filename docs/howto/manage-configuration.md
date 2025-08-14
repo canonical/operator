@@ -7,7 +7,14 @@
 
 ### Define a configuration option
 
-In the `charmcraft.yaml` file of the charm, under `config.options`, add a configuration definition, including a name, a description, the type, and the default value. The example below shows how to define two configuration options, one called `name` of type `string` and default value `Wiki`, and one called `skin` with type `string` and default value `vector`:
+In the `charmcraft.yaml` file of the charm, under `config.options`, add a configuration definition, including a name, a description, the type, and the default value.
+
+```{admonition} Best practice
+
+Avoid duplicating configuration options that are best controlled at a model level, through `juju model-config`.
+```
+
+The example below shows how to define two configuration options, one called `name` of type `string` and default value `Wiki`, and one called `skin` with type `string` and default value `vector`:
 
 ```yaml
 config:
