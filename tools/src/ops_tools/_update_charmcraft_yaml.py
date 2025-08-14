@@ -23,8 +23,10 @@
 """Update a charmcraft.yaml file with generated config and action sections."""
 
 import argparse
+import difflib
 import importlib
 import re
+import sys
 from typing import Generator
 
 import yaml
@@ -81,6 +83,14 @@ def main():
         'file instead of overwriting those sections completely.',
         default=False,
     )
+    parser.add_argument(
+        '--diff',
+        action='store_true',
+        help='Show the differences between the generated config and action sections and the '
+        'existing charmcraft.yaml file instead of writing to the file. Exit non-zero if there are '
+        'differences.',
+        default=False,
+    )
     args = parser.parse_args()
 
     with open(args.charmcraft_yaml) as raw:
@@ -95,6 +105,33 @@ def main():
         for cls in get_class_from_module(class_specifier):
             actions.update(action_to_juju_schema(cls))
     actions = dict(sorted(actions.items()))  # Sort actions by name.
+
+    if args.diff:
+        exit_code = 0
+
+        if 'config' in charmcraft_yaml:
+            existing_config = charmcraft_yaml['config']['options']
+        else:
+            existing_config = {}
+        if config != {'options': existing_config}:
+            print('Config section differs from existing charmcraft.yaml:\n')
+            existing = yaml.safe_dump({'config': {'options': existing_config}})
+            generated = yaml.safe_dump({'config': config})
+            differ = difflib.Differ()
+            result = differ.compare(existing.splitlines(), generated.splitlines())
+            print('\n'.join(result))
+            exit_code += 1
+
+        existing_actions = charmcraft_yaml.get('actions', {})
+        if actions != existing_actions:
+            print('Action section differs from existing charmcraft.yaml:\n')
+            existing = yaml.safe_dump({'actions': existing_actions})
+            generated = yaml.safe_dump({'actions': actions})
+            differ = difflib.Differ()
+            result = differ.compare(existing.splitlines(), generated.splitlines())
+            print('\n'.join(result))
+            exit_code += 2
+        sys.exit(exit_code)
 
     if config:
         if args.merge and 'config' in charmcraft_yaml:
