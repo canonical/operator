@@ -275,41 +275,44 @@ def to_json_schema(cls: type[object]) -> tuple[dict[str, Any], list[str]]:
 def config_to_juju_schema(cls: type[object]) -> dict[str, dict[str, OptionDict]]:
     """Translate the class to YAML suitable for charmcraft.yaml.
 
-    For example, with the class::
+    For example::
 
-        class MyConfig(pydantic.BaseModel):
-            my_bool: bool = pydantic.Field(default=False, description='A boolean value.')
-            my_float: float = pydantic.Field(
-                default=3.14, description='A floating point value.'
-            )
-            my_int: int = pydantic.Field(default=42, description='An integer value.')
-            my_str: str = pydantic.Field(default="foo", description='A string value.')
-            my_secret: ops.Secret | None = pydantic.Field(
-                default=None, description='A user secret.'
-            )
-
-    ``print(yaml.safe_dump(to_juju_schema(MyConfig)))`` will output::
-
+        >>> import pydantic
+        >>> import yaml
+        >>> class MyConfig(pydantic.BaseModel):
+        ...     my_bool: bool = pydantic.Field(default=False, description='A boolean value.')
+        ...     my_float: float = pydantic.Field(
+        ...         default=3.14, description='A floating point value.'
+        ...     )
+        ...     my_int: int = pydantic.Field(default=42, description='An integer value.')
+        ...     my_str: str = pydantic.Field(default="foo", description='A string value.')
+        ...     my_secret: ops.Secret | None = pydantic.Field(
+        ...         default=None, description='A user secret.'
+        ...     )
+        ...     class Config:
+        ...         arbitrary_types_allowed = True
+        >>> print(yaml.safe_dump(config_to_juju_schema(MyConfig)))
         options:
-            my-bool:
-                type: boolean
-                default: false
-                description: A boolean value.
-            my-float:
-                type: float
-                default: 3.14
-                description: A floating point value.
-            my-int:
-                type: int
-                default: 42
-                description: An integer value.
-            my-str:
-                type: string
-                default: foo
-                description: A string value.
-            my-secret:
-                type: secret
-                description: A user secret.
+          my-bool:
+            type: boolean
+            default: false
+            description: A boolean value.
+          my-float:
+            type: float
+            default: 3.14
+            description: A floating point value.
+          my-int:
+            type: int
+            default: 42
+            description: An integer value.
+          my-str:
+            type: string
+            default: foo
+            description: A string value.
+          my-secret:
+            type: secret
+            description: A user secret.
+        <BLANKLINE>
 
     Options with a default value of ``None`` will not have a ``default`` key
     in the output. If the type of the option cannot be determined, it will
@@ -355,36 +358,40 @@ def config_to_juju_schema(cls: type[object]) -> dict[str, dict[str, OptionDict]]
 def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     """Translate the class to a dictionary suitable for ``charmcraft.yaml``.
 
-    For example, with the classes::
+    For example::
 
-        class Compression(enum.Enum):
-            GZ = 'gzip'
-            BZ = 'bzip2'
-
-        class RunBackup(pydantic.BaseModel):
-            '''Backup the database.'''
-
-            filename: str = pydantic.Field(description='The name of the backup file.')
-            compression: Compression = pydantic.Field(
-                Compression.GZ,
-                description='The type of compression to use.',
-            )
-
-    The output will be a dictionary that can be dumped to produce YAML like this::
-
+        >>> import enum
+        >>> import pydantic
+        >>> import yaml
+        >>> class RunBackup(pydantic.BaseModel):
+        ...     '''Backup the database.'''
+        ...     class Compression(enum.Enum):
+        ...         GZ = 'gzip'
+        ...         BZ = 'bzip2'
+        ...
+        ...     filename: str = pydantic.Field(description='The name of the backup file.')
+        ...     compression: Compression = pydantic.Field(
+        ...         Compression.GZ,
+        ...         description='The type of compression to use.',
+        ...     )
+        >>> print(yaml.safe_dump(action_to_juju_schema(RunBackup)))
         run-backup:
-            description: Backup the database.
-            params:
-                filename:
-                    type: string
-                    description: The name of the backup file.
-                compression:
-                    type: string
-                    description: The type of compression to use.
-                    default: gzip
-                    enum: [gzip, bzip2]
-            required: [filename]
-            additionalProperties: false
+          additionalProperties: false
+          description: Backup the database.
+          params:
+            compression:
+              type: string
+              default: gzip
+              description: The type of compression to use.
+              enum: [gzip, bzip2]
+            filename:
+              description: The name of the backup file.
+              title: Filename
+              type: string
+          required:
+          - filename
+        <BLANKLINE>
+        >>>
 
     To adjust the YAML, provide a ``to_juju_schema`` method in the class. For
     example, to allow additional properties::
