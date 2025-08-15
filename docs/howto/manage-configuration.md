@@ -10,6 +10,7 @@
 In the `charmcraft.yaml` file of the charm, under `config.options`, add a configuration definition, including a name, a description, the type, and the default value.
 
 ```{admonition} Best practice
+:class: hint
 
 Avoid duplicating configuration options that are best controlled at a model level, through `juju model-config`.
 ```
