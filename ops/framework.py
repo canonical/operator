@@ -943,10 +943,16 @@ class Framework(Object):
         is completed.
 
         Usage:
+
+            >>> import ops
+            >>> from ops import testing
+            >>> harness = testing.Harness(ops.CharmBase)
             >>> with harness._event_context('db-relation-changed'):
-            >>>     print('Harness thinks it is running an event hook.')
+            ...     # Harness thinks it is running an event hook.
+            ...     pass
             >>> with harness._event_context(''):
-            >>>     print('harness thinks it is not running an event hook.')
+            ...     # Harness thinks it is not running an event hook.
+            ...     pass
         """
         backend: _ModelBackend | None = self.model._backend if self.model else None
         if not backend:

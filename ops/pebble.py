@@ -2979,6 +2979,9 @@ class Client:
         below, however, input/output handling is a bit more complex. Some
         examples are shown below::
 
+            >>> import pytest
+            >>> pytest.skip('these examples require a running Pebble')
+
             # Simple command with no output; just check exit code
             >>> process = client.exec(['send-emails'])
             >>> process.wait()
