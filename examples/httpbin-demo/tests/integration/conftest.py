@@ -22,7 +22,6 @@ import pytest
 @pytest.fixture(scope='module')
 def juju(request: pytest.FixtureRequest):
     with jubilant.temp_model() as juju:
-        juju.wait_timeout = 100
 
         yield juju
 
