@@ -501,7 +501,7 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
     Assert on the unit status before any relations/configurations take place.
     """
     # Build and deploy charm from local source folder
-    resources = {'httpbin-image': METADATA['resources']['httpbin-image']['upstream-source']}
+    resources = {'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']}
 
     # Deploy the charm and wait for active/idle status
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
