@@ -26,7 +26,7 @@ jobs:
             commit: 1ee19d9d5a782cf9f68e911aa02041bd7ee5e538  # 2025-07-28T15:06:48Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
