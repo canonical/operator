@@ -90,7 +90,11 @@ First, at the top of the file, import the database interfaces library:
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseEndpointsChangedEvent, DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 ```
 
 ````{important}
@@ -272,8 +276,10 @@ def get_app_environment(self) -> dict[str, str]:
 Finally, let's define the method that is called on the database created event:
 
 ```python
-def _on_database_created(self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent) -> None:
-    """Event is fired when postgres database is created."""
+def _on_database_created(
+    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+) -> None:
+    """Event is fired when postgres database is created or endpoint is changed."""
     self._update_layer_and_restart()
 ```
 
@@ -500,7 +506,6 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
     Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
     resources = {'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']}
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
@@ -536,8 +541,6 @@ When it's done, the output should show two passing tests:
 ```text
 tests/integration/test_charm.py::test_build_and_deploy
 ...
-[snip]
-...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'
 - .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.message = 'running start hook'
@@ -547,8 +550,6 @@ PASSED
 
 ```text
 tests/integration/test_charm.py::test_database_integration
-...
-[snip]
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['postgresql-k8s'].app_status.current = 'waiting'

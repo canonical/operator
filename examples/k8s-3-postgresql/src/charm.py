@@ -99,7 +99,7 @@ class FastAPIDemoCharm(ops.CharmBase):
     def _on_database_created(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
-        """Event is fired when postgres database is created."""
+        """Event is fired when postgres database is created or endpoint is changed."""
         self._update_layer_and_restart()
 
     def _update_layer_and_restart(self) -> None:

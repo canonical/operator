@@ -609,7 +609,7 @@ mkdir -p tests/integration
 
 Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm, then verify that the installation event is handled without errors.
 
-In your `tests/integration` directory, create a file named `conftest.py` and add the following fixtures:
+In your `tests/integration` directory, create a file called `conftest.py` and add the following fixtures:
 
 ```python
 import pathlib
@@ -655,8 +655,9 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
     Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    resources = {'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']}
+    resources = {
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
+    }
 
     # Deploy the charm and wait for active/idle status
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
@@ -684,8 +685,6 @@ INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
 INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./demo-api-charm_ubuntu-22.04-amd64.charm demo-api-charm --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 + .model.name = 'jubilant-823cf1fd'
-...
-[snip]
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['demo-api-charm'].app_status.current = 'waiting'

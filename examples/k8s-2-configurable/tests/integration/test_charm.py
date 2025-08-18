@@ -27,7 +27,7 @@ APP_NAME = METADATA['name']
 def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before integration or configuration.
+    Assert on the unit status before any relations/configurations take place.
     """
     resources = {
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
@@ -35,4 +35,4 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
     # Deploy the charm and wait for active/idle status
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_active, timeout=300)
+    juju.wait(jubilant.all_active)
