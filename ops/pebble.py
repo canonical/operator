@@ -2979,6 +2979,7 @@ class Client:
         below, however, input/output handling is a bit more complex. Some
         examples are shown below::
 
+            # These two lines are related to documentation testing, not exec()
             >>> import pytest
             >>> pytest.skip('these examples require a running Pebble')
 
