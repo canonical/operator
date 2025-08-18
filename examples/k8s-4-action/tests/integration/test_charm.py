@@ -34,7 +34,7 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source'],
     }
 
-    # Deploy the charm and wait for active/idle status
+    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 

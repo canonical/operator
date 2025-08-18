@@ -503,7 +503,7 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
     # Build and deploy charm from local source folder
     resources = {'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']}
 
-    # Deploy the charm and wait for active/idle status
+    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 ```
@@ -534,23 +534,32 @@ The test may again take some time to run.
 When it's done, the output should show two passing tests:
 
 ```text
+tests/integration/test_charm.py::test_build_and_deploy
 ...
-INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-l5a20
-INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 34.47s
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm (missing)
-INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] blocked: Waiting for database relation
+[snip]
+...
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'
+- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.message = 'running start hook'
++ .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'idle'
 PASSED
+```
+
+```text
 tests/integration/test_charm.py::test_database_integration
---------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
-INFO     juju.model:__init__.py:2301 Deploying ch:amd64/jammy/postgresql-k8s-495
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] blocked: Waiting for database relation
-PASSED
 ...
+[snip]
+...
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['postgresql-k8s'].app_status.current = 'waiting'
+- .apps['postgresql-k8s'].app_status.message = 'awaiting for cluster to start'
++ .apps['postgresql-k8s'].app_status.current = 'active'
++ .apps['postgresql-k8s'].app_status.message = 'Primary'
+- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'waiting'
+- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'awaiting for cluster to start'
++ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
++ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
+PASSED
 ```
 
 Congratulations, with this integration test you have verified that your charm's relation to PostgreSQL works as well!
