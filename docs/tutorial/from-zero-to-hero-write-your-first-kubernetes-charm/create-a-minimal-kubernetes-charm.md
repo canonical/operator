@@ -622,8 +622,6 @@ import pytest
 @pytest.fixture(scope='module')
 def juju(request: pytest.FixtureRequest):
     with jubilant.temp_model() as juju:
-        juju.wait_timeout = 100
-
         yield juju
 
         if request.session.testsfailed:
@@ -671,35 +669,36 @@ The result should be similar to the following output:
 
 ```text
 integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
-=============================================================================================== test session starts ================================================================================================
-platform linux -- Python 3.10.18, pytest-8.4.1, pluggy-1.6.0 -- /code/operator/examples/httpbin-demo/.tox/integration/bin/python3
+============================= test session starts ==============================
+platform linux -- Python 3.10.18, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python3
 cachedir: .tox/integration/.pytest_cache
 rootdir: /home/ubuntu/fastapi-demo
 configfile: pyproject.toml
 collected 1 item
 
-Packed httpbin-demo_ubuntu-22.04-amd64.charm
+tests/integration/test_charm.py::test_build_and_deploy
 
--------------------------------------------------------------------------------------------------- live log setup --------------------------------------------------------------------------------------------------
-INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-06e34954
--------------------------------------------------------------------------------------------------- live log call ---------------------------------------------------------------------------------------------------
-INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-06e34954 ./httpbin-demo_ubuntu-22.04-amd64.charm httpbin-demo --resource httpbin-image=docker.io/kennethreitz/httpbin:latest
+-------------------------------- live log setup --------------------------------
+INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
+-------------------------------- live log call ---------------------------------
+INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./demo-api-charm_ubuntu-22.04-amd64.charm demo-api-charm --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-
-[snipped]
-
++ .model.name = 'jubilant-823cf1fd'
+...
+[snip]
+...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['httpbin-demo'].units['httpbin-demo/0'].juju_status.current = 'executing'
-- .apps['httpbin-demo'].units['httpbin-demo/0'].juju_status.message = 'running start hook'
-+ .apps['httpbin-demo'].units['httpbin-demo/0'].juju_status.current = 'idle'
+- .apps['demo-api-charm'].app_status.current = 'waiting'
+- .apps['demo-api-charm'].app_status.message = 'installing agent'
++ .apps['demo-api-charm'].app_status.current = 'active'
 PASSED
------------------------------------------------------------------------------------------------- live log teardown -------------------------------------------------------------------------------------------------
-INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-06e34954 --no-prompt --destroy-storage --force
+------------------------------ live log teardown -------------------------------
+INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-823cf1fd --no-prompt --destroy-storage --force
 
 
-================================================================================================ 1 passed in 50.79s ================================================================================================
-  integration: OK (50.98=setup[0.01]+cmd[50.97] seconds)
-  congratulations :) (51.03 seconds)
+========================= 1 passed in 63.92s (0:01:03) =========================
+  integration: OK (64.10=setup[0.01]+cmd[64.10] seconds)
+  congratulations :) (64.15 seconds)
 ```
 
 ## Review the final code
