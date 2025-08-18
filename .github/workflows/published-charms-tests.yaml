@@ -65,7 +65,7 @@ jobs:
           - charm-repo: canonical/zookeeper-operator
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false

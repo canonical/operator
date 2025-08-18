@@ -34,8 +34,10 @@ platforms:
   amd64:
 parts:
     charm:
-        plugin: charm
+        plugin: uv
         source: .
+        build-snaps:
+            - astral-uv
 """
 
 
@@ -82,9 +84,13 @@ def test_smoke(juju: jubilant_backports.Juju, base: str):
 
 
 @pytest.fixture(scope='module')
-def juju():
+def juju(request: pytest.FixtureRequest):
     with jubilant_backports.temp_model() as juju:
         yield juju
+
+        if request.session.testsfailed:
+            log = juju.debug_log(limit=1000)
+            print(log, end='')
 
 
 @pytest.fixture
