@@ -506,7 +506,9 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
     Assert on the unit status before any relations/configurations take place.
     """
-    resources = {'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']}
+    resources = {
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
+    }
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
