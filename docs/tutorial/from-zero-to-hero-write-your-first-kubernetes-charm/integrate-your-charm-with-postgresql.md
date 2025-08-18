@@ -90,7 +90,7 @@ First, at the top of the file, import the database interfaces library:
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseEndpointsChangedEvent, DatabaseRequires
 ```
 
 ````{important}
@@ -272,7 +272,7 @@ def get_app_environment(self) -> dict[str, str]:
 Finally, let's define the method that is called on the database created event:
 
 ```python
-def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
+def _on_database_created(self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent) -> None:
     """Event is fired when postgres database is created."""
     self._update_layer_and_restart()
 ```
@@ -557,6 +557,6 @@ Congratulations, with this integration test you have verified that your charm's 
 
 ## Review the final code
 
-For the full code,  see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql).
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql).
 
 > **See next: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`**
