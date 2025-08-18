@@ -170,10 +170,10 @@ class ActionEvent(EventBase):
         Juju eventually only accepts a str:str mapping, so we will attempt
         to flatten any more complex data structure like so:
 
-        * ``{'a': 'b'}`` becomes: ``'a'='b'``
-        * ``{'a': {'b': 'c'}}`` becomes: ``'a.b'='c'``
-        * ``{'a': {'b': 'c', 'd': 'e'}}`` becomes: ``'a.b'='c', 'a.d' = 'e'``
-        * ``{'a.b': 'c', 'a.d': 'e'}`` equivalent to previous
+        * ``{'a': 'b'}`` becomes ``'a'='b'``
+        * ``{'a': {'b': 'c'}}`` becomes ``'a.b'='c'``
+        * ``{'a': {'b': 'c', 'd': 'e'}}`` becomes ``'a.b'='c', 'a.d' = 'e'``
+        * ``{'a.b': 'c', 'a.d': 'e'}`` is equivalent to the previous example
 
         Note that duplicate keys are not allowed, so this is invalid::
 
