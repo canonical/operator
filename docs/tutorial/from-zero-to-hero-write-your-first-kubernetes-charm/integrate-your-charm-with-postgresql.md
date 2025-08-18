@@ -480,7 +480,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
 import logging
@@ -518,7 +518,7 @@ def test_database_integration(juju: jubilant.Juju):
 
     Assert that the charm is active if the integration is established.
     """
-    juju.deploy('postgresql-k8s', app='postgresql-k8s', channel='14/stable')
+    juju.deploy('postgresql-k8s', channel='14/stable', trust=True)
     juju.integrate(APP_NAME, 'postgresql-k8s')
     juju.wait(jubilant.all_active)
 ```
