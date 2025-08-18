@@ -2330,8 +2330,8 @@ class _Secret:
     label: str | None = None
     description: str | None = None
     tracked: int = 1
-    grants: dict[int, set[str]] = dataclasses.field(default_factory=dict)
-    user_secrets_grants: set[str] = dataclasses.field(default_factory=set)
+    grants: dict[int, set[str]] = dataclasses.field(default_factory=dict[int, set[str]])
+    user_secrets_grants: set[str] = dataclasses.field(default_factory=set[str])
 
 
 @_copy_docstrings(model._ModelBackend)

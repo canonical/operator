@@ -3456,7 +3456,7 @@ class TestExec:
         with pytest.raises(ValueError):
             client.exec(['foo'], stdin='s', encoding=None)  # type: ignore
         with pytest.raises(ValueError):
-            client.exec(['foo'], stdin=b's')
+            client.exec(['foo'], stdin=b's')  # type: ignore
         with pytest.raises(TypeError):
             client.exec(['foo'], stdin=123)  # type: ignore
         with pytest.raises(ValueError):
@@ -3494,8 +3494,9 @@ class TestExec:
         self.add_responses(client, '456', 1)
 
         process = client.exec(['false'])
+        # https://github.com/microsoft/pyright/discussions/10774
         excinfo: pytest.ExceptionInfo[pebble.ExecError[str]]
-        with pytest.raises(pebble.ExecError) as excinfo:
+        with pytest.raises(pebble.ExecError) as excinfo:  # type: ignore
             process.wait()
         assert excinfo.value.command == ['false']
         assert excinfo.value.exit_code == 1
@@ -4030,7 +4031,7 @@ class TestIdentity:
 
     def test_local_identity_from_dict_with_access_enum(self):
         identity = pebble.Identity.from_dict({
-            'access': pebble.IdentityAccess.ADMIN,
+            'access': pebble.IdentityAccess.ADMIN,  # type: ignore
             'local': {'user-id': 42},
         })
         assert identity == pebble.Identity(
@@ -4055,7 +4056,7 @@ class TestIdentity:
 
     def test_basic_identity_from_dict_with_access_enum(self):
         identity = pebble.Identity.from_dict({
-            'access': pebble.IdentityAccess.METRICS,
+            'access': pebble.IdentityAccess.METRICS,  # type: ignore
             'basic': {'password': 'hashed password'},
         })
         assert identity == pebble.Identity(

@@ -35,3 +35,4 @@ jobs:
 
       - name: Run smoke tests
         run: tox -e smoke
+        timeout-minutes: 20  # Juju 4 gets stuck while destroying the test model
