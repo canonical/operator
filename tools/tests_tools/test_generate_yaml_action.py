@@ -77,7 +77,7 @@ class MyDataclassAction:
     my_float: float = 3.14
     """A floating point value."""
 
-    my_list: list[str] = dataclasses.field(default_factory=list)
+    my_list: list[str] = dataclasses.field(default_factory=list)  # type: ignore
     """A list value."""
 
 
@@ -111,20 +111,20 @@ if pydantic:
         basic_float: float
         basic_str: str
 
-        my_str: str = pydantic.Field('foo', alias='my-str', description='A string value.')  # type: ignore
+        my_str: str = pydantic.Field('foo', alias='my-str', description='A string value.')
         my_bool: bool = pydantic.Field(
             False,
-            alias='my-bool',  # type: ignore
+            alias='my-bool',
             description='A Boolean value.',
         )
-        my_int: int = pydantic.Field(42, alias='my-int', description='A positive integer value.')  # type: ignore
+        my_int: int = pydantic.Field(42, alias='my-int', description='A positive integer value.')
         my_float: float = pydantic.Field(
             3.14,
-            alias='my-float',  # type: ignore
+            alias='my-float',
             description='A floating point value.',
         )
         my_list: list[str] = pydantic.Field(
-            alias='my-list',  # type: ignore
+            alias='my-list',
             default_factory=list,
             description='A list value.',
         )
