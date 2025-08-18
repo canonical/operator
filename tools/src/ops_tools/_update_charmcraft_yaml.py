@@ -22,12 +22,14 @@
 
 """Update a charmcraft.yaml file with generated config and action sections."""
 
+from __future__ import annotations
+
 import argparse
 import difflib
 import importlib
 import re
 import sys
-from typing import Generator
+from typing import Any, Generator
 
 import yaml
 
@@ -47,6 +49,45 @@ def get_class_from_module(class_specifier: str) -> Generator[type]:
             continue
         if re.fullmatch(class_name, attr):
             yield getattr(module, attr)
+
+
+def _insert_into_charmcraft_yaml(
+    raw_yaml: str, section_name: str, replacement: dict[str, Any]
+) -> str:
+    """Surgically insert a section into charmcraft.yaml.
+
+    The specified section of charmcraft.yaml is replaced with the provided data.
+    However, the rest of the file is left unchanged; in particular, comments and
+    ordering is preserved.
+    """
+    # To simplify the regular expressions, look for four variants. Firstly,
+    # there is a section with YAML both before and after it.
+    mo = re.match(
+        rf'(?P<before>.*)^{section_name}:(?P<tab_size>\s+).+?^(?P<after>\w.*)',
+        raw_yaml,
+        re.DOTALL | re.MULTILINE,
+    )
+    if mo:
+        replacement_section = yaml.safe_dump(replacement, indent=len(mo['tab_size']))
+        return f'{mo["before"]}{replacement_section}{mo["after"]}'
+    # Secondly, there is a section with YAML before it, but no section after it.
+    mo = re.match(
+        rf'(?P<before>.*)^{section_name}:(?P<tab_size>\s+).+', raw_yaml, re.DOTALL | re.MULTILINE
+    )
+    if mo:
+        replacement_section = yaml.safe_dump(replacement, indent=len(mo['tab_size']))
+        return f'{mo["before"]}{replacement_section}'
+    # Next, there is a section with no YAML before it, but YAML after it.
+    mo = re.match(
+        rf'^{section_name}:(?P<tab_size>\s+).+?^(?P<after>\w.*)',
+        raw_yaml,
+        re.DOTALL | re.MULTILINE,
+    )
+    if mo:
+        replacement_section = yaml.safe_dump(replacement, indent=len(mo['tab_size']))
+        return f'{replacement_section}{mo["after"]}'
+    # Finally, there is no existing config section.
+    return f'{raw_yaml}\n{yaml.safe_dump(replacement, indent=2)}'
 
 
 def main():
@@ -94,7 +135,8 @@ def main():
     args = parser.parse_args()
 
     with open(args.charmcraft_yaml) as raw:
-        charmcraft_yaml = yaml.safe_load(raw)
+        raw_yaml = raw.read()
+        charmcraft_yaml = yaml.safe_load(raw_yaml)
 
     config: dict[str, dict[str, OptionDict]] = {'options': {}}
     for class_specifier in args.config_class:
@@ -133,19 +175,16 @@ def main():
             exit_code += 2
         sys.exit(exit_code)
 
-    if config:
-        if args.merge and 'config' in charmcraft_yaml:
-            charmcraft_yaml['config']['options'].update(config['options'])
-        else:
-            charmcraft_yaml['config'] = config
+    if args.merge and 'config' in charmcraft_yaml:
+        config = charmcraft_yaml['config']['options'].update(config['options'])
+    raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'config', {'config': config})
     if actions:
         if args.merge and 'actions' in charmcraft_yaml:
-            charmcraft_yaml['actions'].update(actions)
-        else:
-            charmcraft_yaml['actions'] = actions
+            actions = charmcraft_yaml['actions'].update(actions)
+        raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'actions', {'actions': actions})
 
     with open(args.charmcraft_yaml, 'w') as raw:
-        yaml.safe_dump(charmcraft_yaml, raw)
+        raw.write(raw_yaml)
 
 
 if __name__ == '__main__':
