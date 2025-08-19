@@ -69,7 +69,7 @@ def ca_relation():
 @pytest.fixture
 def juju_context(tmp_path: pathlib.Path):
     (tmp_path / 'metadata.yaml').write_text('name: testcharm')
-    return ops.JujuContext.from_dict({
+    return ops.JujuContext._from_dict({
         'JUJU_VERSION': '3.6.0',
         'JUJU_MODEL_NAME': 'test-model',
         'JUJU_MODEL_UUID': '4242',
