@@ -27,7 +27,7 @@ jobs:
           python-version: '3.10'
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false

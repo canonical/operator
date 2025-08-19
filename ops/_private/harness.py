@@ -335,46 +335,47 @@ class Harness(Generic[CharmType]):
 
         Example usage:
 
-        # this is how we test that attempting to write a remote app's
-        # databag will raise RelationDataError.
-        >>> with harness._event_context('foo'):
-        >>>     with pytest.raises(ops.model.RelationDataError):
-        >>>         my_relation.data[remote_app]['foo'] = 'bar'
-
-        # this is how we test with 'realistic conditions' how an event handler behaves
-        # when we call it directly -- i.e. without going through harness.add_relation
+        >>> # this is how we test that attempting to write a remote app's
+        >>> # databag will raise RelationDataError.
         >>> def test_foo():
-        >>>     class MyCharm:
-        >>>         ...
-        >>>         def event_handler(self, event):
-        >>>             # this is expected to raise an exception
-        >>>             event.relation.data[event.relation.app]['foo'] = 'bar'
-        >>>
-        >>>     harness = Harness(MyCharm)
-        >>>     event = MagicMock()
-        >>>     event.relation = harness.charm.model.relations[0]
-        >>>
-        >>>     with harness._event_context('my_relation_joined'):
-        >>>         with pytest.raises(ops.model.RelationDataError):
-        >>>             harness.charm.event_handler(event)
+        ...     with harness._event_context('foo'):
+        ...         with pytest.raises(ops.model.RelationDataError):
+        ...             my_relation.data[remote_app]['foo'] = 'bar'
 
+        >>> # this is how we test with 'realistic conditions' how an event handler behaves
+        >>> # when we call it directly -- i.e. without going through harness.add_relation
+        >>> def test_foo():
+        ...     class MyCharm:
+        ...         ...
+        ...         def event_handler(self, event):
+        ...             # this is expected to raise an exception
+        ...             event.relation.data[event.relation.app]['foo'] = 'bar'
+        ...
+        ...     harness = Harness(MyCharm)
+        ...     event = MagicMock()
+        ...     event.relation = harness.charm.model.relations[0]
+        ...
+        ...     with harness._event_context('my_relation_joined'):
+        ...         with pytest.raises(ops.model.RelationDataError):
+        ...             harness.charm.event_handler(event)
 
         If event_name == '', conversely, the Harness will believe that no hook
         is running, allowing temporary unrestricted access to read/write a relation's
         databags even from inside an event handler.
+
         >>> def test_foo():
-        >>>     class MyCharm:
-        >>>         ...
-        >>>         def event_handler(self, event):
-        >>>             # this is expected to raise an exception since we're not leader
-        >>>             event.relation.data[self.app]['foo'] = 'bar'
-        >>>
-        >>>     harness = Harness(MyCharm)
-        >>>     event = MagicMock()
-        >>>     event.relation = harness.charm.model.relations[0]
-        >>>
-        >>>     with harness._event_context('my_relation_joined'):
-        >>>         harness.charm.event_handler(event)
+        ...     class MyCharm:
+        ...         ...
+        ...         def event_handler(self, event):
+        ...             # this is expected to raise an exception since we're not leader
+        ...             event.relation.data[self.app]['foo'] = 'bar'
+        ...
+        ...     harness = Harness(MyCharm)
+        ...     event = MagicMock()
+        ...     event.relation = harness.charm.model.relations[0]
+        ...
+        ...     with harness._event_context('my_relation_joined'):
+        ...         harness.charm.event_handler(event)
 
         """
         return self._framework._event_context(event_name)

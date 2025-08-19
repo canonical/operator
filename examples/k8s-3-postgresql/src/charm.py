@@ -24,7 +24,11 @@ import logging
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 
 import ops
 
@@ -92,8 +96,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
-        """Event is fired when postgres database is created."""
+    def _on_database_created(
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
+        """Event is fired when postgres database is created or endpoint is changed."""
         self._update_layer_and_restart()
 
     def _update_layer_and_restart(self) -> None:
