@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "ops",
     "ops-scenario",
+    "ops-tools",
     "ops-tracing",
 ]
 
@@ -576,7 +577,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -1075,6 +1076,7 @@ coverage = [
 docs = [
     { name = "canonical-sphinx", extra = ["full"] },
     { name = "ops", extra = ["testing", "tracing"] },
+    { name = "ops-tools" },
     { name = "packaging" },
     { name = "sphinx-last-updated-by-git" },
     { name = "sphinx-sitemap" },
@@ -1097,12 +1099,14 @@ release = [
 ]
 static = [
     { name = "ops", extra = ["testing", "tracing"] },
+    { name = "ops-tools" },
     { name = "pyright" },
     { name = "typing-extensions" },
 ]
 unit = [
     { name = "jsonpatch" },
     { name = "ops", extra = ["testing", "tracing"] },
+    { name = "ops-tools" },
     { name = "pydantic" },
     { name = "pytest" },
 ]
@@ -1126,6 +1130,7 @@ coverage = [{ name = "coverage", extras = ["toml"], specifier = "~=7.0" }]
 docs = [
     { name = "canonical-sphinx", extras = ["full"] },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
+    { name = "ops-tools", editable = "tools" },
     { name = "packaging" },
     { name = "sphinx-last-updated-by-git" },
     { name = "sphinx-sitemap", specifier = "~=2.8" },
@@ -1146,12 +1151,14 @@ lint = [
 release = [{ name = "pygithub", specifier = "~=2.6" }]
 static = [
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
+    { name = "ops-tools", editable = "tools" },
     { name = "pyright", specifier = "~=1.1" },
     { name = "typing-extensions", specifier = "~=4.2" },
 ]
 unit = [
     { name = "jsonpatch", specifier = "~=1.33" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
+    { name = "ops-tools", editable = "tools" },
     { name = "pydantic", specifier = "~=2.10" },
     { name = "pytest", specifier = "~=8.4" },
 ]
@@ -1170,6 +1177,23 @@ dependencies = [
 requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
+]
+
+[[package]]
+name = "ops-tools"
+version = "1.2.0.dev0"
+source = { editable = "tools" }
+dependencies = [
+    { name = "ops" },
+    { name = "pyyaml" },
+    { name = "typing-extensions" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ops", editable = "." },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "typing-extensions", specifier = "~=4.2" },
 ]
 
 [[package]]

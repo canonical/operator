@@ -35,3 +35,13 @@ artifacts:
         version: ''
         channel: 'stable'
         cycle: '25.10'
+
+  - name: 'ops-tools'
+    type: 'sdist'
+    version: ''
+    compression: 'gz'
+    ssdlc_params:
+        name: 'ops-tools'
+        version: ''
+        channel: 'stable'
+        cycle: '25.10'
