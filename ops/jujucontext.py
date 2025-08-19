@@ -26,7 +26,19 @@ from .jujuversion import JujuVersion
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class JujuContext:
-    """JujuContext collects information from environment variables named 'JUJU_*'."""
+    """JujuContext provides the Juju hook context.
+
+    Juju provides context for the hook in the form of environment variables.
+    Rather than directly accessing the environment, charms should use
+    :meth:`ops.JujuContext.from_environ` to access this information.
+
+    Note that most of the information in ``JujuContext`` is exposed through the
+    framework, for example :attr:`ops.JujuContext.model_name` is
+    :attr:`ops.Model.name`, and :attr:`ops.JujuContext.action_uuid` is
+    :attr:`ops.ActionEvent.id`. Typically, charms should not directly use the
+    ``JujuContext`` class -- it is primarily provided to support charming
+    approaches outside of the Ops framework.
+    """
 
     # Source: https://documentation.ubuntu.com/juju/3.6/reference/hook/#hook-execution.
     # The HookVars function: https://github.com/juju/juju/blob/3.6/worker/uniter/runner/context/context.go#L1398.
@@ -77,7 +89,7 @@ class JujuContext:
     availability_zone: str | None = None
     """The availability zone.
 
-    For example, 'us-east-1a' (from JUJU_AVAILABILITY_ZONE).
+    For example, 'zone1' (from JUJU_AVAILABILITY_ZONE).
     """
 
     charm_dir: Path = dataclasses.field(
@@ -86,9 +98,6 @@ class JujuContext:
     """The root directory of the charm where it is running.
 
     For example '/var/lib/juju/agents/unit-bare-0/charm' (from JUJU_CHARM_DIR).
-
-    If JUJU_CHARM_DIR is None or set to an empty string, use Path(f'{__file__}/../../..') as
-    default (assuming the '$JUJU_CHARM_DIR/lib/op/main.py' structure).
     """
 
     debug: bool = False
@@ -228,6 +237,8 @@ class JujuContext:
             action_name=env.get('JUJU_ACTION_NAME') or None,
             action_uuid=env.get('JUJU_ACTION_UUID') or None,
             availability_zone=env.get('JUJU_AVAILABILITY_ZONE') or None,
+            # If JUJU_CHARM_DIR is None or set to an empty string, use Path(f'{__file__}/../../..')
+            # as default (assuming the '$JUJU_CHARM_DIR/lib/op/main.py' structure).
             charm_dir=(
                 Path(env['JUJU_CHARM_DIR']).resolve()
                 if env.get('JUJU_CHARM_DIR')
