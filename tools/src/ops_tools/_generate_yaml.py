@@ -294,24 +294,24 @@ def config_to_juju_schema(cls: type[object]) -> dict[str, dict[str, OptionDict]]
         >>> print(yaml.safe_dump(config_to_juju_schema(MyConfig)))
         options:
           my-bool:
-            type: boolean
             default: false
             description: A boolean value.
+            type: boolean
           my-float:
-            type: float
             default: 3.14
             description: A floating point value.
+            type: float
           my-int:
-            type: int
             default: 42
             description: An integer value.
+            type: int
+          my-secret:
+            description: A user secret.
+            type: secret
           my-str:
-            type: string
             default: foo
             description: A string value.
-          my-secret:
-            type: secret
-            description: A user secret.
+            type: string
         <BLANKLINE>
 
     Options with a default value of ``None`` will not have a ``default`` key
