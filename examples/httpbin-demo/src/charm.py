@@ -127,11 +127,9 @@ class HttpbinDemoCharm(ops.CharmBase):
             return
         logger.debug("Log level for gunicorn changed to '%s'", config.log_level)
 
-    def _make_pebble_layer(self, log_level: str) -> ops.pebble.LayerDict:
-        """Return a dictionary representing a Pebble layer."""
-        return {
-            'summary': 'httpbin layer',
-            'description': 'pebble config layer for httpbin',
+    def _make_pebble_layer(self, log_level: str) -> ops.pebble.Layer:
+        """Return a Pebble layer that starts gunicorn with the specified log level."""
+        layer: ops.pebble.LayerDict = {  # Typing as a LayerDict hints the layer's keys.
             'services': {
                 SERVICE_NAME: {
                     'override': 'replace',
@@ -140,8 +138,9 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'startup': 'enabled',
                     'environment': {'GUNICORN_CMD_ARGS': f'--log-level {log_level}'},
                 }
-            },
+            }
         }
+        return ops.pebble.Layer(layer)
 
 
 if __name__ == '__main__':  # pragma: nocover
