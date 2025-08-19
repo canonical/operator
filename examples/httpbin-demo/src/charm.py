@@ -129,6 +129,7 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _make_pebble_layer(self, log_level: str) -> ops.pebble.Layer:
         """Return a Pebble layer that starts gunicorn with the specified log level."""
+        environment = {'GUNICORN_CMD_ARGS': f'--log-level {log_level}'}
         layer: ops.pebble.LayerDict = {  # Typing as a LayerDict hints the layer's keys.
             'services': {
                 SERVICE_NAME: {
@@ -136,7 +137,7 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'summary': 'httpbin',
                     'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
                     'startup': 'enabled',
-                    'environment': {'GUNICORN_CMD_ARGS': f'--log-level {log_level}'},
+                    'environment': environment,
                 }
             }
         }
