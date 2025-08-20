@@ -3,7 +3,7 @@ name: Update Best Practices Doc
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 25 * *' # On the 25th of each month
+    - cron: '0 1 * * 1' # 01:00 Mondays
 
 permissions: {}
 
