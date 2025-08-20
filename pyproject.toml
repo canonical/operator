@@ -39,6 +39,9 @@ harness = []
 lint = [
     "ruff==0.11.2",
     "codespell==2.4.1",
+    "ops[testing,tracing]",
+    "pyright~=1.1",
+    "typing_extensions~=4.2",
 ]
 docs = [
     "ops[testing,tracing]",
@@ -47,11 +50,6 @@ docs = [
     "sphinxcontrib-svg2pdfconverter[CairoSVG]",
     "sphinx-last-updated-by-git",
     "sphinx-sitemap~=2.8",
-]
-static = [
-    "ops[testing,tracing]",
-    "pyright~=1.1",
-    "typing_extensions~=4.2",
 ]
 unit = [
     "ops[testing,tracing]",
