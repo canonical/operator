@@ -23,8 +23,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/update-best-practice-table
-        with:
-          gh-pat: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
 
       - run: |
           echo "New changes in best practices"
