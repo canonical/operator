@@ -293,7 +293,7 @@ class JujuContext:
         )
 
     @classmethod
-    def from_environ(cls, environ: dict[str, str] | None = None) -> JujuContext:
+    def from_environ(cls, environ: Mapping[str, str] | None = None) -> JujuContext:
         """Create a ``JujuContext`` object from the environment.
 
         If environ is ``None``, ``os.environ`` will be used.
@@ -302,7 +302,7 @@ class JujuContext:
             ValueError: If any required environment variables are missing.
         """
         if environ is None:
-            environ = os.environ  # type: ignore
+            environ = os.environ
         assert environ is not None
 
         required = (
