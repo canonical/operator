@@ -1,34 +1,34 @@
-## [How to run workloads with a machine charm](https://documentation.ubuntu.com/ops/latest/howto/run-workloads-with-a-charm-machines/)
+### [How to run workloads with a machine charm](https://documentation.ubuntu.com/ops/latest/howto/run-workloads-with-a-charm-machines/)
 - Use absolute paths in subprocesses to prevent security issues.
 - Execute processes directly rather than via the shell.
 
-## [How to write and structure charm code](https://documentation.ubuntu.com/ops/latest/howto/write-and-structure-charm-code/)
+### [How to write and structure charm code](https://documentation.ubuntu.com/ops/latest/howto/write-and-structure-charm-code/)
 - Name the repository using the pattern ``<charm name>-operator`` for a single charm, or ``<base charm name>-operators`` when the repository will hold multiple related charms. For the charm name, see {external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`. (See more: [Create a repository and initialise it](#create-a-repository-and-initialise-it).)
 - Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python) version in your `pyproject.toml` so that tooling will detect any use of Python features not available in the versions you support. (See more: [Use the Python provided by the base](#define-the-required-dependencies).)
 - Ensure that tooling is configured to automatically detect new versions, particularly security releases, for all your dependencies. (See more: [Add Python dependencies to pyproject.toml and generate a lock file](#define-the-required-dependencies).)
 - Ensure that the `pyproject.toml` *and* the lock file are committed to version control, so that exact versions of charms can be reproduced. (See more: [Add Python dependencies to pyproject.toml and generate a lock file](#define-the-required-dependencies).)
 - The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. (See more: [Validate your charm with every change](#validate-your-charm-with-every-change).)
 
-## [How to log from your charm](https://documentation.ubuntu.com/ops/latest/howto/log-from-your-charm/)
+### [How to log from your charm](https://documentation.ubuntu.com/ops/latest/howto/log-from-your-charm/)
 - Capture output to `stdout` and `stderr` in your charm and use the logging and warning functionality to send messages to the charm user, rather than rely on Juju capturing output. In particular, you should avoid `print()` calls, and ensure that any subprocess calls capture output.
 - Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 -Never log credentials or other sensitive information.
 
-## [How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)
+### [How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)
 - All charms should provide the commands configured by the Charmcraft profile, to allow easy testing across the charm ecosystem. It's fine to tweak the configuration of individual tools, or to add additional commands, but keep the command names and meanings that the profile provides. (See more: [Develop your charm](#develop-your-charm).)
 - The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. (See more: [Develop your charm](#develop-your-charm).)
 
-## [Manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)
+### [Manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. (See more: [Write a library](#manage-libraries-write-a-library).)
 
-## [Manage charms](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/)
+### [Manage charms](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/)
 - If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see :ref:`specify-a-name`.  (See more: {external+charmcraft:ref}`Initialise a charm <initialise-a-charm>`.)
 - Bigger charm documentation examples: * `OpenSearch <https://charmhub.io/opensearch>`_ charm * `Wordpress-k8s <https://charmhub.io/wordpress-k8s>`_ charm  (See more: {external+charmcraft:ref}`Add charm project metadata, an icon, docs <add-docs>`.)
 
-## [Manage resources](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-resources/)
+### [Manage resources](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-resources/)
 - For resources that are binary files, provide binaries for all the CPU architectures you intend to support.  (See more: {external+charmcraft:ref}`Publish a resource on Charmhub <publish-a-resource>`.)
 
-## [``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/)
+### [``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/)
 - Prefer lowercase alphanumeric names, and use hyphens (-) to separate words. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some action names be dashed and some be underscored.  (See more: {external+charmcraft:ref}```actions`` <charmcraft-yaml-key-analysis>`.)
 - For very complex applications, consider providing configuration profiles, which can group values for large configs together. For example, a ``profile: large`` that tweaks multiple options under the hood to optimize for larger deployments, or a ``profile: ci`` for limited resource usage during testing.  (See more: {external+charmcraft:ref}```config`` <charmcraft-yaml-key-containers>`.)
 - Documentation links should apply to the charm, and not to the application that is being charmed. Assume that the user already has basic competency in the use of the application.  (See more: {external+charmcraft:ref}```links`` <charmcraft-yaml-key-name>`.)
