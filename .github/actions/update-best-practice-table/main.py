@@ -87,14 +87,14 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
     return results
 
 
-def make_ops_ref(raw: str):
-    """Turn the raw reference into one that can go into a link."""
-    return f'#{raw}'
+def make_ops_ref(heading: str, raw: str):
+    """Turn the raw reference into a link."""
+    return f'[{heading}](#{raw})'
 
 
-def make_charmcraft_ref(raw: str):
+def make_charmcraft_ref(heading: str, raw: str):
     """Turn the charmcraft reference into an external intersphinx link."""
-    return f'{{external+charmcraft:ref}}`{raw}`'
+    return f'{{external+charmcraft:ref}}`{heading} <{raw}>`'
 
 
 def main():
@@ -141,8 +141,8 @@ def main():
             if len(practices):
                 print(f'## [{title}]({link})')
             for heading, ref, practice in practices:
-                ref = make_ref(ref) if make_ref else ref
-                see_more = f' (See more: [{heading}]({ref}).)' if heading and ref else ''
+                ref = make_ref(heading, ref) if make_ref else ref
+                see_more = f' (See more: {ref}.)' if heading and ref else ''
                 practice = re.sub(r'\s+', ' ', practice)
                 print(f'-{practice}{see_more}')
             if len(practices):
