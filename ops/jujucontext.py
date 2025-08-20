@@ -306,15 +306,15 @@ class JujuContext:
         assert environ is not None
 
         required = (
-            'DISPATCH_PATH',
-            'HOOK_NAME',
-            'MODEL_NAME',
-            'MODEL_UUID',
-            'UNIT_NAME',
-            'VERSION',
+            'JUJU_DISPATCH_PATH',
+            'JUJU_HOOK_NAME',
+            'JUJU_MODEL_NAME',
+            'JUJU_MODEL_UUID',
+            'JUJU_UNIT_NAME',
+            'JUJU_VERSION',
         )
         for var in required:
-            if f'JUJU_{var}' not in environ:
+            if var not in environ:
                 raise ValueError(f'Missing required environment variable: {var}')
 
         event = environ['JUJU_HOOK_NAME']
