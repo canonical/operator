@@ -86,23 +86,19 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
 def main():
     """Extract the best practices, update the doc, and open a PR."""
     parser = argparse.ArgumentParser(
-        description='Open a pull request to update the list of best practices.'
-    )
-    parser.add_argument(
-        '--path-to-ops',
-        type=pathlib.Path,
-        default=pathlib.Path(__file__).parent.parent / 'operator',
-        help='Path to a clone of canonical/operator',
+        description='Open a pull request to update the list of best practices. '
+        'Run in a clone of the operator repository.'
     )
     parser.add_argument(
         '--path-to-charmcraft',
         type=pathlib.Path,
-        default=pathlib.Path(__file__).parent.parent / 'charmcraft',
+        default=pathlib.Path(__file__).parent.parent.parent / 'charmcraft',
         help='Path to a clone of canonical/charmcraft',
     )
     args = parser.parse_args()
+    path_to_ops = pathlib.Path(__file__).parent.parent.parent
     for directory, base_url in (
-        (args.path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/'),
+        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/'),
         (args.path_to_charmcraft / 'docs', 'https://documentation.ubuntu.com/charmcraft/stable/'),
     ):
         for file_path in directory.rglob('*'):

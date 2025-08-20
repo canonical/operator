@@ -20,6 +20,7 @@ jobs:
         with:
           repository: canonical/charmcraft
           path: charmcraft
+          persist-credentials: false
 
       - uses: ./.github/actions/update-best-practice-table
         with:
