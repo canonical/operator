@@ -25,7 +25,7 @@ jobs:
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -35,3 +35,4 @@ jobs:
 
       - name: Run smoke tests
         run: tox -e smoke
+        timeout-minutes: 20  # Juju 4 gets stuck while destroying the test model
