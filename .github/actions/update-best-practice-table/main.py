@@ -21,7 +21,6 @@ import pathlib
 import re
 
 
-# TODO: It seems like I broke the rst extraction. Fix that!
 def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
     """Extracts 'Best practice' blocks from a Markdown or ReST file."""
     lines = content.splitlines()
@@ -34,7 +33,7 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
     admonition_lines: list[str] = []
 
     for line in lines:
-        if line == ':class: hint':
+        if line.strip() == ':class: hint':
             continue
 
         if file_path.suffix == '.md':
@@ -49,7 +48,6 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
                 current_heading = previous_line.strip()
                 previous_line = line
                 continue
-        previous_line = line
 
         if file_path.suffix == '.md':
             ref_match = re.match(r'\((.+?)\)=', line)
@@ -57,17 +55,20 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
             ref_match = re.match(r'.. _(.+?):', line)
         if ref_match:
             current_ref = ref_match.group(1)
+            previous_line = line
             continue
 
         if file_path.suffix == '.md':
             if re.match(r'^```{admonition} Best practice', line):
                 inside_admonition = True
                 admonition_lines.clear()
+                previous_line = line
                 continue
         else:  # .rst
             if re.match(r'^\.\. admonition:: Best practice', line):
                 inside_admonition = True
                 admonition_lines.clear()
+                previous_line = line
                 continue
 
         if inside_admonition:
@@ -81,7 +82,19 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
             else:
                 admonition_lines.append(line)
 
+        previous_line = line
+
     return results
+
+
+def make_ops_ref(raw: str):
+    """Turn the raw reference into one that can go into a link."""
+    return f'#{raw}'
+
+
+def make_charmcraft_ref(raw: str):
+    """Turn the charmcraft reference into an external intersphinx link."""
+    return f'{{external+charmcraft:ref}}`{raw}`'
 
 
 def main():
@@ -98,9 +111,13 @@ def main():
     )
     args = parser.parse_args()
     path_to_ops = pathlib.Path(__file__).parent.parent.parent.parent
-    for directory, base_url in (
-        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/'),
-        (args.path_to_charmcraft / 'docs', 'https://documentation.ubuntu.com/charmcraft/stable/'),
+    for directory, base_url, make_ref in (
+        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/', make_ops_ref),
+        (
+            args.path_to_charmcraft / 'docs',
+            'https://documentation.ubuntu.com/charmcraft/stable/',
+            make_charmcraft_ref,
+        ),
     ):
         for file_path in directory.rglob('*'):
             if file_path.suffix not in ('.md', '.rst'):
@@ -124,9 +141,10 @@ def main():
             if len(practices):
                 print(f'## [{title}]({link})')
             for heading, ref, practice in practices:
-                see_more = f' (See more: [{heading}](#{ref}).)' if heading and ref else ''
-                practice = practice.strip().replace('\n', ' ')
-                print(f'- {practice}{see_more}')
+                ref = make_ref(ref) if make_ref else ref
+                see_more = f' (See more: [{heading}]({ref}).)' if heading and ref else ''
+                practice = re.sub(r'\s+', ' ', practice)
+                print(f'-{practice}{see_more}')
             if len(practices):
                 print()
 

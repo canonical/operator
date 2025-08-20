@@ -10,9 +10,9 @@
 - The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. (See more: [Validate your charm with every change](#validate-your-charm-with-every-change).)
 
 ## [How to log from your charm](https://documentation.ubuntu.com/ops/latest/howto/log-from-your-charm/)
-- Capture output to `stdout` and `stderr` in your charm and use the logging and warning functionality to send messages to the charm user, rather than rely on Juju capturing output.  In particular, you should avoid `print()` calls, and ensure that any subprocess calls capture output.
+- Capture output to `stdout` and `stderr` in your charm and use the logging and warning functionality to send messages to the charm user, rather than rely on Juju capturing output. In particular, you should avoid `print()` calls, and ensure that any subprocess calls capture output.
 - Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
-- Never log credentials or other sensitive information.
+-Never log credentials or other sensitive information.
 
 ## [How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)
 - All charms should provide the commands configured by the Charmcraft profile, to allow easy testing across the charm ecosystem. It's fine to tweak the configuration of individual tools, or to add additional commands, but keep the command names and meanings that the profile provides. (See more: [Develop your charm](#develop-your-charm).)
@@ -20,3 +20,17 @@
 
 ## [Manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. (See more: [Write a library](#manage-libraries-write-a-library).)
+
+## [Manage charms](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/)
+- If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see :ref:`specify-a-name`.  (See more: [Initialise a charm]({external+charmcraft:ref}`initialise-a-charm`).)
+- Bigger charm documentation examples: * `OpenSearch <https://charmhub.io/opensearch>`_ charm * `Wordpress-k8s <https://charmhub.io/wordpress-k8s>`_ charm  (See more: [Add charm project metadata, an icon, docs]({external+charmcraft:ref}`add-docs`).)
+
+## [Manage resources](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-resources/)
+- For resources that are binary files, provide binaries for all the CPU architectures you intend to support.  (See more: [Publish a resource on Charmhub]({external+charmcraft:ref}`publish-a-resource`).)
+
+## [``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/)
+- Prefer lowercase alphanumeric names, and use hyphens (-) to separate words. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some action names be dashed and some be underscored.  (See more: [``actions``]({external+charmcraft:ref}`charmcraft-yaml-key-analysis`).)
+- For very complex applications, consider providing configuration profiles, which can group values for large configs together. For example, a ``profile: large`` that tweaks multiple options under the hood to optimize for larger deployments, or a ``profile: ci`` for limited resource usage during testing.  (See more: [``config``]({external+charmcraft:ref}`charmcraft-yaml-key-containers`).)
+- Documentation links should apply to the charm, and not to the application that is being charmed. Assume that the user already has basic competency in the use of the application.  (See more: [``links``]({external+charmcraft:ref}`charmcraft-yaml-key-name`).)
+- The name should be slug-oriented (ASCII lowercase letters, numbers, and hyphens) and follow the pattern ``<workload name in full>[<function>][-k8s]``. For example, ``argo-server-k8s``. Include the ``-k8s`` suffix on all charms that run on a Kubernetes cloud, unless the charm has no workload or you know that there will never be a machine version of the charm. Don't include an organization or publisher in the name. Don't add an ``operator`` or ``charm`` prefix or suffix. For naming a repository, see :ref:`initialise-a-charm`.  (See more: [``name``]({external+charmcraft:ref}`charmcraft-yaml-key-parts`).)
+- Always include the ``optional`` key, rather than relying on the default value to indicate that the relation is required. Although this field is not enforced by Juju, including it makes it clear to users (and other tools) whether the relation is required.  (See more: [``<endpoint role>``]({external+charmcraft:ref}`charmcraft-yaml-key-requires`).)
