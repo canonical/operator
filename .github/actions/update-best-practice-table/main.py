@@ -21,6 +21,7 @@ import pathlib
 import re
 
 
+# TODO: It seems like I broke the rst extraction. Fix that!
 def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
     """Extracts 'Best practice' blocks from a Markdown or ReST file."""
     lines = content.splitlines()
@@ -96,7 +97,7 @@ def main():
         help='Path to a clone of canonical/charmcraft',
     )
     args = parser.parse_args()
-    path_to_ops = pathlib.Path(__file__).parent.parent.parent
+    path_to_ops = pathlib.Path(__file__).parent.parent.parent.parent
     for directory, base_url in (
         (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/'),
         (args.path_to_charmcraft / 'docs', 'https://documentation.ubuntu.com/charmcraft/stable/'),
@@ -104,7 +105,7 @@ def main():
         for file_path in directory.rglob('*'):
             if file_path.suffix not in ('.md', '.rst'):
                 continue
-            if file_path.name == 'best-practices.md':
+            if file_path.name == 'best-practices-generated':
                 continue
             text = file_path.read_text()
             # Get the title of the page. This will be the first heading in the file.

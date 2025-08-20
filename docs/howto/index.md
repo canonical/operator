@@ -7,7 +7,6 @@
 Manage charms <manage-charms>
 Write and structure charm code <write-and-structure-charm-code>
 Make your charm discoverable <request-public-listing>
-Best practices <best-practices>
 Write unit tests for a charm <write-unit-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 Log from your charm <log-from-your-charm>

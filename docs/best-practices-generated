@@ -15,8 +15,8 @@
 - Never log credentials or other sensitive information.
 
 ## [How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)
-- All charms should provide the commands configured by the Charmcraft profile, to allow easy testing across the charm ecosystem. It's fine to tweak the configuration of individual tools, or to add additional commands, but keep the command names and meanings that the profile provides. (See more: [Develop your charm](#manage-charms).)
-- The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. (See more: [Develop your charm](#manage-charms).)
+- All charms should provide the commands configured by the Charmcraft profile, to allow easy testing across the charm ecosystem. It's fine to tweak the configuration of individual tools, or to add additional commands, but keep the command names and meanings that the profile provides. (See more: [Develop your charm](#develop-your-charm).)
+- The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. (See more: [Develop your charm](#develop-your-charm).)
 
 ## [Manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. (See more: [Write a library](#manage-libraries-write-a-library).)
