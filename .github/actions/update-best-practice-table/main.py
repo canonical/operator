@@ -20,51 +20,67 @@ import argparse
 import pathlib
 import re
 
-BEST_PRACTICE_RE_MD = re.compile(
-    r'```{admonition} Best practice\s*(?:.*?\n)?([\s\S]*?)```',
-    re.MULTILINE,
-)
-BEST_PRACTICE_RE_REST = re.compile(
-    r'^\.\. admonition:: Best practice\s*\n\s*:class: hint\s*\n\s*\n([\s\S]*?)(?=\n\.\. |\n\n|\Z)',
-    re.MULTILINE,
-)
 
+def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
+    """Extracts 'Best practice' blocks from a Markdown or ReST file."""
+    lines = content.splitlines()
+    results: list[tuple[str | None, str | None, str]] = []
 
-def extract_best_practice_blocks(file_path: pathlib.Path):
-    """Extracts 'Best practice' blocks from a file."""
-    remove_pattern: str | None = None
-    matches: list[str] = []
-    content = file_path.read_text()
-    if file_path.suffix == '.md':
-        matches = BEST_PRACTICE_RE_MD.findall(content)
-        remove_pattern = r'^:class: hint\s*\n'
-    elif file_path.suffix == '.rst':
-        matches = BEST_PRACTICE_RE_REST.findall(content)
-        remove_pattern = r'^\s+'
-    assert remove_pattern is not None, 'Unsupported file type for best practices extraction.'
-    if not matches:
-        return matches
-    return [
-        re.sub(remove_pattern, '', match, flags=re.MULTILINE).strip().replace('\n', ' ')
-        for match in matches
-    ]
+    current_heading = None
+    current_ref = None
+    previous_line = ''
+    inside_admonition = False
+    admonition_lines: list[str] = []
 
+    for line in lines:
+        if line == ':class: hint':
+            continue
 
-def find_best_practices(path_to_ops: pathlib.Path, path_to_charmcraft: pathlib.Path):
-    """Recursively located best practice blocks in Ops and Charmcraft."""
-    checklist: list[tuple[pathlib.Path, str]] = []
-    for directory, base_url in (
-        (path_to_ops, 'https://documentation.ubuntu.com/ops/latest/'),
-        (path_to_charmcraft, 'https://documentation.ubuntu.com/charmcraft/stable/'),
-    ):
-        for file_path in directory.rglob('*'):
-            if file_path.suffix in ('.md', '.rst'):
-                practices = extract_best_practice_blocks(file_path)
-                # TODO: It would be even nicer if we found the closest reference link rather than
-                # just the file path.
-                link = f'{base_url}{file_path.relative_to(directory).with_suffix("")}/'
-                checklist.extend((link, practice) for practice in practices)
-    return checklist
+        if file_path.suffix == '.md':
+            md_match = re.match(r'^(#{2,})\s+(.*)', line)
+            if md_match:
+                current_heading = md_match.group(2)
+                previous_line = line
+                continue
+        else:  # .rst
+            rst_match = re.match(r'^[-=]{3,}$', line.strip())
+            if rst_match and previous_line.strip():
+                current_heading = previous_line.strip()
+                previous_line = line
+                continue
+        previous_line = line
+
+        if file_path.suffix == '.md':
+            ref_match = re.match(r'\((.+?)\)=', line)
+        else:  # .rst
+            ref_match = re.match(r'.. _(.+?):', line)
+        if ref_match:
+            current_ref = ref_match.group(1)
+            continue
+
+        if file_path.suffix == '.md':
+            if re.match(r'^```{admonition} Best practice', line):
+                inside_admonition = True
+                admonition_lines.clear()
+                continue
+        else:  # .rst
+            if re.match(r'^\.\. admonition:: Best practice', line):
+                inside_admonition = True
+                admonition_lines.clear()
+                continue
+
+        if inside_admonition:
+            if file_path.suffix == '.md':
+                at_end = line.strip() == '```'
+            else:  # .rst
+                at_end = previous_line.strip() == '' and len(line) > 0 and line[0] != ' '
+            if at_end:
+                results.append((current_heading, current_ref, '\n'.join(admonition_lines)))
+                inside_admonition = False
+            else:
+                admonition_lines.append(line)
+
+    return results
 
 
 def main():
@@ -85,9 +101,37 @@ def main():
         help='Path to a clone of canonical/charmcraft',
     )
     args = parser.parse_args()
-    practices = find_best_practices(args.path_to_ops / 'docs', args.path_to_charmcraft / 'docs')
-    for link, practice in practices:
-        print(f'- {practice.strip()} [See more]({link}).')
+    for directory, base_url in (
+        (args.path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/'),
+        (args.path_to_charmcraft / 'docs', 'https://documentation.ubuntu.com/charmcraft/stable/'),
+    ):
+        for file_path in directory.rglob('*'):
+            if file_path.suffix not in ('.md', '.rst'):
+                continue
+            if file_path.name == 'best-practices.md':
+                continue
+            text = file_path.read_text()
+            # Get the title of the page. This will be the first heading in the file.
+            if file_path.suffix == '.md':
+                mo = re.search(r'^#\s+?(.*)', text, re.MULTILINE)
+                if not mo:
+                    continue
+                title = mo.group(1).strip()
+            else:  # file_path.suffix == '.rst':
+                mo = re.search(r'^(.+?)\n[-=]+\n', text, re.MULTILINE)
+                if not mo:
+                    continue
+                title = mo.group(1).strip()
+            practices = extract_best_practice_blocks(file_path, text)
+            link = f'{base_url}{file_path.relative_to(directory).with_suffix("")}/'
+            if len(practices):
+                print(f'## [{title}]({link})')
+            for heading, ref, practice in practices:
+                see_more = f' (See more: [{heading}](#{ref}).)' if heading and ref else ''
+                practice = practice.strip().replace('\n', ' ')
+                print(f'- {practice}{see_more}')
+            if len(practices):
+                print()
 
 
 if __name__ == '__main__':
