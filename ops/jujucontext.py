@@ -26,14 +26,15 @@ from .jujuversion import JujuVersion
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class JujuContext:
-    """JujuContext provides the Juju hook context.
+    """Provides the Juju hook context, primarily for charming approaches outside of Ops.
 
     Juju provides context for the hook in the form of environment variables.
     Rather than directly accessing the environment, charms should use
-    :meth:`ops.JujuContext.from_environ` to access this information.
+    :meth:`ops.JujuContext.from_environ` to create a ``JujuContext`` object that contains this
+    information.
 
-    Note that most of the information in ``JujuContext`` is exposed through the
-    framework, for example :attr:`ops.JujuContext.model_name` is
+    Most of the information in ``JujuContext`` is exposed through the
+    framework. For example :attr:`ops.JujuContext.model_name` is
     :attr:`ops.Model.name`, and :attr:`ops.JujuContext.action_uuid` is
     :attr:`ops.ActionEvent.id`. Typically, charms should not directly use the
     ``JujuContext`` class -- it is primarily provided to support charming
@@ -293,7 +294,7 @@ class JujuContext:
 
     @classmethod
     def from_environ(cls, environ: dict[str, str] | None = None) -> JujuContext:
-        """Create a JujuContext from the environment.
+        """Create a ``JujuContext`` object from the environment.
 
         If environ is ``None``, ``os.environ`` will be used.
 
