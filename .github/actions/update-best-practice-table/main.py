@@ -50,15 +50,6 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
                 continue
 
         if file_path.suffix == '.md':
-            ref_match = re.match(r'\((.+?)\)=', line)
-        else:  # .rst
-            ref_match = re.match(r'.. _(.+?):', line)
-        if ref_match:
-            current_ref = ref_match.group(1)
-            previous_line = line
-            continue
-
-        if file_path.suffix == '.md':
             if re.match(r'^```{admonition} Best practice', line):
                 inside_admonition = True
                 admonition_lines.clear()
@@ -82,6 +73,14 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
             else:
                 admonition_lines.append(line)
 
+        if file_path.suffix == '.md':
+            ref_match = re.match(r'\((.+?)\)=', line)
+        else:  # .rst
+            ref_match = re.match(r'.. _(.+?):', line)
+        if ref_match:
+            current_ref = ref_match.group(1)
+            continue
+
         previous_line = line
 
     return results
@@ -94,7 +93,7 @@ def make_ops_ref(heading: str, raw: str):
 
 def make_charmcraft_ref(heading: str, raw: str):
     """Turn the charmcraft reference into an external intersphinx link."""
-    return f'{{external+charmcraft:ref}}`{heading} <{raw}>`'
+    return f'{{external+charmcraft:ref}}`{heading.replace("`", "")} <{raw}>`'
 
 
 def main():
