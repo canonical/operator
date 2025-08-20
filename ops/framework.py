@@ -595,7 +595,7 @@ class Framework(Object):
     """The charm's metadata."""
 
     charm_dir: pathlib.Path = None  # type: ignore
-    """The charm project root directory."""
+    """The directory where the charm is running."""
 
     _stored: StoredStateData = None  # type: ignore
 

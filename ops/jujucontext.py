@@ -96,7 +96,7 @@ class JujuContext:
     charm_dir: Path = dataclasses.field(
         default_factory=lambda: Path(f'{__file__}/../../..').resolve()
     )
-    """The root directory of the charm where it is running.
+    """The directory where the charm is running.
 
     For example '/var/lib/juju/agents/unit-bare-0/charm' (from ``JUJU_CHARM_DIR``).
     """
