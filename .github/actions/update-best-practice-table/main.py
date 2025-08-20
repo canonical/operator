@@ -139,7 +139,7 @@ def main():
             practices = extract_best_practice_blocks(file_path, text)
             link = f'{base_url}{file_path.relative_to(directory).with_suffix("")}/'
             if len(practices):
-                print(f'## [{title}]({link})')
+                print(f'### [{title}]({link})')
             for heading, ref, practice in practices:
                 ref = make_ref(heading, ref) if make_ref else ref
                 see_more = f' (See more: {ref}.)' if heading and ref else ''

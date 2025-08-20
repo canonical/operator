@@ -12,7 +12,7 @@ While anyone can upload a charm to Charmhub, before a charm is publicly listed i
 
 A listing review is **not** code review. The reviewer may be looking at some of the charm code, and may have comments on it, but the listing review is not a review of the architecture or design of the charm, and is not a line-by-line review of the charm code. Do architecture, design, and code review earlier in the charm development process -- reach out in the [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) Matrix channel if you would like assistance.
 
-### Steps of a review
+## Steps of a review
 
 The overall approach is straightforward:
 
@@ -25,7 +25,7 @@ The result of the process is that:
 * if the review is successful, the charm is switched to listed mode, or
 * if the review is unsuccessful, the charm does not reach the required criteria and the charm remains unlisted, until the issues are resolved.
 
-### Review prerequisites
+## Review prerequisites
 
 The listing request issue will prompt the author to provide information about the charm:
 
