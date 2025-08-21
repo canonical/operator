@@ -149,8 +149,8 @@ def main():
             for heading, ref, practice in practices:
                 ref = make_ref(heading, ref) if make_ref else ref
                 see_more = f' See: {ref}.' if heading and ref else ''
-                practice = re.sub(r'\s+', ' ', practice)
-                print(f'-{practice}{see_more}')
+                practice = re.sub(r'\s+', ' ', practice).strip()
+                print(f'- {practice}{see_more}')
             if len(practices):
                 print()
 
