@@ -12,5 +12,5 @@ runs:
       with:
         python-version: "3.12"
     - run: |
-        python .github/actions/update-best-practice-table/main.py > docs/best-practices-generated
+        python .github/actions/update-best-practice-table/main.py > docs/reuse/best-practices.txt
       shell: bash

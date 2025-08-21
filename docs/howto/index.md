@@ -6,7 +6,6 @@
 
 Manage charms <manage-charms>
 Write and structure charm code <write-and-structure-charm-code>
-Make your charm discoverable <request-public-listing>
 Write unit tests for a charm <write-unit-tests-for-a-charm>
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 Log from your charm <log-from-your-charm>
@@ -27,5 +26,6 @@ Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
 Manage metrics <manage-metrics>
 Trace your charm <trace-your-charm>
+Make your charm discoverable <request-public-listing>
 Legacy how-to guides <legacy/index>
 ```

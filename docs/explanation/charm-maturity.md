@@ -48,8 +48,6 @@ For example, if the workload requires initial passwords to be set, auto-generate
 
 ### The charm is compatible with the ecosystem
 
-TODO: Likely this whole section gets lifted out into James's documentation.
-
 Ensure that newly proposed public interfaces have been reviewed and approved to ensure:
 
 - The interface is ready for adoption by other charmers. In most cases this will mean providing a library to help other charms provide or require a relation using the interface.
