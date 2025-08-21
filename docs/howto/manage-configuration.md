@@ -12,11 +12,8 @@ In the `charmcraft.yaml` file of the charm, under `config.options`, add a config
 ```{admonition} Best practice
 :class: hint
 
-Don't duplicate model-level configuration options that are controlled by `juju model-config`.
+Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`.
 ```
-
-> See more:
->  - {external+juju:ref}`Juju CLI | model-config <command-juju-model-config>`
 
 The example below shows how to define two configuration options, one called `name` of type `string` and default value `Wiki`, and one called `skin` with type `string` and default value `vector`:
 
