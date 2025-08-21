@@ -267,26 +267,8 @@ with Kubernetes charms easily.
 
 ### Deploy a bundle
 
-```{note}
+Here's how an integration can deploy a bundle with the current charm:
 
-It is not recommended to use `ops_test.build_bundle` and `ops_test.deploy_bundle` until this [issue](https://github.com/charmed-kubernetes/pytest-operator/issues/98) is closed, as it uses `juju-bundle` which is outdated. You can deploy bundles using `ops_test.model.deploy` or `ops_test.juju`.
-
-```
-
-### Render bundles and charms
-
-`pytest-operator` has utilities to template your charms and bundles using Jinja2.
-
-To render a kubernetes bundle with your current charm, create the file `./test/integration/bundle.yaml.j2` with this content:
-```text
-bundle: kubernetes
-applications:
-  my-app:
-    charm: {{ charm }}
-    scale: {{ scale }}
-```
-
-You can now add the next integration test that will build an deploy the bundle with the current charm:
 ```python
 def test_build_and_deploy_bundle(charm: Path, juju: jubilant.Juju):
     # Bundle definition with the charm under test:
