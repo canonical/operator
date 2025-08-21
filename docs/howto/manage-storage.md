@@ -235,13 +235,9 @@ To verify that adding and removing storage works correctly against a real Juju i
 
 ```python
 # This assumes there is a previous test that handles building and deploying.
-async def test_storage_attaching(ops_test):
-    # Add a 1GB "cache" storage:
-    await ops_test.model.applications[APP_NAME].units[0].add_storage("cache", size=1024*1024)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", timeout=600
-    )
-
+def test_storage_attaching(juju: jubilant.Juju):
+    # Add two storage units of 2 gigabyte each to unit 0 of the Kafka app.
+    juju.cli("add-storage", "kafka/0", "data=2G,2", include_model=True)
+    juju.wait(jubilant.all_active)
     # Assert that the storage is being used appropriately.
 ```
