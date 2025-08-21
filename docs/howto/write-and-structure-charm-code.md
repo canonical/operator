@@ -374,6 +374,14 @@ By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
 ```
 
+(best-practices)=
+## Follow best practices
+
+Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
+
+```{include} ../reuse/best-practices.txt
+```
+
 (validate-your-charm-with-every-change)=
 ## Validate your charm with every change
 
@@ -467,12 +475,4 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
 The [charming-actions](https://github.com/canonical/charming-actions)
 repository includes actions to ensure that libraries are up-to-date, publish
 charms and libraries, and more.
-```
-
-(best-practices)=
-## Best practices
-
-Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
-
-```{include} ../reuse/best-practices.txt
 ```
