@@ -56,6 +56,17 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
                 previous_line = line
                 continue
 
+        if inside_admonition:
+            if file_path.suffix == '.md':
+                at_end = line.strip() == '```'
+            else:  # .rst
+                at_end = previous_line.strip() == '' and len(line) > 0 and line[0] != ' '
+            if at_end:
+                results.append((current_heading, current_ref, '\n'.join(admonition_lines)))
+                inside_admonition = False
+            else:
+                admonition_lines.append(line)
+
         if file_path.suffix == '.md':
             if re.match(r'^```{admonition} Best practice', line):
                 inside_admonition = True
@@ -68,17 +79,6 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
                 admonition_lines.clear()
                 previous_line = line
                 continue
-
-        if inside_admonition:
-            if file_path.suffix == '.md':
-                at_end = line.strip() == '```'
-            else:  # .rst
-                at_end = previous_line.strip() == '' and len(line) > 0 and line[0] != ' '
-            if at_end:
-                results.append((current_heading, current_ref, '\n'.join(admonition_lines)))
-                inside_admonition = False
-            else:
-                admonition_lines.append(line)
 
         if file_path.suffix == '.md':
             ref_match = re.match(r'\((.+?)\)=', line)
