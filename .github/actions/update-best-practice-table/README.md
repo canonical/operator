@@ -2,7 +2,7 @@
 
 ## GitHub Actions Usage
 
-This action will regenerate the [best practices doc](../../../docs/reference/best-practices.md) by
+This action will regenerate the [best practices doc](../../../docs/reuse/best-practices.txt) by
 scraping the operator and charmcraft repository `docs` folders. If there are changes, then the
 action will open a pull request to have those changes added to the main branch.
 
@@ -13,7 +13,7 @@ from), and also the [canonical/charmcraft](https://github.com/canonical/charmcra
 ideally checked out to the branch that is used for the `stable` version of the Charmcraft docs.
 
 ```command
-python3 .github/actions/update-best-practice-table/main.py --path-to-ops=. --path-to-charmcraft=../charmcraft > docs/reference/best-practices.md
+python3 .github/actions/update-best-practice-table/main.py --path-to-charmcraft=../charmcraft > docs/reuse/best-practices.txt
 
 # Check the modifications in the current branch.
 git diff
