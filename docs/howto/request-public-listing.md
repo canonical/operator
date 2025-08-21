@@ -38,9 +38,9 @@ Ensure your charm's documentation focuses on the charm itself. For workload-spec
 
 The charm should follow documented [best practices](#follow-best-practices).
 
-## 2. Review prerequisites
+### Use the evaluation tool to get more details
 
-Once your charm is close to review readiness, it's worth evaluating it yourself before requesting a review, to be confident in a positive result. To see the list of requirements and have some automatically checked, in the root of your charm folder in your repository run the command:
+Use the evaluation tool to see the list of requirements that will be used in the review, and have some automatically checked. In the root of your charm folder in your repository run the command:
 
 ```bash
 uvx --with=package-name something-or-other-here
@@ -48,7 +48,7 @@ uvx --with=package-name something-or-other-here
 
 This will provide you with information about the full listing criteria, and, for those that can be checked automatically, whether the charm currently passes.
 
-## 3. Request a review
+## 2. Request a review
 
 ```{note}
 Each review covers exactly one charm. If your charm is designed to only work with other charms in a solution, open multiple review requests and note in them that they are connected.
@@ -75,6 +75,6 @@ You should see that some of the items in the checklist are already ticked - thes
 
 Over the next few days, the reviewer will check the remaining items, and post the results as a new comment on the issue. GitHub subscribed you to the issue when you created it, so you'll receive notifications when there is new activity.
 
-## 4. Address any remaining issues
+## 3. Address any remaining issues
 
 If there are items in the checklist that are not yet ticked, address those through conversations with the reviewer in issue comments, and by making adjustments to the charm metadata and code. Once there are no items left to resolve, the review is complete, and the store team will be automatically notified that the charm should be listed publicly. This typically happens within a day or two.
