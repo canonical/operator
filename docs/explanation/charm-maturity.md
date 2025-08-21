@@ -22,7 +22,7 @@ Anyone can publish a charm to Charmhub (you'll need to create an account, and th
 When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure, metadata, and so forth. After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
 
 > See more:
->  - [How to request Charmhub public listing](#request-public-listing)
+>  - [How to request Charmhub public listing](#make-your-charm-discoverable)
 
 Reviewing charms encourages the involvement of the community. The community refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem.
 

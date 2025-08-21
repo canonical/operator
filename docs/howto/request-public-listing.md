@@ -1,4 +1,4 @@
-(request-public-listing)=
+(make-your-charm-discoverable)=
 # Make your charm discoverable
 
 > See first: [Charm maturity](#charm-maturity)
