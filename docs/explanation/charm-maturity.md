@@ -3,17 +3,26 @@
 
 Like all software, charms continually evolve and should increase in maturity and quality over time. There are four major stages of charm maturity, which correlate with the availability of the charm:
 
-1. **Early development and local deployment**. Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This is frequently done during development, but can also be used for private charms.
-2. **Private listing on Charmhub**. Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name. *These charms will not show up in searches on Charmhub, or general web searches*.
-3. **Public listing on Charmhub**. When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure and metadata, and so forth. After passing review, the charm will show up in searches on Charmhub.
-4. **Ongoing improvement**. Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem (ingress, observability, identity, ...), gracefully handle scaling up and down, and more. These noteworthy charms are most likely to get wide adoption, and be featured in editorial content in the charming world.
+## Early development and local deployment
+
+Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This is frequently done during development, but can also be used for private charms.
 
 > See more:
 >  - {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
->  - {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
->  - [How to request Charmhub public listing](#request-public-listing)
 
-## Publicly listed charms
+## Private listing on Charmhub
+
+Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name. *These charms will not show up in searches on Charmhub, or general web searches*.
+
+> See more:
+>  - {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
+
+## Public listing on Charmhub
+
+When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure, metadata, and so forth. After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
+
+> See more:
+>  - [How to request Charmhub public listing](#request-public-listing)
 
 Reviewing charms encourages the involvement of the community. The community refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem.
 
@@ -36,9 +45,9 @@ The process for making a charm discoverable on Charmhub involves a light review 
 |Reviewer|Person conducting the review.|
 |Listing|After the reviewer has reviewed the charm successfully, it can be switched to 'listing'. Listing means that the charm will be part of the search result when querying the web pages and API of Charmhub.io, and is in the Charmhub sitemap (so will be found by third-party search engines). Without 'listing', the charm will be available under its URL but is not listed in searches.|
 
-## Signs of mature charms
+## Ongoing improvement
 
-Once your charm is discoverable, you'll want to continue working on it to get it to be a noteworthy addition to the charming ecosystem. Exactly what that entails will depend on the workload being charmed, but there are some specific standards that Juju users are looking for.
+Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem (ingress, observability, identity, ...), gracefully handle scaling up and down, and more. These noteworthy charms are most likely to get wide adoption, and be featured in editorial content in the charming world. Some specific standards that Juju users are looking for include:
 
 ### The charm has sensible defaults
 
@@ -58,11 +67,9 @@ Ensure that newly proposed public interfaces have been reviewed and approved to 
 > See more:
 >  - [charmlibs](https://documentation.ubuntu.com/charmlibs/)
 
-### The charm respects `juju model-config`
+### The charm respects the Juju proxy options
 
-Avoid duplicating configuration options that are best controlled at a model level:
-
-- `juju-http-proxy`, `juju-https-proxy`, and `juju-no-proxy` should influence the charm's behavior when the charm or charm workload makes any HTTP request.
+`juju-http-proxy`, `juju-https-proxy`, and `juju-no-proxy` should influence the charm's behavior when the charm or charm workload makes any HTTP request.
 
 ### The charm upgrades the application safely
 
