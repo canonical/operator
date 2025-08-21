@@ -129,7 +129,7 @@ class TestJujuContext:
 
 
 _valid_minimal = {
-    'JUJU_DISPATCH_PATH': 'actions/do-something',
+    'JUJU_DISPATCH_PATH': 'hooks/install',
     'JUJU_HOOK_NAME': 'install',
     'JUJU_MODEL_NAME': 'foo',
     'JUJU_MODEL_UUID': 'cdac5656-2423-4388-8f30-41854b4cca7d',
@@ -142,7 +142,7 @@ def test_context_from_os_environ(monkeypatch: pytest.MonkeyPatch):
     with monkeypatch.context() as m:
         m.setattr(os, 'environ', _valid_minimal)
         juju_context = JujuContext.from_environ()
-    assert juju_context.dispatch_path == 'actions/do-something'
+    assert juju_context.dispatch_path == 'hooks/install'
     assert juju_context.hook_name == 'install'
     assert juju_context.model_name == 'foo'
     assert juju_context.model_uuid == 'cdac5656-2423-4388-8f30-41854b4cca7d'
@@ -180,18 +180,18 @@ def test_invalid_context_from_environ_simple(event: str, missing: str):
         ('secret-rotate', {}),
         ('secret-remove', {'JUJU_SECRET_ID': 'secret:1'}),
         ('secret-expired', {'JUJU_SECRET_ID': 'secret:1'}),
-        ('w-pebble-ready', {}),
-        ('w-pebble-check-failed', {'JUJU_WORKLOAD_NAME': 'w'}),
-        ('w-pebble-check-recovered', {'JUJU_PEBBLE_CHECK_NAME': 'c'}),
-        ('w-pebble-custom-notice', {}),
-        ('s-storage-attached', {}),
-        ('s-storage-detaching', {}),
-        ('act', {'JUJU_DISPATCH_PATH': 'actions/act', 'JUJU_HOOK_NAME': ''}),
-        ('r-relation-created', {}),
-        ('r-relation-joined', {}),
-        ('r-relation-changed', {}),
-        ('r-relation-departed', {}),
-        ('r-relation-broken', {}),
+        ('a-workload-pebble-ready', {}),
+        ('a-workload-pebble-check-failed', {'JUJU_WORKLOAD_NAME': 'a-workload'}),
+        ('a-workload-pebble-check-recovered', {'JUJU_PEBBLE_CHECK_NAME': 'chk1'}),
+        ('a-workload-pebble-custom-notice', {}),
+        ('storage-1-storage-attached', {}),
+        ('storage-1-storage-detaching', {}),
+        ('the-act', {'JUJU_DISPATCH_PATH': 'actions/the-act', 'JUJU_HOOK_NAME': ''}),
+        ('some-rel-relation-created', {}),
+        ('some-rel-relation-joined', {}),
+        ('some-rel-relation-changed', {}),
+        ('some-rel-relation-departed', {}),
+        ('some-rel-relation-broken', {}),
     ],
 )
 def test_invalid_context_from_environ(event: str, additional_env: dict[str, str]):
@@ -218,8 +218,9 @@ def test_invalid_context_from_environ(event: str, additional_env: dict[str, str]
 def test_from_environ_simple(event: str):
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = event
+    environ['JUJU_DISPATCH_PATH'] = f'hooks/{event}'
     context = JujuContext.from_environ(environ)
-    assert context.dispatch_path == 'actions/do-something'
+    assert context.dispatch_path == f'hooks/{event}'
     assert context.hook_name == event
     assert context.model_name == 'foo'
     assert context.model_uuid == 'cdac5656-2423-4388-8f30-41854b4cca7d'
@@ -239,6 +240,7 @@ def test_from_environ_simple(event: str):
 def test_from_environ_secret(event: str, additional_env: dict[str, str]):
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = event
+    environ['JUJU_DISPATCH_PATH'] = f'hooks/{event}'
     environ.update(additional_env)
     context = JujuContext.from_environ(environ)
     assert context.secret_id == 'secret:1'
@@ -249,79 +251,89 @@ def test_from_environ_secret(event: str, additional_env: dict[str, str]):
 def test_from_environ_action():
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = ''
-    environ['JUJU_DISPATCH_PATH'] = 'actions/act'
-    environ['JUJU_ACTION_NAME'] = 'act'
+    environ['JUJU_DISPATCH_PATH'] = 'actions/my-act'
+    environ['JUJU_ACTION_NAME'] = 'my-act'
     environ['JUJU_ACTION_UUID'] = '1'
     context = JujuContext.from_environ(environ)
-    assert context.action_name == 'act'
+    assert context.action_name == 'my-act'
     assert context.action_uuid == '1'
 
 
 def test_from_environ_pebble_ready():
     environ = _valid_minimal.copy()
-    environ['JUJU_HOOK_NAME'] = 'w-pebble-ready'
-    environ['JUJU_WORKLOAD_NAME'] = 'w'
+    environ['JUJU_HOOK_NAME'] = 'a-workload-pebble-ready'
+    environ['JUJU_DISPATCH_PATH'] = 'hooks/a-workload-pebble-ready'
+    environ['JUJU_WORKLOAD_NAME'] = 'a-workload'
     context = JujuContext.from_environ(environ)
-    assert context.workload_name == 'w'
+    assert context.workload_name == 'a-workload'
 
 
 def test_from_environ_pebble_notice():
     environ = _valid_minimal.copy()
-    environ['JUJU_HOOK_NAME'] = 'w-pebble-custom-notice'
-    environ['JUJU_WORKLOAD_NAME'] = 'w'
+    environ['JUJU_HOOK_NAME'] = 'a-workload-pebble-custom-notice'
+    environ['JUJU_DISPATCH_PATH'] = 'hooks/a-workload-pebble-custom-notice'
+    environ['JUJU_WORKLOAD_NAME'] = 'a-workload'
     environ['JUJU_NOTICE_ID'] = '1'
     environ['JUJU_NOTICE_KEY'] = 'example.com/k'
     environ['JUJU_NOTICE_TYPE'] = 'custom'
     context = JujuContext.from_environ(environ)
-    assert context.workload_name == 'w'
+    assert context.workload_name == 'a-workload'
     assert context.notice_id == '1'
     assert context.notice_key == 'example.com/k'
     assert context.notice_type == 'custom'
 
 
-@pytest.mark.parametrize('event', ['w-pebble-check-failed', 'w-pebble-check-recovered'])
+@pytest.mark.parametrize(
+    'event', ['a-workload-pebble-check-failed', 'a-workload-pebble-check-recovered']
+)
 def test_from_environ_pebble_check(event: str):
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = event
-    environ['JUJU_WORKLOAD_NAME'] = 'w'
+    environ['JUJU_DISPATCH_PATH'] = f'hooks/{event}'
+    environ['JUJU_WORKLOAD_NAME'] = 'a-workload'
     environ['JUJU_PEBBLE_CHECK_NAME'] = 'chk1'
     context = JujuContext.from_environ(environ)
-    assert context.workload_name == 'w'
+    assert context.workload_name == 'a-workload'
     assert context.pebble_check_name == 'chk1'
 
 
-@pytest.mark.parametrize('event', ['s-storage-attached', 's-storage-detaching'])
+@pytest.mark.parametrize('event', ['some-stor-storage-attached', 'some-stor-storage-detaching'])
 def test_from_environ_storage(event: str):
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = event
-    environ['JUJU_STORAGE_ID'] = 's/2'
+    environ['JUJU_DISPATCH_PATH'] = f'hooks/{event}'
+    environ['JUJU_STORAGE_ID'] = 'some-stor/2'
     context = JujuContext.from_environ(environ)
-    assert context.storage_name == 's'
+    assert context.storage_name == 'some-stor'
     assert context.storage_index == 2
 
 
 @pytest.mark.parametrize(
     'event,additional_env',
     [
-        ('r-relation-created', {}),
-        ('r-relation-joined', {'JUJU_REMOTE_UNIT': 'remoteunit'}),
-        ('r-relation-changed', {'JUJU_REMOTE_UNIT': 'remoteunit'}),
-        ('r-relation-departed', {'JUJU_REMOTE_UNIT': 'remoteunit', 'JUJU_DEPARTING_UNIT': 'd'}),
-        ('r-relation-broken', {}),
+        ('one-rel-relation-created', {}),
+        ('one-rel-relation-joined', {'JUJU_REMOTE_UNIT': 'remoteunit'}),
+        ('one-rel-relation-changed', {'JUJU_REMOTE_UNIT': 'remoteunit'}),
+        (
+            'one-rel-relation-departed',
+            {'JUJU_REMOTE_UNIT': 'remoteunit', 'JUJU_DEPARTING_UNIT': 'd-unit'},
+        ),
+        ('one-rel-relation-broken', {}),
     ],
 )
 def test_from_environ_relation(event: str, additional_env: dict[str, str]):
     environ = _valid_minimal.copy()
     environ['JUJU_HOOK_NAME'] = event
-    environ['JUJU_RELATION'] = 'r'
-    environ['JUJU_RELATION_ID'] = 'r:1'
+    environ['JUJU_DISPATCH_PATH'] = f'hooks/{event}'
+    environ['JUJU_RELATION'] = 'one-rel'
+    environ['JUJU_RELATION_ID'] = 'one-rel:1'
     environ['JUJU_REMOTE_APP'] = 'remoteapp'
     environ.update(additional_env)
     context = JujuContext.from_environ(environ)
     assert context.relation_id == 1
-    assert context.relation_name == 'r'
+    assert context.relation_name == 'one-rel'
     assert context.remote_app_name == 'remoteapp'
     if 'JUJU_REMOTE_UNIT' in environ:
         assert context.remote_unit_name == 'remoteunit'
     if 'JUJU_DEPARTING_UNIT' in environ:
-        assert context.relation_departing_unit_name == 'd'
+        assert context.relation_departing_unit_name == 'd-unit'
