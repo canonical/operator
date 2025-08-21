@@ -9,6 +9,7 @@ Writing a machine charm is not so different from writing a Kubernetes charm, but
 
 write-your-first-machine-charm
 from-zero-to-hero-write-your-first-kubernetes-charm/index
+write-a-machine-charm-for-tinyproxy
 ```
 
 To charm a 12-factor style application, you're able to build a charm by running a Charmcraft command and making a few modifications to the provided content. The Charmcraft tutorials are a great entry point for anyone new to making charms, particularly anyone building or managing applications that use these frameworks:
