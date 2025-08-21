@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  charm-unit-tests:
+  charm-checks:
     runs-on: ubuntu-latest
 
     strategy:
@@ -35,6 +35,10 @@ jobs:
           python-version: '${{ matrix.python-version }}'
       - name: Install tox
         run: pip install tox~=4.2
+      - name: Run linting and static checks
+        run: |
+          cd ${{ matrix.dir }}
+          tox -e lint
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
