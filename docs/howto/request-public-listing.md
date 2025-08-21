@@ -36,7 +36,7 @@ Ensure your charm's documentation focuses on the charm itself. For workload-spec
 * How to modify the charm
 * A concise summary of the charm in the `charmcraft.yaml` 'summary' field, and a more detailed description in the `charmcraft.yaml` 'description' field.
 
-The charm should follow documented [best practices](#best-practices).
+The charm should follow documented [best practices](#follow-best-practices).
 
 ## Review prerequisites
 

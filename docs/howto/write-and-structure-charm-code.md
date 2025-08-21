@@ -374,7 +374,7 @@ By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
 ```
 
-(best-practices)=
+(follow-best-practices)=
 ## Follow best practices
 
 Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
