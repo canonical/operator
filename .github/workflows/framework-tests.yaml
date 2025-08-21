@@ -19,26 +19,11 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
       - run: uv tool install tox --with tox-uv
-      - name: Run linting
+      - name: Run linting and static checks
         run: tox -e lint
 
-      - name: Run tracing linter
+      - name: Run tracing linter and static checks
         run: cd tracing && tox -e lint
-
-  static:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
-      - run: uv tool install tox --with tox-uv
-      - name: Run static type checks
-        run: tox -e static
-
-      - name: Run tracing static type checks
-        run: cd tracing && tox -e static
 
   test:
     runs-on: ${{ matrix.os }}
