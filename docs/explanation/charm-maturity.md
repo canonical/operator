@@ -3,21 +3,21 @@
 
 Like all software, charms continually evolve and should increase in maturity and quality over time. There are four major stages of charm maturity, which correlate with the availability of the charm:
 
-## Early development and local deployment
+## Phase 1: Early development and testing and private deployment
 
 Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This is frequently done during development, but can also be used for private charms.
 
 > See more:
 >  - {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
 
-## Private listing on Charmhub
+## Phase 2: Private listing on Charmhub
 
 Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name. *These charms will not show up in searches on Charmhub, or general web searches*.
 
 > See more:
 >  - {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
 
-## Public listing on Charmhub
+## Phase 3: Public listing on Charmhub
 
 When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure, metadata, and so forth. After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
 
@@ -45,7 +45,7 @@ The process for making a charm discoverable on Charmhub involves a light review 
 |Reviewer|Person conducting the review.|
 |Listing|After the reviewer has reviewed the charm successfully, it can be switched to 'listing'. Listing means that the charm will be part of the search result when querying the web pages and API of Charmhub.io, and is in the Charmhub sitemap (so will be found by third-party search engines). Without 'listing', the charm will be available under its URL but is not listed in searches.|
 
-## Ongoing maintenance and evolution
+## Phase 4: Ongoing maintenance and evolution
 
 Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem (ingress, observability, identity, ...), gracefully handle scaling up and down, and more. These noteworthy charms are most likely to get wide adoption, and be featured in editorial content in the charming world. Some specific standards that Juju users are looking for include:
 
