@@ -472,7 +472,7 @@ charms and libraries, and more.
 (best-practices)=
 ## Best practices
 
-Best practices for charm development and maintenance can be found across the charming ecosystem documentation. Those practices are collected here for convenience, but we encourage reading the how-to guides and reference documentation whenever you are working on your charm to understand the full context of the best practice.
+Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
 
 ```{include} ../reuse/best-practices.txt
 ```
