@@ -45,7 +45,7 @@ The process for making a charm discoverable on Charmhub involves a light review 
 |Reviewer|Person conducting the review.|
 |Listing|After the reviewer has reviewed the charm successfully, it can be switched to 'listing'. Listing means that the charm will be part of the search result when querying the web pages and API of Charmhub.io, and is in the Charmhub sitemap (so will be found by third-party search engines). Without 'listing', the charm will be available under its URL but is not listed in searches.|
 
-## Ongoing improvement
+## Ongoing maintenance and evolution
 
 Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem (ingress, observability, identity, ...), gracefully handle scaling up and down, and more. These noteworthy charms are most likely to get wide adoption, and be featured in editorial content in the charming world. Some specific standards that Juju users are looking for include:
 
