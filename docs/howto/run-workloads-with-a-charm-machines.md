@@ -69,20 +69,15 @@ class MachineCharm(ops.CharmBase):
 ```
 
 ```{tip}
-
 When running subprocesses, log the return (exit) code as well as `stderr` when
 errors occur.
 ```
 
-```{admonition} Best practice
-:class: hint
-
+```{tip}
 Use absolute paths in subprocesses to prevent security issues.
 ```
 
-```{admonition} Best practice
-:class: hint
-
+```{tip}
 Execute processes directly rather than via the shell.
 ```
 
