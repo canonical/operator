@@ -14,7 +14,7 @@ Anyone can upload a charm to Charmhub, which allows deploying the charm and view
 A listing review is **not** code review. The reviewer may be looking at some of the charm code, and may have comments on it, but the listing review is not a review of the architecture or design of the charm, and is not a line-by-line review of the charm code. Do architecture, design, and code review earlier in the charm development process -- reach out in the [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) Matrix channel if you would like assistance.
 ```
 
-## Self-evaluate your charm against the public listing criteria
+## 1. Self-evaluate your charm against the public listing criteria
 
 Carry out your own review of your charm and its metadata. In particular, make sure that:
 
@@ -38,7 +38,7 @@ Ensure your charm's documentation focuses on the charm itself. For workload-spec
 
 The charm should follow documented [best practices](#follow-best-practices).
 
-## Review prerequisites
+## 2. Review prerequisites
 
 Once your charm is close to review readiness, it's worth evaluating it yourself before requesting a review, to be confident in a positive result. To see the list of requirements and have some automatically checked, in the root of your charm folder in your repository run the command:
 
@@ -48,7 +48,7 @@ uvx --with=package-name something-or-other-here
 
 This will provide you with information about the full listing criteria, and, for those that can be checked automatically, whether the charm currently passes.
 
-## Request a review
+## 3. Request a review
 
 ```{note}
 Each review covers exactly one charm. If your charm is designed to only work with other charms in a solution, open multiple review requests and note in them that they are connected.
@@ -71,8 +71,10 @@ Avoid editing the issue description. The automation uses the data in the descrip
 
 You should see that some of the items in the checklist are already ticked - these are ones that the system is able to check automatically. Congratulations - you're part of the way through the review already!
 
+### Address any issues found
+
 Over the next few days, the reviewer will check the remaining items, and post the results as a new comment on the issue. GitHub subscribed you to the issue when you created it, so you'll receive notifications when there is new activity.
 
-## Address any remaining issues
+## 4. Address any remaining issues
 
 If there are items in the checklist that are not yet ticked, address those through conversations with the reviewer in issue comments, and by making adjustments to the charm metadata and code. Once there are no items left to resolve, the review is complete, and the store team will be automatically notified that the charm should be listed publicly. This typically happens within a day or two.
