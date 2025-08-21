@@ -5,7 +5,7 @@
 
 Once your charm is ready for wide production use, get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches done by Juju users and other charm developers.
 
-While anyone can upload a charm to Charmhub, before a charm is publicly listed it must pass through a lightweight review process. The goals of the review are:
+Anyone can upload a charm to Charmhub, which allows deploying the charm and viewing its information on Charmhub if you know the name of the charm. To have a charm publicly listed, meaning it will be found in searches on Charmhub and general web searches leading to Charmhub, it must pass through a lightweight review process. The goals of the review are:
 
 1. Be transparent about the capabilities and qualities of a charm.
 2. Ensure a common level of quality.
