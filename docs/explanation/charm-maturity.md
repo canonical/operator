@@ -7,22 +7,19 @@ Like all software, charms continually evolve and should increase in maturity and
 
 Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This is frequently done during development, but can also be used for private charms.
 
-> See more:
->  - {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
+> See more: {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
 
 ## Phase 2: Private listing on Charmhub
 
 Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name. *These charms will not show up in searches on Charmhub, or general web searches*.
 
-> See more:
->  - {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
+> See more: {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
 
 ## Phase 3: Public listing on Charmhub
 
 When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure, metadata, and so forth. After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
 
-> See more:
-> See more:  [How to request Charmhub public listing](#make-your-charm-discoverable)
+> See more: [How to request Charmhub public listing](#make-your-charm-discoverable)
 
 Reviewing charms encourages the involvement of the community. The community refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem.
 
@@ -64,8 +61,7 @@ Ensure that newly proposed public interfaces have been reviewed and approved to 
 - Interface names and structure are consistent with the charming ecosystem.
 - Tests cover integration with the applications consuming or providing the relations.
 
-> See more:
->  - [charmlibs](https://documentation.ubuntu.com/charmlibs/)
+> See more: [charmlibs](https://documentation.ubuntu.com/charmlibs/)
 
 ### The charm respects the Juju proxy options
 
