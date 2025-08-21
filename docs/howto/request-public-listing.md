@@ -1,7 +1,7 @@
 (request-public-listing)=
 # Make your charm discoverable
 
-> See first: [](#charm-maturity)
+> See first: [Charm maturity](#charm-maturity)
 
 Once your charm is ready for wide production use, get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches done by Juju users and other charm developers.
 
