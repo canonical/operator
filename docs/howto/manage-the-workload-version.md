@@ -80,8 +80,8 @@ def test_workload_version_is_set():
 
 To verify that setting the workload version works correctly in an integration test, get the status
 of the model, and check the `workload_version` attribute of the unit. In your
-`tests/integration/test_charm.py` file, after the `test_build_and_deploy` test
-that `charmcraft init` provides, add a new test that verifies the workload
+`tests/integration/test_charm.py` file, replace the `test_build_and_deploy` test
+that `charmcraft init` provides, and add a new test that verifies the workload
 version is set. For example:
 
 ```python
@@ -101,8 +101,4 @@ def test_workload_version_is_set(juju: jubilant.Juju):
     assert version == "3.14"
 ```
 
-<!---
-No "see more" link: this is not currently documented in the pylibjuju docs.
--->
-
-> Examples: [synapse checking that the unit's workload version matches the one reported by the server](https://github.com/canonical/synapse-operator/blob/778bcd414644c922373d542a304be14866835516/tests/integration/test_charm.py#L139)
+> See more: [](jubilant.Juju.status)

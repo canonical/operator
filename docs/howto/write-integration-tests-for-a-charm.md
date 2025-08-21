@@ -13,7 +13,7 @@ Integration testing is only one part of a comprehensive testing strategy. Also s
 
 The instructions all use the Jubilant library.
 
-> See more: [](jubilant)
+> See more: [Jubilant documentation](https://documentation.ubuntu.com/jubilant/)
 
 ## Prepare your environment
 
@@ -45,7 +45,9 @@ commands =
 
 By convention, integration tests are kept in the charm’s source tree, in a directory called `tests/integration`.
 
-If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, create this directory structure manually with a leaf `conftest.py` file and the test file that can be called whatever you wish as long as it starts with `test_`.
+If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
+
+Also create a leaf file called `conftest.py`. We'll edit this file later.
 
 Below is an example of a typical integration test:
 
@@ -118,15 +120,18 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that build and deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
 
-> Example implementations: [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/e54b482a4b72c45006451cd7436ec9f6e40162d6/tests/integration/test_charm.py#L15-L21)
-
 > See more: [](jubilant.temp_model)
+
+#### Example implementations
+
+- [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/e54b482a4b72c45006451cd7436ec9f6e40162d6/tests/integration/test_charm.py#L15-L21)
+- [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/integration)
 
 ### Deploy your charm with resources
 
-> See first: `manage-resources`
+> See first: {ref}`manage-resources`
 
-A charm can require `file` or `oci-image` `resources` to work, which have revision numbers on Charmhub. The OCI images can be referenced directly, while the file resources are typically built during `charmcraft pack` invocation.
+A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
 
 ```python
     ...
@@ -135,7 +140,7 @@ A charm can require `file` or `oci-image` `resources` to work, which have revisi
     ...
 ```
 
-In `charmcraft.yaml`'s `resources` section, the `upstream-resource` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
+In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
 
 ```python
 METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
@@ -161,7 +166,7 @@ def test_my_integration(juju: jubilant.Juju):
     ...
     # Both applications have to be deployed at this point.
     # This could be done above in the current test or in a previous one.
-    juju.integrate("your-application:endpoint1", "another:relation_name_2")
+    juju.integrate("your-app:endpoint1", "another:relation_name_2")
     juju.wait(jubilant.all_active)
     # check any assertion here
     ...
@@ -178,14 +183,13 @@ You can set a configuration option in your application and check its results.
 ```python
 def test_config_changed(juju: jubilant.Juju):
     ...
-    juju.config("your-application", {"server_name": "invalid_name"})
+    juju.config("your-app", {"server_name": "invalid_name"})
     # In this case, when setting server_name to "invalid_name"
     # we could for example expect a blocked status.
     juju.wait(jubilant.all_blocked, timeout=60)
     ...
 ```
-> See also: https://discourse.charmhub.io/t/how-to-add-a-configuration-option-to-a-charm/4458
->
+
 > See also: [](jubilant.Juju.config)
 
 ### Test an action
@@ -196,7 +200,7 @@ You can execute an action on a unit and get its results.
 
 ```python
 def test_run_action(juju: jubilant.Juju):
-    action_register_user = juju.run("your-application/0", "register-user", {"username": "ubuntu"})
+    action_register_user = juju.run("your-app/0", "register-user", {"username": "ubuntu"})
     assert action_register_user.status == "completed"
     password = action_register_user.results["user-password"]
     # We could for example check here that we can login with the new user
