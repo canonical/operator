@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Open a PR to update the best practices reference doc with the latest practices."""
+"""Update the best practices reference doc with the latest practices.
+
+Given clones of the repositories in the charming ecosystem that contain best
+practice notes (in the standard format, in either Markdown or reStructuredText
+files), find all the best practice blocks (and the heading and reference that is
+associated with them) and produce a suitable block of Markdown to include in the
+Ops documentation.
+"""
 
 import argparse
 import pathlib
