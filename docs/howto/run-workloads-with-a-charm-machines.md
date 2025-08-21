@@ -78,7 +78,6 @@ Use absolute paths in subprocesses to prevent security issues.
 ```
 
 ```{tip}
-
 Execute processes directly rather than via the shell.
 ```
 
