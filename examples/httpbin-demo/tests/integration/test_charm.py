@@ -45,3 +45,4 @@ def test_block_on_invalid_config(charm: Path, juju: jubilant.Juju):
         },
     )
     juju.wait(jubilant.all_blocked)
+    juju.config(APP_NAME, reset='log-level')
