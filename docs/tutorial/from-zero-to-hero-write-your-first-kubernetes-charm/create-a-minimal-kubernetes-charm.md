@@ -639,18 +639,18 @@ In the same directory, create a file called `test_charm.py` and add the followin
 
 ```python
 import logging
-from pathlib import Path
+import pathlib
 
 import jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
