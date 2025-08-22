@@ -138,8 +138,8 @@ class HttpbinDemoCharm(ops.CharmBase):
                     'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
                     'startup': 'enabled',
                     'environment': environment,
-                }
-            }
+                },
+            },
         }
         return ops.pebble.Layer(layer)
 
