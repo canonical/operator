@@ -14,13 +14,14 @@
 
 import pathlib
 import subprocess
+from typing import Generator
 
 import jubilant
 import pytest
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest):
+def juju(request: pytest.FixtureRequest) -> Generator[jubilant.Juju, None, None]:
     with jubilant.temp_model() as juju:
         yield juju
 
@@ -30,6 +31,6 @@ def juju(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(scope='session')
-def charm():
+def charm() -> pathlib.Path:
     subprocess.check_call(['charmcraft', 'pack'])  # noqa
     return next(pathlib.Path('.').glob('*.charm'))
