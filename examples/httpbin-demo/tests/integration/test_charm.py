@@ -41,7 +41,7 @@ def test_block_on_invalid_config(charm: Path, juju: jubilant.Juju):
     juju.config(
         APP_NAME,
         {
-            'log-level': 'foo'  # Should be info, debug, etc.
+            'log-level': 'foo'  # Should be one of info, debug, and so on.
         },
     )
     juju.wait(jubilant.all_blocked)
