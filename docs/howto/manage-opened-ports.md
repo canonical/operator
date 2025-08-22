@@ -61,11 +61,6 @@ By adding the following test to your `tests/integration/test_charm.py` file, you
 that your charm opens a port specified in the configuration, but prohibits using port 22:
 
 ```python
-async def get_address(ops_test: OpsTest, app_name: str, unit_num: int = 0) -> str:
-    """Get the address for service for an app."""
-    status = await ops_test.model.get_status()
-    return status['applications'][app_name].public_address
-
 def is_port_open(host: str, port: int) -> bool:
     """Check if a port is opened in a particular host."""
     try:
@@ -74,26 +69,24 @@ def is_port_open(host: str, port: int) -> bool:
     except (ConnectionRefusedError, TimeoutError):
         return False  # If connection fails, the port is closed
 
-@pytest.mark.abort_on_fail
-async def test_open_ports(ops_test: OpsTest):
+
+def test_open_ports(juju: jubilant.Juju):
     """Verify that setting the server-port in the charm's opens that port.
 
     Assert blocked status in case of port 22 and active status for others.
     """
-    app = ops_test.model.applications.get('my-charm')
-
     # Get the public address of the app:
-    address = await get_address(ops_test=ops_test, app_name=APP_NAME)
+    address = juju.status().apps["your-app"].units["your-app/0"].public_address
     # Validate that initial port is opened:
     assert is_port_open(address, 8000)
 
     # Set the port to 22 and validate the app goes to blocked status with the port not opened:
-    await app.set_config({'server-port': '22'})
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status='blocked', timeout=120)
+    juju.config("your-app", {"server-port": "22"})
+    juju.wait(jubilant.all_blocked)
     assert not is_port_open(address, 22)
 
     # Set the port to 6789 and validate the app goes to active status with the port opened.
-    await app.set_config({'server-port': '6789'})
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status='active', timeout=120)
+    juju.config("your-app", {"server-port": "6789"})
+    juju.wait(jubuilant.all_active)
     assert is_port_open(address, 6789)
 ```
