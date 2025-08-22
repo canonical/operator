@@ -52,7 +52,7 @@ Also create a leaf file called `conftest.py`. We'll edit this file later.
 Below is an example of a typical integration test:
 
 ```python
-def test_operation(charm: Path, juju: jubilant.Juju):
+def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy this charm:
     juju.deploy(f"./{charm}", config={"foo": ...})
 
@@ -112,7 +112,12 @@ def charm():
 Then add this test in your integration test file:
 
 ```python
-def test_deploy(charm: Path, juju: jubilant.Juju):
+import pathlib
+
+import jubilant
+
+
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it."""
     juju.deploy(f"./{charm}")
     juju.wait(jubilant.all_active)
@@ -143,10 +148,10 @@ A charm can require `file` or `oci-image` resources to work, which have revision
 In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
 
 ```python
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 
 
-def test_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     resources = {
         name: res["upstream-source"]
         for name, res in METADATA["resources"].items()
@@ -270,7 +275,7 @@ with Kubernetes charms easily.
 Here's how an integration can deploy a bundle with the current charm:
 
 ```python
-def test_deploy_bundle(charm: Path, juju: jubilant.Juju):
+def test_deploy_bundle(charm: pathlib.Path, juju: jubilant.Juju):
     # Bundle definition with the charm under test:
     bundle_yaml = f"""
 
