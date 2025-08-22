@@ -650,7 +650,7 @@ METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -677,7 +677,7 @@ rootdir: /home/ubuntu/fastapi-demo
 configfile: pyproject.toml
 collected 1 item
 
-tests/integration/test_charm.py::test_build_and_deploy
+tests/integration/test_charm.py::test_deploy
 
 -------------------------------- live log setup --------------------------------
 INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd

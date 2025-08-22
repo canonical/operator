@@ -85,7 +85,7 @@ that `charmcraft init` provides, and add a new test that verifies the workload
 version is set. For example:
 
 ```python
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it."""
     juju.deploy(f'./{charm}')
     juju.wait(jubilant.all_active)
@@ -93,7 +93,7 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
-    version = juju.status().apps["your-app"].units["your-app/0"].workload_status.version
+    version = juju.status().apps["your-app"].version
     # We'll need to update this version every time we upgrade to a new workload
     # version. If the workload has an API or some other way of getting the
     # version, the test should get it from there and use that to compare to the
