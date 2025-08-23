@@ -123,6 +123,7 @@ aggressive = 3
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
+exclude = ["examples"]
 # FIXME
 target-version = "py38"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
@@ -130,9 +131,6 @@ extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
-exclude = [
-    "examples/*/lib/*",  # Ignore libs fetched during our testing (or by a charmer)
-]
 
 [tool.ruff.lint]
 select = [
@@ -215,10 +213,7 @@ ignore = [
     # `subprocess` call: check for execution of untrusted input
     "S603",
 ]
-exclude = [
-    "tracing/ops_tracing/vendor/*",
-    "examples/*/lib/*",  # Ignore libs fetched during our testing (or by a charmer)
-]
+exclude = ["tracing/ops_tracing/vendor/*"]
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = [
@@ -297,10 +292,6 @@ exclude = [
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "UP031",  # Use format specifiers instead of percent format
 ]
-"examples/*/tests/*" = [
-    # All documentation linting.
-    "D",
-]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -326,5 +317,5 @@ disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]
-skip = './docs/_build,.venv,venv,build'
+skip = './docs/_build,.venv,venv,build,examples'
 quiet-level = 3
