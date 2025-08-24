@@ -20,8 +20,8 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
-APP_NAME = METADATA['name']
+METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+APP_NAME = METADATA["name"]
 
 
 def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
@@ -29,8 +29,8 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
 
     Assert on the unit status before any relations/configurations take place.
     """
-    resources = {'httpbin-image': METADATA['resources']['httpbin-image']['upstream-source']}
+    resources = {"httpbin-image": METADATA["resources"]["httpbin-image"]["upstream-source"]}
 
     # Deploy the charm and wait for active/idle status
-    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
