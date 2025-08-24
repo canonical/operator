@@ -21,9 +21,9 @@ repos:
     rev: v0.11.2
     hooks:
       - id: ruff
-        args: [ --preview ]
+        args: [ --config, pyproject.toml ]
       - id: ruff-format
-        args: [ --preview ]
+        args: [ --config, pyproject.toml ]
   # Spellcheck the code.
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
