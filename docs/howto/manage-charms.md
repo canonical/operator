@@ -27,6 +27,7 @@ configures development tooling.
 TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
 -->
 
+(develop-your-charm)=
 ## Develop your charm
 
 The Charmcraft profile has configured some commands to help you develop your charm:
