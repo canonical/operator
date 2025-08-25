@@ -148,6 +148,12 @@ A charm can require `file` or `oci-image` resources to work, which have revision
 In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
 
 ```python
+import pathlib
+
+import jubilant
+import yaml
+
+
 METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 
 
