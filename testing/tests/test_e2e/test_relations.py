@@ -486,10 +486,7 @@ def test_relation_default_unit_data_peer():
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
 
 
-@pytest.mark.parametrize(
-    'evt_name',
-    ('changed', 'broken', 'departed', 'joined', 'created'),
-)
+@pytest.mark.parametrize('evt_name', ('broken', 'created'))
 def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
     relation = Relation(
         endpoint='foo',
@@ -544,7 +541,11 @@ def test_relation_app_data_bad_types(mycharm, data):
 )
 @pytest.mark.parametrize(
     'relation',
-    (Relation('a'), PeerRelation('b'), SubordinateRelation('c')),
+    (
+        Relation('a', remote_units_data={0: {}}),
+        PeerRelation('b', peers_data={1: {}}),
+        SubordinateRelation('c'),
+    ),
 )
 def test_relation_event_trigger(relation, evt_name, mycharm):
     meta = {

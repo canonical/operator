@@ -2166,6 +2166,8 @@ class _Event:  # type: ignore
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
+        # This is the event name as Juju provides it, with dashes not underscores.
+        object.__setattr__(self, '_juju_name', f'{path.prefix}{path.suffix.replace("_", "-")}')
 
     @property
     def _path(self) -> _EventPath:

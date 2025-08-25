@@ -32,7 +32,7 @@ import pytest
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 from test.test_helpers import FakeScript
@@ -75,7 +75,7 @@ def create_framework(
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
-        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
+        juju_debug_at=JujuContext._from_dict(os.environ).debug_at,
     )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)

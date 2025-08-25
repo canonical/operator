@@ -24,7 +24,7 @@ import unittest
 import pytest
 
 import ops
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.model import _ModelBackend
 from ops.storage import SQLiteStorage
 
@@ -109,7 +109,7 @@ def create_framework(request: pytest.FixtureRequest, *, meta: ops.CharmMeta | No
         tmpdir,
         meta,
         model,
-        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
+        juju_debug_at=JujuContext._from_dict(os.environ).debug_at,
     )
 
     def finalizer():

@@ -24,7 +24,7 @@ from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 from ops._private import yaml
 
 if TYPE_CHECKING:
-    from ops.jujucontext import _JujuContext
+    from ops import JujuContext
 
 from ._buffer import Destination
 from ._export import BufferingSpanExporter
@@ -36,7 +36,7 @@ _exporter: BufferingSpanExporter | None = None
 """A reference to the exporter that we passed to OpenTelemetry SDK at setup."""
 
 
-def setup(juju_context: _JujuContext, charm_class_name: str) -> None:
+def setup(juju_context: JujuContext, charm_class_name: str) -> None:
     """Set up the tracing subsystem and configure OpenTelemetry.
 
     Args:

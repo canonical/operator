@@ -19,7 +19,6 @@ from typing import (
 )
 
 import ops
-import ops.jujucontext
 import ops.storage
 
 from ops.framework import _event_regex
@@ -124,7 +123,7 @@ class Ops(_Manager, Generic[CharmType]):
         event: _Event,
         context: Context[CharmType],
         charm_spec: _CharmSpec[CharmType],
-        juju_context: ops.jujucontext._JujuContext,
+        juju_context: ops.JujuContext,
     ):
         self.state = state
         self.event = event
