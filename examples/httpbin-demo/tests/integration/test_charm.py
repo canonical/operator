@@ -34,3 +34,11 @@ def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
     # Deploy the charm and wait for active/idle status
     juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+
+
+def test_block_on_invalid_config(charm: Path, juju: jubilant.Juju):
+    """Check that the charm goes into blocked status if log-level is invalid."""
+    # The value of log-level should be one of info, debug, and so on.
+    juju.config(APP_NAME, {"log-level": "foo"})
+    juju.wait(jubilant.all_blocked)
+    juju.config(APP_NAME, reset="log-level")
