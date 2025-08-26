@@ -66,8 +66,25 @@ def test_emitted_framework():
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
-    assert len(ctx.emitted_events) == 4
-    assert list(map(type, ctx.emitted_events)) == [
+    with pytest.warns(DeprecationWarning):
+        assert len(ctx.emitted_events) == 4
+        assert list(map(type, ctx.emitted_events)) == [
+            ops.UpdateStatusEvent,
+            ops.CollectStatusEvent,
+            ops.PreCommitEvent,
+            ops.CommitEvent,
+        ]
+
+
+def test_emitted_framework_from_manager():
+    class MyCharm(CharmBase):
+        META = {'name': 'joop'}
+
+    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    with ctx(ctx.on.update_status(), State()) as mgr:
+        mgr.run()
+    assert len(mgr.emitted_events) == 4
+    assert list(map(type, mgr.emitted_events)) == [
         ops.UpdateStatusEvent,
         ops.CollectStatusEvent,
         ops.PreCommitEvent,
@@ -92,13 +109,14 @@ def test_emitted_deferred():
         capture_deferred_events=True,
         capture_framework_events=True,
     )
-    ctx.run(
+    with ctx(
         ctx.on.start(),
         State(deferred=[ctx.on.update_status().deferred(MyCharm._on_update_status)]),
-    )
+    ) as mgr:
+        mgr.run()
 
-    assert len(ctx.emitted_events) == 5
-    assert [e.handle.kind for e in ctx.emitted_events] == [
+    assert len(mgr.emitted_events) == 5
+    assert [e.handle.kind for e in mgr.emitted_events] == [
         'update_status',
         'start',
         'collect_unit_status',

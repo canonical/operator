@@ -59,7 +59,17 @@ def test_storage_add(storage_ctx, n):
         storages = mgr.charm.model.storages
         storages.request('foo', n)
 
-    assert storage_ctx.requested_storages['foo'] == n
+    with pytest.warns(DeprecationWarning):
+        assert storage_ctx.requested_storages['foo'] == n
+
+
+@pytest.mark.parametrize('n', (1, 3, 5))
+def test_storage_add_manager(storage_ctx, n):
+    with storage_ctx(storage_ctx.on.update_status(), State()) as mgr:
+        storages = mgr.charm.model.storages
+        storages.request('foo', n)
+
+    assert mgr.requested_storages['foo'] == n
 
 
 def test_storage_usage(storage_ctx):

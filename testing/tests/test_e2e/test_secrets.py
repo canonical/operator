@@ -493,7 +493,8 @@ def test_add_grant_revoke_remove():
         output.get_secret(label='mylabel')
 
 
-def test_secret_removed_event():
+@pytest.mark.parametrize('source', ['context', 'manager'])
+def test_secret_removed_event(source: str):
     class SecretCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -505,12 +506,21 @@ def test_secret_removed_event():
     ctx = Context(SecretCharm, meta={'name': 'foo'})
     secret = Secret({'a': 'b'}, owner='app')
     old_revision = 42
-    state = ctx.run(
-        ctx.on.secret_remove(secret, revision=old_revision),
-        State(leader=True, secrets={secret}),
-    )
+    if source == 'context':
+        state = ctx.run(
+            ctx.on.secret_remove(secret, revision=old_revision),
+            State(leader=True, secrets={secret}),
+        )
+        with pytest.warns(DeprecationWarning):
+            assert ctx.removed_secret_revisions == [old_revision]
+    else:
+        with ctx(
+            ctx.on.secret_remove(secret, revision=old_revision),
+            State(leader=True, secrets={secret}),
+        ) as mgr:
+            state = mgr.run()
+        assert mgr.removed_secret_revisions == [old_revision]
     assert secret in state.secrets
-    assert ctx.removed_secret_revisions == [old_revision]
 
 
 def test_secret_expired_event():
@@ -526,12 +536,13 @@ def test_secret_expired_event():
     ctx = Context(SecretCharm, meta={'name': 'foo'})
     secret = Secret({'password': 'oldpass'}, owner='app')
     old_revision = 42
-    state = ctx.run(
+    with ctx(
         ctx.on.secret_expired(secret, revision=old_revision),
         State(leader=True, secrets={secret}),
-    )
+    ) as mgr:
+        state = mgr.run()
     assert state.get_secret(id=secret.id).latest_content == {'password': 'newpass'}
-    assert ctx.removed_secret_revisions == [old_revision]
+    assert mgr.removed_secret_revisions == [old_revision]
 
 
 def test_remove_bad_revision():

@@ -30,9 +30,19 @@ def mycharm():
     return MyCharm
 
 
-def test_juju_log(mycharm):
+def test_juju_log_from_context(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     ctx.run(ctx.on.start(), State())
-    assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log
-    assert JujuLogLine(level='WARNING', message='bar!') in ctx.juju_log
+    with pytest.warns(DeprecationWarning):
+        assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log
+        assert JujuLogLine(level='WARNING', message='bar!') in ctx.juju_log
+    # prints are not juju-logged.
+
+
+def test_juju_log_from_manager(mycharm):
+    ctx = Context(mycharm, meta=mycharm.META)
+    with ctx(ctx.on.start(), State()) as mgr:
+        mgr.run()
+    assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in mgr.juju_log
+    assert JujuLogLine(level='WARNING', message='bar!') in mgr.juju_log
     # prints are not juju-logged.

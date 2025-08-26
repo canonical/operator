@@ -270,7 +270,7 @@ class Runtime:
         self,
         state: State,
         event: _Event,
-        context: Context,
+        context: Context[CharmType],
     ):
         """Runs an event with this state as initial state on a charm.
 
@@ -341,7 +341,10 @@ class Runtime:
             finally:
                 if ops:
                     ops.destroy()
-                    context.trace_data.extend(ops.trace_data)
+                    # In the future, we will only store this on the manager.
+                    context._trace_data.extend(ops.trace_data)
+                    if context._manager is not None:
+                        context._manager.trace_data.extend(ops.trace_data)
                 for key in tuple(os.environ):
                     if key not in previous_env:
                         del os.environ[key]

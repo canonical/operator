@@ -136,7 +136,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         state: State,
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context,
+        context: Context[CharmType],
         juju_context: _JujuContext,
     ):
         super().__init__(juju_context=juju_context)
@@ -362,9 +362,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     # setter methods: these can mutate the state.
     def application_version_set(self, version: str):
-        if workload_version := self._state.workload_version:
-            # do not record if empty = unset
-            self._context.workload_version_history.append(workload_version)
+        if workload_version := self._state.workload_version:  # do not record if empty = unset
+            # In the future, we will only store this on the manager.
+            self._context._workload_version_history.append(workload_version)
+            if self._context._manager is not None:
+                self._context._manager.workload_version_history.append(workload_version)
 
         self._state._update_workload_version(version)
 
@@ -380,12 +382,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ModelError(
                 f'ERROR invalid status "{status}", expected one of [{", ".join(valid_names)}]',
             )
+        # In the future, we will only store this on the manager.
         self._context._record_status(self._state, is_app)
         status_obj = _EntityStatus.from_status_name(status, message)
         self._state._update_status(status_obj, is_app)
 
     def juju_log(self, level: str, message: str):
-        self._context.juju_log.append(JujuLogLine(level, message))
+        # In the future, we will only store this on the manager.
+        self._context._juju_log.append(JujuLogLine(level, message))
+        if self._context._manager is not None:
+            self._context._manager.juju_log.append(JujuLogLine(level, message))
 
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         self._check_app_data_access(is_app)
@@ -585,7 +591,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # longer be in use). That means that the state does not need to be
         # modified - however, unit tests should be able to verify that the remove call was
         # executed, so we track that in a history list in the context.
-        self._context.removed_secret_revisions.append(revision)
+        # In the future, we will only store this on the manager.
+        self._context._removed_secret_revisions.append(revision)
+        if self._context._manager is not None:
+            self._context._manager.removed_secret_revisions.append(revision)
 
     def relation_remote_app_name(
         self,
@@ -615,10 +624,16 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         _format_action_result_dict(results)
         # but then we will store it in its unformatted,
         # original form for testing ease
-        if self._context.action_results:
-            self._context.action_results.update(results)
+        # In the future, we will only store this on the manager.
+        if self._context._action_results:
+            self._context._action_results.update(results)
         else:
-            self._context.action_results = results
+            self._context._action_results = results
+        if self._context._manager is not None:
+            if self._context._manager.action_results:
+                self._context._manager.action_results.update(results)
+            else:
+                self._context._manager.action_results = results
 
     def action_fail(self, message: str = ''):
         if not self._event.action:
@@ -632,7 +647,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-log',
             )
-        self._context.action_logs.append(message)
+        # In the future, we will only store this on the manager.
+        self._context._action_logs.append(message)
+        if self._context._manager is not None:
+            self._context._manager.action_logs.append(message)
 
     def action_get(self):
         action = self._event.action
@@ -652,7 +670,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             # this error is raised by Harness but not by ops at runtime
             raise ModelError('storage name cannot contain "/"')
 
-        self._context.requested_storages[name] = count
+        # In the future, we will only store this on the manager.
+        self._context._requested_storages[name] = count
+        if self._context._manager is not None:
+            self._context._manager.requested_storages[name] = count
 
     def storage_list(self, name: str) -> list[int]:
         return [storage.index for storage in self._state.storages if storage.name == name]
@@ -756,7 +777,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         state: State,
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context,
+        context: Context[CharmType],
         container_name: str,
     ):
         self._state = state
@@ -972,10 +993,16 @@ class _MockPebbleClient(_TestingPebbleClient):
             encoding=encoding,
             combine_stderr=combine_stderr,
         )
+        # In the future, we will only store this on the manager.
         try:
-            self._context.exec_history[self._container_name].append(args)
+            self._context._exec_history[self._container_name].append(args)
         except KeyError:
-            self._context.exec_history[self._container_name] = [args]
+            self._context._exec_history[self._container_name] = [args]
+        if self._context._manager is not None:
+            try:
+                self._context._manager.exec_history[self._container_name].append(args)
+            except KeyError:
+                self._context._manager.exec_history[self._container_name] = [args]
 
         change_id = handler._run()
         return cast(

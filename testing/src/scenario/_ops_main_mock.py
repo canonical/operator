@@ -299,7 +299,10 @@ class CapturingFramework(ops.Framework):
         ):
             # Dump/undump the event to ensure any custom attributes are (re)set by restore().
             event.restore(event.snapshot())
-            self._context.emitted_events.append(event)
+            # In the future, we will only store this on the manager.
+            self._context._emitted_events.append(event)
+            if self._context._manager is not None:
+                self._context._manager.emitted_events.append(event)
 
         return super()._emit(event)
 
@@ -320,6 +323,9 @@ class CapturingFramework(ops.Framework):
 
             # Dump/undump the event to ensure any custom attributes are (re)set by restore().
             event.restore(event.snapshot())
-            self._context.emitted_events.append(event)
+            # In the future, we will only store this on the manager.
+            self._context._emitted_events.append(event)
+            if self._context._manager is not None:
+                self._context._manager.emitted_events.append(event)
 
         return super()._reemit(single_event_path)
