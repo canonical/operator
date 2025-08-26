@@ -24,7 +24,7 @@ METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.

@@ -13,19 +13,19 @@
 # limitations under the License.
 
 import logging
-from pathlib import Path
+import pathlib
 
 import jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it together with related charms.
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
+    """Deploy the charm under test.
 
     Assert on the unit status before any relations/configurations take place.
     """
