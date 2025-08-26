@@ -25,15 +25,6 @@ When an author is satisfied that the charm is suitable for wider production use,
 
 Reviewing charms encourages the involvement of the community. 'Community' refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem. Reviews take place in public GitHub issues so that anyone from the community can participate.
 
-### Key considerations
-
-The process for making a charm discoverable on Charmhub involves a light review of the charm and its metadata. The goals of that process include:
-
-1. The process is streamlined: The party requesting the review provides structured evidence as input to the review process.
-2. A review is transparent for the community. Review and the review comments are public.
-3. Everyone can participate in the review, for example, participate in a discussion in a GitHub issue. A review may benefit from the expertise of a reviewer in the relevant field. Thus, the review process is flexible and open to involving multiple persons.
-4. The review covers the effective automation of tests for automated approvals of subsequent releases.
-
 ### Roles and concepts
 
 |Role or item|Description|
