@@ -70,7 +70,7 @@ Support upgrades sequentially, so that users of the charm can regularly apply up
 
 ### The charm supports scaling up and down
 
-If the application permits or supports it, the charm does not only scale up but also supports scaling down. Scale-up and scale-down can involve the number of deployment units and the allocated resources (such as storage or computing).
+If the workload supports scaling, the charm can be scaled up or down. Scale-up and scale-down may change the number of deployed units and the allocated resources (such as storage or computing).
 
 ### The charm is integrated with observability
 
