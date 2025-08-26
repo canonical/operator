@@ -66,7 +66,7 @@ Open a [listing request issue](https://github.com/canonical/charmhub-listing-rev
 Creating your issue will trigger automation that will assign the review to a team, and add a comment that explains the review process and includes a checklist of the review criteria.
 
 ```{tip}
-Avoid editing the issue description. The automation uses the data in the description to perform automated checks, which speeds up the review process. If you need to provide additional information to the reviewer, or want to respond to review comments, add a new comment on this issue.
+To provide additional information to the reviewer or respond to review feedback, add a comment on the issue. Avoid editing the issue description. Our automation uses the data in the description to perform automated checks, which speeds up the review process.
 ```
 
 You should see that some of the items in the checklist are already ticked - these are ones that the system is able to check automatically. Congratulations - you're part of the way through the review already!
