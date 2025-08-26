@@ -3,12 +3,7 @@
 
 > See first: [Charm maturity](#charm-maturity)
 
-Once your charm is ready for wide production use, your next goal should be to get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches done by Juju users and other charm developers.
-
-Anyone can upload a charm to Charmhub, which allows deploying the charm and viewing its information on Charmhub if you know the name of the charm. However, to have a charm publicly listed, meaning it will be found in searches on Charmhub and general web searches leading to Charmhub, it must pass through a lightweight review process. The goals of the review are:
-
-1. Be transparent about the capabilities and qualities of a charm.
-2. Ensure a common level of quality.
+Once your charm is ready for wide production use, your next goal should be to get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches. This requires a lightweight review.
 
 ```{note}
 A listing review is **not** code review. The reviewer may be looking at some of the charm code, and may have comments on it, but the listing review is not a review of the architecture or design of the charm, and is not a line-by-line review of the charm code. Do architecture, design, and code review earlier in the charm development process -- reach out in the [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) Matrix channel if you would like assistance.
