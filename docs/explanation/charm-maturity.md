@@ -1,7 +1,7 @@
 (charm-maturity)=
 # Charm maturity
 
-Like all software, charms continually evolve and should increase in maturity and quality over time. There are four major stages of charm maturity, which correlate with the availability of the charm:
+Like all software, charms continually evolve and should increase in maturity and quality over time. There are four major stages of charm maturity, which correlate with the availability of the charm.
 
 ## Phase 1: Early development and testing and private deployment
 
