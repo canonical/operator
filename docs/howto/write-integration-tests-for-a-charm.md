@@ -118,7 +118,7 @@ import jubilant
 
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it."""
+    """Deploy the charm under test."""
     juju.deploy(f"./{charm}")
     juju.wait(jubilant.all_active)
 ```

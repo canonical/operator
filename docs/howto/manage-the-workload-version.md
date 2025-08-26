@@ -86,7 +86,7 @@ version is set. For example:
 
 ```python
 def test_deploy(charm: Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it."""
+    """Deploy the charm under test."""
     juju.deploy(f'./{charm}')
     juju.wait(jubilant.all_active)
 

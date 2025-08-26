@@ -14,14 +14,14 @@
 
 import pathlib
 import subprocess
-from typing import Generator
+from typing import Iterator
 
 import jubilant
 import pytest
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest) -> Generator[jubilant.Juju, None, None]:
+def juju(request: pytest.FixtureRequest) -> Iterator[jubilant.Juju]:
     with jubilant.temp_model() as juju:
         yield juju
 

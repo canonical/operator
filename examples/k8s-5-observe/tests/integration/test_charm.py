@@ -25,7 +25,7 @@ APP_NAME = METADATA['name']
 
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Deploy the charm under test.
 
     Assert on the unit status before any relations/configurations take place.
     """
