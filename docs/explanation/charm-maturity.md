@@ -38,7 +38,7 @@ Public listing is not the end of a charm's growth. Truly mature charms offer mor
 
 ### The charm has sensible defaults
 
-A user can deploy the charm with a sensible default configuration. Optimised deployments will require configurations, but a charm should be opinionated and start out with reasonable defaults, and without the Juju user needing to specify configuration in deploy, whenever possible.
+A user can deploy the charm with a sensible default configuration. Optimised deployments will require configuration, but a charm should be opinionated and start out with reasonable defaults.
 
 For example, if the workload requires initial passwords to be set, auto-generate them and provide them to the Juju user via an action or secret. Host names and load balancer addresses are examples that often cannot be set with a sensible default: cover these in the documentation and indicate clearly in the status messages when they are not set and how the user should fix that.
 
