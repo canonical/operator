@@ -228,13 +228,15 @@ Finally, define  the `_get_pebble_layer` function as below. The `command` variab
 
 ```python
 def _get_pebble_layer(self) -> ops.pebble.Layer:
-    """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join([
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        '--port=8000',
-    ])
+    """Pebble layer for the FastAPI demo services."""
+    command = ' '.join(
+        [
+            'uvicorn',
+            'api_demo_server.app:app',
+            '--host=0.0.0.0',
+            '--port=8000',
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -443,6 +445,7 @@ env_list = unit
 [vars]
 src_path = {tox_root}/src
 tests_path = {tox_root}/tests
+all_path = {[vars]src_path} {[vars]tests_path}
 
 [testenv]
 set_env =
@@ -488,10 +491,10 @@ mkdir -p tests/unit
 In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
-from charm import FastAPIDemoCharm
-
 import ops
 from ops import testing
+
+from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():

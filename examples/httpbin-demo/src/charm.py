@@ -25,15 +25,15 @@ import ops
 # Log messages can be retrieved using juju debug-log.
 logger = logging.getLogger(__name__)
 
-CONTAINER_NAME = 'httpbin'  # Name of workload container.
-SERVICE_NAME = 'httpbin'  # Name of Pebble service that runs in the workload container.
+CONTAINER_NAME = "httpbin"  # Name of workload container.
+SERVICE_NAME = "httpbin"  # Name of Pebble service that runs in the workload container.
 
 
 @dataclasses.dataclass(frozen=True)
 class HttpbinConfig:
     """Schema for the configuration of the httpbin charm."""
 
-    log_level: str = 'info'
+    log_level: str = "info"
     """Configures the log level of gunicorn.
 
     Acceptable values are: "info", "debug", "warning", "error" and "critical".
@@ -41,13 +41,13 @@ class HttpbinConfig:
 
     def __post_init__(self):
         log_level = self.log_level.lower()
-        valid_log_levels = {'info', 'debug', 'warning', 'error', 'critical'}
+        valid_log_levels = {"info", "debug", "warning", "error", "critical"}
         if log_level not in valid_log_levels:
             raise ValueError(
                 f"Invalid log level: '{self.log_level}'. "
-                f'Valid values are: {", ".join(valid_log_levels)}.'
+                f"Valid values are: {', '.join(valid_log_levels)}."
             )
-        object.__setattr__(self, 'log_level', log_level)
+        object.__setattr__(self, "log_level", log_level)
 
 
 class HttpbinDemoCharm(ops.CharmBase):
@@ -69,18 +69,18 @@ class HttpbinDemoCharm(ops.CharmBase):
         try:
             if not self.container.get_service(SERVICE_NAME).is_running():
                 # We can connect to Pebble in the container, but the service hasn't started yet.
-                event.add_status(ops.MaintenanceStatus('waiting for workload'))
+                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         except ops.ModelError:
             # We can connect to Pebble in the container, but the service doesn't exist. This is
             # most likely because we haven't added a layer yet.
-            event.add_status(ops.MaintenanceStatus('waiting for workload container'))
+            event.add_status(ops.MaintenanceStatus("waiting for workload container"))
         except ops.pebble.ConnectionError:
             # We can't connect to Pebble in the container. This is most likely because the
             # container hasn't started yet.
-            event.add_status(ops.MaintenanceStatus('waiting for workload container'))
+            event.add_status(ops.MaintenanceStatus("waiting for workload container"))
         except ops.pebble.APIError:
             # It's technically possible (but unlikely) for Pebble to have an internal error.
-            logger.error('Unable to fetch service info from Pebble')
+            logger.error("Unable to fetch service info from Pebble")
             raise
         event.add_status(ops.ActiveStatus())
 
@@ -92,7 +92,7 @@ class HttpbinDemoCharm(ops.CharmBase):
             return
         # Add initial Pebble config layer using the Pebble API.
         self.container.add_layer(
-            'httpbin', self._make_pebble_layer(config.log_level), combine=True
+            "httpbin", self._make_pebble_layer(config.log_level), combine=True
         )
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         self.container.replan()
@@ -112,16 +112,16 @@ class HttpbinDemoCharm(ops.CharmBase):
         for attempt in range(max_attempts):
             try:
                 self.container.add_layer(
-                    'httpbin', self._make_pebble_layer(config.log_level), combine=True
+                    "httpbin", self._make_pebble_layer(config.log_level), combine=True
                 )
                 self.container.replan()
             except (ops.pebble.APIError, ops.pebble.ConnectionError):  # noqa: PERF203 (try-except in loop)
-                logger.info('Unable to reconfigure gunicorn (attempt %d)', attempt + 1)
+                logger.info("Unable to reconfigure gunicorn (attempt %d)", attempt + 1)
                 time.sleep(2**attempt)
             else:
                 break
         else:
-            logger.warning('Unable to reconfigure gunicorn after %d attempts.', max_attempts)
+            logger.warning("Unable to reconfigure gunicorn after %d attempts.", max_attempts)
             # We expect that there'll be a pebble-ready event in the future,
             # which will configure and start the workload.
             return
@@ -129,20 +129,20 @@ class HttpbinDemoCharm(ops.CharmBase):
 
     def _make_pebble_layer(self, log_level: str) -> ops.pebble.Layer:
         """Return a Pebble layer that starts gunicorn with the specified log level."""
-        environment = {'GUNICORN_CMD_ARGS': f'--log-level {log_level}'}
+        environment = {"GUNICORN_CMD_ARGS": f"--log-level {log_level}"}
         layer: ops.pebble.LayerDict = {  # Typing as a LayerDict hints the layer's keys.
-            'services': {
+            "services": {
                 SERVICE_NAME: {
-                    'override': 'replace',
-                    'summary': 'httpbin',
-                    'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
-                    'startup': 'enabled',
-                    'environment': environment,
+                    "override": "replace",
+                    "summary": "httpbin",
+                    "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
+                    "startup": "enabled",
+                    "environment": environment,
                 },
             },
         }
         return ops.pebble.Layer(layer)
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     ops.main(HttpbinDemoCharm)

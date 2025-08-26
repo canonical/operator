@@ -56,13 +56,15 @@ class FastAPIDemoCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 
     def _get_pebble_layer(self) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join([
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            '--port=8000',
-        ])
+        """Pebble layer for the FastAPI demo services."""
+        command = ' '.join(
+            [
+                'uvicorn',
+                'api_demo_server.app:app',
+                '--host=0.0.0.0',
+                '--port=8000',
+            ]
+        )
         pebble_layer: ops.pebble.LayerDict = {
             'summary': 'FastAPI demo service',
             'description': 'pebble config layer for FastAPI demo server',
