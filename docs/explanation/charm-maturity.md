@@ -36,7 +36,7 @@ Reviewing charms encourages the involvement of the community. 'Community' refers
 
 ## Phase 4: Ongoing maintenance and evolution
 
-Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem (ingress, observability, identity, ...), gracefully handle scaling up and down, and more. These noteworthy charms are most likely to get wide adoption, and be featured in editorial content in the charming world. Some specific standards that Juju users are looking for include:
+Public listing is not the end of a charm's growth. Truly mature charms offer more integration across the charming ecosystem and are most likely to get wide adoption. This section explains some standards that Juju users expect.
 
 ### The charm has sensible defaults
 
