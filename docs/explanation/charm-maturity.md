@@ -11,7 +11,9 @@ Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This 
 
 ## Phase 2: Private listing on Charmhub
 
-Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name. *These charms will not show up in searches on Charmhub, or general web searches*.
+Anyone can publish a charm to Charmhub (you'll need to create an account, and there are some restrictions on charm names). Once this is done, anyone can see the Charmhub page for the charm, or deploy from Charmhub, as long as they know the charm name.
+
+Privately-listed charms will not show up in searches on Charmhub, or general web searches.
 
 > See more: {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
 
