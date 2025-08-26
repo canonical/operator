@@ -3,9 +3,9 @@
 
 Like all software, charms continually evolve and should increase in maturity and quality over time. There are four major stages of charm maturity, which correlate with the availability of the charm.
 
-## Phase 1: Early development and testing and private deployment
+## Phase 1: Early development and private deployment
 
-Anyone can pack a charm and `juju deploy` it passing in the `.charm` file. This is frequently done during development, but can also be used for private charms.
+Anyone can pack a charm from source and deploy it by passing the `.charm` file to `juju deploy`. This is frequently done during development and testing, but can also be used for private charms.
 
 > See more: {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
 
