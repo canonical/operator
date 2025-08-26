@@ -46,7 +46,7 @@ Sometimes, it's not possible to set a sensible default. For example, a host name
 
 ### The charm is compatible with the ecosystem
 
-Ensure that newly proposed public interfaces have been reviewed and approved to ensure:
+Submit any newly-proposed public interfaces for review, to ensure that:
 
 - The interface is ready for adoption by other charmers. In most cases this will mean providing a library to help other charms provide or require a relation using the interface.
 - There are no conflicts with existing interfaces of published charms.
