@@ -21,6 +21,20 @@ practice notes (in the standard format, in either Markdown or reStructuredText
 files), find all the best practice blocks (and the heading and reference that is
 associated with them) and produce a suitable block of Markdown to include in the
 Ops documentation.
+
+## Local Usage
+
+You'll need a clone of the `operator` repository (presumably the one you're running this command
+from), and also the [canonical/charmcraft](https://github.com/canonical/charmcraft) repository,
+ideally checked out to the branch that is used for the `stable` version of the Charmcraft docs.
+
+```command
+python3 .github/update-best-practice-table/main.py \
+    --path-to-charmcraft=../charmcraft > docs/reuse/best-practices.txt
+
+# Check the modifications in the current branch.
+git diff
+```
 """
 
 import argparse
