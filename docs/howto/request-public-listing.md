@@ -22,7 +22,7 @@ Carry out your own review of your charm and its metadata. In particular, make su
 * The charm's page on Charmhub provides a quality impression. This requires providing suitable metadata in `charmcraft.yaml` and reasonable documentation (more on documentation below).
 * The charm has an icon, in the correct format.
 * Some form of CI workflow exists that automatically releases the charm to an unstable channel on commits to the default branch.
-* The charm has integration tests that run on every change to the default branch, and are passing. At minimum, the tests verify that the charm can be deployed and ends up in a success state, and that the charm can be integrated with at least one example for each 'provides' and 'requires' specified (including optional integrations, but excluding tracing) ending up in a success state. The tests should be run with `charmcraft test`.
+* The charm has integration tests that run on every change to the default branch, and are passing. At minimum, the tests verify that the charm can be deployed and ends up in a success state, and that the charm can be integrated with at least one example for each 'provides' and 'requires' specified (including optional integrations, but excluding tracing) ending up in a success state.
 
 With respect to test coverage of the charm, note that:
 
