@@ -31,7 +31,6 @@ Reviewing charms encourages the involvement of the community. 'Community' refers
 |Publisher|The responsible person or organisation for publishing the charm.|
 |Review group|A group of people who watch for review requests, then request changes or assign a suitable reviewer. This is currently the Canonical Charm Tech team.|
 |Reviewer|Person conducting the review.|
-|Listing|After the reviewer has reviewed the charm successfully, it can be switched to 'listing'. Listing means that the charm will be part of the search result when querying the web pages and API of Charmhub.io, and is in the Charmhub sitemap (so will be found by third-party search engines). Without 'listing', the charm will be available under its URL but is not listed in searches.|
 
 ## Phase 4: Ongoing maintenance and evolution
 
