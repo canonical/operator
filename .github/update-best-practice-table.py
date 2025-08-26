@@ -142,8 +142,6 @@ def main():
         for file_path in directory.rglob('*'):
             if file_path.suffix not in ('.md', '.rst'):
                 continue
-            if file_path.name == 'best-practices-generated':
-                continue
             text = file_path.read_text()
             # Get the title of the page. This will be the first heading in the file.
             if file_path.suffix == '.md':
