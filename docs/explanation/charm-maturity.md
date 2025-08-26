@@ -19,7 +19,9 @@ Privately-listed charms will not show up in searches on Charmhub, or general web
 
 ## Phase 3: Public listing on Charmhub
 
-When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does, has suitable documentation, infrastructure, metadata, and so forth. After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
+When an author is satisfied that the charm is suitable for wider production use, they can request public Charmhub listing. The charm will be lightly reviewed to ensure that it does what it says that it does and has suitable documentation & metadata. The review also covers the effective automation of tests for automated approvals of subsequent releases.
+
+After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
 
 > See more: [How to request Charmhub public listing](#make-your-charm-discoverable)
 
