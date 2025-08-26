@@ -23,7 +23,7 @@ When an author is satisfied that the charm is suitable for wider production use,
 
 > See more: [How to request Charmhub public listing](#make-your-charm-discoverable)
 
-Reviewing charms encourages the involvement of the community. The community refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem.
+Reviewing charms encourages the involvement of the community. 'Community' refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem. Reviews take place in public GitHub issues so that anyone from the community can participate.
 
 ### Key considerations
 
