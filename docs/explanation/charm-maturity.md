@@ -25,7 +25,7 @@ When an author is satisfied that the charm is suitable for wider production use,
 
 Reviewing charms encourages the involvement of the community. 'Community' refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem. Reviews take place in public GitHub issues so that anyone from the community can participate.
 
-### Roles and concepts
+### Roles
 
 |Author|Author of the charm or person representing the organisation. The person submitting the charm for review is called the author in this documentation.|
 |Publisher|The responsible person or organisation for publishing the charm.|
