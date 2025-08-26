@@ -49,8 +49,6 @@ This will provide you with information about the full listing criteria, and, for
 Each review covers exactly one charm. If your charm is designed to only work with other charms in a solution, open multiple review requests and note in them that they are connected.
 ```
 
-### Open an issue
-
 Open a [listing request issue](https://github.com/canonical/charmhub-listing-review/issues/new). You will be asked for some basic information:
 
 1. The name of the charm.
@@ -66,10 +64,8 @@ To provide additional information to the reviewer or respond to review feedback,
 
 You should see that some of the items in the checklist are already ticked - these are ones that the system is able to check automatically. Congratulations - you're part of the way through the review already!
 
-### Address any issues found
+## 3. Address review feedback
 
 Over the next few days, the reviewer will check the remaining items, and post the results as a new comment on the issue. GitHub subscribed you to the issue when you created it, so you'll receive notifications when there is new activity.
-
-## 3. Address any remaining issues
 
 If there are items in the checklist that are not yet ticked, address those through conversations with the reviewer in issue comments, and by making adjustments to the charm metadata and code. Once there are no items left to resolve, the review is complete, and the store team will be automatically notified that the charm should be listed publicly. This typically happens within a day or two.
