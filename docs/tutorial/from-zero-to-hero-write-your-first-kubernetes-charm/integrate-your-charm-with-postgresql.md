@@ -509,9 +509,6 @@ When it's done, the output should show two passing tests:
 ```text
 tests/integration/test_charm.py::test_deploy
 ...
-  integration: OK (291.01=setup[0.04]+cmd[290.97] seconds)
-  congratulations :) (291.05 seconds)
-=======
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'
 - .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.message = 'running start hook'
