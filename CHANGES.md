@@ -21,20 +21,19 @@
 * Refresh docs homepage with more context about Ops (#1964)
 * Update link to Charmlibs docs (#1985)
 * Remove unnecessary pages from sitemap (#1979)
-* Update the httpbin charm to jubilant (#1987)
-* Update zero to hero to jubilant (#1988)
+* Update the httpbin example charm to Jubilant (#1987)
+* Update the Zero to Hero tutorial to Jubilant (#1988)
 * Add model-config best practice note (#1990)
 * Change some best practices to tips (#2001)
 * Add integration test for invalid config in httpbin charm (#2002)
 * Make a `Layer` instead of a `LayerDict` in the httpbin charm (#2003)
-* Update how-to to feature Jubilant (1/2) (#2000)
+* Update how-to to feature Jubilant (#2000, #2004)
 * Use Charmcraft-style format and lint for example charms, not Ops-style (#2008)
 * Update broken link to HookVars source code (#2006)
-* Update how-to to feature Jubilant (2/2) (#2004)
 
 ## CI
 
-* Fixes for the sbom and secscan workflow, and trigger it on publishing (#1916)
+* Fixes for the SBOM and security scan workflow, and trigger it on publishing (#1916)
 * Store the charmcraft logs if packing fails (#1936)
 * Install release dependencies for the TIOBE analysis (#1930)
 * Add Juju 4/beta to the smoke test matrix (#1963)
@@ -42,7 +41,7 @@
 * Update actions/checkout to v5 (#1993)
 * Enable doctests (#1991)
 * Ignore juju/4 timeouts (#1998)
-* Remove the token for SBOM and secscan on publish (#2009)
+* Remove the token for SBOM and security scan workflow (#2009)
 * Speed up integration test (#1978)
 
 # 3.1.0 - 30 July 2025
