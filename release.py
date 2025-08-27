@@ -288,10 +288,6 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
         if items:
             lines.append(f'## {commit_type_to_category(commit_type)}\n')
             for description, pr_link in items:
-                pr_num = '?'
-                match = re.match(r'https?://[^ ]+/pull/(\d+)', pr_link)
-                if match:
-                    pr_num = match.group(1)
                 lines.append(f'* {description} in {pr_link}')
             lines.append('')
     return '\n'.join(lines) + '\n'
