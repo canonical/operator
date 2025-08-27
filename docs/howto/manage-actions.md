@@ -161,7 +161,7 @@ def test_backup_action_failed():
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that an action works correctly against a real Juju instance, write an integration test with `pytest_operator`. For example:
+To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
 def test_logger(juju: jubilant.Juju):

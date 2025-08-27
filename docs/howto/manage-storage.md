@@ -231,7 +231,7 @@ ctx.run(ctx.on.storage_attached(foo_1), testing.State(storages={foo_0, foo_1}))
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that adding and removing storage works correctly against a real Juju instance, write an integration test with `pytest_operator`. For example:
+To verify that adding and removing storage works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
 # This assumes there is a previous test that handles building and deploying.

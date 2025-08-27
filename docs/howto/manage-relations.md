@@ -346,7 +346,9 @@ relation.remote_unit_name  # 'zookeeper/42'
 
 ### Write integration tests
 
-Write an integration test that verifies that your charm behaves as expected in a real Juju environment. Other than when testing peer relations, as well as deploying your own charm, the test needs to deploy a second application.
+> See first: {ref}`write-integration-tests-for-a-charm`
+
+To verify that charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
 
 ```python
 # This assumes that your integration tests already include the standard

@@ -91,7 +91,7 @@ def get_leader_unit(juju: jubilant.Juju) -> str | None:
         if unit.leader:
             return unit_name
     # It's possible that no leader has been elected,
-    # for example # if the application has just been deployed.
+    # for example if the application has just been deployed.
     return None
 ```
 
