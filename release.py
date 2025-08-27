@@ -292,7 +292,7 @@ def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> st
                 match = re.match(r'https?://[^ ]+/pull/(\d+)', pr_link)
                 if match:
                     pr_num = match.group(1)
-                lines.append(f'* {description} (#{pr_num})')
+                lines.append(f'* {description} in {pr_link}')
             lines.append('')
     return '\n'.join(lines) + '\n'
 
