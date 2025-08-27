@@ -87,4 +87,4 @@ actions:
         additionalProperties: false
 ```
 
-Type annotations for all classes should use the modern `a | b` and `a | None` form, rather than `Union[a, b]` or `Optional[a]`.
+Type annotations for all classes must use the modern `a | b` and `a | None` form, rather than `Union[a, b]` or `Optional[a]`.
