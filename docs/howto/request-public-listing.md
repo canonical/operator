@@ -49,7 +49,7 @@ This will provide you with information about the full listing criteria, and, for
 Each review covers exactly one charm. If your charm is designed to only work with other charms in a solution, open multiple review requests and note in them that they are connected.
 ```
 
-Open a [listing request issue](https://github.com/canonical/charmhub-listing-review/issues/new). You will be asked for some basic information:
+Open a [listing request issue](https://github.com/canonical/charmhub-listing-review/issues/new?template=listing-request.yml). You will be asked for some basic information:
 
 1. The name of the charm.
 2. A URL to a Git source code repository.
