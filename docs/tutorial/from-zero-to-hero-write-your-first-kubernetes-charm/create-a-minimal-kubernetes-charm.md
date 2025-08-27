@@ -228,13 +228,15 @@ Finally, define  the `_get_pebble_layer` function as below. The `command` variab
 
 ```python
 def _get_pebble_layer(self) -> ops.pebble.Layer:
-    """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join([
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        '--port=8000',
-    ])
+    """Pebble layer for the FastAPI demo services."""
+    command = ' '.join(
+        [
+            'uvicorn',
+            'api_demo_server.app:app',
+            '--host=0.0.0.0',
+            '--port=8000',
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -443,6 +445,7 @@ env_list = unit
 [vars]
 src_path = {tox_root}/src
 tests_path = {tox_root}/tests
+all_path = {[vars]src_path} {[vars]tests_path}
 
 [testenv]
 set_env =
@@ -488,10 +491,10 @@ mkdir -p tests/unit
 In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
-from charm import FastAPIDemoCharm
-
 import ops
 from ops import testing
+
+from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():
@@ -570,7 +573,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator) library.
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`jubilant`](https://documentation.ubuntu.com/jubilant/) library.
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
@@ -583,8 +586,7 @@ In your `tox.ini` file, add the following new environment:
 description = Run integration tests
 deps =
     pytest
-    juju
-    pytest-operator
+    jubilant
     -r {tox_root}/requirements.txt
 commands =
     pytest \
@@ -610,94 +612,95 @@ mkdir -p tests/integration
 
 Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm, then verify that the installation event is handled without errors.
 
-In your `tests/integration` directory, create a file called `test_charm.py` and add the following test:
+In your `tests/integration` directory, create a file called `conftest.py` and add the following fixtures:
 
 ```python
-import asyncio
-import logging
-from pathlib import Path
+import pathlib
+import subprocess
 
+import jubilant
 import pytest
+
+
+@pytest.fixture(scope='module')
+def juju(request: pytest.FixtureRequest):
+    with jubilant.temp_model() as juju:
+        yield juju
+
+        if request.session.testsfailed:
+            log = juju.debug_log(limit=1000)
+            print(log, end='')
+
+
+@pytest.fixture(scope='session')
+def charm():
+    subprocess.check_call(['charmcraft', 'pack'])  # noqa
+    return next(pathlib.Path('.').glob('*.charm'))
+```
+
+In the same directory, create a file called `test_charm.py` and add the following test:
+
+```python
+import logging
+import pathlib
+
+import jubilant
 import yaml
-from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before integration or configuration.
+    Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm('.')
     resources = {
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
-        ),
-    )
+    # Deploy the charm and wait for active/idle status
+    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.wait(jubilant.all_active)
 ```
 
-The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
+The test takes some time to run as Jubilant adds a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
 
 The result should be similar to the following output:
 
 ```text
-integration: install_deps> python -I -m pip install juju pytest pytest-operator -r /home/ubuntu/fastapi-demo/requirements.txt
 integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
-==================================================================================== test session starts =====================================================================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python
+============================= test session starts ==============================
+platform linux -- Python 3.10.18, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python3
 cachedir: .tox/integration/.pytest_cache
 rootdir: /home/ubuntu/fastapi-demo
-plugins: operator-0.43.1, asyncio-0.21.2
-asyncio: mode=Mode.STRICT
+configfile: pyproject.toml
 collected 1 item
 
-tests/integration/test_charm.py::test_build_and_deploy
---------------------------------------------------------------------------------------- live log setup ---------------------------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:762 Adding model microk8s:test-charm-2q7l on cloud microk8s
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
---------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-2q7l0
-INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 20.87s
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm (missing)
-INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
+tests/integration/test_charm.py::test_deploy
+
+-------------------------------- live log setup --------------------------------
+INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
+-------------------------------- live log call ---------------------------------
+INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./demo-api-charm_ubuntu-22.04-amd64.charm demo-api-charm --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
++ .model.name = 'jubilant-823cf1fd'
+...
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['demo-api-charm'].app_status.current = 'waiting'
+- .apps['demo-api-charm'].app_status.message = 'installing agent'
++ .apps['demo-api-charm'].app_status.current = 'active'
 PASSED
-------------------------------------------------------------------------------------- live log teardown --------------------------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:951 Model status:
-
-Model            Controller  Cloud/Region        Version  SLA          Timestamp
-test-charm-2q7l  microk8s    microk8s/localhost  3.6.8    unsupported  07:44:31+08:00
-
-App             Version  Status  Scale  Charm           Channel  Rev  Address        Exposed  Message
-demo-api-charm           active      1  demo-api-charm             0  10.152.183.57  no
-
-Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.91
-
-INFO     pytest_operator.plugin:plugin.py:957 Juju error logs:
+------------------------------ live log teardown -------------------------------
+INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-823cf1fd --no-prompt --destroy-storage --force
 
 
-INFO     pytest_operator.plugin:plugin.py:1063 Resetting model test-charm-2q7l...
-INFO     pytest_operator.plugin:plugin.py:1052    Destroying applications demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1068 Not waiting on reset to complete.
-INFO     pytest_operator.plugin:plugin.py:1039 Forgetting model main...
-
-
-===================================================================================== 1 passed in 51.25s =====================================================================================
-  integration: OK (83.78=setup[31.75]+cmd[52.02] seconds)
-  congratulations :) (83.82 seconds)
+========================= 1 passed in 63.92s (0:01:03) =========================
+  integration: OK (64.10=setup[0.01]+cmd[64.10] seconds)
+  congratulations :) (64.15 seconds)
 ```
 
 ## Review the final code

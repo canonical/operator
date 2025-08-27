@@ -54,9 +54,7 @@ In particular, you should avoid `print()` calls, and ensure that any subprocess
 calls capture output.
 ```
 
-````{admonition} Best practice
-:class: hint
-
+````{tip}
 Do not build log strings yourself: allow the logger to do this for you as
 required. That is:
 
@@ -78,5 +76,6 @@ Ensure that log messages are clear, meaningful, and provide enough information f
 
 ```{admonition} Best practice
 :class: hint
+
 Never log credentials or other sensitive information.
 ```

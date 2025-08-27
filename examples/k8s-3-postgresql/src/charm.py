@@ -21,12 +21,16 @@ from __future__ import annotations
 import dataclasses
 import logging
 
+import ops
+
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
-
-import ops
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -92,8 +96,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
-        """Event is fired when postgres database is created."""
+    def _on_database_created(
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
+        """Event is fired when postgres database is created or endpoint is changed."""
         self._update_layer_and_restart()
 
     def _update_layer_and_restart(self) -> None:
@@ -132,13 +138,15 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info('Unable to connect to Pebble: %s', e)
 
     def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join([
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
-        ])
+        """Pebble layer for the FastAPI demo services."""
+        command = ' '.join(
+            [
+                'uvicorn',
+                'api_demo_server.app:app',
+                '--host=0.0.0.0',
+                f'--port={port}',
+            ]
+        )
         pebble_layer: ops.pebble.LayerDict = {
             'summary': 'FastAPI demo service',
             'description': 'pebble config layer for FastAPI demo server',

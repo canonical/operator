@@ -14,22 +14,23 @@
 
 import pathlib
 import subprocess
+from typing import Iterator
 
 import jubilant
 import pytest
 
 
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
+@pytest.fixture(scope='module')
+def juju(request: pytest.FixtureRequest) -> Iterator[jubilant.Juju]:
     with jubilant.temp_model() as juju:
         yield juju
 
         if request.session.testsfailed:
             log = juju.debug_log(limit=1000)
-            print(log, end="")
+            print(log, end='')
 
 
-@pytest.fixture(scope="session")
-def charm():
-    subprocess.check_call(["charmcraft", "pack"])  # noqa
-    return next(pathlib.Path(".").glob("*.charm"))
+@pytest.fixture(scope='session')
+def charm() -> pathlib.Path:
+    subprocess.check_call(['charmcraft', 'pack'])  # noqa
+    return next(pathlib.Path('.').glob('*.charm'))

@@ -90,7 +90,11 @@ First, at the top of the file, import the database interfaces library:
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent, DatabaseRequires
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 ```
 
 ````{important}
@@ -218,13 +222,15 @@ Now, update your `_get_pebble_layer()` method to use the passed environment:
 
 ```python
 def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
-    """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join([
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        f'--port={port}',
-    ])
+    """Pebble layer for the FastAPI demo services."""
+    command = ' '.join(
+        [
+            'uvicorn',
+            'api_demo_server.app:app',
+            '--host=0.0.0.0',
+            f'--port={port}',
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -272,8 +278,10 @@ def get_app_environment(self) -> dict[str, str]:
 Finally, let's define the method that is called on the database created event:
 
 ```python
-def _on_database_created(self, _: DatabaseCreatedEvent) -> None:
-    """Event is fired when postgres database is created."""
+def _on_database_created(
+    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+) -> None:
+    """Event is fired when postgres database is created or endpoint is changed."""
     self._update_layer_and_restart()
 ```
 
@@ -480,29 +488,33 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `ops_test.model.wait_for_idle`:
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+import logging
+import pathlib
+
+import jubilant
+import yaml
+
+logger = logging.getLogger(__name__)
+
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
+APP_NAME = METADATA['name']
+
+
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before integration or configuration.
+    Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm('.')
     resources = {
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
-    # Deploy the charm and wait for blocked/idle status.
-    # The app will not be in active status as this requires a database relation.
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status='blocked', raise_on_blocked=False, timeout=300
-        ),
-    )
+    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
+    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.wait(jubilant.all_blocked)
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
@@ -510,27 +522,14 @@ Then, let's add another test case to check the integration is successful. For th
 In your `tests/integration/test_charm.py` file add the following test case:
 
 ```python
-@pytest.mark.abort_on_fail
-async def test_database_integration(ops_test: OpsTest):
+def test_database_integration(juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
     """
-    await ops_test.model.deploy(
-        application_name='postgresql-k8s',
-        entity_url='postgresql-k8s',
-        channel='14/stable',
-    )
-    await ops_test.model.integrate(f'{APP_NAME}', 'postgresql-k8s')
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
-    )
-```
-
-```{important}
-
-If you run one test and then the other as separate `pytest ...` invocations, then two separate models will be created unless you pass `--model=some-existing-model` to inform pytest-operator to use a model you provide.
-
+    juju.deploy('postgresql-k8s', channel='14/stable', trust=True)
+    juju.integrate(APP_NAME, 'postgresql-k8s')
+    juju.wait(jubilant.all_active)
 ```
 
 In your Multipass Ubuntu VM, run the test again:
@@ -541,38 +540,37 @@ ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
 
 The test may again take some time to run.
 
-```{tip}
-
-To make things faster, use the `--model=<existing model name>` to inform `pytest-operator` to use the model it has created for the first test. Otherwise, charmers often have a way to cache their pack or deploy results.
-
-```
-
 When it's done, the output should show two passing tests:
 
 ```text
+tests/integration/test_charm.py::test_deploy
 ...
-INFO     pytest_operator.plugin:plugin.py:621 Using tmp_path: /home/ubuntu/fastapi-demo/.tox/integration/tmp/pytest/test-charm-l5a20
-INFO     pytest_operator.plugin:plugin.py:1213 Building charm demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1218 Built charm demo-api-charm in 34.47s
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm (missing)
-INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] blocked: Waiting for database relation
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'
+- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.message = 'running start hook'
++ .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'idle'
 PASSED
+```
+
+```text
 tests/integration/test_charm.py::test_database_integration
---------------------------------------------------------------------------------------- live log call ----------------------------------------------------------------------------------------
-INFO     juju.model:__init__.py:2301 Deploying ch:amd64/jammy/postgresql-k8s-495
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] blocked: Waiting for database relation
-PASSED
 ...
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['postgresql-k8s'].app_status.current = 'waiting'
+- .apps['postgresql-k8s'].app_status.message = 'awaiting for cluster to start'
++ .apps['postgresql-k8s'].app_status.current = 'active'
++ .apps['postgresql-k8s'].app_status.message = 'Primary'
+- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'waiting'
+- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'awaiting for cluster to start'
++ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
++ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
+PASSED
 ```
 
 Congratulations, with this integration test you have verified that your charm's relation to PostgreSQL works as well!
 
 ## Review the final code
 
-For the full code,  see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql).
+For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql).
 
 > **See next: {ref}`Expose your charm's operational tasks via actions <expose-operational-tasks-via-actions>`**
