@@ -97,12 +97,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        '--charmcraft-yaml',
+        '--path',
         help='Path to the charmcraft.yaml file to update.',
         default='charmcraft.yaml',
     )
     parser.add_argument(
-        '--config-class',
+        '--config',
         action='append',
         help='Python class with config classes (can be specified multiple times). '
         'For example, "src.config:Config". The module defaults to "src.charm".'
@@ -110,7 +110,7 @@ def main():
         default=[],
     )
     parser.add_argument(
-        '--action-class',
+        '--action',
         action='append',
         help='Python class with action classes (can be specified multiple times). '
         'For example, "src.backup:BackupAction". The module defaults to "src.charm".'
@@ -134,16 +134,16 @@ def main():
     )
     args = parser.parse_args()
 
-    with open(args.charmcraft_yaml) as raw:
+    with open(args.path) as raw:
         raw_yaml = raw.read()
         charmcraft_yaml = yaml.safe_load(raw_yaml)
 
     config: dict[str, dict[str, OptionDict]] = {'options': {}}
-    for class_specifier in args.config_class:
+    for class_specifier in args.config:
         for cls in get_class_from_module(class_specifier):
             config['options'].update(config_to_juju_schema(cls)['options'])
     actions: dict[str, ActionDict] = {}
-    for class_specifier in args.action_class:
+    for class_specifier in args.action:
         for cls in get_class_from_module(class_specifier):
             actions.update(action_to_juju_schema(cls))
     actions = dict(sorted(actions.items()))  # Sort actions by name.
@@ -183,7 +183,7 @@ def main():
             actions = charmcraft_yaml['actions'].update(actions)
         raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'actions', {'actions': actions})
 
-    with open(args.charmcraft_yaml, 'w') as raw:
+    with open(args.path, 'w') as raw:
         raw.write(raw_yaml)
 
 
