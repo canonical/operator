@@ -1,3 +1,50 @@
+# 3.2.0 - 28 August 2025
+
+## Features
+
+* Add security event logging (#1905)
+* Surface JUJU_MACHINE_ID envvar in testing env (#1961)
+* Add a new log target type opentelemetry (#1937)
+
+## Documentation
+
+* Update links and config for switch to documentation.ubuntu.com/ops (#1940)
+* Update the required Python version and note the 2.x documentation site (#1946)
+* Be consistent with recommending self.config (#1947)
+* Use latest styles from starter pack and remove .html extensions (#1951)
+* Remove .html extensions from hardcoded links (#1955)
+* Fix broken URLs in sitemap (#1956)
+* Add related doc links to homepage (#1959)
+* Use classes from ops instead of ops.<submodule> (#1968)
+* Fix unstyled error pages (#1969)
+* Add Google Analyics integration and cookie consent banner (#1971)
+* Refresh docs homepage with more context about Ops (#1964)
+* Update link to Charmlibs docs (#1985)
+* Remove unnecessary pages from sitemap (#1979)
+* Update the httpbin charm to jubilant (#1987)
+* Update zero to hero to jubilant (#1988)
+* Add model-config best practice note (#1990)
+* Change some best practices to tips (#2001)
+* Add integration test for invalid config in httpbin charm (#2002)
+* Make a `Layer` instead of a `LayerDict` in the httpbin charm (#2003)
+* Update how-to to feature Jubilant (1/2) (#2000)
+* Use Charmcraft-style format and lint for example charms, not Ops-style (#2008)
+* Update broken link to HookVars source code (#2006)
+* Update how-to to feature Jubilant (2/2) (#2004)
+
+## CI
+
+* Fixes for the sbom and secscan workflow, and trigger it on publishing (#1916)
+* Store the charmcraft logs if packing fails (#1936)
+* Install release dependencies for the TIOBE analysis (#1930)
+* Add Juju 4/beta to the smoke test matrix (#1963)
+* Adjust permissions block in publish workflow (#1984)
+* Update actions/checkout to v5 (#1993)
+* Enable doctests (#1991)
+* Ignore juju/4 timeouts (#1998)
+* Remove the token for SBOM and secscan on publish (#2009)
+* Speed up integration test (#1978)
+
 # 3.1.0 - 30 July 2025
 
 ## Features
