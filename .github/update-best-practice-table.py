@@ -42,8 +42,11 @@ import pathlib
 import re
 
 
-def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
-    """Extracts 'Best practice' blocks from a Markdown or ReST file."""
+def extract_best_practice_blocks_rst(file_path: pathlib.Path, content: str):
+    """Extracts 'Best practice' blocks from a ReST file.
+
+    Returns a tuple of (heading, reference, content).
+    """
     lines = content.splitlines()
     results: list[tuple[str | None, str | None, str]] = []
 
@@ -57,52 +60,75 @@ def extract_best_practice_blocks(file_path: pathlib.Path, content: str):
         if line.strip() == ':class: hint':
             continue
 
-        if file_path.suffix == '.md':
-            md_match = re.match(r'^(#{2,})\s+(.*)', line)
-            if md_match:
-                current_heading = md_match.group(2)
-                previous_line = line
-                continue
-        else:  # .rst
-            rst_match = re.match(r'^[-=]{3,}$', line.strip())
-            if rst_match and previous_line.strip():
-                current_heading = previous_line.strip()
-                previous_line = line
-                continue
+        rst_match = re.match(r'^[-=]{3,}$', line.strip())
+        if rst_match and previous_line.strip():
+            current_heading = previous_line.strip()
+            previous_line = line
+            continue
 
         if inside_admonition:
-            if file_path.suffix == '.md':
-                at_end = line.strip() == '```'
-            else:  # .rst
-                at_end = previous_line.strip() == '' and len(line) > 0 and line[0] != ' '
+            at_end = previous_line.strip() == '' and len(line) > 0 and line[0] != ' '
             if at_end:
                 results.append((current_heading, current_ref, '\n'.join(admonition_lines)))
                 inside_admonition = False
             else:
                 admonition_lines.append(line)
 
-        if file_path.suffix == '.md':
-            if re.match(r'^```{admonition} Best practice', line):
-                inside_admonition = True
-                admonition_lines.clear()
-                previous_line = line
-                continue
-        else:  # .rst
-            if re.match(r'^\.\. admonition:: Best practice', line):
-                inside_admonition = True
-                admonition_lines.clear()
-                previous_line = line
-                continue
+        if re.match(r'^\.\. admonition:: Best practice', line):
+            inside_admonition = True
+            admonition_lines.clear()
+            previous_line = line
+            continue
 
-        if file_path.suffix == '.md':
-            ref_match = re.match(r'\((.+?)\)=', line)
-        else:  # .rst
-            ref_match = re.match(r'.. _(.+?):', line)
+        ref_match = re.match(r'.. _(.+?):', line)
         if ref_match:
             current_ref = ref_match.group(1)
             continue
 
         previous_line = line
+
+    return results
+
+
+def extract_best_practice_blocks_md(file_path: pathlib.Path, content: str):
+    """Extracts 'Best practice' blocks from a Markdown file.
+
+    Returns a tuple of (heading, reference, content).
+    """
+    lines = content.splitlines()
+    results: list[tuple[str | None, str | None, str]] = []
+
+    current_heading = None
+    current_ref = None
+    inside_admonition = False
+    admonition_lines: list[str] = []
+
+    for line in lines:
+        if line.strip() == ':class: hint':
+            continue
+
+        md_match = re.match(r'^(#{2,})\s+(.*)', line)
+        if md_match:
+            current_heading = md_match.group(2)
+            continue
+
+        if inside_admonition:
+            at_end = line.strip() == '```'
+            if at_end:
+                results.append((current_heading, current_ref, '\n'.join(admonition_lines)))
+                inside_admonition = False
+            else:
+                admonition_lines.append(line)
+
+        if re.match(r'^```{admonition} Best practice', line):
+            inside_admonition = True
+            admonition_lines.clear()
+            continue
+
+        ref_match = re.match(r'\((.+?)\)=', line)
+        if ref_match:
+            current_ref = ref_match.group(1)
+            continue
 
     return results
 
@@ -149,17 +175,18 @@ def main():
                 if not mo:
                     continue
                 title = mo.group(1).strip()
+                practices = extract_best_practice_blocks_md(file_path, text)
             else:  # file_path.suffix == '.rst':
                 mo = re.search(r'^(.+?)\n[-=]+\n', text, re.MULTILINE)
                 if not mo:
                     continue
                 title = mo.group(1).strip()
-            practices = extract_best_practice_blocks(file_path, text)
+                practices = extract_best_practice_blocks_rst(file_path, text)
             link = f'{base_url}{file_path.relative_to(directory).with_suffix("")}/'
             if len(practices):
                 print(f'**[{title}]({link})**')
             for heading, ref, practice in practices:
-                ref = make_ref(heading, ref) if make_ref else ref
+                ref = make_ref(heading, ref) if ref and heading else ref
                 see_more = f' See {ref}.' if heading and ref else ''
                 practice = re.sub(r'\s+', ' ', practice).strip()
                 print(f'- {practice}{see_more}')
