@@ -77,7 +77,7 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
 
     # For Pydantic dataclasses, we expect to have the docstrings in field
     # objects, but there's no "model_fields" attribute.
-    elif dataclasses.is_dataclass(cls):
+    if dataclasses.is_dataclass(cls):
         for field in dataclasses.fields(cls):
             if (
                 hasattr(field, 'default')
@@ -85,6 +85,8 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
                 and field.default.description  # type: ignore
             ):
                 docs[field.name] = field.default.description  # type: ignore
+        if docs:
+            return docs
         # This might be a standard library dataclass, where there aren't
         # description fields, so we fall through to collect any docstrings from
         # the code as well.
