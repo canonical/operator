@@ -32,6 +32,7 @@ logger = logging.getLogger()
 # during unit tests, and test_main failures that subprocess out are often
 # difficult to debug. Uncomment this line to get more informative errors when
 # running the tests.
+# When uncommented the test_hook_and_dispatch_with_failing_hook test will fail.
 # logger.addHandler(logging.StreamHandler(sys.stderr))
 
 
