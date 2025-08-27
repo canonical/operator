@@ -151,7 +151,7 @@ LogTargetDict = typing.TypedDict(
     'LogTargetDict',
     {
         'override': Union[Literal['merge'], Literal['replace']],
-        'type': Literal['loki'],
+        'type': Literal['loki', 'opentelemetry'],
         'location': str,
         'services': List[str],
         'labels': Dict[str, str],
