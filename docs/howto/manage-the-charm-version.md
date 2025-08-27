@@ -64,15 +64,9 @@ To verify that setting the charm version works correctly in an integration test,
 in your `tests/integration/test_charm.py` file, add a new test:
 
 ```py
-def test_deploy(charm: Path, juju: jubilant.Juju):
-    resources = {
-        name: res["upstream-source"]
-        for name, res in METADATA["resources"].items()
-    }
-
-    juju.deploy(f"./{charm}", resources=resources)
-    juju.wait(jubilant.all_active)
-    version = juju.status().apps["your-application"].charm_version
+def test_charm_version_is_set(juju: jubilant.Juju):
+    """Verify that the charm version has been set."""
+    version = juju.status().apps["your-app"].charm_version
     expected_version = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8")
     assert version == expected_version
 ```
