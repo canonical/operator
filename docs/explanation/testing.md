@@ -123,7 +123,7 @@ basepython = python3.10
 
 ### Examples
 
-- [Prometheus K8s integration tests](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py)
+- [Tempo worker integration tests](https://github.com/canonical/tempo-operators/blob/main/worker/tests/integration/test_deploy.py)
 
 ## Continuous integration
 
