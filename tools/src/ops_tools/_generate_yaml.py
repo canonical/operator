@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 class OptionDict(TypedDict):
     type: str
     """The Juju option type."""
+
     description: NotRequired[str]
     default: NotRequired[bool | int | float | str]
 
@@ -51,8 +52,10 @@ class ActionDict(TypedDict, total=False):
     description: str
     params: dict[str, Any]
     """A dictionary of parameters for the action."""
+
     required: list[str]
     """A list of required parameters for the action."""
+
     additionalProperties: bool
     """Whether additional properties are allowed in the action parameters."""
 
@@ -75,7 +78,7 @@ JSON_TYPES: Final[Mapping[type, str]] = {
 }
 
 
-def attr_to_default(cls: type[object], name: str) -> Any:
+def attr_to_default(cls: type[object], name: str) -> object:
     """Get the default value for the attribute."""
     if not dataclasses.is_dataclass(cls):
         return getattr(cls, name, None)
