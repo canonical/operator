@@ -65,10 +65,6 @@ Submit any newly-proposed public interfaces for review, to ensure that:
 
 The charm supports upgrading the workload and the application. An upgrade task preserves data and settings of both.
 
-```{tip}
-Support upgrades sequentially, so that users of the charm can regularly apply upgrades in the sequence of released revisions.
-```
-
 ### The charm supports scaling up and down
 
 If the workload supports scaling, the charm can be scaled up or down. Scale-up and scale-down may change the number of deployed units and the allocated resources (such as storage or computing).
