@@ -79,11 +79,11 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType: TypeAlias = 'dict[str, list[Storage] | None]'
 _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
-SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
 _ReadOnlyStatusName = Literal['error', 'unknown']
-_StatusName: TypeAlias = 'SettableStatusName | _ReadOnlyStatusName'
+_SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+_StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
-_SETTABLE_STATUS_NAMES: tuple[SettableStatusName, ...] = get_args(SettableStatusName)
+_SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw: TypeAlias = 'dict[str, list[Relation] | None]'
@@ -469,7 +469,7 @@ class Application:
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
-            typing.cast('SettableStatusName', value.name),  # status_set will validate at runtime
+            typing.cast('_SettableStatusName', value.name),  # status_set will validate at runtime
             value.message,
             is_app=True,
         )
@@ -647,7 +647,7 @@ class Unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         self._backend.status_set(
-            typing.cast('SettableStatusName', value.name),  # status_set will validate at runtime
+            typing.cast('_SettableStatusName', value.name),  # status_set will validate at runtime
             value.message,
             is_app=False,
         )
@@ -3872,7 +3872,7 @@ class _ModelBackend:
             return typing.cast('_StatusDict', content)
 
     def status_set(
-        self, status: SettableStatusName, message: str = '', *, is_app: bool = False
+        self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
     ) -> None:
         """Set a status of a unit or an application.
 
