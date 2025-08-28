@@ -121,15 +121,11 @@ class NamedTemporaryFile:
 
 
 class TemporaryDirectory:
-    """Mock for tempfile.TemporaryDirectory.
-
-    Captures any files opened in the directory, using NamedTemporaryFile mocks
-    for them.
-    """
+    """Mock for tempfile.TemporaryDirectory."""
 
     def __init__(self):
-        self.paths: list[NamedTemporaryFile] = []
-        self.name = pathlib.Path('path/to/temp_dir_name')
+        self.name = 'path/to/temp_dir_name'
+        self.files: list[NamedTemporaryFile] = []
 
     def __call__(self, *args: Any, **kwargs: Any):
         return self
@@ -140,11 +136,8 @@ class TemporaryDirectory:
     def __exit__(self, *args: Any):
         return
 
-    def __truediv__(self, other: pathlib.Path | str):
-        file_mock = NamedTemporaryFile()
-        file_mock.name = str(self.name / other)
-        self.paths.append(file_mock)
-        return file_mock
+    def __str__(self):
+        return self.name
 
 
 @pytest.fixture
@@ -175,9 +168,20 @@ def mock_file(monkeypatch: pytest.MonkeyPatch) -> Generator[NamedTemporaryFile]:
 
 @pytest.fixture
 def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirectory]:
-    """Pytest fixture that patches tempfile.TemporaryDirectory with Dir."""
+    """Pytest fixture that patches tempfile.TemporaryDirectory and open()."""
     dir_mock = TemporaryDirectory()
     monkeypatch.setattr('tempfile.TemporaryDirectory', dir_mock)
+
+    def mock_open(path: str, *args: Any, **kwargs: Any) -> Any:
+        if path.startswith(f'{dir_mock.name}/'):
+            file_mock = NamedTemporaryFile()
+            file_mock.name = f'{dir_mock.name}/{file_mock.name}'
+            dir_mock.files.append(file_mock)
+            return file_mock
+        return open(path, *args, **kwargs)  # type: ignore
+
+    monkeypatch.setattr('builtins.open', mock_open)
+
     yield dir_mock
 
 
@@ -347,8 +351,8 @@ def test_resource_get(run: Run):
     assert str(result) == '/path/to/resource'
 
 
-def test_secret_add(run: Run, mock_temp_dir: TemporaryDirectory):
-    run.handle(['secret-add', f'foo#file={mock_temp_dir.name}/foo'], stdout='secretid')
+def test_secret_add(run: Run, mock_temp_dir: str):
+    run.handle(['secret-add', f'foo#file={mock_temp_dir}/foo'], stdout='secretid')
     result = hookcmds.secret_add({'foo': 'bar'})
     assert result == 'secretid'
 
@@ -397,8 +401,8 @@ def test_secret_revoke(run: Run):
     hookcmds.secret_revoke('id', relation_id=None, app=None)
 
 
-def test_secret_set(run: Run, mock_temp_dir: TemporaryDirectory):
-    run.handle(['secret-set', 'secret:123', f'foo#file={mock_temp_dir.name}/foo'])
+def test_secret_set(run: Run, mock_temp_dir: str):
+    run.handle(['secret-set', 'secret:123', f'foo#file={mock_temp_dir}/foo'])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
