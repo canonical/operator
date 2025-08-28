@@ -29,7 +29,7 @@ def juju_post_deploy(build_relation_charm: Callable[[], str], juju: jubilant.Juj
     yield juju
 
 
-def test_action(juju_post_deploy: jubilant.Juju):
+def test_hookcmds_action(juju_post_deploy: jubilant.Juju):
     task = juju_post_deploy.run(
         'test-hookcmds/0', 'backup', params={'backup-location': 'loc', 'days': 7}
     )
@@ -40,12 +40,12 @@ def test_action(juju_post_deploy: jubilant.Juju):
     assert task.results == {'backup-location': 'loc', 'days+1': 8}
 
 
-def test_application_version(juju_post_deploy: jubilant.Juju):
+def test_hookcmds_application_version(juju_post_deploy: jubilant.Juju):
     status = juju_post_deploy.status()
     assert status.apps['test-hookcmds'].version == '1.25.79'
 
 
-def test_ports(juju_post_deploy: jubilant.Juju):
+def test_hookcmds_ports(juju_post_deploy: jubilant.Juju):
     status = juju_post_deploy.status()
     assert status.get_units('test-hookcmds')['test-hookcmds/0'].open_ports == []
     juju_post_deploy.run('test-hookcmds/0', 'open-port', params={'protocol': 'tcp', 'port': 80})
@@ -58,7 +58,7 @@ def test_ports(juju_post_deploy: jubilant.Juju):
     assert status.get_units('test-hookcmds')['test-hookcmds/0'].open_ports == []
 
 
-def test_config(juju_post_deploy: jubilant.Juju):
+def test_hookcmds_config(juju_post_deploy: jubilant.Juju):
     juju_post_deploy.config('test-hookcmds', {'log-level': 'DEBUG', 'another-option': 42})
     log = juju_post_deploy.debug_log(limit=10)
     assert "New config: {'log-level': 'DEBUG', 'another-option': 42'}" in log
