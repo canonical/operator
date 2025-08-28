@@ -61,7 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .hookcmds import SecretRotate, SettableStatusName, StatusName
+from .hookcmds import SecretRotate
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -79,7 +79,10 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType: TypeAlias = 'dict[str, list[Storage] | None]'
 _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
-_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
+SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
+_ReadOnlyStatusName = Literal['error', 'unknown']
+_StatusName: TypeAlias = 'SettableStatusName | _ReadOnlyStatusName'
+_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[SettableStatusName, ...] = get_args(SettableStatusName)
 
 # mapping from relation name to a list of relation objects
@@ -2225,10 +2228,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: ClassVar[dict[StatusName, type[StatusBase]]] = {}
+    _statuses: ClassVar[dict[_StatusName, type[StatusBase]]] = {}
 
     # Subclasses must provide this attribute
-    name: StatusName
+    name: _StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -2265,7 +2268,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[typing.cast('StatusName', name)](message)
+            return cls._statuses[typing.cast('_StatusName', name)](message)
 
     @classmethod
     def register(cls, child: type[StatusBase]):
