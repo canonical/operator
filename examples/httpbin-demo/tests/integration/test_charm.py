@@ -32,7 +32,7 @@ def test_deploy(charm: Path, juju: jubilant.Juju):
     resources = {"httpbin-image": METADATA["resources"]["httpbin-image"]["upstream-source"]}
 
     # Deploy the charm and wait for active/idle status
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
 
 
