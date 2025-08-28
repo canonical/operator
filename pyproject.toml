@@ -76,6 +76,7 @@ integration = [
 ]
 release = [
     "pygithub~=2.6",
+    "rich~=14.1",
 ]
 
 [project.urls]
