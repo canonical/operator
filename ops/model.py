@@ -22,7 +22,6 @@ import contextvars
 import copy
 import dataclasses
 import datetime
-import enum
 import ipaddress
 import json
 import logging
@@ -62,6 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
+from .hookcmds import SecretRotate, SettableStatusName, StatusName
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -79,11 +79,8 @@ K8sSpec = Mapping[str, Any]
 _StorageDictType: TypeAlias = 'dict[str, list[Storage] | None]'
 _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
-_ReadOnlyStatusName = Literal['error', 'unknown']
-_SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
 _StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
-_SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
+_SETTABLE_STATUS_NAMES: tuple[SettableStatusName, ...] = get_args(SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw: TypeAlias = 'dict[str, list[Relation] | None]'
@@ -469,7 +466,7 @@ class Application:
             raise RuntimeError('cannot set application status as a non-leader unit')
 
         self._backend.status_set(
-            typing.cast('_SettableStatusName', value.name),  # status_set will validate at runtime
+            typing.cast('SettableStatusName', value.name),  # status_set will validate at runtime
             value.message,
             is_app=True,
         )
@@ -647,7 +644,7 @@ class Unit:
             raise RuntimeError(f'cannot set status for a remote unit {self}')
 
         self._backend.status_set(
-            typing.cast('_SettableStatusName', value.name),  # status_set will validate at runtime
+            typing.cast('SettableStatusName', value.name),  # status_set will validate at runtime
             value.message,
             is_app=False,
         )
@@ -1231,18 +1228,6 @@ class NetworkInterface:
             subnet = None
         self.subnet = subnet
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
-
-
-class SecretRotate(enum.Enum):
-    """Secret rotation policies."""
-
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
 
 
 class SecretInfo:
@@ -3884,7 +3869,7 @@ class _ModelBackend:
             return typing.cast('_StatusDict', content)
 
     def status_set(
-        self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
+        self, status: SettableStatusName, message: str = '', *, is_app: bool = False
     ) -> None:
         """Set a status of a unit or an application.
 

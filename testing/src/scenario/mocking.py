@@ -42,7 +42,7 @@ from ops.model import Secret as Secret_Ops  # lol
 from ops.model import (
     _format_action_result_dict,
     _ModelBackend,
-    _SettableStatusName,
+    SettableStatusName,
 )
 from ops.pebble import Client, ExecError
 
@@ -370,12 +370,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def status_set(
         self,
-        status: _SettableStatusName,
+        status: SettableStatusName,
         message: str = '',
         *,
         is_app: bool = False,
     ):
-        valid_names = get_args(_SettableStatusName)
+        valid_names = get_args(SettableStatusName)
         if status not in valid_names:
             raise ModelError(
                 f'ERROR invalid status "{status}", expected one of [{", ".join(valid_names)}]',
