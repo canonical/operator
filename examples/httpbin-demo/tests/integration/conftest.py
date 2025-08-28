@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pathlib
 import subprocess
 
@@ -31,5 +32,5 @@ def juju(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="session")
 def charm():
-    subprocess.check_call(["charmcraft", "pack"])  # noqa
+    subprocess.check_call(["charmcraft", "pack"])
     return next(pathlib.Path(".").glob("*.charm"))
