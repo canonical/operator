@@ -283,6 +283,8 @@ from .framework import (
     StoredStateData,
 )
 
+from .hookcmds import StatusName
+
 from .jujuversion import JujuVersion
 
 from .model import (
@@ -327,7 +329,6 @@ from .model import (
     SecretRotate,
     ServiceInfoMapping,
     StatusBase,
-    StatusName,
     Storage,
     StorageMapping,
     TooManyRelatedAppsError,

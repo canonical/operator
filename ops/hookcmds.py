@@ -262,14 +262,14 @@ class AppStatus:
 @overload
 def _run(
     *args: str,
-    return_output: Literal[True] = True,
+    return_output: Literal[True],
     use_json: Literal[False] = False,
     input_stream: str | None = None,
 ) -> str: ...
 @overload
 def _run(
     *args: str,
-    return_output: Literal[True] = True,
+    return_output: Literal[True],
     use_json: Literal[True] = True,
     input_stream: str | None = None,
 ) -> Any: ...
@@ -277,7 +277,6 @@ def _run(
 def _run(
     *args: str,
     return_output: Literal[False] = False,
-    use_json: bool = False,
     input_stream: str | None = None,
 ) -> None: ...
 def _run(
@@ -911,11 +910,11 @@ def state_set(data: Mapping[str, str], file: pathlib.Path | None = None):
 
 
 @overload
-def status_get(*, include_data: Literal[True], app: Literal[False] = False) -> UnitStatus: ...
+def status_get(*, include_data: Literal[True], app: Literal[False]) -> UnitStatus: ...
 @overload
-def status_get(*, include_data: Literal[True], app: Literal[True] = True) -> AppStatus: ...
+def status_get(*, include_data: Literal[True], app: Literal[True]) -> AppStatus: ...
 @overload
-def status_get(*, app: bool = False) -> str: ...
+def status_get(*, include_data: Literal[False], app: bool = False) -> str: ...
 def status_get(*, include_data: bool = False, app: bool = False) -> AppStatus | UnitStatus | str:
     """Get a status of a unit or an application."""
     args = ['status-get', f'--application={str(app).lower()}']

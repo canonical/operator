@@ -121,11 +121,18 @@ class NamedTemporaryFile:
 
 @pytest.fixture
 def run(monkeypatch: pytest.MonkeyPatch) -> Generator[Run]:
-    """Pytest fixture that patches subprocess.run with Run."""
+    """Pytest fixture that patches subprocess.run with Run.
+
+    ``shutil.which`` is also mocked, to return the same string as provided.
+    """
     run_mock = Run()
     monkeypatch.setattr('subprocess.run', run_mock)
+
     # hookcmds always does a shutil.which upfront.
-    monkeypatch.setattr('shutil.which', lambda cmd: cmd)
+    def mock_which(cmd: str):
+        return cmd
+
+    monkeypatch.setattr('shutil.which', mock_which)
     yield run_mock
     assert len(run_mock.calls) >= 1, 'subprocess.run not called'
 
@@ -188,7 +195,7 @@ def test_config_get(run: Run):
 
 
 def test_credential_get(run: Run):
-    cred = {
+    cred: dict[str, Any] = {
         'type': 'cloud',
         'name': 'test',
         'region': None,
@@ -377,12 +384,12 @@ def test_state_set(run: Run):
 
 
 def test_status_get(run: Run):
-    unit = {'status': 'active', 'message': 'ok', 'status-data': {}}
+    unit: hookcmds._UnitStatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
     run.handle(
         ['status-get', '--application=false', '--include-data', '--format=json'],
         stdout=json.dumps(unit),
     )
-    result = hookcmds.status_get(include_data=True)
+    result = hookcmds.status_get(include_data=True, app=False)
     assert result.status == 'active'
 
 
@@ -400,10 +407,11 @@ def test_storage_get(run: Run):
     storage = {'kind': 'block', 'location': '/path/to/storage'}
     run.handle(['storage-get', '--format=json'], stdout=json.dumps(storage))
     result = hookcmds.storage_get()
-    assert result['kind'] == 'block' or getattr(result, 'kind', None) == 'block'
+    assert result.kind == 'block'
+    assert result.location == '/path/to/storage'
 
 
 def test_storage_list(run: Run):
-    run.handle(['storage-list', '--format=json'], stdout='["s1", "s2"]')
+    run.handle(['storage-list', '--format=json'], stdout='["stor/1", "stor/2"]')
     result = hookcmds.storage_list()
-    assert result == ['s1', 's2']
+    assert result == ['stor/1', 'stor/2']
