@@ -17,6 +17,7 @@ from __future__ import annotations
 import dataclasses
 import ipaddress
 import json
+import pathlib
 import subprocess
 import uuid
 from typing import Any, Generator
@@ -119,6 +120,33 @@ class NamedTemporaryFile:
         self.num_flushes += 1
 
 
+class TemporaryDirectory:
+    """Mock for tempfile.TemporaryDirectory.
+
+    Captures any files opened in the directory, using NamedTemporaryFile mocks
+    for them.
+    """
+
+    def __init__(self):
+        self.paths: list[NamedTemporaryFile] = []
+        self.name = pathlib.Path('path/to/temp_dir_name')
+
+    def __call__(self, *args: Any, **kwargs: Any):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args: Any):
+        return
+
+    def __truediv__(self, other: pathlib.Path | str):
+        file_mock = NamedTemporaryFile()
+        file_mock.name = str(self.name / other)
+        self.paths.append(file_mock)
+        return file_mock
+
+
 @pytest.fixture
 def run(monkeypatch: pytest.MonkeyPatch) -> Generator[Run]:
     """Pytest fixture that patches subprocess.run with Run.
@@ -142,8 +170,15 @@ def mock_file(monkeypatch: pytest.MonkeyPatch) -> Generator[NamedTemporaryFile]:
     """Pytest fixture that patches tempfile.NamedTemporaryFile with File."""
     file_mock = NamedTemporaryFile()
     monkeypatch.setattr('tempfile.NamedTemporaryFile', file_mock)
-    monkeypatch.setattr('ops.hookcmds.tempfile.NamedTemporaryFile', file_mock)
     yield file_mock
+
+
+@pytest.fixture
+def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirectory]:
+    """Pytest fixture that patches tempfile.TemporaryDirectory with Dir."""
+    dir_mock = TemporaryDirectory()
+    monkeypatch.setattr('tempfile.TemporaryDirectory', dir_mock)
+    yield dir_mock
 
 
 def test_action_fail(run: Run):
@@ -312,8 +347,8 @@ def test_resource_get(run: Run):
     assert str(result) == '/path/to/resource'
 
 
-def test_secret_add(run: Run, mock_file: NamedTemporaryFile):
-    run.handle(['secret-add', f'foo#file={mock_file.name}/foo'], stdout='secretid')
+def test_secret_add(run: Run, mock_temp_dir: TemporaryDirectory):
+    run.handle(['secret-add', f'foo#file={mock_temp_dir.name}/foo'], stdout='secretid')
     result = hookcmds.secret_add({'foo': 'bar'})
     assert result == 'secretid'
 
@@ -362,8 +397,8 @@ def test_secret_revoke(run: Run):
     hookcmds.secret_revoke('id', relation_id=None, app=None)
 
 
-def test_secret_set(run: Run, mock_file: NamedTemporaryFile):
-    run.handle(['secret-set', 'secret:123', f'foo#file={mock_file.name}/foo'])
+def test_secret_set(run: Run, mock_temp_dir: TemporaryDirectory):
+    run.handle(['secret-set', 'secret:123', f'foo#file={mock_temp_dir.name}/foo'])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
@@ -408,7 +443,7 @@ def test_storage_get(run: Run):
     run.handle(['storage-get', '--format=json'], stdout=json.dumps(storage))
     result = hookcmds.storage_get()
     assert result.kind == 'block'
-    assert result.location == '/path/to/storage'
+    assert result.location == pathlib.Path('/path/to/storage')
 
 
 def test_storage_list(run: Run):

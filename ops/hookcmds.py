@@ -980,10 +980,10 @@ def storage_get(identifier: str | None = None, attribute: str | None = None) -> 
         args.extend(['-s', identifier])
     if attribute is not None:
         args.append(attribute)
-    out = _run(*args, return_output=True, use_json=True)
+    result = _run(*args, return_output=True, use_json=True)
     if attribute is not None:
-        return cast('str', out)
-    return cast('Storage', out)
+        return cast('str', result)
+    return Storage(kind=result['kind'], location=pathlib.Path(result['location']))
 
 
 def storage_list(name: str | None = None) -> list[str]:
