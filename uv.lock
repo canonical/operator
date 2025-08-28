@@ -1155,7 +1155,7 @@ xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
 
 [[package]]
 name = "ops-scenario"
-version = "8.2.0"
+version = "8.3.0.dev0"
 source = { editable = "testing" }
 dependencies = [
     { name = "ops" },
@@ -1170,7 +1170,7 @@ requires-dist = [
 
 [[package]]
 name = "ops-tracing"
-version = "3.2.0"
+version = "3.3.0.dev0"
 source = { editable = "tracing" }
 dependencies = [
     { name = "opentelemetry-api" },
