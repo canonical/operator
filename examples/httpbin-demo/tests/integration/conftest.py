@@ -32,5 +32,11 @@ def juju(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="session")
 def charm():
+    charm_path = os.getenv("CHARM_PATH")
+    if charm_path is not None:
+        return pathlib.Path(charm_path)
+        # TODO: Raise an error if the charm doesn't exist?
+        #       Will juju.deploy() raise for us?
+
     subprocess.check_call(["charmcraft", "pack"])
     return next(pathlib.Path(".").glob("*.charm"))
