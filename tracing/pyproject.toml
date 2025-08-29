@@ -49,6 +49,7 @@ dev = [
 ]
 testing = [
     "pytest ~= 8.4",
+    "ops[testing]",
 ]
 
 [build-system]
