@@ -14,7 +14,6 @@
 
 import os
 import pathlib
-import subprocess
 
 import jubilant
 import pytest
@@ -32,11 +31,14 @@ def juju(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="session")
 def charm():
-    charm_path = os.getenv("CHARM_PATH")
-    if charm_path is not None:
-        if not pathlib.Path(charm_path).exists():
+    if "CHARM_PATH" in os.environ:
+        charm_path = pathlib.Path(os.environ["CHARM_PATH"])
+        if not charm_path.exists():
             raise FileNotFoundError(f"Charm does not exist: {charm_path}")
-        return pathlib.Path(charm_path)
-
-    subprocess.check_call(["charmcraft", "pack"])
-    return next(pathlib.Path(".").glob("*.charm"))
+        return charm_path
+    charm_paths = list(pathlib.Path(".").glob("*.charm"))
+    if not charm_paths:
+        raise FileNotFoundError("No .charm files in current directory")
+    if len(charm_paths) > 1:
+        raise ValueError("More than one .charm file in current directory")
+    return charm_paths[0]
