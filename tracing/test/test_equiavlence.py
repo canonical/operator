@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import json
-from typing import Type, TypeAlias
+from typing import Literal, Type, TypeAlias
 from unittest.mock import Mock
 
 import ops
@@ -49,16 +49,13 @@ GOOD_PROTOCOL: RECEIVER = {'protocol': {'name': 'otlp_http', 'type': 'http'}}
 GOOD_HTTP_URL: RECEIVER = {'url': 'http://tracing.example:4318/'}
 GOOD_HTTPS_URL: RECEIVER = {'url': 'https://tls.example:4318/'}
 GRPC_RECEIVER: RECEIVER = {'protocol': {'name': 'otlp_grpc', 'type': 'grpc'}, 'url': 'grpc://'}
+EVENTS = ['start', 'upgrade_charm', 'relation_changed', 'relation_broken']
 
 
+@pytest.mark.parametrize('extra_receiver_fields', [{}, {'foo': 'bar'}])
+@pytest.mark.parametrize('extra_receiver', [None, GRPC_RECEIVER])
 @pytest.mark.parametrize(
-    'event',
-    [
-        'start',
-        'upgrade_charm',
-        'relation_changed',
-        'relation_broken',
-    ],
+    'extra_databag_fields', [{}, {'foo': 'not-json'}, {'foo': '"json-str"'}, {'version': '1'}]
 )
 @pytest.mark.parametrize(
     'receiver',
@@ -67,16 +64,14 @@ GRPC_RECEIVER: RECEIVER = {'protocol': {'name': 'otlp_grpc', 'type': 'grpc'}, 'u
         {**GOOD_PROTOCOL, **GOOD_HTTPS_URL},
     ],
 )
-@pytest.mark.parametrize(
-    'extra_databag_fields', [{}, {'foo': 'not-json'}, {'foo': '"json-str"'}, {'version': '1'}]
-)
-@pytest.mark.parametrize('extra_receiver', [None, GRPC_RECEIVER])
-@pytest.mark.parametrize('extra_receiver_fields', [{}, {'foo': 'bar'}])
+@pytest.mark.parametrize('event', EVENTS)
+@pytest.mark.parametrize('implementation', ['old', 'new'])
 def test_foo(
     sample_charm: Type[ops.CharmBase],
     mock_destination: Mock,
     ca_relation: ops.testing.Relation,
     monkeypatch: pytest.MonkeyPatch,
+    implementation: Literal['old', 'new'],
     event: str,
     receiver: RECEIVER,
     extra_databag_fields: dict[str, str],
@@ -90,19 +85,11 @@ def test_foo(
     databag = {'receivers': json.dumps(receivers), **extra_databag_fields}
     charm_tracing_relation = ops.testing.Relation('charm-tracing', id=0, remote_app_data=databag)
 
-    ctx = ops.testing.Context(sample_charm)
-    state = ops.testing.State(relations={charm_tracing_relation, ca_relation}, leader=True)
+    assert implementation in ('old', 'new')
 
-    event_args = [charm_tracing_relation] if event.startswith('relation') else []
-    state = ctx.run(getattr(ctx.on, event)(*event_args), state)
+    if implementation == 'new':
+        monkeypatch.setattr('ops.tracing.Tracing', ops.tracing.Tracing2)
 
-    if event == 'relation_broken':
-        mock_destination.assert_called_with(url=None, ca=None)
-    else:
-        assert state.get_relation(0).local_app_data == {'receivers': '["otlp_http"]'}
-        mock_destination.assert_called_with(url=url, ca=ca)
-
-    monkeypatch.setattr('ops.tracing.Tracing', ops.tracing.Tracing2)
     ctx = ops.testing.Context(sample_charm)
     state = ops.testing.State(relations={charm_tracing_relation, ca_relation}, leader=True)
 

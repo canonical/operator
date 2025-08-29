@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import opentelemetry.trace
@@ -304,18 +305,11 @@ class Tracing2(ops.Object):
                     f' expected'
                 )
 
-            # FIXME new code goes here
-            self._tracing = TracingEndpointRequirer(
-                self.charm,
-                tracing_relation_name,
-                protocols=['otlp_http'],
-            )
-
             for event in (
                 self.charm.on.start,
                 self.charm.on.upgrade_charm,
-                self._tracing.on.endpoint_changed,
-                self._tracing.on.endpoint_removed,
+                self.charm.on[tracing_relation_name].relation_changed,
+                self.charm.on[tracing_relation_name].relation_broken,
             ):
                 self.framework.observe(event, self._reconcile)
 
@@ -350,12 +344,29 @@ class Tracing2(ops.Object):
 
     def _get_destination(self) -> Destination:
         try:
-            if not self._tracing.is_ready():
+            rel = self.model.get_relation(self.tracing_relation_name)
+            if not rel:
                 return Destination(None, None)
 
-            base_url = self._tracing.get_endpoint('otlp_http')
+            rel.data[self.charm.app]['receivers'] = '["otlp_http"]'
+            base_url: str | None = None
+            app_data = rel.data[rel.app]
+            # FIXME does the authoritative lib skip over unparsable receivers, or does it bail?
+            try:
+                # FIXME the authoritative lib raises if field is not valid JSON: check in tests.
+                # FIXME the authoritative lib has pydantic raise if subfields are missing.
+                # We don't want to raise, we'd want to skip, maybe with a warning.
+                for receiver in json.loads(app_data['receivers']):
+                    proto = receiver['protocol']
+                    if proto['name'] != 'otlp_http':
+                        continue
+                    if proto['type'] != 'http':
+                        continue
+                    base_url = receiver['url']
+            except (KeyError, TypeError, ValueError):
+                pass
 
-            if not base_url:
+            if not base_url or not isinstance(base_url, str):
                 return Destination(None, None)
 
             if not base_url.startswith(('http://', 'https://')):
