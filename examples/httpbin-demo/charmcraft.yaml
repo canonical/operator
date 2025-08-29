@@ -19,6 +19,13 @@ assumes:
   - juju >= 3.1
   - k8s-api
 
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
 config:
   options:
     log-level:
