@@ -48,28 +48,35 @@ RECEIVERS: TypeAlias = list[RECEIVER]
 GOOD_PROTOCOL: RECEIVER = {'protocol': {'name': 'otlp_http', 'type': 'http'}}
 GOOD_HTTP_URL: RECEIVER = {'url': 'http://tracing.example:4318/'}
 GOOD_HTTPS_URL: RECEIVER = {'url': 'https://tls.example:4318/'}
-EXTRA_KEYS: RECEIVER = {'foo': 'bar', 'baz': 42}
+GRPC_RECEIVER: RECEIVER = {'protocol': {'name': 'otlp_grpc', 'type': 'grpc'}, 'url': 'grpc://'}
 
 
-@pytest.mark.parametrize("event",
+@pytest.mark.parametrize(
+    'event',
     [
-        "start",
-        "upgrade_charm",
-        "relation_changed",
-        "relation_broken",
-    ])
-@pytest.mark.parametrize("receiver",
+        'start',
+        'upgrade_charm',
+        'relation_changed',
+        'relation_broken',
+    ],
+)
+@pytest.mark.parametrize(
+    'receiver',
     [
         {**GOOD_PROTOCOL, **GOOD_HTTP_URL},
         {**GOOD_PROTOCOL, **GOOD_HTTPS_URL},
-    ])
-@pytest.mark.parametrize("extra_databag_fields", [{}])
-@pytest.mark.parametrize("extra_receiver", [None])
-@pytest.mark.parametrize("extra_receiver_fields", [{}])
+    ],
+)
+@pytest.mark.parametrize(
+    'extra_databag_fields', [{}, {'foo': 'not-json'}, {'foo': '"json-str"'}, {'version': '1'}]
+)
+@pytest.mark.parametrize('extra_receiver', [None, GRPC_RECEIVER])
+@pytest.mark.parametrize('extra_receiver_fields', [{}, {'foo': 'bar'}])
 def test_foo(
     sample_charm: Type[ops.CharmBase],
     mock_destination: Mock,
     ca_relation: ops.testing.Relation,
+    monkeypatch: pytest.MonkeyPatch,
     event: str,
     receiver: RECEIVER,
     extra_databag_fields: dict[str, str],
@@ -78,12 +85,24 @@ def test_foo(
 ):
     url = f'{receiver["url"].strip("/")}/v1/traces'  # type: ignore
     ca = 'FIRST\nSECOND' if url.startswith('https') else None
-    charm_tracing_relation = ops.testing.Relation(
-        'charm-tracing',
-        id=0,
-        remote_app_data={'receivers': json.dumps([receiver])},
-    )
+    receiver = {**receiver, **extra_receiver_fields}
+    receivers = [receiver] if extra_receiver is None else [receiver, extra_receiver]
+    databag = {'receivers': json.dumps(receivers), **extra_databag_fields}
+    charm_tracing_relation = ops.testing.Relation('charm-tracing', id=0, remote_app_data=databag)
 
+    ctx = ops.testing.Context(sample_charm)
+    state = ops.testing.State(relations={charm_tracing_relation, ca_relation}, leader=True)
+
+    event_args = [charm_tracing_relation] if event.startswith('relation') else []
+    state = ctx.run(getattr(ctx.on, event)(*event_args), state)
+
+    if event == 'relation_broken':
+        mock_destination.assert_called_with(url=None, ca=None)
+    else:
+        assert state.get_relation(0).local_app_data == {'receivers': '["otlp_http"]'}
+        mock_destination.assert_called_with(url=url, ca=ca)
+
+    monkeypatch.setattr('ops.tracing.Tracing', ops.tracing.Tracing2)
     ctx = ops.testing.Context(sample_charm)
     state = ops.testing.State(relations={charm_tracing_relation, ca_relation}, leader=True)
 
