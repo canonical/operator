@@ -135,6 +135,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredSet',
     'StoredState',
     'StoredStateData',
+    # From hookcmds.py
+    'StatusName',
     # From jujuversion.py
     'JujuVersion',
     # From model.py
@@ -178,7 +180,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'SecretRotate',
     'ServiceInfoMapping',
     'StatusBase',
-    'StatusName',
     'Storage',
     'StorageMapping',
     'TooManyRelatedAppsError',
@@ -283,6 +284,8 @@ from .framework import (
     StoredStateData,
 )
 
+from .hookcmds import StatusName
+
 from .jujuversion import JujuVersion
 
 from .model import (
@@ -327,7 +330,6 @@ from .model import (
     SecretRotate,
     ServiceInfoMapping,
     StatusBase,
-    StatusName,
     Storage,
     StorageMapping,
     TooManyRelatedAppsError,

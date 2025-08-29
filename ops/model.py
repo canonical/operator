@@ -22,7 +22,6 @@ import contextvars
 import copy
 import dataclasses
 import datetime
-import enum
 import ipaddress
 import json
 import logging
@@ -62,6 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
+from .hookcmds import SecretRotate
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -81,8 +81,8 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
-_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
+_StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
+_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
@@ -1233,18 +1233,6 @@ class NetworkInterface:
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
 
 
-class SecretRotate(enum.Enum):
-    """Secret rotation policies."""
-
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
-
-
 class SecretInfo:
     """Secret information (metadata)."""
 
@@ -2240,10 +2228,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: ClassVar[dict[StatusName, type[StatusBase]]] = {}
+    _statuses: ClassVar[dict[_StatusName, type[StatusBase]]] = {}
 
     # Subclasses must provide this attribute
-    name: StatusName
+    name: _StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -2280,7 +2268,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[typing.cast('StatusName', name)](message)
+            return cls._statuses[typing.cast('_StatusName', name)](message)
 
     @classmethod
     def register(cls, child: type[StatusBase]):
