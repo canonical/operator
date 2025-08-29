@@ -33,6 +33,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python-version }}'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
@@ -41,8 +45,6 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
-      - name: Install tox
-        run: pip install tox~=4.2
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}
