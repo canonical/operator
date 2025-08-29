@@ -38,7 +38,7 @@ def charm():
         return charm_path
     charm_paths = list(pathlib.Path(".").glob("*.charm"))
     if not charm_paths:
-        raise FileNotFoundError("No .charm files in current directory")
+        raise FileNotFoundError("No .charm file in current directory")
     if len(charm_paths) > 1:
         raise ValueError("More than one .charm file in current directory")
     return charm_paths[0]
