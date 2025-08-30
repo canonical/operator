@@ -235,8 +235,9 @@ def test_exec_history_stdin(stdin, write):
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
     container = Container(name='foo', can_connect=True, execs={Exec([])})
-    ctx.run(ctx.on.pebble_ready(container=container), State(containers={container}))
-    assert ctx.exec_history[container.name][0].stdin == 'hello world!'
+    with ctx(ctx.on.pebble_ready(container=container), State(containers={container})) as mgr:
+        mgr.run()
+    assert mgr.exec_history[container.name][0].stdin == 'hello world!'
 
 
 def test_pebble_ready(charm_cls):
@@ -370,7 +371,26 @@ def test_exec_wait_output(charm_cls, command):
         out, err = proc.wait_output()
         assert out == 'hello pebble'
         assert err == 'oepsie'
-        assert ctx.exec_history[container.name][0].command == command
+        mgr.run()
+        assert mgr.exec_history[container.name][0].command == command
+
+
+def test_exec_history_from_context(charm_cls):
+    state = State(
+        containers={
+            Container(
+                name='foo',
+                can_connect=True,
+                execs={Exec(['foo'], stdout='hello pebble', stderr='oepsie')},
+            )
+        }
+    )
+
+    ctx = Context(charm_cls, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.start(), state) as mgr:
+        mgr.charm.unit.get_container('foo').exec(['foo']).wait()
+    with pytest.warns(DeprecationWarning):
+        assert ctx.exec_history['foo'][0].command == ['foo']
 
 
 def test_exec_wait_output_error(charm_cls):

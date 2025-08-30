@@ -164,13 +164,17 @@ def test_defer_reemit_lifecycle_event(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
-    state_1 = ctx.run(ctx.on.update_status(), State())
+    with ctx(ctx.on.update_status(), State()) as mgr:
+        state_1 = mgr.run()
+    assert [type(e).__name__ for e in mgr.emitted_events] == [
+        'UpdateStatusEvent',
+    ]
 
     mycharm.defer_next = 0
-    state_2 = ctx.run(ctx.on.start(), state_1)
+    with ctx(ctx.on.start(), state_1) as mgr:
+        state_2 = mgr.run()
 
-    assert [type(e).__name__ for e in ctx.emitted_events] == [
-        'UpdateStatusEvent',
+    assert [type(e).__name__ for e in mgr.emitted_events] == [
         'UpdateStatusEvent',
         'StartEvent',
     ]
@@ -183,13 +187,17 @@ def test_defer_reemit_relation_event(mycharm):
 
     rel = Relation('foo')
     mycharm.defer_next = 1
-    state_1 = ctx.run(ctx.on.relation_created(rel), State(relations={rel}))
+    with ctx(ctx.on.relation_created(rel), State(relations={rel})) as mgr:
+        state_1 = mgr.run()
+    assert [type(e).__name__ for e in mgr.emitted_events] == [
+        'RelationCreatedEvent',
+    ]
 
     mycharm.defer_next = 0
-    state_2 = ctx.run(ctx.on.start(), state_1)
+    with ctx(ctx.on.start(), state_1) as mgr:
+        state_2 = mgr.run()
 
-    assert [type(e).__name__ for e in ctx.emitted_events] == [
-        'RelationCreatedEvent',
+    assert [type(e).__name__ for e in mgr.emitted_events] == [
         'RelationCreatedEvent',
         'StartEvent',
     ]
@@ -238,21 +246,19 @@ def test_defer_custom_event(mycharm):
     ctx = Context(MyCharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
-    state_1 = ctx.run(ctx.on.custom(MyConsumer.on.foo_changed, 'foo', 28), State())
-    assert [type(e).__name__ for e in ctx.emitted_events] == ['CustomEventWithArgs']
+    with ctx(ctx.on.custom(MyConsumer.on.foo_changed, 'foo', 28), State()) as mgr:
+        state_1 = mgr.run()
+    assert [type(e).__name__ for e in mgr.emitted_events] == ['CustomEventWithArgs']
     assert ctx.emitted_events[0].snapshot() == {'arg0': 'foo', 'arg1': 28}
     assert len(state_1.deferred) == 1
+    snapshot_1 = mgr.emitted_events[0].snapshot()
 
     mycharm.defer_next = 0
-    state_2 = ctx.run(ctx.on.start(), state_1)
-    assert [type(e).__name__ for e in ctx.emitted_events] == [
-        'CustomEventWithArgs',
+    with ctx(ctx.on.start(), state_1) as mgr:
+        state_2 = mgr.run()
+    assert [type(e).__name__ for e in mgr.emitted_events] == [
         'CustomEventWithArgs',
         'StartEvent',
     ]
-    assert (
-        ctx.emitted_events[0].snapshot()
-        == ctx.emitted_events[1].snapshot()
-        == {'arg0': 'foo', 'arg1': 28}
-    )
+    assert snapshot_1 == mgr.emitted_events[0].snapshot() == {'arg0': 'foo', 'arg1': 28}
     assert not state_2.deferred

@@ -53,9 +53,10 @@ def test_action_no_results():
             pass
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'act': {}})
-    ctx.run(ctx.on.action('act'), State())
-    assert ctx.action_results is None
-    assert ctx.action_logs == []
+    with ctx(ctx.on.action('act'), State()) as mgr:
+        mgr.run()
+    assert mgr.action_results is None
+    assert mgr.action_logs == []
 
 
 @pytest.mark.parametrize('res_value', ('one', 1, [2], ['bar'], (1,), {1, 2}))
@@ -83,9 +84,9 @@ def test_action_event_results_valid(mycharm, res_value):
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
 
-    ctx.run(ctx.on.action('foo'), State())
-
-    assert ctx.action_results == res_value
+    with ctx(ctx.on.action('foo'), State()) as mgr:
+        mgr.run()
+    assert mgr.action_results == res_value
 
 
 @pytest.mark.parametrize('res_value', ({'a': {'b': {'c'}}}, {'d': 'e'}))
@@ -103,10 +104,11 @@ def test_action_event_outputs(mycharm, res_value):
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
-        ctx.run(ctx.on.action('foo'), State())
+        with ctx(ctx.on.action('foo'), State()) as mgr:
+            mgr.run()
     assert exc_info.value.message == 'failed becozz'
-    assert ctx.action_results == {'my-res': res_value}
-    assert ctx.action_logs == ['log1', 'log2']
+    assert mgr.action_results == {'my-res': res_value}
+    assert mgr.action_logs == ['log1', 'log2']
 
 
 def test_action_continues_after_fail():
@@ -123,10 +125,11 @@ def test_action_continues_after_fail():
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
-        ctx.run(ctx.on.action('foo'), State())
+        with ctx(ctx.on.action('foo'), State()) as mgr:
+            mgr.run()
     assert exc_info.value.message == 'oh no!'
-    assert ctx.action_logs == ['starting']
-    assert ctx.action_results == {'initial': 'result', 'final': 'result'}
+    assert mgr.action_logs == ['starting']
+    assert mgr.action_results == {'initial': 'result', 'final': 'result'}
 
 
 def _ops_less_than(wanted_major, wanted_minor):
@@ -182,13 +185,32 @@ def test_two_actions_same_context():
             event.set_results({'bar': 'result'})
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}, 'bar': {}})
-    ctx.run(ctx.on.action('foo'), State())
-    assert ctx.action_results == {'foo': 'result'}
-    assert ctx.action_logs == ['foo']
+    with ctx(ctx.on.action('foo'), State()) as mgr:
+        mgr.run()
+    assert mgr.action_results == {'foo': 'result'}
+    assert mgr.action_logs == ['foo']
     # Not recommended, but run another action in the same context.
-    ctx.run(ctx.on.action('bar'), State())
-    assert ctx.action_results == {'bar': 'result'}
-    assert ctx.action_logs == ['bar']
+    with ctx(ctx.on.action('bar'), State()) as mgr:
+        mgr.run()
+    assert mgr.action_results == {'bar': 'result'}
+    assert mgr.action_logs == ['bar']
+
+
+def test_action_side_effect_from_context():
+    class MyCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            framework.observe(self.on.foo_action, self._on_foo_action)
+
+        def _on_foo_action(self, event):
+            event.log('foo')
+            event.set_results({'foo': 'result'})
+
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}, 'bar': {}})
+    ctx.run(ctx.on.action('foo'), State())
+    with pytest.warns(DeprecationWarning):
+        assert ctx.action_results == {'foo': 'result'}
+        assert ctx.action_logs == ['foo']
 
 
 def test_positional_arguments():

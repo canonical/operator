@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
+import warnings
 from contextlib import contextmanager
 from typing import (
     Generic,
@@ -67,9 +68,124 @@ class Manager(Generic[CharmType]):
     in a ``with`` statement instead, for example::
 
         ctx = Context(MyCharm)
-        with ctx(ctx.on.start(), State()) as manager:
-            manager.charm.setup()
-            manager.run()
+        with ctx(ctx.on.start(), State()) as mgr:
+            mgr.charm.setup()
+            mgr.run()
+            assert len(mgr.juju_log) > 0
+    """
+
+    juju_log: list[JujuLogLine]
+    """A record of what the charm has sent to juju-log."""
+
+    app_status_history: list[_EntityStatus]
+    """A record of the app statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the app
+    status history like so::
+
+        ctx = Context(MyCharm)
+        with ctx(ctx.on.start(), State()) as mgr:
+            state_out = mgr.run()
+            assert mgr.app_status_history == [
+                UnknownStatus(),
+                MaintenanceStatus('...'),
+            ]
+        assert state_out.app_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the app status history.
+    """
+
+    unit_status_history: list[_EntityStatus]
+    """A record of the unit statuses the charm has set.
+
+    Assert that the charm has followed the expected path by checking the unit
+    status history like so::
+
+        ctx = Context(MyCharm)
+        with ctx(ctx.on.start(), State()) as mgr:
+            state_out = mgr.run()
+            assert mgr.unit_status_history == [
+                UnknownStatus(),
+                MaintenanceStatus('...'),
+                WaitingStatus('...'),
+            ]
+        assert state_out.unit_status == ActiveStatus()
+
+    Note that the *current* status is **not** in the unit status history.
+
+    Also note that, unless you initialise the State with a preexisting status,
+    the first status in the history will always be ``unknown``.
+    """
+
+    exec_history: dict[str, list[ExecArgs]]
+    """A record of the exec calls made by the charm."""
+
+    workload_version_history: list[str]
+    """A record of the workload versions the charm has set.
+
+    Assert that the charm has set one or more workload versions during a hook
+    execution::
+
+        ctx = Context(MyCharm)
+        with ctx(ctx.on.start(), State()) as mgr:
+            assert mgr.workload_version_history == ['1', '1.2', '1.5']
+
+    Note that the *current* version is **not** in the version history.
+    """
+
+    removed_secret_revisions: list[int]
+    """A record of the secret revisions the charm has removed."""
+
+    emitted_events: list[ops.EventBase]
+    """A record of the events (including custom) that the charm has processed.
+
+    You can configure which events will be captured by passing the following
+    arguments to :class:`Context`:
+
+    -  `capture_deferred_events`: If you want to include re-emitted deferred events.
+    -  `capture_framework_events`: If you want to include Ops framework events.
+
+    For example::
+
+        def test_emitted():
+            ctx = Context(
+                MyCharm,
+                capture_deferred_events=True,
+                capture_framework_events=True,
+            )
+            deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
+            with ctx(ctx.on.start(), State(deferred=[deferred])) as mgr:
+                assert len(mgr.emitted_events) == 5
+                assert [e.handle.kind for e in mgr.emitted_events] == [
+                    'update_status',
+                    'start',
+                    'collect_unit_status',
+                    'pre_commit',
+                    'commit',
+                ]
+    """
+
+    requested_storages: dict[str, int]
+    """A record of the storages the charm has requested."""
+
+    trace_data: list[ReadableSpan]
+    """Trace data generated during the last run.
+
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
+    order of this list. Rather, tests could validate parent/child relationships or containment by
+    start and end timestamps.
+    """
+
+    action_logs: list[str]
+    """Logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`.
+
+    This will be empty when handling a non-action event.
+    """
+
+    action_results: dict[str, Any] | None
+    """A key-value mapping assigned by the charm as a result of the action.
+
+    This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
     """
 
     def __init__(
@@ -83,6 +199,19 @@ class Manager(Generic[CharmType]):
         self._state_in = state_in
 
         self._emitted: bool = False
+
+        # Streaming side effects from running an event.
+        self.juju_log = []
+        self.app_status_history = []
+        self.unit_status_history = []
+        self.exec_history = {}
+        self.workload_version_history = []
+        self.removed_secret_revisions = []
+        self.emitted_events = []
+        self.requested_storages = {}
+        self.trace_data = []
+        self.action_logs = []
+        self.action_results = None
 
         self.ops: Ops[CharmType] | None = None
 
@@ -431,21 +560,9 @@ class Context(Generic[CharmType]):
     ``Context`` is not cleaned up automatically between charm runs.
 
     Any side effects generated by executing the charm, that are not rightful part of the
-    ``State``, are in fact stored in the ``Context``:
-
-    - :attr:`juju_log`
-    - :attr:`app_status_history`
-    - :attr:`unit_status_history`
-    - :attr:`workload_version_history`
-    - :attr:`removed_secret_revisions`
-    - :attr:`requested_storages`
-    - :attr:`emitted_events`
-    - :attr:`action_logs`
-    - :attr:`action_results`
-    - :attr:`trace_data`
-
-    This allows you to write assertions not only on the output state, but also, to some
-    extent, on the path the charm took to get there.
+    ``State``, are available when using ``Context`` as a context manager. This allows you to write
+    assertions not only on the output state, but also, to some extent, on the path the charm took
+    to get there.
 
     A typical test will look like::
 
@@ -462,7 +579,7 @@ class Context(Generic[CharmType]):
             assert len(ctx.emitted_events) == 4
             assert isinstance(ctx.emitted_events[3], MyCustomEvent)
 
-    If you need access to the charm object that will handle the event, use the
+    If you need access to the charm object that will handle the event, or the side effects, use the
     class in a ``with`` statement, like::
 
         def test_foo():
@@ -483,107 +600,6 @@ class Context(Generic[CharmType]):
     unit_id: int
     """The unit ID that this charm is deployed to."""
 
-    juju_log: list[JujuLogLine]
-    """A record of what the charm has sent to juju-log"""
-    app_status_history: list[_EntityStatus]
-    """A record of the app statuses the charm has set.
-
-    Assert that the charm has followed the expected path by checking the app
-    status history like so::
-
-        ctx = Context(MyCharm)
-        state_out = ctx.run(ctx.on.start(), State())
-        assert ctx.app_status_history == [
-            UnknownStatus(),
-            MaintenanceStatus('...'),
-        ]
-        assert state_out.app_status == ActiveStatus()
-
-    Note that the *current* status is **not** in the app status history.
-    """
-    unit_status_history: list[_EntityStatus]
-    """A record of the unit statuses the charm has set.
-
-    Assert that the charm has followed the expected path by checking the unit
-    status history like so::
-
-        ctx = Context(MyCharm)
-        state_out = ctx.run(ctx.on.start(), State())
-        assert ctx.unit_status_history == [
-            UnknownStatus(),
-            MaintenanceStatus('...'),
-            WaitingStatus('...'),
-        ]
-        assert state_out.unit_status == ActiveStatus()
-
-    Note that the *current* status is **not** in the unit status history.
-
-    Also note that, unless you initialise the State with a preexisting status,
-    the first status in the history will always be ``unknown``.
-    """
-    workload_version_history: list[str]
-    """A record of the workload versions the charm has set.
-
-    Assert that the charm has set one or more workload versions during a hook
-    execution::
-
-        ctx = Context(MyCharm)
-        ctx.run(ctx.on.start(), State())
-        assert ctx.workload_version_history == ['1', '1.2', '1.5']
-
-    Note that the *current* version is **not** in the version history.
-    """
-    removed_secret_revisions: list[int]
-    """A record of the secret revisions the charm has removed"""
-    emitted_events: list[ops.EventBase]
-    """A record of the events (including custom) that the charm has processed.
-
-    You can configure which events will be captured by passing the following
-    arguments to ``Context``:
-
-    -  `capture_deferred_events`: If you want to include re-emitted deferred events.
-    -  `capture_framework_events`: If you want to include Ops framework events.
-
-    For example::
-
-        def test_emitted():
-            ctx = Context(
-                MyCharm,
-                capture_deferred_events=True,
-                capture_framework_events=True,
-            )
-            deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
-            ctx.run(ctx.on.start(), State(deferred=[deferred]))
-
-            assert len(ctx.emitted_events) == 5
-            assert [e.handle.kind for e in ctx.emitted_events] == [
-                'update_status',
-                'start',
-                'collect_unit_status',
-                'pre_commit',
-                'commit',
-            ]
-    """
-    requested_storages: dict[str, int]
-    """A record of the storages the charm has requested"""
-    trace_data: list[ReadableSpan]
-    """Trace data generated during the last run.
-
-    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
-    order of this list. Rather, tests could validate parent/child relationships or containment by
-    start and end timestamps.
-    """
-
-    action_logs: list[str]
-    """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
-
-    This will be empty when handling a non-action event.
-    """
-    action_results: dict[str, Any] | None
-    """A key-value mapping assigned by the charm as a result of the action.
-
-    This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
-    """
     charm_root: str | pathlib.Path | None
     """The charm root directory to use when executing the charm.
 
@@ -688,25 +704,171 @@ class Context(Generic[CharmType]):
         self.capture_framework_events = capture_framework_events
 
         # streaming side effects from running an event
-        self.juju_log: list[JujuLogLine] = []
-        self.app_status_history: list[_EntityStatus] = []
-        self.unit_status_history: list[_EntityStatus] = []
-        self.exec_history: dict[str, list[ExecArgs]] = {}
-        self.workload_version_history: list[str] = []
-        self.removed_secret_revisions: list[int] = []
-        self.emitted_events: list[ops.EventBase] = []
-        self.requested_storages: dict[str, int] = {}
-        self.trace_data = []
+        self._juju_log: list[JujuLogLine] = []
+        self._app_status_history: list[_EntityStatus] = []
+        self._unit_status_history: list[_EntityStatus] = []
+        self._exec_history: dict[str, list[ExecArgs]] = {}
+        self._workload_version_history: list[str] = []
+        self._removed_secret_revisions: list[int] = []
+        self._emitted_events: list[ops.EventBase] = []
+        self._requested_storages: dict[str, int] = {}
+        self._trace_data = []
 
         # set by Runtime.exec() in self._run()
         self._output_state: State | None = None
+        # set if we're being used to create a context manager (None otherwise)
+        self._manager: Manager[CharmType] | None = None
 
         # operations (and embedded tasks) from running actions
-        self.action_logs: list[str] = []
-        self.action_results: dict[str, Any] | None = None
+        self._action_logs: list[str] = []
+        self._action_results: dict[str, Any] | None = None
         self._action_failure_message: str | None = None
 
         self.on = CharmEvents()
+
+    def _deprecated_side_effect_access(self, attr: str):
+        warnings.warn(
+            f"Accessing '{attr}' on the Context object is deprecated. Use the Context as a "
+            f"context manager instead, with 'mgr.{attr}`",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return getattr(self, f'_{attr}')
+
+    @property
+    def juju_log(self) -> list[JujuLogLine]:
+        """A record of what the charm has sent to juju-log"""
+        return self._deprecated_side_effect_access('juju_log')
+
+    @property
+    def app_status_history(self) -> list[_EntityStatus]:
+        """A record of the app statuses the charm has set.
+
+        Assert that the charm has followed the expected path by checking the app
+        status history like so::
+
+            ctx = Context(MyCharm)
+            state_out = ctx.run(ctx.on.start(), State())
+            assert ctx.app_status_history == [
+                UnknownStatus(),
+                MaintenanceStatus('...'),
+            ]
+            assert state_out.app_status == ActiveStatus()
+
+        Note that the *current* status is **not** in the app status history.
+        """
+        return self._deprecated_side_effect_access('app_status_history')
+
+    @property
+    def unit_status_history(self) -> list[_EntityStatus]:
+        """A record of the unit statuses the charm has set.
+
+        Assert that the charm has followed the expected path by checking the unit
+        status history like so::
+
+            ctx = Context(MyCharm)
+            state_out = ctx.run(ctx.on.start(), State())
+            assert ctx.unit_status_history == [
+                UnknownStatus(),
+                MaintenanceStatus('...'),
+                WaitingStatus('...'),
+            ]
+            assert state_out.unit_status == ActiveStatus()
+
+        Note that the *current* status is **not** in the unit status history.
+
+        Also note that, unless you initialise the State with a preexisting status,
+        the first status in the history will always be ``unknown``.
+        """
+        return self._deprecated_side_effect_access('unit_status_history')
+
+    @property
+    def exec_history(self) -> dict[str, list[ExecArgs]]:
+        """A record of the exec calls made by the charm."""
+        return self._deprecated_side_effect_access('exec_history')
+
+    @property
+    def workload_version_history(self) -> list[str]:
+        """A record of the workload versions the charm has set.
+
+        Assert that the charm has set one or more workload versions during a hook
+        execution::
+
+            ctx = Context(MyCharm)
+            ctx.run(ctx.on.start(), State())
+            assert ctx.workload_version_history == ['1', '1.2', '1.5']
+
+        Note that the *current* version is **not** in the version history.
+        """
+        return self._deprecated_side_effect_access('workload_version_history')
+
+    @property
+    def removed_secret_revisions(self) -> list[int]:
+        """A record of the secret revisions the charm has removed"""
+        return self._deprecated_side_effect_access('removed_secret_revisions')
+
+    @property
+    def emitted_events(self) -> list[ops.EventBase]:
+        """A record of the events (including custom) that the charm has processed.
+
+        You can configure which events will be captured by passing the following
+        arguments to ``Context``:
+
+        -  `capture_deferred_events`: If you want to include re-emitted deferred events.
+        -  `capture_framework_events`: If you want to include Ops framework events.
+
+        For example::
+
+            def test_emitted():
+                ctx = Context(
+                    MyCharm,
+                    capture_deferred_events=True,
+                    capture_framework_events=True,
+                )
+                deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
+                ctx.run(ctx.on.start(), State(deferred=[deferred]))
+
+                assert len(ctx.emitted_events) == 5
+                assert [e.handle.kind for e in ctx.emitted_events] == [
+                    'update_status',
+                    'start',
+                    'collect_unit_status',
+                    'pre_commit',
+                    'commit',
+                ]
+        """
+        return self._deprecated_side_effect_access('emitted_events')
+
+    @property
+    def requested_storages(self) -> dict[str, int]:
+        """A record of the storages the charm has requested"""
+        return self._deprecated_side_effect_access('requested_storages')
+
+    @property
+    def trace_data(self) -> list[ReadableSpan]:
+        """Trace data generated during the last run.
+
+        Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on
+        the order of this list. Rather, tests could validate parent/child relationships or
+        containment by start and end timestamps.
+        """
+        return self._deprecated_side_effect_access('trace_data')
+
+    @property
+    def action_logs(self) -> list[str]:
+        """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
+
+        This will be empty when handling a non-action event.
+        """
+        return self._deprecated_side_effect_access('action_logs')
+
+    @property
+    def action_results(self) -> dict[str, Any] | None:
+        """A key-value mapping assigned by the charm as a result of the action.
+
+        This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
+        """
+        return self._deprecated_side_effect_access('action_results')
 
     def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
@@ -725,10 +887,15 @@ class Context(Generic[CharmType]):
 
     def _record_status(self, state: State, is_app: bool):
         """Record the previous status before a status change."""
+        # In the future, we will only store this on the manager.
         if is_app:
-            self.app_status_history.append(state.app_status)
+            self._app_status_history.append(state.app_status)
+            if self._manager is not None:
+                self._manager.app_status_history.append(state.app_status)
         else:
-            self.unit_status_history.append(state.unit_status)
+            self._unit_status_history.append(state.unit_status)
+            if self._manager is not None:
+                self._manager.unit_status_history.append(state.unit_status)
 
     def __call__(self, event: _Event, state: State) -> Manager[CharmType]:
         """Context manager to introspect live charm object before and after the event is emitted.
@@ -745,7 +912,9 @@ class Context(Generic[CharmType]):
             event: the event that the charm will respond to.
             state: the :class:`State` instance to use when handling the event.
         """
-        return Manager(self, event, state)
+        mgr = Manager(self, event, state)
+        self._manager = mgr
+        return mgr
 
     def run_action(self, action: str, state: State):
         """Use `run()` instead.
@@ -817,9 +986,9 @@ class Context(Generic[CharmType]):
         if event.action:
             # Reset the logs, failure status, and results, in case the context
             # is reused.
-            self.action_logs.clear()
-            if self.action_results is not None:
-                self.action_results.clear()
+            self._action_logs.clear()
+            if self._action_results is not None:
+                self._action_results.clear()
             self._action_failure_message = None
         with self._run(event=event, state=state) as ops:
             ops.run()
