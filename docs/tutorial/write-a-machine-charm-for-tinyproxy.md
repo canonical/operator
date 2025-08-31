@@ -270,6 +270,7 @@ class TinyproxyCharm(ops.CharmBase):
         try:
             config = self.load_config(TinyproxyConfig)
         except ValueError:
+            # The collect-status handler will run next and will set status for the user to see.
             return
         if not tinyproxy.is_installed():
             return
