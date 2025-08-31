@@ -72,10 +72,6 @@ A test consists of three broad steps:
     - verify that the output state is what you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
-.. note::
-    Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see :doc:`/explanation/testing`.
-
 
 ..
    _The list here is manually maintained, because the `automodule` directive
