@@ -176,10 +176,7 @@ TODO: Add commentary to this section.
 config:
   options:
     slug:
-      description: |
-        Configures the path of the reverse proxy.
-
-        Must match the regex [a-z0-9-]+
+      description: "Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"
       default: example
       type: string
 ```
@@ -192,7 +189,7 @@ class TinyproxyConfig:
     """Schema for the configuration of the tinyproxy charm."""
 
     slug: str = "example"
-    """Configures the path of the reverse proxy."""
+    """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
 
     def __post_init__(self):
         tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
@@ -222,7 +219,7 @@ class TinyproxyConfig:
     """Schema for the charm's config options."""
 
     slug: str = "example"
-    """Configures the path of the reverse proxy."""
+    """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
 
     def __post_init__(self):
         tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
