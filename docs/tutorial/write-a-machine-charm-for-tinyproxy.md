@@ -395,9 +395,17 @@ def test_slug_valid():
     tinyproxy.check_slug("example")  # No error raised.
 
 
-def test_slug_invalid():
+@pytest.mark.parametrize(
+    "slug",
+    [
+        "",
+        "foo_bar",
+        "foo/bar",
+    ],
+)
+def test_slug_invalid(slug: str):
     with pytest.raises(ValueError):
-        tinyproxy.check_slug("foo/bar")
+        tinyproxy.check_slug(slug)
 ```
 
 ### Write state-transition tests
