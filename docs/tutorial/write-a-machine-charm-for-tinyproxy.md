@@ -78,7 +78,7 @@ This has added the following Python packages to the `dependencies` list in `pypr
 
 TODO: Can we make these intersphinx links?
 
-Next, replace the contents of `src/tinyproxy.py` by:
+Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
 import logging
