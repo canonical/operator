@@ -415,22 +415,26 @@ TODO: Add commentary to this section.
 `tests/unit/test_charm.py`:
 
 ```python
-from dataclasses import dataclass
-
 import pytest
 from ops import testing
 
 from charm import PORT, TinyproxyCharm
 
 
-@dataclass
 class MockTinyproxy:
     """Mock object that represents tinyproxy."""
 
-    config: None | tuple[int, str] = None
-    installed: bool = False
-    reloaded_config: bool = False
-    running: bool = False
+    def __init__(
+        self,
+        config: None | tuple[int, str] = None,
+        installed: bool = False,
+        reloaded_config: bool = False,
+        running: bool = False,
+    ):
+        self.config = config
+        self.installed = installed
+        self.reloaded_config = reloaded_config
+        self.running = running
 
     def ensure_config(self, port: int, slug: str) -> bool:
         old_config = self.config
