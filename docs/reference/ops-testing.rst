@@ -6,6 +6,14 @@
 Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
 
+To learn how to test a particular feature, such as relations, see the relevant how-to guide.
+For example :doc:`/howto/manage-relations` > Test the feature.
+
+See also:
+
+- :doc:`/howto/write-unit-tests-for-a-charm`
+- :doc:`/explanation/testing` - A summary of types of charm tests
+
 State-transition tests, previously known as 'Scenario', expect you to define the
 Juju state all at once, define the Juju context against which to test the charm,
 and fire a single event on the charm to execute its logic. The tests can then
