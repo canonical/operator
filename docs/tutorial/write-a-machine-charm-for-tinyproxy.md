@@ -478,8 +478,9 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     # Act:
-    ctx.run(ctx.on.install(), testing.State())
+    state_out = ctx.run(ctx.on.install(), testing.State())
     # Assert:
+    assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
     assert tinyproxy.is_installed()
 
 
