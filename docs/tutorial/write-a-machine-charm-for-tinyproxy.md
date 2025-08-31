@@ -30,7 +30,7 @@ TODO: Charmcraft, Juju, LXD (all using Concierge)
 
 ### Install Python development tools
 
-TODO: tox, uv
+TODO: uv (as an extra snap from Concierge), tox (with `uv tool`)
 
 ## Create a charm project
 
