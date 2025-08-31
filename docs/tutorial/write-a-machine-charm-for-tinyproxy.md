@@ -163,7 +163,7 @@ Notice that the helper module is stateless. In fact, your charm as a whole will 
 3. Report the status back to Juju.
 
 ```{tip}
-After adding code to your charm, run `tox -e lint` to check the code against coding style standards and run static checks. If the code has formatting issues, you can use `tox -e format` to format the code.
+After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks.
 ```
 
 ### Define a configuration option
