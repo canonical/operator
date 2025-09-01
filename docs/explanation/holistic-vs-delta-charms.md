@@ -38,6 +38,63 @@ class MyCharm(ops.CharmBase):
             return
 ```
 
+```py
+def __init__(self, framework: ops.Framework):
+    super().__init__(framework)
+    self.workload = Workload()
+    self.foo = FooRequirer()
+    self.bar = BarProvider()
+
+    safe_juju_events = [self.on.start, self.on.foo_relation_changed, ...]
+
+    for event in safe_juju_events:
+        framework.observe(event, self._reconcile)
+
+def _reconcile(self, event: Any):
+    # Initial read
+    workload_ready = self.workload.is_ready
+    foo_ready = self.foo.is_ready
+    bar_ready = self.bar.is_ready
+    
+    if workload_ready and foo_ready and bar_ready:
+        # Read specifics from the libraries and the workload
+        foo_port = self.foo.service_port
+        bar_name = self.bar.remote_name
+        current_config = self.workload.config
+        workload_path = self.workload.special_path
+
+        # Render the outputs
+        config = self.render_config(foo_port, bar_name)
+
+        # Write to the libraries and the workload
+        if config != current_config:
+            self.workload.update_config_and_restart(config)
+        self.bar.update_foo_port(foo_port)
+        self.foo.update_bar_name(bar_name)
+
+        self.status = ops.ActiveStatus(f"Sering at {workload_path}")
+    elif not self.foo.relation:
+        self.status = ops.BlockedStatus("Foo relation is needed")
+    elif not foo_ready:
+        self.status = ops.WaitingStatus("Waiting for foo")
+    ...
+```
+
+### Charm library API for the reconciler pattern
+
+```py
+def __init__(self, charm: ops.CharmBase, relation_name: str):
+    super().__init__(charm, relation_name)
+    self._charm = charm
+    self._relation_name = relation_name
+
+@property
+def relations(self) -> list[ops.Relation]:
+    return self._charm.model.relations[self._relation_name]
+
+@property
+```
+
 
 ## When to use the holistic approach
 
