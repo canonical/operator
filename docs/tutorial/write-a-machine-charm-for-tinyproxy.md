@@ -395,17 +395,15 @@ def test_slug_valid():
     tinyproxy.check_slug("example")  # No error raised.
 
 
-@pytest.mark.parametrize(
-    "slug",
-    [
-        "",
-        "foo_bar",
-        "foo/bar",
-    ],
-)
-def test_slug_invalid(slug: str):
+# Define a reusable fixture that provides invalid slugs.
+@pytest.fixture(params=["", "foo_bar", "foo/bar"])
+def invalid_slug(request):
+    return request.param
+
+
+def test_slug_invalid(invalid_slug: str):
     with pytest.raises(ValueError):
-        tinyproxy.check_slug(slug)
+        tinyproxy.check_slug(invalid_slug)
 ```
 
 ### Write state-transition tests
@@ -513,33 +511,39 @@ def test_config_changed(monkeypatch: pytest.MonkeyPatch):
     assert tinyproxy.reloaded_config
 
 
-def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch):
+# Define a reusable fixture that provides invalid slugs.
+@pytest.fixture(params=["", "foo_bar", "foo/bar"])
+def invalid_slug(request):
+    return request.param
+
+
+def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_slug: str):
     """Test that the charm fails to start if the config is invalid."""
     tinyproxy = MockTinyproxy(installed=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State(config={"slug": "foo/bar"})  # Invalid value!
+    state_in = testing.State(config={"slug": invalid_slug})
 
     state_out = ctx.run(ctx.on.start(), state_in)
 
     assert state_out.unit_status == testing.BlockedStatus(
-        "Invalid slug: 'foo/bar'. Slug must match the regex [a-z0-9-]+"
+        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
     assert not tinyproxy.is_running()
     assert tinyproxy.config is None
 
 
-def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch):
+def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_slug: str):
     """Test that the charm fails to change config if the config is invalid."""
     tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State(config={"slug": "foo/bar"})  # Invalid value!
+    state_in = testing.State(config={"slug": invalid_slug})
 
     state_out = ctx.run(ctx.on.config_changed(), state_in)
 
     assert state_out.unit_status == testing.BlockedStatus(
-        "Invalid slug: 'foo/bar'. Slug must match the regex [a-z0-9-]+"
+        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
     assert tinyproxy.is_running()  # tinyproxy should still be running...
     assert tinyproxy.config == (PORT, "example")  # ...with the original config.
