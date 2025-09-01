@@ -14,10 +14,14 @@ See also:
 - :doc:`/howto/write-unit-tests-for-a-charm`
 - :doc:`/explanation/testing` - A summary of types of charm tests
 
-State-transition tests, also called 'unit' tests, expect you to define the
+State-transition tests expect you to define the
 Juju state all at once, define the Juju context against which to test the charm,
 and fire a single event on the charm to execute its logic. The tests can then
 assert that the Juju state has changed as expected.
+
+Unlike integration tests, state-transition tests do not deploy your charm with a real Juju
+controller and model. Instead, your charm code is run using the 'Scenario' testing framework.
+These are the primary form of unit tests that you should write for a charm.
 
 A very simple test, where the charm has no config, no relations, the unit
 is the leader, and has a `start` handler that sets the status to active might
@@ -38,8 +42,7 @@ how the state changes in reaction to events. They are not
 necessarily tests of individual methods or functions;
 they are testing the 'contract' of the charm: given
 a certain state, when a certain event happens, the charm should transition to
-another state. Unlike integration tests, they do not test using a real Juju
-controller and model, and focus on a single Juju unit.
+another state.
 
 Writing these tests should nudge you into thinking of a charm as a black-box
 'input to output' function. The inputs are:
