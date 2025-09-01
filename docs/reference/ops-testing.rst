@@ -7,7 +7,7 @@ Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
 
 To learn how to test a particular feature, such as relations, see the relevant how-to guide.
-For example :doc:`/howto/manage-relations` > Test the feature.
+For example, How to manage relations > :ref:`manage-relations-test-the-feature`.
 
 See also:
 
