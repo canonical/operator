@@ -280,6 +280,7 @@ def _on_db_relation_broken(self, event: ops.RelationBrokenEvent):
 
 > See more: [](ops.RelationBrokenEvent)
 
+(manage-relations-test-the-feature)=
 ## Test the feature
 
 ### Write unit tests
