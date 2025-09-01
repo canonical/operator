@@ -473,26 +473,26 @@ def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
 
 def test_install(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm correctly handles the install event."""
-    # Arrange:
+    # A state-transition test has three broad steps:
+    # Step 1. Arrange the input state.
     tinyproxy = MockTinyproxy()
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-    # Act:
+    # Step 2. Simulate an event, in this case an install event.
     state_out = ctx.run(ctx.on.install(), testing.State())
-    # Assert:
+    # Step 3. Verify the output state.
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
     assert tinyproxy.is_installed()
 
 
 def test_start(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm correctly handles the start event."""
-    # Arrange:
     tinyproxy = MockTinyproxy(installed=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-    # Act:
+
     state_out = ctx.run(ctx.on.start(), testing.State())
-    # Assert:
+
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy.is_running()
     assert tinyproxy.config == (PORT, "example")
@@ -500,14 +500,13 @@ def test_start(monkeypatch: pytest.MonkeyPatch):
 
 def test_config_changed(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm correctly handles the config-changed event."""
-    # Arrange:
     tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo"})
-    # Act:
+
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    # Assert:
+
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy.is_running()
     assert tinyproxy.config == (PORT, "foo")
@@ -516,14 +515,13 @@ def test_config_changed(monkeypatch: pytest.MonkeyPatch):
 
 def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm fails to start if the config is invalid."""
-    # Arrange:
     tinyproxy = MockTinyproxy(installed=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo/bar"})  # Invalid value!
-    # Act:
+
     state_out = ctx.run(ctx.on.start(), state_in)
-    # Assert:
+
     assert state_out.unit_status == testing.BlockedStatus(
         "Invalid slug: 'foo/bar'. Slug must match the regex [a-z0-9-]+"
     )
@@ -533,14 +531,13 @@ def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch):
 
 def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm fails to change config if the config is invalid."""
-    # Arrange:
     tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo/bar"})  # Invalid value!
-    # Act:
+
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    # Assert:
+
     assert state_out.unit_status == testing.BlockedStatus(
         "Invalid slug: 'foo/bar'. Slug must match the regex [a-z0-9-]+"
     )
@@ -551,13 +548,12 @@ def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch):
 
 def test_stop(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm correctly handles the stop event."""
-    # Arrange:
     tinyproxy = MockTinyproxy(installed=True)
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-    # Act:
+
     state_out = ctx.run(ctx.on.stop(), testing.State())
-    # Assert:
+
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
     assert not tinyproxy.is_running()
 ```
