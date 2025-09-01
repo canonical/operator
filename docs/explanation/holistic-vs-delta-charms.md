@@ -2,7 +2,7 @@
 # Holistic vs delta charms
 
 
-Charm developers have had many discussion about "holistic" charms compared to "delta" charms, and which approach is better. First, let's define those terms:
+Charm developers have had many discussions about "holistic" charms compared to "delta" charms, and which approach is better. First, let's define those terms:
 
 * A *delta-based* charm is when the charm handles each kind of Juju hook with a separate handler function, which does the minimum necessary to process that kind of event.
 * A *holistic* charm handles some or all Juju hooks using a common code path such as `_update_charm`, which queries the charm config and relation data and "rewrites the world", that is, rewrites application configuration and restarts necessary services.
@@ -45,12 +45,12 @@ If a charm is waiting for a collection of events, as in the example above, it ma
 
 In other words, when writing a charm, it's not so much "should the *charm* be holistic?" as "does it make sense for *these events* to be handled holistically?"
 
-Using the holistic approach is normally centred around configuring an application. Various events that affect configuration use a common handler, to simplify writing an application config file and restarting the application.  This is common for events like `config-changed`, `relation-changed`, `secret-changed`, and `pebble-ready`.
+Using the holistic approach is normally centered around configuring an application. Various events that affect configuration use a common handler, to simplify writing an application config file and restarting the application.  This is common for events like `config-changed`, `relation-changed`, `secret-changed`, and `pebble-ready`.
 
 Many existing charms use holistic event handling. A few examples are:
 
 - [`alertmanager-k8s` uses a `_common_exit_hook` method to unify several event handlers](https://github.com/canonical/alertmanager-k8s-operator/blob/561f1d8eb1dc6e4511c1c0b3cba444a3ec399464/src/charm.py#L390)
-- [`hello-kubecon` is a simple charm that handles `config-changed` and `pebble-cready` holistically](https://github.com/jnsgruk/hello-kubecon/blob/dbd133466dde59ee64f20a732a8f3d2e560ec3b8/src/charm.py#L32-L33)
+- [`hello-kubecon` is a simple charm that handles `config-changed` and `pebble-ready` holistically](https://github.com/jnsgruk/hello-kubecon/blob/dbd133466dde59ee64f20a732a8f3d2e560ec3b8/src/charm.py#L32-L33)
 - [`prometheus-k8s` uses a common `_configure` method to handle various events](https://github.com/canonical/prometheus-k8s-operator/blob/84c6a406ed585cdb7ba40e01a258864987d6f67f/src/charm.py#L221-L230)
 - [`sdcore-gnbsim-k8s` also uses a common `_configure` method](https://github.com/canonical/sdcore-gnbsim-k8s-operator/blob/ea2afe069346757b1eb6c02de5b4f50f90e81698/src/charm.py#L84-L92)
 
