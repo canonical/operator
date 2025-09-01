@@ -483,32 +483,45 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     assert tinyproxy.is_installed()
 
 
-def test_start(monkeypatch: pytest.MonkeyPatch):
-    """Test that the charm correctly handles the start event."""
+# For convenience, define a reusable fixture that provides a MockTinyproxy object
+# and patches the helper module in the charm.
+@pytest.fixture
+def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy(installed=True)
     patch_charm(monkeypatch, tinyproxy)
+    return tinyproxy
+
+
+def test_start(tinyproxy_installed: MockTinyproxy):
+    """Test that the charm correctly handles the start event."""
     ctx = testing.Context(TinyproxyCharm)
 
     state_out = ctx.run(ctx.on.start(), testing.State())
 
     assert state_out.unit_status == testing.ActiveStatus()
-    assert tinyproxy.is_running()
-    assert tinyproxy.config == (PORT, "example")
+    assert tinyproxy_installed.is_running()
+    assert tinyproxy_installed.config == (PORT, "example")
 
 
-def test_config_changed(monkeypatch: pytest.MonkeyPatch):
-    """Test that the charm correctly handles the config-changed event."""
+# Define another fixture, this time representing an installed, configured, and running tinyproxy.
+@pytest.fixture
+def tinyproxy_configured(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
     patch_charm(monkeypatch, tinyproxy)
+    return tinyproxy
+
+
+def test_config_changed(tinyproxy_configured: MockTinyproxy):
+    """Test that the charm correctly handles the config-changed event."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo"})
 
     state_out = ctx.run(ctx.on.config_changed(), state_in)
 
     assert state_out.unit_status == testing.ActiveStatus()
-    assert tinyproxy.is_running()
-    assert tinyproxy.config == (PORT, "foo")
-    assert tinyproxy.reloaded_config
+    assert tinyproxy_configured.is_running()
+    assert tinyproxy_configured.config == (PORT, "foo")
+    assert tinyproxy_configured.reloaded_config
 
 
 # Define a reusable fixture that provides invalid slugs.
@@ -517,10 +530,8 @@ def invalid_slug(request):
     return request.param
 
 
-def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_slug: str):
+def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: str):
     """Test that the charm fails to start if the config is invalid."""
-    tinyproxy = MockTinyproxy(installed=True)
-    patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
 
@@ -529,14 +540,12 @@ def test_start_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_slug: str
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
-    assert not tinyproxy.is_running()
-    assert tinyproxy.config is None
+    assert not tinyproxy_installed.is_running()
+    assert tinyproxy_installed.config is None
 
 
-def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_slug: str):
+def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, invalid_slug: str):
     """Test that the charm fails to change config if the config is invalid."""
-    tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
-    patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
 
@@ -545,21 +554,19 @@ def test_config_changed_invalid_config(monkeypatch: pytest.MonkeyPatch, invalid_
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
-    assert tinyproxy.is_running()  # tinyproxy should still be running...
-    assert tinyproxy.config == (PORT, "example")  # ...with the original config.
-    assert not tinyproxy.reloaded_config
+    assert tinyproxy_configured.is_running()  # tinyproxy should still be running...
+    assert tinyproxy_configured.config == (PORT, "example")  # ...with the original config.
+    assert not tinyproxy_configured.reloaded_config
 
 
-def test_stop(monkeypatch: pytest.MonkeyPatch):
+def test_stop(tinyproxy_installed: MockTinyproxy):
     """Test that the charm correctly handles the stop event."""
-    tinyproxy = MockTinyproxy(installed=True)
-    patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
 
     state_out = ctx.run(ctx.on.stop(), testing.State())
 
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
-    assert not tinyproxy.is_running()
+    assert not tinyproxy_installed.is_running()
 ```
 
 ### Run the tests
