@@ -74,7 +74,7 @@ A test consists of three broad steps:
     - verify that the output state is what you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
-This API for unit testing was previously called 'Scenario'.
+This API for testing was previously called 'Scenario'.
 
 
 ..
