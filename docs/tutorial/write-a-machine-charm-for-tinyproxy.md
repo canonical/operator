@@ -577,6 +577,10 @@ TODO: Add commentary to this section.
 tox -e unit
 ```
 
+## Write integration tests for your charm
+
+TODO
+
 ## Tear things down
 
 TODO:
