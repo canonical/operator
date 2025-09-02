@@ -594,4 +594,3 @@ TODO:
 - Links to more detail on the concepts covered in the tutorial.
 - Suggestions for real machine charms to look at.
 - Suggestions for what to learn next, e.g., learn about relations.
-- Challenge: Try modifying this tutorial charm to make the port configurable too.
