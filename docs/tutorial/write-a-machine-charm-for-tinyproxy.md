@@ -202,6 +202,7 @@ TODO: Split this section up, building the code in logical steps, with commentary
 ```python
 import dataclasses
 import logging
+import time
 
 import ops
 
@@ -275,9 +276,20 @@ class TinyproxyCharm(ops.CharmBase):
         changed = tinyproxy.ensure_config(PORT, config.slug)
         if not tinyproxy.is_running():
             tinyproxy.start()
+            self.wait_for_running()
         elif changed:
             logger.info("Config changed while tinyproxy is running. Updating tinyproxy config")
             tinyproxy.reload_config()
+
+    def wait_for_running(self) -> None:
+        """Wait for tinyproxy to be running."""
+        for _ in range(3):
+            if tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was not running within the expected time")
+        # Raising a runtime error will put the charm into error status. The error message is for
+        # you (the charm author) to see in the Juju logs, not for the user of the charm.
 
 
 if __name__ == "__main__":  # pragma: nocover
