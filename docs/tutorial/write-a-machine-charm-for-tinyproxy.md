@@ -253,17 +253,17 @@ class TinyproxyCharm(ops.CharmBase):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        self._configure_and_restart()
+        self.configure_and_restart()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config-changed event."""
-        self._configure_and_restart()
+        self.configure_and_restart()
 
     def _on_stop(self, event: ops.StopEvent) -> None:
         """Handle stop event."""
         tinyproxy.stop()
 
-    def _configure_and_restart(self) -> None:
+    def configure_and_restart(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
         try:
             config = self.load_config(TinyproxyConfig)
