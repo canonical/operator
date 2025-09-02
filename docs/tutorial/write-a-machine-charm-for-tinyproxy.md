@@ -135,7 +135,7 @@ def is_running() -> bool:
 
 def start() -> None:
     """Start tinyproxy."""
-    subprocess.run(["tinyproxy"], check=True)
+    subprocess.run(["tinyproxy"], capture_output=True, check=True)
 
 
 def stop() -> None:
