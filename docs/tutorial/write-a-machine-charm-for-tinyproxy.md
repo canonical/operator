@@ -148,9 +148,10 @@ def stop() -> None:
 def reload_config() -> None:
     """Ask tinyproxy to reload config."""
     pid = _get_pid()
-    if pid:
-        # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
-        os.kill(pid, signal.SIGUSR1)
+    if not pid:
+        raise RuntimeError("tinyproxy is not running")
+    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+    os.kill(pid, signal.SIGUSR1)
 
 
 def _get_pid() -> int | None:
