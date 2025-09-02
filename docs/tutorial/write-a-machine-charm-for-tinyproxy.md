@@ -118,11 +118,9 @@ ReversePath "/{slug}/" "http://www.example.com/"
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    try:
-        apt.add_package("tinyproxy-bin")
-    except apt.PackageError as e:
-        logger.error("Unable to install tinyproxy-bin. %s", e.message)
-        raise
+    apt.add_package("tinyproxy-bin")
+    # If this call fails, the charm will go into error status. The Juju logs will show the error:
+    # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
 
 
 def is_installed() -> bool:
