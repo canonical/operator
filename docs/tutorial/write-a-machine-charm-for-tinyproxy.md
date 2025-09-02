@@ -130,7 +130,7 @@ def is_installed() -> bool:
 
 def is_running() -> bool:
     """Return whether tinyproxy is running."""
-    return pathops.LocalPath(PID_FILE).exists()
+    return bool(_get_pid())
 
 
 def start() -> None:
@@ -140,18 +140,30 @@ def start() -> None:
 
 def stop() -> None:
     """Stop tinyproxy."""
-    os.kill(_get_pid(), signal.SIGTERM)
+    pid = _get_pid()
+    if pid:
+        os.kill(pid, signal.SIGTERM)
 
 
 def reload_config() -> None:
     """Ask tinyproxy to reload config."""
-    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
-    os.kill(_get_pid(), signal.SIGUSR1)
+    pid = _get_pid()
+    if pid:
+        # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+        os.kill(pid, signal.SIGUSR1)
 
 
-def _get_pid() -> int:
-    """Return the PID of tinyproxy."""
-    return int(pathops.LocalPath(PID_FILE).read_text())
+def _get_pid() -> int | None:
+    """Return the PID of the tinyproxy process, or None if the process can't be found."""
+    if not pathops.LocalPath(PID_FILE).exists():
+        return None
+    pid = int(pathops.LocalPath(PID_FILE).read_text())
+    # Check that we can send signals to the process.
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return None
+    return pid
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
@@ -263,6 +275,7 @@ class TinyproxyCharm(ops.CharmBase):
     def _on_stop(self, event: ops.StopEvent) -> None:
         """Handle stop event."""
         tinyproxy.stop()
+        self.wait_for_not_running()
 
     def configure_and_restart(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
@@ -290,6 +303,14 @@ class TinyproxyCharm(ops.CharmBase):
         raise RuntimeError("tinyproxy was not running within the expected time")
         # Raising a runtime error will put the charm into error status. The error message is for
         # you (the charm author) to see in the Juju logs, not for the user of the charm.
+
+    def wait_for_not_running(self) -> None:
+        """Wait for tinyproxy to not be running."""
+        for _ in range(3):
+            if not tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was still running after the expected time")
 
 
 if __name__ == "__main__":  # pragma: nocover
