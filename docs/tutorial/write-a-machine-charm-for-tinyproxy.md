@@ -507,9 +507,11 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy()
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
+
     # Step 2. Simulate an event, in this case an install event.
     state_out = ctx.run(ctx.on.install(), testing.State())
-    # Step 3. Verify the output state.
+
+    # Step 3. Check the output state.
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
     assert tinyproxy.is_installed()
 
