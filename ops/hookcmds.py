@@ -16,7 +16,7 @@
 
 Charm authors should use the :class:`ops.Model` (via ``self.model``) rather than
 directly running the hook commands, where possible. This module is primarily
-provided to assist with developing charming alternatives to the Ops framework.
+provided to help with developing charming alternatives to the Ops framework.
 
 All methods are 1:1 mapping to Juju hook commands. This is a *low-level* API,
 available for charm use, but expected to be used via higher-level wrappers.
