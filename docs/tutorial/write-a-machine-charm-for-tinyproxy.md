@@ -118,8 +118,6 @@ ReversePath "/{slug}/" "http://www.example.com/"
 def get_version() -> str:
     """Get the version of tinyproxy that is installed."""
     result = subprocess.run(["tinyproxy", "-v"], check=True, capture_output=True, text=True)
-    if not result.stdout:
-        raise RuntimeError("tinyproxy didn't provide any version information")
     return result.stdout.removeprefix("tinyproxy").strip()
 
 
