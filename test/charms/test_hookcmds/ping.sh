@@ -1,3 +1,3 @@
 #! /usr/bin/bash
 
-echo "Going!"
+echo "Pong!"

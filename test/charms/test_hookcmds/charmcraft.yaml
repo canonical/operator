@@ -65,9 +65,9 @@ peers:
     interface: chit-chat
 
 resources:
-  gosh:
+  ping:
     type: file
-    filename: ./go.sh
+    filename: ./ping.sh
 
 storage:
   cache:
