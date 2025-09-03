@@ -51,7 +51,7 @@ from typing import (
     overload,
 )
 
-from ._private import yaml
+from ._private import yaml as _yaml
 
 
 class HookCommandError(Exception):
@@ -703,9 +703,9 @@ def relation_set(
     if file is not None:
         data = dict(data)
         with open(file) as f:
-            data.update(yaml.safe_load(f))
+            data.update(_yaml.safe_load(f))
     args.extend(['--file', '-'])
-    content = yaml.safe_dump(data)
+    content = _yaml.safe_dump(data)
     _run(*args, input_stream=content)
 
 
