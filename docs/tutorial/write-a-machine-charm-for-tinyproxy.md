@@ -115,6 +115,14 @@ ReversePath "/{slug}/" "http://www.example.com/"
     return pathops.ensure_contents(CONFIG_FILE, config)
 
 
+def get_version() -> str:
+    """Get the version of tinyproxy that is installed."""
+    result = subprocess.run(["tinyproxy", "-v"], check=True, capture_output=True, text=True)
+    if not result.stdout:
+        raise RuntimeError("tinyproxy didn't provide any version information")
+    return result.stdout.removeprefix("tinyproxy").strip()
+
+
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
@@ -135,7 +143,7 @@ def is_running() -> bool:
 
 def start() -> None:
     """Start tinyproxy."""
-    subprocess.run(["tinyproxy"], capture_output=True, check=True)
+    subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
 
 
 def stop() -> None:
@@ -264,6 +272,8 @@ class TinyproxyCharm(ops.CharmBase):
         """Install tinyproxy on the machine."""
         if not tinyproxy.is_installed():
             tinyproxy.install()
+            version = tinyproxy.get_version()
+            self.unit.set_workload_version(version)
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
@@ -357,7 +367,7 @@ Model    Controller     Cloud/Region         Version  SLA          Timestamp
 testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:00:38+08:00
 
 App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
-tinyproxy           active      1  tinyproxy             0  no
+tinyproxy  1.11.0   active      1  tinyproxy             0  no
 
 Unit          Workload  Agent  Machine  Public address  Ports  Message
 tinyproxy/0*  active    idle   0        10.71.67.208
@@ -471,6 +481,9 @@ class MockTinyproxy:
         self.config = (port, slug)
         return self.config != old_config
 
+    def get_version(self) -> str:
+        return "1.11.0"
+
     def install(self) -> None:
         self.installed = True
 
@@ -493,6 +506,7 @@ class MockTinyproxy:
 def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
     """Patch the helper module to use mock functions for interacting with tinyproxy."""
     monkeypatch.setattr("charm.tinyproxy.ensure_config", tinyproxy.ensure_config)
+    monkeypatch.setattr("charm.tinyproxy.get_version", tinyproxy.get_version)
     monkeypatch.setattr("charm.tinyproxy.install", tinyproxy.install)
     monkeypatch.setattr("charm.tinyproxy.is_installed", tinyproxy.is_installed)
     monkeypatch.setattr("charm.tinyproxy.is_running", tinyproxy.is_running)
@@ -513,6 +527,7 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     state_out = ctx.run(ctx.on.install(), testing.State())
 
     # Step 3. Check the output state.
+    assert state_out.workload_version is not None
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
     assert tinyproxy.is_installed()
 
