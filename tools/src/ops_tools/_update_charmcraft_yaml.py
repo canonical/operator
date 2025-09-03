@@ -104,7 +104,7 @@ def main():
     parser.add_argument(
         '--config',
         action='append',
-        help='Python class with config classes (can be specified multiple times). '
+        help='Python class with optional module path (can be specified multiple times). '
         'For example, "src.config:Config". The module defaults to "src.charm".'
         'The class may be a regular expression.',
         default=[],
@@ -112,7 +112,7 @@ def main():
     parser.add_argument(
         '--action',
         action='append',
-        help='Python class with action classes (can be specified multiple times). '
+        help='Python class with optional module path (can be specified multiple times). '
         'For example, "src.backup:BackupAction". The module defaults to "src.charm".'
         'The class may be a regular expression.',
         default=[],
