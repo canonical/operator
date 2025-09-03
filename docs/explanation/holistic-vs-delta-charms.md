@@ -182,4 +182,4 @@ This is very closely related to [which events can be deferred](#how-and-when-to-
 
 On the other hand, if an event cannot be deferred, the charm cannot handle it holistically. This applies to action "events", `stop`, `remove`, `secret-expired`, `secret-rotate`, and Ops-emitted events such as `collect-status`.
 
-FIXME: since the doc is part of explaination, should I explain briefly why each class of events doesn't belong to the reconciler?
+FIXME: since the doc is part of explanation, should I explain briefly why each class of events doesn't belong to the reconciler?
