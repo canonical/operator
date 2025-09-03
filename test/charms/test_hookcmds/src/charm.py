@@ -35,7 +35,7 @@ class HookcmdsTester(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
         try:
             credentials = hookcmds.credential_get()
-        except hookcmds.HookCommandError:
+        except hookcmds.Error:
             hookcmds.juju_log("No credentials available (probably no trust, or K8s)")
         else:
             hookcmds.juju_log(f"Credentials: name={credentials.name}, type={credentials.type}")

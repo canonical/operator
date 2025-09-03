@@ -54,7 +54,7 @@ from typing import (
 from ._private import yaml as _yaml
 
 
-class HookCommandError(Exception):
+class Error(Exception):
     """Raised when a hook command exits with a non-zero code."""
 
     returncode: int
@@ -301,9 +301,7 @@ def _run(
     try:
         result = subprocess.run(args, **kwargs)  # type: ignore
     except subprocess.CalledProcessError as e:
-        raise HookCommandError(
-            returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr
-        ) from None
+        raise Error(returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr) from None
     if not return_output:
         return
     if result.stdout is None:  # type: ignore
