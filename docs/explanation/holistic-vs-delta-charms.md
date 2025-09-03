@@ -2,10 +2,10 @@
 # Holistic vs delta charms
 
 
-Charm developers have had many discussions about "holistic" charms compared to "delta" charms, and which approach is better. First, let's define those terms:
+Charm developers have had many discussions about "holistic", or "reconciler" charms compared to "delta" charms, and which approach is better. First, let's define those terms:
 
 * A *delta-based* charm is when the charm handles each kind of Juju hook with a separate handler function, which does the minimum necessary to process that kind of event.
-* A *holistic* charm handles some or all Juju hooks using a common code path such as `_update_charm`, which queries the charm config and relation data and "rewrites the world", that is, rewrites application configuration and restarts necessary services.
+* A *holistic* charm handles some or all Juju hooks using a common code path such as `_reconcile`, which queries the charm config and relation data and "rewrites the world", that is, rewrites application configuration and restarts necessary services.
 
 Juju itself nudges charm authors in the direction of delta-based charms, because it provides specific event kinds that signal that one "thing" changed: `config-changed` says that a config value changed, `relation-changed` says that relation data has changed, `pebble-ready` signals that the Pebble container is ready, and so on.
 
@@ -38,6 +38,24 @@ class MyCharm(ops.CharmBase):
             return
 ```
 
+The reconciler setup attaches the same observer, `self._reconcile` to every interesting Juju event:
+- lifecycle start events
+- config change event
+- all relation events
+- pebble events
+- storage events, if applicable
+
+Some events are special, and are better processed outside the reconciler pattern:
+- custom events, unless required by a library API
+- lifecycle end events [link TBD]
+- action events
+- secret rotation events
+- Ops events, like `update-unit-status`
+
+FIXME: this is part of the explanation doc, should I explain why these event groups specifically are excluded? Here in the doc, or link out to series of Charmhub Discourse posts?
+
+The reconciler typically consists of three main parts in addition to early checks and error handling: reading the inputs (workload and Juju state), computing the updates, writing the output (updating the workload and writing out the Juju state). It's recommended to have helper methods or classes for the workload and to use charm libraries to read and write Juju state on charm's relations. The code may look like this:
+
 ```py
 def __init__(self, framework: ops.Framework):
     super().__init__(framework)
@@ -45,9 +63,9 @@ def __init__(self, framework: ops.Framework):
     self.foo = FooRequirer()
     self.bar = BarProvider()
 
-    safe_juju_events = [self.on.start, self.on.foo_relation_changed, ...]
+    fixm_juju_events = [self.on.start, self.on.foo_relation_changed, ...]
 
-    for event in safe_juju_events:
+    for event in fixm_juju_events:
         framework.observe(event, self._reconcile)
 
 def _reconcile(self, event: Any):
@@ -72,13 +90,54 @@ def _reconcile(self, event: Any):
         self.bar.update_foo_port(foo_port)
         self.foo.update_bar_name(bar_name)
 
-        self.status = ops.ActiveStatus(f"Sering at {workload_path}")
-    elif not self.foo.relation:
-        self.status = ops.BlockedStatus("Foo relation is needed")
-    elif not foo_ready:
-        self.status = ops.WaitingStatus("Waiting for foo")
-    ...
+    else:
+        ...
 ```
+
+Expert reconcilers
+
+Reconcilliation happens towards a certain goal state. For many charms, and for most of the charm's lifecycle, the goal state is the same: a running workload with correct configuration. Sometimes, the goal state may change:
+- unit lifecycle end (example TBD)
+- failover to another unit (example TBD)
+
+FIXME: a link to charmlibs "dual API libraries"
+
+FIXME: a note about sub-reconcilers
+
+FIXME: collecting status
+
+---
+
+For contrast, a delta charm may look like this:
+
+```py
+def __init__(self, framework: ops.Framework):
+    super().__init__(framework)
+    self.framework.observe(self.on.start, self._on_start)
+    self.framework.observe(self.on.install, self._on_install)
+
+    hostname = socket.getfqdn()
+    self.foo = FooRequires(self, "foo-relation", address=hostname)
+    self.framework.observe(self.foo.on.data_available, self._on_data_available)
+
+    self.bar = BarProvider(self, "bar-relation")
+    self.framework.observe(self.bar.on.create_bar, self._on_create_bar)
+
+def _on_start(self, event: ops.StartEvent):
+    # This unit has been started
+
+def _on_install(self, event: ops.InstallEvent):
+    # Install the workload binary
+
+def _on_data_available(self, event: DataAvailableEvent):
+    # Compte the delta vs. old data, apply to workload
+
+def _on_create_bar(self, CreateBarEvent):
+    # A related app has requested a logical bar.
+```
+
+<!--
+FIXME: this belongs to charmlibs/docs/how-to
 
 ### Charm library API for the reconciler pattern
 
@@ -94,6 +153,7 @@ def relations(self) -> list[ops.Relation]:
 
 @property
 ```
+-->
 
 
 ## When to use the holistic approach
@@ -121,3 +181,5 @@ Similarly, events like `secret-expired` and `secret-rotate` don't make sense to 
 This is very closely related to [which events can be deferred](#how-and-when-to-defer-events). A good rule of thumb is this: if an event can be deferred, it may make sense to handle it holistically.
 
 On the other hand, if an event cannot be deferred, the charm cannot handle it holistically. This applies to action "events", `stop`, `remove`, `secret-expired`, `secret-rotate`, and Ops-emitted events such as `collect-status`.
+
+FIXME: since the doc is part of explaination, should I explain briefly why each class of events doesn't belong to the reconciler?
