@@ -156,13 +156,14 @@ def main():
         help='Path to a clone of canonical/charmcraft',
     )
     args = parser.parse_args()
-    path_to_ops = pathlib.Path(__file__).parent.parent.parent.parent
-    for directory, base_url, make_ref in (
-        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/', make_ops_ref),
+    path_to_ops = pathlib.Path(__file__).parent.parent
+    for directory, base_url, make_ref, ref_sub in (
+        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/', make_ops_ref, None),
         (
             args.path_to_charmcraft / 'docs',
             'https://documentation.ubuntu.com/charmcraft/stable/',
             make_charmcraft_ref,
+            '{external+charmcraft:ref}',
         ),
     ):
         for file_path in directory.rglob('*'):
@@ -189,6 +190,8 @@ def main():
                 ref = make_ref(heading, ref) if ref and heading else ref
                 see_more = f' See {ref}.' if heading and ref else ''
                 practice = re.sub(r'\s+', ' ', practice).strip()
+                if ref_sub:
+                    practice = re.sub(r':ref:', ref_sub, practice)
                 print(f'- {practice}{see_more}')
             if len(practices):
                 print()
