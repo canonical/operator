@@ -40,5 +40,6 @@ def charm():
     if not charm_paths:
         raise FileNotFoundError("No .charm file in current directory")
     if len(charm_paths) > 1:
-        raise ValueError("More than one .charm file in current directory")
+        path_list = ", ".join(str(path) for path in charm_paths)
+        raise ValueError(f"More than one .charm file in current directory: {path_list}")
     return charm_paths[0]
