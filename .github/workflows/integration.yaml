@@ -16,13 +16,13 @@ jobs:
       matrix:
         preset: ['k8s', 'microk8s']
         test:
-          - 'test_direct_connection'
-          - 'test_with_tls'
-          - 'test_relation_units'
-          - 'test_hookcmds_action'
-          - 'test_hookcmds_application_version'
-          - 'test_hookcmds_ports'
-          - 'test_hookcmds_config'
+          - test_direct_connection
+          - test_with_tls
+          - test_relation_units
+          - test_hookcmds_action
+          - test_hookcmds_application_version
+          - test_hookcmds_ports
+          - test_hookcmds_config
 
     steps:
       - run: |
