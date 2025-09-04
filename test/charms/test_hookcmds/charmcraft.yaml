@@ -1,0 +1,76 @@
+type: charm
+name: hookcmds
+title: Test charm for ops.hookcmds
+summary: Simple charm with enough functionality to exercise all of ops.hookcmds.
+description: |
+  A simple charm that contains secrets, storage, actions, and so forth so that
+  the ops.hookcmds module can be tested against it in a real Juju model.
+
+base: ubuntu@22.04
+platforms:
+  amd64:
+  arm64:
+
+parts:
+  charm:
+    plugin: charm
+    source: .
+    build-snaps:
+      - astral-uv
+
+config:
+  options:
+    log-level:
+      description: Configures the log level.
+      default: "info"
+      type: string
+    another-option:
+      description: Another option for the charm.
+      type: int
+
+actions:
+  backup:
+    description: Pretend to back up data for the charm.
+    params:
+      backup-location:
+        description: Location to pretend to back up data to.
+        type: string
+        default: "/var/lib/juju/backup"
+      days:
+        description: Number of days to pretend to back up.
+        type: int
+  open-port:
+    description: Ask Juju to open a port.
+    params:
+      protocol:
+        description: The protocol to use (e.g., tcp, udp).
+        type: string
+      port:
+        description: The port to open.
+        type: int
+  close-port:
+    description: Ask Juju to close a port.
+    params:
+      protocol:
+        description: The protocol to use (e.g., tcp, udp).
+        type: string
+      port:
+        description: The port to close.
+        type: int
+  opened-ports:
+    description: List opened ports.
+
+peers:
+  peer:
+    interface: chit-chat
+
+resources:
+  gosh:
+    type: file
+    filename: ./go.sh
+
+storage:
+  cache:
+    type: filesystem
+    description: A place to stash stuff.
+    multiple: 1-3
