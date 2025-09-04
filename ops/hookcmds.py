@@ -501,7 +501,9 @@ def is_leader() -> bool:
     return cast('bool', leader)
 
 
-def juju_log(message: str, level: str = 'INFO'):
+def juju_log(
+    message: str, *, level: Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
+):
     """Write a message to the juju log."""
     _run('juju-log', '--log-level', level, message)
 
