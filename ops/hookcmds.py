@@ -871,7 +871,7 @@ def secret_set(
         args.extend(['--owner', owner])
     args.append(id)
 
-    # Always use the --file argument to provide the content to avoid secret data
+    # Always use "key#file" arguments to provide the content to avoid secret data
     # ending up in the command line, where it may be logged and also is visible
     # via /proc.
     with tempfile.TemporaryDirectory() as tmp:
