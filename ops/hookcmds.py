@@ -714,7 +714,6 @@ def relation_set(
     id: int | None = None,
     *,
     app: bool = False,
-    file: pathlib.Path | None = None,
 ):
     """Set relation settings.
 
@@ -727,10 +726,6 @@ def relation_set(
         args.append('--app')
     if id is not None:
         args.extend(['-r', str(id)])
-    if file is not None:
-        data = dict(data)
-        with open(file) as f:
-            data.update(_yaml.safe_load(f))
     args.extend(['--file', '-'])
     content = _yaml.safe_dump(data)
     _run(*args, input_stream=content)
