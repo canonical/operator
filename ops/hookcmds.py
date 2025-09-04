@@ -601,6 +601,12 @@ def opened_ports(endpoints: bool = False) -> list[Port]:
         args.append('--endpoints')
     output = cast('list[str]', _run(*args, return_output=True, use_json=True))
     ports: list[Port] = []
+    # Each port from Juju will look like one of these:
+    # 'icmp'
+    # '80/tcp' or '42/udp' (where the port could be any port number)
+    # '80' (where this could be any port number)
+    # '8000-8999/tcp' or '8000-8999/udp' (where the two numbers can be any ports)
+    # '8000-8999' (where these could be any port number)
     for port in output:
         if '/' in port:
             port, protocol = port.split('/', 1)
@@ -616,6 +622,9 @@ def opened_ports(endpoints: bool = False) -> list[Port]:
             port = None
         else:
             port = int(port)
+        # This will be the case unless we get back an invalid port from Juju.
+        # The assert helps type checkers know that the protocol literal will be
+        # correct.
         assert protocol in ('tcp', 'udp', 'icmp')
         ports.append(Port(protocol=protocol, port=port, to_port=to_port))
     return ports
