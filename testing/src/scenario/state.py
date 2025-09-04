@@ -397,6 +397,8 @@ class Secret(_max_posargs(1)):
         object.__setattr__(self, '_tracked_revision', self._latest_revision)
         object.__setattr__(self, 'tracked_content', self.latest_content)
 
+    # FIXME what if a secret doesn't have a label,
+    # how do we update Scenario state then?
     def _update_metadata(
         self,
         content: RawSecretRevisionContents | None = None,
@@ -407,8 +409,8 @@ class Secret(_max_posargs(1)):
     ):
         """Update the metadata."""
         # bypass frozen dataclass
-        object.__setattr__(self, '_latest_revision', self._latest_revision + 1)
         if content:
+            object.__setattr__(self, '_latest_revision', self._latest_revision + 1)
             object.__setattr__(self, 'latest_content', content)
         if label:
             object.__setattr__(self, 'label', label)

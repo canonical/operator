@@ -1029,12 +1029,7 @@ class SecretEvent(HookEvent):
         until :meth:`Secret.get_content()` is called.
         """
         backend = self.framework.model._backend
-        return model.Secret(
-            backend=backend,
-            id=self._id,
-            label=self._label,
-            _secret_set_cache=self.framework.model._cache._secret_set_cache,
-        )
+        return model.Secret(backend=backend, id=self._id, label=self._label)
 
     def snapshot(self) -> dict[str, Any]:
         """Used by the framework to serialize the event to disk.
@@ -1565,11 +1560,7 @@ class CharmBase(Object):
             # same way that SecretEvent.secret is.
             if option_type and option_type.type == 'secret':
                 assert isinstance(value, str)  # Juju will have made sure of this.
-                value = model.Secret(
-                    backend=self.model._backend,
-                    id=value,
-                    _secret_set_cache=self.model._cache._secret_set_cache,
-                )
+                value = model.Secret(backend=self.model._backend, id=value)
             config[attr] = value
         try:
             return cls(*args, **config)

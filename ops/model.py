@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import collections
 import contextlib
 import contextvars
 import copy
@@ -301,11 +300,6 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
-        The content of the secret is retrieved, so calls to
-        :meth:`Secret.get_content` do not require querying the secret storage
-        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
-        has been called.
-
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
 
@@ -313,23 +307,32 @@ class Model:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
 
-        Raises:
-            SecretNotFoundError: If a secret with this ID or label doesn't exist.
-            ModelError: if the charm does not have permission to access the
-                secret.
+        .. versionchanged:: 3.3.0
+          ``get_secret()`` no longer fetches the secret content. Call
+          ``get_content()`` explicitly.
         """
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
-        content = self._backend.secret_get(id=id, label=label)
+        # FIXME
+        # There are two ways to attach a local label to a secret:
+        #
+        # secret-get $id --label AAA
+        # Note that labels cannot be reused:
+        #   the above command succeeds, returns content, but doesn't set the label
+        # or
+        # secret-set $id --label AAA
+        # Note that labels cannot be reused:
+        #   the above command errors out and doesn't set the label
+        #
+        # A secret starts with an empty label, and there can be many secrets like that.
+        # Once a label has been set, it can be changed, but never erased.
         return Secret(
             self._backend,
             id=id,
             label=label,
-            content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
         )
 
     def get_cloud_spec(self) -> CloudSpec:
@@ -353,9 +356,6 @@ class _ModelCache:
     def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend):
         self._meta = meta
         self._backend = backend
-        self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
-            collections.defaultdict(dict)
-        )
         # (entity type, name): instance.
         self._weakrefs: weakref.WeakValueDictionary[
             tuple[UnitOrApplicationType, str], Unit | Application | None
@@ -541,13 +541,7 @@ class Application:
             rotate=rotate,
             owner='application',
         )
-        return Secret(
-            self._backend,
-            id=id,
-            label=label,
-            content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
-        )
+        return Secret(self._backend, id=id, label=label)
 
 
 def _calculate_expiry(
@@ -733,13 +727,7 @@ class Unit:
             rotate=rotate,
             owner='unit',
         )
-        return Secret(
-            self._backend,
-            id=id,
-            label=label,
-            content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
-        )
+        return Secret(self._backend, id=id, label=label)
 
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
@@ -1331,7 +1319,6 @@ class Secret:
         id: str | None = None,
         label: str | None = None,
         content: dict[str, str] | None = None,
-        _secret_set_cache: collections.defaultdict[str, dict[str, Any]] | None = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1340,10 +1327,8 @@ class Secret:
         self._backend = backend
         self._id = id
         self._label = label
-        self._content = content
-        self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
-            collections.defaultdict(dict) if _secret_set_cache is None else _secret_set_cache
-        )
+        if content is not None:
+            warnings.warn('Secret(content=???) is deprecated', DeprecationWarning, stacklevel=2)
 
     def __repr__(self):
         fields: list[str] = []
@@ -1480,10 +1465,6 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> dict[str, str]:
         """Get the secret's content.
 
-        The content of the secret is cached on the :class:`Secret` object, so
-        subsequent calls do not require querying the secret storage again,
-        unless ``refresh=True`` is used, or :meth:`set_content` is called.
-
         Returns:
             A copy of the secret's content dictionary.
 
@@ -1496,10 +1477,12 @@ class Secret:
             SecretNotFoundError: if the secret no longer exists.
             ModelError: if the charm does not have permission to access the
                 secret.
+
+        .. versionchanged:: 3.3.0
+          Secret content is no longer cached in Ops. Each ``get_content()`` call
+          queries the secret storage again.
         """
-        if refresh or self._content is None:
-            self._content = self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
-        return self._content.copy()
+        return self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
 
     def peek_content(self) -> dict[str, str]:
         """Get the content of the latest revision of this secret.
@@ -1549,25 +1532,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
 
-        # If `_backend.secret_set` has already been called, this call will
-        # overwrite anything done in the previous call (even if it was in a
-        # different event handler, as long as it was in the same Juju hook
-        # context). We want to provide more predictable behavior, so we cache
-        # the values and provide them in subsequent calls.
-        cached_data = self._secret_set_cache[self._id]
-        expire = _calculate_expiry(cached_data['expire']) if 'expire' in cached_data else None
-        # Don't store the actual secret content in memory, but put a sentinel
-        # there to indicate that the content has been set during this hook.
-        cached_data['content'] = object()
-
-        self._backend.secret_set(
-            typing.cast('str', self.id),
-            content=content,
-            label=cached_data.get('label'),
-            description=cached_data.get('description'),
-            expire=expire,
-            rotate=cached_data.get('rotate'),
-        )
+        self._backend.secret_set_content(typing.cast('str', self.id), content=content)
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1602,28 +1567,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
 
-        # If `_backend.secret_set` has already been called, this call will
-        # overwrite anything done in the previous call (even if it was in a
-        # different event handler, as long as it was in the same Juju hook
-        # context). We want to provide more predictable behavior, so we cache
-        # the values and provide them in subsequent calls.
-        cached_data = self._secret_set_cache[self._id]
-        label = cached_data.get('label') if label is None else label
-        cached_data['label'] = label
-        description = cached_data.get('description') if description is None else description
-        cached_data['description'] = description
-        expire = cached_data.get('expire') if expire is None else expire
-        cached_data['expire'] = expire
-        rotate = cached_data.get('rotate') if rotate is None else rotate
-        cached_data['rotate'] = rotate
-        # Get the previous content from the unit agent's cache.
-        content = (
-            self._backend.secret_get(id=self._id, peek=True) if 'content' in cached_data else None
-        )
-
-        self._backend.secret_set(
+        self._backend.secret_set_metadata(
             typing.cast('str', self.id),
-            content=content,
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
@@ -4096,11 +4041,10 @@ class _ModelBackend:
             id, typing.cast('dict[str, Any]', info_dicts[id]), model_uuid=self.model_uuid
         )
 
-    def secret_set(
+    def secret_set_metadata(
         self,
         id: str,
         *,
-        content: dict[str, str] | None = None,
         label: str | None = None,
         description: str | None = None,
         expire: datetime.datetime | None = None,
@@ -4115,6 +4059,10 @@ class _ModelBackend:
             args.extend(['--expire', expire.isoformat()])
         if rotate is not None:
             args.extend(['--rotate', rotate.value])
+        self._run_for_secret('secret-set', *args)
+
+    def secret_set_content(self, id: str, *, content: dict[str, str] | None = None):
+        args = [id]
 
         with tempfile.TemporaryDirectory() as tmp:
             # The content is None or has already been validated with Secret._validate_content
