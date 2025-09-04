@@ -1975,10 +1975,6 @@ class _CharmSpec(Generic[CharmType]):
             # try to load using legacy metadata.yaml/actions.yaml/config.yaml files
             meta, config, actions = _CharmSpec._load_metadata_legacy(charm_root)
 
-        # TODO: ideally, we would look for ConfigBase classes in the charm
-        # module and autoload from there at this point. Leaving this until the
-        # conversation about if & how the generation is done is resolved.
-
         if not meta:
             # still no metadata? bug out
             raise MetadataNotFoundError(
