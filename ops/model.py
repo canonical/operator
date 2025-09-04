@@ -335,8 +335,9 @@ class Model:
     def get_cloud_spec(self) -> CloudSpec:
         """Get details of the cloud in which the model is deployed.
 
-        Note: This information is only available for machine charms,
-        not Kubernetes sidecar charms.
+        Since Juju 3.6.10, this information is available on both machine
+        charms and Kubernetes charms. With earlier Juju versions, it was only
+        available on machine charms.
 
         Returns:
             a specification for the cloud in which the model is deployed,
