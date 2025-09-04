@@ -655,7 +655,7 @@ def open_port(
     _run(*args)
 
 
-def opened_ports(endpoints: bool = False) -> list[Port]:
+def opened_ports(*, endpoints: bool = False) -> list[Port]:
     """List all ports or port ranges opened by the unit.
 
     Args:
