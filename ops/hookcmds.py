@@ -256,7 +256,7 @@ class Goal:
     def _from_dict(cls, d: _GoalDict) -> Goal:
         return cls(
             status=d['status'],
-            since=datetime.datetime.fromisoformat(d['since']),
+            since=_datetime_from_iso(d['since']),
         )
 
 
@@ -358,11 +358,9 @@ class SecretInfo:
             id=id,
             label=data.get('label'),
             description=data.get('description'),
-            expiry=datetime.datetime.fromisoformat(data['expiry']) if data.get('expiry') else None,
+            expiry=_datetime_from_iso(data['expiry']) if data.get('expiry') else None,
             rotation=SecretRotate(data['rotation']) if data.get('rotation') else None,
-            rotates=datetime.datetime.fromisoformat(data['rotates'])
-            if data.get('rotates')
-            else None,
+            rotates=_datetime_from_iso(data['rotates']) if data.get('rotates') else None,
             revision=data['revision'],
         )
 
@@ -494,6 +492,12 @@ def _format_action_result_dict(
             output_[key] = value
 
     return output_
+
+
+def _datetime_from_iso(dt: str) -> datetime.datetime:
+    """Converts a Juju-specific ISO 8601 string to a datetime object."""
+    # Older versions of Python cannot handle the 'Z'.
+    return datetime.datetime.fromisoformat(dt.replace('Z', '+00:00'))
 
 
 def action_fail(message: str | None = None):
