@@ -443,6 +443,22 @@ def application_version_set(version: str):
     _run('application-version-set', version)
 
 
+@overload
+def close_port(
+    protocol: str,
+    port: int | None = None,
+    *,
+    to_port: int | None = None,
+    endpoints: str | Iterable[str],
+) -> None: ...
+@overload
+def close_port(
+    protocol: str | None,
+    port: int,
+    *,
+    to_port: int | None = None,
+    endpoints: str | Iterable[str],
+) -> None: ...
 def close_port(
     protocol: str | None = None,
     port: int | None = None,
@@ -620,6 +636,22 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
     return Network(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 
+@overload
+def open_port(
+    protocol: str,
+    port: int | None = None,
+    *,
+    to_port: int | None = None,
+    endpoints: str | Iterable[str],
+) -> None: ...
+@overload
+def open_port(
+    protocol: str | None,
+    port: int,
+    *,
+    to_port: int | None = None,
+    endpoints: str | Iterable[str],
+) -> None: ...
 def open_port(
     protocol: str | None = None,
     port: int | None = None,
