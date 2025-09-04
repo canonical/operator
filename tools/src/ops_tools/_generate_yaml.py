@@ -85,9 +85,8 @@ def attr_to_default(cls: type[object], name: str) -> object:
         return getattr(cls, name, None)
     default = None
     for field in dataclasses.fields(cls):
-        if field.name != name:
-            continue
-        break
+        if field.name == name:
+            break
     else:
         return default
 
