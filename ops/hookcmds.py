@@ -806,7 +806,7 @@ def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
     """Grant access to a secret."""
     args = ['secret-grant', '--relation', str(relation_id)]
     if unit is not None:
-        args += ['--unit', str(unit)]
+        args.extend(['--unit', str(unit)])
     args.append(id)
     _run(*args)
 
