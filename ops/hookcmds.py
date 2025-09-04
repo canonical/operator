@@ -41,6 +41,7 @@ import tempfile
 import uuid
 from typing import (
     Any,
+    Iterable,
     Literal,
     Mapping,
     MutableMapping,
@@ -185,13 +186,22 @@ class Network:
     ingress_addresses: Sequence[ipaddress.IPv4Address | ipaddress.IPv6Address]
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
+# Note that this cannot have kw_only=True, because it existed (in model.py) in
+# earlier versions of Ops that worked with Python versions that did support
+# that feature. We cannot require keyword arguments now without breaking
+# backwards compatibility.
+@dataclasses.dataclass(frozen=True)
 class Port:
     """A port that Juju has opened for the charm."""
 
     protocol: Literal['tcp', 'udp', 'icmp'] | None
+    """The IP protocol."""
+
     port: int | None
+    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
+
     to_port: int | None
+    """The final port number if this is a range of ports."""
 
 
 class _RelationModelDict(TypedDict):
@@ -411,7 +421,7 @@ def close_port(
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | list[str],
+    endpoints: str | Iterable[str],
 ):
     """Register a request to close a port or port range."""
     args = ['close-port']
@@ -505,6 +515,14 @@ def juju_reboot(now: bool = False):
     _run('juju-reboot')
 
 
+# model.py has this comment:
+# > fields marked as network addresses need not be IPs; they could be
+# > hostnames that juju failed to resolve.
+# Is this still true? It doesn't seem to make sense, because if they could be a
+# hostname, then why don't we have a str possibility where they do resolve.
+# If it is true, we perhaps should wrap all the conversions to ipaddr.
+
+
 # We could have bind_address: bool=True, egress_subnets: bool=True,
 # --ingress-address: bool=True, and could even return just that data if only one
 # is specified. However, it seems like it's unlikely there would be a lot of data
@@ -553,7 +571,7 @@ def open_port(
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | list[str],
+    endpoints: str | Iterable[str],
 ):
     """Register a request to open a port or port range."""
     args = ['open-port']

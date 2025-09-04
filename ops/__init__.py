@@ -136,6 +136,7 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredState',
     'StoredStateData',
     # From hookcmds.py
+    'Port',
     'StatusName',
     # From jujuversion.py
     'JujuVersion',
@@ -163,7 +164,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'Network',
     'NetworkInterface',
     'OpenedPort',
-    'Port',
     'Pod',
     'Relation',
     'RelationData',
@@ -284,7 +284,7 @@ from .framework import (
     StoredStateData,
 )
 
-from .hookcmds import StatusName
+from .hookcmds import Port, StatusName
 
 from .jujuversion import JujuVersion
 
@@ -313,7 +313,6 @@ from .model import (
     NetworkInterface,
     OpenedPort,
     Pod,
-    Port,
     Relation,
     RelationData,
     RelationDataAccessError,
