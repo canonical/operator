@@ -136,6 +136,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredState',
     'StoredStateData',
     # From hookcmds.py
+    'CloudCredential',
+    'CloudSpec',
     'Port',
     'StatusName',
     # From jujuversion.py
@@ -147,8 +149,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'BindingMapping',
     'BlockedStatus',
     'CheckInfoMapping',
-    'CloudCredential',
-    'CloudSpec',
     'ConfigData',
     'Container',
     'ContainerMapping',
@@ -284,7 +284,7 @@ from .framework import (
     StoredStateData,
 )
 
-from .hookcmds import Port, StatusName
+from .hookcmds import CloudCredential, CloudSpec, Port, StatusName
 
 from .jujuversion import JujuVersion
 
@@ -295,8 +295,6 @@ from .model import (
     BindingMapping,
     BlockedStatus,
     CheckInfoMapping,
-    CloudCredential,
-    CloudSpec,
     ConfigData,
     Container,
     ContainerMapping,

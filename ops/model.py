@@ -61,7 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .hookcmds import Port, SecretRotate
+from .hookcmds import CloudSpec, Port, SecretRotate
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -4338,85 +4338,3 @@ class LazyCheckInfo:
         if self._info is not None:
             return
         self._info = self._container.get_check(self.name)
-
-
-@dataclasses.dataclass(frozen=True)
-class CloudCredential:
-    """Credentials for cloud.
-
-    Used as the type of attribute `credential` in :class:`CloudSpec`.
-    """
-
-    auth_type: str
-    """Authentication type."""
-
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
-    """A dictionary containing cloud credentials.
-
-    For example, for AWS, it contains `access-key` and `secret-key`;
-    for Azure, `application-id`, `application-password` and `subscription-id`
-    can be found here.
-    """
-
-    redacted: list[str] = dataclasses.field(default_factory=list[str])
-    """A list of redacted secrets."""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
-        """Create a new CloudCredential object from a dictionary."""
-        return cls(
-            auth_type=d['auth-type'],
-            attributes=d.get('attrs') or {},
-            redacted=d.get('redacted') or [],
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class CloudSpec:
-    """Cloud specification information (metadata) including credentials."""
-
-    type: str
-    """Type of the cloud."""
-
-    name: str
-    """Juju cloud name."""
-
-    region: str | None = None
-    """Region of the cloud."""
-
-    endpoint: str | None = None
-    """Endpoint of the cloud."""
-
-    identity_endpoint: str | None = None
-    """Identity endpoint of the cloud."""
-
-    storage_endpoint: str | None = None
-    """Storage endpoint of the cloud."""
-
-    credential: CloudCredential | None = None
-    """Cloud credentials with key-value attributes."""
-
-    ca_certificates: list[str] = dataclasses.field(default_factory=list[str])
-    """A list of CA certificates."""
-
-    skip_tls_verify: bool = False
-    """Whether to skip TLS verification."""
-
-    is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudSpec:
-        """Create a new CloudSpec object from a dict parsed from JSON."""
-        return cls(
-            type=d['type'],
-            name=d['name'],
-            region=d.get('region') or None,
-            endpoint=d.get('endpoint') or None,
-            identity_endpoint=d.get('identity-endpoint') or None,
-            storage_endpoint=d.get('storage-endpoint') or None,
-            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
-            ca_certificates=d.get('cacertificates') or [],
-            skip_tls_verify=d.get('skip-tls-verify') or False,
-            is_controller_cloud=d.get('is-controller-cloud') or False,
-        )
