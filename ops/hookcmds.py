@@ -108,6 +108,14 @@ class Address:
     value: ipaddress.IPv4Address | ipaddress.IPv6Address
     cidr: ipaddress.IPv4Network | ipaddress.IPv6Network
 
+    @classmethod
+    def _from_dict(cls, d: _AddressDict) -> Address:
+        return cls(
+            hostname=d['hostname'],
+            value=ipaddress.ip_address(d['value']),
+            cidr=ipaddress.ip_network(d['cidr']),
+        )
+
 
 _BindAddressDict = TypedDict(
     '_BindAddressDict',
@@ -122,6 +130,17 @@ class BindAddress:
     mac_address: str
     interface_name: str
     addresses: list[Address] = dataclasses.field(default_factory=list[Address])
+
+    @classmethod
+    def _from_dict(cls, d: _BindAddressDict) -> BindAddress:
+        addresses = [
+            Address._from_dict(cast('_AddressDict', addr)) for addr in d.get('addresses', [])
+        ]
+        return cls(
+            mac_address=d['mac-address'],
+            interface_name=d['interface-name'],
+            addresses=addresses,
+        )
 
 
 # Note that this cannot have kw_only=True, because it existed (in model.py) in
@@ -149,6 +168,7 @@ class CloudCredential:
     redacted: list[str] = dataclasses.field(default_factory=list[str])
     """A list of redacted secrets."""
 
+    # Note that this is public because it was public in model.py.
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
@@ -197,6 +217,7 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller, defaults to False."""
 
+    # Note that this is public because it was public in model.py.
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudSpec:
         """Create a new CloudSpec object from a dict parsed from JSON."""
@@ -231,6 +252,13 @@ class Goal:
     status: str
     since: datetime.datetime
 
+    @classmethod
+    def _from_dict(cls, d: _GoalDict) -> Goal:
+        return cls(
+            status=d['status'],
+            since=datetime.datetime.fromisoformat(d['since']),
+        )
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class GoalState:
@@ -240,6 +268,19 @@ class GoalState:
     # The top key is the endpoint/relation name, the second key is the app/unit name.
     relations: dict[str, dict[str, Goal]]
 
+    @classmethod
+    def _from_dict(cls, d: _GoalStateDict) -> GoalState:
+        units: dict[str, Goal] = {
+            name: Goal._from_dict(unit) for name, unit in d.get('units', {}).items()
+        }
+        relations: dict[str, dict[str, Goal]] = {}
+        for name, relation in d.get('relations', {}).items():
+            goals: dict[str, Goal] = {
+                app_or_unit: Goal._from_dict(data) for app_or_unit, data in relation.items()
+            }
+            relations[name] = goals
+        return cls(units=units, relations=relations)
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class Network:
@@ -248,6 +289,16 @@ class Network:
     bind_addresses: Sequence[BindAddress]
     egress_subnets: Sequence[ipaddress.IPv4Network | ipaddress.IPv6Network]
     ingress_addresses: Sequence[ipaddress.IPv4Address | ipaddress.IPv6Address]
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> Network:
+        bind: list[BindAddress] = [
+            BindAddress._from_dict(bind_data)
+            for bind_data in cast('list[_BindAddressDict]', d['bind-addresses'])
+        ]
+        egress = [ipaddress.ip_network(addr) for addr in d.get('egress-subnets', [])]
+        ingress = [ipaddress.ip_address(addr) for addr in d.get('ingress-addresses', [])]
+        return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 
 # Note that this cannot have kw_only=True, because it existed (in model.py) in
@@ -281,6 +332,12 @@ class RelationModel:
 
     uuid: uuid.UUID
 
+    @classmethod
+    def _from_dict(cls, d: _RelationModelDict) -> RelationModel:
+        return cls(
+            uuid=uuid.UUID(d['uuid']),
+        )
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class SecretInfo:
@@ -294,6 +351,21 @@ class SecretInfo:
     rotation: SecretRotate | None = None
     rotates: datetime.datetime | None = None
 
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> SecretInfo:
+        id, data = next(iter(d.items()))  # Juju returns dict of {secret_id: {info}}
+        return cls(
+            id=id,
+            label=data.get('label'),
+            description=data.get('description'),
+            expiry=datetime.datetime.fromisoformat(data['expiry']) if data.get('expiry') else None,
+            rotation=SecretRotate(data['rotation']) if data.get('rotation') else None,
+            rotates=datetime.datetime.fromisoformat(data['rotates'])
+            if data.get('rotates')
+            else None,
+            revision=data['revision'],
+        )
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class Storage:
@@ -301,6 +373,13 @@ class Storage:
 
     kind: str
     location: pathlib.Path
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> Storage:
+        return cls(
+            kind=d['kind'],
+            location=pathlib.Path(d['location']),
+        )
 
 
 _UnitStatusDict = TypedDict(
@@ -325,6 +404,14 @@ class UnitStatus:
     message: str = ''
     status_data: dict[str, Any]
 
+    @classmethod
+    def _from_dict(cls, d: _UnitStatusDict) -> UnitStatus:
+        return cls(
+            status=d['status'],
+            message=d['message'],
+            status_data=d['status-data'],
+        )
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class AppStatus:
@@ -334,6 +421,16 @@ class AppStatus:
     message: str = ''
     status_data: dict[str, Any]
     units: dict[str, UnitStatus]
+
+    @classmethod
+    def _from_dict(cls, d: _AppStatusDict) -> AppStatus:
+        units = {name: UnitStatus._from_dict(u) for name, u in d.get('units', {}).items()}
+        return cls(
+            status=d['status'],
+            message=d['message'],
+            status_data=d['status-data'],
+            units=units,
+        )
 
 
 def _run(
@@ -549,25 +646,13 @@ def config_get(
 def credential_get() -> CloudSpec:
     """Access cloud credentials."""
     result = json.loads(_run('credential-get', '--format=json'))
-    # TODO: This needs to properly create any CloudCredential objects.
-    return CloudSpec(**cast('dict[str, Any]', result))
+    return CloudSpec.from_dict(cast('dict[str, Any]', result))
 
 
 def goal_state() -> GoalState:
     """Print the status of the charm's peers and related units."""
     result = cast('_GoalStateDict', json.loads(_run('goal-state', '--format=json')))
-    units: dict[str, Goal] = {}
-    for name, unit in result.get('units', {}).items():
-        since = datetime.datetime.fromisoformat(unit['since'])
-        units[name] = Goal(since=since, status=unit['status'])
-    relations: dict[str, dict[str, Goal]] = {}
-    for name, relation in result.get('relations', {}).items():
-        goals: dict[str, Goal] = {}
-        for app_or_unit, data in relation.items():
-            since = datetime.datetime.fromisoformat(data['since'])
-            goals[app_or_unit] = Goal(since=since, status=data['status'])
-        relations[name] = goals
-    return GoalState(units=units, relations=relations)
+    return GoalState._from_dict(result)
 
 
 def is_leader() -> bool:
@@ -631,29 +716,7 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
     result = cast('dict[str, Any]', json.loads(_run(*args, '--format=json')))
-    bind: list[BindAddress] = []
-    for bind_data in cast('list[_BindAddressDict]', result['bind-addresses']):
-        raw_bind_addresses = [
-            cast('_AddressDict', addr) for addr in bind_data.get('addresses', [])
-        ]
-        bind_addresses = [
-            Address(
-                hostname=addr['hostname'],
-                value=ipaddress.ip_address(addr['value']),
-                cidr=ipaddress.ip_network(addr['cidr']),
-            )
-            for addr in raw_bind_addresses
-        ]
-        bind.append(
-            BindAddress(
-                mac_address=bind_data['mac-address'],
-                interface_name=bind_data['interface-name'],
-                addresses=bind_addresses,
-            )
-        )
-    egress = [ipaddress.ip_network(addr) for addr in result.get('egress-subnets', [])]
-    ingress = [ipaddress.ip_address(addr) for addr in result.get('ingress-addresses', [])]
-    return Network(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
+    return Network._from_dict(result)
 
 
 @overload
@@ -849,8 +912,7 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     args = ['relation-model-get', '--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
-    result = cast('_RelationModelDict', json.loads(_run(*args)))
-    return RelationModel(uuid=uuid.UUID(result['uuid']))
+    return RelationModel._from_dict(cast('_RelationModelDict', json.loads(_run(*args))))
 
 
 def relation_set(
@@ -1020,17 +1082,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
         args.append(id)
     elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
         args.extend(['--label', label])
-    info_dicts = cast('dict[str, Any]', json.loads(_run(*args)))
-    id, data = next(iter(info_dicts.items()))  # Juju returns dict of {secret_id: {info}}
-    return SecretInfo(
-        id=id,
-        label=data.get('label'),
-        description=data.get('description'),
-        expiry=datetime.datetime.fromisoformat(data['expiry']) if data.get('expiry') else None,
-        rotation=SecretRotate(data['rotation']) if data.get('rotation') else None,
-        rotates=datetime.datetime.fromisoformat(data['rotates']) if data.get('rotates') else None,
-        revision=data['revision'],
-    )
+    return SecretInfo._from_dict(cast('dict[str, Any]', json.loads(_run(*args))))
 
 
 def secret_remove(id: str, *, revision: int | None = None):
@@ -1175,24 +1227,8 @@ def status_get(*, include_data: bool = False, app: bool = False) -> AppStatus | 
     result = json.loads(_run(*args))
     if app:
         app_status = cast('_AppStatusDict', result['application-status'])
-        units = {
-            name: UnitStatus(
-                status=u['status'], message=u['message'], status_data=u['status-data']
-            )
-            for name, u in app_status.get('units', {}).items()
-        }
-        return AppStatus(
-            status=app_status['status'],
-            message=app_status['message'],
-            status_data=app_status['status-data'],
-            units=units,
-        )
-    unit_status = cast('_UnitStatusDict', result)
-    return UnitStatus(
-        status=unit_status['status'],
-        message=unit_status['message'],
-        status_data=unit_status['status-data'],
-    )
+        return AppStatus._from_dict(app_status)
+    return UnitStatus._from_dict(cast('_UnitStatusDict', result))
 
 
 def status_set(status: SettableStatusName, message: str = '', *, app: bool = False):
@@ -1243,7 +1279,7 @@ def storage_get(identifier: str | None = None, attribute: str | None = None) -> 
     result = json.loads(_run(*args))
     if attribute is not None:
         return cast('str', result)
-    return Storage(kind=result['kind'], location=pathlib.Path(result['location']))
+    return Storage._from_dict(result)
 
 
 def storage_list(name: str | None = None) -> list[str]:

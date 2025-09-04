@@ -38,7 +38,7 @@ actions:
         default: "/var/lib/juju/backup"
       days:
         description: Number of days to pretend to back up.
-        type: int
+        type: integer
   open-port:
     description: Ask Juju to open a port.
     params:
@@ -47,7 +47,7 @@ actions:
         type: string
       port:
         description: The port to open.
-        type: int
+        type: integer
   close-port:
     description: Ask Juju to close a port.
     params:
@@ -56,7 +56,7 @@ actions:
         type: string
       port:
         description: The port to close.
-        type: int
+        type: integer
   opened-ports:
     description: List opened ports.
 
@@ -67,10 +67,11 @@ peers:
 resources:
   ping:
     type: file
-    filename: ./ping.sh
+    filename: ping.sh
 
 storage:
   cache:
     type: filesystem
     description: A place to stash stuff.
-    multiple: 1-3
+    multiple:
+        range: 1-3
