@@ -430,7 +430,7 @@ def close_port(
             endpoints = [endpoints]
         args.extend(['--endpoints', ','.join(endpoints)])
     if protocol is None and port is None:
-        raise ValueError('Either protocol or port must be specified')
+        raise TypeError('Either protocol or port must be specified')
     if port is None:
         assert protocol is not None
         args.append(protocol)
@@ -580,7 +580,7 @@ def open_port(
             endpoints = [endpoints]
         args.extend(['--endpoints', ','.join(endpoints)])
     if protocol is None and port is None:
-        raise ValueError('Either protocol or port must be specified')
+        raise TypeError('Either protocol or port must be specified')
     if port is None:
         assert protocol is not None
         args.append(protocol)
