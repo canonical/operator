@@ -34,7 +34,6 @@ import enum
 import ipaddress
 import json
 import pathlib
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -337,57 +336,17 @@ class AppStatus:
     units: dict[str, UnitStatus]
 
 
-@overload
 def _run(
     *args: str,
-    return_output: Literal[True],
-    use_json: Literal[False] = False,
-    input_stream: str | None = None,
-) -> str: ...
-@overload
-def _run(
-    *args: str,
-    return_output: Literal[True],
-    use_json: Literal[True] = True,
-    input_stream: str | None = None,
-) -> Any: ...
-@overload
-def _run(
-    *args: str,
-    return_output: Literal[False] = False,
-    input_stream: str | None = None,
-) -> None: ...
-def _run(
-    *args: str,
-    return_output: bool = False,
-    use_json: bool = False,
-    input_stream: str | None = None,
-) -> str | Any | None:
-    kwargs = {
-        'capture_output': True,
-        'check': True,
-        'encoding': 'utf-8',
-    }
-    if input_stream:
-        kwargs.update({'input': input_stream})
-    which_cmd = shutil.which(args[0])
-    if which_cmd is None:
-        raise RuntimeError(f'command not found: {args[0]}')
-    args = (which_cmd,) + args[1:]
-    if use_json:
-        args += ('--format=json',)
+    input: str | None = None,
+) -> str:
     try:
-        result = subprocess.run(args, **kwargs)  # type: ignore
+        result = subprocess.run(
+            args, capture_output=True, check=True, encoding='utf-8', input=input
+        )
     except subprocess.CalledProcessError as e:
         raise Error(returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr) from None
-    if not return_output:
-        return
-    if result.stdout is None:  # type: ignore
-        return ''
-    text: str = result.stdout  # type: ignore
-    if use_json:
-        return json.loads(text)  # type: ignore
-    return text  # type: ignore
+    return result.stdout
 
 
 def _format_action_result_dict(
@@ -468,10 +427,10 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
         key: The key of the action parameter to retrieve. If not provided, all
             parameters will be returned.
     """
-    args = ['action-get']
+    args = ['action-get', '--format=json']
     if key is not None:
         args.append(key)
-    out = _run(*args, return_output=True, use_json=True)
+    out = json.loads(_run(*args))
     return cast('dict[str, Any]', out) if key is None else cast('str', out)
 
 
@@ -537,8 +496,6 @@ def close_port(
         if isinstance(endpoints, str):
             endpoints = [endpoints]
         args.extend(['--endpoints', ','.join(endpoints)])
-    if protocol is None and port is None:
-        raise TypeError('Either protocol or port must be specified')
     if port is None:
         assert protocol is not None
         args.append(protocol)
@@ -578,14 +535,12 @@ def config_get(
             return all config settings that are explicitly set or have a non-nil
             default.
     """
-    args = ['config-get']
-    if key is not None and all:
-        raise ValueError("Cannot specify both 'key' and 'all'")
+    args = ['config-get', '--format=json']
     if all:
         args.append('--all')
     if key:
         args.append(key)
-    out = _run(*args, return_output=True, use_json=True)
+    out = json.loads(_run(*args))
     if key:
         return cast('bool | int | float | str', out)
     return cast('dict[str, bool | int | float | str]', out)
@@ -593,15 +548,14 @@ def config_get(
 
 def credential_get() -> CloudSpec:
     """Access cloud credentials."""
-    result = _run('credential-get', return_output=True, use_json=True)
+    result = json.loads(_run('credential-get', '--format=json'))
     # TODO: This needs to properly create any CloudCredential objects.
     return CloudSpec(**cast('dict[str, Any]', result))
 
 
 def goal_state() -> GoalState:
     """Print the status of the charm's peers and related units."""
-    result = _run('goal-state', return_output=True, use_json=True)
-    result = cast('_GoalStateDict', result)
+    result = cast('_GoalStateDict', json.loads(_run('goal-state', '--format=json')))
     units: dict[str, Goal] = {}
     for name, unit in result.get('units', {}).items():
         since = datetime.datetime.fromisoformat(unit['since'])
@@ -622,7 +576,7 @@ def is_leader() -> bool:
     The value is not cached. It is accurate for 30s from the time the method is
     successfully called.
     """
-    leader = _run('is-leader', return_output=True, use_json=True)
+    leader = json.loads(_run('is-leader', '--format=json'))
     return cast('bool', leader)
 
 
@@ -676,7 +630,7 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
     if relation_id is not None:
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
-    result = cast('dict[str, Any]', _run(*args, return_output=True, use_json=True))
+    result = cast('dict[str, Any]', json.loads(_run(*args, '--format=json')))
     bind: list[BindAddress] = []
     for bind_data in cast('list[_BindAddressDict]', result['bind-addresses']):
         raw_bind_addresses = [
@@ -764,7 +718,7 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     args = ['opened-ports']
     if endpoints:
         args.append('--endpoints')
-    output = cast('list[str]', _run(*args, return_output=True, use_json=True))
+    output = cast('list[str]', json.loads(_run(*args, '--format=json')))
     ports: list[Port] = []
     # Each port from Juju will look like one of these:
     # 'icmp'
@@ -837,7 +791,7 @@ def relation_get(
         key: The specific key to get data for, or ``None`` to get all data.
         unit: The unit to get data for, or ``None`` to get data for all units.
     """
-    args = ['relation-get']
+    args = ['relation-get', '--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
     if app:
@@ -846,7 +800,7 @@ def relation_get(
         args.append(key)
     if unit is not None:
         args.append(unit)
-    result = _run(*args, return_output=True, use_json=True)
+    result = json.loads(_run(*args))
     if key is not None:
         return cast('str', result)
     return cast('dict[str, str]', result)
@@ -858,8 +812,7 @@ def relation_ids(name: str) -> list[str]:
     Args:
         name: the endpoint name.
     """
-    result = _run('relation-ids', name, return_output=True, use_json=True)
-    return cast('list[str]', result)
+    return cast('list[str]', json.loads(_run('relation-ids', name, '--format=json')))
 
 
 def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
@@ -874,13 +827,12 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
             for the relation that triggered the current hook.
         app: List remote application instead of participating units.
     """
-    args = ['relation-list']
+    args = ['relation-list', '--format=json']
     if app:
         args.append('--app')
     if id is not None:
         args.extend(['-r', str(id)])
-    result = _run(*args, return_output=True, use_json=True)
-    return cast('list[str]', result)
+    return cast('list[str]', json.loads(_run(*args)))
 
 
 def relation_model_get(id: int | None = None) -> RelationModel:
@@ -894,10 +846,10 @@ def relation_model_get(id: int | None = None) -> RelationModel:
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
     """
-    args = ['relation-model-get']
+    args = ['relation-model-get', '--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
-    result = cast('_RelationModelDict', _run(*args, return_output=True, use_json=True))
+    result = cast('_RelationModelDict', json.loads(_run(*args)))
     return RelationModel(uuid=uuid.UUID(result['uuid']))
 
 
@@ -926,7 +878,7 @@ def relation_set(
         args.extend(['-r', str(id)])
     args.extend(['--file', '-'])
     content = _yaml.safe_dump(data)
-    _run(*args, input_stream=content)
+    _run(*args, input=content)
 
 
 def resource_get(name: str) -> pathlib.Path:
@@ -935,8 +887,8 @@ def resource_get(name: str) -> pathlib.Path:
     Args:
         name: The name of the resource.
     """
-    out = _run('resource-get', name, return_output=True)
-    return pathlib.Path(out.strip())
+    # Note that this does not have a `--format=json` flag
+    return pathlib.Path(_run('resource-get', name).strip())
 
 
 def secret_add(
@@ -977,7 +929,7 @@ def secret_add(
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
-        result = _run('secret-add', *args, return_output=True)
+        result = json.loads(_run('secret-add', '--format=json', *args))
     return result.strip()
 
 
@@ -1021,8 +973,7 @@ def secret_get(
         args.append('--refresh')
     if peek:
         args.append('--peek')
-    result = _run('secret-get', *args, return_output=True, use_json=True)
-    return cast('dict[str, str]', result)
+    return cast('dict[str, str]', json.loads(_run('secret-get', '--format=json', *args)))
 
 
 def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
@@ -1042,8 +993,7 @@ def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
 
 def secret_ids() -> list[str]:
     """Retrieve IDs for secrets owned by the application."""
-    result = _run('secret-ids', return_output=True, use_json=True)
-    return cast('list[str]', result)
+    return cast('list[str]', json.loads(_run('secret-ids', '--format=json')))
 
 
 @overload
@@ -1065,13 +1015,12 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
         id: The ID of the secret to retrieve.
         label: The label of the secret to retrieve.
     """
-    args: list[str] = ['secret-info-get']
+    args: list[str] = ['secret-info-get', '--format=json']
     if id is not None:
         args.append(id)
     elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
         args.extend(['--label', label])
-    result = _run(*args, return_output=True, use_json=True)
-    info_dicts = cast('dict[str, Any]', result)
+    info_dicts = cast('dict[str, Any]', json.loads(_run(*args)))
     id, data = next(iter(info_dicts.items()))  # Juju returns dict of {secret_id: {info}}
     return SecretInfo(
         id=id,
@@ -1186,10 +1135,10 @@ def state_get(key: str | None) -> dict[str, str] | str:
         key: The key of the server-side state to get. If ``None``, get all keys
             and values.
     """
-    args = ['state-get']
+    args = ['state-get', '--format=json']
     if key is not None:
         args.append(key)
-    result = _run(*args, return_output=True, use_json=True)
+    result = json.loads(_run(*args))
     return cast('dict[str, str]', result) if key is None else cast('str', result)
 
 
@@ -1220,10 +1169,10 @@ def status_get(*, include_data: bool = False, app: bool = False) -> AppStatus | 
         include_data: include additional information when in error state.
         app: Get status for all units of this application if this unit is the leader.
     """
-    args = ['status-get', f'--application={str(app).lower()}']
+    args = ['status-get', '--format=json', f'--application={str(app).lower()}']
     if include_data:
         args.append('--include-data')
-    result = _run(*args, use_json=True, return_output=True)
+    result = json.loads(_run(*args))
     if app:
         app_status = cast('_AppStatusDict', result['application-status'])
         units = {
@@ -1286,12 +1235,12 @@ def storage_get(identifier: str | None = None, attribute: str | None = None) -> 
         attribute: The specific attribute to retrieve from the storage instance.
     """
     # TODO: It looks like you can pass in a UUID instead of an identifier.
-    args = ['storage-get']
+    args = ['storage-get', '--format=json']
     if identifier is not None:
         args.extend(['-s', identifier])
     if attribute is not None:
         args.append(attribute)
-    result = _run(*args, return_output=True, use_json=True)
+    result = json.loads(_run(*args))
     if attribute is not None:
         return cast('str', result)
     return Storage(kind=result['kind'], location=pathlib.Path(result['location']))
@@ -1303,8 +1252,7 @@ def storage_list(name: str | None = None) -> list[str]:
     Args:
         name: Only list storage with this name.
     """
-    args = ['storage-list']
+    args = ['storage-list', '--format=json']
     if name is not None:
         args.append(name)
-    storages = _run(*args, return_output=True, use_json=True)
-    return cast('list[str]', storages)
+    return cast('list[str]', json.loads(_run(*args)))
