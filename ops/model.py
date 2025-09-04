@@ -1307,6 +1307,19 @@ class SecretInfo:
             f'description={self.description!r})'
         )
 
+    def __eq__(self, other: object):
+        if not isinstance(other, SecretInfo):
+            return NotImplemented
+        return (
+            self.id == other.id
+            and self.label == other.label
+            and self.revision == other.revision
+            and self.expires == other.expires
+            and self.rotation == other.rotation
+            and self.rotates == other.rotates
+            and self.description == other.description
+        )
+
 
 class Secret:
     """Represents a single secret in the model.
