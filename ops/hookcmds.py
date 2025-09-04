@@ -309,13 +309,13 @@ class Network:
 class Port:
     """A port that Juju has opened for the charm."""
 
-    protocol: Literal['tcp', 'udp', 'icmp'] | None
+    protocol: Literal['tcp', 'udp', 'icmp'] | None = 'tcp'
     """The IP protocol."""
 
-    port: int | None
+    port: int | None = None
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
-    to_port: int | None
+    to_port: int | None = None
     """The final port number if this is a range of ports."""
 
     endpoints: list[str] | None = None
