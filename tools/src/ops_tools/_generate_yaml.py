@@ -83,12 +83,11 @@ def attr_to_default(cls: type[object], name: str) -> object:
     """Get the default value for the attribute."""
     if not dataclasses.is_dataclass(cls):
         return getattr(cls, name, None)
-    default = None
     for field in dataclasses.fields(cls):
         if field.name == name:
             break
     else:
-        return default
+        return None
 
     # This might be a Pydantic dataclass using a Pydantic.Field object.
     field_default = (  # type: ignore
@@ -109,7 +108,7 @@ def attr_to_default(cls: type[object], name: str) -> object:
         return field_default  # type: ignore
     if field_default_factory is not dataclasses.MISSING:
         return field_default_factory()  # type: ignore
-    return default
+    return None
 
 
 def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]) -> str:
