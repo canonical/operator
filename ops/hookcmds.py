@@ -583,7 +583,7 @@ def juju_reboot(*, now: bool = False):
 # here, and that it's unlikely to be much faster to only get one, so the API is
 # a lot simpler if we only support getting all at once (which is the behaviour
 # when none of those arguments are specified).
-def network_get(binding_name: str, relation_id: int | None = None) -> Network:
+def network_get(binding_name: str, *, relation_id: int | None = None) -> Network:
     """Get network config.
 
     Args:
