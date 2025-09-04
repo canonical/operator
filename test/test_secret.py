@@ -30,6 +30,7 @@ class DifferentSecretRefreshesCharm(ops.CharmBase):
     def _on_install(self, event: ops.InstallEvent):
         secret1 = self.model.get_secret(label='my-secret')
         secret1.set_content({'foo': 'baz'})
+        secret1.set_info(description='infotainment')
 
         secret2 = self.model.get_secret(label='my-secret')
 

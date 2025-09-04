@@ -323,12 +323,10 @@ class Model:
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
-        content = self._backend.secret_get(id=id, label=label)
         return Secret(
             self._backend,
             id=id,
             label=label,
-            content=content,
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
@@ -544,7 +542,6 @@ class Application:
             self._backend,
             id=id,
             label=label,
-            content=content,
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
@@ -736,7 +733,6 @@ class Unit:
             self._backend,
             id=id,
             label=label,
-            content=content,
             _secret_set_cache=self._cache._secret_set_cache,
         )
 
@@ -1352,7 +1348,8 @@ class Secret:
         self._backend = backend
         self._id = id
         self._label = label
-        self._content = content
+        if content is not None:
+            warnings.warn('Secret(content=???) is deprecated', DeprecationWarning, stacklevel=2)
         self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
             collections.defaultdict(dict) if _secret_set_cache is None else _secret_set_cache
         )
@@ -1492,26 +1489,22 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> dict[str, str]:
         """Get the secret's content.
 
-        The content of the secret is cached on the :class:`Secret` object, so
-        subsequent calls do not require querying the secret storage again,
-        unless ``refresh=True`` is used, or :meth:`set_content` is called.
-
         Returns:
             A copy of the secret's content dictionary.
 
         Args:
-            refresh: If true, fetch the latest revision's content and tell
-                Juju to update to tracking that revision. The default is to
-                get the content of the currently-tracked revision.
+            refresh: ignored. Retained for backwards compatibility.
 
         Raises:
             SecretNotFoundError: if the secret no longer exists.
             ModelError: if the charm does not have permission to access the
                 secret.
+
+        .. versionchanged:: 3.3.0
+          Secret content is no longer cached in Ops. Each ``get_content()`` call
+          queries the secret storage again. The ``refresh`` argument is ignored.
         """
-        if refresh or self._content is None:
-            self._content = self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
-        return self._content.copy()
+        return self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
 
     def peek_content(self) -> dict[str, str]:
         """Get the content of the latest revision of this secret.
