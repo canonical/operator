@@ -25,10 +25,8 @@
 from __future__ import annotations
 
 import argparse
-import difflib
 import importlib
 import re
-import sys
 from typing import Any, Generator
 
 import yaml
@@ -117,26 +115,10 @@ def main():
         'The class may be a regular expression.',
         default=[],
     )
-    parser.add_argument(
-        '--merge',
-        action='store_true',
-        help='Merge the generated config and action sections into the existing charmcraft.yaml '
-        'file instead of overwriting those sections completely.',
-        default=False,
-    )
-    parser.add_argument(
-        '--diff',
-        action='store_true',
-        help='Show the differences between the generated config and action sections and the '
-        'existing charmcraft.yaml file instead of writing to the file. Exit non-zero if there are '
-        'differences.',
-        default=False,
-    )
     args = parser.parse_args()
 
     with open(args.path) as raw:
         raw_yaml = raw.read()
-        charmcraft_yaml = yaml.safe_load(raw_yaml)
 
     config: dict[str, dict[str, OptionDict]] = {'options': {}}
     for class_specifier in args.config:
@@ -148,39 +130,8 @@ def main():
             actions.update(action_to_juju_schema(cls))
     actions = dict(sorted(actions.items()))  # Sort actions by name.
 
-    if args.diff:
-        exit_code = 0
-
-        if 'config' in charmcraft_yaml:
-            existing_config = charmcraft_yaml['config']['options']
-        else:
-            existing_config = {}
-        if config != {'options': existing_config}:
-            print('Config section differs from existing charmcraft.yaml:\n')
-            existing = yaml.safe_dump({'config': {'options': existing_config}})
-            generated = yaml.safe_dump({'config': config})
-            differ = difflib.Differ()
-            result = differ.compare(existing.splitlines(), generated.splitlines())
-            print('\n'.join(result))
-            exit_code += 1
-
-        existing_actions = charmcraft_yaml.get('actions', {})
-        if actions != existing_actions:
-            print('Action section differs from existing charmcraft.yaml:\n')
-            existing = yaml.safe_dump({'actions': existing_actions})
-            generated = yaml.safe_dump({'actions': actions})
-            differ = difflib.Differ()
-            result = differ.compare(existing.splitlines(), generated.splitlines())
-            print('\n'.join(result))
-            exit_code += 2
-        sys.exit(exit_code)
-
-    if args.merge and 'config' in charmcraft_yaml:
-        config = charmcraft_yaml['config']['options'].update(config['options'])
     raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'config', {'config': config})
     if actions:
-        if args.merge and 'actions' in charmcraft_yaml:
-            actions = charmcraft_yaml['actions'].update(actions)
         raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'actions', {'actions': actions})
 
     with open(args.path, 'w') as raw:
