@@ -508,7 +508,7 @@ def juju_log(
     _run('juju-log', '--log-level', level, message)
 
 
-def juju_reboot(now: bool = False):
+def juju_reboot(*, now: bool = False):
     """Reboot the host machine."""
     if now:
         _run('juju-reboot', '--now')
