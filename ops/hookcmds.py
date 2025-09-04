@@ -203,6 +203,9 @@ class Port:
     to_port: int | None
     """The final port number if this is a range of ports."""
 
+    endpoints: list[str] | None = None
+    """The endpoints this port applies to, ``['*']`` if all endpoints, or ``None`` if unknown."""
+
 
 class _RelationModelDict(TypedDict):
     uuid: str
@@ -373,7 +376,12 @@ def _format_action_result_dict(
 
 
 def action_fail(message: str | None = None):
-    """Set action fail status with message."""
+    """Set action fail status with message.
+
+    Args:
+        message: the failure error message. Juju will provide a default message
+            if one is not provided.
+    """
     args = ['action-fail']
     if message is not None:
         args.append(message)
@@ -390,6 +398,10 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
     ``action_get`` returns the value of the parameter at the given key. If a
     dotted key (for example foo.bar) is passed, ``action_get`` will recurse into
     the parameter map as needed.
+
+    Args:
+        key: The key of the action parameter to retrieve. If not provided, all
+            parameters will be returned.
     """
     args = ['action-get']
     if key is not None:
@@ -399,12 +411,20 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
 
 
 def action_log(message: str):
-    """Record a progress message for the current action."""
+    """Record a progress message for the current action.
+
+    Args:
+        message: The progress message to provide to the Juju user.
+    """
     _run('action-log', message)
 
 
 def action_set(results: Mapping[str, Any]):
-    """Set action results."""
+    """Set action results.
+
+    Args:
+        results: The results map of the action, provided to the Juju user.
+    """
     # The Juju action-set hook tool cannot interpret nested dicts, so we use a
     # helper to flatten out any nested dict structures into a dotted notation.
     flat_results = _format_action_result_dict(results)
@@ -412,7 +432,14 @@ def action_set(results: Mapping[str, Any]):
 
 
 def application_version_set(version: str):
-    """Specify which version of the application is deployed."""
+    """Specify which version of the application is deployed.
+
+    Args:
+        version: the version of the application software the unit is running.
+            This could be a package version number or some other useful identifier,
+            such as a Git hash, that indicates the version of the deployed software.
+            It shouldn't be confused with the charm revision.
+    """
     _run('application-version-set', version)
 
 
@@ -443,16 +470,32 @@ def close_port(
 
 
 @overload
-def config_get(key: str, all: Literal[False]) -> bool | int | float | str: ...
+def config_get(key: str, *, all: Literal[False]) -> bool | int | float | str: ...
 @overload
-def config_get(key: None = None, all: bool = False) -> Mapping[str, bool | int | float | str]: ...
+def config_get(
+    key: None = None, *, all: bool = False
+) -> Mapping[str, bool | int | float | str]: ...
 def config_get(
     key: str | None = None,
+    *,
     all: bool = False,  # noqa: A002 - we're ok shadowing the builtin here.
 ) -> Mapping[str, bool | int | float | str] | bool | int | float | str:
     """Retrieve application configuration.
 
     Note that 'secret' type options are returned as string secret IDs.
+
+    If called without arguments, returns a dictionary containing all config
+    settings that are either explicitly set, or which have a non-nil default
+    value. If ``all`` is ``True``, it returns a dictionary containing al
+    defined config settings including nil values (for those without defaults).
+    If called with a key, it returns the value of that config option. Missing
+    config keys are reported as nulls, and do not return an error.
+
+    Args:
+        key: The configuration option to retrieve.
+        all: If ``True``, return all defined config settings. If ``False``,
+            return all config settings that are explicitly set or have a non-nil
+            default.
     """
     args = ['config-get']
     if key is not None and all:
@@ -504,12 +547,21 @@ def is_leader() -> bool:
 def juju_log(
     message: str, *, level: Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
 ):
-    """Write a message to the juju log."""
+    """Write a message to the juju log.
+
+    Args:
+        message: The message to log.
+        level: Send the message at the given level.
+    """
     _run('juju-log', '--log-level', level, message)
 
 
 def juju_reboot(*, now: bool = False):
-    """Reboot the host machine."""
+    """Reboot the host machine.
+
+    Args:
+        now: Reboot immediately, killing the invoking process.
+    """
     if now:
         _run('juju-reboot', '--now')
         # Juju will kill this process, but to avoid races we force that to be the case.
@@ -575,7 +627,16 @@ def open_port(
     to_port: int | None = None,
     endpoints: str | Iterable[str],
 ):
-    """Register a request to open a port or port range."""
+    """Register a request to open a port or port range.
+
+    Args:
+        protocol: Open the port(s) for the specified protocol.
+        port: If ``to_port`` is not specified, open only this port.
+        to_port: Open a range of ports from ``port`` to ``to_port``.
+        endpoints: If not provided, ports will be opened for all defined
+            application endpoints. To constrain the open request to specific
+            endpoints, provide one or more endpoint names.
+    """
     args = ['open-port']
     if endpoints:
         if isinstance(endpoints, str):
@@ -595,7 +656,13 @@ def open_port(
 
 
 def opened_ports(endpoints: bool = False) -> list[Port]:
-    """List all ports or port ranges opened by the unit."""
+    """List all ports or port ranges opened by the unit.
+
+    Args:
+        endpoints: If ``True``, each entry in the port list will be augmented
+            with a list of endpoints that the port applies to. If a port applies
+            to all endpoints, this will be indicated by an endpoint of ``*``.
+    """
     args = ['opened-ports']
     if endpoints:
         args.append('--endpoints')
@@ -607,7 +674,14 @@ def opened_ports(endpoints: bool = False) -> list[Port]:
     # '80' (where this could be any port number)
     # '8000-8999/tcp' or '8000-8999/udp' (where the two numbers can be any ports)
     # '8000-8999' (where these could be any port number)
+    # If ``--endpoints`` is used, then each port will be followed by a
+    # (possibly empty) tuple of endpoints.
     for port in output:
+        if endpoints:
+            port, port_endpoints = port.rsplit(' ', 1)
+            port_endpoints = [e.strip() for e in port_endpoints.strip('()').split(',')]
+        else:
+            port_endpoints = None
         if '/' in port:
             port, protocol = port.split('/', 1)
         else:
@@ -626,7 +700,7 @@ def opened_ports(endpoints: bool = False) -> list[Port]:
         # The assert helps type checkers know that the protocol literal will be
         # correct.
         assert protocol in ('tcp', 'udp', 'icmp')
-        ports.append(Port(protocol=protocol, port=port, to_port=to_port))
+        ports.append(Port(protocol=protocol, port=port, to_port=to_port, endpoints=port_endpoints))
     return ports
 
 
@@ -657,6 +731,13 @@ def relation_get(
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    Args:
+        app: Get the relation data for the overall application, not just a unit
+        id: The ID of the relation to get data for, or ``None`` to get data for
+            the relation that triggered the current hook.
+        key: The specific key to get data for, or ``None`` to get all data.
+        unit: The unit to get data for, or ``None`` to get data for all units.
     """
     args = ['relation-get']
     if id is not None:
@@ -674,7 +755,11 @@ def relation_get(
 
 
 def relation_ids(name: str) -> list[str]:
-    """List all relation IDs for the given endpoint."""
+    """List all relation IDs for the given endpoint.
+
+    Args:
+        name: the endpoint name.
+    """
     result = _run('relation-ids', name, return_output=True, use_json=True)
     return cast('list[str]', result)
 
@@ -685,6 +770,11 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    Args:
+        id: The ID of the relation to list units for, or ``None`` to list units
+            for the relation that triggered the current hook.
+        app: List remote application instead of participating units.
     """
     args = ['relation-list']
     if app:
@@ -701,6 +791,10 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    Args:
+        id: The ID of the relation to get data for, or ``None`` to get data for
+            the relation that triggered the current hook.
     """
     args = ['relation-model-get']
     if id is not None:
@@ -720,6 +814,12 @@ def relation_set(
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    Args:
+        data: The relation data to set.
+        id: The ID of the relation to set data for, or ``None`` to set data for
+            the relation that triggered the current hook.
+        app: Set data for the overall application, not just a unit.
     """
     args = ['relation-set']
     if app:
@@ -732,7 +832,11 @@ def relation_set(
 
 
 def resource_get(name: str) -> pathlib.Path:
-    """Get the path to the locally cached resource file."""
+    """Get the path to the locally cached resource file.
+
+    Args:
+        name: The name of the resource.
+    """
     out = _run('resource-get', name, return_output=True)
     return pathlib.Path(out.strip())
 
@@ -742,18 +846,30 @@ def secret_add(
     *,
     label: str | None = None,
     description: str | None = None,
-    expire: datetime.datetime | None = None,
+    expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: str | None = None,
+    owner: Literal['application', 'unit'] | None = None,
 ) -> str:
-    """Add a new secret."""
+    """Add a new secret.
+
+    Args:
+        content: The content of the secret.
+        label: A label used to identify the secret in hooks.
+        description: The secret description.
+        expire: Either a duration or time when the secret should expire.
+        rotate: The secret rotation policy.
+        owner: The owner of the secret, either the application or the unit.
+    """
     args: list[str] = []
     if label is not None:
         args.extend(['--label', label])
     if description is not None:
         args.extend(['--description', description])
     if expire is not None:
-        args.extend(['--expire', expire.isoformat()])
+        if isinstance(expire, str):
+            args.extend(['--expire', expire])
+        else:
+            args.extend(['--expire', expire.isoformat()])
     if rotate is not None:
         args.extend(['--rotate', rotate.value])
     if owner is not None:
@@ -788,7 +904,16 @@ def secret_get(
     refresh: bool = False,
     peek: bool = False,
 ) -> dict[str, str]:
-    """Get the content of a secret."""
+    """Get the content of a secret.
+
+    Either the ID or the label must be provided.
+
+    Args:
+        id: The ID of the secret to retrieve.
+        label: The label of the secret to retrieve.
+        peek: Get the latest revision just this time.
+        refresh: Get the latest revision and also get this same revision for subsequent calls.
+    """
     args: list[str] = []
     if id is not None:
         args.append(id)
@@ -803,7 +928,13 @@ def secret_get(
 
 
 def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
-    """Grant access to a secret."""
+    """Grant access to a secret.
+
+    Args:
+        id: The ID of the secret to grant access to.
+        relation_id: The relation with which to associate the grant.
+        unit: If provided, limit access to just that unit.
+    """
     args = ['secret-grant', '--relation', str(relation_id)]
     if unit is not None:
         args.extend(['--unit', str(unit)])
@@ -828,7 +959,14 @@ def secret_info_get(
     label: str,
 ) -> SecretInfo: ...
 def secret_info_get(*, id: str | None = None, label: str | None = None) -> SecretInfo:
-    """Get a secret's metadata info."""
+    """Get a secret's metadata info.
+
+    Either the ID or the label must be provided.
+
+    Args:
+        id: The ID of the secret to retrieve.
+        label: The label of the secret to retrieve.
+    """
     args: list[str] = ['secret-info-get']
     if id is not None:
         args.append(id)
@@ -849,7 +987,13 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
 
 
 def secret_remove(id: str, *, revision: int | None = None):
-    """Remove an existing secret."""
+    """Remove an existing secret.
+
+    Args:
+        id: The ID of the secret to remove.
+        revision: The revision of the secret to remove. If not provided, all
+            revisions are removed.
+    """
     args = ['secret-remove', id]
     if revision is not None:
         args.extend(['--revision', str(revision)])
@@ -857,7 +1001,14 @@ def secret_remove(id: str, *, revision: int | None = None):
 
 
 def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: str | None = None):
-    """Revoke access to a secret."""
+    """Revoke access to a secret.
+
+    Args:
+        id: The ID of the secret.
+        relation_id: The relation for which to revoke the grant.
+        app: Revoke access from all units in that application.
+        unit: Revoke access from just this unit.
+    """
     args = ['secret-revoke']
     if relation_id is not None:
         args.extend(['--relation', str(relation_id)])
@@ -875,18 +1026,31 @@ def secret_set(
     content: dict[str, str] | None = None,
     label: str | None = None,
     description: str | None = None,
-    expire: datetime.datetime | None = None,
+    expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: str | None = None,
+    owner: Literal['application', 'unit'] | None = None,
 ):
-    """Update an existing secret."""
+    """Update an existing secret.
+
+    Args:
+        id: The ID of the secret to update.
+        content: The content of the secret.
+        label: A label used to identify the secret in hooks.
+        description: The secret description.
+        expire: Either a duration or time when the secret should expire.
+        rotate: The secret rotation policy.
+        owner: The owner of the secret, either the application or the unit.
+    """
     args = ['secret-set']
     if label is not None:
         args.extend(['--label', label])
     if description is not None:
         args.extend(['--description', description])
     if expire is not None:
-        args.extend(['--expire', expire.isoformat()])
+        if isinstance(expire, str):
+            args.extend(['--expire', expire])
+        else:
+            args.extend(['--expire', expire.isoformat()])
     if rotate is not None:
         args.extend(['--rotate', rotate.value])
     if owner is not None:
@@ -905,7 +1069,11 @@ def secret_set(
 
 
 def state_delete(key: str):
-    """Delete server-side-state key value pairs."""
+    """Delete server-side-state key value pairs.
+
+    Args:
+        key: The key of the server-side state to delete.
+    """
     _run('state-delete', key)
 
 
@@ -914,7 +1082,12 @@ def state_get(key: str) -> str: ...
 @overload
 def state_get(key: None) -> dict[str, str]: ...
 def state_get(key: str | None) -> dict[str, str] | str:
-    """Get server-side-state value."""
+    """Get server-side-state value.
+
+    Args:
+        key: The key of the server-side state to get. If ``None``, get all keys
+            and values.
+    """
     args = ['state-get']
     if key is not None:
         args.append(key)
@@ -923,7 +1096,12 @@ def state_get(key: str | None) -> dict[str, str] | str:
 
 
 def state_set(data: Mapping[str, str], file: pathlib.Path | None = None):
-    """Set server-side-state values."""
+    """Set server-side-state values.
+
+    Args:
+        data: The key-value pairs to set in the server-side state.
+        file: An optional file containing key-value pairs to set.
+    """
     args = ['state-set']
     args.extend(f'{k}={v}' for k, v in data.items())
     if file is not None:
@@ -938,7 +1116,12 @@ def status_get(*, include_data: Literal[True], app: Literal[True]) -> AppStatus:
 @overload
 def status_get(*, include_data: Literal[False], app: bool = False) -> str: ...
 def status_get(*, include_data: bool = False, app: bool = False) -> AppStatus | UnitStatus | str:
-    """Get a status of a unit or an application."""
+    """Get a status of a unit or an application.
+
+    Args:
+        include_data: include additional information when in error state.
+        app: Get status for all units of this application if this unit is the leader.
+    """
     args = ['status-get', f'--application={str(app).lower()}']
     if include_data:
         args.append('--include-data')
@@ -970,9 +1153,8 @@ def status_set(status: SettableStatusName, message: str = '', *, app: bool = Fal
 
     Args:
         status: The status to set.
-        message: The message to set in the status.
-        app: A boolean indicating whether the status should be set for a unit or an
-            application.
+        message: A message to include in the status.
+        app: If ``True``, set this status for the application to which the unit belongs.
     """
     args = ['status-set', f'--application={app}', status]
     if message is not None:
@@ -981,7 +1163,12 @@ def status_set(status: SettableStatusName, message: str = '', *, app: bool = Fal
 
 
 def storage_add(name: str, count: int = 1):
-    """Add storage instances."""
+    """Add storage instances.
+
+    Args:
+        count: How many instances of the storage to create.
+        name: The name of the storage to create.
+    """
     _run('storage-add', f'{name}={count}')
 
 
@@ -995,6 +1182,10 @@ def storage_get(identifier: str | None = None, attribute: str | None = None) -> 
     Note that ``identifier`` can only be ``None`` if the current hook is a
     storage event, in which case Juju will use the ID of the storage that
     triggered the event.
+
+    Args:
+        identifier: The ID of the storage instance.
+        attribute: The specific attribute to retrieve from the storage instance.
     """
     # TODO: It looks like you can pass in a UUID instead of an identifier.
     args = ['storage-get']
@@ -1009,7 +1200,11 @@ def storage_get(identifier: str | None = None, attribute: str | None = None) -> 
 
 
 def storage_list(name: str | None = None) -> list[str]:
-    """List storage attached to the unit."""
+    """List storage attached to the unit.
+
+    Args:
+        name: Only list storage with this name.
+    """
     args = ['storage-list']
     if name is not None:
         args.append(name)
