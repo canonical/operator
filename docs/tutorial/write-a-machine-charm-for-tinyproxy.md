@@ -156,6 +156,7 @@ def reload_config() -> None:
     pid = _get_pid()
     if not pid:
         raise RuntimeError("tinyproxy is not running")
+    # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
     # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
     os.kill(pid, signal.SIGUSR1)
 
@@ -165,8 +166,8 @@ def _get_pid() -> int | None:
     if not pathops.LocalPath(PID_FILE).exists():
         return None
     pid = int(pathops.LocalPath(PID_FILE).read_text())
-    # Check that we can send signals to the process.
     try:
+        # Sending signal 0 doesn't terminate the process. It just checks whether the PID exists.
         os.kill(pid, 0)
     except ProcessLookupError:
         return None
