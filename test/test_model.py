@@ -3520,6 +3520,7 @@ class TestSecrets:
 
     def test_app_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:234')
+        fake_script.write('secret-get', """echo '{"foo": "x", "bar": "y"}'""")
 
         expire = datetime.datetime(2022, 12, 9, 16, 17, 0)
         secret = model.app.add_secret(
@@ -3548,7 +3549,14 @@ class TestSecrets:
                 'application',
                 mock.ANY,
                 mock.ANY,
-            ]
+            ],
+            [
+                'secret-get',
+                'secret:234',
+                '--label',
+                'lbl',
+                '--format=json',
+            ],
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
