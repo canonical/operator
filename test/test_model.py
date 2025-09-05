@@ -29,7 +29,7 @@ import unittest
 import warnings
 from collections import OrderedDict
 from textwrap import dedent
-from typing import Any, Mapping
+from typing import Callable, Mapping
 from unittest import mock
 
 import pytest
@@ -3721,11 +3721,19 @@ class TestSecrets:
         assert secret.id == 'secret://modeluuid/125'
         assert secret.unique_identifier == '125'
 
+    @staticmethod
+    def call_unit_add_secret(model: ops.Model) -> None:
+        model.unit.add_secret(content={'password': 'xxxx'})
+
+    @staticmethod
+    def call_get_secret_get_content(model: ops.Model) -> None:
+        model.get_secret(id='123').get_content()
+
     @pytest.mark.parametrize(
-        'hook_command,method,kwargs',
+        'hook_command,call',
         [
-            ('secret-add', 'unit.add_secret', {'content': {'password': 'xxxx'}}),
-            ('secret-get', 'get_secret', {'id': '123'}),
+            ('secret-add', call_unit_add_secret),
+            ('secret-get', call_get_secret_get_content),
         ],
     )
     @pytest.mark.parametrize(
@@ -3745,21 +3753,15 @@ class TestSecrets:
         monkeypatch: pytest.MonkeyPatch,
         failure: str,
         hook_command: str,
-        method: str,
-        kwargs: dict[str, Any],
+        call: Callable[[ops.Model], None],
         is_leader: bool,
     ):
         monkeypatch.setattr(os, 'getuid', lambda: 1001)
         fake_script.write(hook_command, f"""echo 'ERROR: {failure}' >&2 && exit 1""")
         fake_script.write('is-leader', 'echo true' if is_leader else 'echo false')
         fake_script.write('juju-log', 'exit 0')
-        if '.' in method:
-            attr_name, method = method.split('.', 1)
-            attr = getattr(model, attr_name)
-        else:
-            attr = model
         with pytest.raises(ops.ModelError):
-            getattr(attr, method)(**kwargs)
+            call(model)
         calls = fake_script.calls(clear=True)
         # For this test we aren't interested in the secret or is-leader call.
         calls.pop(0)
@@ -3877,15 +3879,6 @@ class TestSecretClass:
         assert secret.id is None
         assert secret.label == 'y'
 
-    def test_get_content_cached(self, model: ops.Model, fake_script: FakeScript):
-        fake_script.write('secret-get', """exit 1""")
-
-        secret = self.make_secret(model, id='x', label='y', content={'foo': 'bar'})
-        content = secret.get_content()  # will use cached content, not run secret-get
-        assert content == {'foo': 'bar'}
-
-        assert fake_script.calls(clear=True) == []
-
     def test_get_content_refresh(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "refreshed"}'""")
 
@@ -3897,18 +3890,18 @@ class TestSecretClass:
             ['secret-get', f'secret://{model._backend.model_uuid}/y', '--refresh', '--format=json']
         ]
 
-    def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
-        fake_script.write('secret-get', """echo '{"foo": "notcached"}'""")
+    def test_get_content(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
 
         secret = self.make_secret(model, id='z')
         content = secret.get_content()
-        assert content == {'foo': 'notcached'}
+        assert content == {'foo': 'bar'}
 
         assert fake_script.calls(clear=True) == [
             ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
         ]
 
-    def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
+    def test_get_content_gets_data_from_juju(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
 
         secret = self.make_secret(model, id='z')
@@ -3918,7 +3911,8 @@ class TestSecretClass:
         assert secret.get_content() == {'foo': 'bar'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json'],
+            ['secret-get', 'secret://abcd/z', '--format=json'],
         ]
 
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
