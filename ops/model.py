@@ -301,11 +301,6 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
-        The content of the secret is retrieved, so calls to
-        :meth:`Secret.get_content` do not require querying the secret storage
-        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
-        has been called.
-
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
 
@@ -313,10 +308,9 @@ class Model:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
 
-        Raises:
-            SecretNotFoundError: If a secret with this ID or label doesn't exist.
-            ModelError: if the charm does not have permission to access the
-                secret.
+        .. versionchanged:: 3.3.0
+          ``get_secret()`` no longer fetches the secret content. Call
+          ``get_content()`` explicitly.
         """
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')

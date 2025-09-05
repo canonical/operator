@@ -3573,6 +3573,7 @@ class TestSecrets:
 
     def test_unit_add_secret_args(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:456')
+        fake_script.write('secret-get', """echo '{"foo": "w", "bar": "z"}'""")
 
         expire = datetime.datetime(2022, 12, 9, 16, 22, 0)
         secret = model.unit.add_secret(
@@ -3601,7 +3602,14 @@ class TestSecrets:
                 'unit',
                 mock.ANY,
                 mock.ANY,
-            ]
+            ],
+            [
+                'secret-get',
+                'secret:456',
+                '--label',
+                'l2',
+                '--format=json',
+            ],
         ]
         assert fake_script.secrets() == {'foo': 'w', 'bar': 'z'}
 
@@ -3681,24 +3689,22 @@ class TestSecrets:
         with pytest.raises(TypeError):
             model.get_secret()
 
-    def test_get_secret_not_found(self, fake_script: FakeScript, model: ops.Model):
+    def test_get_secret_content_not_found(self, fake_script: FakeScript, model: ops.Model):
         script = """echo 'ERROR secret "123" not found' >&2; exit 1"""
         fake_script.write('secret-get', script)
 
         with pytest.raises(ops.SecretNotFoundError):
-            model.get_secret(id='123')
+            model.get_secret(id='123').get_content()
 
-    def test_get_secret_other_error(self, fake_script: FakeScript, model: ops.Model):
+    def test_get_secret_content_other_error(self, fake_script: FakeScript, model: ops.Model):
         script = """echo 'ERROR other error' >&2; exit 1"""
         fake_script.write('secret-get', script)
 
         with pytest.raises(ops.ModelError) as excinfo:
-            model.get_secret(id='123')
+            model.get_secret(id='123').get_content()
         assert not isinstance(excinfo.value, ops.SecretNotFoundError)
 
     def test_secret_unique_identifier(self, fake_script: FakeScript, model: ops.Model):
-        fake_script.write('secret-get', """echo '{"foo": "g"}'""")
-
         secret = model.get_secret(label='lbl')
         assert secret.id is None
         assert secret.unique_identifier is None
@@ -3714,13 +3720,6 @@ class TestSecrets:
         secret = model.get_secret(id='secret://modeluuid/125')
         assert secret.id == 'secret://modeluuid/125'
         assert secret.unique_identifier == '125'
-
-        assert fake_script.calls(clear=True) == [
-            ['secret-get', '--label', 'lbl', '--format=json'],
-            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json'],
-            ['secret-get', 'secret:124', '--format=json'],
-            ['secret-get', 'secret://modeluuid/125', '--format=json'],
-        ]
 
     @pytest.mark.parametrize(
         'hook_command,method,kwargs',
