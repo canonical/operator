@@ -1303,19 +1303,6 @@ class SecretInfo:
             f'description={self.description!r})'
         )
 
-    def __eq__(self, other: object):
-        if not isinstance(other, SecretInfo):
-            return NotImplemented
-        return (
-            self.id == other.id
-            and self.label == other.label
-            and self.revision == other.revision
-            and self.expires == other.expires
-            and self.rotation == other.rotation
-            and self.rotates == other.rotates
-            and self.description == other.description
-        )
-
 
 class Secret:
     """Represents a single secret in the model.
@@ -1493,7 +1480,9 @@ class Secret:
             A copy of the secret's content dictionary.
 
         Args:
-            refresh: ignored. Retained for backwards compatibility.
+            refresh: If true, fetch the latest revision's content and tell
+                Juju to update to tracking that revision. The default is to
+                get the content of the currently-tracked revision.
 
         Raises:
             SecretNotFoundError: if the secret no longer exists.
@@ -1502,7 +1491,7 @@ class Secret:
 
         .. versionchanged:: 3.3.0
           Secret content is no longer cached in Ops. Each ``get_content()`` call
-          queries the secret storage again. The ``refresh`` argument is ignored.
+          queries the secret storage again.
         """
         return self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
 

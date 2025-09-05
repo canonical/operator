@@ -34,10 +34,14 @@ class DifferentSecretRefreshesCharm(ops.CharmBase):
 
         secret2 = self.model.get_secret(label='my-secret')
 
+        info1 = secret1.get_info()
+        info2 = secret2.get_info()
+        assert info1.id == info2.id
+        assert info1.label == info2.label
+        assert info1.description == info2.description
+
         content1 = secret1.get_content(refresh=True)
         content2 = secret2.get_content()
-
-        assert secret1.get_info() == secret2.get_info()
         assert content1 == content2
 
 
