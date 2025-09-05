@@ -112,34 +112,35 @@ def attr_to_default(cls: type[object], name: str) -> object:
 
 
 def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]) -> str:
+    # If we can't figure it out, then use "string", which should be the most
+    # compatible, and most likely to be used for arbitrary types. Charms can
+    # provide `to_juju_schema` to adjust this if required.
+    fallback: Final[str] = yaml_types[str]
+
     try:
         raw_hint = get_type_hints(cls)[name]
     except KeyError:
-        pass
+        return fallback
+    # Collapse Optional[] and Union[] and so on to the simpler form.
+    origin = get_origin(raw_hint)
+    if origin in (list, tuple):
+        return yaml_types[origin]
+    elif origin:
+        hints = {arg for arg in get_args(raw_hint) if arg in yaml_types}
     else:
-        # Collapse Optional[] and Union[] and so on to the simpler form.
-        origin = get_origin(raw_hint)
-        if origin in (list, tuple):
-            return yaml_types[origin]
-        elif origin:
-            hints = {arg for arg in get_args(raw_hint) if arg in yaml_types}
-        else:
-            hints = {raw_hint}
-        # If there are multiple types -- for example, the type annotation is
-        # `int | str` -- then we can't determine the type, and we fall back to
-        # "string", even if `str` is not in the type hint, because our
-        # "we can't determine the type" choice is always "string".
-        if len(hints) > 1:
-            return 'string'
-        elif hints:
-            try:
-                return yaml_types[hints.pop()]
-            except KeyError:
-                pass
-    # If we can't figure it out, then use "string", which should be the most
-    # compatible, and most likely to be used for arbitrary types. Charms can
-    # override `to_juju_schema` to adjust this if required.
-    return 'string'
+        hints = {raw_hint}
+    # If there are multiple types -- for example, the type annotation is
+    # `int | str` -- then we can't determine the type, and we fall back to
+    # "string", even if `str` is not in the type hint, because our
+    # "we can't determine the type" choice is always "string".
+    if len(hints) > 1:
+        return 'string'
+    elif hints:
+        try:
+            return yaml_types[hints.pop()]
+        except KeyError:
+            pass
+    return fallback
 
 
 def attr_to_juju_type(cls: type[object], name: str) -> str:
