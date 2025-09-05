@@ -176,7 +176,7 @@ def _get_pid() -> int | None:
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
 
-1. Receive an event from Juju. For example, the `start` event, meaning "it's time to start tinyproxy".
+1. Receive an event from Juju. Later in the tutorial, we'll explain what this means in practice.
 2. Use the functions in the helper module to manage tinyproxy and check its status.
 3. Report the status back to Juju.
 
@@ -215,7 +215,7 @@ class TinyproxyConfig:
 
 ### Write the charm code (placeholder title)
 
-TODO: Split this section up, building the code in logical steps, with commentary.
+TODO: Split this section up, building the code in logical steps, with commentary. Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the enrivonment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
 
 `src/charm.py`:
 
