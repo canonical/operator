@@ -125,7 +125,7 @@ def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]
     # Collapse Optional[] and Union[] and so on to the simpler form.
     origin = get_origin(raw_hint)
     if origin in (list, tuple):
-        return yaml_types[origin]
+        return fallback
 
     hints = set(get_args(raw_hint)) if origin else {raw_hint}
     # If there are multiple types -- for example, the type annotation is
