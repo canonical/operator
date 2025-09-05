@@ -1,0 +1,42 @@
+# This file configures Charmcraft.
+# See https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/
+type: charm
+name: tinyproxy
+title: Charm Template
+summary: A very short one-line summary of the charm.
+description: |
+  A single sentence that says what the charm is, concisely and memorably.
+
+  A paragraph of one to three short sentences, that describe what the charm does.
+
+  A third paragraph that explains what need the charm meets.
+
+  Finally, a paragraph that describes whom the charm is useful for.
+
+# Documentation:
+# https://documentation.ubuntu.com/charmcraft/stable/howto/build-guides/select-platforms/
+base: ubuntu@22.04
+platforms:
+  amd64:
+  arm64:
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+# (Optional) Configuration options for the charm
+# This config section defines charm config options, and populates the Configure
+# tab on Charmhub.
+# More information on this section at:
+# https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/#config
+# General configuration documentation:
+# https://documentation.ubuntu.com/juju/3.6/reference/configuration/#application-configuration
+config:
+  options:
+    slug:
+      description: "Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"
+      default: example
+      type: string

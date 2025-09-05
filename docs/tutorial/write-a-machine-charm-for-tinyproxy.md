@@ -81,6 +81,8 @@ TODO: Can we make these intersphinx links?
 Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
+"""Functions for managing and interacting with tinyproxy."""
+
 import logging
 import os
 import re
@@ -220,6 +222,8 @@ TODO: Split this section up, building the code in logical steps, with commentary
 `src/charm.py`:
 
 ```python
+"""Charm the application."""
+
 import dataclasses
 import logging
 import time
