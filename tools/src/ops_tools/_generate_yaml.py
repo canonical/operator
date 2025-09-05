@@ -121,26 +121,17 @@ def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]
         raw_hint = get_type_hints(cls)[name]
     except KeyError:
         return fallback
+
     # Collapse Optional[] and Union[] and so on to the simpler form.
     origin = get_origin(raw_hint)
     if origin in (list, tuple):
         return yaml_types[origin]
-    elif origin:
-        hints = {arg for arg in get_args(raw_hint) if arg in yaml_types}
-    else:
-        hints = {raw_hint}
+
+    hints = set(get_args(raw_hint)) if origin else {raw_hint}
     # If there are multiple types -- for example, the type annotation is
-    # `int | str` -- then we can't determine the type, and we fall back to
-    # "string", even if `str` is not in the type hint, because our
-    # "we can't determine the type" choice is always "string".
-    if len(hints) > 1:
-        return 'string'
-    elif hints:
-        try:
-            return yaml_types[hints.pop()]
-        except KeyError:
-            pass
-    return fallback
+    # `int | str` -- then we can't determine the type.
+    # Likewise if there are no hints somehow (generic used without args?).
+    return yaml_types.get(hints.pop(), fallback) if len(hints) == 1 else fallback
 
 
 def attr_to_juju_type(cls: type[object], name: str) -> str:
