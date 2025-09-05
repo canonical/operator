@@ -215,7 +215,7 @@ class TinyproxyConfig:
 
 ### Write the charm code (placeholder title)
 
-TODO: Split this section up, building the code in logical steps, with commentary. Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the enrivonment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
+TODO: Split this section up, building the code in logical steps, with commentary. Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the environment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
 
 `src/charm.py`:
 
