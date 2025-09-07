@@ -188,16 +188,19 @@ def juju_schema_from_model_fields(cls: type[object]) -> dict[str, OptionDict]:
 
 def juju_names(cls: type[object]) -> Generator[str]:
     """Iterates over all the names to include in the config or action YAML."""
+    # Note that this should match the behaviour of ops.Relation.save().
     if dataclasses.is_dataclass(cls):
         for field in dataclasses.fields(cls):
-            yield field.name
+            yield field.metadata.get('alias', field.name)
         return
     if hasattr(cls, 'model_fields'):
-        for field in cls.model_fields.values():  # type: ignore
-            yield field.name  # type: ignore
+        # Pydantic models:
+        for name, field in cls.model_fields.items():  # type: ignore
+            yield field.alias or name  # type: ignore
         return
-    # If this isn't a dataclass or a Pydantic model, then fall back to using
-    # any class attribute with a type annotation.
+    # If we could not otherwise determine the fields for the class, store all
+    # the fields that have type annotations. If a charm needs a more specific
+    # set of fields, then it should use a dataclass or Pydantic model instead.
     yield from get_type_hints(cls)
 
 
