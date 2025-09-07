@@ -421,6 +421,7 @@ maximum_signature_line_length = 80
 # that should be linked to in this documentation.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
+    'jubilant': ('https://documentation.ubuntu.com/jubilant', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
