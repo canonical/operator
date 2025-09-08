@@ -114,7 +114,7 @@ TODO: Can we make these intersphinx links?
 Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
-"""Functions for managing and interacting with tinyproxy."""
+"""Functions for interacting with tinyproxy."""
 
 import logging
 import os
