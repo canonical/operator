@@ -368,39 +368,68 @@ if __name__ == "__main__":  # pragma: nocover
 
 ### Pack your charm
 
-TODO: Add commentary to this section.
+Before you can try your charm, you need to "pack" it. Packing combines the charm code and metadata into a single file that can be deployed to Juju.
+
+In your virtual machine, make sure that the working directory is `~/tinyproxy`. Then run:
 
 ```text
 charmcraft pack
 ```
 
-This created the charm:
+Charmcraft will take about 20 minutes to pack your charm, depending on your computer and network.
+
+TODO: Check the timing.
+
+When Charmcraft has packed your charm, you'll see a message similar to:
 
 ```text
-CONTRIBUTING.md  charmcraft.yaml  src                    tox.ini
-LICENSE          lib              tests                  uv.lock
-README.md        pyproject.toml   tinyproxy_amd64.charm
+Packed tinyproxy_amd64.charm
 ```
 
-(The charm filename depends on architecture)
+The name of the `.charm` file depends on your computer's architecture. For example, if your computer has an ARM-based architecture, the file is called `tinyproxy_arm64.charm`.
 
 ### Deploy your charm
 
-TODO: Add commentary to this section.
+As you deploy your charm to Juju, it will be helpful to watch Juju status in real time.
 
-Open another terminal, using `multipass shell juju-sandbox`. Use this terminal to watch Juju status`. In the other terminal, deploy the charm:
+Open another terminal, then run:
+
+```text
+multipass shell juju-sandbox
+```
+
+Next, in the same terminal, run:
+
+```text
+juju status --watch 2s
+```
+
+You should now have two terminals:
+
+- A terminal with working directory `~/tinyproxy`, from earlier.
+
+- A terminal that shows Juju's status in real time:
+
+    ```text
+    Model    Controller     Cloud/Region         Version  SLA          Timestamp
+    testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:00:00+08:00
+    ```
+
+You're now ready to deploy your charm.
+
+In the `~/tinyproxy` directory, run `juju deploy ./<charm-file>`, where `<charm-file`> is the name of the file created by `charmcraft pack`. For example:
 
 ```text
 juju deploy ./tinyproxy_amd64.charm
 ```
 
-(The charm filename depends on architecture)
+Juju creates an "application" from your charm. For each unit in the application, Juju starts a machine and installs your charm on the machine. We didn't tell Juju how many units we want, so Juju assumes one unit and starts one machine. After Juju has installed your charm on the machine, Juju starts sending events to your charm so that your charm can install and start tinyproxy.
 
-When the charm is ready, you'll see:
+When your charm has started tinyproxy, the application will go into "active" status:
 
 ```text
 Model    Controller     Cloud/Region         Version  SLA          Timestamp
-testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:00:38+08:00
+testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:01:38+08:00
 
 App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
 tinyproxy  1.11.0   active      1  tinyproxy             0  no
@@ -412,11 +441,16 @@ Machine  State    Address       Inst id        Base          AZ  Message
 0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04      Running
 ```
 
-Make a note of the IP address of the machine (10.71.67.208).
+```{tip}
+For the rest of the tutorial, we'll assume that you're still watching Juju status. To stop watching, press <kbd>Ctrl</kbd> + <kbd>C</kbd>.
+```
 
 ### Try the proxy
 
-TODO: Add commentary to this section.
+TODO:
+
+- Add commentary to this section.
+- IP address comes from Juju status. IP address of the machine (10.71.67.208).
 
 ```text
 curl <address>:8000/example/
