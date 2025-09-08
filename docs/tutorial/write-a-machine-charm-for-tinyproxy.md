@@ -22,7 +22,11 @@ TODO:
 
 ### Create a virtual machine
 
-TODO: Multipass
+TODO:
+
+- Multipass
+- Suggest using nano to edit files.
+- Configure nano to use spaces for indentation. (Check whether this is needed.) Or install a different editor if you like.
 
 ### Install Juju and charm development tools
 
@@ -34,7 +38,7 @@ TODO: uv (as an extra snap from Concierge), tox (with `uv tool`)
 
 ## Create a charm project
 
-You'll need to work inside the virtual machine again. Open a terminal, then run:
+You'll need to work inside your virtual machine again. Open a terminal, then run:
 
 ```text
 multipass shell juju-sandbox
@@ -50,17 +54,46 @@ cd tinyproxy
 charmcraft init --profile machine
 ```
 
-TODO:
+Charmcraft created several files, including:
 
-- Briefly summarise the most important files that Charmcraft creates.
-- Edit charmcraft.yaml to set the title, description, summary, and platform.
-- Suggest using nano to edit files.
+- `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
+- `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
+- `src/charm.py` - The Python file that will contain the main logic of your charm.
+- `src/tinyproxy.py` - A helper module that will contain functions for interacting with tinyproxy.
+
+These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
 
 ## Write your charm
 
+### Edit the metadata
+
+We'll start by editing the metadata in `charmcraft.yaml`.
+
+In your virtual machine, make sure that the working directory is `~/tinyproxy`. Then run:
+
+```text
+nano charmcraft.yaml
+```
+
+This opens the "nano" text editor. If you haven't used nano before, see [nano tips on Ask Ubuntu](https://askubuntu.com/a/54222).
+
+In nano, change the values of `title`, `summary`, and `description` to:
+
+```yaml
+title: Reverse Proxy Demo
+summary: A demo charm that configures tinyproxy as a reverse proxy.
+description: |
+  This charm demonstrates how to write a machine charm with Ops.
+```
+
+TODO:
+
+- Do we need to edit `platforms` in charmcraft.yaml?
+- Save the file and quit nano.
+
 ### Write a helper module
 
-Your charm will interact with tinyproxy, so it's a good idea to start by writing a helper module that wraps tinyproxy.
+Your charm will interact with tinyproxy, so it's a good idea to write a helper module that wraps tinyproxy.
 Charmcraft created `src/tinyproxy.py` as a placeholder helper module.
 
 The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. However, the helper module won't be a general-purpose wrapper for tinyproxy. The helper module will contain opinionated functions for managing tinyproxy on Ubuntu.
