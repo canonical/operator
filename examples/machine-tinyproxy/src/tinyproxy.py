@@ -72,6 +72,16 @@ def is_running() -> bool:
     return bool(_get_pid())
 
 
+def reload_config() -> None:
+    """Ask tinyproxy to reload config."""
+    pid = _get_pid()
+    if not pid:
+        raise RuntimeError("tinyproxy is not running")
+    # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
+    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+    os.kill(pid, signal.SIGUSR1)
+
+
 def start() -> None:
     """Start tinyproxy."""
     subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
@@ -90,16 +100,6 @@ def uninstall() -> None:
     pathops.LocalPath(PID_FILE).unlink(missing_ok=True)
     pathops.LocalPath(CONFIG_FILE).unlink(missing_ok=True)
     pathops.LocalPath(CONFIG_FILE).parent.rmdir()
-
-
-def reload_config() -> None:
-    """Ask tinyproxy to reload config."""
-    pid = _get_pid()
-    if not pid:
-        raise RuntimeError("tinyproxy is not running")
-    # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
-    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
-    os.kill(pid, signal.SIGUSR1)
 
 
 def _get_pid() -> int | None:
