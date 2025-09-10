@@ -1247,30 +1247,21 @@ def storage_add(name: str, count: int = 1):
     _run('storage-add', f'{name}={count}')
 
 
-@overload
-def storage_get(identifier: str | None = None, *, attribute: str) -> str: ...
-@overload
-def storage_get(identifier: str | None = None) -> Storage: ...
-def storage_get(identifier: str | None = None, attribute: str | None = None) -> Storage | str:
+def storage_get(id: str | None = None) -> Storage:
     """Retrieve information for the storage instance with the specified ID.
 
-    Note that ``identifier`` can only be ``None`` if the current hook is a
-    storage event, in which case Juju will use the ID of the storage that
-    triggered the event.
+    Note that ``id`` can only be ``None`` if the current hook is a storage
+    event, in which case Juju will use the ID of the storage that triggered the
+    event.
 
     Args:
-        identifier: The ID of the storage instance.
-        attribute: The specific attribute to retrieve from the storage instance.
+        id: The ID of the storage instance.
     """
     # TODO: It looks like you can pass in a UUID instead of an identifier.
     args = ['storage-get', '--format=json']
-    if identifier is not None:
-        args.extend(['-s', identifier])
-    if attribute is not None:
-        args.append(attribute)
+    if id is not None:
+        args.extend(['-s', id])
     result = json.loads(_run(*args))
-    if attribute is not None:
-        return cast('str', result)
     return Storage._from_dict(result)
 
 
