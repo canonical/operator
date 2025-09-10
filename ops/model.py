@@ -344,7 +344,7 @@ class Model:
             including credential information.
 
         Raises:
-            :class:`ModelError`: if called in a Kubernetes model.
+            :class:`ModelError`: if called without trust.
         """
         return self._backend.credential_get()
 
