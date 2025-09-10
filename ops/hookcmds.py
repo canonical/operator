@@ -301,10 +301,9 @@ class Network:
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 
-# Note that this cannot have kw_only=True, because it existed (in model.py) in
-# earlier versions of Ops that worked with Python versions that did support
-# that feature. We cannot require keyword arguments now without breaking
-# backwards compatibility.
+# Note that we intend to merge this with model.py's `Port` in the future, and
+# that does not have `kw_only=True`. That means that we should not use it here,
+# either, so that merging can be backwards compatible.
 @dataclasses.dataclass(frozen=True)
 class Port:
     """A port that Juju has opened for the charm."""

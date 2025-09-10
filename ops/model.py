@@ -61,7 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .hookcmds import CloudSpec, Port, SecretRotate
+from .hookcmds import CloudSpec, SecretRotate
 from .jujucontext import _JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -856,6 +856,17 @@ class Unit:
         if not self._is_our_unit:
             raise RuntimeError(f'cannot reboot a remote unit {self}')
         self._backend.reboot(now)
+
+
+@dataclasses.dataclass(frozen=True)
+class Port:
+    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
+
+    protocol: typing.Literal['tcp', 'udp', 'icmp']
+    """The IP protocol."""
+
+    port: int | None
+    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
 
 
 OpenedPort = Port
