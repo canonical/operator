@@ -597,7 +597,8 @@ def close_port(
             endpoints = [endpoints]
         args.extend(['--endpoints', ','.join(endpoints)])
     if port is None:
-        assert protocol is not None
+        if protocol is None:
+            raise TypeError('You must provide a port or protocol.')
         args.append(protocol)
     else:
         port_arg = f'{port}-{to_port}' if to_port is not None else str(port)
@@ -608,15 +609,11 @@ def close_port(
 
 
 @overload
-def config_get(key: str, *, all: Literal[False]) -> bool | int | float | str: ...
+def config_get(key: str) -> bool | int | float | str: ...
 @overload
-def config_get(
-    key: None = None, *, all: bool = False
-) -> Mapping[str, bool | int | float | str]: ...
+def config_get(key: None = None) -> Mapping[str, bool | int | float | str]: ...
 def config_get(
     key: str | None = None,
-    *,
-    all: bool = False,  # noqa: A002 - we're ok shadowing the builtin here.
 ) -> Mapping[str, bool | int | float | str] | bool | int | float | str:
     """Retrieve application configuration.
 
@@ -624,20 +621,13 @@ def config_get(
 
     If called without arguments, returns a dictionary containing all config
     settings that are either explicitly set, or which have a non-nil default
-    value. If ``all`` is ``True``, it returns a dictionary containing al
-    defined config settings including nil values (for those without defaults).
-    If called with a key, it returns the value of that config option. Missing
-    config keys are reported as nulls, and do not return an error.
+    value. If called with a key, it returns the value of that config option.
+    Missing config keys are reported as nulls, and do not return an error.
 
     Args:
         key: The configuration option to retrieve.
-        all: If ``True``, return all defined config settings. If ``False``,
-            return all config settings that are explicitly set or have a non-nil
-            default.
     """
     args = ['config-get', '--format=json']
-    if all:
-        args.append('--all')
     if key:
         args.append(key)
     out = json.loads(_run(*args))
@@ -763,7 +753,8 @@ def open_port(
     if protocol is None and port is None:
         raise TypeError('Either protocol or port must be specified')
     if port is None:
-        assert protocol is not None
+        if protocol is None:
+            raise TypeError('You must provide a port or protocol.')
         args.append(protocol)
     else:
         port_arg = f'{port}-{to_port}' if to_port is not None else str(port)
@@ -814,10 +805,8 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
             port = None
         else:
             port = int(port)
-        # This will be the case unless we get back an invalid port from Juju.
-        # The assert helps type checkers know that the protocol literal will be
-        # correct.
-        assert protocol in ('tcp', 'udp', 'icmp')
+        if protocol not in ('tcp', 'udp', 'icmp'):
+            raise ValueError(f'Unexpected protocol from Juju: {protocol}')
         ports.append(Port(protocol=protocol, port=port, to_port=to_port, endpoints=port_endpoints))
     return ports
 
