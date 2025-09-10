@@ -84,6 +84,14 @@ def stop() -> None:
         os.kill(pid, signal.SIGTERM)
 
 
+def uninstall() -> None:
+    """Uninstall the tinyproxy executable and remove files."""
+    apt.remove_package("tinyproxy-bin")
+    pathops.LocalPath(PID_FILE).unlink(missing_ok=True)
+    pathops.LocalPath(CONFIG_FILE).unlink(missing_ok=True)
+    pathops.LocalPath(CONFIG_FILE).parent.rmdir()
+
+
 def reload_config() -> None:
     """Ask tinyproxy to reload config."""
     pid = _get_pid()

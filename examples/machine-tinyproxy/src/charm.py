@@ -49,6 +49,7 @@ class TinyproxyCharm(ops.CharmBase):
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.config_changed, self._on_config_changed)
         framework.observe(self.on.stop, self._on_stop)
+        framework.observe(self.on.remove, self._on_remove)
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
         """Report the status of tinyproxy (runs after each event)."""
@@ -81,6 +82,10 @@ class TinyproxyCharm(ops.CharmBase):
         """Handle stop event."""
         tinyproxy.stop()
         self.wait_for_not_running()
+
+    def _on_remove(self, event: ops.RemoveEvent) -> None:
+        """Handle remove event."""
+        tinyproxy.uninstall()
 
     def configure_and_restart(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
