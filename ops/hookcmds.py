@@ -1186,36 +1186,28 @@ def state_get(key: str | None) -> dict[str, str] | str:
     return cast('dict[str, str]', result) if key is None else cast('str', result)
 
 
-def state_set(data: Mapping[str, str], file: pathlib.Path | None = None):
+def state_set(data: Mapping[str, str]):
     """Set server-side-state values.
 
     Args:
         data: The key-value pairs to set in the server-side state.
-        file: An optional file containing key-value pairs to set.
     """
-    args = ['state-set']
-    args.extend(f'{k}={v}' for k, v in data.items())
-    if file is not None:
-        args.extend(['--file', str(file)])
-    _run(*args)
+    args = ['state-set', '--file', '-']
+    content = _yaml.safe_dump(data)
+    _run(*args, input=content)
 
 
 @overload
-def status_get(*, include_data: Literal[True], app: Literal[False]) -> UnitStatus: ...
+def status_get(*, app: Literal[False]) -> UnitStatus: ...
 @overload
-def status_get(*, include_data: Literal[True], app: Literal[True]) -> AppStatus: ...
-@overload
-def status_get(*, include_data: Literal[False], app: bool = False) -> str: ...
-def status_get(*, include_data: bool = False, app: bool = False) -> AppStatus | UnitStatus | str:
+def status_get(*, app: Literal[True]) -> AppStatus: ...
+def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     """Get a status of a unit or an application.
 
     Args:
-        include_data: include additional information when in error state.
         app: Get status for all units of this application if this unit is the leader.
     """
-    args = ['status-get', '--format=json', f'--application={str(app).lower()}']
-    if include_data:
-        args.append('--include-data')
+    args = ['status-get', '--include-data', '--format=json', f'--application={str(app).lower()}']
     result = json.loads(_run(*args))
     if app:
         app_status = cast('_AppStatusDict', result['application-status'])
