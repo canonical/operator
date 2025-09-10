@@ -2419,7 +2419,7 @@ class Resources:
 
         Raises:
             NameError: if the resource name is not in the charm metadata.
-            ModelError: if the controller is unable to fetch the resource, for
+            ModelError: if the controller is unable to fetch the resource; for
                 example, if you ``juju deploy`` from a local charm file and
                 forget the appropriate ``--resource``.
         """
