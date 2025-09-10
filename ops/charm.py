@@ -1524,6 +1524,10 @@ class CharmBase(Object):
                 data = self.load_config(Config, errors='blocked')
                 # `data.workload_class` has the value of the Juju option `class`
 
+        Note that Pydantic classes that have fields that are not simple or
+        Pydantic types, such as :class:`ops.Secret`, require setting
+        ``arbitrary_types_allowed`` in the Pydantic model config.
+
         Any additional positional or keyword arguments to this method will be
         passed through to the config class ``__init__``.
 
