@@ -142,18 +142,10 @@ class TemporaryDirectory:
 
 @pytest.fixture
 def run(monkeypatch: pytest.MonkeyPatch) -> Generator[Run]:
-    """Pytest fixture that patches subprocess.run with Run.
-
-    ``shutil.which`` is also mocked, to return the same string as provided.
-    """
+    """Pytest fixture that patches subprocess.run with Run."""
     run_mock = Run()
     monkeypatch.setattr('subprocess.run', run_mock)
 
-    # hookcmds always does a shutil.which upfront.
-    def mock_which(cmd: str):
-        return cmd
-
-    monkeypatch.setattr('shutil.which', mock_which)
     yield run_mock
     assert len(run_mock.calls) >= 1, 'subprocess.run not called'
 
@@ -202,7 +194,7 @@ def test_action_get(run: Run):
 
 
 def test_action_get_key(run: Run):
-    run.handle(['action-get', 'baz', '--format=json'], stdout='"qux"')
+    run.handle(['action-get', '--format=json', 'baz'], stdout='"qux"')
     param = hookcmds.action_get('baz')
     assert param == 'qux'
 
@@ -358,7 +350,7 @@ def test_secret_add(run: Run, mock_temp_dir: str):
 
 
 def test_secret_get(run: Run):
-    run.handle(['secret-get', 'secret:123', '--format=json'], stdout='{"foo": "bar"}')
+    run.handle(['secret-get', '--format=json', 'secret:123'], stdout='{"foo": "bar"}')
     result = hookcmds.secret_get(id='secret:123')
     assert result == {'foo': 'bar'}
 
@@ -385,7 +377,7 @@ def test_secret_info_get(run: Run):
             'revision': 1,
         }
     }
-    run.handle(['secret-info-get', 'secret:123', '--format=json'], stdout=json.dumps(info))
+    run.handle(['secret-info-get', '--format=json', 'secret:123'], stdout=json.dumps(info))
     result = hookcmds.secret_info_get(id='secret:123')
     assert result.id == '123'
     assert result.label == 'lbl'
@@ -418,17 +410,17 @@ def test_state_get(run: Run):
 
 
 def test_state_set(run: Run):
-    run.handle(['state-set', 'foo=bar'])
+    run.handle(['state-set', '--file', '-'])
     hookcmds.state_set({'foo': 'bar'})
 
 
 def test_status_get(run: Run):
     unit: hookcmds._UnitStatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
     run.handle(
-        ['status-get', '--application=false', '--include-data', '--format=json'],
+        ['status-get', '--include-data', '--format=json', '--application=false'],
         stdout=json.dumps(unit),
     )
-    result = hookcmds.status_get(include_data=True, app=False)
+    result = hookcmds.status_get(app=False)
     assert result.status == 'active'
 
 
