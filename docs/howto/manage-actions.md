@@ -161,14 +161,11 @@ def test_backup_action_failed():
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that an action works correctly against a real Juju instance, write an integration test with `pytest_operator`. For example:
+To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
-async def test_logger(ops_test):
-    app = ops_test.model.applications[APP_NAME]
-    unit = app.units[0]  # Run the action against the first unit.
-    action = await unit.run_action('snapshot', filename='db-snapshot.tar.gz')
-    action = await action.wait()
-    assert action.status == 'completed'
-    assert action.results['snapshot-size'].isdigit()
+def test_logger(juju: jubilant.Juju):
+    action = juju.run("your-app/0", "snapshot", {"filename": "db-snapshot.tar.gz"})
+    assert action.status == "completed"
+    assert action.results["snapshot-size"].isdigit()
 ```

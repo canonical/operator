@@ -222,13 +222,15 @@ Now, update your `_get_pebble_layer()` method to use the passed environment:
 
 ```python
 def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
-    """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join([
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        f'--port={port}',
-    ])
+    """Pebble layer for the FastAPI demo services."""
+    command = ' '.join(
+        [
+            'uvicorn',
+            'api_demo_server.app:app',
+            '--host=0.0.0.0',
+            f'--port={port}',
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -486,22 +488,22 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_build_and_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
 import logging
-from pathlib import Path
+import pathlib
 
 import jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -541,7 +543,7 @@ The test may again take some time to run.
 When it's done, the output should show two passing tests:
 
 ```text
-tests/integration/test_charm.py::test_build_and_deploy
+tests/integration/test_charm.py::test_deploy
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'

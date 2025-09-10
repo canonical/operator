@@ -21,6 +21,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 
+import ops
+
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
@@ -29,8 +31,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseEndpointsChangedEvent,
     DatabaseRequires,
 )
-
-import ops
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -135,10 +135,12 @@ class FastAPIDemoCharm(ops.CharmBase):
             'db-port': db_data.get('db_port', None),
         }
         if params.show_password:
-            output.update({
-                'db-username': db_data.get('db_username', None),
-                'db-password': db_data.get('db_password', None),
-            })
+            output.update(
+                {
+                    'db-username': db_data.get('db_username', None),
+                    'db-password': db_data.get('db_password', None),
+                }
+            )
         event.set_results(output)
 
     def _update_layer_and_restart(self) -> None:
@@ -177,13 +179,15 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info('Unable to connect to Pebble: %s', e)
 
     def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
-        """A Pebble layer for the FastAPI demo services."""
-        command = ' '.join([
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
-        ])
+        """Pebble layer for the FastAPI demo services."""
+        command = ' '.join(
+            [
+                'uvicorn',
+                'api_demo_server.app:app',
+                '--host=0.0.0.0',
+                f'--port={port}',
+            ]
+        )
         pebble_layer: ops.pebble.LayerDict = {
             'summary': 'FastAPI demo service',
             'description': 'pebble config layer for FastAPI demo server',

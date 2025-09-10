@@ -228,13 +228,15 @@ Finally, define  the `_get_pebble_layer` function as below. The `command` variab
 
 ```python
 def _get_pebble_layer(self) -> ops.pebble.Layer:
-    """A Pebble layer for the FastAPI demo services."""
-    command = ' '.join([
-        'uvicorn',
-        'api_demo_server.app:app',
-        '--host=0.0.0.0',
-        '--port=8000',
-    ])
+    """Pebble layer for the FastAPI demo services."""
+    command = ' '.join(
+        [
+            'uvicorn',
+            'api_demo_server.app:app',
+            '--host=0.0.0.0',
+            '--port=8000',
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         'summary': 'FastAPI demo service',
         'description': 'pebble config layer for FastAPI demo server',
@@ -443,6 +445,7 @@ env_list = unit
 [vars]
 src_path = {tox_root}/src
 tests_path = {tox_root}/tests
+all_path = {[vars]src_path} {[vars]tests_path}
 
 [testenv]
 set_env =
@@ -488,10 +491,10 @@ mkdir -p tests/unit
 In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
 
 ```python
-from charm import FastAPIDemoCharm
-
 import ops
 from ops import testing
+
+from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():
@@ -639,18 +642,18 @@ In the same directory, create a file called `test_charm.py` and add the followin
 
 ```python
 import logging
-from pathlib import Path
+import pathlib
 
 import jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-def test_build_and_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -677,7 +680,7 @@ rootdir: /home/ubuntu/fastapi-demo
 configfile: pyproject.toml
 collected 1 item
 
-tests/integration/test_charm.py::test_build_and_deploy
+tests/integration/test_charm.py::test_deploy
 
 -------------------------------- live log setup --------------------------------
 INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
