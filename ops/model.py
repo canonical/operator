@@ -2412,13 +2412,16 @@ class Resources:
         self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
-        """Fetch the resource from the controller or store.
+        """Fetch the resource path from the controller or store.
 
-        If successfully fetched, this returns the path where the resource is stored
-        on disk, otherwise it raises a :class:`NameError`.
+        Returns:
+            The path where the resource is stored on disk.
 
         Raises:
-            NameError: if the resource's path cannot be fetched.
+            NameError: if the resource name is not in the charm metadata.
+            ModelError: if the controller is unable to fetch the resource; for
+                example, if you ``juju deploy`` from a local charm file and
+                forget the appropriate ``--resource``.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
