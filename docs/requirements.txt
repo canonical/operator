@@ -1,3 +1,4 @@
+ops[testing,tracing]
 canonical-sphinx[full]
 packaging
 sphinxcontrib-svg2pdfconverter[CairoSVG]
