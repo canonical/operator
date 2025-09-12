@@ -500,17 +500,32 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             model_uuid=self._state.model.uuid,
         )
 
-    def secret_set(
+    def secret_set_metadata(
         self,
         id: str,
         *,
-        content: dict[str, str] | None = None,
         label: str | None = None,
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
     ):
         secret = self._get_secret(id, label)
+        self._check_can_manage_secret(secret)
+
+        secret._update_metadata(
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate,
+        )
+
+    def secret_set_content(
+        self,
+        id: str,
+        *,
+        content: dict[str, str] | None = None,
+    ):
+        secret = self._get_secret(id, None)
         self._check_can_manage_secret(secret)
 
         if content == secret.latest_content:
@@ -522,13 +537,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 f'secret {id} contents set to the existing value: new revision not needed',
             )
 
-        secret._update_metadata(
-            content=content,
-            label=label,
-            description=description,
-            expire=expire,
-            rotate=rotate,
-        )
+        secret._update_metadata(content=content)
 
     def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
