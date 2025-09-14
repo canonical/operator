@@ -40,7 +40,7 @@ However, this only goes so far: `config-changed` doesn't tell the charm which co
 
 In addition, the charm may receive an event like `config-changed` before it's ready to handle it, for example, if the container is not yet ready. In such cases, a delta charm may defer the event (effectively storing a small amount of state) or could try to wait for both events to occur using intricate, error-prone custom logic.
 
-The holistic approach side-steps this disparity and applies a single code path, `_reconcile` to all events of interest, which scrapes all of visible state to perform computation, and updates all writable state.
+The holistic approach side-steps this disparity and applies a single code path, `_reconcile` to all events of interest, which scrapes all of the visible state to perform computation, and updates all writable state.
 
 ### Example
 
@@ -113,8 +113,8 @@ Charm libraries too can be written using the reconciler pattern, see [the implem
 Some applications, like database or observability providers, are expected to be related to an unbounded number of other applications.
 It may become expensive to scrape all the data from that relation on every hook.
 
-Such applications should be profiled, and, based on the results, the charm developer may cache the Juju state, communicate less on the relation and [more out of band](https://github.com/charmed-hpc/slurm-charms/blob/edc47369560845fa54f81a2f02e0a3870b14302a/charms/slurmrestd/src/charm.py#L93-L98), or perhaps reconsider whether this key relation processing could be moved out of the reconciler.
-Similar [performance concern](https://discourse.charmhub.io/t/performance-limitations-of-peer-relations-and-a-solution/18144) applies to peer relation processing for applications where hundreds of units are expected.
+Such applications should be profiled, and, based on the results, the charm developer may cache the Juju state, communicate less on the relation and [more out of band](https://github.com/charmed-hpc/slurm-charms/blob/edc47369560845fa54f81a2f02e0a3870b14302a/charms/slurmrestd/src/charm.py#L93-L98), or perhaps reconsider whether this key relation processing could be moved out of the reconciliation loop.
+Similar [performance concern](https://discourse.charmhub.io/t/performance-limitations-of-peer-relations-and-a-solution/18144) applies to peer relation processing for applications where hundreds of units may be expected.
 
 ## Which approach to use?
 
@@ -158,7 +158,7 @@ Charms that implement the reconciler pattern have been proven more robust.
 This comes down to two observations:
 
 - The charm author is thinking about their workload more than about minute Juju semantics.
-- When the Juju event is taken out of the equation, same number of unit tests covers larger portion of (state, event) space.
+- When the Juju event is taken out of the equation, same number of unit tests covers a larger portion of (state, event) space.
 
 ### When to use the delta approach
 
@@ -168,7 +168,7 @@ Either of the following hints at suitability of such approach:
 - The Juju event model can be mapped directly to the workload semantics.
 - The charm is trivial.
 
-See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where delta charm is suitable.
+See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable.
 
 ## Handling events individually
 
@@ -184,8 +184,8 @@ A delta charm may look like this:
 ```py
 def __init__(self, framework: ops.Framework):
     super().__init__(framework)
-    self.framework.observe(self.on.start, self._on_start)
     self.framework.observe(self.on.install, self._on_install)
+    self.framework.observe(self.on.start, self._on_start)
 
     hostname = socket.getfqdn()
     self.foo = FooRequires(self, "foo-relation", address=hostname)
@@ -194,19 +194,33 @@ def __init__(self, framework: ops.Framework):
     self.bar = BarProvider(self, "bar-relation")
     self.framework.observe(self.bar.on.create_bar, self._on_create_bar)
 
-def _on_start(self, event: ops.StartEvent):
-    # This unit has been started
-    ...
-
 def _on_install(self, event: ops.InstallEvent):
     # Install the workload binary
-    ...
+    apt.add_package("some-workload")
+
+def _on_start(self, event: ops.StartEvent):
+    # This unit has been started, peer relations are usable
+    if self.unit.is_leader():
+        ...
 
 def _on_data_available(self, event: DataAvailableEvent):
     # Update the workload with event's data
-    ...
+    self.workload.reconfigure(some_key=event.some_value)
 
-def _on_create_bar(self, CreateBarEvent):
+def _on_create_bar(self, event: CreateBarEvent):
     # Create a logical bar for the related app
-    ...
+    self.workload.create_foo(event.some_field)
 ```
+
+Notice how the handler methods map to Juju and custom events directly.
+There's less boilerplate and flow control is predictable.
+
+### Developing your charm
+
+Unit testing is initially straightforward, however can get messy when interdependencies are accounted for:
+
+- creating a logical bar is only possible after the workload has been installed
+- the available data typically needs to be mixed with application's configuration
+- sequences like `upgrade-charm -> config-changed -> start` due to [Juju being helpful](https://discourse.charmhub.io/t/charm-lifecycle/5938)
+
+A good rule of thumb is this: if you're tempted to defer an event, consider if it's time to rewrite the charm using the reconciler pattern.
