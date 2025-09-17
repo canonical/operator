@@ -6,18 +6,16 @@ Stateless charms are more robust. The charming community developed two approache
 - Holistic charms reconcile towards a goal state on every event.
 - Delta charms handle each Juju event individually.
 
-Note that processing of some Juju events doesn't lend to this distinction.
-
 ## Handling events holistically
 
-A typical holistic charm subscribes the same observer method, often called `_reconcile` to all interesting Juju events.
+A typical holistic charm subscribes the same observer method, often called `_reconcile`, to all interesting Juju events.
 The event payload is ignored, and reconciliation progresses towards a defined goal state: typically a functional workload configured appropriately and able to interact with the related applications.
 This implies that the observer has to scrape the entirety of the Juju state available to the current unit, as well as workload state.
 The observer then rewrite the world: updates all the Juju state it can, overwrites the workload configuration and instructs the workload to reload the configuration.
 
 ### Why reconcile?
 
-Conceptually, a Juju event informs the unit that a specific thing has changed at a pre-defined level in the Juju event model, while the charm author wants the charm to process unit's logical state at workload's own granularity.
+Conceptually, a Juju event informs the unit that a specific thing has changed at a predefined level in the Juju event model, while the charm author wants the charm to process a unit's logical state at the workload's own granularity.
 
 ```{list-table}
 :header-rows: 1
@@ -29,14 +27,14 @@ Conceptually, a Juju event informs the unit that a specific thing has changed at
 * - `pebble-ready`
   - Workload container is reachable
 * - `relation-joined`
-  - N+1 consumers expect resources
+  - The set of consumers requires provisioning
 * - `relation-changed`
   - Consumer requirements are defined
 ```
 
 Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that a configuration value has changed, `relation-changed` says that relation data has changed.
 
-However, this only goes so far: `config-changed` doesn't tell the charm which configuration keys have changed or whether configuration has become valid; `relation-changed` doesn't tell the charm how the relation data have changed or whether the data can be parsed.
+However, this only goes so far: `config-changed` doesn't tell the charm which configuration keys have changed or whether configuration has become valid; `relation-changed` doesn't tell the charm how the relation data has changed or whether the data can be parsed.
 
 In addition, the charm may receive an event like `config-changed` before it's ready to handle it, for example, if the container is not yet ready. In such cases, a delta charm may defer the event (effectively storing a small amount of state) or could try to wait for both events to occur using intricate, error-prone custom logic.
 
@@ -208,7 +206,7 @@ def _on_data_available(self, event: DataAvailableEvent):
     self.workload.reconfigure(some_key=event.some_value)
 
 def _on_create_bar(self, event: CreateBarEvent):
-    # Create a logical bar for the related app
+    # Provision a `Bar` resourse in the workload
     self.workload.create_foo(event.some_field)
 ```
 
@@ -219,8 +217,8 @@ There's less boilerplate and flow control is predictable.
 
 Unit testing is initially straightforward, however can get messy when interdependencies are accounted for:
 
-- creating a logical bar is only possible after the workload has been installed
+- creating a resource is only possible after the workload has been installed
 - the available data typically needs to be mixed with application's configuration
 - sequences like `upgrade-charm -> config-changed -> start` due to [Juju being helpful](https://discourse.charmhub.io/t/charm-lifecycle/5938)
 
-A good rule of thumb is this: if you're tempted to defer an event, consider if it's time to rewrite the charm using the reconciler pattern.
+A good rule of thumb is this: if you're starting to use `defer` in various places, consider whether it's time to rewrite the charm using the reconciler pattern.
