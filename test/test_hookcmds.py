@@ -415,7 +415,7 @@ def test_state_set(run: Run):
 
 
 def test_status_get(run: Run):
-    unit: hookcmds._UnitStatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
+    unit: hookcmds._StatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
     run.handle(
         ['status-get', '--include-data', '--format=json', '--application=false'],
         stdout=json.dumps(unit),

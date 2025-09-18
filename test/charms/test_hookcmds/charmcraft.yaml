@@ -15,6 +15,8 @@ parts:
   charm:
     plugin: charm
     source: .
+    build-packages:
+      - git
     build-snaps:
       - astral-uv
 
@@ -27,6 +29,10 @@ config:
     another-option:
       description: Another option for the charm.
       type: int
+    crash:
+      description: Crash the charm with an exception.
+      type: boolean
+      default: false
 
 actions:
   backup:
@@ -59,6 +65,33 @@ actions:
         type: integer
   opened-ports:
     description: List opened ports.
+  test-status:
+    description: Test setting and getting status.
+  test-state:
+    description: Test setting and getting state.
+    params:
+      value:
+        description: Value to set in state.
+        type: string
+        default: "value"
+  test-secrets:
+    description: Test setting and getting secrets.
+  get-storage:
+    description: Provide information about the storage attached to the unit.
+  add-storage:
+    description: Add more storage to the unit.
+    params:
+      count:
+        description: Number of additional storage units to add.
+        type: integer
+        default: 1
+  set-peer-data:
+    description: Set some data on the peer relation.
+    params:
+      data:
+        description: Data to set on the peer relation.
+        type: string
+        default: "hello world!"
 
 peers:
   peer:
