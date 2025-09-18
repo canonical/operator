@@ -379,16 +379,14 @@ class Storage:
         )
 
 
-_UnitStatusDict = TypedDict(
-    '_UnitStatusDict', {'message': str, 'status': str, 'status-data': dict[str, Any]}
+_StatusDict = TypedDict(
+    '_StatusDict', {'message': str, 'status': str, 'status-data': dict[str, Any]}
 )
 _AppStatusDict = TypedDict(
     '_AppStatusDict',
     {
-        'message': str,
-        'status': str,
-        'status-data': dict[str, Any],
-        'units': dict[str, _UnitStatusDict],
+        'application-status': _StatusDict,
+        'units': dict[str, _StatusDict],
     },
 )
 
@@ -402,7 +400,7 @@ class UnitStatus:
     status_data: dict[str, Any]
 
     @classmethod
-    def _from_dict(cls, d: _UnitStatusDict) -> UnitStatus:
+    def _from_dict(cls, d: _StatusDict) -> UnitStatus:
         return cls(
             status=d['status'],
             message=d['message'],
@@ -422,10 +420,11 @@ class AppStatus:
     @classmethod
     def _from_dict(cls, d: _AppStatusDict) -> AppStatus:
         units = {name: UnitStatus._from_dict(u) for name, u in d.get('units', {}).items()}
+        app = d['application-status']
         return cls(
-            status=d['status'],
-            message=d['message'],
-            status_data=d['status-data'],
+            status=app['status'],
+            message=app['message'],
+            status_data=app['status-data'],
             units=units,
         )
 
@@ -718,7 +717,7 @@ def open_port(
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ) -> None: ...
 @overload
 def open_port(
@@ -726,14 +725,14 @@ def open_port(
     port: int,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ) -> None: ...
 def open_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ):
     """Register a request to open a port or port range.
 
@@ -1198,7 +1197,7 @@ def state_set(data: Mapping[str, str]):
 
 
 @overload
-def status_get(*, app: Literal[False]) -> UnitStatus: ...
+def status_get(*, app: Literal[False] = False) -> UnitStatus: ...
 @overload
 def status_get(*, app: Literal[True]) -> AppStatus: ...
 def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
@@ -1212,7 +1211,7 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     if app:
         app_status = cast('_AppStatusDict', result['application-status'])
         return AppStatus._from_dict(app_status)
-    return UnitStatus._from_dict(cast('_UnitStatusDict', result))
+    return UnitStatus._from_dict(cast('_StatusDict', result))
 
 
 def status_set(status: SettableStatusName, message: str = '', *, app: bool = False):
