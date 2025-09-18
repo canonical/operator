@@ -62,7 +62,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .jujucontext import _JujuContext
+from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
@@ -3591,10 +3591,10 @@ class _ModelBackend:
         unit_name: str | None = None,
         model_name: str | None = None,
         model_uuid: str | None = None,
-        juju_context: _JujuContext | None = None,
+        juju_context: JujuContext | None = None,
     ):
         if juju_context is None:
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
         self._juju_context = juju_context
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name
