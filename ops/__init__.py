@@ -135,6 +135,10 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredSet',
     'StoredState',
     'StoredStateData',
+    # From hookcmds.py
+    'CloudCredential',
+    'CloudSpec',
+    'StatusName',
     # From jujuversion.py
     'JujuVersion',
     # From model.py
@@ -144,8 +148,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'BindingMapping',
     'BlockedStatus',
     'CheckInfoMapping',
-    'CloudCredential',
-    'CloudSpec',
     'ConfigData',
     'Container',
     'ContainerMapping',
@@ -161,8 +163,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'Network',
     'NetworkInterface',
     'OpenedPort',
-    'Port',
     'Pod',
+    'Port',
     'Relation',
     'RelationData',
     'RelationDataAccessError',
@@ -178,7 +180,6 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'SecretRotate',
     'ServiceInfoMapping',
     'StatusBase',
-    'StatusName',
     'Storage',
     'StorageMapping',
     'TooManyRelatedAppsError',
@@ -283,6 +284,8 @@ from .framework import (
     StoredStateData,
 )
 
+from .hookcmds import CloudCredential, CloudSpec, StatusName
+
 from .jujuversion import JujuVersion
 
 from .model import (
@@ -292,8 +295,6 @@ from .model import (
     BindingMapping,
     BlockedStatus,
     CheckInfoMapping,
-    CloudCredential,
-    CloudSpec,
     ConfigData,
     Container,
     ContainerMapping,
@@ -327,7 +328,6 @@ from .model import (
     SecretRotate,
     ServiceInfoMapping,
     StatusBase,
-    StatusName,
     Storage,
     StorageMapping,
     TooManyRelatedAppsError,

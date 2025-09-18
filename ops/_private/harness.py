@@ -61,7 +61,7 @@ from typing import (
 from .. import charm, framework, model, pebble, storage
 from ..charm import CharmBase, CharmMeta, RelationRole
 from ..jujucontext import _JujuContext
-from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..model import Container, RelationNotFoundError, _NetworkDict, _StatusName
 from ..pebble import ExecProcess
 from . import yaml
 
@@ -95,7 +95,7 @@ _RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[st
 _RawStatus = TypedDict(
     '_RawStatus',
     {
-        'status': StatusName,
+        'status': _StatusName,
         'message': str,
     },
 )
@@ -2534,7 +2534,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status: StatusName, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: _StatusName, message: str = '', *, is_app: bool = False):
         if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
             raise model.ModelError(
                 f'ERROR invalid status "{status}", expected one of'
