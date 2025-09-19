@@ -253,7 +253,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         self._check_app_data_access(is_app)
-        return self._relation_get(relation_id, member_name=member_name, is_app=is_app).copy()
+        data = self._relation_get(relation_id, member_name=member_name, is_app=is_app)
+        return data.copy()
 
     def _relation_get(self, relation_id: int, member_name: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
