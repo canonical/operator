@@ -1736,6 +1736,9 @@ class Relation:
     """Holds the data buckets for each entity of a relation.
 
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
+
+    Note that peer relation data is not readable or writable during the Juju ``install``
+    event, even though the relation exists. :class:`ModelError` will be raised in that case.
     """
 
     active: bool
