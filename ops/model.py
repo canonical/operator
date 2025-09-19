@@ -1738,7 +1738,7 @@ class Relation:
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
 
     Note that peer relation data is not readable or writable during the Juju ``install``
-    event, even though the relation exists.
+    event, even though the relation exists. :class:`ModelError` will be raised in that case.
     """
 
     active: bool
