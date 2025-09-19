@@ -19,6 +19,7 @@ import dataclasses
 import functools
 import pathlib
 import sqlite3
+import stat
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
@@ -89,6 +90,8 @@ class Buffer:
     Access to the buffer attributes is effectively protected by an sqlite transaction.
     """
 
+    path: pathlib.Path
+    """Location of the buffer on disk."""
     ids: set[int]
     """Trace data ids buffered during this dispatch invocation."""
     observed = False
@@ -96,14 +99,17 @@ class Buffer:
     stored: int | None = None
     """Estimate of stored data size in bytes if known, or None if not yet known."""
 
-    def __init__(self, path: pathlib.Path | str):
-        self.path = str(path)
+    def __init__(self, path: pathlib.Path):
+        self.path = path
         self.ids = set()
         self._set_db_schema()
 
     @retry
     def _set_db_schema(self) -> None:
         with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
+            mode = stat.S_IRUSR | stat.S_IWUSR
+            if stat.S_IMODE(self.path.stat().st_mode) != mode:
+                self.path.chmod(mode)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS tracing (
