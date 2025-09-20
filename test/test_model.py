@@ -38,7 +38,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops._private import yaml
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
 from ops.model import _ModelBackend
@@ -57,7 +57,14 @@ def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture
 def root_logging():
-    context = _JujuContext(model_uuid='1234', unit_name='myapp/0')
+    context = JujuContext(
+        model_uuid='1234',
+        unit_name='myapp/0',
+        model_name='testing-model',
+        version=JujuVersion('3.6.8'),
+        hook_name='',
+        dispatch_path='',
+    )
     backend = ops.model._ModelBackend('myapp/0', 'testing-model', juju_context=context)
     orig_hook = sys.excepthook
     orig_show = warnings.showwarning
@@ -1197,7 +1204,7 @@ class TestModel:
 
     def test_juju_version_from_model(self):
         version = '3.6.2'
-        context = _JujuContext.from_dict({'JUJU_VERSION': version})
+        context = JujuContext._from_dict({'JUJU_VERSION': version})
         backend = _ModelBackend('myapp/0', juju_context=context)
         model = ops.Model(ops.CharmMeta(), backend)
         assert model.juju_version == version
