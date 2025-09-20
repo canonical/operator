@@ -3,6 +3,8 @@ version: 2
 build:
   os: ubuntu-24.04
   tools:
+    # Python version shouldn't be important. Our Makefile controls the Python version.
+    python: latest
   jobs:
     post_checkout:
       - git fetch --unshallow || true
