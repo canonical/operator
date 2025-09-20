@@ -54,7 +54,6 @@ full-help: $(VENVDIR)
 	@echo "Run 'make help' to see supported targets."
 
 # IMPORTANT: This is a custom target for Ops docs, not the target that comes with the starter pack.
-# To match .readthedocs.yaml, we're creating a venv with Python 3 installed.
 $(VENVDIR): requirements.txt ../uv.lock
 	@test -d $(VENVDIR) || uv venv --python 3.11 $(VENVDIR)
 	uv pip install --directory $(VENVDIR) --requirements ../../requirements.txt
