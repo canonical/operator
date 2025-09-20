@@ -53,17 +53,13 @@ full-help: $(VENVDIR)
 	@echo "\n\033[1;31mNOTE: This help texts shows unsupported targets!\033[0m"
 	@echo "Run 'make help' to see supported targets."
 
-# If requirements are updated, venv should be rebuilt and timestamped.
-$(VENVDIR):
-	@echo "... setting up virtualenv"
-	python3 -m venv $(VENVDIR) || { echo "You must install python3-venv before you can build the documentation."; exit 1; }
-	. $(VENV); pip install $(PIPOPTS) --require-virtualenv \
-	    --upgrade -r requirements.txt \
-            --log $(VENVDIR)/pip_install.log
-	@test ! -f $(VENVDIR)/pip_list.txt || \
-            mv $(VENVDIR)/pip_list.txt $(VENVDIR)/pip_list.txt.bak
-	@. $(VENV); pip list --local --format=freeze > $(VENVDIR)/pip_list.txt
-	@touch $(VENVDIR)
+# IMPORTANT: This is a custom target for Ops docs, not the target that comes with the starter pack.
+# To match .readthedocs.yaml, we're creating a venv with Python 3 installed.
+$(VENVDIR): requirements.txt ../uv.lock
+	@test -d $(VENVDIR) || uv venv --python 3.11 $(VENVDIR)
+	uv pip install --directory $(VENVDIR) --requirements ../../requirements.txt
+	uv pip install --directory $(VENVDIR) "ops[testing,tracing] @ ../../.."
+	touch $(VENVDIR)
 
 pa11y-install:
 	@command -v $(PA11Y) >/dev/null || { \
