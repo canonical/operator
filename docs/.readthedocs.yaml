@@ -15,4 +15,4 @@ build:
     build:
       html:
         - make -C docs html
-        - mv docs/_build/html $READTHEDOCS_OUTPUT
+        - mv -r docs/_build/* $READTHEDOCS_OUTPUT
