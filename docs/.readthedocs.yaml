@@ -15,4 +15,5 @@ build:
     build:
       html:
         - make -C docs html
-        - mv docs/_build/* $READTHEDOCS_OUTPUT
+        - mkdir -p $READTHEDOCS_OUTPUT/html
+        - mv docs/_build/* $READTHEDOCS_OUTPUT/html
