@@ -316,7 +316,7 @@ charmcraft pack
 
 ```{important}
 
-If packing failed - perhaps you forgot to make the charm.py executable earlier - you may need to run `charmcraft clean` before re-running `charmcraft pack`. `charmcraft` will generally detect when files have changed, but will miss only file attributes changing.
+If packing failed - perhaps you forgot to make `charm.py` executable earlier - you may need to run `charmcraft clean` before re-running `charmcraft pack`. `charmcraft` will generally detect when files have changed, but will miss only file attributes changing.
 
 ```
 
