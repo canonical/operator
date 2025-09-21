@@ -54,6 +54,7 @@ full-help: $(VENVDIR)
 	@echo "Run 'make help' to see supported targets."
 
 # This is a custom target for Ops docs, not the target that comes with the starter pack.
+# Our conf.py checks that this target hasn't been overwritten (e.g., during a starter pack upgrade).
 $(VENVDIR): requirements.txt ../uv.lock
 	@which uv || (echo "Error: uv is not installed. To install uv, run 'sudo snap install astral-uv --classic' or see https://docs.astral.sh/uv/"; exit 1)
 	@test -d $(VENVDIR) || uv venv --python 3.11 $(VENVDIR)
