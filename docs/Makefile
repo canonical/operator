@@ -53,12 +53,13 @@ full-help: $(VENVDIR)
 	@echo "\n\033[1;31mNOTE: This help texts shows unsupported targets!\033[0m"
 	@echo "Run 'make help' to see supported targets."
 
-# IMPORTANT: This is a custom target for Ops docs, not the target that comes with the starter pack.
+# This is a custom target for Ops docs, not the target that comes with the starter pack.
 $(VENVDIR): requirements.txt ../uv.lock
+	@which uv || (echo "Error: uv is not installed. To install uv, run 'sudo snap install astral-uv --classic' or see https://docs.astral.sh/uv/"; exit 1)
 	@test -d $(VENVDIR) || uv venv --python 3.11 $(VENVDIR)
 	uv pip install --directory $(VENVDIR) --requirements ../../requirements.txt
 	uv pip install --directory $(VENVDIR) "ops[testing,tracing] @ ../../.."
-	touch $(VENVDIR)
+	@touch $(VENVDIR)
 
 pa11y-install:
 	@command -v $(PA11Y) >/dev/null || { \
