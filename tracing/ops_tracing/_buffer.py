@@ -17,6 +17,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import functools
+import os
 import pathlib
 import sqlite3
 import stat
@@ -106,10 +107,14 @@ class Buffer:
 
     @retry
     def _set_db_schema(self) -> None:
-        with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
-            mode = stat.S_IRUSR | stat.S_IWUSR
+        mode = stat.S_IRUSR | stat.S_IWUSR
+        try:
+            os.close(os.open(self.path, os.O_CREAT| os.O_EXCL, mode))
+        except FileExistsError:
             if stat.S_IMODE(self.path.stat().st_mode) != mode:
                 self.path.chmod(mode)
+
+        with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS tracing (
