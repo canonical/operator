@@ -109,7 +109,7 @@ class Buffer:
     def _set_db_schema(self) -> None:
         mode = stat.S_IRUSR | stat.S_IWUSR
         try:
-            os.close(os.open(self.path, os.O_CREAT| os.O_EXCL, mode))
+            os.close(os.open(self.path, os.O_CREAT | os.O_EXCL, mode))
         except FileExistsError:
             if stat.S_IMODE(self.path.stat().st_mode) != mode:
                 self.path.chmod(mode)
