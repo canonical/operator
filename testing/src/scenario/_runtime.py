@@ -18,8 +18,7 @@ from typing import (
 )
 
 import yaml
-from ops import pebble
-from ops.jujucontext import _JujuContext
+from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
 
@@ -69,7 +68,8 @@ class Runtime:
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event.name}',
+            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
+            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
@@ -298,7 +298,7 @@ class Runtime:
                 event=event,
                 charm_root=temporary_charm_root,
             )
-            juju_context = _JujuContext.from_dict(env)
+            juju_context = JujuContext.from_environ(env)
             # We need to set JUJU_VERSION in os.environ, because charms may use
             # `JujuVersion.from_environ()` to get the (simulated) Juju version.
             # For consistency, we put all the other ones there too, although we'd

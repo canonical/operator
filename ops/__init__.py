@@ -139,6 +139,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'CloudCredential',
     'CloudSpec',
     'StatusName',
+    # From jujucontext.py
+    'JujuContext',
     # From jujuversion.py
     'JujuVersion',
     # From model.py
@@ -285,7 +287,7 @@ from .framework import (
 )
 
 from .hookcmds import CloudCredential, CloudSpec, StatusName
-
+from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 
 from .model import (
