@@ -66,7 +66,7 @@ def secret_add(
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
-        result = json.loads(run('secret-add', '--format=json', *args))
+        result = run('secret-add', *args)
     return result.strip()
 
 
