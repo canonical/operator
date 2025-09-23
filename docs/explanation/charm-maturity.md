@@ -7,7 +7,7 @@ Like all software, charms continually evolve and should increase in maturity and
 
 Anyone can pack a charm from source and deploy it by passing the `.charm` file to `juju deploy`. This is frequently done during development and testing, but can also be used for private charms.
 
-> See more: {external+juju:ref}`How to manage applications | Deploy an application <deploy-an-application>`
+> See more: {external+juju:ref}`Juju | How to manage applications | Deploy an application <deploy-an-application>`
 
 ## Phase 2: Private listing on Charmhub
 
@@ -15,7 +15,7 @@ Anyone can publish a charm to Charmhub (you'll need to create an account, and th
 
 Privately-listed charms will not show up in searches on Charmhub, or general web searches.
 
-> See more: {external+charmcraft:ref}`How to manage charms | Public a charm <publish-a-charm>`
+> See more: {external+charmcraft:ref}`Charmcraft | How to manage charms | Public a charm <publish-a-charm>`
 
 ## Phase 3: Public listing on Charmhub
 
@@ -60,6 +60,8 @@ Submit any newly-proposed public interfaces for review, to ensure that:
 ### The charm respects the Juju proxy options
 
 `juju-http-proxy`, `juju-https-proxy`, and `juju-no-proxy` should influence the charm's behavior when the charm or charm workload makes any HTTP request.
+
+For the corresponding environment variables that the charm should read, see {external+juju:ref}`Juju | List of model configuration keys <list-of-model-configuration-keys>`
 
 ### The charm upgrades the application safely
 
