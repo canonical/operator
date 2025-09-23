@@ -36,7 +36,7 @@ The charm should follow documented [best practices](#follow-best-practices).
 Use the evaluation tool to see the list of requirements that will be used in the review, and have some automatically checked. In the root of your charm folder in your repository run the command:
 
 ```bash
-uvx --with=package-name something-or-other-here
+uvx charmhub-listing-review:self-review
 ```
 
 This will provide you with information about the full listing criteria, and, for those that can be checked automatically, whether the charm currently passes.
