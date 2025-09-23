@@ -1,0 +1,61 @@
+# Copyright 2025 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import annotations
+
+import json
+from typing import cast
+
+from ._types import Storage
+from ._utils import run
+
+
+def storage_add(name: str, count: int = 1):
+    """Add storage instances.
+
+    Args:
+        count: How many instances of the storage to create.
+        name: The name of the storage to create.
+    """
+    run('storage-add', f'{name}={count}')
+
+
+def storage_get(id: str | None = None) -> Storage:
+    """Retrieve information for the storage instance with the specified ID.
+
+    Note that ``id`` can only be ``None`` if the current hook is a storage
+    event, in which case Juju will use the ID of the storage that triggered the
+    event.
+
+    Args:
+        id: The ID of the storage instance.
+    """
+    # TODO: It looks like you can pass in a UUID instead of an identifier.
+    args = ['storage-get', '--format=json']
+    if id is not None:
+        args.extend(['-s', id])
+    result = json.loads(run(*args))
+    return Storage._from_dict(result)
+
+
+def storage_list(name: str | None = None) -> list[str]:
+    """List storage attached to the unit.
+
+    Args:
+        name: Only list storage with this name.
+    """
+    args = ['storage-list', '--format=json']
+    if name is not None:
+        args.append(name)
+    return cast('list[str]', json.loads(run(*args)))

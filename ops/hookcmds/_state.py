@@ -1,0 +1,63 @@
+# Copyright 2025 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import annotations
+
+import json
+from typing import (
+    Mapping,
+    cast,
+    overload,
+)
+
+from .._private import yaml
+from ._utils import run
+
+
+def state_delete(key: str):
+    """Delete server-side-state key value pairs.
+
+    Args:
+        key: The key of the server-side state to delete.
+    """
+    run('state-delete', key)
+
+
+@overload
+def state_get(key: str) -> str: ...
+@overload
+def state_get(key: None) -> dict[str, str]: ...
+def state_get(key: str | None) -> dict[str, str] | str:
+    """Get server-side-state value.
+
+    Args:
+        key: The key of the server-side state to get. If ``None``, get all keys
+            and values.
+    """
+    args = ['state-get', '--format=json']
+    if key is not None:
+        args.append(key)
+    result = json.loads(run(*args))
+    return cast('dict[str, str]', result) if key is None else cast('str', result)
+
+
+def state_set(data: Mapping[str, str]):
+    """Set server-side-state values.
+
+    Args:
+        data: The key-value pairs to set in the server-side state.
+    """
+    args = ['state-set', '--file', '-']
+    content = yaml.safe_dump(data)
+    run(*args, input=content)

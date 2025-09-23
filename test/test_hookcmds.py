@@ -25,6 +25,7 @@ from typing import Any, Generator
 import pytest
 
 from ops import hookcmds
+from ops.hookcmds._types import StatusDict
 
 # Call, Run, and NamedTemporaryFile are heavily based on the mocks of the same
 # names in Jubilant: https://github.com/canonical/jubilant/blob/main/tests/unit/mocks.py
@@ -415,7 +416,7 @@ def test_state_set(run: Run):
 
 
 def test_status_get(run: Run):
-    unit: hookcmds._StatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
+    unit: StatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
     run.handle(
         ['status-get', '--include-data', '--format=json', '--application=false'],
         stdout=json.dumps(unit),
