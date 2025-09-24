@@ -1,0 +1,24 @@
+---
+name: test-secrets
+type: charm
+title: Test secrets
+summary: Test secrets
+description: A charm to test the fidelity of Ops API for Juju secrets.
+
+base: ubuntu@24.04
+platforms:
+    amd64:
+
+parts:
+    test-secrets:
+        plugin: charm
+        source: .
+
+actions:
+    exec:
+        description: Execute arbitrary Python code in an event handler.
+        required: [code]
+        params:
+            code:
+                type: string
+                description: The Python code to run.

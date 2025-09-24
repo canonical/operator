@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import ast
 import datetime
+import inspect
+import json
+import textwrap
+from typing import Any, Callable, NamedTuple
+from unittest.mock import ANY
 
 import pytest
 from ops.charm import CharmBase
-from ops.framework import Framework
+from ops.framework import Framework, StoredState
 from ops.model import ModelError
 from ops.model import Secret as ops_Secret
 from ops.model import SecretNotFoundError, SecretRotate
@@ -590,3 +596,146 @@ def test_default_values():
     assert secret.rotate is None
     assert secret.expire is None
     assert secret.remote_grants == {}
+
+
+class TestSecretsCharm(CharmBase):
+    """Protocol for the test secrets charm."""
+
+    _stored: StoredState
+
+
+UnitCode = Callable[[TestSecretsCharm, dict[str, Any]], None]
+"""
+Python code that will be executed in the test charm is defined
+as a function with this type.
+
+Arguments names must be exactly these, if used:
+    self: TestSecretsCharm
+    rv: dict[str, Any]
+"""
+
+ScenarioAssertions = Callable[[Secret | None, dict[str, Any] | None], None]
+"""
+Python code that validates the results of the above.
+
+Example:
+
+assert result == {
+    '_before': None,
+    '_after': {
+        'info': {
+            'id': ANY,
+            'label': None,
+            'revision': 1,
+            'expires': None,
+            'rotation': None,
+            'rotates': None,
+            'description': None,
+        },
+        'tracked': {'foo': 'bar'},
+        'latest': {'foo': 'bar'},
+    },
+}
+
+assert secret
+assert secret.owner == 'application'
+assert not secret.remote_grants
+"""
+
+
+def py_to_src(func: UnitCode) -> str:
+    func_src = inspect.getsource(func)
+    func_def = ast.parse(func_src).body[0]
+    assert isinstance(func_def, ast.FunctionDef)
+    return '\n'.join(textwrap.dedent(ast.unparse(stmt)) for stmt in func_def.body)
+
+
+class TestCase(NamedTuple):
+    name: str | None
+    unit_code: UnitCode
+    scenario_assertions: ScenarioAssertions | None
+    # Later:
+    # - jubilant_assertions
+    # - setup?
+    # - teardown?
+
+
+def code1(self: TestSecretsCharm, rv: dict[str, Any]):
+    """Add secret with content."""
+    secret: ops_Secret = self.app.add_secret({'foo': 'bar'})
+    secret_id = secret.id
+    self._stored.secret_id = secret_id
+
+
+def code1_assert(secret: Secret | None, result: dict[str, Any] | None) -> None:
+    assert result == {
+        '_before': None,
+        '_after': {
+            'info': ANY,  # relying on scaffolding check
+            'tracked': {'foo': 'bar'},
+            'latest': {'foo': 'bar'},
+        },
+    }
+
+    assert secret
+    assert secret.owner == 'application'
+    assert not secret.remote_grants
+
+
+TEST_CASES = [
+    TestCase(code1.__doc__, code1, code1_assert),
+]
+
+
+@pytest.mark.parametrize('test_case', TEST_CASES, ids=[t.name for t in TEST_CASES])
+def test_secret_something(secrets_context: Context[CharmBase], test_case: TestCase):
+    state = State(leader=True)
+    code = py_to_src(test_case.unit_code)
+    state = secrets_context.run(secrets_context.on.action('exec', params={'code': code}), state)
+    secret = next(iter(state.secrets))
+
+    assert secrets_context.action_results
+    result = json.loads(secrets_context.action_results['rv'])
+    info = result['_after']['info']
+
+    # Verify that the unit and the scaffolding see the same data
+    assert secret.id == info['id']
+    assert secret.label == info['label']
+    assert secret._tracked_revision == info['revision']
+    assert secret._latest_revision == info['revision']
+    assert secret.expire == info['expires']
+    assert secret.rotate == info['rotates']
+    # rotation is not represented in ops[testing]
+    assert secret.description == info['description']
+    assert secret.description == info['description']
+
+    # Note that if a unit modifies the secret content,
+    # it can see the new values with `--refresh` right away,
+    # but it doesn't see the new revision until the hook exits
+    #
+    # Example:
+    # juju exec --unit hexanator/1 "
+    #     secret-get --refresh d39p607mp25c761jrfc0;
+    #     secret-info-get d39p607mp25c761jrfc0;
+    #     secret-set d39p607mp25c761jrfc0 val=key77;
+    #     secret-get --refresh d39p607mp25c761jrfc0;
+    #     secret-info-get d39p607mp25c761jrfc0;
+    # "
+    # val: key56
+    # d39p607mp25c761jrfc0:
+    #   revision: 2
+    #   label: "77"
+    #   owner: application
+    #   rotation: never
+    # val: key77
+    # d39p607mp25c761jrfc0:
+    #   revision: 2
+    #   label: "77"
+    #   owner: application
+    #   rotation: never
+
+    assert secret.tracked_content == result['_after']['tracked']
+    assert secret.latest_content == result['_after']['latest']
+
+    if test_case.scenario_assertions:
+        test_case.scenario_assertions(secret, result)
