@@ -29,7 +29,7 @@ from), and also the [canonical/charmcraft](https://github.com/canonical/charmcra
 ideally checked out to the branch that is used for the `stable` version of the Charmcraft docs.
 
 ```command
-python3 .github/update-best-practice-table/main.py \
+python3 .github/update-best-practice-table.py \
     --path-to-charmcraft=../charmcraft > docs/reuse/best-practices.txt
 
 # Check the modifications in the current branch.
