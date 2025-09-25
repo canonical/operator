@@ -79,15 +79,43 @@ def secret_add(
 def secret_get(
     *,
     id: str,
-    refresh: bool = False,
-    peek: bool = False,
+    refresh: Literal[False] = False,
+    peek: Literal[False] = False,
 ) -> dict[str, str]: ...
 @overload
 def secret_get(
     *,
     label: str,
-    refresh: bool = False,
-    peek: bool = False,
+    refresh: Literal[False] = False,
+    peek: Literal[False] = False,
+) -> dict[str, str]: ...
+@overload
+def secret_get(
+    *,
+    id: str,
+    refresh: Literal[True],
+    peek: Literal[False] = False,
+) -> dict[str, str]: ...
+@overload
+def secret_get(
+    *,
+    label: str,
+    refresh: Literal[True],
+    peek: Literal[False] = False,
+) -> dict[str, str]: ...
+@overload
+def secret_get(
+    *,
+    id: str,
+    refresh: Literal[False] = False,
+    peek: Literal[True],
+) -> dict[str, str]: ...
+@overload
+def secret_get(
+    *,
+    label: str,
+    refresh: Literal[False] = False,
+    peek: Literal[True],
 ) -> dict[str, str]: ...
 def secret_get(
     *,
