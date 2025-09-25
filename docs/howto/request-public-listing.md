@@ -56,7 +56,7 @@ Open a [listing request issue](https://github.com/canonical/charmhub-listing-rev
 3. Information for the reviewer to verify that the charm behaves as expected.
 4. URLs for CI workflows and specific documentation.
 
-Creating your issue will trigger automation that will assign the review to a team, and add a comment that explains the review process and includes a checklist of the review criteria.
+Creating your issue will automatically assign the review to a team and add a comment that explains the review process. The comment includes a checklist of the review criteria.
 
 ```{tip}
 To provide additional information to the reviewer or respond to review feedback, add a comment on the issue. Avoid editing the issue description. Our automation uses the data in the description to perform automated checks, which speeds up the review process.
