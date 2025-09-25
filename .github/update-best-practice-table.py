@@ -26,7 +26,7 @@ Ops documentation.
 
 You'll need a clone of the `operator` repository (presumably the one you're running this command
 from), and also the [canonical/charmcraft](https://github.com/canonical/charmcraft) repository,
-ideally checked out to the branch that is used for the `stable` version of the Charmcraft docs.
+ideally checked out to the main branch at HEAD.
 
 ```command
 python3 .github/update-best-practice-table.py \
@@ -161,7 +161,7 @@ def main():
         (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/', make_ops_ref, None),
         (
             args.path_to_charmcraft / 'docs',
-            'https://documentation.ubuntu.com/charmcraft/stable/',
+            'https://documentation.ubuntu.com/charmcraft/latest/',
             make_charmcraft_ref,
             '{external+charmcraft:ref}',
         ),
