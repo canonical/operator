@@ -28,14 +28,12 @@ import sys
 import github
 import github.GitRelease
 import github.Repository
+import rich.logging
 
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]
+)
 logger = logging.getLogger('release')
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
 
 if 'GITHUB_TOKEN' not in os.environ:
     raise SystemExit('Environment variable GITHUB_TOKEN not set.')

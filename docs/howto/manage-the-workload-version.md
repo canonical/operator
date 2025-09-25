@@ -80,28 +80,20 @@ def test_workload_version_is_set():
 
 To verify that setting the workload version works correctly in an integration test, get the status
 of the model, and check the `workload_version` attribute of the unit. In your
-`tests/integration/test_charm.py` file, after the `test_build_and_deploy` test
-that `charmcraft init` provides, add a new test that verifies the workload
+`tests/integration/test_charm.py` file, replace the `test_build_and_deploy` test
+that `charmcraft init` provides, and add a new test that verifies the workload
 version is set. For example:
 
 ```python
-# `charmcraft init` will provide you with this test.
-async def test_build_and_deploy(ops_test: OpsTest):
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
+def test_deploy(charm: Path, juju: jubilant.Juju):
+    """Deploy the charm under test."""
+    juju.deploy(f'./{charm}')
+    juju.wait(jubilant.all_active)
 
-    # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
-    )
 
-async def test_workload_version_is_set(ops_test: OpsTest):
+def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
-    status = await ops_test.model.get_status()
-    version = status.applications[APP_NAME].units[f"{APP_NAME}/0"].workload_version
+    version = juju.status().apps["your-app"].version
     # We'll need to update this version every time we upgrade to a new workload
     # version. If the workload has an API or some other way of getting the
     # version, the test should get it from there and use that to compare to the
@@ -109,8 +101,4 @@ async def test_workload_version_is_set(ops_test: OpsTest):
     assert version == "3.14"
 ```
 
-<!---
-No "see more" link: this is not currently documented in the pylibjuju docs.
--->
-
-> Examples: [synapse checking that the unit's workload version matches the one reported by the server](https://github.com/canonical/synapse-operator/blob/778bcd414644c922373d542a304be14866835516/tests/integration/test_charm.py#L139)
+> See more: [](jubilant.Juju.status)

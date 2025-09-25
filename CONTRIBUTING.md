@@ -100,8 +100,8 @@ We do note when features behave differently when using different versions of Juj
 In docstrings:
 
 - Use `.. jujuadded:: x.y` to indicate that the feature is only available when using version x.y (or higher) of Juju.
-- Use `.. jujuchanged:: x.y` when the feature's behaviour _in Ops_ changes.
-- Use `.. jujuremoved:: x.y` when the feature will be available in Ops but not in that version (or later) of Juju.
+- Use `.. jujuchanged:: x.y` when the feature's behaviour changed in version x.y of Juju.
+- Use `.. jujuremoved:: x.y` when the feature's behaviour changed in version x.y of Juju.
 
 Similar directives also work in MyST Markdown. For example:
 

@@ -135,6 +135,8 @@ __all__ = [  # noqa: RUF022 `__all__` is not sorted
     'StoredSet',
     'StoredState',
     'StoredStateData',
+    # From jujucontext.py
+    'JujuContext',
     # From jujuversion.py
     'JujuVersion',
     # From model.py
@@ -282,6 +284,8 @@ from .framework import (
     StoredState,
     StoredStateData,
 )
+
+from .jujucontext import JujuContext
 
 from .jujuversion import JujuVersion
 
