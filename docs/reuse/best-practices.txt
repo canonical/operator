@@ -19,13 +19,13 @@
 **[Manage configuration](https://documentation.ubuntu.com/ops/latest/howto/manage-configuration/)**
 - Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`. See [Define a configuration option](#define-a-configuration-option).
 
-**[Manage charms](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/)**
+**[Manage charms](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-charms/)**
 - If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see {external+charmcraft:ref}`specify-a-name`. See {external+charmcraft:ref}`Initialise a charm <initialise-a-charm>`.
 
-**[Manage resources](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-resources/)**
+**[Manage resources](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-resources/)**
 - For resources that are binary files, provide binaries for all the CPU architectures you intend to support. See {external+charmcraft:ref}`Publish a resource on Charmhub <publish-a-resource>`.
 
-**[``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/)**
+**[``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/latest/reference/files/charmcraft-yaml-file/)**
 - Prefer lowercase alphanumeric action names, and use hyphens (-) to separate words. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some action names be dashed and some be underscored. See {external+charmcraft:ref}`actions <charmcraft-yaml-key-actions>`.
 - Just like Juju, a charm is an opinionated tool. Configure the application with the best defaults (ideally the application is deployable without providing any configuration at deploy time), and only expose application configuration options when necessary. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
 - Prefer lowercase alphanumeric option names, separated with dashes if required. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some config names be dashed and some be underscored. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
