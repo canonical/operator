@@ -17,7 +17,7 @@
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. See [Write a library](#manage-libraries-write-a-library).
 
 **[Manage configuration](https://documentation.ubuntu.com/ops/latest/howto/manage-configuration/)**
-- Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`. See [Define a configuration option](#manage-configuration).
+- Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`. See [Define a configuration option](#define-a-configuration-option).
 
 **[Manage charms](https://documentation.ubuntu.com/charmcraft/stable/howto/manage-charms/)**
 - If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see {external+charmcraft:ref}`specify-a-name`. See {external+charmcraft:ref}`Initialise a charm <initialise-a-charm>`.
