@@ -27,8 +27,8 @@ Review the charm's test coverage:
 
 Ensure your charm's documentation focuses on the charm itself. For workload-specific or Juju-related content, link to the appropriate upstream documentation. A smaller charm can have single-page documentation for its description. A bigger charm should include a full [Diátaxis](https://diataxis.fr) navigation tree. Ensure that the charm has documentation that covers:
 * How to use the charm, including configuration, limitations, and deviations in behaviour from the 'non-charmed' version of the application.
-* How to modify the charm
 * A concise summary of the charm in the `charmcraft.yaml` 'summary' field, and a more detailed description in the `charmcraft.yaml` 'description' field.
+* Guidance for anyone that wants to contribute to the charm's development
 
 The charm should follow documented [best practices](#follow-best-practices).
 
