@@ -19,10 +19,9 @@ Carry out your own review of your charm and its metadata. In particular, make su
 * Some form of CI workflow exists that automatically releases the charm to an unstable channel on commits to the default branch.
 * The charm has integration tests that run on every change to the default branch, and are passing. At minimum, the tests verify that the charm can be deployed and ends up in a success state, and that the charm can be integrated with at least one example for each 'provides' and 'requires' specified (including optional integrations, but excluding tracing) ending up in a success state.
 
-With respect to test coverage of the charm, note that:
+Review the charm's test coverage:
 
 * Unit tests are recommended, but *not* required.
-* A minimal set of integration tests is required, as outlined in the checklist.
 * There is no minimum for test coverage. We suggest that tests cover at least all configuration options and actions, as well as the observed Juju events, but this is not a requirement for listing.
 * Charms may have additional tests in an external location, particularly if the charm has specific resource requirements (such as specific hardware). If this is the case, please mention it in the review request, ideally providing some mechanism for viewing the tests and their results.
 
