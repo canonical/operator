@@ -28,6 +28,9 @@ from ._types import SecretInfo, SecretRotate
 from ._utils import run
 
 
+# We do not offer a `file` argument here as we expect that charms will generally
+# have the data to set in memory. We do always use `--file` ourselves, to ensure
+# that secret data does not end up in the command line.
 def secret_add(
     content: dict[str, str],
     *,
@@ -61,6 +64,8 @@ def secret_add(
         args.extend(['--rotate', rotate.value])
     if owner is not None:
         args.extend(['--owner', owner])
+    # This method of providing the content is not documented, but allows us to
+    # securely pass the secret content.
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:

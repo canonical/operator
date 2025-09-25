@@ -122,6 +122,9 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     return RelationModel._from_dict(cast('RelationModelDict', json.loads(run(*args))))
 
 
+# We don't offer a `file` argument here as we expect that charms will generally
+# have the data to set in memory. We do always use `--file` ourselves, but with
+# stdin rather than a real file.
 def relation_set(
     data: Mapping[str, str],
     id: int | None = None,

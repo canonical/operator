@@ -31,6 +31,8 @@ def storage_add(name: str, count: int = 1):
     run('storage-add', f'{name}={count}')
 
 
+# Juju allows specifying a single attribute to get, but there are only two
+# possible attributes at this time, so it doesn't seem worth exposing that.
 def storage_get(id: str | None = None) -> Storage:
     """Retrieve information for the storage instance with the specified ID.
 
@@ -42,6 +44,7 @@ def storage_get(id: str | None = None) -> Storage:
         id: The ID of the storage instance.
     """
     # TODO: It looks like you can pass in a UUID instead of an identifier.
+    # The documentation doesn't say how to get that UUID, though.
     args = ['storage-get', '--format=json']
     if id is not None:
         args.extend(['-s', id])

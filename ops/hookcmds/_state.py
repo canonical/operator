@@ -52,6 +52,9 @@ def state_get(key: str | None) -> dict[str, str] | str:
     return cast('dict[str, str]', result) if key is None else cast('str', result)
 
 
+# We don't offer a `file` argument here as we expect that charms will generally
+# have the data to set in memory. We do always use `--file` ourselves, but with
+# stdin rather than a real file.
 def state_set(data: Mapping[str, str]):
     """Set server-side-state values.
 

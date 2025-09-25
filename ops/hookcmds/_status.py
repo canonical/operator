@@ -25,6 +25,10 @@ from ._types import AppStatus, AppStatusDict, SettableStatusName, StatusDict, Un
 from ._utils import run
 
 
+# We do not offer an argument to control whether `--include-data` is passed. The
+# data is not large (although it does scale linearly with the number of units),
+# so the method signature is simpler if it is always included and callers can
+# ignore any data they don't need.
 @overload
 def status_get(*, app: Literal[False] = False) -> UnitStatus: ...
 @overload

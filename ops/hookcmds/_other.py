@@ -41,6 +41,10 @@ def application_version_set(version: str):
     run('application-version-set', version)
 
 
+# config-get has an `--all` option, which we do not offer here. When `--all` is
+# specified, Juju returns all config options, including those that are unset and
+# have no default value. We do not currently have a use-case for `--all` and
+# excluding it simplifies the method signature.
 @overload
 def config_get(key: str) -> bool | int | float | str: ...
 @overload
