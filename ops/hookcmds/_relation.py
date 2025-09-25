@@ -64,6 +64,8 @@ def relation_get(
         key: The specific key to get data for, or ``None`` to get all data.
         unit: The unit to get data for, or ``None`` to get data for all units.
     """
+    if key == '-':
+        raise ValueError('To get all keys, pass None for the key argument; "-" is not supported.')
     args = ['relation-get', '--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
