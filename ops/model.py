@@ -62,7 +62,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .jujucontext import _JujuContext
+from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
@@ -1736,6 +1736,9 @@ class Relation:
     """Holds the data buckets for each entity of a relation.
 
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
+
+    Note that peer relation data is not readable or writable during the Juju ``install``
+    event, even though the relation exists. :class:`ModelError` will be raised in that case.
     """
 
     active: bool
@@ -2412,13 +2415,16 @@ class Resources:
         self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
-        """Fetch the resource from the controller or store.
+        """Fetch the resource path from the controller or store.
 
-        If successfully fetched, this returns the path where the resource is stored
-        on disk, otherwise it raises a :class:`NameError`.
+        Returns:
+            The path where the resource is stored on disk.
 
         Raises:
-            NameError: if the resource's path cannot be fetched.
+            NameError: if the resource name is not in the charm metadata.
+            ModelError: if the controller is unable to fetch the resource; for
+                example, if you ``juju deploy`` from a local charm file and
+                forget the appropriate ``--resource``.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -3588,10 +3594,10 @@ class _ModelBackend:
         unit_name: str | None = None,
         model_name: str | None = None,
         model_uuid: str | None = None,
-        juju_context: _JujuContext | None = None,
+        juju_context: JujuContext | None = None,
     ):
         if juju_context is None:
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
         self._juju_context = juju_context
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name

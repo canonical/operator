@@ -1,7 +1,7 @@
 (holistic-vs-delta-charms)=
 # Holistic vs delta charms
 
-Stateless charms are more robust. The charming community developed two approaches to keep charms mostly stateless: "holistic" and "delta".
+The charming community developed two approaches to writing robust, stateless charms: "holistic" and "delta".
 
 - Holistic charms reconcile towards a goal state on every event.
 - Delta charms handle each Juju event individually.
@@ -10,12 +10,13 @@ Stateless charms are more robust. The charming community developed two approache
 
 A typical holistic charm subscribes the same observer method, often called `_reconcile`, to all interesting Juju events.
 The event payload is ignored, and reconciliation progresses towards a defined goal state: typically a functional workload configured appropriately and able to interact with the related applications.
+
 This implies that a holistic charm has to fetch all the state it needs: the state of the current unit, and any workload state.
 The observer then "rewrites the world": updates all the Juju state it needs to, overwrites the workload configuration, and instructs the workload to reload its configuration.
 
 ### Why reconcile?
 
-Conceptually, a Juju event informs the unit that a specific thing has changed at a predefined level in the Juju event model, while the charm author wants the charm to process a unit's logical state at the workload's own granularity.
+Conceptually, a Juju event informs the unit that a specific thing has changed in the Juju event model, while the charm author wants the charm to process a unit's logical state at the workload's own granularity. For example:
 
 ```{list-table}
 :header-rows: 1
@@ -34,11 +35,15 @@ Conceptually, a Juju event informs the unit that a specific thing has changed at
 
 Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that a configuration value has changed, `relation-changed` says that relation data has changed.
 
-However, this only goes so far: `config-changed` doesn't tell the charm which configuration keys have changed or whether configuration has become valid; `relation-changed` doesn't tell the charm how the relation data has changed or whether the data can be parsed.
+However, this only goes so far.
+The `config-changed` event doesn't tell the charm which configuration keys have changed or whether configuration has become valid.
+The `relation-changed` event doesn't tell the charm how the relation data has changed or whether the data can be parsed.
 
-In addition, the charm may receive an event like `config-changed` before it's ready to handle it, for example, if the container is not yet ready. In such cases, a delta charm may defer the event (effectively storing a small amount of state) or could try to wait for both events to occur using intricate, error-prone custom logic.
+In addition, the charm may receive an event like `config-changed` before it's ready to handle it, for example, if the container is not yet ready.
+In such cases, a delta charm may defer the event, effectively storing a small amount of state.
 
-The holistic approach side-steps this disparity and applies a single code path, `_reconcile`, to all events of interest, which scrapes all state it needs to perform computation, and updates all writable state.
+The holistic approach side-steps this disparity and applies a single code path, `_reconcile`, to all events of interest.
+The code path reads all state it needs to perform computation, and updates all writable state.
 
 ### Example
 
@@ -53,8 +58,8 @@ def __init__(self, framework: ops.Framework):
     events = [
         self.on.start,
         self.on.config_changed,
-        self.on.foo_relation_changed,
-        self.on.bar_relation_changed,
+        self.on['foo'].relation_changed,
+        self.on['bar'].relation_changed,
         ...
     ]
 
@@ -67,7 +72,11 @@ def _reconcile(self, _: ops.EventBase):
     foo_ready = self.foo.is_ready
     bar_ready = self.bar.is_ready
     
-    if workload_ready and foo_ready and bar_ready:
+    if not workload_ready or not foo_ready or not bar_ready:
+        # Status will be set in `_on_collect_unit_status`
+        return
+
+    try:
         # Read the inputs: configuration, libraries and the workload
         path = self.typed_config.some_path
         foo_value = self.foo.some_relation_property
@@ -80,10 +89,9 @@ def _reconcile(self, _: ops.EventBase):
         # Write the outputs to the libraries and the workload
         if workload_config != current_config:
             self.workload.update_config_and_restart(workload_config)
-        self.foo.update_some_relation(bar_value)
-        self.bar.update_some_relation(foo_value)
-
-    else:
+        self.foo.update_some_relation_field(bar_value)
+        self.bar.update_some_relation_field(foo_value)
+    except (WorkloadError, FooError, BarError, ops.ModelError, ...):
         # Error handling
         ...
 ```
@@ -91,11 +99,11 @@ def _reconcile(self, _: ops.EventBase):
 The reconciler method above has been reduced for clarity, but is representative of the common reconciler pattern.
 It consists of three main parts in addition to early checks and error handling:
 
-- reading the inputs (configuration, workload and Juju state)
+- reading the inputs (configuration, workload, and Juju environment state)
 - computing the new state
-- writing the output (updating the workload and writing out the Juju state)
+- writing the output (updating the workload and writing environment state)
 
-Well-written charms include helper methods or classes for the workload and use charm libraries to read and write Juju state on charm's relations.
+Well-written charms include helper methods or classes for the workload and use charm libraries to read and write environment state on relations.
 
 You may notice that the role of a complex charm is to cross-connect configuration, workload and libraries.
 In fact, complex charms often use many charm libraries, moving the emphasis towards shovelling data from a set of charm libraries to other charm libraries.
@@ -131,6 +139,7 @@ Juju provides specific event kinds that signal that one "thing" changed: `config
 ```py
 def __init__(self, framework: ops.Framework):
     super().__init__(framework)
+    self.workload = Workload()
     self.framework.observe(self.on.install, self._on_install)
     self.framework.observe(self.on.start, self._on_start)
 
@@ -200,7 +209,7 @@ In a charm following the reconciler pattern, the `_reconcile` method is attached
 - unit lifecycle start events
 - config change event
 - most or all relation events
-- pebble events
+- Pebble events
 - storage events
 
 Consider relations: if a charm declares a relation, it's natural to expect that this unit's behaviour or the remote app behaviour depends on the databag content of the relation.

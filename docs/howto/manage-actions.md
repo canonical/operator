@@ -144,9 +144,9 @@ success checks in every test where the action is successful.
 def test_backup_action_failed():
     ctx = testing.Context(MyCharm)
 
-    with pytest.raises(ops.ActionFailed) as exc_info:
+    with pytest.raises(testing.ActionFailed) as exc_info:
         ctx.run(ctx.on.action('do_backup'), State())
-    assert exc_info.value.message == 'sorry, couldn't do the backup'
+    assert exc_info.value.message == "sorry, couldn't do the backup"
     # The state is also available if that's required:
     assert exc_info.value.state.get_container(...)
 
