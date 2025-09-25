@@ -133,6 +133,10 @@ def relation_set(
 ):
     """Set relation settings.
 
+    Setting the value for a key to the empty string deletes that key. The data
+    is updated with the values provided, not replaced, so any keys that are not
+    specified are left unchanged.
+
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
