@@ -5,8 +5,10 @@
 
 Once your charm is ready for wide production use, your next goal should be to get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches. This requires a lightweight review.
 
-```{note}
-A listing review is **not** code review. The reviewer may be looking at some of the charm code, and may have comments on it, but the listing review is not a review of the architecture or design of the charm, and is not a line-by-line review of the charm code. Do architecture, design, and code review earlier in the charm development process -- reach out in the [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) Matrix channel if you would like assistance.
+A listing review is **not** code review. The reviewer may be looking at some of the charm code, and may have comments on it, but the listing review is not a review of the architecture or design of the charm, and is not a line-by-line review of the charm code. Do architecture, design, and code review earlier in the charm development process.
+
+```{tip}
+Reach out in [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix if you would like assistance with designing and developing your charm.
 ```
 
 ## 1. Check your charm against the public listing criteria
