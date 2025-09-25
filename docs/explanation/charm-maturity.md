@@ -29,10 +29,12 @@ Reviewing charms encourages the involvement of the community. 'Community' refers
 
 ### Roles
 
-|Author|Author of the charm or person representing the organisation. The person submitting the charm for review is called the author in this documentation.|
-|Publisher|The responsible person or organisation for publishing the charm.|
-|Review group|A group of people who watch for review requests, then request changes or assign a suitable reviewer. This is currently the Canonical Charm Tech team.|
-|Reviewer|Person conducting the review.|
+| Role | Description |
+|------|-------------|
+| Author | Author of the charm or person representing the organisation. The person submitting the charm for review is called the author in this documentation. |
+| Publisher | The responsible person or organisation for publishing the charm. |
+| Review group | A group of people who watch for review requests, then request changes or assign a suitable reviewer. This is currently the Canonical Charm Tech team. |
+| Reviewer | Person conducting the review. |
 
 ## Phase 4: Ongoing maintenance and evolution
 
