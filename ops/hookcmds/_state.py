@@ -28,6 +28,9 @@ from ._utils import run
 def state_delete(key: str):
     """Delete server-side-state key value pairs.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/state-delete/
+
     Args:
         key: The key of the server-side state to delete.
     """
@@ -40,6 +43,9 @@ def state_get(key: str) -> str: ...
 def state_get(key: None) -> dict[str, str]: ...
 def state_get(key: str | None) -> dict[str, str] | str:
     """Get server-side-state value.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/state-get/
 
     Args:
         key: The key of the server-side state to get. If ``None``, get all keys
@@ -57,6 +63,9 @@ def state_get(key: str | None) -> dict[str, str] | str:
 # stdin rather than a real file.
 def state_set(data: Mapping[str, str]):
     """Set server-side-state values.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/state-set/
 
     Args:
         data: The key-value pairs to set in the server-side state.

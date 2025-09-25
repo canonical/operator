@@ -36,6 +36,9 @@ def status_get(*, app: Literal[True]) -> AppStatus: ...
 def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     """Get a status of a unit or an application.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/status-get/
+
     Args:
         app: Get status for all units of this application if this unit is the leader.
     """
@@ -49,6 +52,9 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
 
 def status_set(status: SettableStatusName, message: str = '', *, app: bool = False):
     """Set a status of a unit or an application.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/status-set/
 
     Args:
         status: The status to set.

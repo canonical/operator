@@ -28,6 +28,9 @@ from ._utils import format_action_result_dict, run
 def action_fail(message: str | None = None):
     """Set action fail status with message.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-fail/
+
     Args:
         message: the failure error message. Juju will provide a default message
             if one is not provided.
@@ -49,6 +52,9 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
     dotted key (for example foo.bar) is passed, ``action_get`` will recurse into
     the parameter map as needed.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-get/
+
     Args:
         key: The key of the action parameter to retrieve. If not provided, all
             parameters will be returned.
@@ -63,6 +69,9 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
 def action_log(message: str):
     """Record a progress message for the current action.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-log/
+
     Args:
         message: The progress message to provide to the Juju user.
     """
@@ -71,6 +80,9 @@ def action_log(message: str):
 
 def action_set(results: Mapping[str, Any]):
     """Set action results.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-set/
 
     Args:
         results: The results map of the action, provided to the Juju user.

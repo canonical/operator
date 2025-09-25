@@ -24,6 +24,9 @@ from ._utils import run
 def storage_add(name: str, count: int = 1):
     """Add storage instances.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-add/
+
     Args:
         count: How many instances of the storage to create.
         name: The name of the storage to create.
@@ -40,6 +43,9 @@ def storage_get(id: str | None = None) -> Storage:
     event, in which case Juju will use the ID of the storage that triggered the
     event.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-get/
+
     Args:
         id: The ID of the storage instance.
     """
@@ -54,6 +60,9 @@ def storage_get(id: str | None = None) -> Storage:
 
 def storage_list(name: str | None = None) -> list[str]:
     """List storage attached to the unit.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-list/
 
     Args:
         name: Only list storage with this name.

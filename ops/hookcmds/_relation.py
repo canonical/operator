@@ -54,6 +54,9 @@ def relation_get(
     event, in which case Juju will use the ID of the relation that triggered the
     event.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-get/
+
     Args:
         app: Get the relation data for the overall application, not just a unit
         id: The ID of the relation to get data for, or ``None`` to get data for
@@ -79,6 +82,9 @@ def relation_get(
 def relation_ids(name: str) -> list[str]:
     """List all relation IDs for the given endpoint.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-ids/
+
     Args:
         name: the endpoint name.
     """
@@ -91,6 +97,9 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-list/
 
     Args:
         id: The ID of the relation to list units for, or ``None`` to list units
@@ -111,6 +120,9 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-model-get/
 
     Args:
         id: The ID of the relation to get data for, or ``None`` to get data for
@@ -140,6 +152,9 @@ def relation_set(
     Note that ``id`` can only be ``None`` if the current hook is a relation
     event, in which case Juju will use the ID of the relation that triggered the
     event.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-set/
 
     Args:
         data: The relation data to set.

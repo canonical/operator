@@ -48,7 +48,11 @@ def close_port(
     to_port: int | None = None,
     endpoints: str | Iterable[str],
 ):
-    """Register a request to close a port or port range."""
+    """Register a request to close a port or port range.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/close-port/
+    """
     args = ['close-port']
     if endpoints:
         if isinstance(endpoints, str):
@@ -91,6 +95,9 @@ def open_port(
 ):
     """Register a request to open a port or port range.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/open-port/
+
     Args:
         protocol: Open the port(s) for the specified protocol.
         port: If ``to_port`` is not specified, open only this port.
@@ -120,6 +127,9 @@ def open_port(
 
 def opened_ports(*, endpoints: bool = False) -> list[Port]:
     """List all ports or port ranges opened by the unit.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/opened-ports/
 
     Args:
         endpoints: If ``True``, each entry in the port list will be augmented

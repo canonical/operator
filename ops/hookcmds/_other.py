@@ -32,6 +32,9 @@ from ._utils import run
 def application_version_set(version: str):
     """Specify which version of the application is deployed.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/application-version-set/
+
     Args:
         version: the version of the application software the unit is running.
             This could be a package version number or some other useful identifier,
@@ -61,6 +64,9 @@ def config_get(
     value. If called with a key, it returns the value of that config option.
     Missing config keys are reported as nulls, and do not return an error.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/config-get/
+
     Args:
         key: The configuration option to retrieve.
     """
@@ -74,13 +80,21 @@ def config_get(
 
 
 def credential_get() -> CloudSpec:
-    """Access cloud credentials."""
+    """Access cloud credentials.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/credential-get/
+    """
     result = json.loads(run('credential-get', '--format=json'))
     return CloudSpec.from_dict(cast('dict[str, Any]', result))
 
 
 def goal_state() -> GoalState:
-    """Print the status of the charm's peers and related units."""
+    """Print the status of the charm's peers and related units.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/goal-state/
+    """
     result = cast('GoalStateDict', json.loads(run('goal-state', '--format=json')))
     return GoalState._from_dict(result)
 
@@ -90,6 +104,9 @@ def is_leader() -> bool:
 
     The value is not cached. It is accurate for 30s from the time the method is
     successfully called.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/
     """
     leader = json.loads(run('is-leader', '--format=json'))
     return cast('bool', leader)
@@ -100,6 +117,9 @@ def juju_log(
 ):
     """Write a message to the juju log.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-log/
+
     Args:
         message: The message to log.
         level: Send the message at the given level.
@@ -109,6 +129,9 @@ def juju_log(
 
 def juju_reboot(*, now: bool = False):
     """Reboot the host machine.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-reboot/
 
     Args:
         now: Reboot immediately, killing the invoking process.
@@ -137,6 +160,9 @@ def juju_reboot(*, now: bool = False):
 def network_get(binding_name: str, *, relation_id: int | None = None) -> Network:
     """Get network config.
 
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/network-get/
+
     Args:
         binding_name: A name of a binding (relation name or extra-binding name).
         relation_id: An optional relation id to get network info for.
@@ -151,6 +177,9 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
 
 def resource_get(name: str) -> pathlib.Path:
     """Get the path to the locally cached resource file.
+
+    For more details, see:
+    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/resource-get/
 
     Args:
         name: The name of the resource.
