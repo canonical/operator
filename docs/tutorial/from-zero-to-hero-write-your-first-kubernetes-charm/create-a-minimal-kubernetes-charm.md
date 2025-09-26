@@ -289,7 +289,7 @@ bases:
 ```
 
 
-Aaaand that's it! Time to validate your charm!
+And that's it! Time to validate your charm!
 
 ```{tip}
 

@@ -58,7 +58,7 @@ def _on_config_changed(self, event):
     self._stored.current_mode = mode
 ```
 
-We advise against doing this. We have added one to the list of places that attempt to track `ExampleBlog`'s "mode". In addition to the config file on disk, the Juju config, and the actual state of the running code, we've added a fourth "instance" of the state: "current_mode" in our `StoredState` object. We've doubled the number of possible states of this part of the system from 8 to 16, without increasing the number of correct states. There are still only two: all set to `test`, or all set to `production`. We have essentially halved the reliability of this part of our code.
+We advise against doing this. We have added one to the list of places that attempt to track `ExampleBlog`'s "mode". In addition to the config file on disk, the Juju config, and the actual state of the running code, we've added a fourth "instance" of the state: `current_mode` in our `StoredState` object. We've doubled the number of possible states of this part of the system from 8 to 16, without increasing the number of correct states. There are still only two: all set to `test`, or all set to `production`. We have essentially halved the reliability of this part of our code.
 
 ## Differences in StoredState behaviour across substrates
 
