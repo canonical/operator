@@ -45,7 +45,7 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     args = ['status-get', '--include-data', '--format=json', f'--application={str(app).lower()}']
     result = json.loads(run(*args))
     if app:
-        app_status = cast('AppStatusDict', result['application-status'])
+        app_status = cast('AppStatusDict', result)
         return AppStatus._from_dict(app_status)
     return UnitStatus._from_dict(cast('StatusDict', result))
 

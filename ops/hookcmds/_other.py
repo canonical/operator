@@ -140,6 +140,7 @@ def juju_reboot(*, now: bool = False):
         run('juju-reboot', '--now')
         # Juju will kill this process, but to avoid races we force that to be the case.
         sys.exit()
+        return  # Make it simpler to mock out sys.exit() in tests.
     run('juju-reboot')
 
 

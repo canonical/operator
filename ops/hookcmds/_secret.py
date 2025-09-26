@@ -25,7 +25,7 @@ from typing import (
 )
 
 from ._types import SecretInfo, SecretRotate
-from ._utils import run
+from ._utils import datetime_to_iso, run
 
 
 # We do not offer a `file` argument here as we expect that charms will generally
@@ -62,7 +62,7 @@ def secret_add(
         if isinstance(expire, str):
             args.extend(['--expire', expire])
         else:
-            args.extend(['--expire', expire.isoformat()])
+            args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate.value])
     if owner is not None:
@@ -282,7 +282,7 @@ def secret_set(
         if isinstance(expire, str):
             args.extend(['--expire', expire])
         else:
-            args.extend(['--expire', expire.isoformat()])
+            args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate.value])
     if owner is not None:

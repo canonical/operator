@@ -31,7 +31,7 @@ def close_port(
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ) -> None: ...
 @overload
 def close_port(
@@ -39,14 +39,14 @@ def close_port(
     port: int,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ) -> None: ...
 def close_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
-    endpoints: str | Iterable[str],
+    endpoints: str | Iterable[str] | None = None,
 ):
     """Register a request to close a port or port range.
 

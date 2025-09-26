@@ -114,3 +114,11 @@ def datetime_from_iso(dt: str) -> datetime.datetime:
     """Converts a Juju-specific ISO 8601 string to a datetime object."""
     # Older versions of Python cannot handle the 'Z'.
     return datetime.datetime.fromisoformat(dt.replace('Z', '+00:00'))
+
+
+def datetime_to_iso(dt: datetime.datetime) -> str:
+    """Converts a datetime object to a Juju-specific ISO 8601 string."""
+    # Older versions of Python cannot generate the 'Z'.
+    if dt.tzinfo == datetime.timezone.utc:
+        return dt.isoformat().replace('+00:00', 'Z')
+    return dt.isoformat()

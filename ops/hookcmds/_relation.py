@@ -71,10 +71,10 @@ def relation_get(
         args.extend(['-r', str(id)])
     if app:
         args.append('--app')
-    if key is not None:
-        args.append(key)
     if unit is not None:
         args.append(unit)
+    if key is not None:
+        args.append(key)
     result = json.loads(run(*args))
     if key is not None:
         return cast('str', result)

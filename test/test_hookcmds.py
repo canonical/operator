@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import ipaddress
 import json
 import pathlib
@@ -25,7 +26,6 @@ from typing import Any, Generator
 import pytest
 
 from ops import hookcmds
-from ops.hookcmds._types import StatusDict
 
 # Call, Run, and NamedTemporaryFile are heavily based on the mocks of the same
 # names in Jubilant: https://github.com/canonical/jubilant/blob/main/tests/unit/mocks.py
@@ -178,6 +178,14 @@ def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirecto
     yield dir_mock
 
 
+def test_run_error(run: Run):
+    run.handle(['juju-log', '--log-level', 'INFO', 'msg'], returncode=1, stderr='error msg')
+    with pytest.raises(hookcmds.Error) as excinfo:
+        hookcmds.juju_log('msg')
+    assert excinfo.value.returncode == 1
+    assert excinfo.value.stderr == 'error msg'
+
+
 def test_action_fail(run: Run):
     run.handle(['action-fail'])
     hookcmds.action_fail()
@@ -210,20 +218,46 @@ def test_action_set(run: Run):
     hookcmds.action_set({'foo': 'bar', 'baz': 'qux'})
 
 
+def test_action_set_nested(run: Run):
+    run.handle(['action-set', 'foo=bar', 'baz.baz2=qux'])
+    hookcmds.action_set({'foo': 'bar', 'baz': {'baz2': 'qux'}})
+
+
 def test_application_version_set(run: Run):
     run.handle(['application-version-set', '1.2.3'])
     hookcmds.application_version_set('1.2.3')
 
 
 def test_close_port(run: Run):
+    run.handle(['close-port', 'icmp'])
+    hookcmds.close_port('icmp')
+
+
+def test_close_port_endpoints(run: Run):
     run.handle(['close-port', '--endpoints', 'ep1', '8080/tcp'])
     hookcmds.close_port(protocol='tcp', port=8080, endpoints='ep1')
+
+
+def test_close_port_single(run: Run):
+    run.handle(['close-port', '8080/tcp'])
+    hookcmds.close_port(protocol='tcp', port=8080)
+
+
+def test_close_port_range(run: Run):
+    run.handle(['close-port', '8080-8090/tcp'])
+    hookcmds.close_port(protocol='tcp', port=8080, to_port=8090)
 
 
 def test_config_get(run: Run):
     run.handle(['config-get', '--format=json'], stdout='{"foo": "bar"}')
     result = hookcmds.config_get()
     assert result == {'foo': 'bar'}
+
+
+def test_config_get_key(run: Run):
+    run.handle(['config-get', '--format=json', 'baz'], stdout='42')
+    result = hookcmds.config_get('baz')
+    assert result == 42
 
 
 def test_credential_get(run: Run):
@@ -266,10 +300,28 @@ def test_juju_log(run: Run):
     hookcmds.juju_log('msg')
 
 
-def test_juju_reboot(run: Run, monkeypatch: pytest.MonkeyPatch):
+def test_juju_log_level(run: Run):
+    run.handle(['juju-log', '--log-level', 'DEBUG', 'debug msg'])
+    hookcmds.juju_log('debug msg', level='DEBUG')
+
+
+def test_juju_reboot(run: Run):
     run.handle(['juju-reboot'])
-    monkeypatch.setattr('sys.exit', lambda: None)
     hookcmds.juju_reboot()
+
+
+def test_juju_reboot_now(run: Run, monkeypatch: pytest.MonkeyPatch):
+    run.handle(['juju-reboot', '--now'])
+
+    exit_called = False
+
+    def patched_exit():
+        nonlocal exit_called
+        exit_called = True
+
+    monkeypatch.setattr('sys.exit', patched_exit)
+    hookcmds.juju_reboot(now=True)
+    assert exit_called
 
 
 def test_network_get(run: Run):
@@ -295,9 +347,40 @@ def test_network_get(run: Run):
     assert result.ingress_addresses[0] == ipaddress.ip_address('127.0.0.1')
 
 
+def test_network_get_relation_id(run: Run):
+    net = {
+        'bind-addresses': [
+            {
+                'mac-address': 'aa:bb',
+                'interface-name': 'eth0',
+                'addresses': [{'hostname': 'host', 'value': '127.0.0.1', 'cidr': '127.0.0.0/24'}],
+            }
+        ],
+        'egress-subnets': ['127.0.0.0/24'],
+        'ingress-addresses': ['127.0.0.1'],
+    }
+    run.handle(['network-get', '-r', '123', 'bind', '--format=json'], stdout=json.dumps(net))
+    hookcmds.network_get('bind', relation_id=123)
+
+
 def test_open_port(run: Run):
+    run.handle(['open-port', 'icmp'])
+    hookcmds.open_port('icmp')
+
+
+def test_open_port_endpoints(run: Run):
     run.handle(['open-port', '--endpoints', 'ep1', '8080/tcp'])
     hookcmds.open_port(protocol='tcp', port=8080, endpoints='ep1')
+
+
+def test_open_port_single(run: Run):
+    run.handle(['open-port', '8080/tcp'])
+    hookcmds.open_port(protocol='tcp', port=8080)
+
+
+def test_open_port_range(run: Run):
+    run.handle(['open-port', '8080-8090/tcp'])
+    hookcmds.open_port(protocol='tcp', port=8080, to_port=8090)
 
 
 def test_opened_ports(run: Run):
@@ -307,10 +390,53 @@ def test_opened_ports(run: Run):
     assert result[0].protocol == 'tcp'
 
 
-def test_relation_get(run: Run):
-    run.handle(['relation-get', '--format=json'], stdout='{"foo": "bar"}')
-    result = hookcmds.relation_get()
+def test_opened_ports_endpoints(run: Run):
+    run.handle(
+        ['opened-ports', '--endpoints', '--format=json'],
+        stdout='["8080/tcp (ep1,ep2)"]',
+    )
+    result = hookcmds.opened_ports(endpoints=True)
+    assert result[0].port == 8080
+    assert result[0].protocol == 'tcp'
+    assert result[0].endpoints == ['ep1', 'ep2']
+
+
+@pytest.mark.parametrize('id', [None, 123])
+@pytest.mark.parametrize('app', [False, True])
+@pytest.mark.parametrize('unit', [None, 'myapp/0'])
+def test_relation_get(run: Run, id: int | None, app: bool, unit: str | None):
+    cmd = ['relation-get', '--format=json']
+    if id:
+        cmd.extend(['-r', str(id)])
+    if app:
+        cmd.append('--app')
+    if unit:
+        cmd.append(unit)
+    run.handle(cmd, stdout='{"foo": "bar"}')
+    result = hookcmds.relation_get(id=id, app=app, unit=unit)
     assert result == {'foo': 'bar'}
+
+
+@pytest.mark.parametrize('id', [None, 123])
+@pytest.mark.parametrize('app', [False, True])
+@pytest.mark.parametrize('unit', [None, 'myapp/0'])
+def test_relation_get_key(run: Run, id: int | None, app: bool, unit: str | None):
+    cmd = ['relation-get', '--format=json']
+    if id:
+        cmd.extend(['-r', str(id)])
+    if app:
+        cmd.append('--app')
+    if unit:
+        cmd.append(unit)
+    cmd.append('baz')
+    run.handle(cmd, stdout='"qux"')
+    result = hookcmds.relation_get(key='baz', id=id, app=app, unit=unit)
+    assert result == 'qux'
+
+
+def test_relation_get_dash():
+    with pytest.raises(ValueError):
+        hookcmds.relation_get(key='-')
 
 
 def test_relation_ids(run: Run):
@@ -319,22 +445,41 @@ def test_relation_ids(run: Run):
     assert result == ['rel:1']
 
 
-def test_relation_list(run: Run):
-    run.handle(['relation-list', '--format=json'], stdout='["unit/0"]')
-    result = hookcmds.relation_list()
+@pytest.mark.parametrize('id', [None, 123])
+@pytest.mark.parametrize('app', [False, True])
+def test_relation_list(run: Run, id: int | None, app: bool):
+    cmd = ['relation-list', '--format=json']
+    if app:
+        cmd.append('--app')
+    if id is not None:
+        cmd.extend(['-r', str(id)])
+    run.handle(cmd, stdout='["unit/0"]')
+    result = hookcmds.relation_list(id=id, app=app)
     assert result == ['unit/0']
 
 
-def test_relation_model_get(run: Run):
+@pytest.mark.parametrize('id', [None, 123])
+def test_relation_model_get(run: Run, id: int | None):
     data = {'uuid': str(uuid.uuid4())}
-    run.handle(['relation-model-get', '--format=json'], stdout=json.dumps(data))
-    result = hookcmds.relation_model_get()
+    cmd = ['relation-model-get', '--format=json']
+    if id is not None:
+        cmd.extend(['-r', str(id)])
+    run.handle(cmd, stdout=json.dumps(data))
+    result = hookcmds.relation_model_get(id=id)
     assert str(result.uuid) == data['uuid']
 
 
-def test_relation_set(run: Run, mock_file: NamedTemporaryFile):
-    run.handle(['relation-set', '--file', '-'])
-    hookcmds.relation_set({'foo': 'bar'})
+@pytest.mark.parametrize('id', [None, 123])
+@pytest.mark.parametrize('app', [False, True])
+def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, app: bool):
+    cmd = ['relation-set']
+    if app:
+        cmd.append('--app')
+    if id is not None:
+        cmd.extend(['-r', str(id)])
+    cmd.extend(['--file', '-'])
+    run.handle(cmd)
+    hookcmds.relation_set({'foo': 'bar'}, id=id, app=app)
     assert run.calls[0].stdin == 'foo: bar\n'
 
 
@@ -350,9 +495,74 @@ def test_secret_add(run: Run, mock_temp_dir: str):
     assert result == 'secretid'
 
 
-def test_secret_get(run: Run):
-    run.handle(['secret-get', '--format=json', 'secret:123'], stdout='{"foo": "bar"}')
-    result = hookcmds.secret_get(id='secret:123')
+@pytest.mark.parametrize('owner', ['application', 'unit'])
+def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: str):
+    run.handle(
+        [
+            'secret-add',
+            '--label',
+            'mylabel',
+            '--description',
+            'mydesc',
+            '--expire',
+            '3d',
+            '--rotate',
+            'quarterly',
+            '--owner',
+            owner,
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
+    result = hookcmds.secret_add(
+        {'foo': 'bar'},
+        label='mylabel',
+        description='mydesc',
+        expire='3d',
+        rotate=hookcmds.SecretRotate.QUARTERLY,
+        owner=owner,
+    )
+    assert result == 'secretid'
+
+
+def test_secret_add_date(run: Run, mock_temp_dir: str):
+    run.handle(
+        [
+            'secret-add',
+            '--expire',
+            '2025-12-31T23:59:59Z',
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
+    result = hookcmds.secret_add(
+        {'foo': 'bar'},
+        expire=datetime.datetime(2025, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc),
+    )
+    assert result == 'secretid'
+
+
+@pytest.mark.parametrize('peek,refresh', [(False, False), (False, True), (True, False)])
+def test_secret_get_id(run: Run, peek: bool, refresh: bool):
+    cmd = ['secret-get', '--format=json', 'secret:123']
+    if peek:
+        cmd.append('--peek')
+    if refresh:
+        cmd.append('--refresh')
+    run.handle(cmd, stdout='{"foo": "bar"}')
+    result = hookcmds.secret_get(id='secret:123', peek=peek, refresh=refresh)
+    assert result == {'foo': 'bar'}
+
+
+@pytest.mark.parametrize('peek,refresh', [(False, False), (False, True), (True, False)])
+def test_secret_get_label(run: Run, peek: bool, refresh: bool):
+    cmd = ['secret-get', '--format=json', '--label', 'lbl']
+    if peek:
+        cmd.append('--peek')
+    if refresh:
+        cmd.append('--refresh')
+    run.handle(cmd, stdout='{"foo": "bar"}')
+    result = hookcmds.secret_get(label='lbl', peek=peek, refresh=refresh)
     assert result == {'foo': 'bar'}
 
 
@@ -361,13 +571,18 @@ def test_secret_grant(run: Run):
     hookcmds.secret_grant('id', 1)
 
 
+def test_secret_grant_unit(run: Run):
+    run.handle(['secret-grant', '--relation', '1', '--unit', 'myapp/0', 'id'])
+    hookcmds.secret_grant('id', 1, unit='myapp/0')
+
+
 def test_secret_ids(run: Run):
     run.handle(['secret-ids', '--format=json'], stdout='["id1", "id2"]')
     result = hookcmds.secret_ids()
     assert result == ['id1', 'id2']
 
 
-def test_secret_info_get(run: Run):
+def test_secret_info_get_id(run: Run):
     info = {
         '123': {
             'label': 'lbl',
@@ -384,19 +599,101 @@ def test_secret_info_get(run: Run):
     assert result.label == 'lbl'
 
 
+def test_secret_info_get_label(run: Run):
+    info = {
+        '123': {
+            'label': 'lbl',
+            'description': 'desc',
+            'expiry': None,
+            'rotation': None,
+            'rotates': None,
+            'revision': 1,
+        }
+    }
+    run.handle(['secret-info-get', '--format=json', '--label', 'lbl'], stdout=json.dumps(info))
+    result = hookcmds.secret_info_get(label='lbl')
+    assert result.id == '123'
+    assert result.label == 'lbl'
+
+
 def test_secret_remove(run: Run):
     run.handle(['secret-remove', 'id'])
     hookcmds.secret_remove('id')
 
 
-def test_secret_revoke(run: Run):
-    run.handle(['secret-revoke', 'id'])
-    hookcmds.secret_revoke('id', relation_id=None, app=None)
+def test_secret_remove_revision(run: Run):
+    run.handle(['secret-remove', 'id', '--revision', '2'])
+    hookcmds.secret_remove('id', revision=2)
+
+
+@pytest.mark.parametrize('relation_id', [None, 123])
+@pytest.mark.parametrize('app', [None, 'remote-app'])
+@pytest.mark.parametrize('unit', [None, 'myapp/0'])
+def test_secret_revoke(run: Run, relation_id: int | None, app: str | None, unit: str | None):
+    cmd = ['secret-revoke']
+    if relation_id is not None:
+        cmd.extend(['--relation', str(relation_id)])
+    if app is not None:
+        cmd.extend(['--app', app])
+    if unit is not None:
+        cmd.extend(['--unit', unit])
+    cmd.append('secret:id')
+    run.handle(cmd)
+    hookcmds.secret_revoke('secret:id', relation_id=relation_id, app=app, unit=unit)
 
 
 def test_secret_set(run: Run, mock_temp_dir: str):
     run.handle(['secret-set', 'secret:123', f'foo#file={mock_temp_dir}/foo'])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
+
+
+@pytest.mark.parametrize('owner', ['application', 'unit'])
+def test_secret_set_with_metadata(run: Run, mock_temp_dir: str, owner: str):
+    run.handle(
+        [
+            'secret-set',
+            '--label',
+            'mylabel',
+            '--description',
+            'mydesc',
+            '--expire',
+            '3d',
+            '--rotate',
+            'quarterly',
+            '--owner',
+            owner,
+            'secret:id',
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
+    hookcmds.secret_set(
+        'secret:id',
+        content={'foo': 'bar'},
+        label='mylabel',
+        description='mydesc',
+        expire='3d',
+        rotate=hookcmds.SecretRotate.QUARTERLY,
+        owner=owner,
+    )
+
+
+def test_secret_set_date(run: Run, mock_temp_dir: str):
+    run.handle(
+        [
+            'secret-set',
+            '--expire',
+            '2025-12-31T23:59:59Z',
+            'secret:id',
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
+    hookcmds.secret_set(
+        'secret:id',
+        content={'foo': 'bar'},
+        expire=datetime.datetime(2025, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc),
+    )
 
 
 def test_state_delete(run: Run):
@@ -410,13 +707,19 @@ def test_state_get(run: Run):
     assert result == {'foo': 'bar'}
 
 
+def test_state_get_key(run: Run):
+    run.handle(['state-get', '--format=json', 'foo'], stdout='"bar"')
+    result = hookcmds.state_get('foo')
+    assert result == 'bar'
+
+
 def test_state_set(run: Run):
     run.handle(['state-set', '--file', '-'])
     hookcmds.state_set({'foo': 'bar'})
 
 
-def test_status_get(run: Run):
-    unit: StatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
+def test_status_get_unit(run: Run):
+    unit: hookcmds._types.StatusDict = {'status': 'active', 'message': 'ok', 'status-data': {}}
     run.handle(
         ['status-get', '--include-data', '--format=json', '--application=false'],
         stdout=json.dumps(unit),
@@ -425,14 +728,47 @@ def test_status_get(run: Run):
     assert result.status == 'active'
 
 
+def test_status_get_app(run: Run):
+    app: hookcmds._types.AppStatusDict = {
+        'application-status': {
+            'message': 'all good',
+            'status': 'active',
+            'status-data': {},
+        },
+        'units': {
+            'myapp/0': {'status': 'active', 'message': 'ok', 'status-data': {}},
+        },
+    }
+    run.handle(
+        ['status-get', '--include-data', '--format=json', '--application=true'],
+        stdout=json.dumps(app),
+    )
+    result = hookcmds.status_get(app=True)
+    assert result.status == 'active'
+    assert result.message == 'all good'
+    assert tuple(result.units) == ('myapp/0',)
+    assert result.units['myapp/0'].status == 'active'
+    assert result.units['myapp/0'].message == 'ok'
+
+
 def test_status_set(run: Run):
     run.handle(['status-set', '--application=False', 'active', 'msg'])
     hookcmds.status_set('active', 'msg')
 
 
+def test_status_set_app(run: Run):
+    run.handle(['status-set', '--application=True', 'active', 'msg'])
+    hookcmds.status_set('active', 'msg', app=True)
+
+
 def test_storage_add(run: Run):
     run.handle(['storage-add', 'foo=1'])
     hookcmds.storage_add('foo')
+
+
+def test_storage_add_multiple(run: Run):
+    run.handle(['storage-add', 'foo=99'])
+    hookcmds.storage_add('foo', count=99)
 
 
 def test_storage_get(run: Run):
@@ -443,7 +779,21 @@ def test_storage_get(run: Run):
     assert result.location == pathlib.Path('/path/to/storage')
 
 
+def test_storage_get_id(run: Run):
+    storage = {'kind': 'block', 'location': '/path/to/storage'}
+    run.handle(['storage-get', '--format=json', '-s', 'stor/1'], stdout=json.dumps(storage))
+    result = hookcmds.storage_get('stor/1')
+    assert result.kind == 'block'
+    assert result.location == pathlib.Path('/path/to/storage')
+
+
 def test_storage_list(run: Run):
     run.handle(['storage-list', '--format=json'], stdout='["stor/1", "stor/2"]')
     result = hookcmds.storage_list()
+    assert result == ['stor/1', 'stor/2']
+
+
+def test_storage_list_named(run: Run):
+    run.handle(['storage-list', '--format=json', 'stor'], stdout='["stor/1", "stor/2"]')
+    result = hookcmds.storage_list('stor')
     assert result == ['stor/1', 'stor/2']
