@@ -21,7 +21,7 @@ import json
 import pathlib
 import subprocess
 import uuid
-from typing import Any, Generator
+from typing import Any, Generator, Literal
 
 import pytest
 
@@ -496,7 +496,9 @@ def test_secret_add(run: Run, mock_temp_dir: str):
 
 
 @pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: str):
+def test_secret_add_with_metadata(
+    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
+):
     run.handle(
         [
             'secret-add',
@@ -550,7 +552,7 @@ def test_secret_get_id(run: Run, peek: bool, refresh: bool):
     if refresh:
         cmd.append('--refresh')
     run.handle(cmd, stdout='{"foo": "bar"}')
-    result = hookcmds.secret_get(id='secret:123', peek=peek, refresh=refresh)
+    result = hookcmds.secret_get(id='secret:123', peek=peek, refresh=refresh)  # type: ignore
     assert result == {'foo': 'bar'}
 
 
@@ -562,7 +564,7 @@ def test_secret_get_label(run: Run, peek: bool, refresh: bool):
     if refresh:
         cmd.append('--refresh')
     run.handle(cmd, stdout='{"foo": "bar"}')
-    result = hookcmds.secret_get(label='lbl', peek=peek, refresh=refresh)
+    result = hookcmds.secret_get(label='lbl', peek=peek, refresh=refresh)  # type: ignore
     assert result == {'foo': 'bar'}
 
 
@@ -648,7 +650,9 @@ def test_secret_set(run: Run, mock_temp_dir: str):
 
 
 @pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_set_with_metadata(run: Run, mock_temp_dir: str, owner: str):
+def test_secret_set_with_metadata(
+    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
+):
     run.handle(
         [
             'secret-set',
