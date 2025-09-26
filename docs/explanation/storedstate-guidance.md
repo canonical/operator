@@ -58,13 +58,13 @@ def _on_config_changed(self, event):
     self._stored.current_mode = mode
 ```
 
-We advise against doing this. We have added one to the list of places that attempt to track `ExampleBlog`'s "mode". In addition to the config file on disk, the Juju config, and the actual state of the running code, we've added a fourth "instance" of the state: "current_mode" in our `StoredState` object. We've doubled the number of possible states of this part of the system from 8 to 16, without increasing the number of correct states. There are still only two: all set to `test`, or all set to `production`. We have essentially halved the reliability of this part of our code.
+We advise against doing this. We have added one to the list of places that attempt to track `ExampleBlog`'s "mode". In addition to the config file on disk, the Juju config, and the actual state of the running code, we've added a fourth "instance" of the state: `current_mode` in our `StoredState` object. We've doubled the number of possible states of this part of the system from 8 to 16, without increasing the number of correct states. There are still only two: all set to `test`, or all set to `production`. We have essentially halved the reliability of this part of our code.
 
 ## Differences in StoredState behaviour across substrates
 
 Let's say the charm is running on Kubernetes, and the container it is running in gets destroyed and recreated. This might happen due to events outside of an operator's control -- perhaps the underlying Kubernetes service rescheduled the pod, for example. In this scenario the `StoredState` will go away, and the flags will be reset.
 
-Do you see the bug in our example code? We could fix it by setting the initial value in our `StoredState` to something other than `test` or `production`. E.g., `self._stored.set_default(current_mode="unset")`. This will never match the actual intended state, and we'll thus always invoke the codepath that loads the operator's intended state after a pod restart, and write that to the new local disk.
+Do you see the bug in our example code? We could fix it by setting the initial value in our `StoredState` to something other than `test` or `production`. E.g., `self._stored.set_default(current_mode="unset")`. This will never match the actual intended state, and we'll thus always invoke the code path that loads the operator's intended state after a pod restart, and write that to the new local disk.
 
 ## Practical suggestions and solutions
 

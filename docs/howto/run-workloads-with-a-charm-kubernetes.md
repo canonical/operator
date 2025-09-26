@@ -466,9 +466,9 @@ This will raise an `APIError` if any of the services are not in the plan or are 
 
 ### View service logs
 
-Pebble stores service logs (stdout and stderr from services) in a ring buffer accessible via the `pebble logs` command. Each log line is prefixed with the timestamp and service name, using the format `2021-05-03T03:55:49.654Z [snappass] ...`. Pebble allocates a ring buffer of 100KB per service (not one ring to rule them all), and overwrites the oldest logs in the buffer when it fills up.
+Pebble stores service logs (`stdout` and `stderr` from services) in a ring buffer accessible via the `pebble logs` command. Each log line is prefixed with the timestamp and service name, using the format `2021-05-03T03:55:49.654Z [snappass] ...`. Pebble allocates a ring buffer of 100KB per service (not one ring to rule them all), and overwrites the oldest logs in the buffer when it fills up.
 
-When running under Juju, the Pebble server is started with the `--verbose` flag, which means it also writes these logs to Pebble's own stdout. That in turn is accessible via Kubernetes using the `kubectl logs` command. For example, to view the logs for the "redis" container, you could run:
+When running under Juju, the Pebble server is started with the `--verbose` flag, which means it also writes these logs to Pebble's own `stdout`. That in turn is accessible via Kubernetes using the `kubectl logs` command. For example, to view the logs for the "redis" container, you could run:
 
 ```
 microk8s kubectl logs -n snappass snappass-test-0 -c redis
@@ -805,7 +805,7 @@ container.isdir('/tmp/mydir') # True
 
 ## Run commands on the workload container
 
-Pebble includes an API for executing arbitrary commands on the workload container: the [`Container.exec`](ops.Container.exec) method. It supports sending stdin to the process and receiving stdout and stderr, as well as more advanced options.
+Pebble includes an API for executing arbitrary commands on the workload container: the [`Container.exec`](ops.Container.exec) method. It supports sending `stdin` to the process and receiving `stdout` and `stderr`, as well as more advanced options.
 
 To run simple commands and receive their output, call `Container.exec` to start the command, and then use the returned [`Process`](ops.pebble.ExecProcess) object's [`wait_output`](ops.pebble.ExecProcess.wait_output) method to wait for it to finish and collect its output.
 
@@ -826,7 +826,7 @@ The `exec` method raises a [`pebble.APIError`](ops.pebble.APIError) if basic che
 
 The [`ExecProcess.wait`](ops.pebble.ExecProcess.wait) and [`ExecProcess.wait_output`](ops.pebble.ExecProcess.wait_output) methods raise [`pebble.ChangeError`](ops.pebble.ChangeError) if there was an error starting or running the process, and [`pebble.ExecError`](ops.pebble.ExecError) if the process exits with a non-zero exit code.
 
-In the case where the process exits via a signal (such as SIGTERM or SIGKILL), the exit code will be 128 plus the signal number. SIGTERM's signal number is 15, so a process terminated via SIGTERM would give exit code 143 (128+15).
+In the case where the process exits via a signal (such as `SIGTERM` or `SIGKILL`), the exit code will be 128 plus the signal number. `SIGTERM`'s signal number is 15, so a process terminated via `SIGTERM` would give exit code 143 (128+15).
 
 It's okay to let these exceptions bubble up: Juju will mark the hook as failed and re-run it automatically. However, if you want fine-grained control over error handling, you can catch the `ExecError` and inspect its attributes. For example:
 
@@ -970,7 +970,7 @@ process.send_signal(signal.SIGTERM)
 process.wait()
 ```
 
-Note that because sleep will exit via a signal, `wait()` will raise an `ExecError` with an exit code of 143 (128+SIGTERM):
+Note that because sleep will exit via a signal, `wait()` will raise an `ExecError` with an exit code of 143 (128+`SIGTERM`):
 
 ```
 Traceback (most recent call last):
@@ -981,7 +981,7 @@ ops.pebble.ExecError: non-zero exit code 143 executing ['sleep', '10']
 ### Test command execution
 
 Specify, for each possible command the charm might run on the container, what the result of that
-would be: its return code, what will be written to stdout/stderr.
+would be: its return code, what will be written to `stdout`/`stderr`.
 
 ```python
 LS_LL = """

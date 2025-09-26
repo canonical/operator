@@ -129,7 +129,7 @@ class SMTPProviderUnitData(pydantic.BaseMode):
     smtp_credentials: str = pydantic.Field(description="A Juju secret ID")
 ```
 
-Now, in the body of the charm definition, define the event handler. In this example, a “smtp_credentials” key is set in the unit data with the ID of a secret:
+Now, in the body of the charm definition, define the event handler. In this example, a `smtp_credentials` key is set in the unit data with the ID of a secret:
 
 ```python
 def _on_smtp_relation_joined(self, event: ops.RelationJoinedEvent):
