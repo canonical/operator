@@ -64,7 +64,7 @@ We advise against doing this. We have added one to the list of places that attem
 
 Let's say the charm is running on Kubernetes, and the container it is running in gets destroyed and recreated. This might happen due to events outside of an operator's control -- perhaps the underlying Kubernetes service rescheduled the pod, for example. In this scenario the `StoredState` will go away, and the flags will be reset.
 
-Do you see the bug in our example code? We could fix it by setting the initial value in our `StoredState` to something other than `test` or `production`. E.g., `self._stored.set_default(current_mode="unset")`. This will never match the actual intended state, and we'll thus always invoke the codepath that loads the operator's intended state after a pod restart, and write that to the new local disk.
+Do you see the bug in our example code? We could fix it by setting the initial value in our `StoredState` to something other than `test` or `production`. E.g., `self._stored.set_default(current_mode="unset")`. This will never match the actual intended state, and we'll thus always invoke the code path that loads the operator's intended state after a pod restart, and write that to the new local disk.
 
 ## Practical suggestions and solutions
 
