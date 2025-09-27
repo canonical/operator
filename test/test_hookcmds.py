@@ -552,6 +552,8 @@ def test_secret_get_id(run: Run, peek: bool, refresh: bool):
     if refresh:
         cmd.append('--refresh')
     run.handle(cmd, stdout='{"foo": "bar"}')
+    # The type: ignore is needed here, because pyright can't tell that we will
+    # not be passing both values as True (which would be invalid).
     result = hookcmds.secret_get(id='secret:123', peek=peek, refresh=refresh)  # type: ignore
     assert result == {'foo': 'bar'}
 
@@ -564,6 +566,8 @@ def test_secret_get_label(run: Run, peek: bool, refresh: bool):
     if refresh:
         cmd.append('--refresh')
     run.handle(cmd, stdout='{"foo": "bar"}')
+    # The type: ignore is needed here, because pyright can't tell that we will
+    # not be passing both values as True (which would be invalid).
     result = hookcmds.secret_get(label='lbl', peek=peek, refresh=refresh)  # type: ignore
     assert result == {'foo': 'bar'}
 
@@ -767,12 +771,17 @@ def test_status_set_app(run: Run):
 
 def test_storage_add(run: Run):
     run.handle(['storage-add', 'foo=1'])
-    hookcmds.storage_add('foo')
+    hookcmds.storage_add({'foo': 1})
 
 
 def test_storage_add_multiple(run: Run):
     run.handle(['storage-add', 'foo=99'])
-    hookcmds.storage_add('foo', count=99)
+    hookcmds.storage_add({'foo': 99})
+
+
+def test_storage_add_multiple_storages(run: Run):
+    run.handle(['storage-add', 'foo=2', 'bar=3'])
+    hookcmds.storage_add({'foo': 2, 'bar': 3})
 
 
 def test_storage_get(run: Run):

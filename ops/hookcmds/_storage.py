@@ -15,23 +15,23 @@
 from __future__ import annotations
 
 import json
-from typing import cast
+from typing import Mapping, cast
 
 from ._types import Storage
 from ._utils import run
 
 
-def storage_add(name: str, count: int = 1):
+def storage_add(counts: Mapping[str, int]):
     """Add storage instances.
 
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-add/
 
     Args:
-        count: How many instances of the storage to create.
-        name: The name of the storage to create.
+        counts: A maps of storage names to the number of instances of that
+            storage to create.
     """
-    run('storage-add', f'{name}={count}')
+    run('storage-add', *(f'{name}={count}' for name, count in counts.items()))
 
 
 # Juju allows specifying a single attribute to get, but there are only two
@@ -51,10 +51,11 @@ def storage_get(id: str | None = None) -> Storage:
     """
     # TODO: It looks like you can pass in a UUID instead of an identifier.
     # The documentation doesn't say how to get that UUID, though.
-    args = ['storage-get', '--format=json']
+    args = ['--format=json']
     if id is not None:
         args.extend(['-s', id])
-    result = json.loads(run(*args))
+    stdout = run('storage-get', *args)
+    result = json.loads(stdout)
     return Storage._from_dict(result)
 
 
@@ -67,7 +68,9 @@ def storage_list(name: str | None = None) -> list[str]:
     Args:
         name: Only list storage with this name.
     """
-    args = ['storage-list', '--format=json']
+    args = ['--format=json']
     if name is not None:
         args.append(name)
-    return cast('list[str]', json.loads(run(*args)))
+    stdout = run('storage-list', *args)
+    result = cast('list[str]', json.loads(stdout))
+    return result

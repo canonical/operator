@@ -18,11 +18,62 @@ import json
 from typing import (
     Any,
     Mapping,
+    MutableMapping,
     cast,
     overload,
 )
 
-from ._utils import format_action_result_dict, run
+from ._utils import run
+
+
+def format_result_dict(
+    input: Mapping[str, Any],
+    parent_key: str | None = None,
+    output: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key separator.
+
+    This is used to allow nested dictionaries to be translated into the dotted
+    format required by the Juju `action-set` hook command in order to set nested
+    data on an action.
+
+    Example::
+
+        >>> test_dict = {'a': {'b': 1, 'c': 2}}
+        >>> format_result_dict(test_dict)
+        {'a.b': 1, 'a.c': 2}
+
+    Arguments:
+        input: The dictionary to flatten
+        parent_key: The string to prepend to dictionary's keys
+        output: The current dictionary to be returned, which may or may not yet
+            be completely flat
+
+    Returns:
+        A flattened dictionary
+
+    Raises:
+        ValueError: if the dict is passed with a mix of dotted/non-dotted keys
+            that expand out to result in duplicate keys. For example:
+            ``{'a': {'b': 1}, 'a.b': 2}``.
+    """
+    output_: dict[str, str] = output or {}
+
+    for key, value in input.items():
+        if parent_key:
+            key = f'{parent_key}.{key}'
+
+        if isinstance(value, MutableMapping):
+            value = cast('dict[str, Any]', value)
+            output_ = format_result_dict(value, key, output_)
+        elif key in output_:
+            raise ValueError(
+                f"duplicate key detected in dictionary passed to 'action-set': {key!r}"
+            )
+        else:
+            output_[key] = value
+
+    return output_
 
 
 def action_fail(message: str | None = None):
@@ -35,10 +86,10 @@ def action_fail(message: str | None = None):
         message: the failure error message. Juju will provide a default message
             if one is not provided.
     """
-    args = ['action-fail']
+    args: list[str] = []
     if message is not None:
         args.append(message)
-    run(*args)
+    run('action-fail', *args)
 
 
 @overload
@@ -59,11 +110,16 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
         key: The key of the action parameter to retrieve. If not provided, all
             parameters will be returned.
     """
-    args = ['action-get', '--format=json']
+    args = ['--format=json']
     if key is not None:
         args.append(key)
-    out = json.loads(run(*args))
-    return cast('dict[str, Any]', out) if key is None else cast('str', out)
+    stdout = run('action-get', *args)
+    result = (
+        cast('dict[str, Any]', json.loads(stdout))
+        if key is None
+        else cast('str', json.loads(stdout))
+    )
+    return result
 
 
 def action_log(message: str):
@@ -89,5 +145,5 @@ def action_set(results: Mapping[str, Any]):
     """
     # The Juju action-set hook tool cannot interpret nested dicts, so we use a
     # helper to flatten out any nested dict structures into a dotted notation.
-    flat_results = format_action_result_dict(results)
+    flat_results = format_result_dict(results)
     run('action-set', *[f'{k}={v}' for k, v in flat_results.items()])

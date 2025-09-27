@@ -66,7 +66,7 @@ def relation_get(
     """
     if key == '-':
         raise ValueError('To get all keys, pass None for the key argument; "-" is not supported.')
-    args = ['relation-get', '--format=json']
+    args = ['--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
     if app:
@@ -75,10 +75,12 @@ def relation_get(
         args.append(unit)
     if key is not None:
         args.append(key)
-    result = json.loads(run(*args))
+    stdout = run('relation-get', *args)
     if key is not None:
-        return cast('str', result)
-    return cast('dict[str, str]', result)
+        result = cast('str', json.loads(stdout))
+    else:
+        result = cast('dict[str, str]', json.loads(stdout))
+    return result
 
 
 def relation_ids(name: str) -> list[str]:
@@ -90,7 +92,9 @@ def relation_ids(name: str) -> list[str]:
     Args:
         name: the endpoint name.
     """
-    return cast('list[str]', json.loads(run('relation-ids', name, '--format=json')))
+    stdout = run('relation-ids', name, '--format=json')
+    result = cast('list[str]', json.loads(stdout))
+    return result
 
 
 def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
@@ -108,12 +112,14 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
             for the relation that triggered the current hook.
         app: List remote application instead of participating units.
     """
-    args = ['relation-list', '--format=json']
+    args = ['--format=json']
     if app:
         args.append('--app')
     if id is not None:
         args.extend(['-r', str(id)])
-    return cast('list[str]', json.loads(run(*args)))
+    stdout = run('relation-list', *args)
+    result = cast('list[str]', json.loads(stdout))
+    return result
 
 
 def relation_model_get(id: int | None = None) -> RelationModel:
@@ -130,10 +136,12 @@ def relation_model_get(id: int | None = None) -> RelationModel:
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
     """
-    args = ['relation-model-get', '--format=json']
+    args = ['--format=json']
     if id is not None:
         args.extend(['-r', str(id)])
-    return RelationModel._from_dict(cast('RelationModelDict', json.loads(run(*args))))
+    stdout = run('relation-model-get', *args)
+    result = cast('RelationModelDict', json.loads(stdout))
+    return RelationModel._from_dict(result)
 
 
 # We don't offer a `file` argument here as we expect that charms will generally
@@ -164,11 +172,11 @@ def relation_set(
             the relation that triggered the current hook.
         app: Set data for the overall application, not just a unit.
     """
-    args = ['relation-set']
+    args: list[str] = []
     if app:
         args.append('--app')
     if id is not None:
         args.extend(['-r', str(id)])
     args.extend(['--file', '-'])
     content = yaml.safe_dump(data)
-    run(*args, input=content)
+    run('relation-set', *args, input=content)

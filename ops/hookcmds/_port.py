@@ -53,7 +53,7 @@ def close_port(
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/close-port/
     """
-    args = ['close-port']
+    args: list[str] = []
     if endpoints:
         if isinstance(endpoints, str):
             endpoints = [endpoints]
@@ -67,7 +67,7 @@ def close_port(
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run(*args)
+    run('close-port', *args)
 
 
 @overload
@@ -106,7 +106,7 @@ def open_port(
             application endpoints. To constrain the open request to specific
             endpoints, provide one or more endpoint names.
     """
-    args = ['open-port']
+    args: list[str] = []
     if endpoints:
         if isinstance(endpoints, str):
             endpoints = [endpoints]
@@ -122,7 +122,7 @@ def open_port(
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run(*args)
+    run('open-port', *args)
 
 
 def opened_ports(*, endpoints: bool = False) -> list[Port]:
@@ -136,10 +136,11 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
             with a list of endpoints that the port applies to. If a port applies
             to all endpoints, this will be indicated by an endpoint of ``*``.
     """
-    args = ['opened-ports']
+    args: list[str] = []
     if endpoints:
         args.append('--endpoints')
-    output = cast('list[str]', json.loads(run(*args, '--format=json')))
+    stdout = run('opened-ports', *args, '--format=json')
+    result = cast('list[str]', json.loads(stdout))
     ports: list[Port] = []
     # Each port from Juju will look like one of these:
     # 'icmp'
@@ -149,7 +150,7 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     # '8000-8999' (where these could be any port number)
     # If ``--endpoints`` is used, then each port will be followed by a
     # (possibly empty) tuple of endpoints.
-    for port in output:
+    for port in result:
         if endpoints:
             port, port_endpoints = port.rsplit(' ', 1)
             port_endpoints = [e.strip() for e in port_endpoints.strip('()').split(',')]

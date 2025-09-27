@@ -51,11 +51,16 @@ def state_get(key: str | None) -> dict[str, str] | str:
         key: The key of the server-side state to get. If ``None``, get all keys
             and values.
     """
-    args = ['state-get', '--format=json']
+    args = ['--format=json']
     if key is not None:
         args.append(key)
-    result = json.loads(run(*args))
-    return cast('dict[str, str]', result) if key is None else cast('str', result)
+    stdout = run('state-get', *args)
+    result = (
+        cast('dict[str, str]', json.loads(stdout))
+        if key is None
+        else cast('str', json.loads(stdout))
+    )
+    return result
 
 
 # We don't offer a `file` argument here as we expect that charms will generally
@@ -70,6 +75,6 @@ def state_set(data: Mapping[str, str]):
     Args:
         data: The key-value pairs to set in the server-side state.
     """
-    args = ['state-set', '--file', '-']
+    args = ['--file', '-']
     content = yaml.safe_dump(data)
-    run(*args, input=content)
+    run('state-set', *args, input=content)

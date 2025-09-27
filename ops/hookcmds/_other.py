@@ -70,13 +70,15 @@ def config_get(
     Args:
         key: The configuration option to retrieve.
     """
-    args = ['config-get', '--format=json']
+    args = ['--format=json']
     if key:
         args.append(key)
-    out = json.loads(run(*args))
+    stdout = run('config-get', *args)
     if key:
-        return cast('bool | int | float | str', out)
-    return cast('dict[str, bool | int | float | str]', out)
+        result = cast('bool | int | float | str', json.loads(stdout))
+    else:
+        result = cast('dict[str, bool | int | float | str]', json.loads(stdout))
+    return result
 
 
 def credential_get() -> CloudSpec:
@@ -85,8 +87,9 @@ def credential_get() -> CloudSpec:
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/credential-get/
     """
-    result = json.loads(run('credential-get', '--format=json'))
-    return CloudSpec.from_dict(cast('dict[str, Any]', result))
+    stdout = run('credential-get', '--format=json')
+    result = cast('dict[str, Any]', json.loads(stdout))
+    return CloudSpec.from_dict(result)
 
 
 def goal_state() -> GoalState:
@@ -95,7 +98,8 @@ def goal_state() -> GoalState:
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/goal-state/
     """
-    result = cast('GoalStateDict', json.loads(run('goal-state', '--format=json')))
+    stdout = run('goal-state', '--format=json')
+    result = cast('GoalStateDict', json.loads(stdout))
     return GoalState._from_dict(result)
 
 
@@ -108,8 +112,9 @@ def is_leader() -> bool:
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/
     """
-    leader = json.loads(run('is-leader', '--format=json'))
-    return cast('bool', leader)
+    stdout = run('is-leader', '--format=json')
+    result = cast('bool', json.loads(stdout))
+    return result
 
 
 def juju_log(
@@ -168,11 +173,12 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
         binding_name: A name of a binding (relation name or extra-binding name).
         relation_id: An optional relation id to get network info for.
     """
-    args = ['network-get']
+    args: list[str] = []
     if relation_id is not None:
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
-    result = cast('dict[str, Any]', json.loads(run(*args, '--format=json')))
+    stdout = run('network-get', *args, '--format=json')
+    result = cast('dict[str, Any]', json.loads(stdout))
     return Network._from_dict(result)
 
 
@@ -185,5 +191,6 @@ def resource_get(name: str) -> pathlib.Path:
     Args:
         name: The name of the resource.
     """
+    stdout = run('resource-get', name)
     # Note that this does not have a `--format=json` flag
-    return pathlib.Path(run('resource-get', name).strip())
+    return pathlib.Path(stdout.strip())

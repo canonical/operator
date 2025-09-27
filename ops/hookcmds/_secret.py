@@ -67,15 +67,13 @@ def secret_add(
         args.extend(['--rotate', rotate.value])
     if owner is not None:
         args.extend(['--owner', owner])
-    # This method of providing the content is not documented, but allows us to
-    # securely pass the secret content.
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
-        result = run('secret-add', *args)
-    return result.strip()
+        stdout = run('secret-add', *args)
+    return stdout.strip()
 
 
 @overload
@@ -149,7 +147,9 @@ def secret_get(
         args.append('--refresh')
     if peek:
         args.append('--peek')
-    return cast('dict[str, str]', json.loads(run('secret-get', '--format=json', *args)))
+    stdout = run('secret-get', '--format=json', *args)
+    result = cast('dict[str, str]', json.loads(stdout))
+    return result
 
 
 def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
@@ -163,11 +163,11 @@ def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
         relation_id: The relation with which to associate the grant.
         unit: If provided, limit access to just that unit.
     """
-    args = ['secret-grant', '--relation', str(relation_id)]
+    args = ['--relation', str(relation_id)]
     if unit is not None:
         args.extend(['--unit', str(unit)])
     args.append(id)
-    run(*args)
+    run('secret-grant', *args)
 
 
 def secret_ids() -> list[str]:
@@ -176,7 +176,9 @@ def secret_ids() -> list[str]:
     For more details, see:
     https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-ids/
     """
-    return cast('list[str]', json.loads(run('secret-ids', '--format=json')))
+    stdout = run('secret-ids', '--format=json')
+    result = cast('list[str]', json.loads(stdout))
+    return result
 
 
 @overload
@@ -201,12 +203,14 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
         id: The ID of the secret to retrieve.
         label: The label of the secret to retrieve.
     """
-    args: list[str] = ['secret-info-get', '--format=json']
+    args: list[str] = ['--format=json']
     if id is not None:
         args.append(id)
     elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
         args.extend(['--label', label])
-    return SecretInfo._from_dict(cast('dict[str, Any]', json.loads(run(*args))))
+    stdout = run('secret-info-get', *args)
+    result = cast('dict[str, Any]', json.loads(stdout))
+    return SecretInfo._from_dict(result)
 
 
 def secret_remove(id: str, *, revision: int | None = None):
@@ -220,10 +224,10 @@ def secret_remove(id: str, *, revision: int | None = None):
         revision: The revision of the secret to remove. If not provided, all
             revisions are removed.
     """
-    args = ['secret-remove', id]
+    args = [id]
     if revision is not None:
         args.extend(['--revision', str(revision)])
-    run(*args)
+    run('secret-remove', *args)
 
 
 def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: str | None = None):
@@ -238,7 +242,7 @@ def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: st
         app: Revoke access from all units in that application.
         unit: Revoke access from just this unit.
     """
-    args = ['secret-revoke']
+    args: list[str] = []
     if relation_id is not None:
         args.extend(['--relation', str(relation_id)])
     if app is not None:
@@ -246,7 +250,7 @@ def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: st
     if unit is not None:
         args.extend(['--unit', unit])
     args.append(id)
-    run(*args)
+    run('secret-revoke', *args)
 
 
 def secret_set(
@@ -273,7 +277,7 @@ def secret_set(
         rotate: The secret rotation policy.
         owner: The owner of the secret, either the application or the unit.
     """
-    args = ['secret-set']
+    args: list[str] = []
     if label is not None:
         args.extend(['--label', label])
     if description is not None:
@@ -297,4 +301,4 @@ def secret_set(
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
-        run(*args)
+        run('secret-set', *args)

@@ -19,7 +19,6 @@ import datetime
 import enum
 import ipaddress
 import pathlib
-import uuid
 from typing import (
     Any,
     Literal,
@@ -284,12 +283,12 @@ class RelationModelDict(TypedDict):
 class RelationModel:
     """Details of the model on the remote side of the relation."""
 
-    uuid: uuid.UUID
+    uuid: str
 
     @classmethod
     def _from_dict(cls, d: RelationModelDict) -> RelationModel:
         return cls(
-            uuid=uuid.UUID(d['uuid']),
+            uuid=d['uuid'],
         )
 
 

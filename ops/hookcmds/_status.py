@@ -42,12 +42,13 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     Args:
         app: Get status for all units of this application if this unit is the leader.
     """
-    args = ['status-get', '--include-data', '--format=json', f'--application={str(app).lower()}']
-    result = json.loads(run(*args))
+    args = ['--include-data', '--format=json', f'--application={str(app).lower()}']
+    stdout = run('status-get', *args)
     if app:
-        app_status = cast('AppStatusDict', result)
-        return AppStatus._from_dict(app_status)
-    return UnitStatus._from_dict(cast('StatusDict', result))
+        result = cast('AppStatusDict', json.loads(stdout))
+        return AppStatus._from_dict(result)
+    result = cast('StatusDict', json.loads(stdout))
+    return UnitStatus._from_dict(result)
 
 
 def status_set(status: SettableStatusName, message: str = '', *, app: bool = False):
@@ -61,7 +62,7 @@ def status_set(status: SettableStatusName, message: str = '', *, app: bool = Fal
         message: A message to include in the status.
         app: If ``True``, set this status for the application to which the unit belongs.
     """
-    args = ['status-set', f'--application={app}', status]
+    args = [f'--application={app}', status]
     if message is not None:
         args.append(message)
-    run(*args)
+    run('status-set', *args)
