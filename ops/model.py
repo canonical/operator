@@ -22,7 +22,6 @@ import contextvars
 import copy
 import dataclasses
 import datetime
-import enum
 import ipaddress
 import json
 import logging
@@ -62,6 +61,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
+from .hookcmds import CloudSpec, SecretRotate
 from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -81,8 +81,8 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
-_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
+_StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
+_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
@@ -830,9 +830,9 @@ class Unit:
             for port in ports
         }
         for protocol, port in existing - desired:
-            self._backend.close_port(protocol, port)
+            self._backend.close_port(protocol or 'tcp', port)
         for protocol, port in desired - existing:
-            self._backend.open_port(protocol, port)
+            self._backend.open_port(protocol or 'tcp', port)
 
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
@@ -1232,18 +1232,6 @@ class NetworkInterface:
             subnet = None
         self.subnet = subnet
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
-
-
-class SecretRotate(enum.Enum):
-    """Secret rotation policies."""
-
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
 
 
 class SecretInfo:
@@ -2244,10 +2232,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: ClassVar[dict[StatusName, type[StatusBase]]] = {}
+    _statuses: ClassVar[dict[_StatusName, type[StatusBase]]] = {}
 
     # Subclasses must provide this attribute
-    name: StatusName
+    name: _StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -2284,7 +2272,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[typing.cast('StatusName', name)](message)
+            return cls._statuses[typing.cast('_StatusName', name)](message)
 
     @classmethod
     def register(cls, child: type[StatusBase]):
@@ -4368,85 +4356,3 @@ class LazyCheckInfo:
         if self._info is not None:
             return
         self._info = self._container.get_check(self.name)
-
-
-@dataclasses.dataclass(frozen=True)
-class CloudCredential:
-    """Credentials for cloud.
-
-    Used as the type of attribute `credential` in :class:`CloudSpec`.
-    """
-
-    auth_type: str
-    """Authentication type."""
-
-    attributes: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
-    """A dictionary containing cloud credentials.
-
-    For example, for AWS, it contains `access-key` and `secret-key`;
-    for Azure, `application-id`, `application-password` and `subscription-id`
-    can be found here.
-    """
-
-    redacted: list[str] = dataclasses.field(default_factory=list[str])
-    """A list of redacted secrets."""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
-        """Create a new CloudCredential object from a dictionary."""
-        return cls(
-            auth_type=d['auth-type'],
-            attributes=d.get('attrs') or {},
-            redacted=d.get('redacted') or [],
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class CloudSpec:
-    """Cloud specification information (metadata) including credentials."""
-
-    type: str
-    """Type of the cloud."""
-
-    name: str
-    """Juju cloud name."""
-
-    region: str | None = None
-    """Region of the cloud."""
-
-    endpoint: str | None = None
-    """Endpoint of the cloud."""
-
-    identity_endpoint: str | None = None
-    """Identity endpoint of the cloud."""
-
-    storage_endpoint: str | None = None
-    """Storage endpoint of the cloud."""
-
-    credential: CloudCredential | None = None
-    """Cloud credentials with key-value attributes."""
-
-    ca_certificates: list[str] = dataclasses.field(default_factory=list[str])
-    """A list of CA certificates."""
-
-    skip_tls_verify: bool = False
-    """Whether to skip TLS verification."""
-
-    is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudSpec:
-        """Create a new CloudSpec object from a dict parsed from JSON."""
-        return cls(
-            type=d['type'],
-            name=d['name'],
-            region=d.get('region') or None,
-            endpoint=d.get('endpoint') or None,
-            identity_endpoint=d.get('identity-endpoint') or None,
-            storage_endpoint=d.get('storage-endpoint') or None,
-            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
-            ca_certificates=d.get('cacertificates') or [],
-            skip_tls_verify=d.get('skip-tls-verify') or False,
-            is_controller_cloud=d.get('is-controller-cloud') or False,
-        )
