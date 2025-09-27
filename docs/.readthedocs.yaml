@@ -3,7 +3,8 @@ version: 2
 build:
   os: ubuntu-24.04
   tools:
-    python: "3.11"
+    # The Python version isn't important. Our Makefile controls the Python version.
+    python: latest
   jobs:
     post_checkout:
       - git fetch --unshallow || true
@@ -13,5 +14,4 @@ build:
       - asdf global uv latest
     build:
       html:
-        - uv tool install tox --with tox-uv
-        - ~/.local/bin/tox -e docs
+        - make -C docs BUILDDIR=$READTHEDOCS_OUTPUT/html html
