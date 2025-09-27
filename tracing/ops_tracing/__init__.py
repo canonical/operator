@@ -73,7 +73,7 @@ Note that you don't have to ``import ops.tracing``, that name is automatically
 available when your Python project depends on ``ops[tracing]``.
 """
 
-from ._api import Tracing
+from ._api import Tracing, Tracing2
 from ._backend import mark_observed as _mark_observed
 from ._backend import set_destination
 from ._backend import setup as _setup
@@ -81,6 +81,7 @@ from ._backend import shutdown as _shutdown
 
 __all__ = [
     'Tracing',
+    'Tracing2',
     '_mark_observed',
     '_setup',
     '_shutdown',
