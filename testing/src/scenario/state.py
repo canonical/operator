@@ -1264,10 +1264,13 @@ class _EntityStatus:
 
     _entity_statuses: ClassVar[dict[str, type[_EntityStatus]]] = {}
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.message))
+
     def __eq__(self, other: Any):
         if isinstance(other, (StatusBase, _EntityStatus)):
             return (self.name, self.message) == (other.name, other.message)
-        return super().__eq__(other)
+        return NotImplemented
 
     def __repr__(self):
         status_type_name = self.name.title() + 'Status'
@@ -1430,10 +1433,13 @@ class Port(_max_posargs(1)):
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
 
+    def __hash__(self) -> int:
+        return hash((self.protocol, self.port))
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
-        return False
+        return NotImplemented
 
     def _to_ops(self) -> ops.Port:
         return ops.Port(port=self.port, protocol=self.protocol)
@@ -1533,10 +1539,13 @@ class Storage(_max_posargs(1)):
     For Kubernetes charms, this will always be 1. For machine charms, each new
     Storage instance gets a new index."""
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.index))
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Storage, ops.Storage)):
             return (self.name, self.index) == (other.name, other.index)
-        return False
+        return NotImplemented
 
     def get_filesystem(self, ctx: Context) -> pathlib.Path:
         """Simulated filesystem root in this context."""
