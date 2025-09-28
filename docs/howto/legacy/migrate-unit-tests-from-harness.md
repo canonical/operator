@@ -1,13 +1,29 @@
 (harness-migration)=
 # How to migrate unit tests from Harness
 
-TODO: Introduction, including links to other resources.
+This guide is a starting point for how to migrate [Harness](/reference/ops-testing-harness) tests to state-transition tests. Both approaches to unit testing use the `ops.testing` framework, but Harness tests are deprecated and won't be supported by default in a future Ops release.
 
-> See more:
+State-transition tests are recommended for all charm unit tests. In a state-transition test, you:
+
+1. Prepare an "input state" that represents the charm's relations, configuration, containers, and so on.
+2. Simulate an event.
+3. Inspect the "output state", to check that the charm responded to the event in the correct way.
+
+Each state-transition test is an isolated test of a particular event handler. This matches how the charm runs when deployed; each time Juju triggers an event, the charm code is run from scratch and handles that event.
+
+In contrast, Harness tests typically build up a state event-by-event, using the same instantiation of the charm class for each event. This introduces a danger of the charm getting into an unrealistic state.
+
+To help focus on the differences between the two approaches, we don't use fixtures in this guide.
+
+For more information about state-transition testing, see:
+
+TODO
+
+<!-- > See more:
 >
 > - [`testing.Container`](ops.testing.Container)
 > - [`testing.State`](ops.testing.State)
-> - [How to manage relations > Test the feature](#manage-relations-test-the-feature)
+> - [How to manage relations > Test the feature](#manage-relations-test-the-feature) -->
 
 (harness-migration-action)=
 ## Test a minimal action
@@ -62,7 +78,7 @@ def test_action():
 
 Let's implement this test as a state-transition test.
 
-We'll structure the test around [`Context.on.action`](ops.testing.CharmEvents.action). Our expected input and output states are:
+We'll structure the test around [`Context.on.action`](ops.testing.CharmEvents.action), which represents the event to simulate. Our expected input and output states are:
 
 - Before `action` runs -- A generic state. The action doesn't use data from the charm or workload.
 - After `action` runs -- A successful action result.
@@ -82,6 +98,8 @@ def test_get_value_action():
     ctx.run(ctx.on.action("get-value", params={"value": "foo"}), state_in)
     assert ctx.action_results == {"out-value": "foo"}
 ```
+
+The [`ctx.run`](ops.testing.Context.run) call is the part that simulates the event.
 
 While we're here, let's write a test for the action's failure case:
 
