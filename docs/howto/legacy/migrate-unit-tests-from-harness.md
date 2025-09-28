@@ -95,7 +95,7 @@ def test_get_value_action_failed():
     assert exc_info.value.message == "Action failed, as requested"
 ```
 
-In a more realistic charm, the action will use data from the charm or workload. For examples, see [](#harness-migration-relation) and [](#harness-migration-container). When writing state-transition tests for a real action, we also need to consider collect-status.
+In a more realistic charm, the action will use data from the charm or workload. For an example, see [](#harness-migration-relation). When writing state-transition tests for a real action, we also need to consider collect-status.
 
 (harness-migration-collect-status)=
 ## Consider collect-status
@@ -192,7 +192,6 @@ In [](#harness-migration-container), we'll work through a more realistic example
 
 - How to test the pebble-ready event handler.
 - How to test the status reporting logic in `_on_collect_status`.
-- How to test an action that interacts with the workload container.
 
 (harness-migration-relation)=
 ## Test how a relation is handled
@@ -411,7 +410,6 @@ class DemoCharm(ops.CharmBase):
         self.container = self.unit.get_container("my-container")
         framework.observe(self.on["my-container"].pebble_ready, self._on_pebble_ready)
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        framework.observe(self.on.export_action, self._on_export_action)
         ...  # Observe other events.
 
     def _on_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
@@ -444,20 +442,6 @@ class DemoCharm(ops.CharmBase):
             event.add_status(ops.MaintenanceStatus("waiting for container"))
         event.add_status(ops.ActiveStatus())
 
-    def _on_export_action(self, event: ops.ActionEvent) -> None:
-        """Handle the export action."""
-        try:
-            process = self.container.exec(["export-workload-data"])
-            output, _ = process.wait_output()
-            event.log(output)
-        except ops.pebble.ExecError as e:
-            event.log(str(e.stderr))
-            event.fail(f"Export failed with exit code {e.exit_code}")
-        except ops.pebble.APIError:
-            event.fail("Unable to run export command in container")
-        except ops.pebble.ConnectionError:
-            event.fail("Unable to connect to container")
-
     ...  # Handle other events.
 
 
@@ -488,33 +472,11 @@ def test_container():
     assert "workload" in plan.services
     assert plan.services["workload"].command == "run-workload"
 
-    # Run the action and check the output.
-    export_result = testing.ExecResult(stdout="Export completed in 2 seconds")
-    harness.handle_exec("my-container", ["export-workload-data"], result=export_result)
-    output = harness.run_action("export")
-    assert output.logs == ["Export completed in 2 seconds"]
-
-    # Check that the action fails if the export fails.
-    export_result = testing.ExecResult(
-        exit_code=1,
-        stderr="Command failed: export-workload-data",
-    )
-    with pytest.raises(testing.ActionFailed) as exc_info:
-        harness.handle_exec("my-container", ["export-workload-data"], result=export_result)
-        harness.run_action("export")
-    assert exc_info.value.message == "Export failed with exit code 1"
-    assert exc_info.value.output.logs == ["Command failed: export-workload-data"]
-
     # Simulate a dropped connection to the container, then check the charm's status.
     harness.set_can_connect("my-container", False)
     harness.evaluate_status()
     assert isinstance(harness.charm.unit.status, ops.model.MaintenanceStatus)
     assert harness.charm.unit.status.message == "waiting for container"
-
-    # Check that the action fails.
-    with pytest.raises(testing.ActionFailed) as exc_info:
-        harness.run_action("export")
-    assert exc_info.value.message == "Unable to connect to container"
 
     harness.cleanup()
 ```
@@ -523,7 +485,6 @@ The `test_container` function tests the following aspects of the charm:
 
 1. The pebble-ready event handler defines the correct service in the workload container.
 2. The charm correctly reports active or maintenance status, depending on the status of the container.
-3. The action returns the correct value after executing a command in the container, or fails in two different situations.
 
 Let's implement these tests as independent state-transition tests.
 
@@ -663,7 +624,3 @@ The status reporting logic in `_on_collect_status` actually accounts for two mor
 
 - The container has a Pebble plan, but the service isn't running. To cover this situation, we could add a variant of `test_status_active` that sets the service status to `INACTIVE`.
 - The container is available, but doesn't have a Pebble plan. To cover this situation, we could add a variant of `test_status_container_down` that sets `can_connect=True`.
-
-### Test the action
-
-TODO
