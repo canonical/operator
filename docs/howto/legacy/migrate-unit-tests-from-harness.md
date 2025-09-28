@@ -3,6 +3,12 @@
 
 TODO: Introduction, including links to other resources.
 
+> See more:
+>
+> - [`testing.Container`](ops.testing.Container)
+> - [`testing.State`](ops.testing.State)
+> - [How to manage relations > Test the feature](#manage-relations-test-the-feature)
+
 (harness-migration-action)=
 ## Test a minimal action
 
@@ -183,11 +189,6 @@ def test_get_value_action():
     assert ctx.action_results == {"out-value": "foo"}
 ```
 
-> See more:
->
-> - [`testing.Container`](ops.testing.Container)
-> - [`testing.State`](ops.testing.State)
-
 In [](#harness-migration-container), we'll work through a more realistic example that shows:
 
 - How to test the pebble-ready event handler.
@@ -356,12 +357,6 @@ def test_relation_changed(monkeypatch: pytest.MonkeyPatch):
     assert workload.config == "bar.local:5678"
 ```
 
-> See more:
->
-> - [`testing.Relation`](ops.testing.Relation)
-> - [`testing.State`](ops.testing.State)
-> - [How to manage relations > Test the feature](#manage-relations-test-the-feature)
-
 ### Test the action
 
 To test the charm's action, we'll structure a test around [`Context.on.action`](ops.testing.CharmEvents.action), as in [](#harness-migration-action). Our expected input and output states are:
@@ -514,18 +509,9 @@ def test_pebble_ready():
     assert container_out.plan.services["workload"].command == "run-workload"
 ```
 
-When writing a state-transition test, it's best to treat objects as immutable. We shouldn't expect `ctx.run` to modify the mock container that's passed to `ctx.on.pebble_ready`. In other words, this doesn't work:
-
-```python
-    ...
-    ctx.run(ctx.on.pebble_ready(container_in), state_in)
-    assert "workload" in container_in.plan.services  # Fails!
+```{note}
+When writing a state-transition test, it's best to treat objects as immutable. We shouldn't expect `ctx.run` to modify the mock container that's passed to `ctx.on.pebble_ready`. In other words, the test would break if we replaced the line `assert "workload" ...` with `assert "workload" in container_in.plan.services`.
 ```
-
-> See more:
->
-> - [`testing.Container`](ops.testing.Container)
-> - [`testing.State`](ops.testing.State)
 
 The `test_pebble_ready` function doesn't fully cover the charm's `_on_pebble_ready` method. In addition to defining a service in the container, `_on_pebble_ready` uses [`replan`](ops.Container.replan) to start the service. To cover this, one option would be to check the service status at the end of `test_pebble_ready`:
 
