@@ -155,6 +155,8 @@ def juju_reboot(*, now: bool = False):
 # Is this still true? It doesn't seem to make sense, because if they could be a
 # hostname, then why don't we have a str possibility where they do resolve.
 # If it is true, we perhaps should wrap all the conversions to ipaddr.
+# unit-get: https://github.com/juju/juju/blob/4488fbb57735c2ec74f9f07e85ac5241bd3f52df/internal/worker/uniter/runner/jujuc/unit-get.go#L81
+# network-get: https://github.com/juju/juju/blob/4488fbb57735c2ec74f9f07e85ac5241bd3f52df/internal/worker/uniter/runner/jujuc/network-get.go#L119
 
 
 # We could have bind_address: bool=True, egress_subnets: bool=True,
