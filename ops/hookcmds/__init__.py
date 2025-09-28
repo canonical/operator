@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from ._action import action_fail, action_get, action_log, action_set
 from ._other import (
-    application_version_set,
+    app_version_set,
     config_get,
     credential_get,
     goal_state,
@@ -97,7 +97,7 @@ __all__ = [
     'action_get',
     'action_log',
     'action_set',
-    'application_version_set',
+    'app_version_set',
     'close_port',
     'config_get',
     'credential_get',

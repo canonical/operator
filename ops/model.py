@@ -22,6 +22,7 @@ import contextvars
 import copy
 import dataclasses
 import datetime
+import enum
 import ipaddress
 import json
 import logging
@@ -61,7 +62,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .hookcmds import CloudSpec, SecretRotate
+from .hookcmds import CloudSpec
 from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -1232,6 +1233,18 @@ class NetworkInterface:
             subnet = None
         self.subnet = subnet
         # TODO: expose a hostname/canonical name for the address here, see LP: #1864086.
+
+
+class SecretRotate(enum.Enum):
+    """Secret rotation policies."""
+
+    NEVER = 'never'  # the default in juju
+    HOURLY = 'hourly'
+    DAILY = 'daily'
+    WEEKLY = 'weekly'
+    MONTHLY = 'monthly'
+    QUARTERLY = 'quarterly'
+    YEARLY = 'yearly'
 
 
 class SecretInfo:

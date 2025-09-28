@@ -223,9 +223,9 @@ def test_action_set_nested(run: Run):
     hookcmds.action_set({'foo': 'bar', 'baz': {'baz2': 'qux'}})
 
 
-def test_application_version_set(run: Run):
+def test_app_version_set(run: Run):
     run.handle(['application-version-set', '1.2.3'])
-    hookcmds.application_version_set('1.2.3')
+    hookcmds.app_version_set('1.2.3')
 
 
 def test_close_port(run: Run):
@@ -234,6 +234,11 @@ def test_close_port(run: Run):
 
 
 def test_close_port_endpoints(run: Run):
+    run.handle(['close-port', '--endpoints', 'ep1,ep2', '8080/tcp'])
+    hookcmds.close_port(protocol='tcp', port=8080, endpoints=['ep1', 'ep2'])
+
+
+def test_close_port_str_endpoint(run: Run):
     run.handle(['close-port', '--endpoints', 'ep1', '8080/tcp'])
     hookcmds.close_port(protocol='tcp', port=8080, endpoints='ep1')
 
@@ -369,6 +374,11 @@ def test_open_port(run: Run):
 
 
 def test_open_port_endpoints(run: Run):
+    run.handle(['open-port', '--endpoints', 'ep1,ep2', '8080/tcp'])
+    hookcmds.open_port(protocol='tcp', port=8080, endpoints=['ep1', 'ep2'])
+
+
+def test_open_port_str_endpoint(run: Run):
     run.handle(['open-port', '--endpoints', 'ep1', '8080/tcp'])
     hookcmds.open_port(protocol='tcp', port=8080, endpoints='ep1')
 
@@ -384,10 +394,20 @@ def test_open_port_range(run: Run):
 
 
 def test_opened_ports(run: Run):
-    run.handle(['opened-ports', '--format=json'], stdout='["8080/tcp"]')
+    run.handle(
+        ['opened-ports', '--format=json'],
+        stdout='["8080/tcp", "icmp", "8081-8090/udp", "80"]',
+    )
     result = hookcmds.opened_ports()
     assert result[0].port == 8080
     assert result[0].protocol == 'tcp'
+    assert result[1].port is None
+    assert result[1].protocol == 'icmp'
+    assert result[2].port == 8081
+    assert result[2].to_port == 8090
+    assert result[2].protocol == 'udp'
+    assert result[3].port == 80
+    assert result[3].protocol == 'tcp'
 
 
 def test_opened_ports_endpoints(run: Run):
@@ -495,33 +515,29 @@ def test_secret_add(run: Run, mock_temp_dir: str):
     assert result == 'secretid'
 
 
-@pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_add_with_metadata(
-    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
-):
-    run.handle(
-        [
-            'secret-add',
-            '--label',
-            'mylabel',
-            '--description',
-            'mydesc',
-            '--expire',
-            '3d',
-            '--rotate',
-            'quarterly',
-            '--owner',
-            owner,
-            f'foo#file={mock_temp_dir}/foo',
-        ],
-        stdout='secretid',
-    )
+@pytest.mark.parametrize('owner', ['app', 'unit'])
+def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
+    command = [
+        'secret-add',
+        '--label',
+        'mylabel',
+        '--description',
+        'mydesc',
+        '--expire',
+        '3d',
+        '--rotate',
+        'quarterly',
+    ]
+    if owner != 'app':
+        command.extend(['--owner', owner])
+    command.append(f'foo#file={mock_temp_dir}/foo')
+    run.handle(command, stdout='secretid')
     result = hookcmds.secret_add(
         {'foo': 'bar'},
         label='mylabel',
         description='mydesc',
         expire='3d',
-        rotate=hookcmds.SecretRotate.QUARTERLY,
+        rotate='quarterly',
         owner=owner,
     )
     assert result == 'secretid'
@@ -653,35 +669,36 @@ def test_secret_set(run: Run, mock_temp_dir: str):
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
-@pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_set_with_metadata(
-    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
-):
-    run.handle(
-        [
-            'secret-set',
-            '--label',
-            'mylabel',
-            '--description',
-            'mydesc',
-            '--expire',
-            '3d',
-            '--rotate',
-            'quarterly',
+@pytest.mark.parametrize('owner', ['app', 'unit'])
+def test_secret_set_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
+    command = [
+        'secret-set',
+        '--label',
+        'mylabel',
+        '--description',
+        'mydesc',
+        '--expire',
+        '3d',
+        '--rotate',
+        'quarterly',
+    ]
+    if owner == 'unit':
+        command.extend([
             '--owner',
             owner,
-            'secret:id',
-            f'foo#file={mock_temp_dir}/foo',
-        ],
-        stdout='secretid',
-    )
+        ])
+    command.extend([
+        'secret:id',
+        f'foo#file={mock_temp_dir}/foo',
+    ])
+    run.handle(command, stdout='secretid')
     hookcmds.secret_set(
         'secret:id',
         content={'foo': 'bar'},
         label='mylabel',
         description='mydesc',
         expire='3d',
-        rotate=hookcmds.SecretRotate.QUARTERLY,
+        rotate='quarterly',
         owner=owner,
     )
 
@@ -767,6 +784,11 @@ def test_status_set(run: Run):
 def test_status_set_app(run: Run):
     run.handle(['status-set', '--application=True', 'active', 'msg'])
     hookcmds.status_set('active', 'msg', app=True)
+
+
+def test_status_set_no_message(run: Run):
+    run.handle(['status-set', '--application=False', 'waiting'])
+    hookcmds.status_set('waiting')
 
 
 def test_storage_add(run: Run):

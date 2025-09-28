@@ -29,7 +29,7 @@ from ._types import CloudSpec, GoalState, GoalStateDict, Network
 from ._utils import run
 
 
-def application_version_set(version: str):
+def app_version_set(version: str):
     """Specify which version of the application is deployed.
 
     For more details, see:

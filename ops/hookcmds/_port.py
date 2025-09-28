@@ -169,6 +169,7 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
             protocol = port
             port = None
         else:
+            protocol = protocol or 'tcp'
             port = int(port)
         if protocol not in ('tcp', 'udp', 'icmp'):
             raise ValueError(f'Unexpected protocol from Juju: {protocol}')

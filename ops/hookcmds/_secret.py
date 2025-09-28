@@ -38,7 +38,7 @@ def secret_add(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] | None = None,
+    owner: Literal['app', 'unit'] = 'app',
 ) -> str:
     """Add a new secret.
 
@@ -51,7 +51,7 @@ def secret_add(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the application or the unit.
+        owner: The owner of the secret, either the app or the unit.
     """
     args: list[str] = []
     if label is not None:
@@ -64,8 +64,9 @@ def secret_add(
         else:
             args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
-        args.extend(['--rotate', rotate.value])
-    if owner is not None:
+        args.extend(['--rotate', rotate])
+    # The Juju default is 'application' (our 'app').
+    if owner != 'app':
         args.extend(['--owner', owner])
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
@@ -203,7 +204,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
         id: The ID of the secret to retrieve.
         label: The label of the secret to retrieve.
     """
-    args: list[str] = ['--format=json']
+    args = ['--format=json']
     if id is not None:
         args.append(id)
     elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
@@ -261,7 +262,7 @@ def secret_set(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] | None = None,
+    owner: Literal['app', 'unit'] = 'app',
 ):
     """Update an existing secret.
 
@@ -275,7 +276,7 @@ def secret_set(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the application or the unit.
+        owner: The owner of the secret, either the app or the unit.
     """
     args: list[str] = []
     if label is not None:
@@ -288,8 +289,9 @@ def secret_set(
         else:
             args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
-        args.extend(['--rotate', rotate.value])
-    if owner is not None:
+        args.extend(['--rotate', rotate])
+    # The Juju default is 'application' (our 'app').
+    if owner != 'app':
         args.extend(['--owner', owner])
     args.append(id)
 

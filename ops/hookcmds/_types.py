@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import enum
 import ipaddress
 import pathlib
 from typing import (
@@ -30,19 +29,7 @@ from typing import (
 
 from ._utils import datetime_from_iso
 
-
-class SecretRotate(enum.Enum):
-    """Secret rotation policies."""
-
-    NEVER = 'never'  # the default in juju
-    HOURLY = 'hourly'
-    DAILY = 'daily'
-    WEEKLY = 'weekly'
-    MONTHLY = 'monthly'
-    QUARTERLY = 'quarterly'
-    YEARLY = 'yearly'
-
-
+SecretRotate = Literal['never', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']
 SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
 ReadOnlyStatusName = Literal['error', 'unknown']
 StatusName: TypeAlias = 'SettableStatusName | ReadOnlyStatusName'
@@ -312,7 +299,7 @@ class SecretInfo:
             label=data.get('label'),
             description=data.get('description'),
             expiry=datetime_from_iso(data['expiry']) if data.get('expiry') else None,
-            rotation=SecretRotate(data['rotation']) if data.get('rotation') else None,
+            rotation=data['rotation'] if data.get('rotation') else None,
             rotates=datetime_from_iso(data['rotates']) if data.get('rotates') else None,
             revision=data['revision'],
         )
