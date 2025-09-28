@@ -17,13 +17,9 @@ To help focus on the differences between the two approaches, we don't use fixtur
 
 For more information about state-transition testing, see:
 
-TODO
-
-<!-- > See more:
->
-> - [`testing.Container`](ops.testing.Container)
-> - [`testing.State`](ops.testing.State)
-> - [How to manage relations > Test the feature](#manage-relations-test-the-feature) -->
+- [](#write-unit-tests-for-a-charm)
+- [The reference docs](/reference/ops-testing), especially [](ops.testing.State) and [](ops.testing.CharmEvents)
+- How-to guides for particular features, such as [How to manage relations > Test the feature](#manage-relations-test-the-feature)
 
 (harness-migration-action)=
 ## Test a minimal action
