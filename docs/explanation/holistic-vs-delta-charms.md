@@ -171,11 +171,11 @@ def __init__(self, framework: ops.Framework):
     )
 
 def _on_install(self, event: ops.InstallEvent):
-    # Install the workload binary
-    apt.add_package("some-workload")
+    self.workload.install_binaries()
 
 def _on_start(self, event: ops.StartEvent):
-    # This unit has been started, peer relations are usable
+    self.workload.start_service()
+    # Peer relation is now usable
     if self.unit.is_leader():
         ...
 
@@ -247,11 +247,6 @@ This comes down to two observations:
 
 ### When to use the delta approach
 
-At the same time, simple operators can be trivially written as delta charms.
-
-Either of the following hints at suitability of such approach:
-
-- The Juju event model can be mapped directly to the workload semantics.
-- The charm is trivial.
+A delta approach is most appropriate when the Juju event model can be mapped directly to the workload semantics. Simple operators can typically be written as delta charms.
 
 See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable. Notably, machine charms map to the delta model more readily than Kubernetes charms.
