@@ -255,7 +255,7 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 
 3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
 
-4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
+4. Go to the GitHub releases page, then edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > Pushing the tags will trigger automatic builds for the Python packages and
     > publish them to PyPI ([ops](https://pypi.org/project/ops/)
