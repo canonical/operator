@@ -3,6 +3,24 @@
 `ops.hookcmds`
 ==============
 
+Low-level access to the Juju hook commands.
+
+Charm authors should use the :class:`ops.Model` (via ``self.model``) rather than
+directly running the hook commands, where possible. This module is primarily
+provided to help with developing charming alternatives to the Ops framework.
+
+Note: ``hookcmds`` is not covered by the semver policy that applies to the rest
+of Ops. We will do our best to avoid breaking changes, but we reserve the right
+to make breaking changes within this package if necessary, within the Ops 3.x
+series.
+
+All methods are 1:1 mapping to Juju hook commands. This is a *low-level* API,
+available for charm use, but expected to be used via higher-level wrappers.
+
+See https://documentation.ubuntu.com/juju/3.6/reference/hook-command/ and
+https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/
+for a list of all Juju hook commands.
+
 .. autoclass:: ops.hookcmds.Address
 .. autoclass:: ops.hookcmds.AppStatus
 .. autoclass:: ops.hookcmds.BindAddress
