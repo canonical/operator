@@ -47,19 +47,55 @@ The code path reads all state it needs to perform computation, and updates all w
 
 ### Example
 
+The reconciler method above has been reduced for clarity, but is representative of the common reconciler pattern.
+
+The body of the reconciler loop comprises three main parts:
+
+- reading the inputs (configuration, workload, and Juju environment state)
+- computing the new state
+- writing the output (updating the workload and writing environment state)
+
+```py
+# Read the inputs
+path = self.typed_config.some_path
+foo_value = self.foo_requirer.some_relation_property
+bar_value = self.bar_provider.some_relation_property
+current_config = self.workload.config
+
+# Compute the new state
+workload_config = self.render_config(path, foo_value, bar_value)
+
+# Write the outputs
+if workload_config != current_config:
+    self.workload.update_config_and_restart(workload_config)
+self.foo_requirer.update_some_relation_field(bar_value)
+self.bar_provider.update_some_relation_field(foo_value)
+```
+
+Well-written charms include helper methods or classes for the workload and use charm libraries to read and write environment state on relations.
+
+You may notice that the role of a complex charm is to cross-connect configuration, workload and libraries.
+In fact, complex charms often use many charm libraries, moving the emphasis towards shovelling data from a set of charm libraries to other charm libraries.
+
+The rest of the charm is mostly scaffolding:
+
+- observing all events of interest
+- early checks, ensuring that reconciliation is possible
+- handling errors and reporting unit status
+
 ```py
 def __init__(self, framework: ops.Framework):
     super().__init__(framework)
     self.typed_config = self.load_config(ConfigClass, errors='blocked')
     self.workload = Workload()
-    self.foo = FooRequirer()
-    self.bar = BarProvider()
+    self.foo_requirer = FooRequirer()
+    self.bar_provider = BarProvider()
 
     events = [
         self.on.start,
         self.on.config_changed,
-        self.on['foo'].relation_changed,
-        self.on['bar'].relation_changed,
+        self.on['foo-relation'].relation_changed,
+        self.on['bar-relation'].relation_changed,
         ...
     ]
 
@@ -69,44 +105,22 @@ def __init__(self, framework: ops.Framework):
 def _reconcile(self, _: ops.EventBase):
     # Early checks
     workload_ready = self.workload.is_ready
-    foo_ready = self.foo.is_ready
-    bar_ready = self.bar.is_ready
+    foo_ready = self.foo_requirer.is_ready
+    bar_ready = self.bar_provider.is_ready
     
     if not workload_ready or not foo_ready or not bar_ready:
         # Status will be set in `_on_collect_unit_status`
         return
 
     try:
-        # Read the inputs: configuration, libraries and the workload
-        path = self.typed_config.some_path
-        foo_value = self.foo.some_relation_property
-        bar_value = self.bar.some_relation_property
-        current_config = self.workload.config
-
-        # Compute the new state
-        workload_config = self.render_config(path, foo_value, bar_value)
-
-        # Write the outputs to the libraries and the workload
-        if workload_config != current_config:
-            self.workload.update_config_and_restart(workload_config)
-        self.foo.update_some_relation_field(bar_value)
-        self.bar.update_some_relation_field(foo_value)
+        # 1. Read the inputs: configuration, libraries and the workload
+        # 2. Compute the new state
+        # 3. Write the outputs to the libraries and the workload
+        ...
     except (WorkloadError, FooError, BarError, ops.ModelError, ...):
         # Error handling
         ...
 ```
-
-The reconciler method above has been reduced for clarity, but is representative of the common reconciler pattern.
-It consists of three main parts in addition to early checks and error handling:
-
-- reading the inputs (configuration, workload, and Juju environment state)
-- computing the new state
-- writing the output (updating the workload and writing environment state)
-
-Well-written charms include helper methods or classes for the workload and use charm libraries to read and write environment state on relations.
-
-You may notice that the role of a complex charm is to cross-connect configuration, workload and libraries.
-In fact, complex charms often use many charm libraries, moving the emphasis towards shovelling data from a set of charm libraries to other charm libraries.
 
 ### Expert reconcilers
 
@@ -117,7 +131,7 @@ Rarely, the goal state may change:
 - unit lifecycle end, that is, graceful shutdown
 - failover to another unit, leaving this unit on stand-by
 
-Complex charms often split the reconciler method in functional constituents. See [Parca Kubernetes Operator](https://github.com/canonical/parca-k8s-operator/blob/6fda0c9844bc7a45b93ac12806a6ef04036c50c4/src/charm.py#L188-L206) for an example.
+Complex charms often split the reconciler method into functional constituents. See [Parca Kubernetes Operator](https://github.com/canonical/parca-k8s-operator/blob/6fda0c9844bc7a45b93ac12806a6ef04036c50c4/src/charm.py#L188-L206) for an example.
 
 Charm libraries too can be written using the reconciler pattern. See [the implementation of `ops.tracing.Tracing`](https://github.com/canonical/operator/blob/af6764fbfdcf8ed42a0edb331870dd9d37dc804b/tracing/ops_tracing/_api.py#L128-L163) for an example.
 
@@ -144,11 +158,17 @@ def __init__(self, framework: ops.Framework):
     self.framework.observe(self.on.start, self._on_start)
 
     hostname = socket.getfqdn()
-    self.foo = FooRequires(self, "foo-relation", address=hostname)
-    self.framework.observe(self.foo.on.data_available, self._on_data_available)
+    self.foo_requirer = FooRequirer(self, "foo-relation", address=hostname)
+    self.framework.observe(
+        self.foo_requirer.on.data_available,
+        self._on_data_available,
+    )
 
-    self.bar = BarProvider(self, "bar-relation")
-    self.framework.observe(self.bar.on.create_bar, self._on_create_bar)
+    self.bar_provider = BarProvider(self, "bar-relation")
+    self.framework.observe(
+        self.bar_provider.on.create_bar,
+        self._on_create_bar,
+    )
 
 def _on_install(self, event: ops.InstallEvent):
     # Install the workload binary
@@ -228,11 +248,10 @@ This comes down to two observations:
 ### When to use the delta approach
 
 At the same time, simple operators can be trivially written as delta charms.
+
 Either of the following hints at suitability of such approach:
 
 - The Juju event model can be mapped directly to the workload semantics.
 - The charm is trivial.
 
-[alt text] A delta approach is most appropriate when the Juju event model can be mapped directly to the workload semantics. Simple operators can typically be written as delta charms.
-
-See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable.
+See [SSSD Operator](https://github.com/canonical/sssd-operator/blob/9118ecec6e45820f79dda97f6f7dd287a20b39ac/src/charm.py#L44-L69) and [Apache Kafka Rack Awareness Operator](https://github.com/canonical/kafka-broker-rack-awareness-operator/blob/980781a49b6d65e6d4356819c1f3a2c57a0e3625/src/charm.py#L27-L30) for examples of workloads where a delta charm is suitable. Notably, machine charms map to the delta model more readily than Kubernetes charms.
