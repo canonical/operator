@@ -263,7 +263,9 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
-    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+    > You can troubleshoot errors at [Actions > Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml).
+    >
+    > The Publish workflow includes a job that runs the "SBOM and secscan" workflow.
 
 5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
 6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
