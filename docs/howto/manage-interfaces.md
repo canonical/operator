@@ -469,5 +469,5 @@ Remember, however, to merge the changes first in the operator repository before 
 
 > See more:
 >
-> - [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the ingress interface defined in `charm-relation-interfaces`.
+> - [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the `ingress` interface defined in `charm-relation-interfaces`.
 > - [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) for the [`traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator) charm.
