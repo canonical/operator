@@ -93,3 +93,28 @@ def test_ops_testing_doc():
             })
 
     assert expected_names == found_names
+
+
+def test_ops_hookcmds_doc():
+    """Ensure that ops.hookcmds's documentation includes all the expected names."""
+    # We don't document the type aliases.
+    expected_names = set(name for name in ops.hookcmds.__all__ if name != 'errors')
+    # We don't document `from __future__ import annotations`
+    expected_names.discard('errors.annotations')
+    # CloudCredential and CloudSpec are also exposed in the ops namespace, so
+    # we don't have them in the hookcmds reference.
+    expected_names.discard('CloudCredential')
+    expected_names.discard('CloudSpec')
+
+    found_names: set[str] = set()
+    with open('docs/reference/ops-hookcmds.rst') as testing_doc:
+        found_names.update({
+            line.split('ops.hookcmds.', 1)[1].strip()
+            for line in testing_doc
+            if line.strip().startswith((
+                '.. autoclass:: ops.hookcmds.',
+                '.. automethod:: ops.hookcmds.',
+            ))
+        })
+
+    assert expected_names == found_names
