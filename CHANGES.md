@@ -6,7 +6,7 @@
 
 ## Fixes
 
-* `_MockModelBackend.relation_get` will return a copy of the relation data (#2052)
+* In testing, separate relation data cache from mock Juju backend (#2052)
 
 ## Documentation
 
