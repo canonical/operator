@@ -1,3 +1,29 @@
+# 3.3.0 - 29 September 2025
+
+## Features
+
+* Expose the Juju hook context in ops.JujuContext (#1996)
+
+## Fixes
+
+* `_MockModelBackend.relation_get` will return a copy of the relation data (#2052)
+
+## Documentation
+
+* Use uv for testing and packing the httpbin charm (#2011)
+* Improve intro to ops.testing reference (#2023)
+* In httpbin charm integration tests, add env var for charm file to deploy (#2018)
+* Update get_cloud_spec doc now that credential-get works on K8s (#2031)
+* Note that arbitrary_types_allowed is required when ops.Secret is used in a Pydantic class (#2038)
+* Clean up Resources.fetch docstring, add ModelError exception (#2039)
+* Note that the peer databag isn't usable during the install event (#2051)
+* Fix testing code in actions how-to guide (#2054)
+
+## CI
+
+* Nicer logging output in the release script using rich (#2017)
+* Clean up PYTHONPATH in tox.ini (#2058)
+
 # 3.2.0 - 28 August 2025
 
 ## Features
