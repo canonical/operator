@@ -252,7 +252,9 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     > `tox -e draft-release -- --branch 2.23-maintenance`
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
+
 3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+
 4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > Pushing the tags will trigger automatic builds for the Python packages and
@@ -270,8 +272,10 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 5. On the summary page of the most recent Publish run, locate the secscan artifacts. There will be two artifacts: `secscan-report-upload-sdist` and `secscan-report-upload-wheel`.
 
     Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+
 6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
 7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
