@@ -31,7 +31,7 @@ The app also has a connection to a  [PostgreSQL](https://www.postgresql.org/) da
 
 Additionally, our app uses [starlette-exporter](https://pypi.org/project/starlette-exporter/) to generate real-time application metrics and to expose them via a `/metrics` endpoint that is designed to be scraped by [Prometheus](https://prometheus.io/).
 
-Finally, every time a user interacts with the database, our app writes logging information to the log file and also streams it to `stdout`.
+Finally, every time a user interacts with the database, our app writes logging information to the log file and also streams it to standard output.
 
 To summarize, our demo application is a minimal but real-life-like application that has external API endpoints, performs database read and write operations, and collects real-time metrics and logs for observability purposes.
 
@@ -80,7 +80,7 @@ If you want to proceed with your own copy of an image please proceed with the fo
 
 Since charm framework operates around OCI images we need to build and publish our image.
 
-You can inspect `Dockerfile` in the root of the app directory. We will build our image using docker on top of ubuntu:22.04 base. Later push it to GitHub container registry (ghcr).
+You can inspect `Dockerfile` in the root of the app directory. We will build our image using docker on top of ubuntu:22.04 base. Later push it to the GitHub container registry (ghcr.io).
 
 ```
 # Log in using environment variables for GitHub username and API token
@@ -89,7 +89,7 @@ docker login ghcr.io --username $gh_user --password=$ghcr_token
 # Build image, execute from the directory with `Dockerfile`
 docker build -t api_demo_server .
 
-# tag an image with ghcr tag and version.
+# Tag an image with ghcr tag and version.
 # Specify your username and repo name where to push
 docker tag api_demo_server ghcr.io/beliaev-maksim/api_demo_server:1.0.0
 
