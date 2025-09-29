@@ -193,7 +193,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     full_changelog_line = None
 
     for line in release_notes.splitlines():
-        if match := re.match(r'^\* (\w+): (.*) by @\w+ in (.*)', line.strip()):
+        if match := re.match(r'^\* (\w+): (.*) by [^ ]+ in (.*)', line.strip()):
             category = match.group(1)
             if category in categories:
                 description = match.group(2).strip()
