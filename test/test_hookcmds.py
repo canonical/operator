@@ -510,28 +510,35 @@ def test_resource_get(run: Run):
 
 
 def test_secret_add(run: Run, mock_temp_dir: str):
-    run.handle(['secret-add', f'foo#file={mock_temp_dir}/foo'], stdout='secretid')
+    run.handle(
+        ['secret-add', '--owner', 'application', f'foo#file={mock_temp_dir}/foo'],
+        stdout='secretid',
+    )
     result = hookcmds.secret_add({'foo': 'bar'})
     assert result == 'secretid'
 
 
-@pytest.mark.parametrize('owner', ['app', 'unit'])
-def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
-    command = [
-        'secret-add',
-        '--label',
-        'mylabel',
-        '--description',
-        'mydesc',
-        '--expire',
-        '3d',
-        '--rotate',
-        'quarterly',
-    ]
-    if owner != 'app':
-        command.extend(['--owner', owner])
-    command.append(f'foo#file={mock_temp_dir}/foo')
-    run.handle(command, stdout='secretid')
+@pytest.mark.parametrize('owner', ['application', 'unit'])
+def test_secret_add_with_metadata(
+    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
+):
+    run.handle(
+        [
+            'secret-add',
+            '--label',
+            'mylabel',
+            '--description',
+            'mydesc',
+            '--expire',
+            '3d',
+            '--rotate',
+            'quarterly',
+            '--owner',
+            owner,
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
     result = hookcmds.secret_add(
         {'foo': 'bar'},
         label='mylabel',
@@ -549,6 +556,8 @@ def test_secret_add_date(run: Run, mock_temp_dir: str):
             'secret-add',
             '--expire',
             '2025-12-31T23:59:59Z',
+            '--owner',
+            'application',
             f'foo#file={mock_temp_dir}/foo',
         ],
         stdout='secretid',
@@ -665,33 +674,38 @@ def test_secret_revoke(run: Run, relation_id: int | None, app: str | None, unit:
 
 
 def test_secret_set(run: Run, mock_temp_dir: str):
-    run.handle(['secret-set', 'secret:123', f'foo#file={mock_temp_dir}/foo'])
+    run.handle([
+        'secret-set',
+        '--owner',
+        'application',
+        'secret:123',
+        f'foo#file={mock_temp_dir}/foo',
+    ])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
-@pytest.mark.parametrize('owner', ['app', 'unit'])
-def test_secret_set_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
-    command = [
-        'secret-set',
-        '--label',
-        'mylabel',
-        '--description',
-        'mydesc',
-        '--expire',
-        '3d',
-        '--rotate',
-        'quarterly',
-    ]
-    if owner == 'unit':
-        command.extend([
+@pytest.mark.parametrize('owner', ['application', 'unit'])
+def test_secret_set_with_metadata(
+    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
+):
+    run.handle(
+        [
+            'secret-set',
+            '--label',
+            'mylabel',
+            '--description',
+            'mydesc',
+            '--expire',
+            '3d',
+            '--rotate',
+            'quarterly',
             '--owner',
             owner,
-        ])
-    command.extend([
-        'secret:id',
-        f'foo#file={mock_temp_dir}/foo',
-    ])
-    run.handle(command, stdout='secretid')
+            'secret:id',
+            f'foo#file={mock_temp_dir}/foo',
+        ],
+        stdout='secretid',
+    )
     hookcmds.secret_set(
         'secret:id',
         content={'foo': 'bar'},
@@ -709,6 +723,8 @@ def test_secret_set_date(run: Run, mock_temp_dir: str):
             'secret-set',
             '--expire',
             '2025-12-31T23:59:59Z',
+            '--owner',
+            'application',
             'secret:id',
             f'foo#file={mock_temp_dir}/foo',
         ],

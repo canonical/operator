@@ -38,7 +38,7 @@ def secret_add(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['app', 'unit'] = 'app',
+    owner: Literal['application', 'unit'] = 'application',
 ) -> str:
     """Add a new secret.
 
@@ -51,7 +51,7 @@ def secret_add(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the app or the unit.
+        owner: The owner of the secret, either the application or the unit.
     """
     args: list[str] = []
     if label is not None:
@@ -65,9 +65,7 @@ def secret_add(
             args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    # The Juju default is 'application' (our 'app').
-    if owner != 'app':
-        args.extend(['--owner', owner])
+    args.extend(['--owner', owner])
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
@@ -262,7 +260,7 @@ def secret_set(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['app', 'unit'] = 'app',
+    owner: Literal['application', 'unit'] = 'application',
 ):
     """Update an existing secret.
 
@@ -276,7 +274,7 @@ def secret_set(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the app or the unit.
+        owner: The owner of the secret, either the application or the unit.
     """
     args: list[str] = []
     if label is not None:
@@ -290,9 +288,7 @@ def secret_set(
             args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    # The Juju default is 'application' (our 'app').
-    if owner != 'app':
-        args.extend(['--owner', owner])
+    args.extend(['--owner', owner])
     args.append(id)
 
     # Always use "key#file" arguments to provide the content to avoid secret data
