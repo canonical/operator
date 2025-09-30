@@ -448,8 +448,6 @@ INFO:root:Running tests for role: provider
 }
 ```
 
-For reference, [here](https://github.com/IronCore864/my-fancy-database-operator) is an example of a bare minimum `my-fancy-database-operator` charm to make the test pass. In the charm, application relation data and unit relation data are set according to our definition (see the beginning part of the previous how-to guide "How to register an interface".
-
 ### Troubleshooting and debugging the tests
 
 #### Your charm is missing some configuration or mocks
@@ -471,6 +469,5 @@ Remember, however, to merge the changes first in the operator repository before 
 
 > See more:
 >
-> [Here](https://github.com/IronCore864/my-fancy-database-operator) is a minimum charm that both provides and requires the `my_fancy_database` interface from this how-to guide and [this](https://github.com/IronCore864/my-fancy-database-operator/blob/main/tests/interface/conftest.py) is an example of the bare minimum of `conftest.py`. See the content of `test_provider.py` [here in a forked repo](https://github.com/IronCore864/charm-relation-interfaces/blob/my-fancy-database/interfaces/my_fancy_database/v0/interface_tests/test_provider.py) and `test_requirer.py` [here](https://github.com/IronCore864/charm-relation-interfaces/blob/my-fancy-database/interfaces/my_fancy_database/v0/interface_tests/test_requirer.py).
->
-> For a more realistic reference, refer to the [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the ingress interface defined in the `charm-relation-interfaces` repository, and check out the [`traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) for its content of the [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) file.
+> - [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the `ingress` interface defined in `charm-relation-interfaces`.
+> - [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) for the [`traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator) charm.
