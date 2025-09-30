@@ -290,21 +290,6 @@ transition testing". Users should install `ops-scenario` with
 `pip install ops[testing]` rather than using the `ops-scenario` package name
 directly.
 
-### `git log`
-
-`git log` is used to see every change since a previous release. Obviously, no
-special work needs to be done so that this is available. A link to the GitHub
-view of the log will be included at the end of the GitHub release notes when
-the "Generate Release Notes" button is used, in the form:
-
-```
-**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
-```
-
-These changes include both `ops` and `ops-scenario`. If someone needs to see
-changes only for one of the packages, then the `/testing/` folder can be
-filtered in/out.
-
 ### CHANGES.md
 
 [CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
