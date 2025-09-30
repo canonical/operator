@@ -242,13 +242,13 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
     > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
-    > 
+    >
     > If you have different settings, add parameters accordingly. For example, the following command assumes your forked remote name is `mine`, and `canonical/operator` remote name is `origin`:
-    > 
+    >
     > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
-    > 
+    >
     > By default, the script makes a release on the main branch. If you want to make a release on another branch, for example, on "2.23-maintenance" (you do not need to switch to this branch in your forked repo), run it with the "--branch" parameter:
-    > 
+    >
     > `tox -e draft-release -- --branch 2.23-maintenance`
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
@@ -258,11 +258,11 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
 
     > Pushing the tags will trigger automatic builds for the Python packages and
-    > publish them to PyPI ([ops](https://pypi.org/project/ops/) 
-    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and 
+    > publish them to PyPI ([ops](https://pypi.org/project/ops/)
+    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and
     > [ops-tracing](https://pypi.org/project/ops-tracing/)).
     > Note that it sometimes take a bit of time for the new releases to show up.
-    > 
+    >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
     > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
@@ -273,7 +273,7 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
-    > 
+    >
     > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
@@ -307,48 +307,14 @@ filtered in/out.
 
 ### CHANGES.md
 
-A changelog is kept in version control that simply lists the changes in each
-release, other than chores. The changelog for `ops`
-is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
-`ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
-There will be overlap between the two files, as many PRs will include changes to
-common infrastructure, or will adjust both `ops` and also the testing API in
-`ops-scenario`.
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
+kept up-to-date by the PR that's created when you run `tox -e draft-release`
+duing the release process. You only need to manually edit the changelog if a
+commit message needs adjusting (we try to avoid doing this).
 
-Adding the changes is done in preparation for a release. Use the "Generate
-Release Notes" button in the GitHub releases page, and copy the text to the
-CHANGES.md files.
-
-* Group the changes by the commit type (feat, fix, and so on) and use full names
-  ("Features", not "feat", "Fixes", not "fix") for group headings.
-* Remove any chores.
-* Remove any bullets that do not apply to the package. For instance, if a bullet
-  only affects `ops[testing]`, don't include it in [CHANGES.md](CHANGES.md) when
-  doing an `ops` release. The bullet should go in [testing/CHANGES.md](testing/CHANGES.md)
-  instead. If `ops[testing]` is not being released yet, put the bullet in a placeholder
-  section at top of [testing/CHANGES.md](testing/CHANGES.md).
-* Strip the commit type prefix from the bullet point, and capitalise the first
-  word.
-* Strip the username (who did each commit) if the author is a member of the
-  Charm Tech team.
-* Replace the link to the pull request with the PR number in parentheses.
-* Where appropriate, collapse multiple tightly related bullet points into a
-  single point that refers to multiple commits.
-* Where appropriate, add backticks for code formatting.
-* Do not include the "New Contributors" section and the "Full Changelog" link
-  (created by "Generate Release Notes").
-
-For example: the PR
-
-```
-* docs: clarify where StoredState is stored by @benhoyt in https://github.com/canonical/operator/pull/2006
-```
-
-is added to the "Documentation" section as:
-
-```
-* Clarify where StoredState is stored (#2006)
-```
+There's also a changelog for `ops-scenario`:
+[testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
+We've kept it for historical reference, but we no longer maintain it.
 
 ### GitHub Release Notes
 
