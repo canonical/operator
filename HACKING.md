@@ -231,7 +231,65 @@ dependencies can be found in the relevant `tox.ini` environment `deps` field.
 The build backend is [setuptools](https://pypi.org/project/setuptools/), and
 the build frontend is [build](https://pypi.org/project/build/).
 
-# Publishing a Release
+# Releases
+
+## Release documentation
+
+We produce several pieces of documentation for Ops releases.
+
+As part of the release process, you'll write a summary of the release.
+The summary appears in the GitHub release notes and in Discourse and Matrix.
+
+In the summary, outline the key improvements from all areas of Ops,
+including testing, tracing, and the docs.
+The point here is to encourage people to check out the full notes and to upgrade
+promptly, so ensure that you entice them with the best that the new versions
+have to offer.
+
+Avoid using the word "Scenario", preferring "unit testing API" or "state
+transition testing".
+
+### CHANGES.md
+
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
+kept up-to-date by the PR that's created when you run `tox -e draft-release`
+duing the release process. You only need to manually edit the changelog if a
+commit message needs adjusting (we try to avoid doing this).
+
+There's also a changelog for `ops-scenario`:
+[testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
+We've kept it for historical reference, but we no longer maintain it.
+
+### GitHub release notes
+
+The GitHub release notes include the summary of the release and
+the list of changes found in the changelog. A draft release is created when
+you run `tox -e draft-release` duing the release process. You might need to
+edit the draft release after a review.
+
+### Discourse and Matrix
+
+After completing the release process, post to
+[framework in Discourse](https://discourse.charmhub.io/c/framework/42) and
+[Charm Development in Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
+The Discourse post title should be:
+
+```
+Ops x.y.z (and ops-scenario w.y.z and ops-tracing x.y.z) released
+```
+
+And the post should resemble this:
+
+```
+The main improvements in this release are ...
+
+Read more in the [full release notes on GitHub](link to the GitHub release).
+```
+
+The Matrix post should be similar.
+
+## Publishing a release
 
 Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
 
@@ -279,58 +337,6 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
-
-## Release Documentation
-
-We produce several pieces of documentation for Ops releases.
-
-As part of the release process, you'll write a summary of the release.
-The summary appears in the GitHub release notes, the Discourse post, and the Matrix post.
-
-In the summary, outline the key improvements from all areas of Ops,
-including testing, tracing, and the docs.
-The point here is to encourage people to check out the full notes and to upgrade
-promptly, so ensure that you entice them with the best that the new versions
-have to offer.
-
-Avoid using the word "Scenario", preferring "unit testing API" or "state
-transition testing".
-
-### CHANGES.md
-
-[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
-kept up-to-date by the PR that's created when you run `tox -e draft-release`
-duing the release process. You only need to manually edit the changelog if a
-commit message needs adjusting (we try to avoid doing this).
-
-There's also a changelog for `ops-scenario`:
-[testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
-We've kept it for historical reference, but we no longer maintain it.
-
-### GitHub Release Notes
-
-The GitHub release notes include the summary of the release and
-the list of changes found in the changelogs. A draft release is created when
-you run `tox -e draft-release` duing the release process. You might need to
-edit the draft release after a review.
-
-### Discourse Release Announcement
-
-Post to the [framework category](https://discourse.charmhub.io/c/framework/42).
-
-The post title should be:
-
-```
-Ops x.y.z (and ops-scenario w.y.z and ops-tracing x.y.z) released
-```
-
-And the post should resemble this:
-
-```
-The main improvements in this release are ...
-
-Read more in the [full release notes on GitHub](link to the GitHub release).
-```
 
 ## Updating the Ops versions in the Charmcraft profiles
 
