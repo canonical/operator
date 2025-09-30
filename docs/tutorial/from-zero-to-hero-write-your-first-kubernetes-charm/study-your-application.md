@@ -89,7 +89,7 @@ docker login ghcr.io --username $gh_user --password=$ghcr_token
 # Build image, execute from the directory with `Dockerfile`
 docker build -t api_demo_server .
 
-# Tag an image with ghcr tag and version.
+# Tag an image with registry tag and version.
 # Specify your username and repo name where to push
 docker tag api_demo_server ghcr.io/beliaev-maksim/api_demo_server:1.0.0
 
