@@ -455,7 +455,7 @@ INFO:root:Running tests for role: provider
 Solution to this is to add the missing mocks/patches to the `interface_tester` fixture in `conftest.py`.
 Essentially, you need to make it so that the charm runtime 'thinks' that everything is normal and ready to process and accept the interface you are testing.
 This may mean mocking the presence and connectivity of a container, system calls, substrate API calls, and more.
-If you have scenario or unittests in your codebase, you most likely already have all the necessary patches scattered around and it's a matter of collecting them.
+If you have unit tests in your codebase, you most likely already have all the necessary patches scattered around and it's a matter of collecting them.
 
 Remember that if you run your tests using `run_matrix.py` locally, in your troubleshooting you need to point `interface.yaml` to the branch where you committed your changes as `run_matrix` fetches the charm repositories in order to run the charms:
 
