@@ -282,13 +282,19 @@ If the release automation script fails, delete the draft release and the newly c
 
 ## Release Documentation
 
-We produce several pieces of documentation for `ops` and `ops-scenario`
-releases, each serving a separate purpose and covering a different level.
+We produce several pieces of documentation for Ops releases.
+
+As part of the release process, you'll write a summary of the release.
+The summary appears in the GitHub release notes, the Discourse post, and the Matrix post.
+
+In the summary, outline the key improvements from all areas of Ops,
+including testing, tracing, and the docs.
+The point here is to encourage people to check out the full notes and to upgrade
+promptly, so ensure that you entice them with the best that the new versions
+have to offer.
 
 Avoid using the word "Scenario", preferring "unit testing API" or "state
-transition testing". Users should install `ops-scenario` with
-`pip install ops[testing]` rather than using the `ops-scenario` package name
-directly.
+transition testing".
 
 ### CHANGES.md
 
@@ -303,15 +309,10 @@ We've kept it for historical reference, but we no longer maintain it.
 
 ### GitHub Release Notes
 
-The GitHub release notes include the list of changes found in the changelogs,
-but:
-
-* If both `ops` and `ops-scenario` packages are being released, include all the
-  changes in the same set of release notes. If only one package is being
-  released, remove any bullets that apply only to the other package.
-* The links to the PRs are left in full.
-* Add a section above the list of changes that briefly outlines any key changes
-  in the release.
+The GitHub release notes include the summary of the release and
+the list of changes found in the changelogs. A draft release is created when
+you run `tox -e draft-release` duing the release process. You might need to
+edit the draft release after a review.
 
 ### Discourse Release Announcement
 
@@ -330,12 +331,6 @@ The main improvements in this release are ...
 
 Read more in the [full release notes on GitHub](link to the GitHub release).
 ```
-
-In the post, outline the key improvements from all areas of Ops,
-including testing, tracing, and the docs.
-The point here is to encourage people to check out the full notes and to upgrade
-promptly, so ensure that you entice them with the best that the new versions
-have to offer.
 
 ## Updating the Ops versions in the Charmcraft profiles
 
