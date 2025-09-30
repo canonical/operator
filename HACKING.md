@@ -315,23 +315,24 @@ but:
 
 ### Discourse Release Announcement
 
-Post to the [framework category](https://discourse.charmhub.io/c/framework/42)
-with a subject matching the GitHub release title.
+Post to the [framework category](https://discourse.charmhub.io/c/framework/42).
 
-The post should resemble this:
+The post title should be:
 
 ```
-The Charm Tech team has just released version x.y.z of ops!
+Ops x.y.z (and ops-scenario w.y.z and ops-tracing x.y.z) released
+```
 
-It’s available from PyPI by using `pip install ops`, and `pip install ops[testing]`,
-which will pick up the latest version. Upgrade by running `pip install --upgrade ops`.
+And the post should resemble this:
 
+```
 The main improvements in this release are ...
 
 Read more in the [full release notes on GitHub](link to the GitHub release).
 ```
 
-In the post, outline the key improvements both in `ops` and `ops-scenario`.
+In the post, outline the key improvements from all areas of Ops,
+including testing, tracing, and the docs.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
 have to offer.
