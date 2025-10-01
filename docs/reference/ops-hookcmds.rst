@@ -17,9 +17,9 @@ series.
 All methods are 1:1 mapping to Juju hook commands. This is a *low-level* API,
 available for charm use, but expected to be used via higher-level wrappers.
 
-See https://documentation.ubuntu.com/juju/3.6/reference/hook-command/ and
-https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/
-for a list of all Juju hook commands.
+See {external+juju:ref}`Juju | Hook Command <hook-command>` and
+{external+juju:ref}`Juju | Hook Command List <list-of-hook-commands>` for more
+information.
 
 .. autoclass:: ops.hookcmds.Address
 .. autoclass:: ops.hookcmds.AppStatus
