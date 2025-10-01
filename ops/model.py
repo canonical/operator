@@ -830,9 +830,9 @@ class Unit:
             for port in ports
         }
         for protocol, port in existing - desired:
-            self._backend.close_port(protocol or 'tcp', port)
+            self._backend.close_port(protocol, port)
         for protocol, port in desired - existing:
-            self._backend.open_port(protocol or 'tcp', port)
+            self._backend.open_port(protocol, port)
 
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
