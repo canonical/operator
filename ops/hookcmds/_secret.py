@@ -43,7 +43,7 @@ def secret_add(
     """Add a new secret.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-add/
+    `Juju | Hook commands | secret-add <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-add/>`_
 
     Args:
         content: The content of the secret.
@@ -129,7 +129,7 @@ def secret_get(
     Either the ID or the label must be provided.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-get/
+    `Juju | Hook commands | secret-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-get/>`_
 
     Args:
         id: The ID of the secret to retrieve.
@@ -155,7 +155,7 @@ def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
     """Grant access to a secret.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-grant/
+    `Juju | Hook commands | secret-grant <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-grant/>`_
 
     Args:
         id: The ID of the secret to grant access to.
@@ -173,7 +173,7 @@ def secret_ids() -> list[str]:
     """Retrieve IDs for secrets owned by the application.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-ids/
+    `Juju | Hook commands | secret-ids <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-ids/>`_
     """
     stdout = run('secret-ids', '--format=json')
     result = cast('list[str]', json.loads(stdout))
@@ -196,7 +196,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
     Either the ID or the label must be provided.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-info-get/
+    `Juju | Hook commands | secret-info-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-info-get/>`_
 
     Args:
         id: The ID of the secret to retrieve.
@@ -216,7 +216,7 @@ def secret_remove(id: str, *, revision: int | None = None):
     """Remove an existing secret.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-remove/
+    `Juju | Hook commands | secret-remove <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-remove/>`_
 
     Args:
         id: The ID of the secret to remove.
@@ -233,7 +233,7 @@ def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: st
     """Revoke access to a secret.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-revoke/
+    `Juju | Hook commands | secret-revoke <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-revoke/>`_
 
     Args:
         id: The ID of the secret.
@@ -265,7 +265,7 @@ def secret_set(
     """Update an existing secret.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/
+    `Juju | Hook commands | secret-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/>`_
 
     Args:
         id: The ID of the secret to update.

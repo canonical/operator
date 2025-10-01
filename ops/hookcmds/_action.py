@@ -80,7 +80,7 @@ def action_fail(message: str | None = None):
     """Set action fail status with message.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-fail/
+    `Juju | Hook commands | action-fail <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-fail/>`_
 
     Args:
         message: the failure error message. Juju will provide a default message
@@ -104,7 +104,7 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
     the parameter map as needed.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-get/
+    `Juju | Hook commands | action-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-get/>`_
 
     Args:
         key: The key of the action parameter to retrieve. If not provided, all
@@ -126,7 +126,7 @@ def action_log(message: str):
     """Record a progress message for the current action.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-log/
+    `Juju | Hook commands | action-log <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-log/>`_
 
     Args:
         message: The progress message to provide to the Juju user.
@@ -138,7 +138,7 @@ def action_set(results: Mapping[str, Any]):
     """Set action results.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-set/
+    `Juju | Hook commands | action-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/action-set/>`_
 
     Args:
         results: The results map of the action, provided to the Juju user.

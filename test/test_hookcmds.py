@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import ipaddress
 import json
 import pathlib
 import subprocess
@@ -346,10 +345,10 @@ def test_network_get(run: Run):
     assert result.bind_addresses[0].mac_address == 'aa:bb'
     assert result.bind_addresses[0].interface_name == 'eth0'
     assert result.bind_addresses[0].addresses[0].hostname == 'host'
-    assert result.bind_addresses[0].addresses[0].value == ipaddress.ip_address('127.0.0.1')
-    assert result.bind_addresses[0].addresses[0].cidr == ipaddress.ip_network('127.0.0.0/24')
-    assert result.egress_subnets[0] == ipaddress.ip_network('127.0.0.0/24')
-    assert result.ingress_addresses[0] == ipaddress.ip_address('127.0.0.1')
+    assert result.bind_addresses[0].addresses[0].value == '127.0.0.1'
+    assert result.bind_addresses[0].addresses[0].cidr == '127.0.0.0/24'
+    assert result.egress_subnets[0] == '127.0.0.0/24'
+    assert result.ingress_addresses[0] == '127.0.0.1'
 
 
 def test_network_get_relation_id(run: Run):

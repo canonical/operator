@@ -25,7 +25,7 @@ def storage_add(counts: Mapping[str, int]):
     """Add storage instances.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-add/
+    `Juju | Hook commands | storage-add <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-add/>`_
 
     Args:
         counts: A maps of storage names to the number of instances of that
@@ -44,7 +44,7 @@ def storage_get(id: str | None = None) -> Storage:
     event.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-get/
+    `Juju | Hook commands | storage-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-get/>`_
 
     Args:
         id: The ID of the storage instance.
@@ -63,7 +63,7 @@ def storage_list(name: str | None = None) -> list[str]:
     """List storage attached to the unit.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-list/
+    `Juju | Hook commands | storage-list <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/storage-list/>`_
 
     Args:
         name: Only list storage with this name.

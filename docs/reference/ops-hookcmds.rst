@@ -21,6 +21,12 @@ See {external+juju:ref}`Juju | Hook Command <hook-command>` and
 {external+juju:ref}`Juju | Hook Command List <list-of-hook-commands>` for more
 information.
 
+..
+   _The list here is manually maintained, because the `automodule` directive
+   includes the classes that are also in the ops reference, and we need to skip
+   those here. There is a test in test/test_infra.py that checks that this list
+   is in sync with the actual contents of the module.
+
 .. autoclass:: ops.hookcmds.Address
 .. autoclass:: ops.hookcmds.AppStatus
 .. autoclass:: ops.hookcmds.BindAddress

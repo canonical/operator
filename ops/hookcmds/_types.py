@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import ipaddress
 import pathlib
 from typing import (
     Any,
@@ -46,15 +45,18 @@ class Address:
     """A Juju space address, found in :class:`BindAddress` objects."""
 
     hostname: str
-    value: ipaddress.IPv4Address | ipaddress.IPv6Address
-    cidr: ipaddress.IPv4Network | ipaddress.IPv6Network
+    # These may be IP addresses or hostnames, so we keep things simple and use
+    # str, and leave it to users to convert them to ipaddress types if needed.
+    # See #818 for more information.
+    value: str
+    cidr: str
 
     @classmethod
     def _from_dict(cls, d: AddressDict) -> Address:
         return cls(
             hostname=d['hostname'],
-            value=ipaddress.ip_address(d['value']),
-            cidr=ipaddress.ip_network(d['cidr']),
+            value=d['value'],
+            cidr=d['cidr'],
         )
 
 
@@ -228,8 +230,11 @@ class Network:
     """A Juju space."""
 
     bind_addresses: Sequence[BindAddress]
-    egress_subnets: Sequence[ipaddress.IPv4Network | ipaddress.IPv6Network]
-    ingress_addresses: Sequence[ipaddress.IPv4Address | ipaddress.IPv6Address]
+    # These may be IP addresses or hostnames, so we keep things simple and use
+    # str, and leave it to users to convert them to ipaddress types if needed.
+    # See #818 for more information.
+    egress_subnets: Sequence[str]
+    ingress_addresses: Sequence[str]
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Network:
@@ -237,8 +242,8 @@ class Network:
             BindAddress._from_dict(bind_data)
             for bind_data in cast('list[BindAddressDict]', d['bind-addresses'])
         ]
-        egress = [ipaddress.ip_network(addr) for addr in d.get('egress-subnets', [])]
-        ingress = [ipaddress.ip_address(addr) for addr in d.get('ingress-addresses', [])]
+        egress = d.get('egress-subnets', [])
+        ingress = d.get('ingress-addresses', [])
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 

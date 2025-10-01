@@ -55,7 +55,7 @@ def relation_get(
     event.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-get/
+    `Juju | Hook commands | relation-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-get/>`_
 
     Args:
         app: Get the relation data for the overall application, not just a unit
@@ -87,7 +87,7 @@ def relation_ids(name: str) -> list[str]:
     """List all relation IDs for the given endpoint.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-ids/
+    `Juju | Hook commands | relation-ids <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-ids/>`_
 
     Args:
         name: the endpoint name.
@@ -105,7 +105,7 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
     event.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-list/
+    `Juju | Hook commands | relation-list <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-list/>`_
 
     Args:
         id: The ID of the relation to list units for, or ``None`` to list units
@@ -130,7 +130,7 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     event.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-model-get/
+    `Juju | Hook commands | relation-model-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-model-get/>`_
 
     Args:
         id: The ID of the relation to get data for, or ``None`` to get data for
@@ -164,7 +164,7 @@ def relation_set(
     event.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-set/
+    `Juju | Hook commands | relation-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/relation-set/>`_
 
     Args:
         data: The relation data to set.

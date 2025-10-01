@@ -33,7 +33,7 @@ def app_version_set(version: str):
     """Specify which version of the application is deployed.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/application-version-set/
+    `Juju | Hook commands | application-version-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/application-version-set/>`_
 
     Args:
         version: the version of the application software the unit is running.
@@ -65,7 +65,7 @@ def config_get(
     Missing config keys are reported as nulls, and do not return an error.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/config-get/
+    `Juju | Hook commands | config-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/config-get/>`_
 
     Args:
         key: The configuration option to retrieve.
@@ -85,7 +85,7 @@ def credential_get() -> CloudSpec:
     """Access cloud credentials.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/credential-get/
+    `Juju | Hook commands | credential-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/credential-get/>`_
     """
     stdout = run('credential-get', '--format=json')
     result = cast('dict[str, Any]', json.loads(stdout))
@@ -96,7 +96,7 @@ def goal_state() -> GoalState:
     """Print the status of the charm's peers and related units.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/goal-state/
+    `Juju | Hook commands | goal-state <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/goal-state/>`_
     """
     stdout = run('goal-state', '--format=json')
     result = cast('GoalStateDict', json.loads(stdout))
@@ -110,7 +110,7 @@ def is_leader() -> bool:
     successfully called.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/
+    `Juju | Hook commands | is-leader <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/>`_
     """
     stdout = run('is-leader', '--format=json')
     result = cast('bool', json.loads(stdout))
@@ -123,7 +123,7 @@ def juju_log(
     """Write a message to the juju log.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-log/
+    `Juju | Hook commands | juju-log <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-log/>`_
 
     Args:
         message: The message to log.
@@ -136,7 +136,7 @@ def juju_reboot(*, now: bool = False):
     """Reboot the host machine.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-reboot/
+    `Juju | Hook commands | juju-reboot <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/juju-reboot/>`_
 
     Args:
         now: Reboot immediately, killing the invoking process.
@@ -149,16 +149,6 @@ def juju_reboot(*, now: bool = False):
     run('juju-reboot')
 
 
-# model.py has this comment:
-# > fields marked as network addresses need not be IPs; they could be
-# > hostnames that juju failed to resolve.
-# Is this still true? It doesn't seem to make sense, because if they could be a
-# hostname, then why don't we have a str possibility where they do resolve.
-# If it is true, we perhaps should wrap all the conversions to ipaddr.
-# unit-get: https://github.com/juju/juju/blob/4488fbb57735c2ec74f9f07e85ac5241bd3f52df/internal/worker/uniter/runner/jujuc/unit-get.go#L81
-# network-get: https://github.com/juju/juju/blob/4488fbb57735c2ec74f9f07e85ac5241bd3f52df/internal/worker/uniter/runner/jujuc/network-get.go#L119
-
-
 # We could have bind_address: bool=True, egress_subnets: bool=True,
 # --ingress-address: bool=True, and could even return just that data if only one
 # is specified. However, it seems like it's unlikely there would be a lot of data
@@ -169,7 +159,7 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
     """Get network config.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/network-get/
+    `Juju | Hook commands | network-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/network-get/>`_
 
     Args:
         binding_name: A name of a binding (relation name or extra-binding name).
@@ -188,7 +178,7 @@ def resource_get(name: str) -> pathlib.Path:
     """Get the path to the locally cached resource file.
 
     For more details, see:
-    https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/resource-get/
+    `Juju | Hook commands | resource-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/resource-get/>`_
 
     Args:
         name: The name of the resource.
