@@ -66,13 +66,15 @@ jobs:
       - run: uv python install ${{ matrix.python-version }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.22"
           # To suppress the "Restore cache failed" error, since there is no go.sum file here.
           cache: false
 
       - name: Install Pebble
+        env:
+          GOTOOLCHAIN: auto  # setup-go defaults this to 'local', set back to 'auto' (Go default)
         run: |
           go install github.com/canonical/pebble/cmd/pebble@master
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
