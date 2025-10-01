@@ -89,7 +89,7 @@ def credential_get() -> CloudSpec:
     """
     stdout = run('credential-get', '--format=json')
     result = cast('dict[str, Any]', json.loads(stdout))
-    return CloudSpec.from_dict(result)
+    return CloudSpec._from_dict(result)
 
 
 def goal_state() -> GoalState:

@@ -86,11 +86,7 @@ class BindAddress:
         )
 
 
-# Note that this cannot have kw_only=True, because it existed (in model.py) in
-# earlier versions of Ops that worked with Python versions that did support
-# that feature. We cannot require keyword arguments now without breaking
-# backwards compatibility.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class CloudCredential:
     """Credentials for cloud.
 
@@ -111,9 +107,8 @@ class CloudCredential:
     redacted: list[str] = dataclasses.field(default_factory=list[str])
     """A list of redacted secrets."""
 
-    # Note that this is public because it was public in model.py.
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
+    def _from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
         return cls(
             auth_type=d['auth-type'],
@@ -122,11 +117,7 @@ class CloudCredential:
         )
 
 
-# Note that this cannot have kw_only=True, because it existed (in model.py) in
-# earlier versions of Ops that worked with Python versions that did support
-# that feature. We cannot require keyword arguments now without breaking
-# backwards compatibility.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class CloudSpec:
     """Cloud specification information (metadata) including credentials."""
 
@@ -160,9 +151,8 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller, defaults to False."""
 
-    # Note that this is public because it was public in model.py.
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> CloudSpec:
+    def _from_dict(cls, d: dict[str, Any]) -> CloudSpec:
         """Create a new CloudSpec object from a dict parsed from JSON."""
         return cls(
             type=d['type'],
@@ -171,7 +161,9 @@ class CloudSpec:
             endpoint=d.get('endpoint') or None,
             identity_endpoint=d.get('identity-endpoint') or None,
             storage_endpoint=d.get('storage-endpoint') or None,
-            credential=CloudCredential.from_dict(d['credential']) if d.get('credential') else None,
+            credential=CloudCredential._from_dict(d['credential'])
+            if d.get('credential')
+            else None,
             ca_certificates=d.get('cacertificates') or [],
             skip_tls_verify=d.get('skip-tls-verify') or False,
             is_controller_cloud=d.get('is-controller-cloud') or False,
