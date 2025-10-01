@@ -26,8 +26,8 @@ series.
 All methods are 1:1 mapping to Juju hook commands. This is a *low-level* API,
 available for charm use, but expected to be used via higher-level wrappers.
 
-See https://documentation.ubuntu.com/juju/3.6/reference/hook-command/ and
-https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/
+See `Juju | Hook commands <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/>`_
+and `Juju | Hook command list <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/>`_
 for a list of all Juju hook commands.
 """
 
