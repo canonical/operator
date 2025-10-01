@@ -17,8 +17,8 @@ series.
 All methods are 1:1 mapping to Juju hook commands. This is a *low-level* API,
 available for charm use, but expected to be used via higher-level wrappers.
 
-See {external+juju:ref}`Juju | Hook Command <hook-command>` and
-{external+juju:ref}`Juju | Hook Command List <list-of-hook-commands>` for more
+See :external+juju:ref:`Juju | Hook Command <hook-command>` and
+:external+juju:ref:`Juju | Hook Command List <list-of-hook-commands>` for more
 information.
 
 ..
