@@ -73,6 +73,8 @@ jobs:
           cache: false
 
       - name: Install Pebble
+        env:
+          GOTOOLCHAIN: auto  # setup-go defaults this to 'local', set back to 'auto' (Go default)
         run: |
           go install github.com/canonical/pebble/cmd/pebble@master
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
