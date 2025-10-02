@@ -26,7 +26,9 @@ from .secrets_test_cases import TEST_CASES, TEST_IDS, ATestCase
 @pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
 def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_case: ATestCase):
     charm_path = build_secrets_charm()
-    juju.deploy(charm_path)
+    # Juju 3.1~3.3 don't officially support 24.04, which is the test charm base.
+    needs_force = juju.status().model.version < '3.4'
+    juju.deploy(charm_path, force=needs_force)
     status = juju.wait(jubilant.all_active)
 
     unit, unit_obj = next(iter(status.apps['test-secrets'].units.items()))

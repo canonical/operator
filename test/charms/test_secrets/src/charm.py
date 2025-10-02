@@ -27,7 +27,11 @@ class TestSecretsCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._stored.set_default(secret_id=None)
+        framework.observe(self.on.start, self._on_start)
         framework.observe(self.on['exec'].action, self._on_exec)
+
+    def _on_start(self, event: ops.StartEvent):
+        self.unit.status = ops.ActiveStatus()
 
     def _on_exec(self, event: ops.ActionEvent):
         """Action to execute arbitrary Python code in specific context."""
