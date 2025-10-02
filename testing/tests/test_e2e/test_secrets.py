@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-import ast
 import datetime
-import inspect
 import json
-import textwrap
-from typing import Any, Callable, NamedTuple
-from unittest.mock import ANY
 
 import pytest
 from ops.charm import CharmBase
-from ops.framework import Framework, StoredState
+from ops.framework import Framework
 from ops.model import ModelError
 from ops.model import Secret as ops_Secret
 from ops.model import SecretNotFoundError, SecretRotate
@@ -18,6 +13,7 @@ from ops.model import SecretNotFoundError, SecretRotate
 from scenario import Context
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
+from test.integration.secrets_test_cases import TEST_CASES, TEST_IDS, ATestCase
 
 
 @pytest.fixture(scope='function')
@@ -598,100 +594,12 @@ def test_default_values():
     assert secret.remote_grants == {}
 
 
-class TestSecretsCharm(CharmBase):
-    """Protocol for the test secrets charm."""
-
-    _stored: StoredState
-
-
-UnitCode = Callable[[TestSecretsCharm, dict[str, Any]], None]
-"""
-Python code that will be executed in the test charm is defined
-as a function with this type.
-
-Arguments names must be exactly these, if used:
-    self: TestSecretsCharm
-    rv: dict[str, Any]
-"""
-
-ScenarioAssertions = Callable[[Secret | None, dict[str, Any] | None], None]
-"""
-Python code that validates the results of the above.
-
-Example:
-
-assert result == {
-    '_before': None,
-    '_after': {
-        'info': {
-            'id': ANY,
-            'label': None,
-            'revision': 1,
-            'expires': None,
-            'rotation': None,
-            'rotates': None,
-            'description': None,
-        },
-        'tracked': {'foo': 'bar'},
-        'latest': {'foo': 'bar'},
-    },
-}
-
-assert secret
-assert secret.owner == 'application'
-assert not secret.remote_grants
-"""
-
-
-def py_to_src(func: UnitCode) -> str:
-    func_src = inspect.getsource(func)
-    func_def = ast.parse(func_src).body[0]
-    assert isinstance(func_def, ast.FunctionDef)
-    return '\n'.join(textwrap.dedent(ast.unparse(stmt)) for stmt in func_def.body)
-
-
-class TestCase(NamedTuple):
-    name: str | None
-    unit_code: UnitCode
-    scenario_assertions: ScenarioAssertions | None
-    # Later:
-    # - jubilant_assertions
-    # - setup?
-    # - teardown?
-
-
-def code1(self: TestSecretsCharm, rv: dict[str, Any]):
-    """Add secret with content."""
-    secret: ops_Secret = self.app.add_secret({'foo': 'bar'})
-    secret_id = secret.id
-    self._stored.secret_id = secret_id
-
-
-def code1_assert(secret: Secret | None, result: dict[str, Any] | None) -> None:
-    assert result == {
-        '_before': None,
-        '_after': {
-            'info': ANY,  # relying on scaffolding check
-            'tracked': {'foo': 'bar'},
-            'latest': {'foo': 'bar'},
-        },
-    }
-
-    assert secret
-    assert secret.owner == 'application'
-    assert not secret.remote_grants
-
-
-TEST_CASES = [
-    TestCase(code1.__doc__, code1, code1_assert),
-]
-
-
-@pytest.mark.parametrize('test_case', TEST_CASES, ids=[t.name for t in TEST_CASES])
-def test_secret_something(secrets_context: Context[CharmBase], test_case: TestCase):
+@pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
+def test_secret_something(secrets_context: Context[CharmBase], test_case: ATestCase):
     state = State(leader=True)
-    code = py_to_src(test_case.unit_code)
-    state = secrets_context.run(secrets_context.on.action('exec', params={'code': code}), state)
+    state = secrets_context.run(
+        secrets_context.on.action('exec', params={'code': test_case.code}), state
+    )
     secret = next(iter(state.secrets))
 
     assert secrets_context.action_results

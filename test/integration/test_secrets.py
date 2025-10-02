@@ -14,18 +14,25 @@
 
 from __future__ import annotations
 
+import json
 from typing import Callable
 
 import jubilant
+import pytest
+
+from .secrets_test_cases import TEST_CASES, TEST_IDS, ATestCase
 
 
-def test_foo(build_secret_charm: Callable[[], str], juju: jubilant.Juju):
-    charm_path = build_secret_charm()
+@pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
+def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_case: ATestCase):
+    charm_path = build_secrets_charm()
     juju.deploy(charm_path)
     status = juju.wait(jubilant.all_active)
 
     unit, unit_obj = next(iter(status.apps['test-secrets'].units.items()))
     assert unit_obj.leader
 
-    rv = juju.run(unit, 'foo', params={'a': 42})
-    assert rv.results['foo'] == 'bar'
+    rv = juju.run(unit, 'exec', params={'code': test_case.code})
+    result = json.loads(rv.results['rv'])
+    assert not result.get('_exception')
+    # more checks to do

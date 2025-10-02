@@ -13,6 +13,11 @@ parts:
     test-secrets:
         plugin: charm
         source: .
+        build-packages:
+            - cargo
+        charm-binary-python-packages:
+            - pydantic
+            - PyYAML
 
 actions:
     exec:

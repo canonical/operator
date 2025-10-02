@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import ops
 
@@ -31,11 +32,15 @@ class TestSecretsCharm(ops.CharmBase):
     def _on_exec(self, event: ops.ActionEvent):
         """Action to execute arbitrary Python code in specific context."""
         assert event.params['code']
-        rv = {}
+        rv: dict[str, Any] = {}
 
         rv['_before'] = self._snapshot()
 
-        exec(event.params['code'], globals(), locals())  # noqa
+        try:
+            exec(event.params['code'], globals(), locals())  # noqa
+            rv.setdefault('_result', None)
+        except Exception as e:
+            rv['_exception'] = str(e)
 
         rv['_after'] = self._snapshot()
 
