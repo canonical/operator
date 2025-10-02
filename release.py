@@ -47,6 +47,7 @@ VERSION_FILES = {
     'ops/src': pathlib.Path('ops/version.py'),
     'ops/pyproject': pathlib.Path('pyproject.toml'),
     'testing': pathlib.Path('testing/pyproject.toml'),
+    'tools': pathlib.Path('tools/pyproject.toml'),
     'tracing': pathlib.Path('tracing/pyproject.toml'),
     'uvlock': pathlib.Path('uv.lock'),
 }
@@ -384,6 +385,13 @@ def update_tracing_version(ops_version: str):
     update_pyproject_versions(VERSION_FILES['tracing'], ops_version, deps={'ops': ops_version})
 
 
+def update_tools_version(ops_version: str):
+    """Update the tools pyproject version."""
+    major, rest = ops_version.split('.', 1)
+    tools_version = f'{int(major) - 2}.{rest}'
+    update_pyproject_versions(VERSION_FILES['tools'], tools_version, deps={})
+
+
 def update_uv_lock():
     """Update the uv.lock file with the new versions."""
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
@@ -419,6 +427,7 @@ def update_versions_for_release(tag: str):
     update_ops_version(tag, scenario_version)
     update_testing_version(tag, scenario_version)
     update_tracing_version(tag)
+    update_tools_version(tag)
     update_uv_lock()
 
 
@@ -462,6 +471,7 @@ def update_versions_for_post_release(repo: github.Repository.Repository, branch_
     update_ops_version(ops_version, scenario_version)
     update_testing_version(ops_version, scenario_version)
     update_tracing_version(ops_version)
+    update_tools_version(ops_version)
     update_uv_lock()
 
 
