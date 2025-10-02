@@ -4391,7 +4391,6 @@ class CloudCredential:
     redacted: list[str] = dataclasses.field(default_factory=list[str])
     """A list of redacted secrets."""
 
-    # Note that this is public because it was public in model.py.
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
@@ -4436,7 +4435,6 @@ class CloudSpec:
     is_controller_cloud: bool = False
     """If this is the cloud used by the controller, defaults to False."""
 
-    # Note that this is public because it was public in model.py.
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudSpec:
         """Create a new CloudSpec object from a dict parsed from JSON."""
