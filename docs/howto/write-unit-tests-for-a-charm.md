@@ -161,3 +161,23 @@ def test_charm_runs(my_charm):
 
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
+
+## Test a function that receives charm as an argument
+
+A function might take in charm as an argument to extract charm state or charm relation information. To test such functions, you can use
+the following method to test the function.
+
+
+```python
+# Example function to test that takes the charm as an argument
+def get_num_relation(my_charm):
+    return len(self.model.relations.get("my-relation", []))
+
+# Test for the function that takes the charm as an argument
+def test_get_num_relation():
+    ctx = testing.Context(my_charm)
+    state_in = testing.State(relations=[])
+    with ctx(ctx.on.update_status(), state_in) as mgr: # use any hook event here
+        result = takes_charm_as_argument(my_charm=mgr.charm)
+        assert result == 0
+```
