@@ -128,6 +128,8 @@ class Handle:
         return hash((self.parent, self.kind, self.key))
 
     def __eq__(self, other: Handle):
+        if not isinstance(other, Handle):
+            return NotImplemented
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
