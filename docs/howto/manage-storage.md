@@ -125,6 +125,19 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
 
 > Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823), [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
 
+### Holistic way of managing storage
+
+When writing holistic charms, the charms should make sure that the storage is mounted before making use of said storage.
+
+```
+def _holistic_handler(self):
+    """Reconcile the charm holistically."""
+    cache_storages = self.model.storages.get("cache", [])
+    if not cache_storages:
+        logger.info("Storage is not yet ready.")
+        return
+```
+
 ### Request additional storage
 
 ```{note}
