@@ -96,7 +96,7 @@ def setup_tracing(juju_context: ops.JujuContext):
 
 
 @pytest.fixture
-def sample_charm() -> Generator[ops.CharmBase, None, None]:
+def sample_charm() -> Generator[type[ops.CharmBase]]:
     extra = str(pathlib.Path(__file__).parent / 'sample_charm/src')
     sys.path.append(extra)
     from charm import SampleCharm  # type: ignore

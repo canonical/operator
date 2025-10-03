@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 
 import pytest
 from ops.charm import CharmBase
@@ -12,6 +13,7 @@ from ops.model import SecretNotFoundError, SecretRotate
 from scenario import Context
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
+from test.integration.secrets_test_cases import TEST_CASES, TEST_IDS, Case
 
 
 @pytest.fixture(scope='function')
@@ -590,3 +592,33 @@ def test_default_values():
     assert secret.rotate is None
     assert secret.expire is None
     assert secret.remote_grants == {}
+
+
+@pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
+def test_secret_something(secrets_context: Context[CharmBase], test_case: Case):
+    state = State(leader=True)
+    state = secrets_context.run(
+        secrets_context.on.action('exec', params={'code': test_case.code}), state
+    )
+    secret = next(iter(state.secrets))
+
+    assert secrets_context.action_results
+    result = json.loads(secrets_context.action_results['rv'])
+    info = result['_after']['info']
+
+    # Verify that the unit and the scaffolding see the same data
+    assert secret.id == info['id']
+    assert secret.label == info['label']
+    assert secret._tracked_revision == info['revision']
+    assert secret._latest_revision == info['revision']
+    assert secret.expire == info['expires']
+    assert secret.rotate == info['rotates']
+    # rotation is not represented in ops[testing]
+    assert secret.description == info['description']
+    assert secret.description == info['description']
+
+    assert secret.tracked_content == result['_after']['tracked']
+    assert secret.latest_content == result['_after']['latest']
+
+    if test_case.scenario_assertions:
+        test_case.scenario_assertions(secret, result)
