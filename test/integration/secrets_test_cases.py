@@ -20,6 +20,8 @@ import textwrap
 from typing import Any, Callable, NamedTuple
 from unittest.mock import ANY
 
+import jubilant
+
 import ops
 import ops.testing
 from test.charms.test_secrets.src.charm import TestSecretsCharm
@@ -43,7 +45,7 @@ def code(self: TestSecretsCharm, rv: dict[str, Any]):
 
 ScenarioAssertions = Callable[[ops.testing.Secret | None, dict[str, Any] | None], None]
 """
-Python code that validates the results of the above.
+Validate the result in Scenario.
 
 Example:
 
@@ -69,11 +71,17 @@ assert secret.owner == 'application'
 assert not secret.remote_grants
 """
 
+JubilantAssertions = Callable[[jubilant.RevealedSecret | None], None]
+"""
+Validate the result in Jubilant.
+"""
+
 
 # Note: this can't be called e.g. `TestCase` as pytest would trip
 class Case(NamedTuple):
     func: UnitCode
     scenario_assertions: ScenarioAssertions | None
+    jubilant_assertions: JubilantAssertions | None
     # Later:
     # - jubilant_assertions
     # - setup?
@@ -110,11 +118,15 @@ def scenario_add_secret(secret: ops.testing.Secret | None, result: dict[str, Any
     assert not secret.remote_grants
 
 
-def jubilant_add_secret(arg): ...
+def jubilant_add_secret(secret: jubilant.RevealedSecret | None):
+    # The signature of this function will likely change
+    assert secret
+    assert secret.revision == 1
+    assert secret.content == {'foo': 'bar'}
 
 
 TEST_CASES = [
-    Case(add_secret, scenario_add_secret),
+    Case(add_secret, scenario_add_secret, jubilant_add_secret),
 ]
 TEST_IDS = [t.func.__doc__ or t.func.__name__ for t in TEST_CASES]
 
