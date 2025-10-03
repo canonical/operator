@@ -77,7 +77,7 @@ assert not secret.remote_grants
 
 
 # Note: this can't be called e.g. `TestCase` as pytest would trip
-class ATestCase(NamedTuple):
+class Case(NamedTuple):
     func: UnitCode
     scenario_assertions: ScenarioAssertions | None
     # Later:
@@ -93,14 +93,14 @@ class ATestCase(NamedTuple):
         return '\n'.join(textwrap.dedent(ast.unparse(stmt)) for stmt in func_def.body)
 
 
-def code1(self: TestSecretsCharm, rv: dict[str, Any]):
+def add_secret(self: TestSecretsCharm, rv: dict[str, Any]):
     """Add secret with content."""
     secret: ops.Secret = self.app.add_secret({'foo': 'bar'})
     secret_id = secret.id
     self._stored.secret_id = secret_id
 
 
-def code1_assert(secret: ops.testing.Secret | None, result: dict[str, Any] | None) -> None:
+def scenario_add_secret(secret: ops.testing.Secret | None, result: dict[str, Any] | None) -> None:
     assert result == {
         '_before': None,
         '_after': {
@@ -116,7 +116,36 @@ def code1_assert(secret: ops.testing.Secret | None, result: dict[str, Any] | Non
     assert not secret.remote_grants
 
 
+def jubilant_add_secret(arg): ...
+
+
 TEST_CASES = [
-    ATestCase(code1, code1_assert),
+    Case(add_secret, scenario_add_secret),
 ]
 TEST_IDS = [t.func.__doc__ or t.func.__name__ for t in TEST_CASES]
+
+
+# Note that if a unit modifies the secret content,
+# it can see the new values with `--refresh` right away,
+# but it doesn't see the new revision until the hook exits
+#
+# Example:
+# juju exec --unit hexanator/1 "
+#     secret-get --refresh d39p607mp25c761jrfc0;
+#     secret-info-get d39p607mp25c761jrfc0;
+#     secret-set d39p607mp25c761jrfc0 val=key77;
+#     secret-get --refresh d39p607mp25c761jrfc0;
+#     secret-info-get d39p607mp25c761jrfc0;
+# "
+# val: key56
+# d39p607mp25c761jrfc0:
+#   revision: 2
+#   label: "77"
+#   owner: application
+#   rotation: never
+# val: key77
+# d39p607mp25c761jrfc0:
+#   revision: 2
+#   label: "77"
+#   owner: application
+#   rotation: never

@@ -13,7 +13,7 @@ from ops.model import SecretNotFoundError, SecretRotate
 from scenario import Context
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
-from test.integration.secrets_test_cases import TEST_CASES, TEST_IDS, ATestCase
+from test.integration.secrets_test_cases import TEST_CASES, TEST_IDS, Case
 
 
 @pytest.fixture(scope='function')
@@ -595,7 +595,7 @@ def test_default_values():
 
 
 @pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
-def test_secret_something(secrets_context: Context[CharmBase], test_case: ATestCase):
+def test_secret_something(secrets_context: Context[CharmBase], test_case: Case):
     state = State(leader=True)
     state = secrets_context.run(
         secrets_context.on.action('exec', params={'code': test_case.code}), state
@@ -616,31 +616,6 @@ def test_secret_something(secrets_context: Context[CharmBase], test_case: ATestC
     # rotation is not represented in ops[testing]
     assert secret.description == info['description']
     assert secret.description == info['description']
-
-    # Note that if a unit modifies the secret content,
-    # it can see the new values with `--refresh` right away,
-    # but it doesn't see the new revision until the hook exits
-    #
-    # Example:
-    # juju exec --unit hexanator/1 "
-    #     secret-get --refresh d39p607mp25c761jrfc0;
-    #     secret-info-get d39p607mp25c761jrfc0;
-    #     secret-set d39p607mp25c761jrfc0 val=key77;
-    #     secret-get --refresh d39p607mp25c761jrfc0;
-    #     secret-info-get d39p607mp25c761jrfc0;
-    # "
-    # val: key56
-    # d39p607mp25c761jrfc0:
-    #   revision: 2
-    #   label: "77"
-    #   owner: application
-    #   rotation: never
-    # val: key77
-    # d39p607mp25c761jrfc0:
-    #   revision: 2
-    #   label: "77"
-    #   owner: application
-    #   rotation: never
 
     assert secret.tracked_content == result['_after']['tracked']
     assert secret.latest_content == result['_after']['latest']

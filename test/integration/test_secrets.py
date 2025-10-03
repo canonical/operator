@@ -20,11 +20,11 @@ from typing import Callable
 import jubilant
 import pytest
 
-from .secrets_test_cases import TEST_CASES, TEST_IDS, ATestCase
+from .secrets_test_cases import TEST_CASES, TEST_IDS, Case
 
 
 @pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
-def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_case: ATestCase):
+def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_case: Case):
     charm_path = build_secrets_charm()
     juju.deploy(charm_path)
     status = juju.wait(jubilant.all_active)
