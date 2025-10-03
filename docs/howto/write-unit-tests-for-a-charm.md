@@ -170,8 +170,8 @@ the following method to test the function.
 
 ```python
 # Example function to test that takes the charm as an argument
-def get_num_relation(my_charm):
-    return len(self.model.relations.get("my-relation", []))
+def get_relations_count(charm_instance: MyCharm):
+    return len(charm_instance.model.relations.get("my-relation", []))
 
 # Test for the function that takes the charm as an argument
 def test_get_num_relation():
