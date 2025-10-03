@@ -22,13 +22,7 @@ from unittest.mock import ANY
 
 import ops
 import ops.testing
-
-
-class TestSecretsCharm(ops.CharmBase):
-    """Protocol for the test secrets charm."""
-
-    _stored: ops.StoredState
-
+from test.charms.test_secrets.src.charm import TestSecretsCharm
 
 UnitCode = Callable[[TestSecretsCharm, dict[str, Any]], None]
 """
