@@ -35,10 +35,15 @@ def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_c
     rv = juju.run(unit, 'exec', params={'code': test_case.code})
     result = json.loads(rv.results['rv'])
     assert not result.get('_exception')
+    info = result['_after']['info']
 
-    # Some common checks here
     secrets = juju.secrets()
     secret = juju.show_secret(secrets[0].uri, reveal=True) if secrets else None
+
+    if secret:
+        assert secret.owner == 'test-secrets'
+        assert secret.uri.split('/')[-1] == info['id']
+        assert secret.content == result['_after']['latest']
 
     if test_case.jubilant_assertions:
         test_case.jubilant_assertions(secret)
