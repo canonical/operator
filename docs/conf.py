@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import os
 import pathlib
 import sys
@@ -13,6 +14,15 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
+# Check that the ops package is installed in the Sphinx venv.
+if importlib.util.find_spec("ops") is None:
+    print(
+        "Error: The ops package is not available. "
+        "Check whether the $(VENVDIR) target in our Makefile has been changed or reverted."
+    )
+    sys.exit(1)
+
+# Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Configuration for the Sphinx documentation builder.

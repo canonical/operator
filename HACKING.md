@@ -50,7 +50,7 @@ tox -e unit -- test/test_charm.py
 tox -e format
 
 # Generate a local copy of the Sphinx docs in docs/_build
-tox -e docs
+make -C docs html
 
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>

@@ -76,17 +76,30 @@ Recommended tone:
 
 ## How to build the documentation locally
 
-To build the docs and open them in your browser:
+Before you start, make sure that you've [installed uv](https://docs.astral.sh/uv/getting-started/installation/). On Ubuntu, you can run:
 
 ```sh
-tox -e docs
-open docs/_build/html/index.html
+sudo snap install astral-uv --classic
 ```
+
+To build the docs:
+
+```sh
+make -C docs html
+```
+
+This generates HTML docs in the `docs/_build` directory. To view the docs, run a web server in the `docs/_build` directory:
+
+```sh
+uvx --directory docs/_build python -m http.server
+```
+
+Then open http://localhost:8000 in your browser.
 
 Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
 
 ```sh
-tox -e docs-live
+make -C docs run
 ```
 
 ## How to document version dependencies
