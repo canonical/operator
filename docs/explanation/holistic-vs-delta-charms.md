@@ -1,7 +1,7 @@
 (holistic-vs-delta-charms)=
 # Holistic vs delta charms
 
-The charming community developed two approaches to writing robust, stateless charms: "holistic" and "delta".
+The charming community has developed two approaches to writing robust, stateless charms: "holistic" and "delta".
 
 - Holistic charms reconcile towards a goal state on every event.
 - Delta charms handle each Juju event individually.
@@ -33,23 +33,23 @@ Conceptually, a Juju event informs the unit that a specific thing has changed in
   - Consumer requirements are defined
 ```
 
-Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that a configuration value has changed, `relation-changed` says that relation data has changed.
+Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that one or more configuration values have changed, `relation-changed` says that relation data has changed.
 
 However, this only goes so far.
-The `config-changed` event doesn't tell the charm which configuration keys have changed or whether configuration has become valid.
-The `relation-changed` event doesn't tell the charm how the relation data has changed or whether the data can be parsed.
+The `config-changed` event doesn't tell the charm which configuration keys have changed.
+The `relation-changed` event doesn't tell the charm how the relation data has changed.
 
 In addition, the charm may receive an event like `config-changed` before it's ready to handle it, for example, if the container is not yet ready.
-In such cases, a delta charm may defer the event, effectively storing a small amount of state.
+In such cases, a delta charm may defer the event, effectively storing a small amount of state, or have both `config-changed` and `pebble-ready` check if everything is ready and then run the common code, which is the first step towards a holistic approach.
 
 The holistic approach side-steps this disparity and applies a single code path, `_reconcile`, to all events of interest.
 The code path reads all state it needs to perform computation, and updates all writable state.
 
 ### Example
 
-The reconciler method above has been reduced for clarity, but is representative of the common reconciler pattern.
+The reconciler method below has been reduced for clarity, but is representative of the common reconciler pattern.
 
-The body of the reconciler loop comprises three main parts:
+The body of the reconciler method comprises three main parts:
 
 - reading the inputs (configuration, workload, and Juju environment state)
 - computing the new state
@@ -107,7 +107,7 @@ def _reconcile(self, _: ops.EventBase):
     workload_ready = self.workload.is_ready
     foo_ready = self.foo_requirer.is_ready
     bar_ready = self.bar_provider.is_ready
-    
+
     if not workload_ready or not foo_ready or not bar_ready:
         # Status will be set in `_on_collect_unit_status`
         return
@@ -131,7 +131,7 @@ Rarely, the goal state may change:
 - unit lifecycle end, that is, graceful shutdown
 - failover to another unit, leaving this unit on stand-by
 
-Complex charms often split the reconciler method into functional constituents. See [Parca Kubernetes Operator](https://github.com/canonical/parca-k8s-operator/blob/6fda0c9844bc7a45b93ac12806a6ef04036c50c4/src/charm.py#L188-L206) for an example.
+Complex charms often split the reconciler method into functional constituents. See the [Parca Kubernetes Operator](https://github.com/canonical/parca-k8s-operator/blob/6fda0c9844bc7a45b93ac12806a6ef04036c50c4/src/charm.py#L188-L206) for an example.
 
 Charm libraries too can be written using the reconciler pattern. See [the implementation of `ops.tracing.Tracing`](https://github.com/canonical/operator/blob/af6764fbfdcf8ed42a0edb331870dd9d37dc804b/tracing/ops_tracing/_api.py#L128-L163) for an example.
 
@@ -139,14 +139,14 @@ Some applications, like database or observability providers, are expected to be 
 It may become expensive to scrape all the data from that relation on every hook.
 
 If you're developing such an application, you should profile the application. Based on the results, you might cache the Juju state, communicate less on the relation and [more out of band](https://github.com/charmed-hpc/slurm-charms/blob/edc47369560845fa54f81a2f02e0a3870b14302a/charms/slurmrestd/src/charm.py#L93-L98), or reconsider whether this key relation processing could be moved out of the reconciliation loop.
-Similar [performance concern](https://discourse.charmhub.io/t/performance-limitations-of-peer-relations-and-a-solution/18144) applies to peer relation processing for applications where hundreds of units may be expected.
+Similar [performance concerns](https://discourse.charmhub.io/t/performance-limitations-of-peer-relations-and-a-solution/18144) apply to peer relation processing for applications where hundreds of units may be expected.
 
 ## Handling events individually
 
 A delta-based charm is when the charm handles each kind of Juju hook with a separate handler function, which does the minimum necessary to process that kind of event.
 
 Juju itself nudges charm authors in this direction.
-Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that a configuration value has changed, `relation-changed` says that relation data has changed, `pebble-ready` signals that the Pebble in the workload container has become ready, and so on.
+Juju provides specific event kinds that signal that one "thing" changed: `config-changed` says that one or more configuration values have changed, `relation-changed` says that relation data has changed, `pebble-ready` signals that the Pebble in the workload container has become ready, and so on.
 
 ### Example
 
@@ -193,7 +193,7 @@ There's less boilerplate and flow control is predictable.
 
 ### Developing your charm
 
-The charm code and tests can get messy when event interdependencies are accounted for:
+However, the charm code and tests can get messy when event interdependencies are accounted for:
 
 - creating a resource is only possible after the workload has been installed
 - the available data typically needs to be mixed with application's configuration
@@ -212,11 +212,12 @@ The reconciler pattern is especially suitable for mature, feature-rich charms th
 Some events are special, and are typically processed outside the reconciler pattern in holistic charms.
 In both styles of charms a dedicated event handler is used for:
 
-- unit lifecycle end events, because the goal of reconciliation is different
-- action event, as it is synchronous and the event object holds arguments and results
-- secret rotation event, where secret must be modified synchronously
-- secret remove event, because the revision that needs removal is not available otherwise
-- Ops lifecycle events, like `on_collect_unit_status`, which accompany the Juju event
+- unit lifecycle end events, `stop`, and `remove`, because the goal of reconciliation is different
+- action events, as these are synchronous, and the [](ops.ActionEvent) object holds arguments and results
+- the `secret-rotate` event, where a secret must be modified synchronously
+- the `secret-remove` event, because the revision that needs removal is not available otherwise
+- the `secret-expired` event, as the expired secret must be retired or deleted
+- Ops lifecycle events, like `on.collect_unit_status`, which accompany the Juju event
 - some custom events, if a specific charm library API is not suited for reconciliation
 
 A good rule of thumb is this: if an event [cannot be deferred](#how-and-when-to-defer-events), it needs a dedicated handler.
@@ -226,16 +227,19 @@ A good rule of thumb is this: if an event [cannot be deferred](#how-and-when-to-
 A holistic charm attaches the same observer to a group of events.
 In a charm following the reconciler pattern, the `_reconcile` method is attached to every interesting Juju event:
 
-- unit lifecycle start events
-- config change event
+- the `install` and `start` events
+- the `config-changed` event
 - most or all relation events
 - Pebble events
 - storage events
+- the `secret-changed` event
+- the `upgrade-charm` event
+- the `update-status` event
 
 Consider relations: if a charm declares a relation, it's natural to expect that this unit's behaviour or the remote app behaviour depends on the databag content of the relation.
 Therefore, the reconcile method has to read the relation data to apply the latest data, or overwrite its own databag with the latest computed data.
 Thus, the reconciler loop ought to run for every event on this relation.
-Following the same logic, the reconciler loop ought to run for every configuration, storage, and containers event.
+Following the same logic, the reconciler loop ought to run for every configuration, storage, and container event.
 
 ### When to use the holistic approach
 
