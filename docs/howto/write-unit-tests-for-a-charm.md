@@ -79,7 +79,7 @@ def test_pebble_ready_writes_config_file():
     )
 
     # Act:
-    ctx.run(ctx.on.pebble_ready(container=container), state_in)
+    state_out = ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
     container_fs = state_out.get_container("some-container").get_filesystem(ctx)

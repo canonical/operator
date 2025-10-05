@@ -34,7 +34,7 @@ charm-libs:
     version: "0"
 ```
 
-This tells Charmcraft that your charm requires the [data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces) charm library from Charmhub.
+This tells Charmcraft that your charm requires the [`data_interfaces`](https://charmhub.io/data-platform-libs/libraries/data_interfaces) charm library from Charmhub.
 
 Next, run the following command to download the library:
 
