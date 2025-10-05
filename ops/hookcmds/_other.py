@@ -40,7 +40,8 @@ def app_version_set(version: str):
             such as a Git hash, that indicates the version of the deployed software.
             It shouldn't be confused with the charm revision.
     """
-    run('application-version-set', version)
+    # The '--' allows versions that start with a hyphen.
+    run('application-version-set', '--', version)
 
 
 # config-get has an `--all` option, which we do not offer here. When `--all` is
@@ -128,7 +129,8 @@ def juju_log(
         message: The message to log.
         level: Send the message at the given level.
     """
-    run('juju-log', '--log-level', level, message)
+    # The '--' allows messages that start with a hyphen.
+    run('juju-log', '--log-level', level, '--', message)
 
 
 def juju_reboot(*, now: bool = False):

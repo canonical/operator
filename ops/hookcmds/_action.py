@@ -88,7 +88,8 @@ def action_fail(message: str | None = None):
     """
     args: list[str] = []
     if message is not None:
-        args.append(message)
+        # The '--' allows messages that start with a hyphen.
+        args.extend(['--', message])
     run('action-fail', *args)
 
 
@@ -131,7 +132,8 @@ def action_log(message: str):
     Args:
         message: The progress message to provide to the Juju user.
     """
-    run('action-log', message)
+    # The '--' allows messages that start with a hyphen.
+    run('action-log', '--', message)
 
 
 def action_set(results: Mapping[str, Any]):

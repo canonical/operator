@@ -178,7 +178,7 @@ def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirecto
 
 
 def test_run_error(run: Run):
-    run.handle(['juju-log', '--log-level', 'INFO', 'msg'], returncode=1, stderr='error msg')
+    run.handle(['juju-log', '--log-level', 'INFO', '--', 'msg'], returncode=1, stderr='error msg')
     with pytest.raises(hookcmds.Error) as excinfo:
         hookcmds.juju_log('msg')
     assert excinfo.value.returncode == 1
@@ -191,7 +191,7 @@ def test_action_fail(run: Run):
 
 
 def test_action_fail_with_message(run: Run):
-    run.handle(['action-fail', 'oh no!'])
+    run.handle(['action-fail', '--', 'oh no!'])
     hookcmds.action_fail('oh no!')
 
 
@@ -208,7 +208,7 @@ def test_action_get_key(run: Run):
 
 
 def test_action_log(run: Run):
-    run.handle(['action-log', 'progress update'])
+    run.handle(['action-log', '--', 'progress update'])
     hookcmds.action_log('progress update')
 
 
@@ -223,7 +223,7 @@ def test_action_set_nested(run: Run):
 
 
 def test_app_version_set(run: Run):
-    run.handle(['application-version-set', '1.2.3'])
+    run.handle(['application-version-set', '--', '1.2.3'])
     hookcmds.app_version_set('1.2.3')
 
 
@@ -300,12 +300,12 @@ def test_is_leader(run: Run):
 
 
 def test_juju_log(run: Run):
-    run.handle(['juju-log', '--log-level', 'INFO', 'msg'])
+    run.handle(['juju-log', '--log-level', 'INFO', '--', 'msg'])
     hookcmds.juju_log('msg')
 
 
 def test_juju_log_level(run: Run):
-    run.handle(['juju-log', '--log-level', 'DEBUG', 'debug msg'])
+    run.handle(['juju-log', '--log-level', 'DEBUG', '--', 'debug msg'])
     hookcmds.juju_log('debug msg', level='DEBUG')
 
 
@@ -783,12 +783,12 @@ def test_status_get_app(run: Run):
 
 
 def test_status_set(run: Run):
-    run.handle(['status-set', '--application=False', 'active', 'msg'])
+    run.handle(['status-set', '--application=False', 'active', '--', 'msg'])
     hookcmds.status_set('active', 'msg')
 
 
 def test_status_set_app(run: Run):
-    run.handle(['status-set', '--application=True', 'active', 'msg'])
+    run.handle(['status-set', '--application=True', 'active', '--', 'msg'])
     hookcmds.status_set('active', 'msg', app=True)
 
 

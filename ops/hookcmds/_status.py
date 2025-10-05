@@ -64,5 +64,6 @@ def status_set(status: SettableStatusName, message: str | None = None, *, app: b
     """
     args = [f'--application={app}', status]
     if message is not None:
-        args.append(message)
+        # The '--' allows messages that start with a hyphen.
+        args.extend(['--', message])
     run('status-set', *args)
