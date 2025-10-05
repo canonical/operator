@@ -316,16 +316,7 @@ def test_juju_reboot(run: Run):
 
 def test_juju_reboot_now(run: Run, monkeypatch: pytest.MonkeyPatch):
     run.handle(['juju-reboot', '--now'])
-
-    exit_called = False
-
-    def patched_exit():
-        nonlocal exit_called
-        exit_called = True
-
-    monkeypatch.setattr('sys.exit', patched_exit)
     hookcmds.juju_reboot(now=True)
-    assert exit_called
 
 
 def test_network_get(run: Run):

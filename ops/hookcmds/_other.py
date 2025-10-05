@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import pathlib
-import sys
 from typing import (
     Any,
     Literal,
@@ -143,10 +142,8 @@ def juju_reboot(*, now: bool = False):
     """
     if now:
         run('juju-reboot', '--now')
-        # Juju will kill this process, but to avoid races we force that to be the case.
-        sys.exit()
-        return  # Make it simpler to mock out sys.exit() in tests.
-    run('juju-reboot')
+    else:
+        run('juju-reboot')
 
 
 # We could have bind_address: bool=True, egress_subnets: bool=True,
