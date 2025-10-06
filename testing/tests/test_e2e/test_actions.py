@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
+
+import ops_tools
 import pytest
 from ops import __version__ as ops_version
 from ops.charm import ActionEvent, CharmBase
@@ -203,3 +206,27 @@ def test_default_arguments():
     assert action.name == name
     assert action.params == {}
     assert action.id == expected_id
+
+
+def test_action_using_generated_action():
+    @dataclasses.dataclass
+    class Act:
+        a: int
+        b: float
+        c: str
+
+    class Charm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            framework.observe(self.on['act'].action, self._on_action)
+
+        def _on_action(self, event: ActionEvent):
+            self.typed_params = event.load_params(Act, 10, c='foo')
+
+    schema = ops_tools.action_to_juju_schema(Act)
+    ctx = Context(Charm, meta={'name': 'foo'}, actions=schema)
+    with ctx(ctx.on.action('act', params={'b': 3.14}), State()) as mgr:
+        mgr.run()
+        assert mgr.charm.typed_params.a == 10
+        assert mgr.charm.typed_params.b == 3.14
+        assert mgr.charm.typed_params.c == 'foo'
