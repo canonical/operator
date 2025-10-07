@@ -595,7 +595,7 @@ def test_default_values():
 
 
 @pytest.mark.parametrize('action', ['add-secret'])
-def test_secret_something(secrets_context: Context[CharmBase], action: str):
+def test_secrets(secrets_context: Context[CharmBase], action: str):
     state = State(leader=True)
     state = secrets_context.run(secrets_context.on.action(action), state)
 
@@ -608,13 +608,13 @@ def test_secret_something(secrets_context: Context[CharmBase], action: str):
     common_assertions(scenario_secret, result)
 
     assert result == {
-        '_before': None,
-        '_after': {
+        'before': None,
+        'after': {
             'info': ANY,  # relying on scaffolding check
             'tracked': {'foo': 'bar'},
             'latest': {'foo': 'bar'},
         },
-        '_result': None,
+        'secretid': ANY,
     }
 
     assert scenario_secret

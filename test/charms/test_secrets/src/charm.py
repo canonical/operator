@@ -15,9 +15,32 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
 
 import ops
+
+
+class InfoSnapshot(TypedDict):
+    id: str
+    label: str | None
+    revision: int
+    expires: str | None
+    rotation: str | None
+    rotates: str | None
+    description: str | None
+
+
+class SecretSnapshot(TypedDict):
+    info: InfoSnapshot | None
+    tracked: dict[str, Any]
+    latest: dict[str, Any]
+
+
+class Result(TypedDict, total=False):
+    before: SecretSnapshot | None
+    after: SecretSnapshot | None
+    secretid: str | None
+    exception: str | None
 
 
 class TestSecretsCharm(ops.CharmBase):
@@ -30,19 +53,20 @@ class TestSecretsCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 
     def add_secret(self, event: ops.ActionEvent):
-        rv: dict[str, Any] = {}
-        rv['before'] = None
+        result: Result = {}
+        result['before'] = None
         secret: ops.Secret = self.app.add_secret({'foo': 'bar'})
         assert secret.id
-        rv['secretid'] = secret.id
-        rv['after'] = self._snapshot(secret.id)
-        event.set_results(rv)
+        result['secretid'] = secret.id
+        result['after'] = self._snapshot(secret.id)
+        event.set_results(result)  # type: ignore
 
-    def _snapshot(self, secret_id: str):
+    def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
+        # `expires` and `rotates` may need coercion to str
         info = secret.get_info().__dict__ if self.unit.is_leader() else None
         return {
-            'info': info,
+            'info': info,  # type: ignore
             'tracked': secret.get_content(),
             'latest': secret.peek_content(),
         }
