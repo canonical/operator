@@ -15,63 +15,37 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import ops
 
 
 class TestSecretsCharm(ops.CharmBase):
-    _stored = ops.StoredState()
-
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self._stored.set_default(secret_id=None)
         framework.observe(self.on.start, self._on_start)
-        framework.observe(self.on['exec'].action, self._on_exec)
+        framework.observe(self.on['add-secret'].action, self.add_secret)
 
     def _on_start(self, event: ops.StartEvent):
         self.unit.status = ops.ActiveStatus()
 
-    def _on_exec(self, event: ops.ActionEvent):
-        """Action to execute arbitrary Python code in specific context."""
-        assert event.params['code']
+    def add_secret(self, event: ops.ActionEvent):
         rv: dict[str, Any] = {}
+        rv['before'] = None
+        secret: ops.Secret = self.app.add_secret({'foo': 'bar'})
+        assert secret.id
+        rv['secretid'] = secret.id
+        rv['after'] = self._snapshot(secret.id)
+        event.set_results(rv)
 
-        rv['_before'] = self._snapshot()
-
-        try:
-            exec(event.params['code'], globals(), locals())  # noqa
-            rv.setdefault('_result', None)
-        except Exception as e:
-            rv['_exception'] = str(e)
-
-        rv['_after'] = self._snapshot()
-
-        event.set_results({'rv': json.dumps(rv)})
-
-    def _snapshot(self):
-        secret_id = self._stored.secret_id
-        if not secret_id:
-            return None
+    def _snapshot(self, secret_id: str):
         secret = self.model.get_secret(id=secret_id)
+        info = secret.get_info().__dict__ if self.unit.is_leader() else None
         return {
-            'info': _to_dict(secret_info=secret.get_info()),
+            'info': info,
             'tracked': secret.get_content(),
             'latest': secret.peek_content(),
         }
-
-
-def _to_dict(secret_info: ops.SecretInfo):
-    return {
-        'id': secret_info.id,
-        'label': secret_info.label,
-        'revision': secret_info.revision,
-        'expires': secret_info.expires,
-        'rotation': secret_info.rotation,
-        'rotates': secret_info.rotates,
-        'description': secret_info.description,
-    }
 
 
 if __name__ == '__main__':

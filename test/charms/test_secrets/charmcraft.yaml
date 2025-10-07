@@ -21,10 +21,4 @@ parts:
             - PyYAML
 
 actions:
-    exec:
-        description: Execute arbitrary Python code in an event handler.
-        required: [code]
-        params:
-            code:
-                type: string
-                description: The Python code to run.
+    add-secret:

@@ -95,29 +95,6 @@ class Case(NamedTuple):
         return '\n'.join(textwrap.dedent(ast.unparse(stmt)) for stmt in func_def.body)
 
 
-def add_secret(self: TestSecretsCharm, rv: dict[str, Any]):
-    """Add secret with content."""
-    secret: ops.Secret = self.app.add_secret({'foo': 'bar'})
-    secret_id = secret.id
-    self._stored.secret_id = secret_id
-
-
-def scenario_add_secret(secret: ops.testing.Secret | None, result: dict[str, Any] | None) -> None:
-    assert result == {
-        '_before': None,
-        '_after': {
-            'info': ANY,  # relying on scaffolding check
-            'tracked': {'foo': 'bar'},
-            'latest': {'foo': 'bar'},
-        },
-        '_result': None,
-    }
-
-    assert secret
-    assert secret.owner == 'application'
-    assert not secret.remote_grants
-
-
 def jubilant_add_secret(secret: jubilant.RevealedSecret | None):
     # The signature of this function will likely change
     assert secret

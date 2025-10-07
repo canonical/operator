@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import datetime
-import json
+from typing import Any
+from unittest.mock import ANY
 
 import pytest
 from ops.charm import CharmBase
@@ -13,7 +14,6 @@ from ops.model import SecretNotFoundError, SecretRotate
 from scenario import Context
 from scenario.state import Relation, Secret, State
 from tests.helpers import trigger
-from test.integration.secrets_test_cases import TEST_CASES, TEST_IDS, Case
 
 
 @pytest.fixture(scope='function')
@@ -594,31 +594,47 @@ def test_default_values():
     assert secret.remote_grants == {}
 
 
-@pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
-def test_secret_something(secrets_context: Context[CharmBase], test_case: Case):
+@pytest.mark.parametrize('action', ['add-secret'])
+def test_secret_something(secrets_context: Context[CharmBase], action: str):
     state = State(leader=True)
-    state = secrets_context.run(
-        secrets_context.on.action('exec', params={'code': test_case.code}), state
-    )
-    secret = next(iter(state.secrets))
+    state = secrets_context.run(secrets_context.on.action(action), state)
 
-    assert secrets_context.action_results
-    result = json.loads(secrets_context.action_results['rv'])
-    info = result['_after']['info']
+    result = secrets_context.action_results
+    assert result is not None
+    charm_secret_id = result.get('secretid')
+    scenario_secret = next(iter(state.secrets)) if state.secrets else None
 
-    # Verify that the unit and the scaffolding see the same data
-    assert secret.id == info['id']
-    assert secret.label == info['label']
-    assert secret._tracked_revision == info['revision']
-    assert secret._latest_revision == info['revision']
-    assert secret.expire == info['expires']
-    assert secret.rotate == info['rotates']
-    # rotation is not represented in ops[testing]
-    assert secret.description == info['description']
-    assert secret.description == info['description']
+    assert bool(scenario_secret) == bool(charm_secret_id)
+    common_assertions(scenario_secret, result)
 
-    assert secret.tracked_content == result['_after']['tracked']
-    assert secret.latest_content == result['_after']['latest']
+    assert result == {
+        '_before': None,
+        '_after': {
+            'info': ANY,  # relying on scaffolding check
+            'tracked': {'foo': 'bar'},
+            'latest': {'foo': 'bar'},
+        },
+        '_result': None,
+    }
 
-    if test_case.scenario_assertions:
-        test_case.scenario_assertions(secret, result)
+    assert scenario_secret
+    assert scenario_secret.owner == 'application'
+    assert not scenario_secret.remote_grants
+
+
+def common_assertions(scenario_secret: Secret | None, result: dict[str, Any]):
+    if scenario_secret:
+        info = result['after']['info']
+        # Verify that the unit and the scaffolding see the same data
+        assert scenario_secret.id == info['id']
+        assert scenario_secret.label == info['label']
+        assert scenario_secret._tracked_revision == info['revision']
+        assert scenario_secret._latest_revision == info['revision']
+        assert scenario_secret.expire == info['expires']
+        assert scenario_secret.rotate == info['rotates']
+        # rotation is not represented in ops[testing]
+        assert scenario_secret.description == info['description']
+        assert scenario_secret.description == info['description']
+
+        assert scenario_secret.tracked_content == result['after']['tracked']
+        assert scenario_secret.latest_content == result['after']['latest']
