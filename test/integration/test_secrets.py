@@ -20,11 +20,9 @@ from typing import Callable
 import jubilant
 import pytest
 
-from .secrets_test_cases import TEST_CASES, TEST_IDS, Case
 
-
-@pytest.mark.parametrize('test_case', TEST_CASES, ids=TEST_IDS)
-def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_case: Case):
+@pytest.mark.parametrize('action', ['add-secret'])
+def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, action: str):
     charm_path = build_secrets_charm()
     juju.deploy(charm_path)
     status = juju.wait(jubilant.all_active)
@@ -32,18 +30,18 @@ def test_foo(build_secrets_charm: Callable[[], str], juju: jubilant.Juju, test_c
     unit, unit_obj = next(iter(status.apps['test-secrets'].units.items()))
     assert unit_obj.leader
 
-    rv = juju.run(unit, 'exec', params={'code': test_case.code})
+    rv = juju.run(unit, action)
     result = json.loads(rv.results['rv'])
     assert not result.get('_exception')
-    info = result['_after']['info']
 
     secrets = juju.secrets()
     secret = juju.show_secret(secrets[0].uri, reveal=True) if secrets else None
 
     if secret:
         assert secret.owner == 'test-secrets'
-        assert secret.uri.split('/')[-1] == info['id']
-        assert secret.content == result['_after']['latest']
+        assert secret.uri == result['secretid'] == result['after']['info']['id']
+        assert secret.content == result['after']['latest']
 
-    if test_case.jubilant_assertions:
-        test_case.jubilant_assertions(secret)
+    assert secret
+    assert secret.revision == 1
+    assert secret.content == {'foo': 'bar'}
