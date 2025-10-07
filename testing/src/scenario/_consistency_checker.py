@@ -338,7 +338,7 @@ def _check_action_param_types(
         'object': dict,
     }
     expected_param_type: dict[str, Any] = {}
-    for par_name, par_spec in actions[action.name].get('params', {}).items():
+    for par_name, par_spec in (actions[action.name] or {}).get('params', {}).items():
         value = par_spec.get('type')
         if not value:
             errors.append(
