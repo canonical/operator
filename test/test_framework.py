@@ -2132,7 +2132,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
 
@@ -2281,7 +2280,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
