@@ -126,19 +126,10 @@ class DemoCharm(ops.CharmBase):
             if not service.is_running():
                 event.add_status(ops.MaintenanceStatus("waiting for workload"))
         except (ops.ModelError, ops.pebble.ConnectionError):
-            # ModelError: The service wasn't found, likely because we define
-            # the service on pebble-ready and that event hasn't happened yet.
-            # pebble.ConnectionError: Pebble isn't ready yet, or perhaps the
-            # connection to the container is temporarily down.
             event.add_status(ops.MaintenanceStatus("waiting for container"))
         event.add_status(ops.ActiveStatus())
 
-    def _on_get_value_action(self, event: ops.ActionEvent) -> None:
-        """Handle the get-value action."""
-        if event.params["value"] == "please fail":
-            event.fail("Action failed, as requested")
-        else:
-            event.set_results({"out-value": event.params["value"]})
+    ...  # _on_get_value_action is unchanged.
 ```
 
 Our Harness test `test_action` still works (although it doesn't exercise `_on_collect_status`). However, our state-transition test `test_get_value_action` now fails with an error:
@@ -366,7 +357,7 @@ class DemoCharm(ops.CharmBase):
         }
         self.container.add_layer("base", layer, combine=True)
         self.container.replan()
-        ... # Check that the workload is actually running.
+        ...  # Check that the workload is actually running.
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Report the status of the workload."""
