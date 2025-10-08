@@ -46,11 +46,9 @@ from charm import DemoCharm
 
 def test_action():
     harness = testing.Harness(DemoCharm)
-
     harness.begin()
     output = harness.run_action("get-value", {"value": "foo"})
     assert output.results == {"out-value": "foo"}
-
     harness.cleanup()
 ```
 
@@ -71,7 +69,6 @@ from charm import DemoCharm
 
 def test_get_value_action():
     ctx = testing.Context(DemoCharm)
-
     state_in = testing.State()
     ctx.run(ctx.on.action("get-value", params={"value": "foo"}), state_in)
     assert ctx.action_results == {"out-value": "foo"}
@@ -90,7 +87,6 @@ from charm import DemoCharm
 
 def test_get_value_action_failed():
     ctx = testing.Context(DemoCharm)
-
     state_in = testing.State()
     with pytest.raises(testing.ActionFailed) as exc_info:
         ctx.run(ctx.on.action("get-value", params={"value": "please fail"}), state_in)
@@ -146,7 +142,6 @@ As a reminder, here's our definition of `test_get_value_action`:
 ```python
 def test_get_value_action():
     ctx = testing.Context(DemoCharm)
-
     state_in = testing.State()
     ctx.run(ctx.on.action("get-value", params={"value": "foo"}), state_in)
     assert ctx.action_results == {"out-value": "foo"}
@@ -157,7 +152,6 @@ To fix the test, we need to add a mock container to the input state:
 ```python
 def test_get_value_action():
     ctx = testing.Context(DemoCharm)
-
     container = testing.Container("my-container", can_connect=True)
     state_in = testing.State(containers={container})
     ctx.run(ctx.on.action("get-value", params={"value": "foo"}), state_in)
@@ -288,7 +282,6 @@ from charm import DemoCharm
 
 def test_relation_changed(monkeypatch: pytest.MonkeyPatch):
     ctx = testing.Context(DemoCharm)
-
     workload = MockWorkload("foo.local:1234")
     monkeypatch.setattr("charm.DemoCharm.write_workload_config", workload.write_config)
     relation = testing.Relation(
@@ -317,7 +310,6 @@ from charm import DemoCharm
 
 def test_get_db_endpoint_action():
     ctx = testing.Context(DemoCharm)
-
     relation = testing.Relation(
         endpoint="database",
         remote_app_data={"endpoints": "bar.local:5678"},
@@ -430,7 +422,6 @@ from charm import DemoCharm
 
 def test_pebble_ready():
     ctx = testing.Context(DemoCharm)
-
     container_in = testing.Container("my-container", can_connect=True)
     state_in = testing.State(containers={container_in})
     state_out = ctx.run(ctx.on.pebble_ready(container_in), state_in)
@@ -462,7 +453,6 @@ This works because the testing framework automatically simulates running `_on_co
 ```python
 def test_pebble_ready():
     ctx = testing.Context(DemoCharm)
-
     container_in = testing.Container("my-container", can_connect=True)
     state_in = testing.State(containers={container_in})
     state_out = ctx.run(ctx.on.pebble_ready(container_in), state_in)
@@ -509,7 +499,6 @@ layer = pebble.Layer(
 
 def test_status_active():
     ctx = testing.Context(DemoCharm)
-
     container = testing.Container(
         "my-container",
         layers={"base": layer},
@@ -523,7 +512,6 @@ def test_status_active():
 
 def test_status_container_down():
     ctx = testing.Context(DemoCharm)
-
     container = testing.Container("my-container", can_connect=False)
     state_in = testing.State(containers={container})
     state_out = ctx.run(ctx.on.update_status(), state_in)
