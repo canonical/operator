@@ -15,15 +15,6 @@ In contrast, Harness tests typically build up a state event-by-event, using the 
 
 To help focus on the differences between the two approaches, we don't use fixtures in this guide.
 
-For more information about state-transition testing, see:
-
-- [](#write-unit-tests-for-a-charm)
-- [The reference docs](/reference/ops-testing), especially:
-    - [](ops.testing.Context)
-    - [](ops.testing.State)
-    - [](ops.testing.CharmEvents)
-- How-to guides for particular features, such as [How to manage relations > Test the feature](#manage-relations-test-the-feature)
-
 (harness-migration-action)=
 ## Test a minimal action
 
@@ -558,3 +549,15 @@ The status reporting logic in `_on_collect_status` actually accounts for two mor
 
 - The container has a Pebble plan, but the service isn't running. To cover this situation, we could add a variant of `test_status_active` that sets the service status to `INACTIVE`.
 - The container is available, but doesn't have a Pebble plan. To cover this situation, we could add a variant of `test_status_container_down` that sets `can_connect=True`.
+
+(harness-migration-see-more)=
+## See more
+
+For more information about state-transition testing, see:
+
+- [](#write-unit-tests-for-a-charm)
+- [The reference docs](/reference/ops-testing), especially:
+    - [](ops.testing.Context)
+    - [](ops.testing.State)
+    - [](ops.testing.CharmEvents)
+- How-to guides for particular features, such as [How to manage relations > Test the feature](#manage-relations-test-the-feature)
