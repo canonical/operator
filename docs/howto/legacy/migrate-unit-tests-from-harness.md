@@ -1,7 +1,7 @@
 (harness-migration)=
 # How to migrate unit tests from Harness
 
-This guide is a starting point for how to migrate [Harness](/reference/ops-testing-harness) tests to state-transition tests. Both approaches to unit testing use the `ops.testing` framework, but Harness tests are deprecated and won't be supported by default in a future Ops release.
+This guide is a starting point for how to migrate [Harness](/reference/ops-testing-harness) tests to state-transition tests. Both approaches to unit testing use the `ops.testing` namespace, but Harness tests are deprecated and won't be supported by default in a future Ops release.
 
 State-transition tests are recommended for all charm unit tests. In a state-transition test, you:
 
@@ -18,7 +18,10 @@ To help focus on the differences between the two approaches, we don't use fixtur
 For more information about state-transition testing, see:
 
 - [](#write-unit-tests-for-a-charm)
-- [The reference docs](/reference/ops-testing), especially [](ops.testing.State) and [](ops.testing.CharmEvents)
+- [The reference docs](/reference/ops-testing), especially:
+    - [](ops.testing.Context)
+    - [](ops.testing.State)
+    - [](ops.testing.CharmEvents)
 - How-to guides for particular features, such as [How to manage relations > Test the feature](#manage-relations-test-the-feature)
 
 (harness-migration-action)=
@@ -37,7 +40,7 @@ class DemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        framework.observe(self.on.get_value_action, self._on_get_value_action)
+        framework.observe(self.on["get-value"].action, self._on_get_value_action)
         ...  # Observe other events.
 
     def _on_get_value_action(self, event: ops.ActionEvent) -> None:
@@ -140,7 +143,7 @@ class DemoCharm(ops.CharmBase):
         super().__init__(framework)
         self.container = self.unit.get_container("my-container")
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        framework.observe(self.on.get_value_action, self._on_get_value_action)
+        framework.observe(self.on["get-value"].action, self._on_get_value_action)
         ...  # Observe other events, including pebble-ready.
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
@@ -236,7 +239,7 @@ class DemoCharm(ops.CharmBase):
         self.database = DatabaseRequires(self, relation_name="database", database_name="my-db")
         framework.observe(self.database.on.database_created, self._on_database_available)
         framework.observe(self.database.on.endpoints_changed, self._on_database_available)
-        framework.observe(self.on.get_db_endpoint_action, self._on_get_db_endpoint_action)
+        framework.observe(self.on["get-db-endpoint"].action, self._on_get_db_endpoint_action)
         ...  # Observe other events.
 
     def _on_database_available(
@@ -337,6 +340,11 @@ To test what happens when relation data changes, we'll structure a test around [
 
 - Before `relation_changed` runs -- A mock workload object configured with `foo.local:1234`. Relation data `bar.local:5678`.
 - After `relation_changed` runs -- The mock workload object configured with `bar.local:5678`.
+
+It might be surprising that the input state has relation data `bar.local:5678`, not `foo.local:1234`. This highlights a significant difference between Harness tests and state-transition tests:
+
+- Our Harness test uses [`update_relation_data`](ops.testing.Harness.update_relation_data) to simulate Juju *telling* the charm about new relation data, so we start by setting the old relation data `foo.local:1234` in the mock Juju state.
+- Our state-transition test will simulate the charm *learning* about new relation data, so we'll start with new relation data and check that the charm changes the configuration of the mock workload object.
 
 Here's the test:
 
@@ -524,7 +532,7 @@ def test_pebble_ready():
 ```
 
 ```{note}
-When writing a state-transition test, it's best to treat objects as immutable. We shouldn't expect `ctx.run` to modify the mock container that's passed to `ctx.on.pebble_ready`. In other words, the test would break if we replaced the line `assert "workload" ...` with `assert "workload" in container_in.plan.services`.
+In state-transition tests, the objects in the `State` are immutable. Calling `ctx.run` will modify the mock container in the output state, not the one that's passed to `ctx.on.pebble_ready`. In other words, the test would break if we replaced the line `assert "workload" ...` with `assert "workload" in container_in.plan.services`.
 ```
 
 The `test_pebble_ready` function doesn't fully cover the charm's `_on_pebble_ready` method. In addition to defining a service in the container, `_on_pebble_ready` uses [`replan`](ops.Container.replan) to start the service. To cover this, one option would be to check the service status at the end of `test_pebble_ready`:
@@ -560,7 +568,7 @@ def test_pebble_ready():
 
 We already have a test (`test_pebble_ready`) that partially exercises the charm's status reporting, but it's a good idea to independently cover each situation that the status reporting logic accounts for.
 
-Our Harness test uses [`evaluate_status`](ops.testing.Harness.evaluate_status) to trigger `collect_unit_status`, which causes the charm's `_on_collect_status` method to run. In a state-transition test, the best approach is to simulate the update-status event instead.
+Our Harness test uses [`evaluate_status`](ops.testing.Harness.evaluate_status) to trigger `collect_unit_status`, which causes the charm's `_on_collect_status` method to run. In a state-transition test, a better approach is to simulate a Juju event that isn't observed. The typical choice is update-status.
 
 We'll structure two tests around [`Context.on.update_status`](ops.testing.CharmEvents.update_status).
 
