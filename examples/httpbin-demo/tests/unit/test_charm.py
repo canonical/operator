@@ -13,9 +13,64 @@
 # limitations under the License.
 
 import ops
-from ops import testing
+from ops import pebble, testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
+
+
+layer = pebble.Layer(
+    {
+        "services": {
+            SERVICE_NAME: {
+                "override": "replace",
+                "command": "mock-command",
+                "startup": "enabled",
+            },
+        },
+    }
+)
+
+
+def test_status_active():
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(
+        CONTAINER_NAME,
+        layers={"base": layer},
+        service_statuses={SERVICE_NAME: pebble.ServiceStatus.ACTIVE},
+        can_connect=True,
+    )
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.ActiveStatus()
+
+
+def test_status_inactive():
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(
+        CONTAINER_NAME,
+        layers={"base": layer},
+        service_statuses={SERVICE_NAME: pebble.ServiceStatus.INACTIVE},
+        can_connect=True,
+    )
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload")
+
+
+def test_status_container_down():
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(CONTAINER_NAME, can_connect=True)
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
+
+
+def test_status_container_no_plan():
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(CONTAINER_NAME, can_connect=False)
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
 def test_httpbin_pebble_ready():
