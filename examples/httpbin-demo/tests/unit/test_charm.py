@@ -59,7 +59,7 @@ def test_status_inactive():
 
 def test_status_container_down():
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
+    container = testing.Container(CONTAINER_NAME, can_connect=False)
     state_in = testing.State(containers={container})
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
@@ -67,7 +67,7 @@ def test_status_container_down():
 
 def test_status_container_no_plan():
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=False)
+    container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container})
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
