@@ -119,10 +119,11 @@ class DemoCharm(ops.CharmBase):
         """Report the status of the workload."""
         try:
             service = self.container.get_service("workload")
-            if not service.is_running():
-                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         except (ops.ModelError, ops.pebble.ConnectionError):
             event.add_status(ops.MaintenanceStatus("waiting for container"))
+        else:
+            if not service.is_running():
+                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         event.add_status(ops.ActiveStatus())
 
     ...  # _on_get_value_action is unchanged.
@@ -355,10 +356,11 @@ class DemoCharm(ops.CharmBase):
         """Report the status of the workload."""
         try:
             service = self.container.get_service("workload")
-            if not service.is_running():
-                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         except (ops.ModelError, ops.pebble.ConnectionError):
             event.add_status(ops.MaintenanceStatus("waiting for container"))
+        else:
+            if not service.is_running():
+                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         event.add_status(ops.ActiveStatus())
 ```
 
