@@ -27,14 +27,9 @@ For more information about state-transition testing, see:
 (harness-migration-action)=
 ## Test a minimal action
 
-Suppose that we have the following charm code:
+Suppose that we have the following charm class:
 
 ```python
-"""A demo charm."""
-
-import ops
-
-
 class DemoCharm(ops.CharmBase):
     """Manage the workload."""
 
@@ -51,10 +46,6 @@ class DemoCharm(ops.CharmBase):
             event.set_results({"out-value": event.params["value"]})
 
     ...  # Handle other events.
-
-
-if __name__ == "__main__":
-    ops.main(DemoCharm)
 ```
 
 Also suppose that we have the following testing code, written using Harness:
@@ -128,14 +119,9 @@ A significant difference between Harness tests and state-transition tests is how
 - In a Harness test, you need to trigger these events using [`evaluate_status`](ops.testing.Harness.evaluate_status).
 - In a state-transition test, the framework automatically triggers these events. This matches what happens when the charm is deployed.
 
-To demonstrate the difference, let's modify the charm code from [](#harness-migration-action) to include a workload container and observe `collect_unit_status`:
+To demonstrate the difference, let's modify the charm class from [](#harness-migration-action) to include a workload container and observe `collect_unit_status`:
 
 ```python
-"""A demo charm that has a workload container."""
-
-import ops
-
-
 class DemoCharm(ops.CharmBase):
     """Manage the workload."""
 
@@ -168,10 +154,6 @@ class DemoCharm(ops.CharmBase):
             event.set_results({"out-value": event.params["value"]})
 
     ...  # Handle other events, including pebble-ready.
-
-
-if __name__ == "__main__":
-    ops.main(DemoCharm)
 ```
 
 Our Harness test `test_action` still works (although it doesn't exercise `_on_collect_status`). However, our state-transition test `test_get_value_action` now fails with an error:
@@ -216,26 +198,15 @@ In [](#harness-migration-container), we'll work through a more realistic example
 
 ### Charm with Harness tests
 
-Suppose that we have the following charm code:
+Suppose that we have the following charm class:
 
 ```python
-"""A demo charm that requires a database."""
-
-import ops
-
-# Use the 'data_interfaces' library to help integrate with a database provider.
-from charms.data_platform_libs.v0.data_interfaces import (
-    DatabaseCreatedEvent,
-    DatabaseEndpointsChangedEvent,
-    DatabaseRequires,
-)
-
-
 class DemoCharm(ops.CharmBase):
     """Manage the workload."""
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
+        # Use database helpers from charms.data_platform_libs.v0.data_interfaces.
         self.database = DatabaseRequires(self, relation_name="database", database_name="my-db")
         framework.observe(self.database.on.database_created, self._on_database_available)
         framework.observe(self.database.on.endpoints_changed, self._on_database_available)
@@ -271,10 +242,6 @@ class DemoCharm(ops.CharmBase):
     def write_workload_config(self, config: str) -> None:
         """Update the workload's configuration."""
         ...  # Write a config file. Or in a K8s charm, use Pebble to push config to the container.
-
-
-if __name__ == "__main__":
-    ops.main(DemoCharm)
 ```
 
 Also suppose that we have the following testing code, written using Harness:
@@ -392,14 +359,9 @@ def test_get_db_endpoint_action():
 
 ### Charm with Harness tests
 
-Suppose that we have the following charm code:
+Suppose that we have the following charm class:
 
 ```python
-"""A demo charm that has a workload container."""
-
-import ops
-
-
 class DemoCharm(ops.CharmBase):
     """Manage the workload."""
 
@@ -441,10 +403,6 @@ class DemoCharm(ops.CharmBase):
         event.add_status(ops.ActiveStatus())
 
     ...  # Handle other events.
-
-
-if __name__ == "__main__":
-    ops.main(DemoCharm)
 ```
 
 Also suppose that we have the following testing code, written using Harness:
