@@ -286,16 +286,6 @@ from ops import testing
 from charm import DemoCharm
 
 
-class MockWorkload:
-    """Mock object that represents the workload."""
-
-    def __init__(self, current_config: str):
-        self.config = current_config
-
-    def write_config(self, new_config: str):
-        self.config = new_config
-
-
 def test_db_endpoint(monkeypatch: pytest.MonkeyPatch):
     harness = testing.Harness(DemoCharm)
 
@@ -308,7 +298,8 @@ def test_db_endpoint(monkeypatch: pytest.MonkeyPatch):
     )
     harness.begin_with_initial_hooks()
 
-    # Prepare a mock workload object with matching config.
+    # Prepare a mock workload object with matching config, assuming we've
+    # defined a MockWorkload class with suitable attributes and methods.
     workload = MockWorkload("foo.local:1234")
     monkeypatch.setattr("charm.DemoCharm.write_workload_config", workload.write_config)
 
@@ -353,16 +344,6 @@ import pytest
 from ops import testing
 
 from charm import DemoCharm
-
-
-class MockWorkload:
-    """Mock object that represents the workload."""
-
-    def __init__(self, current_config: str):
-        self.config = current_config
-
-    def write_config(self, new_config: str):
-        self.config = new_config
 
 
 def test_relation_changed(monkeypatch: pytest.MonkeyPatch):
