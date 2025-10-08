@@ -36,7 +36,6 @@ class DemoCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
         framework.observe(self.on["get-value"].action, self._on_get_value_action)
-        ...  # Observe other events.
 
     def _on_get_value_action(self, event: ops.ActionEvent) -> None:
         """Handle the get-value action."""
@@ -44,8 +43,6 @@ class DemoCharm(ops.CharmBase):
             event.fail("Action failed, as requested")
         else:
             event.set_results({"out-value": event.params["value"]})
-
-    ...  # Handle other events.
 ```
 
 Also suppose that we have the following testing code, written using Harness:
@@ -130,7 +127,6 @@ class DemoCharm(ops.CharmBase):
         self.container = self.unit.get_container("my-container")
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         framework.observe(self.on["get-value"].action, self._on_get_value_action)
-        ...  # Observe other events, including pebble-ready.
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Report the status of the workload."""
@@ -152,8 +148,6 @@ class DemoCharm(ops.CharmBase):
             event.fail("Action failed, as requested")
         else:
             event.set_results({"out-value": event.params["value"]})
-
-    ...  # Handle other events, including pebble-ready.
 ```
 
 Our Harness test `test_action` still works (although it doesn't exercise `_on_collect_status`). However, our state-transition test `test_get_value_action` now fails with an error:
@@ -211,7 +205,6 @@ class DemoCharm(ops.CharmBase):
         framework.observe(self.database.on.database_created, self._on_database_available)
         framework.observe(self.database.on.endpoints_changed, self._on_database_available)
         framework.observe(self.on["get-db-endpoint"].action, self._on_get_db_endpoint_action)
-        ...  # Observe other events.
 
     def _on_database_available(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
@@ -229,8 +222,6 @@ class DemoCharm(ops.CharmBase):
             event.set_results({"endpoint": endpoint})
         else:
             event.fail("Database endpoint is not available")
-
-    ...  # Handle other events.
 
     def get_endpoint_from_relation(self) -> str | None:
         """Get the database endpoint from the relation data."""
@@ -370,7 +361,6 @@ class DemoCharm(ops.CharmBase):
         self.container = self.unit.get_container("my-container")
         framework.observe(self.on["my-container"].pebble_ready, self._on_pebble_ready)
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        ...  # Observe other events.
 
     def _on_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
         """Use Pebble to configure and start the workload in the container."""
@@ -385,8 +375,7 @@ class DemoCharm(ops.CharmBase):
         }
         self.container.add_layer("base", layer, combine=True)
         self.container.replan()
-        # In a real charm, we should check that the workload is actually
-        # running. For example, by trying to connect to it over HTTP.
+        ... # Check that the workload is actually running.
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Report the status of the workload."""
@@ -401,8 +390,6 @@ class DemoCharm(ops.CharmBase):
             # connection to the container is temporarily down.
             event.add_status(ops.MaintenanceStatus("waiting for container"))
         event.add_status(ops.ActiveStatus())
-
-    ...  # Handle other events.
 ```
 
 Also suppose that we have the following testing code, written using Harness:
