@@ -524,8 +524,8 @@ The values in the mock layer don't need to exactly match the layer produced by t
 
 The status reporting logic in `_on_collect_status` actually accounts for two more situations:
 
-- The container has a Pebble plan, but the service isn't running. To cover this situation, we could add a variant of `test_status_active` that sets the service status to `INACTIVE`.
-- The container is available, but doesn't have a Pebble plan. To cover this situation, we could add a variant of `test_status_container_down` that sets `can_connect=True`.
+- The container has a Pebble plan, but the service isn't running. This corresponds to the `not service.is_running()` part of the logic. To cover this situation, we could add a variant of `test_status_active` that sets the service status to `INACTIVE`.
+- The container is available, but doesn't have a Pebble plan. This corresponds to the `ops.ModelError` part of the logic. To cover this situation, we could add a variant of `test_status_container_down` that sets `can_connect=True`.
 
 (harness-migration-see-more)=
 ## See more
