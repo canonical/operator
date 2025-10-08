@@ -498,6 +498,12 @@ def test_action_meta_type_inconsistent():
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}}),
     )
 
+    assert_inconsistent(
+        State(),
+        ctx.on.action('foo', params={'bar': 'baz'}),
+        _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+    )
+
 
 def test_action_name():
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
@@ -507,6 +513,13 @@ def test_action_name():
         ctx.on.action('foo', params={'bar': 'baz'}),
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'string'}}}}),
     )
+
+    assert_consistent(
+        State(),
+        ctx.on.action('foo', params={}),
+        _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+    )
+
     assert_inconsistent(
         State(),
         _Event('box_action', action=ctx.on.action('foo', params={'bar': 'baz'})),
