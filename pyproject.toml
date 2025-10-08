@@ -99,6 +99,7 @@ members = ["tracing", "testing"]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
+jubilant = { url = "https://github.com/dimaqq/jubilant/archive/refs/tags/1.4.1rc1.zip" }
 
 [tool.setuptools.packages.find]
 include = ["ops", "ops._private", "ops.lib"]

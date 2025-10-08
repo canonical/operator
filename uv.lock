@@ -607,7 +607,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -789,14 +789,14 @@ wheels = [
 [[package]]
 name = "jubilant"
 version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
+source = { url = "https://github.com/dimaqq/jubilant/archive/refs/tags/1.4.1rc1.zip" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/1a/ba5838825ac99db4ceec68fa146b594c97b682cf3ccf670b1ecf1261209d/jubilant-1.4.0.tar.gz", hash = "sha256:aa377699a8811fea29bfe0febb6b552d4593c02e666f5ba8c3fba24258700199", size = 27502, upload-time = "2025-08-27T00:11:46.295Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/06/4965ed70d4b9d405c8bdefc4926d94cae202014b4488a25aa8c1fe9fb462/jubilant-1.4.0-py3-none-any.whl", hash = "sha256:1df7eaf125fad8d0d3d35e6d83eca43bfbb7884debcd6c7f4b0822600e2a485c", size = 27185, upload-time = "2025-08-27T00:11:44.851Z" },
-]
+sdist = { hash = "sha256:1c46431e2c3f933bbf05d0e9f69cad234f562814d9050bbba37ce197cb2fda08" }
+
+[package.metadata]
+requires-dist = [{ name = "pyyaml", specifier = "==6.*" }]
 
 [[package]]
 name = "jubilant-backports"
@@ -1240,7 +1240,7 @@ docs = [
 ]
 integration = [
     { name = "httpx", specifier = "~=0.28" },
-    { name = "jubilant", specifier = "~=1.2" },
+    { name = "jubilant", url = "https://github.com/dimaqq/jubilant/archive/refs/tags/1.4.1rc1.zip" },
     { name = "jubilant-backports" },
     { name = "minio", specifier = "~=7.2" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
