@@ -358,10 +358,6 @@ class DemoCharm(ops.CharmBase):
             if not service.is_running():
                 event.add_status(ops.MaintenanceStatus("waiting for workload"))
         except (ops.ModelError, ops.pebble.ConnectionError):
-            # ModelError: The service wasn't found, likely because we define
-            # the service on pebble-ready and that event hasn't happened yet.
-            # pebble.ConnectionError: Pebble isn't ready yet, or perhaps the
-            # connection to the container is temporarily down.
             event.add_status(ops.MaintenanceStatus("waiting for container"))
         event.add_status(ops.ActiveStatus())
 ```
@@ -535,8 +531,13 @@ The status reporting logic in `_on_collect_status` actually accounts for two mor
 For more information about state-transition testing, see:
 
 - [](#write-unit-tests-for-a-charm)
-- [The reference docs](/reference/ops-testing), especially:
+- The [reference docs](/reference/ops-testing), especially:
     - [](ops.testing.Context)
     - [](ops.testing.State)
     - [](ops.testing.CharmEvents)
 - How-to guides for particular features, such as [How to manage relations > Test the feature](#manage-relations-test-the-feature)
+
+For more examples of collect-status event handlers, see:
+
+- The [httpbin-demo charm](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/src/charm.py)
+- [Update the unit status to reflect the relation state](#integrate-your-charm-with-postgresql-update-unit-status) in the Kubernetes charm tutorial
