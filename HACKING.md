@@ -235,8 +235,6 @@ the build frontend is [build](https://pypi.org/project/build/).
 
 ## Release documentation
 
-We produce several pieces of documentation for Ops releases.
-
 As part of the release process, you'll write a summary of the release.
 The summary appears in the GitHub release notes and in Discourse and Matrix.
 
@@ -253,7 +251,7 @@ transition testing".
 
 [CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
 kept up-to-date by the PR that's created when you run `tox -e draft-release`
-duing the release process. You only need to manually edit the changelog if a
+during the release process. You only need to manually edit the changelog if a
 commit message needs adjusting (we try to avoid doing this).
 
 There's also a changelog for `ops-scenario`:
@@ -270,13 +268,13 @@ edit the draft release after a review.
 ### Discourse and Matrix
 
 After completing the release process, post to
-[framework in Discourse](https://discourse.charmhub.io/c/framework/42) and
+[the 'framework' category in Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Charm Development in Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
 The Discourse post title should be:
 
 ```
-Ops x.y.z (and ops-scenario w.y.z and ops-tracing x.y.z) released
+Ops x.y.z released
 ```
 
 And the post should resemble this:
