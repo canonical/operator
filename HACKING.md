@@ -242,38 +242,44 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
 
     > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
-    > 
+    >
     > If you have different settings, add parameters accordingly. For example, the following command assumes your forked remote name is `mine`, and `canonical/operator` remote name is `origin`:
-    > 
+    >
     > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
-    > 
+    >
     > By default, the script makes a release on the main branch. If you want to make a release on another branch, for example, on "2.23-maintenance" (you do not need to switch to this branch in your forked repo), run it with the "--branch" parameter:
-    > 
+    >
     > `tox -e draft-release -- --branch 2.23-maintenance`
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
-3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
-4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
-    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+
+4. Go to the GitHub releases page, then edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > Pushing the tags will trigger automatic builds for the Python packages and
-    > publish them to PyPI ([ops](https://pypi.org/project/ops/) 
-    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and 
+    > publish them to PyPI ([ops](https://pypi.org/project/ops/)
+    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and
     > [ops-tracing](https://pypi.org/project/ops-tracing/)).
     > Note that it sometimes take a bit of time for the new releases to show up.
-    > 
+    >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
-    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+    > You can troubleshoot errors at [Actions > Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml).
+    >
+    > The Publish workflow includes a job that runs the "SBOM and secscan" workflow.
 
-5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+5. On the summary page of the most recent Publish run, locate the secscan artifacts. There will be two artifacts: `secscan-report-upload-sdist` and `secscan-report-upload-wheel`.
+
+    Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+
 6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
 7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
-    > 
+    >
     > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
 
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
