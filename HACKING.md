@@ -231,7 +231,63 @@ dependencies can be found in the relevant `tox.ini` environment `deps` field.
 The build backend is [setuptools](https://pypi.org/project/setuptools/), and
 the build frontend is [build](https://pypi.org/project/build/).
 
-# Publishing a Release
+# Releases
+
+## Release documentation
+
+As part of the release process, you'll write a summary of the release.
+The summary appears in the GitHub release notes and in Discourse and Matrix.
+
+In the summary, outline the key improvements from all areas of Ops,
+including testing, tracing, and the docs.
+The point here is to encourage people to check out the full notes and to upgrade
+promptly, so ensure that you entice them with the best that the new versions
+have to offer.
+
+Avoid using the word "Scenario", preferring "unit testing API" or "state
+transition testing".
+
+### CHANGES.md
+
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
+kept up-to-date by the PR that's created when you run `tox -e draft-release`
+during the release process. You only need to manually edit the changelog if a
+commit message needs adjusting (we try to avoid doing this).
+
+There's also a changelog for `ops-scenario`:
+[testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
+We've kept it for historical reference, but we no longer maintain it.
+
+### GitHub release notes
+
+The GitHub release notes include the summary of the release and
+the list of changes found in the changelog. A draft release is created when
+you run `tox -e draft-release` duing the release process. You might need to
+edit the draft release after a review.
+
+### Discourse and Matrix
+
+After completing the release process, post to
+[the 'framework' category in Discourse](https://discourse.charmhub.io/c/framework/42) and
+[Charm Development in Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
+The Discourse post title should be:
+
+```
+Ops x.y.z released
+```
+
+And the post should resemble this:
+
+```
+The main improvements in this release are ...
+
+Read more in the [full release notes on GitHub](link to the GitHub release).
+```
+
+The Matrix post should be similar.
+
+## Publishing a release
 
 Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
 
@@ -285,111 +341,6 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
-
-## Release Documentation
-
-We produce several pieces of documentation for `ops` and `ops-scenario`
-releases, each serving a separate purpose and covering a different level.
-
-Avoid using the word "Scenario", preferring "unit testing API" or "state
-transition testing". Users should install `ops-scenario` with
-`pip install ops[testing]` rather than using the `ops-scenario` package name
-directly.
-
-### `git log`
-
-`git log` is used to see every change since a previous release. Obviously, no
-special work needs to be done so that this is available. A link to the GitHub
-view of the log will be included at the end of the GitHub release notes when
-the "Generate Release Notes" button is used, in the form:
-
-```
-**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
-```
-
-These changes include both `ops` and `ops-scenario`. If someone needs to see
-changes only for one of the packages, then the `/testing/` folder can be
-filtered in/out.
-
-### CHANGES.md
-
-A changelog is kept in version control that simply lists the changes in each
-release, other than chores. The changelog for `ops`
-is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
-`ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
-There will be overlap between the two files, as many PRs will include changes to
-common infrastructure, or will adjust both `ops` and also the testing API in
-`ops-scenario`.
-
-Adding the changes is done in preparation for a release. Use the "Generate
-Release Notes" button in the GitHub releases page, and copy the text to the
-CHANGES.md files.
-
-* Group the changes by the commit type (feat, fix, and so on) and use full names
-  ("Features", not "feat", "Fixes", not "fix") for group headings.
-* Remove any chores.
-* Remove any bullets that do not apply to the package. For instance, if a bullet
-  only affects `ops[testing]`, don't include it in [CHANGES.md](CHANGES.md) when
-  doing an `ops` release. The bullet should go in [testing/CHANGES.md](testing/CHANGES.md)
-  instead. If `ops[testing]` is not being released yet, put the bullet in a placeholder
-  section at top of [testing/CHANGES.md](testing/CHANGES.md).
-* Strip the commit type prefix from the bullet point, and capitalise the first
-  word.
-* Strip the username (who did each commit) if the author is a member of the
-  Charm Tech team.
-* Replace the link to the pull request with the PR number in parentheses.
-* Where appropriate, collapse multiple tightly related bullet points into a
-  single point that refers to multiple commits.
-* Where appropriate, add backticks for code formatting.
-* Do not include the "New Contributors" section and the "Full Changelog" link
-  (created by "Generate Release Notes").
-
-For example: the PR
-
-```
-* docs: clarify where StoredState is stored by @benhoyt in https://github.com/canonical/operator/pull/2006
-```
-
-is added to the "Documentation" section as:
-
-```
-* Clarify where StoredState is stored (#2006)
-```
-
-### GitHub Release Notes
-
-The GitHub release notes include the list of changes found in the changelogs,
-but:
-
-* If both `ops` and `ops-scenario` packages are being released, include all the
-  changes in the same set of release notes. If only one package is being
-  released, remove any bullets that apply only to the other package.
-* The links to the PRs are left in full.
-* Add a section above the list of changes that briefly outlines any key changes
-  in the release.
-
-### Discourse Release Announcement
-
-Post to the [framework category](https://discourse.charmhub.io/c/framework/42)
-with a subject matching the GitHub release title.
-
-The post should resemble this:
-
-```
-The Charm Tech team has just released version x.y.z of ops!
-
-It’s available from PyPI by using `pip install ops`, and `pip install ops[testing]`,
-which will pick up the latest version. Upgrade by running `pip install --upgrade ops`.
-
-The main improvements in this release are ...
-
-Read more in the [full release notes on GitHub](link to the GitHub release).
-```
-
-In the post, outline the key improvements both in `ops` and `ops-scenario`.
-The point here is to encourage people to check out the full notes and to upgrade
-promptly, so ensure that you entice them with the best that the new versions
-have to offer.
 
 ## Updating the Ops versions in the Charmcraft profiles
 
