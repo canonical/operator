@@ -15,8 +15,7 @@ from typing import (
     Any,
     Generic,
     Sequence,
-    cast,
-    Union,
+    cast
 )
 
 import ops
