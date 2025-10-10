@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+import datetime
+from typing import Any, TypedDict, cast
 
 import ops
 
@@ -43,34 +44,61 @@ class Result(TypedDict, total=False):
     exception: str | None
 
 
-class TestSecretsCharm(ops.CharmBase):
+class SecretsCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on['add-secret'].action, self.add_secret)
+        framework.observe(self.on['add-with-meta'].action, self.add_with_meta)
 
     def _on_start(self, event: ops.StartEvent):
         self.unit.status = ops.ActiveStatus()
 
     def add_secret(self, event: ops.ActionEvent):
-        result: Result = {}
-        result['before'] = None
-        secret: ops.Secret = self.app.add_secret({'foo': 'bar'})
+        secret = self.app.add_secret({'foo': 'bar'})
         assert secret.id
-        result['secretid'] = secret.id
-        result['after'] = self._snapshot(secret.id)
-        event.set_results(result)  # type: ignore
+        result: Result = {
+            'secretid': secret.id,
+            'after': self._snapshot(secret.id),
+        }
+        event.set_results(cast(dict[str, Any], result))
+
+    def add_with_description(self, event: ops.ActionEvent):
+        secret = self.app.add_secret({'foo': 'bar'}, description='ddd')
+        assert secret.id
+        result: Result = {
+            'secretid': secret.id,
+            'after': self._snapshot(secret.id),
+        }
+        event.set_results(cast(dict[str, Any], result))
+
+    def add_with_meta(self, event: ops.ActionEvent):
+        field_keys = event.params['fields'].split(',')
+        full_meta = {
+            'label': 'label',
+            'description': 'description',
+            'expire': datetime.datetime(2020, 1, 1, 0, 0, 0),
+            'rotate': ops.SecretRotate.DAILY,
+        }
+        meta = {k: v for k, v in full_meta.items() if k in field_keys}
+        secret = self.app.add_secret({'foo': 'bar'}, **meta)  # type: ignore
+        assert secret.id
+        result: Result = {
+            'secretid': secret.id,
+            'after': self._snapshot(secret.id),
+        }
+        event.set_results(cast(dict[str, Any], result))
 
     def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
         # `expires` and `rotates` may need coercion to str
-        info = secret.get_info().__dict__ if self.unit.is_leader() else None
+        info = cast(InfoSnapshot, secret.get_info().__dict__) if self.unit.is_leader() else None
         return {
-            'info': info,  # type: ignore
+            'info': info,
             'tracked': secret.get_content(),
             'latest': secret.peek_content(),
         }
 
 
 if __name__ == '__main__':
-    ops.main(TestSecretsCharm)
+    ops.main(SecretsCharm)

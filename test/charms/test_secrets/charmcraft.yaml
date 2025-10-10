@@ -22,3 +22,8 @@ parts:
 
 actions:
     add-secret:
+    add-with-meta:
+        params:
+            fields:
+                type: string
+                description: comma-separated list of metadata fields to set
