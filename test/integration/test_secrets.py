@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import datetime
 from typing import Callable, cast
 
 import jubilant
@@ -100,8 +99,8 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
         assert secret.expires == '2020-01-01T00:00:00Z'
         assert info['expires'] == '2020-01-01 00:00:00+00:00'
     if 'rotate' in fields:
-        assert secret.rotation == "daily"
-        assert info['rotation'] == "SecretRotate.DAILY"
+        assert secret.rotation == 'daily'
+        assert info['rotation'] == 'SecretRotate.DAILY'
         assert secret.rotates  # approx 24h from now
         # It seems that Juju coerces the result values to strings.
         assert info['rotates'] == 'None'
@@ -111,7 +110,7 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
 def cleanup(juju: jubilant.Juju, leader: str) -> None:
     secrets = juju.secrets()
     for secret in secrets:
-        if secret.owner == "test-secrets":
+        if secret.owner == 'test-secrets':
             juju.exec(f'secret-remove {secret.uri}', unit=leader)
         else:
             # Later, there could be user secrets too.
