@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import datetime
+from typing import cast
+from unittest.mock import ANY
 
 import pytest
 from ops.charm import CharmBase
@@ -11,6 +13,7 @@ from ops.model import SecretNotFoundError, SecretRotate
 
 from scenario import Context
 from scenario.state import Relation, Secret, State
+from test.charms.test_secrets.src.charm import Result, SecretsCharm
 from tests.helpers import trigger
 
 
@@ -590,3 +593,96 @@ def test_default_values():
     assert secret.rotate is None
     assert secret.expire is None
     assert secret.remote_grants == {}
+
+
+def test_add_secret(secrets_context: Context[CharmBase]):
+    state = State(leader=True)
+    state = secrets_context.run(secrets_context.on.action('add-secret'), state)
+
+    result = cast(Result, secrets_context.action_results)
+    assert result is not None
+    charm_secret_id = result.get('secretid')
+    scenario_secret = next(iter(state.secrets)) if state.secrets else None
+
+    assert bool(scenario_secret) == bool(charm_secret_id)
+    common_assertions(scenario_secret, result)
+
+    assert result == {
+        'after': {
+            'info': ANY,  # relying on scaffolding check
+            'tracked': {'foo': 'bar'},
+            'latest': {'foo': 'bar'},
+        },
+        'secretid': ANY,
+    }
+
+
+@pytest.mark.parametrize(
+    'fields',
+    [
+        '',
+        'label',
+        'description',
+        'expire',
+        'rotate',
+        'label,description',
+        'description,expire,rotate',
+        'label,description,expire,rotate',
+    ],
+)
+def test_add_secret_with_metadata(
+    secrets_context: Context[SecretsCharm],
+    fields: str,
+):
+    state = State(leader=True)
+    state = secrets_context.run(
+        secrets_context.on.action('add-with-meta', params={'fields': fields}), state
+    )
+    scenario_secret = next(iter(state.secrets))
+    result = cast(Result, secrets_context.action_results)
+    assert 'after' in result
+    assert result['after']
+    info = result['after']['info']
+    assert info
+
+    common_assertions(scenario_secret, result)
+
+    if 'label' in fields:
+        assert scenario_secret.label == 'label'
+        assert info['label'] == 'label'
+    if 'description' in fields:
+        assert scenario_secret.description == 'description'
+        # https://github.com/canonical/operator/issues/2037
+        # assert info['description'] == 'description'
+    if 'expire' in fields:
+        assert scenario_secret.expire == datetime.datetime(2020, 1, 1, 0, 0, 0)
+        assert info['expires'] == datetime.datetime(2020, 1, 1, 0, 0, 0)
+    if 'rotate' in fields:
+        assert scenario_secret.rotate == SecretRotate.DAILY
+        assert info['rotation'] == SecretRotate.DAILY
+        # FIXME is this a Scenario limitation?
+        assert info['rotates'] is None
+
+
+def common_assertions(scenario_secret: Secret | None, result: Result):
+    if scenario_secret:
+        assert scenario_secret
+        assert scenario_secret.owner == 'application'
+        assert not scenario_secret.remote_grants
+
+        if result.get('after'):
+            info = result['after']['info']
+            # Verify that the unit and the scaffolding see the same data
+            assert scenario_secret.id == info['id']
+            assert scenario_secret.label == info['label']
+            assert scenario_secret._tracked_revision == info['revision']
+            assert scenario_secret._latest_revision == info['revision']
+            assert scenario_secret.expire == info['expires']
+            assert scenario_secret.rotate == info['rotation']
+            # FIXME is this a Scenario limitation?
+            assert info['rotates'] is None
+            # https://github.com/canonical/operator/issues/2037
+            # assert scenario_secret.description == info['description']
+
+            assert scenario_secret.tracked_content == result['after']['tracked']
+            assert scenario_secret.latest_content == result['after']['latest']
