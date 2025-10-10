@@ -363,9 +363,10 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         yield pebble_dir
         shutil.rmtree(pebble_dir)
 
-    def test_temp_files_cleaned_up_on_failed_pull(self,
+    def test_temp_files_cleaned_up_on_failed_pull(
+        self,
         pebble_dir: str,
-        client: PebbleClientType,
+        client: pebble.Client,
         monkeypatch: pytest.MonkeyPatch,
     ):
         client.push(f'{pebble_dir}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
@@ -375,6 +376,7 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         with pytest.raises(pebble.ProtocolError):
             client.pull(f'{pebble_dir}/test')
         assert not pathlib.Path(tf.name).exists()
+
 
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
