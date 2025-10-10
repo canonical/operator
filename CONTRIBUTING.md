@@ -88,19 +88,15 @@ To build the docs:
 make -C docs html
 ```
 
-This generates HTML docs in the `docs/_build` directory. To view the docs, run a web server in the `docs/_build` directory:
+This generates HTML docs in the `docs/_build` directory.
 
-```sh
-uvx --directory docs/_build python -m http.server
-```
-
-Then open http://localhost:8000 in your browser.
-
-Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
+To view the docs, you'll need to serve the docs locally. The easiest way is to run the following command instead of `make -C docs html`:
 
 ```sh
 make -C docs run
 ```
+
+This serves the docs locally and automatically refreshes them whenever you edit a file.
 
 ## How to document version dependencies
 
