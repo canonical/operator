@@ -162,23 +162,25 @@ def test_charm_runs(my_charm):
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
 
-## Test a function that takes a charm instance
+## Accessing the charm instance
 
-A function might take the charm as a parameter to extract charm state or charm relation 
-information. To test such functions, you can use the `testing.Context` instance as a context
-manager, and then access `mgr.charm`. You should generally use an event the charm doesn't observe,
-for example, `update_status`:
+If you need to access the charm instance in a test, use the `testing.Context` instance as a context manager, then access `mgr.charm`. When setting up the context manager, use an event the charm doesn't observe, such as `update_status`. For example:
 
 ```python
-# Example function to test that takes the charm as an argument
-def get_relations_count(charm: MyCharm):
-    return len(charm.model.relations.get("my-relation", []))
+# Charm code
 
-# Test for the function that takes the charm as an argument
-def test_get_relations_count():
-    ctx = testing.Context(my_charm)
-    state_in = testing.State(relations=[])
-    with ctx(ctx.on.update_status(), state_in) as mgr: # use any hook event here
-        result = get_relations_count(mgr.charm)
-        assert result == 0
+class Charm(CharmBase):
+    def workload_is_ready(self):
+        ...  # Some business logic.
+        return True
+
+
+# Testing code
+
+def test_charm_reports_workload_ready():
+    ctx = testing.Context(Charm)
+    state_in = testing.State(...)  # Some state to represent a ready workload.
+    with ctx(ctx.on.update_status(), state_in) as mgr:
+        assert mgr.charm.workload_is_ready()
+        ...
 ```
