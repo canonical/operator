@@ -371,7 +371,9 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
     ):
         client.push(f'{pebble_dir}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
         tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        # Patch get_response to force a ProtocolError exception.
         monkeypatch.setattr(pebble._FilesParser, 'get_response', lambda self: None)  # type: ignore
+        # Use our previously created temp dir so we can verify that it gets cleaned up.
         monkeypatch.setattr(tempfile, 'NamedTemporaryFile', lambda *args, **kwargs: tf)  # type: ignore
         with pytest.raises(pebble.ProtocolError):
             client.pull(f'{pebble_dir}/test')
