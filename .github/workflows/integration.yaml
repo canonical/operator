@@ -52,7 +52,8 @@ jobs:
           - 3.6/stable
           # Juju 4.0 beta 6 doesn't support actions.
           # https://discourse.charmhub.io/t/the-juju-insider-mongoless-beta/18383
-          # - 4.0/beta
+          # Testing 4.0 beta 7
+          - 4.0/beta
 
     continue-on-error: ${{ matrix.juju-channel == '4.0/beta' }}
 

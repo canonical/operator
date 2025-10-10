@@ -103,7 +103,8 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
         assert secret.rotation == "daily"
         assert info['rotation'] == "SecretRotate.DAILY"
         assert secret.rotates  # approx 24h from now
-        assert info['rotates'] is None
+        # It seems that Juju coerces the result values to strings.
+        assert info['rotates'] == 'None'
 
 
 @pytest.fixture
