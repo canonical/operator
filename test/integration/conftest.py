@@ -25,7 +25,7 @@ import minio
 import pytest
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def juju() -> Generator[jubilant.Juju]:
     """Make a Juju model for testing."""
     with jubilant.temp_model() as juju:

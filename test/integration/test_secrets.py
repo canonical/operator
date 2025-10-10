@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import datetime
 from typing import Callable, cast
 
 import jubilant
@@ -57,11 +58,63 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     assert secret.content == {'foo': 'bar'}
 
 
+@pytest.mark.parametrize(
+    'fields',
+    [
+        '',
+        'label',
+        'description',
+        'expire',
+        'rotate',
+        'label,description',
+        'description,expire,rotate',
+        'label,description,expire,rotate',
+    ],
+)
+def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
+    rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
+    result = cast(Result, rv.results)
+    assert not result.get('exception')
+
+    assert 'secretid' in result
+    assert 'after' in result
+    assert result['after']
+    assert result['after']['info']
+    info = result['after']['info']
+
+    secrets = juju.secrets()
+    secret = juju.show_secret(secrets[0].uri, reveal=True)
+
+    assert secret.uri
+    assert secret.revision == 1
+    assert secret.content == {'foo': 'bar'}
+    assert secret.owner == 'test-secrets'
+
+    if 'label' in fields:
+        assert secret.label == 'label'
+        assert info['label'] == 'label'
+    if 'description' in fields:
+        assert secret.description == 'description'
+        assert info['description'] == 'description'
+    if 'expire' in fields:
+        assert secret.expires == '2020-01-01T00:00:00Z'
+        assert info['expires'] == '2020-01-01 00:00:00+00:00'
+    if 'rotate' in fields:
+        assert secret.rotation == "daily"
+        assert info['rotation'] == "SecretRotate.DAILY"
+        assert secret.rotates  # approx 24h from now
+        assert info['rotates'] is None
+
+
 @pytest.fixture
-def cleanup(juju: jubilant.Juju) -> None:
+def cleanup(juju: jubilant.Juju, leader: str) -> None:
     secrets = juju.secrets()
     for secret in secrets:
-        juju.remove_secret(secret.uri)
+        if secret.owner == "test-secrets":
+            juju.exec(f'secret-remove {secret.uri}', unit=leader)
+        else:
+            # Later, there could be user secrets too.
+            juju.remove_secret(secret.uri)
 
 
 @pytest.fixture
