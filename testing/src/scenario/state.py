@@ -452,7 +452,9 @@ class Address(_max_posargs(1)):
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
-    addresses: Sequence[Address]
+    # This has the 'ops.testing.' prefix so that Sphinx knows which
+    # 'Address' class it is (it's not the one from 'hookcmds').
+    addresses: Sequence[ops.testing.Address]
     """The addresses in the space."""
     interface_name: str = ''
     """The name of the network interface."""
