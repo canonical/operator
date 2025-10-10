@@ -90,11 +90,11 @@ Now, in the body of the charm definition, define the event handler, or adjust an
 ```
 def _update_configuration(self, event: ops.EventBase):
     """Update the workload configuration."""
-    # This handler is called on storage-attached.
+    # This handler is called when the storage-attached event happens.
     # Depending on the charm, it might also be called on other events.
     cache = self.model.storages["cache"]
     if not cache:
-        # We aren't handling storage-attached. Return and wait for storage-attached.
+        # The storage-attached event hasn't happened yet.
         logger.info("Storage is not yet ready.")
         return
     try:
