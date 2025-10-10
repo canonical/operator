@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import tempfile
 import threading
@@ -362,6 +363,18 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         yield pebble_dir
         shutil.rmtree(pebble_dir)
 
+    def test_temp_files_cleaned_up_on_failed_pull(self,
+        pebble_dir: str,
+        client: PebbleClientType,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        client.push(f'{pebble_dir}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
+        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        monkeypatch.setattr(pebble._FilesParser, 'get_response', lambda *args, **kwargs: None)
+        monkeypatch.setattr(tempfile, 'NamedTemporaryFile', lambda *args, **kwargs: tf)
+        with pytest.raises(pebble.ProtocolError):
+            client.pull(f'{pebble_dir}/test')
+        assert not pathlib.Path(tf.name).exists()
 
 @pytest.mark.skipif(
     os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
