@@ -22,7 +22,7 @@ jobs:
             commit: 046b8ce758660d5aa9cf05207e2370fcbab688d0  # 2021-12-16T10:10:24Z
     steps:
       - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 

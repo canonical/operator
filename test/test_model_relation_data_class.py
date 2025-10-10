@@ -122,8 +122,8 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 
 class MyCharm(BaseTestCharm):
-    encoder = nested_encode
-    decoder = nested_decode
+    encoder = staticmethod(nested_encode)
+    decoder = staticmethod(nested_decode)
 
     @property
     def databag_class(self) -> type[DatabagProtocol]:
@@ -747,8 +747,8 @@ class _CommonTypesDataclass:
 
 
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
-    encoder = json_ip_and_country_encode
-    decoder = json_ip_decode
+    encoder = staticmethod(json_ip_and_country_encode)
+    decoder = staticmethod(json_ip_decode)
 
     @property
     def databag_class(self):
@@ -767,7 +767,7 @@ if pydantic:
         origin: Country
 
     class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
-        encoder = json_ip_and_country_encode
+        encoder = staticmethod(json_ip_and_country_encode)
 
         @property
         def databag_class(self):
