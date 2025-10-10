@@ -349,20 +349,6 @@ class TestRealPebble:
         identities = client.get_identities()
         assert len(identities) == 0
 
-
-@pytest.mark.skipif(
-    os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
-    reason='RUN_REAL_PEBBLE_TESTS not set',
-)
-class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
-    @pytest.fixture
-    def pebble_dir(self):
-        pebble_path = os.getenv('PEBBLE')
-        assert pebble_path is not None
-        pebble_dir = tempfile.mkdtemp(dir=pebble_path)
-        yield pebble_dir
-        shutil.rmtree(pebble_dir)
-
     def test_temp_files_cleaned_up_on_failed_pull(
         self,
         pebble_dir: str,
@@ -378,6 +364,20 @@ class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
         with pytest.raises(pebble.ProtocolError):
             client.pull(f'{pebble_dir}/test')
         assert not pathlib.Path(tf.name).exists()
+
+
+@pytest.mark.skipif(
+    os.getenv('RUN_REAL_PEBBLE_TESTS') != '1',
+    reason='RUN_REAL_PEBBLE_TESTS not set',
+)
+class TestPebbleStorageAPIsUsingRealPebble(PebbleStorageAPIsTestMixin):
+    @pytest.fixture
+    def pebble_dir(self):
+        pebble_path = os.getenv('PEBBLE')
+        assert pebble_path is not None
+        pebble_dir = tempfile.mkdtemp(dir=pebble_path)
+        yield pebble_dir
+        shutil.rmtree(pebble_dir)
 
 
 @pytest.mark.skipif(
