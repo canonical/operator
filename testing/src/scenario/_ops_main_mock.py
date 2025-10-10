@@ -16,6 +16,7 @@ from typing import (
     Generic,
     Sequence,
     cast,
+    Union,
 )
 
 import ops
@@ -56,7 +57,7 @@ logger = scenario_logger.getChild('ops_main_mock')
 class UnitStateDB:
     """Wraps the unit-state database with convenience methods for adjusting the state."""
 
-    def __init__(self, underlying_store: ops.storage.SQLiteStorage):
+    def __init__(self, underlying_store: ops.storage.SQLiteStorage | ops.storage.JujuStorage):
         self._db = underlying_store
 
     def get_stored_states(self) -> frozenset[StoredState]:
@@ -78,22 +79,20 @@ class UnitStateDB:
         """Load any DeferredEvent data structures from the db."""
         db = self._db
         deferred: list[DeferredEvent] = []
-        for handle_path in db.list_snapshots():
-            if EVENT_REGEX.match(handle_path):
-                notices = db.notices(handle_path)
-                for handle, owner, observer in notices:
-                    try:
-                        snapshot_data = db.load_snapshot(handle)
-                    except ops.storage.NoSnapshotError:
-                        snapshot_data: dict[str, Any] = {}
+        for handle, owner, observer in sorted(db.notices(), key=lambda n: n[0]):
+            if EVENT_REGEX.match(handle):
+                try:
+                    snapshot_data = db.load_snapshot(handle)
+                except ops.storage.NoSnapshotError:
+                    snapshot_data: dict[str, Any] = {}
 
-                    event = DeferredEvent(
-                        handle_path=handle,
-                        owner=owner,
-                        observer=observer,
-                        snapshot_data=snapshot_data,
-                    )
-                    deferred.append(event)
+                event = DeferredEvent(
+                    handle_path=handle,
+                    owner=owner,
+                    observer=observer,
+                    snapshot_data=snapshot_data,
+                )
+                deferred.append(event)
 
         return deferred
 
