@@ -60,6 +60,7 @@ $(VENVDIR): requirements.txt ../uv.lock
 	@test -d $(VENVDIR) || uv venv --python 3.11 $(VENVDIR)
 	uv pip install --directory $(VENVDIR) --requirements ../../requirements.txt
 	uv pip install --directory $(VENVDIR) "ops[testing,tracing] @ ../../.."
+	uv pip install --directory $(VENVDIR) rst2html vale
 	@touch $(VENVDIR)
 
 pa11y-install:

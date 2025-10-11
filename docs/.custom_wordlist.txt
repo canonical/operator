@@ -1,0 +1,15 @@
+# Leave a blank line at the end of this file to support concatenation
+backoff
+databag
+databags
+dict's
+failover
+manpages
+misconfiguration
+pydantic
+pytest
+repo
+storages
+traceback
+Wordpress
+zizmor
