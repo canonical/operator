@@ -1,17 +1,13 @@
-name: Docs
+name: Docs links
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_call:
 
 permissions: {}
 
 jobs:
-  docs-spelling:
-    name: Spelling
+  docs-linkcheck:
+    name: Links
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -19,5 +15,5 @@ jobs:
           persist-credentials: false
       - name: Set up uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
-      - name: Check spelling
-        run: make -C docs spelling
+      - name: Check links
+        run: make -C docs linkcheck
