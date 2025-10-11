@@ -258,7 +258,9 @@ redirects = {}
 # TODO: Remove or adjust the ACME entry after you update the contributing guide
 
 linkcheck_ignore = [
-    "http://127.0.0.1:8000"
+    r"https://matrix\.to/#/",
+    r"https://documentation\.ubuntu\.com/pebble/reference/api/#/",
+    r"https://documentation\.ubuntu\.com/juju/3\.6/reference/hook-command/list-of-hook-commands/#list-of-hook-commands",
 ]
 
 
