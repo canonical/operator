@@ -51,18 +51,19 @@ SKIP = {
     'grafana-k8s-operator',
     # This has a redirect, which is too complicated to handle for now.
     'bundle-jupyter',
-    # The charms are in a subfolder, which this can't handle yet.
-    'jimm',
-    'notebook-operators',
-    'argo-operators',
-    'k8s-operator',
-    'vault-k8s-operator',
     # Not ops.
     'charm-prometheus-libvirt-exporter',
     'juju-dashboard',
     'charm-openstack-service-checks',
     # Maintenance mode / archived.
     'charm-sysconfig',
+}
+CHARM_ROOTS = {
+    'argo-operators': ['charms/argo-controller'],
+    'jimm': ['charms/jimm'],
+    'k8s-operator': ['charms/worker', 'charms/worker/k8s'],
+    'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
+    'vault-k8s-operator': ['k8s', 'machine'],
 }
 
 
@@ -134,8 +135,17 @@ def main():
     charms.sort()
     with WORKFLOW.open('r') as f:
         workflow = f.read()
-    repos = '\n'.join(f'          - charm-repo: canonical/{charm}' for charm in charms)
-    workflow = re.sub(r'(\s{10}- charm-repo: \S+\n)+', repos + '\n', workflow, count=1)
+    items: list[str] = []
+    for charm in charms:
+        for root in CHARM_ROOTS.get(charm, ['.']):
+            item = """
+          - charm-repo: canonical/{repo}
+            charm-root: {root}
+""".strip('\n').format(repo=charm, root=root)
+            items.append(item)
+    target = r'(\s{10}- charm-repo: \S+\n\s{10}  charm-root: \S+\n)+'
+    replacement = '\n'.join(items) + '\n'
+    workflow = re.sub(target, replacement, workflow, count=1)
     with WORKFLOW.open('w') as f:
         f.write(workflow)
 

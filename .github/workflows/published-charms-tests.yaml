@@ -17,52 +17,162 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - charm-repo: canonical/admission-webhook-operator
+            charm-root: .
           - charm-repo: canonical/airbyte-k8s-operator
+            charm-root: .
           - charm-repo: canonical/airbyte-ui-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/aproxy-operator
+            charm-root: .
+          - charm-repo: canonical/argo-operators
+            charm-root: charms/argo-controller
+          - charm-repo: canonical/catalogue-k8s-operator
+            charm-root: .
           - charm-repo: canonical/charm-ubuntu
+            charm-root: .
+          - charm-repo: canonical/charm-weebl
+            charm-root: .
           - charm-repo: canonical/content-cache-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/cos-lite-bundle
+            charm-root: .
           - charm-repo: canonical/dex-auth-operator
+            charm-root: .
           - charm-repo: canonical/digest-squid-auth-helper
+            charm-root: .
           - charm-repo: canonical/discourse-k8s-operator
+            charm-root: .
           - charm-repo: canonical/grafana-agent-k8s-operator
+            charm-root: .
           - charm-repo: canonical/hardware-observer-operator
+            charm-root: .
+          - charm-repo: canonical/hockeypuck-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/httprequest-lego-provider
+            charm-root: .
           - charm-repo: canonical/hydra-operator
+            charm-root: .
           - charm-repo: canonical/identity-platform-login-ui-operator
+            charm-root: .
           - charm-repo: canonical/indico-operator
+            charm-root: .
           - charm-repo: canonical/jenkins-agent-k8s-operator
+            charm-root: .
           - charm-repo: canonical/jenkins-agent-operator
+            charm-root: .
+          - charm-repo: canonical/jimm
+            charm-root: charms/jimm
+          - charm-repo: canonical/k8s-operator
+            charm-root: charms/worker
+          - charm-repo: canonical/k8s-operator
+            charm-root: charms/worker/k8s
+          - charm-repo: canonical/kafka-k8s-operator
+            charm-root: .
           - charm-repo: canonical/kafka-operator
+            charm-root: .
+          - charm-repo: canonical/katib-operators
+            charm-root: .
+          - charm-repo: canonical/kfp-operators
+            charm-root: .
+          - charm-repo: canonical/kfp-operators
+            charm-root: .
           - charm-repo: canonical/kratos-operator
+            charm-root: .
           - charm-repo: canonical/kubeflow-profiles-operator
+            charm-root: .
+          - charm-repo: canonical/kubeflow-volumes-operator
+            charm-root: .
+          - charm-repo: canonical/kyuubi-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/lego-operator
+            charm-root: .
           - charm-repo: canonical/livepatch-k8s-operator
+            charm-root: .
           - charm-repo: canonical/loki-k8s-operator
+            charm-root: .
           - charm-repo: canonical/manual-tls-certificates-operator
+            charm-root: .
           - charm-repo: canonical/mongodb-k8s-operator
+            charm-root: .
           - charm-repo: canonical/mongodb-operator
+            charm-root: .
           - charm-repo: canonical/mysql-router-k8s-operator
-          - charm-repo: canonical/namecheap-lego-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/netbox-k8s-operator
+            charm-root: .
           - charm-repo: canonical/nginx-ingress-integrator-operator
+            charm-root: .
+          - charm-repo: canonical/notebook-operators
+            charm-root: charms/jupyter-controller
+          - charm-repo: canonical/notebook-operators
+            charm-root: charms/jupyter-ui
+          - charm-repo: canonical/notebook-operators
+            charm-root: charms/jupyter-controller
+          - charm-repo: canonical/notebook-operators
+            charm-root: charms/jupyter-ui
           - charm-repo: canonical/oathkeeper-operator
+            charm-root: .
           - charm-repo: canonical/oauth2-proxy-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/oidc-gatekeeper-operator
+            charm-root: .
           - charm-repo: canonical/openfga-operator
+            charm-root: .
           - charm-repo: canonical/openstack-exporter-operator
+            charm-root: .
+          - charm-repo: canonical/parca-agent-operator
+            charm-root: .
+          - charm-repo: canonical/parca-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/parca-scrape-target-operator
+            charm-root: .
           - charm-repo: canonical/pgbouncer-k8s-operator
+            charm-root: .
           - charm-repo: canonical/ranger-k8s-operator
-          - charm-repo: canonical/route53-lego-k8s-operator
+            charm-root: .
           - charm-repo: canonical/s3-integrator
+            charm-root: .
           - charm-repo: canonical/saml-integrator-operator
+            charm-root: .
           - charm-repo: canonical/seldon-core-operator
+            charm-root: .
           - charm-repo: canonical/self-signed-certificates-operator
+            charm-root: .
           - charm-repo: canonical/smtp-integrator-operator
+            charm-root: .
+          - charm-repo: canonical/spark-history-server-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/spark-integration-hub-k8s-operator
+            charm-root: .
           - charm-repo: canonical/superset-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/tempo-coordinator-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/tempo-worker-k8s-operator
+            charm-root: .
           - charm-repo: canonical/temporal-admin-k8s-operator
+            charm-root: .
           - charm-repo: canonical/temporal-k8s-operator
+            charm-root: .
           - charm-repo: canonical/temporal-ui-k8s-operator
+            charm-root: .
           - charm-repo: canonical/temporal-worker-k8s-operator
+            charm-root: .
           - charm-repo: canonical/traefik-k8s-operator
+            charm-root: .
           - charm-repo: canonical/trino-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/vault-k8s-operator
+            charm-root: k8s
+          - charm-repo: canonical/vault-k8s-operator
+            charm-root: machine
           - charm-repo: canonical/wordpress-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/zookeeper-k8s-operator
+            charm-root: .
           - charm-repo: canonical/zookeeper-operator
+            charm-root: .
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v5
@@ -74,6 +184,7 @@ jobs:
         run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
+        working-directory: ${{ matrix.charm-root }}
         run: |
           if [ -e "test-requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
@@ -112,11 +223,13 @@ jobs:
 
       - name: Run the charm's unit tests
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
+        working-directory: ${{ matrix.charm-root }}
         run: tox -vve unit
 
       - name: Check for tox static environment
         id: has-static
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: ${{ matrix.charm-root }}
         run: |
           if tox list --no-desc | grep '^static$'; then
             echo 'static=true' >> "$GITHUB_OUTPUT"
@@ -126,6 +239,7 @@ jobs:
 
       - name: Run the charm's static tests
         if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static == 'true' }}
+        working-directory: ${{ matrix.charm-root }}
         run: tox -vve static
 
 
