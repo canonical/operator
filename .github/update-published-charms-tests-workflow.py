@@ -125,7 +125,11 @@ def url_to_charm_name(url: str | None):
 def main():
     """Update the workflow file."""
     logging.basicConfig(level=logging.INFO)
-    charms = [url_to_charm_name(get_source_url(package['name'])) for package in packages()]
+    if (charms_file := pathlib.Path('charms.json')).exists():
+        charms = json.loads(charms_file.read_text())
+    else:
+        charms = [url_to_charm_name(get_source_url(package['name'])) for package in packages()]
+        charms_file.write_text(json.dumps(charms))
     charms = [charm for charm in charms if charm and charm not in SKIP]
     charms.sort()
     with WORKFLOW.open('r') as f:
