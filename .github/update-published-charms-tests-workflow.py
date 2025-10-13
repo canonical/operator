@@ -87,7 +87,7 @@ def get_source_url(charm: str):
         ) as response:
             data = json.loads(response.read().decode())
             return data['result']['links']['source'][0]
-    except (urllib.error.HTTPError, KeyError):
+    except (urllib.error.HTTPError, KeyError, IndexError):
         pass
     logger.info("Looking for a 'bugs-url' URL for %s", charm)
     try:
