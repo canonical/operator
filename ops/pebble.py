@@ -2639,32 +2639,30 @@ class Client:
                 raise ProtocolError(f'invalid boundary {boundary!r}')
 
             parser = _FilesParser(boundary)
+            try:
+                while True:
+                    chunk = response.read(self._chunk_size)
+                    if not chunk:
+                        break
+                    parser.feed(chunk)
 
-            while True:
-                chunk = response.read(self._chunk_size)
-                if not chunk:
-                    break
-                parser.feed(chunk)
+                resp = parser.get_response()
+                if resp is None:
+                    raise ProtocolError('no "response" field in multipart body')
+                self._raise_on_path_error(resp, path)
 
-            resp = parser.get_response()
-            if resp is None:
-                raise ProtocolError('no "response" field in multipart body')
-            self._raise_on_path_error(resp, path)
+                filenames = parser.filenames()
+                if not filenames:
+                    raise ProtocolError('no file content in multipart response')
+                elif len(filenames) > 1:
+                    raise ProtocolError('single file request resulted in a multi-file response')
 
-            filenames = parser.filenames()
-            if not filenames:
-                raise ProtocolError('no file content in multipart response')
-            elif len(filenames) > 1:
-                raise ProtocolError('single file request resulted in a multi-file response')
-
-            filename = filenames[0]
-            if filename != path:
-                raise ProtocolError(f'path not expected: {filename!r}')
-
-            f = parser.get_file(path, encoding)
-
-            parser.remove_files()
-            return f
+                filename = filenames[0]
+                if filename != path:
+                    raise ProtocolError(f'path not expected: {filename!r}')
+                return parser.get_file(path, encoding)
+            finally:
+                parser.remove_files()
 
     @staticmethod
     def _raise_on_path_error(resp: _FilesResponse, path: str):
