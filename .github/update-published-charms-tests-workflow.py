@@ -68,12 +68,14 @@ SKIP = {
 
 def packages():
     """Get the list of published charms from Charmhub."""
+    if (packages_file := pathlib.Path('packages.json')).exists():
+        return json.loads(packages_file.read_text())['packages']
     logger.info('Fetching the list of published charms')
     url = 'https://charmhub.io/packages.json'
     with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 (unsafe URL)
         data = response.read().decode()
-        packages = json.loads(data)['packages']
-    return packages
+    packages_file.write_text(data)
+    return json.loads(data)['packages']
 
 
 def get_source_url(charm: str):
