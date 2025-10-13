@@ -130,13 +130,14 @@ def main():
         charms = json.loads(charms_file.read_text())
     else:
         charms = [url_to_charm_name(get_source_url(package['name'])) for package in packages()]
+        charms = sorted({charm for charm in charms if charm})
         charms_file.write_text(json.dumps(charms))
-    charms = [charm for charm in charms if charm and charm not in SKIP]
-    charms.sort()
     with WORKFLOW.open('r') as f:
         workflow = f.read()
     items: list[str] = []
     for charm in charms:
+        if charm in SKIP:
+            continue
         for root in CHARM_ROOTS.get(charm, ['.']):
             item = """
           - charm-repo: canonical/{repo}
