@@ -283,6 +283,45 @@ def test_credential_get(run: Run):
     assert result.name == 'test'
 
 
+def test_credential_get_all(run: Run):
+    cred = {
+        'auth-type': 'certificate',
+        'attrs': {'client-cert': 'foo', 'client-key': 'bar', 'server-cert': 'baz'},
+        'redacted': ['foo'],
+    }
+    spec: dict[str, Any] = {
+        'type': 'cloud',
+        'name': 'test',
+        'region': 'pacific',
+        'endpoint': 'end',
+        'identity-endpoint': 'id-end',
+        'storage-endpoint': 'stor-end',
+        'credential': cred,
+        'cacertificates': ['cert1', 'cert2'],
+        'skip-tls-verify': True,
+        'is-controller-cloud': True,
+    }
+    run.handle(['credential-get', '--format=json'], stdout=json.dumps(spec))
+    result = hookcmds.credential_get()
+    assert result.type == 'cloud'
+    assert result.name == 'test'
+    assert result.region == 'pacific'
+    assert result.endpoint == 'end'
+    assert result.identity_endpoint == 'id-end'
+    assert result.storage_endpoint == 'stor-end'
+    assert result.credential is not None
+    assert result.credential.auth_type == 'certificate'
+    assert result.credential.attributes == {
+        'client-cert': 'foo',
+        'client-key': 'bar',
+        'server-cert': 'baz',
+    }
+    assert result.credential.redacted == ['foo']
+    assert result.ca_certificates == ['cert1', 'cert2']
+    assert result.skip_tls_verify is True
+    assert result.is_controller_cloud is True
+
+
 def test_goal_state(run: Run):
     gs = {
         'units': {'my-unit/0': {'status': 'active', 'since': '2025-08-28T13:20:00'}},
