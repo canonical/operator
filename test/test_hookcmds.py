@@ -560,7 +560,7 @@ def test_secret_add_date(run: Run, mock_temp_dir: str):
 
 
 @pytest.mark.parametrize('peek,refresh', [(False, False), (False, True), (True, False)])
-def test_secret_get_id(run: Run, peek: bool, refresh: bool):
+def test_secret_get_by_id(run: Run, peek: bool, refresh: bool):
     cmd = ['secret-get', '--format=json', 'secret:123']
     if peek:
         cmd.append('--peek')
@@ -574,7 +574,7 @@ def test_secret_get_id(run: Run, peek: bool, refresh: bool):
 
 
 @pytest.mark.parametrize('peek,refresh', [(False, False), (False, True), (True, False)])
-def test_secret_get_label(run: Run, peek: bool, refresh: bool):
+def test_secret_get_by_label(run: Run, peek: bool, refresh: bool):
     cmd = ['secret-get', '--format=json', '--label', 'lbl']
     if peek:
         cmd.append('--peek')
