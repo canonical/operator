@@ -75,16 +75,20 @@ def secret_add(
     return stdout.strip()
 
 
+# It's possible to provide neither peek nor refresh, or one of them, but not both.
+# One or both of id and label must be provided.
 @overload
 def secret_get(
     *,
     id: str,
+    label: str | None = None,
     refresh: Literal[False] = False,
     peek: Literal[False] = False,
 ) -> dict[str, str]: ...
 @overload
 def secret_get(
     *,
+    id: str | None = None,
     label: str,
     refresh: Literal[False] = False,
     peek: Literal[False] = False,
@@ -93,12 +97,14 @@ def secret_get(
 def secret_get(
     *,
     id: str,
+    label: str | None = None,
     refresh: Literal[True],
     peek: Literal[False] = False,
 ) -> dict[str, str]: ...
 @overload
 def secret_get(
     *,
+    id: str | None = None,
     label: str,
     refresh: Literal[True],
     peek: Literal[False] = False,
@@ -107,12 +113,14 @@ def secret_get(
 def secret_get(
     *,
     id: str,
+    label: str | None = None,
     refresh: Literal[False] = False,
     peek: Literal[True],
 ) -> dict[str, str]: ...
 @overload
 def secret_get(
     *,
+    id: str | None = None,
     label: str,
     refresh: Literal[False] = False,
     peek: Literal[True],
@@ -126,7 +134,8 @@ def secret_get(
 ) -> dict[str, str]:
     """Get the content of a secret.
 
-    Either the ID or the label must be provided.
+    Either the ID or the label or both must be provided. If both are provided,
+    the secret is looked up by ID and the label is set to the one provided.
 
     For more details, see:
     `Juju | Hook commands | secret-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-get/>`_

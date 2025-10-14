@@ -627,6 +627,18 @@ def test_secret_get_by_label(run: Run, peek: bool, refresh: bool):
     assert result == {'foo': 'bar'}
 
 
+@pytest.mark.parametrize('peek,refresh', [(False, False), (False, True), (True, False)])
+def test_secret_get_set_label(run: Run, peek: bool, refresh: bool):
+    cmd = ['secret-get', '--format=json', 'secret:123', '--label', 'lbl']
+    if peek:
+        cmd.append('--peek')
+    if refresh:
+        cmd.append('--refresh')
+    run.handle(cmd, stdout='{"foo": "bar"}')
+    result = hookcmds.secret_get(id='secret:123', label='lbl', peek=peek, refresh=refresh)  # type: ignore
+    assert result == {'foo': 'bar'}
+
+
 def test_secret_grant(run: Run):
     run.handle(['secret-grant', '--relation', '1', 'id'])
     hookcmds.secret_grant('id', 1)
