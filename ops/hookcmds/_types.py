@@ -31,7 +31,7 @@ from ._utils import datetime_from_iso
 SecretRotate = Literal['never', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']
 SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
 ReadOnlyStatusName = Literal['error', 'unknown']
-StatusName: TypeAlias = 'SettableStatusName | ReadOnlyStatusName'
+StatusName: TypeAlias = SettableStatusName | ReadOnlyStatusName
 
 
 class AddressDict(TypedDict):
