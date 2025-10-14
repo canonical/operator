@@ -15,7 +15,7 @@ TODO:
 TODO:
 
 - Briefly introduce tinyproxy.
-- Briefly introduce how a machine charm works.
+- Briefly introduce how a machine charm works. TODO: Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the environment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
 - Summarise the experience the charm will provide - reverse proxy with a configurable slug.
 
 ## Set up your environment
@@ -86,10 +86,7 @@ description: |
   This charm demonstrates how to write a machine charm with Ops.
 ```
 
-TODO:
-
-- Do we need to edit `platforms` in charmcraft.yaml?
-- Save the file and quit nano.
+Then save the file and exit nano.
 
 ### Write a helper module
 
@@ -109,13 +106,9 @@ This has added the following Python packages to the `dependencies` list in `pypr
 - [`charmlibs-apt`](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt/) - A library for using APT to manage system packages. This is how your charm will install tinyproxy.
 - [`charmlibs-pathops`](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops/) - A file operations library, similar to `pathlib` from the standard library.
 
-TODO: Can we make these intersphinx links?
-
 Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
-"""Functions for interacting with tinyproxy."""
-
 import logging
 import os
 import re
@@ -219,7 +212,7 @@ def _get_pid() -> int | None:
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
 
-1. Receive an event from Juju. Later in the tutorial, we'll explain what this means in practice.
+1. Receive an event from Juju.
 2. Use the functions in the helper module to manage tinyproxy and check its status.
 3. Report the status back to Juju.
 
@@ -227,11 +220,31 @@ Notice that the helper module is stateless. In fact, your charm as a whole will 
 After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks.
 ```
 
+### Handle the install event
+
+We'll now start updating the charm code that handles events from Juju.
+
+In `src/charm.py`, replace the `_on_install` method with:
+
+```python
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Install tinyproxy on the machine."""
+        if not tinyproxy.is_installed():
+            tinyproxy.install()
+            version = tinyproxy.get_version()
+            self.unit.set_workload_version(version)
+```
+
+When your charm receives the "install" event from Juju, Ops runs this method and responds to Juju with the version of tinyproxy that's installed on the machine. Juju shows the tinyproxy version in its status output.
+
 ### Define a configuration option
 
-TODO: Add commentary to this section.
+We want to use the `juju config` command to change the configuration of tinyproxy, so we'll define a configuration option. We need to define the configuration option twice:
 
-`charmcraft.yaml`:
+1. In `charmcraft.yaml`, so that Juju and Ops know about the configuration option.
+2. In the charm code, so that Ops can validate values of the configuration option.
+
+First, in `charmcraft.yaml`, replace the `config` block with:
 
 ```yaml
 config:
@@ -241,6 +254,8 @@ config:
       default: example
       type: string
 ```
+
+TODO: Switch to Pydantic.
 
 `src/charm.py`:
 
@@ -256,87 +271,11 @@ class TinyproxyConfig:
         tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
 ```
 
-### Write the charm code (placeholder title)
+### Configure and start tinyproxy
 
-TODO: Split this section up, building the code in logical steps, with commentary. Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the environment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
-
-`src/charm.py`:
+TODO: Explain that we want the same thing to happen when starting tinyproxy for the first time or when the user changes the configuration.
 
 ```python
-"""Charm the application."""
-
-import dataclasses
-import logging
-import time
-
-import ops
-
-import tinyproxy
-
-logger = logging.getLogger(__name__)
-
-PORT = 8000
-
-
-@dataclasses.dataclass(frozen=True)
-class TinyproxyConfig:
-    """Schema for the charm's config options."""
-
-    slug: str = "example"
-    """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
-
-    def __post_init__(self):
-        tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
-
-
-class TinyproxyCharm(ops.CharmBase):
-    """Charm the application."""
-
-    def __init__(self, framework: ops.Framework) -> None:
-        super().__init__(framework)
-        framework.observe(self.on.collect_unit_status, self._on_collect_status)
-        framework.observe(self.on.install, self._on_install)
-        framework.observe(self.on.start, self._on_start)
-        framework.observe(self.on.config_changed, self._on_config_changed)
-        framework.observe(self.on.stop, self._on_stop)
-        framework.observe(self.on.remove, self._on_remove)
-
-    def _on_collect_status(self, event: ops.CollectStatusEvent):
-        """Report the status of tinyproxy (runs after each event)."""
-        try:
-            self.load_config(TinyproxyConfig)
-        except ValueError as e:
-            event.add_status(ops.BlockedStatus(str(e)))
-        if not tinyproxy.is_installed():
-            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
-        if not tinyproxy.is_running():
-            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to start"))
-        event.add_status(ops.ActiveStatus())
-
-    def _on_install(self, event: ops.InstallEvent) -> None:
-        """Install tinyproxy on the machine."""
-        if not tinyproxy.is_installed():
-            tinyproxy.install()
-            version = tinyproxy.get_version()
-            self.unit.set_workload_version(version)
-
-    def _on_start(self, event: ops.StartEvent) -> None:
-        """Handle start event."""
-        self.configure_and_restart()
-
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-        """Handle config-changed event."""
-        self.configure_and_restart()
-
-    def _on_stop(self, event: ops.StopEvent) -> None:
-        """Handle stop event."""
-        tinyproxy.stop()
-        self.wait_for_not_running()
-
-    def _on_remove(self, event: ops.RemoveEvent) -> None:
-        """Handle remove event."""
-        tinyproxy.uninstall()
-
     def configure_and_restart(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
         try:
@@ -363,6 +302,68 @@ class TinyproxyCharm(ops.CharmBase):
         raise RuntimeError("tinyproxy was not running within the expected time")
         # Raising a runtime error will put the charm into error status. The error message is for
         # you (the charm author) to see in the Juju logs, not for the user of the charm.
+```
+
+```python
+PORT = 8000
+```
+
+```python
+import time
+```
+
+```python
+        framework.observe(self.on.config_changed, self._on_config_changed)
+```
+
+```python
+    def _on_start(self, event: ops.StartEvent) -> None:
+        """Handle start event."""
+        self.configure_and_restart()
+```
+
+```python
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config-changed event."""
+        self.configure_and_restart()
+```
+
+### Report status to Juju
+
+```python
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
+```
+
+```python
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
+        """Report the status of tinyproxy (runs after each event)."""
+        try:
+            self.load_config(TinyproxyConfig)
+        except ValueError as e:
+            event.add_status(ops.BlockedStatus(str(e)))
+        if not tinyproxy.is_installed():
+            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
+        if not tinyproxy.is_running():
+            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to start"))
+        event.add_status(ops.ActiveStatus())
+```
+
+### Handle the stop and remove events
+
+```python
+        framework.observe(self.on.stop, self._on_stop)
+        framework.observe(self.on.remove, self._on_remove)
+```
+
+```python
+    def _on_stop(self, event: ops.StopEvent) -> None:
+        """Handle stop event."""
+        tinyproxy.stop()
+        self.wait_for_not_running()
+
+    def _on_remove(self, event: ops.RemoveEvent) -> None:
+        """Handle remove event."""
+        tinyproxy.uninstall()
 
     def wait_for_not_running(self) -> None:
         """Wait for tinyproxy to not be running."""
@@ -371,10 +372,6 @@ class TinyproxyCharm(ops.CharmBase):
                 return
             time.sleep(1)
         raise RuntimeError("tinyproxy was still running after the expected time")
-
-
-if __name__ == "__main__":  # pragma: nocover
-    ops.main(TinyproxyCharm)
 ```
 
 ## Try your charm

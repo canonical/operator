@@ -51,7 +51,7 @@ class TinyproxyCharm(ops.CharmBase):
         framework.observe(self.on.stop, self._on_stop)
         framework.observe(self.on.remove, self._on_remove)
 
-    def _on_collect_status(self, event: ops.CollectStatusEvent):
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         """Report the status of tinyproxy (runs after each event)."""
         try:
             self.load_config(TinyproxyConfig)
