@@ -71,7 +71,7 @@ Comparing these tests with `Harness` tests:
 A test consists of three broad steps:
 
 - **Arrange**:
-    - declare the context 
+    - declare the context
     - declare the input state
     - select an event to fire
 - **Act**:
@@ -165,7 +165,7 @@ been emitted, what statuses it went through, etc... Before we get there, we have
 Consider the following tests. Suppose we want to verify that while handling a given top-level Juju event:
 
 - a specific chain of (custom) events was emitted on the charm
-- the charm `juju-log`ged these specific strings
+- the charm logged these specific strings
 - the charm went through this sequence of app/unit statuses (e.g. `maintenance`, then `waiting`, then `active`)
 
 These types of test have a place in Scenario, but that is not State: the contents of the Juju log or

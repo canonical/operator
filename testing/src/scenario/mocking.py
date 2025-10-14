@@ -26,6 +26,7 @@ from typing import (
 )
 
 from ops import (
+    JujuContext,
     JujuVersion,
     pebble,
     SecretInfo,
@@ -35,7 +36,6 @@ from ops import (
     ModelError,
 )
 from ops._private.harness import ExecArgs, _TestingPebbleClient
-from ops.jujucontext import _JujuContext
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import Port as Port_Ops
 from ops.model import Secret as Secret_Ops  # lol
@@ -137,7 +137,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
         context: Context,
-        juju_context: _JujuContext,
+        juju_context: JujuContext,
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -253,6 +253,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         self._check_app_data_access(is_app)
+        data = self._relation_get(relation_id, member_name=member_name, is_app=is_app)
+        return data.copy()
+
+    def _relation_get(self, relation_id: int, member_name: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
         if is_app and member_name == self.app_name:
             return relation.local_app_data
@@ -405,7 +409,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         else:
             tgt = relation.local_unit_data
         for key, value in data.items():
-            tgt[key] = value
+            if value == '':
+                # Match the behavior of Juju, which is that setting the value to an
+                # empty string will remove the key entirely from the relation data.
+                tgt.pop(key, None)
+            else:
+                tgt[key] = value
 
     def secret_add(
         self,

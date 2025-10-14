@@ -32,7 +32,7 @@ import pytest
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 from test.test_helpers import FakeScript
@@ -75,7 +75,7 @@ def create_framework(
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
-        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
+        juju_debug_at=JujuContext._from_dict(os.environ).debug_at,
     )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)
@@ -2132,7 +2132,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
 
@@ -2281,7 +2280,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
