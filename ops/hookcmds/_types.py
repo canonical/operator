@@ -296,7 +296,7 @@ class SecretInfo:
             label=data.get('label'),
             description=data.get('description'),
             expiry=datetime_from_iso(data['expiry']) if data.get('expiry') else None,
-            rotation=data['rotation'] if data.get('rotation') else None,
+            rotation=data.get('rotation'),
             rotates=datetime_from_iso(data['rotates']) if data.get('rotates') else None,
             revision=data['revision'],
         )
