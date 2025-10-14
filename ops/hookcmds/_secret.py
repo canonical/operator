@@ -28,9 +28,9 @@ from ._types import SecretInfo, SecretRotate
 from ._utils import datetime_to_iso, run
 
 
-# We do not offer a `file` argument here as we expect that charms will generally
-# have the data to set in memory. We do always use `--file` ourselves, to ensure
-# that secret data does not end up in the command line.
+# The `--file` parameter is not exposed as we expect the content to be held in
+# memory when charming. Under the hook, `--file` is always used, to ensure that
+# secret data does not end up in the command line.
 def secret_add(
     content: dict[str, str],
     *,
