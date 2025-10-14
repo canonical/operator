@@ -18,10 +18,19 @@
 
 Charms that are not hosted on GitHub are skipped, as well as any charms where
 the source URL could not be found.
+
+When running locally, you can bypass issues with fetching charmhub.io/packages.json
+by saving the file locally and passing it via the `--packages` argument.
+
+The most expensive part of the script is fetching the individual charm urls from Charmhub.
+Make rerunning the script during development faster by directing the stdout of this script
+to a file when running it for the first time, and passing the file via the `--charms`
+argument on subsequent runs.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import pathlib
@@ -67,16 +76,14 @@ CHARM_ROOTS = {
 }
 
 
-def packages():
+def get_packages_from_charmhub():
     """Get the list of published charms from Charmhub."""
-    if (packages_file := pathlib.Path('packages.json')).exists():
-        return json.loads(packages_file.read_text())['packages']
     logger.info('Fetching the list of published charms')
     url = 'https://charmhub.io/packages.json'
     with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 (unsafe URL)
         data = response.read().decode()
-    packages_file.write_text(data)
-    return json.loads(data)['packages']
+        packages = json.loads(data)['packages']
+    return packages
 
 
 def get_source_url(charm: str):
@@ -126,12 +133,29 @@ def url_to_charm_name(url: str | None):
 def main():
     """Update the workflow file."""
     logging.basicConfig(level=logging.INFO)
-    if (charms_file := pathlib.Path('charms.json')).exists():
-        charms = json.loads(charms_file.read_text())
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--packages',
+        type=pathlib.Path,
+        help='A json file matching the format served by Charmhub.',
+    )
+    group.add_argument(
+        '--charms',
+        type=pathlib.Path,
+        help='A json file matching the format output by this script.',
+    )
+    args = parser.parse_args()
+    if args.charms:
+        charms = json.loads(args.charms.read_text())
     else:
-        charms = [url_to_charm_name(get_source_url(package['name'])) for package in packages()]
-        charms = sorted({charm for charm in charms if charm})
-        charms_file.write_text(json.dumps(charms))
+        if args.packages:
+            packages = json.loads(args.packages.read_text())['packages']
+        else:
+            packages = get_packages_from_charmhub()
+        charms = [url_to_charm_name(get_source_url(pkg['name'])) for pkg in packages]
+        charms = sorted({c for c in charms if c})
+    print(json.dumps(charms))
     with WORKFLOW.open('r') as f:
         workflow = f.read()
     items: list[str] = []
