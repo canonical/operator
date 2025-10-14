@@ -143,7 +143,7 @@ def main():
     group.add_argument(
         '--charms',
         type=pathlib.Path,
-        help='A json file matching the format output by this script.',
+        help='A JSON file matching the format output by this script.',
     )
     args = parser.parse_args()
     if args.charms:
