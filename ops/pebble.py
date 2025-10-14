@@ -2623,7 +2623,7 @@ class Client:
             PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
         """
-        path = os.fspath(path)
+        path = str(path)
         with tracer.start_as_current_span('pebble pull') as span:
             query = {
                 'action': 'read',
@@ -2712,7 +2712,7 @@ class Client:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
-        path = os.fspath(path)
+        path = str(path)
         with tracer.start_as_current_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2828,7 +2828,7 @@ class Client:
             PathError: if there was an error listing the directory; for example, if the directory
                 does not exist.
         """
-        path = os.fspath(path)
+        path = str(path)
         with tracer.start_as_current_span('pebble list_files') as span:
             query = {'path': path}
             if pattern:
@@ -2873,7 +2873,7 @@ class Client:
             PathError: if there was an error making the directory; for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
         """
-        path = os.fspath(path)
+        path = str(path)
         with tracer.start_as_current_span('pebble make_dir') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2901,7 +2901,7 @@ class Client:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
-        path = os.fspath(path)
+        path = str(path)
         with tracer.start_as_current_span('pebble remove_path') as span:
             info: dict[str, Any] = {'path': path}
             if recursive:
@@ -3128,7 +3128,7 @@ class Client:
                 'command': command,
                 'service-context': service_context,
                 'environment': environment or {},
-                'working-dir': os.fspath(working_dir) if working_dir is not None else None,
+                'working-dir': str(working_dir) if working_dir is not None else None,
                 'timeout': _format_timeout(timeout) if timeout is not None else None,
                 'user-id': user_id,
                 'user': user,
@@ -3564,7 +3564,7 @@ class _FilesParser:
 
     def get_file(self, path: str | pathlib.PurePath, encoding: str | None) -> _TextOrBinaryIO:
         """Return an open file object containing the data."""
-        path = os.fspath(path)
+        path = str(path)
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
