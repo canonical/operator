@@ -17,25 +17,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - charm-repo: canonical/admission-webhook-operator
-            charm-root: .
           - charm-repo: canonical/airbyte-k8s-operator
             charm-root: .
           - charm-repo: canonical/airbyte-ui-k8s-operator
             charm-root: .
-          - charm-repo: canonical/aproxy-operator
-            charm-root: .
           - charm-repo: canonical/argo-operators
             charm-root: charms/argo-controller
-          - charm-repo: canonical/catalogue-k8s-operator
-            charm-root: .
           - charm-repo: canonical/charm-ubuntu
             charm-root: .
-          - charm-repo: canonical/charm-weebl
-            charm-root: .
           - charm-repo: canonical/content-cache-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/cos-lite-bundle
             charm-root: .
           - charm-repo: canonical/dex-auth-operator
             charm-root: .
@@ -46,10 +36,6 @@ jobs:
           - charm-repo: canonical/grafana-agent-k8s-operator
             charm-root: .
           - charm-repo: canonical/hardware-observer-operator
-            charm-root: .
-          - charm-repo: canonical/hockeypuck-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/httprequest-lego-provider
             charm-root: .
           - charm-repo: canonical/hydra-operator
             charm-root: .
@@ -71,19 +57,9 @@ jobs:
             charm-root: .
           - charm-repo: canonical/kafka-operator
             charm-root: .
-          - charm-repo: canonical/katib-operators
-            charm-root: .
-          - charm-repo: canonical/kfp-operators
-            charm-root: .
           - charm-repo: canonical/kratos-operator
             charm-root: .
           - charm-repo: canonical/kubeflow-profiles-operator
-            charm-root: .
-          - charm-repo: canonical/kubeflow-volumes-operator
-            charm-root: .
-          - charm-repo: canonical/kyuubi-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/lego-operator
             charm-root: .
           - charm-repo: canonical/livepatch-k8s-operator
             charm-root: .
@@ -97,7 +73,7 @@ jobs:
             charm-root: .
           - charm-repo: canonical/mysql-router-k8s-operator
             charm-root: .
-          - charm-repo: canonical/netbox-k8s-operator
+          - charm-repo: canonical/namecheap-lego-k8s-operator
             charm-root: .
           - charm-repo: canonical/nginx-ingress-integrator-operator
             charm-root: .
@@ -109,21 +85,15 @@ jobs:
             charm-root: .
           - charm-repo: canonical/oauth2-proxy-k8s-operator
             charm-root: .
-          - charm-repo: canonical/oidc-gatekeeper-operator
-            charm-root: .
           - charm-repo: canonical/openfga-operator
             charm-root: .
           - charm-repo: canonical/openstack-exporter-operator
             charm-root: .
-          - charm-repo: canonical/parca-agent-operator
-            charm-root: .
-          - charm-repo: canonical/parca-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/parca-scrape-target-operator
-            charm-root: .
           - charm-repo: canonical/pgbouncer-k8s-operator
             charm-root: .
           - charm-repo: canonical/ranger-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/route53-lego-k8s-operator
             charm-root: .
           - charm-repo: canonical/s3-integrator
             charm-root: .
@@ -135,15 +105,7 @@ jobs:
             charm-root: .
           - charm-repo: canonical/smtp-integrator-operator
             charm-root: .
-          - charm-repo: canonical/spark-history-server-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/spark-integration-hub-k8s-operator
-            charm-root: .
           - charm-repo: canonical/superset-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/tempo-coordinator-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/tempo-worker-k8s-operator
             charm-root: .
           - charm-repo: canonical/temporal-admin-k8s-operator
             charm-root: .
@@ -162,8 +124,6 @@ jobs:
           - charm-repo: canonical/vault-k8s-operator
             charm-root: machine
           - charm-repo: canonical/wordpress-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/zookeeper-k8s-operator
             charm-root: .
           - charm-repo: canonical/zookeeper-operator
             charm-root: .
