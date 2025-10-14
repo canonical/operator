@@ -75,8 +75,6 @@ jobs:
             charm-root: .
           - charm-repo: canonical/kfp-operators
             charm-root: .
-          - charm-repo: canonical/kfp-operators
-            charm-root: .
           - charm-repo: canonical/kratos-operator
             charm-root: .
           - charm-repo: canonical/kubeflow-profiles-operator
@@ -103,10 +101,6 @@ jobs:
             charm-root: .
           - charm-repo: canonical/nginx-ingress-integrator-operator
             charm-root: .
-          - charm-repo: canonical/notebook-operators
-            charm-root: charms/jupyter-controller
-          - charm-repo: canonical/notebook-operators
-            charm-root: charms/jupyter-ui
           - charm-repo: canonical/notebook-operators
             charm-root: charms/jupyter-controller
           - charm-repo: canonical/notebook-operators
