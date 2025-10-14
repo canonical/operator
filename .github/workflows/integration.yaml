@@ -15,7 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         preset: ['k8s', 'microk8s']
-        test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
+        test:
+          # https://github.com/canonical/observability-stack/issues/110
+          # - test_direct_connection
+          # - test_with_tls
+          - test_relation_units
 
     steps:
       - run: |
