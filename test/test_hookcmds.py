@@ -421,7 +421,7 @@ def test_relation_get(run: Run, id: int | None, app: bool, unit: str | None):
     if app:
         cmd.append('--app')
     if unit:
-        cmd.append(unit)
+        cmd.extend(['-', unit])
     run.handle(cmd, stdout='{"foo": "bar"}')
     result = hookcmds.relation_get(id=id, app=app, unit=unit)
     assert result == {'foo': 'bar'}
@@ -437,8 +437,9 @@ def test_relation_get_key(run: Run, id: int | None, app: bool, unit: str | None)
     if app:
         cmd.append('--app')
     if unit:
-        cmd.append(unit)
-    cmd.append('baz')
+        cmd.extend(['baz', unit])
+    else:
+        cmd.append('baz')
     run.handle(cmd, stdout='"qux"')
     result = hookcmds.relation_get(key='baz', id=id, app=app, unit=unit)
     assert result == 'qux'

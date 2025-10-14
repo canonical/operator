@@ -71,9 +71,15 @@ def relation_get(
         args.extend(['-r', str(id)])
     if app:
         args.append('--app')
-    if unit is not None:
-        args.append(unit)
-    if key is not None:
+    if unit and key:
+        # If both a unit and a key are provided, the key must come first.
+        args.extend([key, unit])
+    elif unit and not key:
+        # If you provide a unit but no key, we need to put '-' as the key so
+        # that Juju knows to provide all keys.
+        args.extend(['-', unit])
+    elif key:
+        # The unit is not required when inside a relation hook other than relation-broken.
         args.append(key)
     stdout = run('relation-get', *args)
     if key is not None:
