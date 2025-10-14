@@ -138,7 +138,7 @@ def main():
     group.add_argument(
         '--packages',
         type=pathlib.Path,
-        help='A json file matching the format served by Charmhub.',
+        help='A JSON file matching the format served by Charmhub.',
     )
     group.add_argument(
         '--charms',
