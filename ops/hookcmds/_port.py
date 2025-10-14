@@ -172,6 +172,6 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
             protocol = protocol or 'tcp'
             port = int(port)
         if protocol not in ('tcp', 'udp', 'icmp'):
-            raise ValueError(f'Unexpected protocol from Juju: {protocol}')
+            raise RuntimeError(f'Unexpected protocol from Juju: {protocol}')
         ports.append(Port(protocol=protocol, port=port, to_port=to_port, endpoints=port_endpoints))
     return ports
