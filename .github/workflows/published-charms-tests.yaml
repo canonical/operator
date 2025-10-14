@@ -134,13 +134,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        profile: [machine, kubernetes]
+        charmcraft_channel: ["3.x/stable", "latest/edge"]
         include:
-          - profile: machine
-          - profile: kubernetes
-          - profile: simple
+          - charmcraft_channel: "3.x/stable"  # Last version to include "simple"
+            profile: simple
     steps:
       - name: Install charmcraft
-        run: sudo snap install charmcraft --classic
+        run: sudo snap install charmcraft --classic --channel={{ matrix.charmcraft_channel }}
 
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
