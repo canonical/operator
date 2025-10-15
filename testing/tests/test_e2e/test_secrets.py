@@ -666,19 +666,19 @@ def common_assertions(scenario_secret: Secret | None, result: Result):
         assert scenario_secret.owner == 'application'
         assert not scenario_secret.remote_grants
 
-        if result.get('after'):
-            info = result['after']['info']
-            # Verify that the unit and the scaffolding see the same data
-            assert scenario_secret.id == info['id']
-            assert scenario_secret.label == info['label']
-            assert scenario_secret._tracked_revision == info['revision']
-            assert scenario_secret._latest_revision == info['revision']
-            assert scenario_secret.expire == info['expires']
-            assert scenario_secret.rotate == info['rotation']
-            # https://github.com/canonical/operator/issues/2037
-            # assert scenario_secret.description == info['description']
-            # https://github.com/canonical/operator/issues/2104
-            assert info['rotates'] is None
+        assert result.get('after')
+        info = result['after']['info']
+        # Verify that the unit and the scaffolding see the same data
+        assert scenario_secret.id == info['id']
+        assert scenario_secret.label == info['label']
+        assert scenario_secret._tracked_revision == info['revision']
+        assert scenario_secret._latest_revision == info['revision']
+        assert scenario_secret.expire == info['expires']
+        assert scenario_secret.rotate == info['rotation']
+        # https://github.com/canonical/operator/issues/2037
+        # assert scenario_secret.description == info['description']
+        # https://github.com/canonical/operator/issues/2104
+        assert info['rotates'] is None
 
-            assert scenario_secret.tracked_content == result['after']['tracked']
-            assert scenario_secret.latest_content == result['after']['latest']
+        assert scenario_secret.tracked_content == result['after']['tracked']
+        assert scenario_secret.latest_content == result['after']['latest']
