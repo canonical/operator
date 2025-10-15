@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '42 7 25 * *'
+  pull_request:  # temporary
 
 permissions: {}
 
@@ -15,7 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         preset: ['k8s', 'microk8s']
-        test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
+        test:
+          # https://github.com/canonical/observability-stack/issues/110
+          # - test_direct_connection
+          # - test_with_tls
+          - test_relation_units
 
     steps:
       - run: |
@@ -35,3 +40,43 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
+
+  secrets:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        juju-channel:
+          - 3.1/stable
+          - 3.2/stable
+          - 3.3/stable
+          - 3.4/stable
+          - 3.5/stable
+          - 3.6/stable
+          # Juju 4.0 beta 6 doesn't support actions.
+          # https://discourse.charmhub.io/t/the-juju-insider-mongoless-beta/18383
+          # Testing 4.0 beta 7
+          - 4.0/beta
+
+    continue-on-error: ${{ matrix.juju-channel == '4.0/beta' }}
+
+    steps:
+      - run: |
+           # Work around https://github.com/jnsgruk/concierge/issues/30
+           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+           sudo rm -rf /run/containerd
+        if: matrix.preset == 'k8s'
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
+          -p microk8s
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6  # v6.6.1
+      - run: uv tool install tox --with tox-uv
+      - run: tox -e integration -- --log-cli-level=INFO -s test/integration/test_secrets.py
+        timeout-minutes: 20  # Juju 4 gets stuck while destroying the model

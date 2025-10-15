@@ -61,7 +61,7 @@ benchmark = [
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
-    "jubilant~=1.2",
+    "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
