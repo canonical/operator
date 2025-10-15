@@ -29,7 +29,7 @@ from ._utils import datetime_to_iso, run
 
 
 # The `--file` parameter is not exposed as we expect the content to be held in
-# memory when charming. Under the hook, `--file` is always used, to ensure that
+# memory when charming. Under the hood, `--file` is always used, to ensure that
 # secret data does not end up in the command line.
 def secret_add(
     content: dict[str, str],
