@@ -52,7 +52,7 @@ class Runtime:
         charm_root: str | Path | None = None,
         juju_version: str = '3.0.0',
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -75,8 +75,8 @@ class Runtime:
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
         }
 
-        if self._machine_id is not None:  # could be 0
-            env['JUJU_MACHINE_ID'] = str(self._machine_id)
+        if self._machine_id is not None:
+            env['JUJU_MACHINE_ID'] = self._machine_id
 
         if event._is_action_event and (action := event.action):
             env.update(

@@ -614,7 +614,7 @@ class Context(Generic[CharmType]):
         capture_framework_events: bool = False,
         app_name: str | None = None,
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
