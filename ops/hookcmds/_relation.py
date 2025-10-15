@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from typing import (
+    Literal,
     Mapping,
     cast,
     overload,
@@ -103,7 +104,11 @@ def relation_ids(name: str) -> list[str]:
     return result
 
 
-def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
+@overload
+def relation_list(id: int | None = None, *, app: Literal[True]) -> str: ...
+@overload
+def relation_list(id: int | None = None, *, app: Literal[False] = False) -> list[str]: ...
+def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str]:
     """List relation units.
 
     Note that ``id`` can only be ``None`` if the current hook is a relation
@@ -124,7 +129,7 @@ def relation_list(id: int | None = None, *, app: bool = False) -> list[str]:
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-list', *args)
-    result = cast('list[str]', json.loads(stdout))
+    result = cast('str', json.loads(stdout)) if app else cast('list[str]', json.loads(stdout))
     return result
 
 
