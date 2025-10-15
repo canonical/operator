@@ -35,7 +35,8 @@ import ops
 import ops.charm
 from ops import testing
 from ops._main import _Abort
-from ops.model import ModelError, StatusName
+from ops.hookcmds import StatusName
+from ops.model import ModelError
 
 from .test_helpers import FakeScript, create_framework
 
