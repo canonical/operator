@@ -72,11 +72,11 @@ class TinyproxyCharm(ops.CharmBase):
 
     def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        self.configure_and_restart()
+        self.configure_and_run()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config-changed event."""
-        self.configure_and_restart()
+        self.configure_and_run()
 
     def _on_stop(self, event: ops.StopEvent) -> None:
         """Handle stop event."""
@@ -87,7 +87,7 @@ class TinyproxyCharm(ops.CharmBase):
         """Handle remove event."""
         tinyproxy.uninstall()
 
-    def configure_and_restart(self) -> None:
+    def configure_and_run(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
         try:
             config = self.load_config(TinyproxyConfig)

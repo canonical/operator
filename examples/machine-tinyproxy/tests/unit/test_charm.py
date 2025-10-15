@@ -61,6 +61,9 @@ class MockTinyproxy:
     def reload_config(self) -> None:
         self.reloaded_config = True
 
+    def uninstall(self) -> None:
+        self.installed = False
+
 
 def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
     """Patch the helper module to use mock functions for interacting with tinyproxy."""
@@ -72,6 +75,7 @@ def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
     monkeypatch.setattr("charm.tinyproxy.start", tinyproxy.start)
     monkeypatch.setattr("charm.tinyproxy.stop", tinyproxy.stop)
     monkeypatch.setattr("charm.tinyproxy.reload_config", tinyproxy.reload_config)
+    monkeypatch.setattr("charm.tinyproxy.uninstall", tinyproxy.uninstall)
 
 
 def test_install(monkeypatch: pytest.MonkeyPatch):
@@ -81,10 +85,9 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy()
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-
+    state_in = testing.State()
     # Step 2. Simulate an event, in this case an install event.
-    state_out = ctx.run(ctx.on.install(), testing.State())
-
+    state_out = ctx.run(ctx.on.install(), state_in)
     # Step 3. Check the output state.
     assert state_out.workload_version is not None
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
@@ -103,9 +106,7 @@ def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
 def test_start(tinyproxy_installed: MockTinyproxy):
     """Test that the charm correctly handles the start event."""
     ctx = testing.Context(TinyproxyCharm)
-
     state_out = ctx.run(ctx.on.start(), testing.State())
-
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy_installed.is_running()
     assert tinyproxy_installed.config == (PORT, "example")
@@ -123,9 +124,7 @@ def test_config_changed(tinyproxy_configured: MockTinyproxy):
     """Test that the charm correctly handles the config-changed event."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo"})
-
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy_configured.is_running()
     assert tinyproxy_configured.config == (PORT, "foo")
@@ -142,9 +141,7 @@ def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: 
     """Test that the charm fails to start if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
-
     state_out = ctx.run(ctx.on.start(), state_in)
-
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
@@ -156,9 +153,7 @@ def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, inva
     """Test that the charm fails to change config if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
-
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
@@ -167,11 +162,19 @@ def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, inva
     assert not tinyproxy_configured.reloaded_config
 
 
-def test_stop(tinyproxy_installed: MockTinyproxy):
+def test_stop(tinyproxy_configured: MockTinyproxy):
     """Test that the charm correctly handles the stop event."""
     ctx = testing.Context(TinyproxyCharm)
-
     state_out = ctx.run(ctx.on.stop(), testing.State())
-
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
-    assert not tinyproxy_installed.is_running()
+    assert not tinyproxy_configured.is_running()
+
+
+def test_remove(tinyproxy_installed: MockTinyproxy):
+    """Test that the charm correctly handles the remove event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_out = ctx.run(ctx.on.remove(), testing.State())
+    assert state_out.unit_status == testing.MaintenanceStatus(
+        "Waiting for tinyproxy to be installed"
+    )
+    assert not tinyproxy_installed.is_installed()

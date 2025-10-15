@@ -1,9 +1,5 @@
 # Write a machine charm for tinyproxy
 
-```{important}
-This tutorial is a **work in progress**. Some steps don't work yet. For now, please use [](./write-your-first-machine-charm).
-```
-
 TODO:
 
 - What you'll need.
@@ -14,15 +10,15 @@ TODO:
 
 TODO:
 
-- Briefly introduce tinyproxy.
-- Briefly introduce how a machine charm works. TODO: Explain what "receiving an event" from Juju means in practice. Mention that the workload and charm code run on the same machine, called the "unit", but that the charm code is usually not running. Juju runs the charm code on demand, passing data in the environment, which represents an event to be processed. Ops provides a higher-level framework for handling events and responding to Juju.
-- Summarise the experience the charm will provide - reverse proxy with a configurable slug.
+- Briefly introduce tinyproxy. Introduce the term "workload".
+- Briefly introduce how a machine charm works. Mention that the workload and charm code run on the same machine, but that the charm code is usually not running. Explain that "receiving an event" means that Juju runs the charm code on demand, passing data in the environment. Ops provides a higher-level framework for handling events (based on the passed data) and responding to Juju.
+- Summarise the experience the charm will provide: a reverse proxy with a configurable slug.
 
 ## Set up your environment
 
 ### Create a virtual machine
 
-TODO:
+PRIMARY TODO:
 
 - Multipass
 - Suggest using nano to edit files.
@@ -30,11 +26,11 @@ TODO:
 
 ### Install Juju and charm development tools
 
-TODO: Charmcraft, Juju, LXD (all using Concierge)
+PRIMARY TODO: Charmcraft, Juju, LXD (all using Concierge)
 
 ### Install Python development tools
 
-TODO: uv (as an extra snap from Concierge), tox (with `uv tool`)
+PRIMARY TODO: uv (as an extra snap from Concierge), tox (with `uv tool`)
 
 ## Create a charm project
 
@@ -95,7 +91,9 @@ Charmcraft created `src/tinyproxy.py` as a placeholder helper module.
 
 The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. However, the helper module won't be a general-purpose wrapper for tinyproxy. The helper module will contain opinionated functions for managing tinyproxy on Ubuntu.
 
-The helper module will depend on some libraries that are useful when writing charms. Add the libraries to your charm's dependencies:
+The helper module will depend on some libraries that are useful when writing charms.
+
+To add the libraries to your charm's dependencies, run:
 
 ```text
 uv add charmlibs-apt charmlibs-pathops
@@ -178,7 +176,7 @@ def reload_config() -> None:
 
 
 def start() -> None:
-    """Start tinyproxy."""
+    """configure_and_runproxy."""
     subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
 
 
@@ -224,6 +222,8 @@ After adding code to your charm, run `tox -e format` to format the code. Then ru
 
 We'll now start updating the charm code that handles events from Juju.
 
+PRIMARY TODO: Mention the "charm class"
+
 In `src/charm.py`, replace the `_on_install` method with:
 
 ```python
@@ -239,12 +239,12 @@ When your charm receives the "install" event from Juju, Ops runs this method and
 
 ### Define a configuration option
 
-We want to use the `juju config` command to change the configuration of tinyproxy, so we'll define a configuration option. We need to define the configuration option twice:
+After deploying your charm, you'll use the `juju config` command to change the path of the reverse proxy, so we need to define a configuration option called `slug`. We'll do this in two places:
 
-1. In `charmcraft.yaml`, so that Juju and Ops know about the configuration option.
-2. In the charm code, so that Ops can validate values of the configuration option.
+- In `charmcraft.yaml`, to tell Juju and Ops about the configuration option.
+- In the charm code, to additionally tell Ops how to validate values of the configuration option.
 
-First, in `charmcraft.yaml`, replace the `config` block with:
+In `charmcraft.yaml`, replace the `config` block with:
 
 ```yaml
 config:
@@ -255,7 +255,7 @@ config:
       type: string
 ```
 
-TODO: Switch to Pydantic.
+PRIMARY TODO: Switch to Pydantic.
 
 `src/charm.py`:
 
@@ -271,12 +271,18 @@ class TinyproxyConfig:
         tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
 ```
 
-### Configure and start tinyproxy
+### Start tinyproxy and handle configuration changes
 
-TODO: Explain that we want the same thing to happen when starting tinyproxy for the first time or when the user changes the configuration.
+Your charm now needs a way to get the value of the `slug` configuration option, write a configuration file on the machine, then start tinyproxy:
+
+1. To get the value of `slug`, we'll use the `load_config` method that Ops provides. This method also validates the value of `slug` using the `TinyproxyConfig` class that we just defined.
+2. To write a configuration file, we'll use the `ensure_config` function from the helper module.
+3. To start tinyproxy, we'll use the `start` function from the helper module.
+
+In `src/charm.py`, add the following methods to the charm class:
 
 ```python
-    def configure_and_restart(self) -> None:
+    def configure_and_run(self) -> None:
         """Ensure that tinyproxy is running with the correct config."""
         try:
             config = self.load_config(TinyproxyConfig)
@@ -304,35 +310,51 @@ TODO: Explain that we want the same thing to happen when starting tinyproxy for 
         # you (the charm author) to see in the Juju logs, not for the user of the charm.
 ```
 
-```python
-PORT = 8000
-```
+Then add the following lines at the beginning of `src/charm.py`:
 
 ```python
 import time
+
+PORT = 8000
 ```
+
+The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
+
+Replace the `_on_start` method with:
+
+```python
+    def _on_start(self, event: ops.StartEvent) -> None:
+        """Handle start event."""
+        self.configure_and_run()
+```
+
+Next, add the following line to the `__init__` method of the charm class:
 
 ```python
         framework.observe(self.on.config_changed, self._on_config_changed)
 ```
 
-```python
-    def _on_start(self, event: ops.StartEvent) -> None:
-        """Handle start event."""
-        self.configure_and_restart()
-```
+Then add the following method to the charm class:
 
 ```python
     def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
         """Handle config-changed event."""
-        self.configure_and_restart()
+        self.configure_and_run()
 ```
 
 ### Report status to Juju
 
+Your charm should report the machine's status to Juju after handling each event. This enables you to use Juju's status output to see whether tinyproxy is running and correctly configured.
+
+One option would be to modify each method in the charm class to report an appropriate status. However, this tends to be awkward in practice, because the logic to decide which status is most appropriate can become complex. Instead, we'll handle a special "collect-unit-status" event that is produced by Ops.
+
+Add the following line to the `__init__` method of the charm class:
+
 ```python
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
 ```
+
+Then add the following method to the charm class:
 
 ```python
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
@@ -348,12 +370,22 @@ import time
         event.add_status(ops.ActiveStatus())
 ```
 
-### Handle the stop and remove events
+Ops runs this method after each Juju event, regardless of whether the charm code handles the event. After running the method, Ops decides which status to report to Juju, choosing the highest priority status that was proposed with `event.add_status`.
+
+For example, if the value of the `slug` configuration option is invalid, `load_config` raises an error and the charm code proposes a "blocked" status. This status means that your charm needs intervention from a human, so Ops gives it the highest priority and reports it to Juju.
+
+### Stop and uninstall tinyproxy
+
+If Juju wants to remove a unit of the application, your charm (on that unit) receives the "stop" event followed by the "remove" event.
+
+To handle these events, add the following lines to the `__init__` method of the charm class:
 
 ```python
         framework.observe(self.on.stop, self._on_stop)
         framework.observe(self.on.remove, self._on_remove)
 ```
+
+Then add the following methods to the charm class:
 
 ```python
     def _on_stop(self, event: ops.StopEvent) -> None:
@@ -388,7 +420,7 @@ charmcraft pack
 
 Charmcraft will take about 20 minutes to pack your charm, depending on your computer and network.
 
-TODO: Check the timing.
+PRIMARY TODO: Check the timing.
 
 When Charmcraft has packed your charm, you'll see a message similar to:
 
@@ -457,7 +489,7 @@ For the rest of the tutorial, we'll assume that you're still watching Juju statu
 
 ### Try the proxy
 
-TODO:
+PRIMARY TODO:
 
 - Add commentary to this section.
 - IP address comes from Juju status. IP address of the machine (10.71.67.208).
@@ -489,7 +521,7 @@ Output:
 
 ### Change the configuration
 
-TODO: Add commentary to this section.
+PRIMARY TODO: Add commentary to this section.
 
 ```text
 juju config tinyproxy slug=foo
@@ -503,9 +535,14 @@ juju config tinyproxy --reset slug  # Makes the charm active, with the original 
 
 ### Write tests for the helper module
 
-TODO: Add commentary to this section.
+When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations.
 
-`tests/unit/test_tinyproxy.py`:
+To illustrate the approach, we'll write unit tests for the following functions in the helper module:
+
+- `check_slug`
+- `get_version`
+
+Create a file `tests/unit/test_tinyproxy.py` containing:
 
 ```python
 import pytest
@@ -514,6 +551,7 @@ from charm import tinyproxy
 
 
 def test_slug_valid():
+    """Test that the helper module correctly identifies a valid slug."""
     tinyproxy.check_slug("example")  # No error raised.
 
 
@@ -524,15 +562,36 @@ def invalid_slug(request):
 
 
 def test_slug_invalid(invalid_slug: str):
+    """Test that the helper module correctly identifies invalid slugs."""
     with pytest.raises(ValueError):
         tinyproxy.check_slug(invalid_slug)
+
+
+class MockVersionProcess:
+    """Mock object that represents the result of calling 'tinyproxy -v'."""
+
+    def __init__(self, version: str):
+        self.stdout = f"tinyproxy {version}"
+
+
+def test_version(monkeypatch: pytest.MonkeyPatch):
+    """Test that the helper module correctly returns the version of tinyproxy."""
+    version_process = MockVersionProcess("1.11.0")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
+    assert tinyproxy.get_version() == "1.11.0"
 ```
 
 ### Write state-transition tests
 
-TODO: Add commentary to this section.
+We should write unit tests for the charm code that handles events. Each test will be structured as a "state-transition" test, using the testing framework that comes with Ops.
 
-`tests/unit/test_charm.py`:
+State-transition tests are isolated tests of event handlers. They test how your charm responds to simulated events from Juju. It's helpful to think of each test this way:
+
+1. Ops mocks the input to a particular event handler, based on details that you provide. You mock the interaction between the event handler and the workload. For tinyproxy, we'll define a mock object that represents the state of tinyproxy and we'll patch the helper module to act on this mock object.
+2. Ops runs the event handler with the mocked input, which simulates your charm receiving the event.
+3. You assert that the event handler acted correctly.
+
+Replace the contents of `tests/unit/test_charm.py` with:
 
 ```python
 import pytest
@@ -582,6 +641,9 @@ class MockTinyproxy:
     def reload_config(self) -> None:
         self.reloaded_config = True
 
+    def uninstall(self) -> None:
+        self.installed = False
+
 
 def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
     """Patch the helper module to use mock functions for interacting with tinyproxy."""
@@ -593,6 +655,7 @@ def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
     monkeypatch.setattr("charm.tinyproxy.start", tinyproxy.start)
     monkeypatch.setattr("charm.tinyproxy.stop", tinyproxy.stop)
     monkeypatch.setattr("charm.tinyproxy.reload_config", tinyproxy.reload_config)
+    monkeypatch.setattr("charm.tinyproxy.uninstall", tinyproxy.uninstall)
 
 
 def test_install(monkeypatch: pytest.MonkeyPatch):
@@ -602,10 +665,9 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy()
     patch_charm(monkeypatch, tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
-
+    state_in = testing.State()
     # Step 2. Simulate an event, in this case an install event.
-    state_out = ctx.run(ctx.on.install(), testing.State())
-
+    state_out = ctx.run(ctx.on.install(), state_in)
     # Step 3. Check the output state.
     assert state_out.workload_version is not None
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
@@ -624,9 +686,7 @@ def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
 def test_start(tinyproxy_installed: MockTinyproxy):
     """Test that the charm correctly handles the start event."""
     ctx = testing.Context(TinyproxyCharm)
-
     state_out = ctx.run(ctx.on.start(), testing.State())
-
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy_installed.is_running()
     assert tinyproxy_installed.config == (PORT, "example")
@@ -644,9 +704,7 @@ def test_config_changed(tinyproxy_configured: MockTinyproxy):
     """Test that the charm correctly handles the config-changed event."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": "foo"})
-
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     assert state_out.unit_status == testing.ActiveStatus()
     assert tinyproxy_configured.is_running()
     assert tinyproxy_configured.config == (PORT, "foo")
@@ -663,9 +721,7 @@ def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: 
     """Test that the charm fails to start if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
-
     state_out = ctx.run(ctx.on.start(), state_in)
-
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
@@ -677,9 +733,7 @@ def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, inva
     """Test that the charm fails to change config if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State(config={"slug": invalid_slug})
-
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     assert state_out.unit_status == testing.BlockedStatus(
         f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
     )
@@ -688,22 +742,47 @@ def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, inva
     assert not tinyproxy_configured.reloaded_config
 
 
-def test_stop(tinyproxy_installed: MockTinyproxy):
+def test_stop(tinyproxy_configured: MockTinyproxy):
     """Test that the charm correctly handles the stop event."""
     ctx = testing.Context(TinyproxyCharm)
-
     state_out = ctx.run(ctx.on.stop(), testing.State())
-
     assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
-    assert not tinyproxy_installed.is_running()
+    assert not tinyproxy_configured.is_running()
+
+
+def test_remove(tinyproxy_installed: MockTinyproxy):
+    """Test that the charm correctly handles the remove event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_out = ctx.run(ctx.on.remove(), testing.State())
+    assert state_out.unit_status == testing.MaintenanceStatus(
+        "Waiting for tinyproxy to be installed"
+    )
+    assert not tinyproxy_installed.is_installed()
 ```
 
 ### Run the tests
 
-TODO: Add commentary to this section.
+Run the following command from anywhere in the `~/tinyproxy` directory:
 
 ```text
 tox -e unit
+```
+
+The output should be similar to:
+
+```text
+...
+
+============================================= 16 passed in 0.26s =============================================
+unit: commands[1] src> coverage report
+Name               Stmts   Miss Branch BrPart  Cover   Missing
+--------------------------------------------------------------
+src/charm.py          72      5     20      7    87%   68->exit, 98, 103->exit, 112-113, 122-123
+src/tinyproxy.py      51     26      8      0    46%   41-48, 59-60, 67, 72, 77-82, 87, 92-94, 99-102, 107-115
+--------------------------------------------------------------
+TOTAL                123     31     28      7    71%
+  unit: OK (0.62=setup[0.02]+cmd[0.53,0.07] seconds)
+  congratulations :) (0.66 seconds)
 ```
 
 ## Write integration tests for your charm

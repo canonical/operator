@@ -18,6 +18,7 @@ from charm import tinyproxy
 
 
 def test_slug_valid():
+    """Test that the helper module correctly identifies a valid slug."""
     tinyproxy.check_slug("example")  # No error raised.
 
 
@@ -28,5 +29,20 @@ def invalid_slug(request):
 
 
 def test_slug_invalid(invalid_slug: str):
+    """Test that the helper module correctly identifies invalid slugs."""
     with pytest.raises(ValueError):
         tinyproxy.check_slug(invalid_slug)
+
+
+class MockVersionProcess:
+    """Mock object that represents the result of calling 'tinyproxy -v'."""
+
+    def __init__(self, version: str):
+        self.stdout = f"tinyproxy {version}"
+
+
+def test_version(monkeypatch: pytest.MonkeyPatch):
+    """Test that the helper module correctly returns the version of tinyproxy."""
+    version_process = MockVersionProcess("1.11.0")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
+    assert tinyproxy.get_version() == "1.11.0"
