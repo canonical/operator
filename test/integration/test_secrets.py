@@ -37,7 +37,6 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     secret = juju.show_secret(secrets[0].uri, reveal=True)
     common_checks(secret, result)
 
-    assert secret
     assert secret.revision == 1
     assert secret.content == {'foo': 'bar'}
 
