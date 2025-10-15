@@ -195,9 +195,6 @@ ignore = [
     # Manual dict comprehension.
     "PERF403",
 
-    # Quoted types in casts.
-    "TC006",
-
     # Convert {} from `TypedDict` functional to class syntax
     # Note that since we have some `TypedDict`s that cannot use the class
     # syntax, we're currently choosing to be consistent in syntax even though

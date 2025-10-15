@@ -30,27 +30,12 @@ def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
 
 def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     rv = juju.run(leader, 'add-secret')
-    result = cast(Result, rv.results)
+    result = cast('Result', rv.results)
     assert not result.get('exception')
 
     secrets = juju.secrets()
-    secret = juju.show_secret(secrets[0].uri, reveal=True) if secrets else None
-
-    # These assertions keep type checker happy.
-    # I'm not sure if the typed dicts are worth it.
-    assert 'secretid' in result
-    assert 'after' in result
-    assert result['after']
-    assert result['after']['info']
-
-    if secret:
-        assert secret.owner == 'test-secrets'
-        short_juju_id = short_id(secret.uri)
-        assert result['secretid']
-        short_ops_id = short_id(result['secretid'])
-        short_ops_info_id = short_id(result['after']['info']['id'])
-        assert short_juju_id == short_ops_id == short_ops_info_id
-        assert secret.content == result['after']['latest']
+    secret = juju.show_secret(secrets[0].uri, reveal=True)
+    common_checks(secret, result)
 
     assert secret
     assert secret.revision == 1
@@ -72,7 +57,7 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
 )
 def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
     rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
-    result = cast(Result, rv.results)
+    result = cast('Result', rv.results)
     assert not result.get('exception')
 
     assert 'secretid' in result
@@ -83,18 +68,17 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
 
     secrets = juju.secrets()
     secret = juju.show_secret(secrets[0].uri, reveal=True)
+    common_checks(secret, result)
 
-    assert secret.uri
     assert secret.revision == 1
     assert secret.content == {'foo': 'bar'}
-    assert secret.owner == 'test-secrets'
 
     if 'label' in fields:
-        assert secret.label == 'label'
-        assert info['label'] == 'label'
+        assert secret.label == 'label1'
+        assert info['label'] == 'label1'
     if 'description' in fields:
-        assert secret.description == 'description'
-        assert info['description'] == 'description'
+        assert secret.description == 'description1'
+        assert info['description'] == 'description1'
     if 'expire' in fields:
         assert secret.expires == '2020-01-01T00:00:00Z'
         assert info['expires'] == '2020-01-01 00:00:00+00:00'
@@ -102,7 +86,8 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
         assert secret.rotation == 'daily'
         assert info['rotation'] == 'SecretRotate.DAILY'
         assert secret.rotates  # approx 24h from now
-        # It seems that Juju coerces the result values to strings.
+        # Freshly minted secret will only gain `rotates` time stamp in
+        # the next dispatch call. See #2104.
         assert info['rotates'] == 'None'
 
 
@@ -137,3 +122,22 @@ def follower(juju: jubilant.Juju) -> str:
 
 def short_id(secret_uri: str):
     return secret_uri.split(':')[-1].split('/')[-1]
+
+
+def common_checks(secret: jubilant.RevealedSecret | None, result: Result):
+    if secret:
+        assert secret.owner == 'test-secrets'
+
+        assert 'secretid' in result
+        assert result['secretid']
+
+        assert 'after' in result
+        assert (after := result['after'])
+        assert 'info' in after
+        assert (info := after['info'])
+
+        short_juju_id = short_id(secret.uri)
+        short_ops_id = short_id(result['secretid'])
+        assert short_juju_id == short_ops_id == short_id(info['id'])
+
+        assert secret.content == after['latest']

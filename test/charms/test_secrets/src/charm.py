@@ -61,22 +61,13 @@ class SecretsCharm(ops.CharmBase):
             'secretid': secret.id,
             'after': self._snapshot(secret.id),
         }
-        event.set_results(cast(dict[str, Any], result))
-
-    def add_with_description(self, event: ops.ActionEvent):
-        secret = self.app.add_secret({'foo': 'bar'}, description='ddd')
-        assert secret.id
-        result: Result = {
-            'secretid': secret.id,
-            'after': self._snapshot(secret.id),
-        }
-        event.set_results(cast(dict[str, Any], result))
+        event.set_results(cast('dict[str, Any]', result))
 
     def add_with_meta(self, event: ops.ActionEvent):
         field_keys = event.params['fields'].split(',')
         full_meta = {
-            'label': 'label',
-            'description': 'description',
+            'label': 'label1',
+            'description': 'description1',
             'expire': datetime.datetime(2020, 1, 1, 0, 0, 0),
             'rotate': ops.SecretRotate.DAILY,
         }
@@ -87,12 +78,12 @@ class SecretsCharm(ops.CharmBase):
             'secretid': secret.id,
             'after': self._snapshot(secret.id),
         }
-        event.set_results(cast(dict[str, Any], result))
+        event.set_results(cast('dict[str, Any]', result))
 
     def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
         # `expires` and `rotates` may need coercion to str
-        info = cast(InfoSnapshot, secret.get_info().__dict__) if self.unit.is_leader() else None
+        info = cast('InfoSnapshot', secret.get_info().__dict__) if self.unit.is_leader() else None
         return {
             'info': info,
             'tracked': secret.get_content(),

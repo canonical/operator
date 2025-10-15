@@ -595,16 +595,16 @@ def test_default_values():
     assert secret.remote_grants == {}
 
 
-def test_add_secret(secrets_context: Context[CharmBase]):
+def test_add_secret(secrets_context: Context[SecretsCharm]):
     state = State(leader=True)
     state = secrets_context.run(secrets_context.on.action('add-secret'), state)
 
-    result = cast(Result, secrets_context.action_results)
+    result = cast('Result', secrets_context.action_results)
     assert result is not None
-    charm_secret_id = result.get('secretid')
-    scenario_secret = next(iter(state.secrets)) if state.secrets else None
+    assert result['secretid']
 
-    assert bool(scenario_secret) == bool(charm_secret_id)
+    scenario_secret = next(iter(state.secrets))
+
     common_assertions(scenario_secret, result)
 
     assert result == {
@@ -630,16 +630,13 @@ def test_add_secret(secrets_context: Context[CharmBase]):
         'label,description,expire,rotate',
     ],
 )
-def test_add_secret_with_metadata(
-    secrets_context: Context[SecretsCharm],
-    fields: str,
-):
+def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields: str):
     state = State(leader=True)
     state = secrets_context.run(
         secrets_context.on.action('add-with-meta', params={'fields': fields}), state
     )
     scenario_secret = next(iter(state.secrets))
-    result = cast(Result, secrets_context.action_results)
+    result = cast('Result', secrets_context.action_results)
     assert 'after' in result
     assert result['after']
     info = result['after']['info']
@@ -648,25 +645,24 @@ def test_add_secret_with_metadata(
     common_assertions(scenario_secret, result)
 
     if 'label' in fields:
-        assert scenario_secret.label == 'label'
-        assert info['label'] == 'label'
+        assert scenario_secret.label == 'label1'
+        assert info['label'] == 'label1'
     if 'description' in fields:
-        assert scenario_secret.description == 'description'
+        assert scenario_secret.description == 'description1'
         # https://github.com/canonical/operator/issues/2037
-        # assert info['description'] == 'description'
+        assert info['description'] is None
     if 'expire' in fields:
         assert scenario_secret.expire == datetime.datetime(2020, 1, 1, 0, 0, 0)
         assert info['expires'] == datetime.datetime(2020, 1, 1, 0, 0, 0)
     if 'rotate' in fields:
         assert scenario_secret.rotate == SecretRotate.DAILY
         assert info['rotation'] == SecretRotate.DAILY
-        # FIXME is this a Scenario limitation?
+        # https://github.com/canonical/operator/issues/2104
         assert info['rotates'] is None
 
 
 def common_assertions(scenario_secret: Secret | None, result: Result):
     if scenario_secret:
-        assert scenario_secret
         assert scenario_secret.owner == 'application'
         assert not scenario_secret.remote_grants
 
@@ -679,10 +675,10 @@ def common_assertions(scenario_secret: Secret | None, result: Result):
             assert scenario_secret._latest_revision == info['revision']
             assert scenario_secret.expire == info['expires']
             assert scenario_secret.rotate == info['rotation']
-            # FIXME is this a Scenario limitation?
-            assert info['rotates'] is None
             # https://github.com/canonical/operator/issues/2037
             # assert scenario_secret.description == info['description']
+            # https://github.com/canonical/operator/issues/2104
+            assert info['rotates'] is None
 
             assert scenario_secret.tracked_content == result['after']['tracked']
             assert scenario_secret.latest_content == result['after']['latest']
