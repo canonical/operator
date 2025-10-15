@@ -109,7 +109,6 @@ Next, replace the contents of `src/tinyproxy.py` with:
 ```python
 import logging
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -120,12 +119,6 @@ logger = logging.getLogger(__name__)
 
 CONFIG_FILE = "/etc/tinyproxy/tinyproxy.conf"
 PID_FILE = "/var/run/tinyproxy.pid"
-
-
-def check_slug(slug: str) -> None:
-    """Check that the URL slug is valid. Raise ValueError otherwise."""
-    if not re.fullmatch(r"[a-z0-9-]+", slug):
-        raise ValueError(f"Invalid slug: '{slug}'. Slug must match the regex [a-z0-9-]+")
 
 
 def ensure_config(port: int, slug: str) -> bool:
@@ -255,27 +248,35 @@ config:
       type: string
 ```
 
-PRIMARY TODO: Switch to Pydantic.
-
-`src/charm.py`:
+Then add the following class to `src/charm.py`:
 
 ```python
-@dataclasses.dataclass(frozen=True)
-class TinyproxyConfig:
-    """Schema for the configuration of the tinyproxy charm."""
+class TinyproxyConfig(pydantic.BaseModel):
+    """Schema for the charm's config options."""
 
-    slug: str = "example"
+    slug: str = pydantic.Field("example", pattern=r"^[a-z0-9-]+$")
     """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
+```
 
-    def __post_init__(self):
-        tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
+Also add the following line at the beginning of `src/charm.py`:
+
+```python
+import pydantic
+```
+
+The `TinyproxyConfig` class uses [Pydantic](https://docs.pydantic.dev) to specify how to validate values of `slug`. The class doesn't actually load the configured value of `slug`; we'll do that elsewhere in the charm code.
+
+To add Pydantic to your charm's dependencies, run:
+
+```text
+uv add pydantic
 ```
 
 ### Start tinyproxy and handle configuration changes
 
-Your charm now needs a way to get the value of the `slug` configuration option, write a configuration file on the machine, then start tinyproxy:
+Your charm now needs a way to load the value of the `slug` configuration option, write a configuration file on the machine, then start tinyproxy:
 
-1. To get the value of `slug`, we'll use the `load_config` method that Ops provides. This method also validates the value of `slug` using the `TinyproxyConfig` class that we just defined.
+1. To load the value of `slug`, we'll use the `load_config` method that Ops provides. This method also validates the value of `slug` using the `TinyproxyConfig` class that we just defined.
 2. To write a configuration file, we'll use the `ensure_config` function from the helper module.
 3. To start tinyproxy, we'll use the `start` function from the helper module.
 
@@ -286,7 +287,7 @@ In `src/charm.py`, add the following methods to the charm class:
         """Ensure that tinyproxy is running with the correct config."""
         try:
             config = self.load_config(TinyproxyConfig)
-        except ValueError:
+        except pydantic.ValidationError:
             # The collect-status handler will run next and will set status for the user to see.
             return
         if not tinyproxy.is_installed():
@@ -361,8 +362,11 @@ Then add the following method to the charm class:
         """Report the status of tinyproxy (runs after each event)."""
         try:
             self.load_config(TinyproxyConfig)
-        except ValueError as e:
-            event.add_status(ops.BlockedStatus(str(e)))
+        except pydantic.ValidationError as e:
+            slug_error = e.errors()[0]  # Index 0 because 'slug' is the only option validated.
+            slug_value = slug_error["input"]
+            message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
+            event.add_status(ops.BlockedStatus(message))
         if not tinyproxy.is_installed():
             event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
         if not tinyproxy.is_running():
@@ -535,12 +539,7 @@ juju config tinyproxy --reset slug  # Makes the charm active, with the original 
 
 ### Write tests for the helper module
 
-When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations.
-
-To illustrate the approach, we'll write unit tests for the following functions in the helper module:
-
-- `check_slug`
-- `get_version`
+When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations. To illustrate the approach, we'll write a unit test for the `get_version` function in the helper module.
 
 Create a file `tests/unit/test_tinyproxy.py` containing:
 
@@ -548,23 +547,6 @@ Create a file `tests/unit/test_tinyproxy.py` containing:
 import pytest
 
 from charm import tinyproxy
-
-
-def test_slug_valid():
-    """Test that the helper module correctly identifies a valid slug."""
-    tinyproxy.check_slug("example")  # No error raised.
-
-
-# Define a reusable fixture that provides invalid slugs.
-@pytest.fixture(params=["", "foo_bar", "foo/bar"])
-def invalid_slug(request):
-    return request.param
-
-
-def test_slug_invalid(invalid_slug: str):
-    """Test that the helper module correctly identifies invalid slugs."""
-    with pytest.raises(ValueError):
-        tinyproxy.check_slug(invalid_slug)
 
 
 class MockVersionProcess:
@@ -773,16 +755,16 @@ The output should be similar to:
 ```text
 ...
 
-============================================= 16 passed in 0.26s =============================================
-unit: commands[1] src> coverage report
+============================================ 12 passed in 0.43s =============================================
+unit: commands[1]> coverage report
 Name               Stmts   Miss Branch BrPart  Cover   Missing
 --------------------------------------------------------------
-src/charm.py          72      5     20      7    87%   68->exit, 98, 103->exit, 112-113, 122-123
-src/tinyproxy.py      51     26      8      0    46%   41-48, 59-60, 67, 72, 77-82, 87, 92-94, 99-102, 107-115
+src/charm.py          72      5     20      7    87%   67->exit, 97, 102->exit, 111-112, 121-122
+src/tinyproxy.py      47     26      6      0    40%   34-41, 52-53, 60, 65, 70-75, 80, 85-87, 92-95, 100-108
 --------------------------------------------------------------
-TOTAL                123     31     28      7    71%
-  unit: OK (0.62=setup[0.02]+cmd[0.53,0.07] seconds)
-  congratulations :) (0.66 seconds)
+TOTAL                119     31     26      7    70%
+  unit: OK (1.21=setup[0.05]+cmd[1.03,0.13] seconds)
+  congratulations :) (1.30 seconds)
 ```
 
 ## Write integration tests for your charm

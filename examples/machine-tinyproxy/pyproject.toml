@@ -24,6 +24,7 @@ dependencies = [
     "charmlibs-apt>=1,<2",
     "charmlibs-pathops>=1,<2",
     "ops>=3,<4",
+    "pydantic>=2,<3",
 ]
 
 [dependency-groups]

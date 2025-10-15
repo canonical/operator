@@ -15,11 +15,11 @@
 
 """Charm the application."""
 
-import dataclasses
 import logging
 import time
 
 import ops
+import pydantic
 
 import tinyproxy
 
@@ -28,15 +28,11 @@ logger = logging.getLogger(__name__)
 PORT = 8000
 
 
-@dataclasses.dataclass(frozen=True)
-class TinyproxyConfig:
+class TinyproxyConfig(pydantic.BaseModel):
     """Schema for the charm's config options."""
 
-    slug: str = "example"
+    slug: str = pydantic.Field("example", pattern=r"^[a-z0-9-]+$")
     """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
-
-    def __post_init__(self):
-        tinyproxy.check_slug(self.slug)  # Raises ValueError if slug is invalid.
 
 
 class TinyproxyCharm(ops.CharmBase):
@@ -55,8 +51,11 @@ class TinyproxyCharm(ops.CharmBase):
         """Report the status of tinyproxy (runs after each event)."""
         try:
             self.load_config(TinyproxyConfig)
-        except ValueError as e:
-            event.add_status(ops.BlockedStatus(str(e)))
+        except pydantic.ValidationError as e:
+            slug_error = e.errors()[0]  # Index 0 because 'slug' is the only option validated.
+            slug_value = slug_error["input"]
+            message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
+            event.add_status(ops.BlockedStatus(message))
         if not tinyproxy.is_installed():
             event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
         if not tinyproxy.is_running():
@@ -91,7 +90,7 @@ class TinyproxyCharm(ops.CharmBase):
         """Ensure that tinyproxy is running with the correct config."""
         try:
             config = self.load_config(TinyproxyConfig)
-        except ValueError:
+        except pydantic.ValidationError:
             # The collect-status handler will run next and will set status for the user to see.
             return
         if not tinyproxy.is_installed():

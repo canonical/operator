@@ -16,7 +16,6 @@
 
 import logging
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -27,12 +26,6 @@ logger = logging.getLogger(__name__)
 
 CONFIG_FILE = "/etc/tinyproxy/tinyproxy.conf"
 PID_FILE = "/var/run/tinyproxy.pid"
-
-
-def check_slug(slug: str) -> None:
-    """Check that the URL slug is valid. Raise ValueError otherwise."""
-    if not re.fullmatch(r"[a-z0-9-]+", slug):
-        raise ValueError(f"Invalid slug: '{slug}'. Slug must match the regex [a-z0-9-]+")
 
 
 def ensure_config(port: int, slug: str) -> bool:

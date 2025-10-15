@@ -17,23 +17,6 @@ import pytest
 from charm import tinyproxy
 
 
-def test_slug_valid():
-    """Test that the helper module correctly identifies a valid slug."""
-    tinyproxy.check_slug("example")  # No error raised.
-
-
-# Define a reusable fixture that provides invalid slugs.
-@pytest.fixture(params=["", "foo_bar", "foo/bar"])
-def invalid_slug(request):
-    return request.param
-
-
-def test_slug_invalid(invalid_slug: str):
-    """Test that the helper module correctly identifies invalid slugs."""
-    with pytest.raises(ValueError):
-        tinyproxy.check_slug(invalid_slug)
-
-
 class MockVersionProcess:
     """Mock object that represents the result of calling 'tinyproxy -v'."""
 
