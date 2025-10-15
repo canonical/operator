@@ -253,7 +253,7 @@ class JujuContext:
             ),
             dispatch_path=env.get('JUJU_DISPATCH_PATH', ''),
             hook_name=env.get('JUJU_HOOK_NAME', ''),
-            machine_id=env['JUJU_MACHINE_ID'] if env.get('JUJU_MACHINE_ID') else None,
+            machine_id=env.get('JUJU_MACHINE_ID') or None,
             model_name=env.get('JUJU_MODEL_NAME', ''),
             model_uuid=env.get('JUJU_MODEL_UUID', ''),
             notice_id=env.get('JUJU_NOTICE_ID') or None,
