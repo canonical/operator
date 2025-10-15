@@ -334,9 +334,15 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
+                if context.bare_exceptions:
+                    # propagate all exceptions
+                    raise
+
+                # We keep this injected exception for backward compatibility.
+                # To prevent its raising set state.bare_exceptions parameter.
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm. To see the original exception, set Context.bare_exceptions=True. Otherwise try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
 
             finally:
                 if ops:

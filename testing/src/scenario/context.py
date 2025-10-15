@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
+import warnings
 from contextlib import contextmanager
 from typing import (
     Generic,
@@ -594,6 +595,9 @@ class Context(Generic[CharmType]):
     content of the directory after the event has run, unlike the temporary directory, which is
     automatically deleted after the run.
     """
+    bare_exceptions: bool
+    """If True, just propagate all exceptions from Context.run().
+    If False (deprecated default), raise UncaughtCharmError from from original exception."""
 
     on: CharmEvents
     """The events that this charm can respond to.
@@ -616,6 +620,7 @@ class Context(Generic[CharmType]):
         unit_id: int | None = 0,
         machine_id: int | None = None,
         app_trusted: bool = False,
+        bare_exceptions: bool = False,
     ):
         """Represents a simulated charm's execution context.
 
@@ -644,6 +649,8 @@ class Context(Generic[CharmType]):
         :arg machine_id: Juju Machine ID that this charm is deployed onto,
             surfaced to the charm as the JUJU_MACHINE_ID envvar.
             Only applicable to machine charms. Unset by default.
+        :arg bare_exceptions: whether to directly propagate all exceptions from Context.run()
+            instead of raising UncaughtCharmError from from original exception.
         :arg app_trusted: whether the charm has Juju trust (deployed with ``--trust`` or added with
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
@@ -675,6 +682,12 @@ class Context(Generic[CharmType]):
         if juju_version.split('.')[0] == '2':
             logger.warning(
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
+            )
+        self.bare_exceptions = bare_exceptions
+        if not self.bare_exceptions:
+            warnings.warn(
+                'current default `Context.bare_exceptions=False` is deprecated and will be changed to True in ops 4.0',
+                DeprecationWarning,
             )
 
         self.app_name = app_name or self.charm_spec.meta.get('name')
