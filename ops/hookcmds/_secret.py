@@ -238,7 +238,9 @@ def secret_remove(id: str, *, revision: int | None = None):
     run('secret-remove', *args)
 
 
-def secret_revoke(id: str, *, relation_id: int | None, app: str | None, unit: str | None = None):
+def secret_revoke(
+    id: str, *, relation_id: int | None, app: str | None = None, unit: str | None = None
+):
     """Revoke access to a secret.
 
     For more details, see:
