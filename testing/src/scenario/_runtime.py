@@ -331,13 +331,6 @@ class Runtime:
                     if e.exit_code != 0:
                         raise
 
-            except (NoObserverError, ActionFailed):
-                raise  # propagate along
-            except Exception as e:
-                # The following is intentionally on one long line, so that the last line of pdb
-                # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
-
             finally:
                 if ops:
                     ops.destroy()
