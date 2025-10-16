@@ -370,7 +370,7 @@ def test_network_get(run: Run):
         'egress-subnets': ['127.0.0.0/24'],
         'ingress-addresses': ['127.0.0.1'],
     }
-    run.handle(['network-get', 'bind', '--format=json'], stdout=json.dumps(net))
+    run.handle(['network-get', '--format=json', 'bind'], stdout=json.dumps(net))
     result = hookcmds.network_get('bind')
     assert result.bind_addresses[0].mac_address == 'aa:bb'
     assert result.bind_addresses[0].interface_name == 'eth0'
@@ -393,7 +393,7 @@ def test_network_get_relation_id(run: Run):
         'egress-subnets': ['127.0.0.0/24'],
         'ingress-addresses': ['127.0.0.1'],
     }
-    run.handle(['network-get', '-r', '123', 'bind', '--format=json'], stdout=json.dumps(net))
+    run.handle(['network-get', '--format=json', '-r', '123', 'bind'], stdout=json.dumps(net))
     hookcmds.network_get('bind', relation_id=123)
 
 
