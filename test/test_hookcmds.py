@@ -523,10 +523,10 @@ def test_relation_model_get(run: Run, id: int | None):
 @pytest.mark.parametrize('app', [False, True])
 def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, app: bool):
     cmd = ['relation-set']
-    if app:
-        cmd.append('--app')
     if id is not None:
         cmd.extend(['-r', str(id)])
+    if app:
+        cmd.append('--app')
     cmd.extend(['--file', '-'])
     run.handle(cmd)
     hookcmds.relation_set({'foo': 'bar'}, id=id, app=app)

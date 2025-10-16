@@ -184,10 +184,10 @@ def relation_set(
         app: Set data for the overall application, not just a unit.
     """
     args: list[str] = []
-    if app:
-        args.append('--app')
     if id is not None:
         args.extend(['-r', str(id)])
+    if app:
+        args.append('--app')
     args.extend(['--file', '-'])
     content = yaml.safe_dump(data)
     run('relation-set', *args, input=content)
