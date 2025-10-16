@@ -141,7 +141,7 @@ jobs:
             profile: simple
     steps:
       - name: Install charmcraft
-        run: sudo snap install charmcraft --classic --channel={{ matrix.charmcraft_channel }}
+        run: sudo snap install charmcraft --classic --channel=${{ matrix.charmcraft_channel }}
 
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
