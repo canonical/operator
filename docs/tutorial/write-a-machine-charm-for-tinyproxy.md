@@ -16,21 +16,92 @@ TODO:
 
 ## Set up your environment
 
-### Create a virtual machine
-
 PRIMARY TODO:
 
-- Multipass
-- Suggest using nano to edit files.
 - Configure nano to use spaces for indentation. (Check whether this is needed.) Or install a different editor if you like.
+
+### Create a virtual machine
+
+You'll work inside an Ubuntu virtual machine that's running on your computer. The virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
+
+First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
+
+Next, open a terminal, then run:
+
+```text
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+```
+
+This creates a virtual machine called `juju-sandbox`.
+
+Multipass allocates some of your computer's memory and disk space to the virtual machine. The options we've chosen for `multipass launch` ensure that the virtual machine will be powerful enough to run Juju and deploy medium-sized charms.
+
+It will take up to 10 minutes for Multipass to create the virtual machine, depending on your computer's specifications. When the virtual machine has been created, you'll see the message:
+
+```text
+Launched: juju-sandbox
+```
+
+Now run:
+
+```text
+multipass shell juju-sandbox
+```
+
+This switches the terminal so that you're working inside the virtual machine.
+
+You'll see a message with information about the virtual machine. You'll also see a new prompt:
+
+```text
+ubuntu@juju-sandbox:~$
+```
 
 ### Install Juju and charm development tools
 
-PRIMARY TODO: Charmcraft, Juju, LXD (all using Concierge)
+Now that you have a virtual machine, you need to install the following tools in your virtual machine:
 
-### Install Python development tools
+- **Charmcraft, Juju, and LXD** - You'll use Charmcraft to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
+- **uv and tox** - You'll implement your charm using Python code. uv is a Python project manager that will install dependencies for checks and tests. You'll use tox to select which checks or tests to run.
 
-PRIMARY TODO: uv (as an extra snap from Concierge), tox (with `uv tool`)
+Instead of manually installing and configuring each tool, we recommend using Concierge, Canonical's tool for setting up charm development environments.
+
+In your virtual machine, run:
+
+```text
+sudo snap install --classic concierge
+sudo concierge prepare -p machine --extra-snaps astral-uv
+```
+
+This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p machine` tells Concierge that we want tools for developing machine charms.
+
+It will take up to 15 minutes to install the tools, depending on your computer's specifications. When the tools have been installed, you'll see a message that ends with:
+
+```text
+msg="Bootstrapped Juju" provider=lxd
+```
+
+To install tox, run:
+
+```text
+uv tool install tox --with tox-uv
+uv tool update-shell
+```
+
+When tox has been installed, you'll see the message:
+
+```text
+Restart your shell to apply changes
+```
+
+It's important to exit your virtual machine at this point. If you don't exit your virtual machine, you won't be able to use tox later in the tutorial.
+
+To exit your virtual machine, run:
+
+```text
+exit
+```
+
+The terminal switches back to your usual operating system. Your virtual machine is still running in the background.
 
 ## Create a charm project
 
@@ -425,8 +496,6 @@ charmcraft pack
 
 Charmcraft will take about 20 minutes to pack your charm, depending on your computer and network.
 
-PRIMARY TODO: Check the timing.
-
 When Charmcraft has packed your charm, you'll see a message similar to:
 
 ```text
@@ -514,9 +583,7 @@ Then run `curl http://example.com` and check that you get the same output.
 
 ### Change the configuration
 
-Let's see what happens to the reverse proxy if we change the `slug` configuration option.
-
-Run:
+Let's see what happens to the reverse proxy if we change the `slug` configuration option. Run:
 
 ```text
 juju config tinyproxy slug=foo
