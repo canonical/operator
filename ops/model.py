@@ -4071,12 +4071,9 @@ class _ModelBackend:
     def update_relation_data(
         self, relation_id: int, entity: Unit | Application, data: Mapping[str, str]
     ):
-        try:
-            with self._tracing_span('relation-set', relation_id, entity, data):
-                hookcmds.relation_set(data, relation_id, app=isinstance(entity, Application))
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-set', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        self.relation_set(
+            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+        )
 
     def secret_get(
         self,
@@ -4230,7 +4227,16 @@ class _ModelBackend:
         except hookcmds.Error as e:
             self._check_for_security_event('opened-ports', e.returncode, e.stderr)
             raise ModelError(e.stderr) from e
-        return {Port(raw_port.protocol or 'tcp', raw_port.port) for raw_port in results}
+        ports: set[Port] = set()
+        for raw_port in results:
+            if raw_port.protocol not in ('tcp', 'udp', 'icmp'):
+                logger.warning('Unexpected opened-ports protocol: %s', raw_port.protocol)
+                continue
+            if raw_port.to_port is not None:
+                logger.warning('Ignoring opened-ports port range: %s', raw_port)
+            port = Port(raw_port.protocol or 'tcp', raw_port.port)
+            ports.add(port)
+        return ports
 
     def reboot(self, now: bool = False):
         _log_security_event(
