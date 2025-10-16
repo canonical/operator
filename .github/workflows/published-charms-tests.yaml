@@ -160,9 +160,11 @@ jobs:
           fi
 
       - name: Run the charm's unit tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: tox -vve unit
 
       - name: Run the charm's lint tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: tox -vve lint
 
       # Charmcraft 4 doesn't have a separate 'static' environment.
