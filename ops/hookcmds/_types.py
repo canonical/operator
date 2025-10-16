@@ -54,9 +54,9 @@ class Address:
     @classmethod
     def _from_dict(cls, d: AddressDict) -> Address:
         return cls(
-            hostname=d['hostname'],
-            value=d['value'],
-            cidr=d['cidr'],
+            hostname=d.get('hostname', ''),
+            value=d.get('value', ''),
+            cidr=d.get('cidr', ''),
         )
 
 
@@ -77,11 +77,11 @@ class BindAddress:
     @classmethod
     def _from_dict(cls, d: BindAddressDict) -> BindAddress:
         addresses = [
-            Address._from_dict(cast('AddressDict', addr)) for addr in d.get('addresses', [])
+            Address._from_dict(cast('AddressDict', addr)) for addr in d.get('addresses') or []
         ]
         return cls(
-            mac_address=d['mac-address'],
-            interface_name=d['interface-name'],
+            mac_address=d.get('mac-address', ''),
+            interface_name=d.get('interface-name', ''),
             addresses=addresses,
         )
 
@@ -232,7 +232,7 @@ class Network:
     def _from_dict(cls, d: dict[str, Any]) -> Network:
         bind: list[BindAddress] = [
             BindAddress._from_dict(bind_data)
-            for bind_data in cast('list[BindAddressDict]', d['bind-addresses'])
+            for bind_data in cast('list[BindAddressDict]', d.get('bind-addresses', []))
         ]
         egress = d.get('egress-subnets', [])
         ingress = d.get('ingress-addresses', [])
