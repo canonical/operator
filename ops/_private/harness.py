@@ -61,7 +61,7 @@ from typing import (
 from .. import charm, framework, model, pebble, storage
 from ..charm import CharmBase, CharmMeta, RelationRole
 from ..jujucontext import JujuContext
-from ..model import Container, RelationNotFoundError, _NetworkDict, _StatusName
+from ..model import Container, RelationNotFoundError, _StatusName
 from ..pebble import ExecProcess
 from . import yaml
 
@@ -74,6 +74,8 @@ if typing.TYPE_CHECKING:
         # the State class, so we just define it as a dummy class.
         class State:
             pass
+
+    from ..model import _NetworkDict
 
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]

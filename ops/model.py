@@ -65,7 +65,35 @@ from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import TypeAlias
+    from typing_extensions import NotRequired, TypeAlias
+
+    _AddressDict = TypedDict(
+        '_AddressDict',
+        {
+            'hostname': NotRequired[str],
+            'address': NotRequired[str],  # Juju < 2.9
+            'value': NotRequired[str],  # Juju >= 2.9
+            'cidr': str,
+        },
+    )
+
+    _BindAddressDict = TypedDict(
+        '_BindAddressDict',
+        {
+            'mac-address': NotRequired[str],
+            'interface-name': str,
+            'addresses': List[_AddressDict],
+        },
+    )
+
+    _NetworkDict = TypedDict(
+        '_NetworkDict',
+        {
+            'bind-addresses': List[_BindAddressDict],
+            'ingress-addresses': List[str],
+            'egress-subnets': List[str],
+        },
+    )
 
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
@@ -92,26 +120,6 @@ _ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'
 # controller is concerned
 _RelationDataContent_Raw: TypeAlias = 'dict[str, str]'
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
-
-_AddressDict = TypedDict(
-    '_AddressDict',
-    {
-        'address': str,  # Juju < 2.9
-        'value': str,  # Juju >= 2.9
-        'cidr': str,
-    },
-)
-_BindAddressDict = TypedDict(
-    '_BindAddressDict', {'interface-name': str, 'addresses': List[_AddressDict]}
-)
-_NetworkDict = TypedDict(
-    '_NetworkDict',
-    {
-        'bind-addresses': List[_BindAddressDict],
-        'ingress-addresses': List[str],
-        'egress-subnets': List[str],
-    },
-)
 
 
 logger = logging.getLogger(__name__)
@@ -3996,10 +4004,10 @@ class _ModelBackend:
         return {
             'bind-addresses': [
                 {
+                    'mac-address': b_addr.mac_address,
                     'interface-name': b_addr.interface_name,
                     'addresses': [
-                        # 'address' is a deprecated alias for 'value'.
-                        {'address': addr.value, 'value': addr.value, 'cidr': addr.cidr}
+                        {'value': addr.value, 'cidr': addr.cidr, 'hostname': addr.hostname}
                         for addr in b_addr.addresses
                     ],
                 }
