@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '42 7 25 * *'
-  pull_request:  # temporary
 
 permissions: {}
 
@@ -54,9 +53,6 @@ jobs:
           - 3.4/stable
           - 3.5/stable
           - 3.6/stable
-          # Juju 4.0 beta 6 doesn't support actions.
-          # https://discourse.charmhub.io/t/the-juju-insider-mongoless-beta/18383
-          # Testing 4.0 beta 7
           - 4.0/beta
 
     continue-on-error: ${{ matrix.juju-channel == '4.0/beta' }}
