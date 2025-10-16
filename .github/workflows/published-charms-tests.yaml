@@ -146,6 +146,9 @@ jobs:
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
 
+      - name: Install patch dependencies
+        run: pip install uv~=0.9 tox-uv~=1.29
+
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
           if [ -e "requirements.txt" ]; then
