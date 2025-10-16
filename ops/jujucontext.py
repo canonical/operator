@@ -113,7 +113,7 @@ class JujuContext:
     For example 'all' (from ``JUJU_DEBUG_AT``).
     """
 
-    machine_id: int | None = None
+    machine_id: str | None = None
     """The ID of the machine.
 
     For example, 1 (from ``JUJU_MACHINE_ID``).
@@ -253,7 +253,7 @@ class JujuContext:
             ),
             dispatch_path=env.get('JUJU_DISPATCH_PATH', ''),
             hook_name=env.get('JUJU_HOOK_NAME', ''),
-            machine_id=int(env['JUJU_MACHINE_ID']) if env.get('JUJU_MACHINE_ID') else None,
+            machine_id=env.get('JUJU_MACHINE_ID') or None,
             model_name=env.get('JUJU_MODEL_NAME', ''),
             model_uuid=env.get('JUJU_MODEL_UUID', ''),
             notice_id=env.get('JUJU_NOTICE_ID') or None,
