@@ -134,8 +134,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [machine, kubernetes]
         charmcraft_channel: ["3.x/stable", "latest/edge"]
+        profile: [machine, kubernetes]
         include:
           - charmcraft_channel: "3.x/stable"  # Last version to include "simple"
             profile: simple
