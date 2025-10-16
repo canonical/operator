@@ -173,11 +173,11 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         run: |
           if tox list --no-desc | grep '^static$'; then
-            echo 'static_cc=true' >> "$GITHUB_OUTPUT"
+            echo 'static_exists=true' >> "$GITHUB_OUTPUT"
           else
-            echo 'static_cc=false' >> "$GITHUB_OUTPUT"
+            echo 'static_exists=false' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run the charm's static tests
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static_cc == 'true' }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static_exists == 'true' }}
         run: tox -vve static
