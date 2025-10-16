@@ -159,10 +159,26 @@ jobs:
           fi
 
       - name: Install dependencies
+        id: deps
         run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
         run: tox -vve unit
 
+      - name: Run the charm's lint tests
+        run: tox -vve lint
+
+      # Charmcraft 4 doesn't have a separate 'static' environment.
+      - name: Check for tox static environment
+        id: has-static
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          if tox list --no-desc | grep '^static$'; then
+            echo 'static_cc=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'static_cc=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run the charm's static tests
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static_cc == 'true' }}
         run: tox -vve static
