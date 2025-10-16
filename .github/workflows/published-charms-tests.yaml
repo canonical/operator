@@ -151,6 +151,7 @@ jobs:
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
+          set -xueo pipefail
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
@@ -176,6 +177,7 @@ jobs:
       - name: Check for tox static environment
         id: has-static
         run: |
+          set -xueo pipefail
           if tox list --no-desc | grep '^static$'; then
             echo 'static_exists=true' >> "$GITHUB_OUTPUT"
           else
