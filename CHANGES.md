@@ -3,6 +3,7 @@
 ## Fixes
 
 * Change JujuContext.machine_id from int to str (#2108)
+
 # 3.3.0 - 29 September 2025
 
 ## Features
