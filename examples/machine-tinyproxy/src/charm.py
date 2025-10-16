@@ -31,8 +31,11 @@ PORT = 8000
 class TinyproxyConfig(pydantic.BaseModel):
     """Schema for the charm's config options."""
 
-    slug: str = pydantic.Field("example", pattern=r"^[a-z0-9-]+$")
-    """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
+    slug: str = pydantic.Field(
+        "example",
+        pattern=r"^[a-z0-9-]+$",
+        description="Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+",
+    )
 
 
 class TinyproxyCharm(ops.CharmBase):

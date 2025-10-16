@@ -213,11 +213,9 @@ After adding code to your charm, run `tox -e format` to format the code. Then ru
 
 ### Handle the install event
 
-We'll now start updating the charm code that handles events from Juju.
+We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic, containing a class called `TinyproxyCharm`. We'll refer to `TinyproxyCharm` as the "charm class".
 
-PRIMARY TODO: Mention the "charm class"
-
-In `src/charm.py`, replace the `_on_install` method with:
+In `src/charm.py`, replace the `_on_install` method of the charm class with:
 
 ```python
     def _on_install(self, event: ops.InstallEvent) -> None:
@@ -254,8 +252,11 @@ Then add the following class to `src/charm.py`:
 class TinyproxyConfig(pydantic.BaseModel):
     """Schema for the charm's config options."""
 
-    slug: str = pydantic.Field("example", pattern=r"^[a-z0-9-]+$")
-    """Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"""
+    slug: str = pydantic.Field(
+        "example",
+        pattern=r"^[a-z0-9-]+$",
+        description="Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+",
+    )
 ```
 
 Also add the following line at the beginning of `src/charm.py`:
@@ -321,7 +322,7 @@ PORT = 8000
 
 The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
 
-Replace the `_on_start` method with:
+Replace the `_on_start` method of the charm class with:
 
 ```python
     def _on_start(self, event: ops.StartEvent) -> None:
@@ -562,6 +563,8 @@ def test_version(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
     assert tinyproxy.get_version() == "1.11.0"
 ```
+
+We'll run all the unit tests later in the tutorial. But if you'd like to see whether this unit test passes, you can run `tox -e unit -- tests/unit/test_tinyproxy.py`.
 
 ### Write state-transition tests
 
