@@ -455,7 +455,7 @@ You should now have two terminals:
 
 - A terminal with working directory `~/tinyproxy`, from earlier.
 
-- A terminal that shows Juju's status in real time:
+- A terminal that shows Juju status in real time:
 
     ```text
     Model    Controller     Cloud/Region         Version  SLA          Timestamp
@@ -492,48 +492,66 @@ Machine  State    Address       Inst id        Base          AZ  Message
 For the rest of the tutorial, we'll assume that you're still watching Juju status. To stop watching, press <kbd>Ctrl</kbd> + <kbd>C</kbd>.
 ```
 
-### Try the proxy
+### Try the reverse proxy
 
-PRIMARY TODO:
+Now that tinyproxy is running, we can check that it proxies [example.com](http://example.com) on the machine's network.
 
-- Add commentary to this section.
-- IP address comes from Juju status. IP address of the machine (10.71.67.208).
+In your virtual machine, run:
 
 ```text
 curl <address>:8000/example/
 ```
 
-Output:
+Where `<address>` is the IP address of machine 0 from Juju status. In our example of Juju status, the IP address is 10.71.67.208.
+
+The output of curl should be similar to:
 
 ```text
-<!doctype html>
-<html>
-<head>
-    <title>Example Domain</title>
-    ...
-</head>
-
-<body>
-<div>
-    <h1>Example Domain</h1>
-    <p>This domain is for use in illustrative examples in documents. You may use this
-    domain in literature without prior coordination or asking for permission.</p>
-    <p><a href="https://www.iana.org/domains/example">More information...</a></p>
-</div>
-</body>
-</html>
+<!doctype html><html lang="en"><head><title>Example Domain</title>...
 ```
+
+Then run `curl http://example.com` and check that you get the same output.
 
 ### Change the configuration
 
-PRIMARY TODO: Add commentary to this section.
+Let's see what happens to the reverse proxy if we change the `slug` configuration option.
+
+Run:
 
 ```text
 juju config tinyproxy slug=foo
-curl <address>:8000/foo/  # Returns the same HTML as before.
-curl <address>:8000/example/  # Returns an error page.
-juju config tinyproxy slug=foo/bar  # Puts the charm into blocked status.
-juju config tinyproxy --reset slug  # Makes the charm active, with the original config.
+```
+
+Where `<address>` is the IP address of machine 0 from Juju status.
+
+You might see the message "(config-changed)" briefly appear in Juju status as your charm handles the config-changed event.
+
+Then run:
+
+```text
+curl <address>:8000/foo/
+```
+
+The output should be the same as when you ran `curl <address>:8000/example/`. Now run:
+
+```text
+curl <address>:8000/example/
+```
+
+The output should contain "400 Bad Request". These outputs confirm that your charm successfully reconfigured tinyproxy to use `/foo/` instead of `/example/` for the path of the reverse proxy.
+
+Next, let's try an invalid value of `slug`:
+
+```
+juju config tinyproxy slug=foo/bar
+```
+
+Juju status should now show "blocked" and a message about the invalid value.
+
+To unblock your charm, reset `slug` to `example`:
+
+```
+juju config tinyproxy --reset slug
 ```
 
 ## Write unit tests for your charm
