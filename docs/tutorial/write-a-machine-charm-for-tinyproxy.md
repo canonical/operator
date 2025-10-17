@@ -16,10 +16,6 @@ TODO:
 
 ## Set up your environment
 
-PRIMARY TODO:
-
-- Configure nano to use spaces for indentation. (Check whether this is needed.) Or install a different editor if you like.
-
 ### Create a virtual machine
 
 You'll work inside an Ubuntu virtual machine that's running on your computer. The virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
@@ -154,6 +150,14 @@ description: |
 ```
 
 Then save the file and exit nano.
+
+````{tip}
+You'll need to edit Python files later in the tutorial. To make sure that nano inserts spaces instead of tabs, run:
+
+```text
+printf "set tabsize 4\nset tabstospaces\n" > ~/.nanorc
+```
+````
 
 ### Write a helper module
 
