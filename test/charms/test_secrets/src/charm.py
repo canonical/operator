@@ -82,7 +82,7 @@ class SecretsCharm(ops.CharmBase):
 
     def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
-        # The `expires` and `rotates` fields are coerced to strings by hook tool invocation.
+        # The `expires` and `rotates` fields are coerced to strings by hook command invocation.
         info = cast('InfoSnapshot', secret.get_info().__dict__) if self.unit.is_leader() else None
         return {
             'info': info,

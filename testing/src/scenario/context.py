@@ -765,8 +765,8 @@ class Context(Generic[CharmType]):
 
         :arg event: the event that the charm will respond to. Use the :attr:`on` attribute to
             specify the event; for example: ``ctx.on.start()``.
-        :arg state: the :class:`State` instance to use as data source for the hook tool calls that
-            the charm will invoke when handling the event.
+        :arg state: the :class:`State` instance to use as data source for the hook command
+            calls that the charm will invoke when handling the event.
         """
         # Help people transition from Scenario 6:
         if isinstance(event, str):

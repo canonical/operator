@@ -62,7 +62,7 @@ Comparing these tests with `Harness` tests:
   time. This ensures that the execution environment is as clean as possible
   (for a unit test).
 - Harness maintains a model of the Juju Model, which is a maintenance burden and
-  adds complexity. These tests mock at the level of hook tools and store all
+  adds complexity. These tests mock at the level of hook commands and store all
   mocking data in a monolithic data structure (the `State`), which makes it more
   lightweight and portable.
 

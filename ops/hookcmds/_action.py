@@ -145,7 +145,7 @@ def action_set(results: Mapping[str, Any]):
     Args:
         results: The results map of the action, provided to the Juju user.
     """
-    # The Juju action-set hook tool cannot interpret nested dicts, so we use a
+    # The Juju action-set hook command cannot interpret nested dicts, so we use a
     # helper to flatten out any nested dict structures into a dotted notation.
     flat_results = format_result_dict(results)
     run('action-set', *[f'{k}={v}' for k, v in flat_results.items()])
