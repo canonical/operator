@@ -84,9 +84,7 @@ class BindAddress:
 
     @classmethod
     def _from_dict(cls, d: BindAddressDict) -> BindAddress:
-        addresses = [
-            Address._from_dict(cast('AddressDict', addr)) for addr in d.get('addresses') or []
-        ]
+        addresses = [Address._from_dict(addr) for addr in d.get('addresses') or []]
         return cls(
             mac_address=d.get('mac-address', ''),
             interface_name=d.get('interface-name', ''),
