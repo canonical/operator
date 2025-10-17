@@ -90,13 +90,15 @@ Now, in the body of the charm definition, define the event handler, or adjust an
 ```
 def _update_configuration(self, event: ops.EventBase):
     """Update the workload configuration."""
+    # This handler is called when the storage-attached event happens.
+    # Depending on the charm, it might also be called on other events.
     cache = self.model.storages["cache"]
-    if cache.location is None:
-        # This must be one of the other events. Return and wait for the storage-attached event.
+    if not cache:
+        # The storage-attached event hasn't happened yet.
         logger.info("Storage is not yet ready.")
         return
     try:
-        self.push_configuration(cache_dir=cache.location)
+        self.push_configuration(cache_dir=cache[0].location)
     except ops.pebble.ConnectionError:
         # Pebble isn't ready yet. Return and wait for the pebble-ready event.
         logger.info("Pebble is not yet ready.")
