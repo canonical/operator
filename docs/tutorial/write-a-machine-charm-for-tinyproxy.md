@@ -863,7 +863,20 @@ TOTAL                119     31     26      7    70%
 
 ## Write integration tests for your charm
 
-TODO
+Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
+
+When you created the initial version of your charm, Charmcraft included some basic integration tests. We'll expand these tests to cover more of your charm's functionality.
+
+In `tests/integration/test_charm.py`, remove the `@pytest.mark.skip ...` line before the `test_workload_version_is_set`. Then change the `assert version == ...` line to:
+
+```python
+    assert version == "1.11.0"
+```
+
+You should now have the following tests:
+
+- `test_deploy`, which checks that your charm goes into active status when deployed.
+- `test_workload_version_is_set`, which checks that your charm reports the correct version of tinyproxy to Juju.
 
 ## Tear things down
 
