@@ -28,14 +28,12 @@ import sys
 import github
 import github.GitRelease
 import github.Repository
+import rich.logging
 
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]
+)
 logger = logging.getLogger('release')
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
 
 if 'GITHUB_TOKEN' not in os.environ:
     raise SystemExit('Environment variable GITHUB_TOKEN not set.')
@@ -195,7 +193,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     full_changelog_line = None
 
     for line in release_notes.splitlines():
-        if match := re.match(r'^\* (\w+): (.*) by @\w+ in (.*)', line.strip()):
+        if match := re.match(r'^\* (\w+): (.*) by [^ ]+ in (.*)', line.strip()):
             category = match.group(1)
             if category in categories:
                 description = match.group(2).strip()

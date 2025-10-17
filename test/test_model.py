@@ -38,7 +38,7 @@ import ops
 import ops.testing
 from ops import pebble
 from ops._private import yaml
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
 from ops.model import _ModelBackend
@@ -57,7 +57,14 @@ def fake_juju_version(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture
 def root_logging():
-    context = _JujuContext(model_uuid='1234', unit_name='myapp/0')
+    context = JujuContext(
+        model_uuid='1234',
+        unit_name='myapp/0',
+        model_name='testing-model',
+        version=JujuVersion('3.6.8'),
+        hook_name='',
+        dispatch_path='',
+    )
     backend = ops.model._ModelBackend('myapp/0', 'testing-model', juju_context=context)
     orig_hook = sys.excepthook
     orig_show = warnings.showwarning
@@ -1197,7 +1204,7 @@ class TestModel:
 
     def test_juju_version_from_model(self):
         version = '3.6.2'
-        context = _JujuContext.from_dict({'JUJU_VERSION': version})
+        context = JujuContext._from_dict({'JUJU_VERSION': version})
         backend = _ModelBackend('myapp/0', juju_context=context)
         model = ops.Model(ops.CharmMeta(), backend)
         assert model.juju_version == version
@@ -1223,7 +1230,7 @@ class TestModel:
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 
-        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        # Multiple accesses to remote_model are cached (shouldn't call the hook command again).
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 
@@ -2837,7 +2844,9 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
-    def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
+    def test_relation_hook_command_errors(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
+    ):
         monkeypatch.setenv('JUJU_VERSION', '2.8.0')
         backend = _ModelBackend('myapp/0')
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
@@ -3087,7 +3096,7 @@ class TestModelBackend:
                     message=message,  # type: ignore[assignment]
                 )
 
-    def test_storage_tool_errors(self, fake_script: FakeScript, backend: _ModelBackend):
+    def test_storage_hook_command_errors(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.storage_list('foobar')

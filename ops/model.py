@@ -62,7 +62,7 @@ from typing import (
 from . import charm as _charm
 from . import pebble
 from ._private import timeconv, tracer, yaml
-from .jujucontext import _JujuContext
+from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
@@ -81,8 +81,8 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
-_StatusDict = TypedDict('_StatusDict', {'status': StatusName, 'message': str})
+_StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
+_StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
@@ -335,15 +335,16 @@ class Model:
     def get_cloud_spec(self) -> CloudSpec:
         """Get details of the cloud in which the model is deployed.
 
-        Note: This information is only available for machine charms,
-        not Kubernetes sidecar charms.
+        .. jujuchanged:: 3.6.10
+            This information is available on both machine charms and Kubernetes
+            charms. With earlier Juju versions, it was only available on machine charms.
 
         Returns:
             a specification for the cloud in which the model is deployed,
             including credential information.
 
         Raises:
-            :class:`ModelError`: if called in a Kubernetes model.
+            :class:`ModelError`: if called without trust.
         """
         return self._backend.credential_get()
 
@@ -1735,6 +1736,9 @@ class Relation:
     """Holds the data buckets for each entity of a relation.
 
     This is accessed using, for example, ``Relation.data[unit]['foo']``.
+
+    Note that peer relation data is not readable or writable during the Juju ``install``
+    event, even though the relation exists. :class:`ModelError` will be raised in that case.
     """
 
     active: bool
@@ -1818,7 +1822,7 @@ class Relation:
 
         Raises:
             ModelError: if on a version of Juju that doesn't support the
-                "relation-model-get" hook tool.
+                "relation-model-get" hook command.
         """
         if self._remote_model is None:
             d = self._backend.relation_model_get(self.id)
@@ -2240,10 +2244,10 @@ class StatusBase:
     directly use the child class such as :class:`ActiveStatus` to indicate their status.
     """
 
-    _statuses: ClassVar[dict[StatusName, type[StatusBase]]] = {}
+    _statuses: ClassVar[dict[_StatusName, type[StatusBase]]] = {}
 
     # Subclasses must provide this attribute
-    name: StatusName
+    name: _StatusName
 
     def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
@@ -2280,7 +2284,7 @@ class StatusBase:
             # unknown is special
             return UnknownStatus()
         else:
-            return cls._statuses[typing.cast('StatusName', name)](message)
+            return cls._statuses[typing.cast('_StatusName', name)](message)
 
     @classmethod
     def register(cls, child: type[StatusBase]):
@@ -2411,13 +2415,16 @@ class Resources:
         self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
     def fetch(self, name: str) -> Path:
-        """Fetch the resource from the controller or store.
+        """Fetch the resource path from the controller or store.
 
-        If successfully fetched, this returns the path where the resource is stored
-        on disk, otherwise it raises a :class:`NameError`.
+        Returns:
+            The path where the resource is stored on disk.
 
         Raises:
-            NameError: if the resource's path cannot be fetched.
+            NameError: if the resource name is not in the charm metadata.
+            ModelError: if the controller is unable to fetch the resource; for
+                example, if you ``juju deploy`` from a local charm file and
+                forget the appropriate ``--resource``.
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
@@ -2485,7 +2492,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
     def request(self, storage_name: str, count: int = 1):
         """Requests new storage instances of a given name.
 
-        Uses storage-add tool to request additional storage. Juju will notify the unit
+        Uses storage-add hook command to request additional storage. Juju will notify the unit
         via ``<storage-name>-storage-attached`` events when it becomes available.
 
         Raises:
@@ -2831,7 +2838,7 @@ class Container:
             pebble.PathError: If there was an error reading the file at path,
                 for example, if the file doesn't exist or is a directory.
         """
-        return self._pebble.pull(str(path), encoding=encoding)
+        return self._pebble.pull(path, encoding=encoding)
 
     def push(
         self,
@@ -2873,7 +2880,7 @@ class Container:
                 both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.push(
-            str(path),
+            path,
             source,
             encoding=encoding,
             make_dirs=make_dirs,
@@ -2900,7 +2907,7 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        return self._pebble.list_files(str(path), pattern=pattern, itself=itself)
+        return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
     def push_path(
         self,
@@ -3160,7 +3167,7 @@ class Container:
     def exists(self, path: str | PurePath) -> bool:
         """Report whether a path exists on the container filesystem."""
         try:
-            self._pebble.list_files(str(path), itself=True)
+            self._pebble.list_files(path, itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -3170,7 +3177,7 @@ class Container:
     def isdir(self, path: str | PurePath) -> bool:
         """Report whether a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(str(path), itself=True)
+            files = self._pebble.list_files(path, itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -3206,7 +3213,7 @@ class Container:
                 if both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.make_dir(
-            str(path),
+            path,
             make_parents=make_parents,
             permissions=permissions,
             user_id=user_id,
@@ -3229,7 +3236,7 @@ class Container:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
-        self._pebble.remove_path(str(path), recursive=recursive)
+        self._pebble.remove_path(path, recursive=recursive)
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
@@ -3239,7 +3246,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3260,7 +3267,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3279,7 +3286,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3517,7 +3524,7 @@ def _format_action_result_dict(
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key separator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
-    the Juju `action-set` hook tool in order to set nested data on an action.
+    the Juju `action-set` hook command in order to set nested data on an action.
 
     Additionally, this method performs some validation on keys to ensure they only use permitted
     characters.
@@ -3587,10 +3594,10 @@ class _ModelBackend:
         unit_name: str | None = None,
         model_name: str | None = None,
         model_uuid: str | None = None,
-        juju_context: _JujuContext | None = None,
+        juju_context: JujuContext | None = None,
     ):
         if juju_context is None:
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
         self._juju_context = juju_context
         # if JUJU_UNIT_NAME is not being passed nor in the env, something is wrong
         unit_name_ = unit_name or self._juju_context.unit_name
@@ -3624,7 +3631,7 @@ class _ModelBackend:
         input_stream: str | None = None,
     ) -> str | Any | None:
         if self._is_recursive.get():
-            # Either `juju-log` hook tool failed or there's a bug in ops.
+            # Either `juju-log` hook command failed or there's a bug in ops.
             return
         # Logs are collected via log integration, omit the subprocess calls that push
         # the same content to juju from telemetry.
@@ -3650,7 +3657,7 @@ class _ModelBackend:
                 args += ('--format=json',)
             if span:
                 span.set_attribute('call', 'subprocess.run')
-                # Some hook tool command line arguments may include sensitive data.
+                # The command-line arguments for some hook commands may include sensitive data.
                 truncate = args[0] in ['action-set']
                 span.set_attribute('argv', [args[0], '...'] if truncate else args)
             # TODO(benhoyt): all the "type: ignore"s below kinda suck, but I've
@@ -3941,7 +3948,7 @@ class _ModelBackend:
         return typing.cast('dict[str, Any]', out)
 
     def action_set(self, results: dict[str, Any]) -> None:
-        # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
+        # The Juju action-set hook command cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         flat_results = _format_action_result_dict(results)
         self._run('action-set', *[f'{k}={v}' for k, v in flat_results.items()])
@@ -4025,9 +4032,9 @@ class _ModelBackend:
         of being started, but will not include units that are being shut down.
 
         """
-        # The goal-state tool will return the information that we need. Goal state as a general
-        # concept is being deprecated, however, in favor of approaches such as the one that we use
-        # here.
+        # The goal-state hook command will return the information that we need. Goal state as a
+        # general concept is being deprecated, however, in favor of approaches such as the one
+        # that we use here.
         app_state = self._run('goal-state', return_output=True, use_json=True)
         app_state = typing.cast('dict[str, dict[str, Any]]', app_state)
 
@@ -4227,7 +4234,7 @@ class _ModelBackend:
             self._run('juju-reboot')
 
     def credential_get(self) -> CloudSpec:
-        """Access cloud credentials by running the credential-get hook tool.
+        """Access cloud credentials by running the credential-get hook command.
 
         Returns the cloud specification used by the model.
         """

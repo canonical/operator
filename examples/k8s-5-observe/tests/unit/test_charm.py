@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from charm import FastAPIDemoCharm
-
 import ops
 from ops import testing
+
+from charm import FastAPIDemoCharm
 
 
 def test_pebble_layer():

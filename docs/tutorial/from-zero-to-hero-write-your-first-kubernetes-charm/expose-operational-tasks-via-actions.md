@@ -92,10 +92,12 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
         'db-port': db_data.get('db_port', None),
     }
     if params.show_password:
-        output.update({
-            'db-username': db_data.get('db_username', None),
-            'db-password': db_data.get('db_password', None),
-        })
+        output.update(
+            {
+                'db-username': db_data.get('db_username', None),
+                'db-password': db_data.get('db_password', None),
+            }
+        )
     event.set_results(output)
 ```
 

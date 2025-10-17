@@ -22,7 +22,6 @@ from typing import Generator
 import ops
 import ops.testing
 import pytest
-from ops.jujucontext import _JujuContext
 
 import ops_tracing
 
@@ -70,7 +69,7 @@ def ca_relation():
 @pytest.fixture
 def juju_context(tmp_path: pathlib.Path):
     (tmp_path / 'metadata.yaml').write_text('name: testcharm')
-    return _JujuContext.from_dict({
+    return ops.JujuContext._from_dict({
         'JUJU_VERSION': '3.6.0',
         'JUJU_MODEL_NAME': 'test-model',
         'JUJU_MODEL_UUID': '4242',
@@ -80,7 +79,7 @@ def juju_context(tmp_path: pathlib.Path):
 
 
 @pytest.fixture
-def setup_tracing(juju_context: _JujuContext):
+def setup_tracing(juju_context: ops.JujuContext):
     ops_tracing._setup(juju_context, 'DummyCharm')
     yield
     ops_tracing._shutdown()
@@ -97,7 +96,7 @@ def setup_tracing(juju_context: _JujuContext):
 
 
 @pytest.fixture
-def sample_charm() -> Generator[ops.CharmBase, None, None]:
+def sample_charm() -> Generator[type[ops.CharmBase]]:
     extra = str(pathlib.Path(__file__).parent / 'sample_charm/src')
     sys.path.append(extra)
     from charm import SampleCharm  # type: ignore

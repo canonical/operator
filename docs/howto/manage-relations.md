@@ -46,7 +46,7 @@ requires:
 
 Note that implementing a cross-model relation is done in the same way as one between applications in the same model. The ops library does not distinguish between data from a different model or from the same model as the one the charm is deployed to.
 
-Which side of the relation is the 'provider' or the 'requirer' is sometimes arbitrary, but if one side has a workload that is a server and the other a client, then the server side should be the provider. This becomes important for how Juju sets up network permissions in cross-model relations.
+Which side of the relation is the "provider" or the "requirer" is sometimes arbitrary, but if one side has a workload that is a server and the other a client, then the server side should be the provider. This becomes important for how Juju sets up network permissions in cross-model relations.
 
 If the relation is with a subordinate charm, make sure to set the `scope` field to `container`.
 
@@ -129,7 +129,7 @@ class SMTPProviderUnitData(pydantic.BaseMode):
     smtp_credentials: str = pydantic.Field(description="A Juju secret ID")
 ```
 
-Now, in the body of the charm definition, define the event handler. In this example, a “smtp_credentials” key is set in the unit data with the ID of a secret:
+Now, in the body of the charm definition, define the event handler. In this example, a `smtp_credentials` key is set in the unit data with the ID of a secret:
 
 ```python
 def _on_smtp_relation_joined(self, event: ops.RelationJoinedEvent):
@@ -280,6 +280,7 @@ def _on_db_relation_broken(self, event: ops.RelationBrokenEvent):
 
 > See more: [](ops.RelationBrokenEvent)
 
+(manage-relations-test-the-feature)=
 ## Test the feature
 
 ### Write unit tests
@@ -346,29 +347,17 @@ relation.remote_unit_name  # 'zookeeper/42'
 
 ### Write integration tests
 
-Write an integration test that verifies that your charm behaves as expected in a real Juju environment. Other than when testing peer relations, as well as deploying your own charm, the test needs to deploy a second application, either the real charm or a facade that provides enough functionality to test against.
+> See first: {ref}`write-integration-tests-for-a-charm`
 
-The pytest-operator plugin provides methods to deploy multiple charms. For example:
+To verify that charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
 
 ```python
 # This assumes that your integration tests already include the standard
-# build and deploy test that the Charmcraft profile provides.
+# build and deploy test.
 
-@pytest.mark.abort_on_fail
-async def test_active_when_deploy_db_facade(ops_test: OpsTest):
-    await ops_test.model.deploy('facade')
-    await ops_test.model.integrate(APP_NAME + ':postgresql', 'facade:provide-postgresql')
+def test_active_with_another_app(juju: jubilant.Juju):
+    juju.deploy("another-app")
+    juju.integrate("your-app:endpoint", "another-app:endpoint")
 
-    present_facade('postgresql', model=ops_test.model_name,
-                   app_data={
-                       'credentials': 'secret:abc',
-                   })
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status='active',
-        timeout=600,
-    )
+    juju.wait(jubilant.all_active)
 ```
-
-> See more: [`pytest-operator`](https://pypi.org/project/pytest-operator/)

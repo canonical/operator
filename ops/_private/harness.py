@@ -60,8 +60,8 @@ from typing import (
 
 from .. import charm, framework, model, pebble, storage
 from ..charm import CharmBase, CharmMeta, RelationRole
-from ..jujucontext import _JujuContext
-from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..jujucontext import JujuContext
+from ..model import Container, RelationNotFoundError, _NetworkDict, _StatusName
 from ..pebble import ExecProcess
 from . import yaml
 
@@ -95,7 +95,7 @@ _RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[st
 _RawStatus = TypedDict(
     '_RawStatus',
     {
-        'status': StatusName,
+        'status': _StatusName,
         'message': str,
     },
 )
@@ -292,7 +292,7 @@ class Harness(Generic[CharmType]):
         context_environ = os.environ.copy()
         if 'JUJU_VERSION' not in context_environ:
             context_environ['JUJU_VERSION'] = '0.0.0'
-        self._juju_context = _JujuContext.from_dict(context_environ)
+        self._juju_context = JujuContext._from_dict(context_environ)
         self._charm_cls = charm_cls
         self._charm: CharmType | None = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -2350,7 +2350,7 @@ class _TestingModelBackend:
         unit_name: str,
         meta: charm.CharmMeta,
         config: _RawConfig,
-        juju_context: _JujuContext,
+        juju_context: JujuContext,
     ):
         self._juju_context = juju_context
         self.unit_name = unit_name
@@ -2534,7 +2534,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status: StatusName, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: _StatusName, message: str = '', *, is_app: bool = False):
         if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
             raise model.ModelError(
                 f'ERROR invalid status "{status}", expected one of'
@@ -3532,7 +3532,10 @@ class _TestingPebbleClient:
         if not path.startswith('/'):
             raise pebble.PathError('generic-file-error', f'paths must be absolute, got {path!r}')
 
-    def pull(self, path: str, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
+    def pull(
+        self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
+    ) -> BinaryIO | TextIO:
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
@@ -3552,7 +3555,7 @@ class _TestingPebbleClient:
 
     def push(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         source: ReadableBuffer,
         *,
         encoding: str = 'utf-8',
@@ -3563,6 +3566,7 @@ class _TestingPebbleClient:
         group_id: int | None = None,
         group: str | None = None,
     ) -> None:
+        path = str(path)
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -3604,8 +3608,9 @@ class _TestingPebbleClient:
             ) from None
 
     def list_files(
-        self, path: str, *, pattern: str | None = None, itself: bool = False
+        self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
     ) -> list[pebble.FileInfo]:
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
@@ -3632,7 +3637,7 @@ class _TestingPebbleClient:
 
     def make_dir(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         *,
         make_parents: bool = False,
         permissions: int | None = None,
@@ -3641,6 +3646,7 @@ class _TestingPebbleClient:
         group_id: int | None = None,
         group: str | None = None,
     ) -> None:
+        path = str(path)
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -3673,7 +3679,8 @@ class _TestingPebbleClient:
             # Attempted to create a subdirectory of a file
             raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]

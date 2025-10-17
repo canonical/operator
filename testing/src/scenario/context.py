@@ -630,7 +630,7 @@ class Context(Generic[CharmType]):
         capture_framework_events: bool = False,
         app_name: str | None = None,
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -934,8 +934,8 @@ class Context(Generic[CharmType]):
 
         :arg event: the event that the charm will respond to. Use the :attr:`on` attribute to
             specify the event; for example: ``ctx.on.start()``.
-        :arg state: the :class:`State` instance to use as data source for the hook tool calls that
-            the charm will invoke when handling the event.
+        :arg state: the :class:`State` instance to use as data source for the hook command
+            calls that the charm will invoke when handling the event.
         """
         # Help people transition from Scenario 6:
         if isinstance(event, str):

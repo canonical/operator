@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import os
 import pathlib
 import sys
@@ -13,6 +14,15 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
+# Check that the ops package is installed in the Sphinx venv.
+if importlib.util.find_spec("ops") is None:
+    print(
+        "Error: The ops package is not available. "
+        "Check whether the $(VENVDIR) target in our Makefile has been changed or reverted."
+    )
+    sys.exit(1)
+
+# Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Configuration for the Sphinx documentation builder.
@@ -421,6 +431,7 @@ maximum_signature_line_length = 80
 # that should be linked to in this documentation.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
+    'jubilant': ('https://documentation.ubuntu.com/jubilant', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
@@ -444,11 +455,9 @@ nitpick_ignore = [
     ('py:class', '_EntityStatus'),
     ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
-    ('py:class', '_JujuContext'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
     ('py:class', '_RawPortProtocolLiteral'),
-    ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
     ('py:class', '_StateKwargs'),
@@ -456,7 +465,6 @@ nitpick_ignore = [
     ('py:class', '_TaskDict'),
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
-    ('py:class', '_Writeable'),
     ('py:class', 'AnyJson'),
     ('py:class', 'BasicIdentityDict'),
     ('py:class', 'CharmType'),
@@ -473,7 +481,6 @@ nitpick_ignore = [
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
     ('py:class', 'ops.model._T'),
-    ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),
     ('py:class', 'ops.pebble._ServiceInfoDict'),

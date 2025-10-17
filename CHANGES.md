@@ -1,3 +1,75 @@
+# 3.3.0 - 29 September 2025
+
+## Features
+
+* Expose the Juju hook context in ops.JujuContext (#1996)
+
+## Fixes
+
+* In testing, separate relation data cache from mock Juju backend (#2052)
+
+## Documentation
+
+* Use uv for testing and packing the httpbin charm (#2011)
+* Improve intro to ops.testing reference (#2023)
+* In httpbin charm integration tests, add env var for charm file to deploy (#2018)
+* Update get_cloud_spec doc now that credential-get works on K8s (#2031)
+* Note that arbitrary_types_allowed is required when ops.Secret is used in a Pydantic class (#2038)
+* Clean up Resources.fetch docstring, add ModelError exception (#2039)
+* Note that the peer databag isn't usable during the install event (#2051)
+* Fix testing code in actions how-to guide (#2054)
+
+## CI
+
+* Nicer logging output in the release script using rich (#2017)
+* Clean up PYTHONPATH in tox.ini (#2058)
+
+# 3.2.0 - 28 August 2025
+
+## Features
+
+* Add security event logging (#1905)
+* Surface JUJU_MACHINE_ID envvar in testing env (#1961)
+* Add a new log target type opentelemetry (#1937)
+
+## Documentation
+
+* Update links and config for switch to documentation.ubuntu.com/ops (#1940)
+* Update the required Python version and note the 2.x documentation site (#1946)
+* Be consistent with recommending self.config (#1947)
+* Use latest styles from starter pack and remove .html extensions (#1951)
+* Remove .html extensions from hardcoded links (#1955)
+* Fix broken URLs in sitemap (#1956)
+* Add related doc links to homepage (#1959)
+* Use classes from ops instead of ops.<submodule> (#1968)
+* Fix unstyled error pages (#1969)
+* Add Google Analyics integration and cookie consent banner (#1971)
+* Refresh docs homepage with more context about Ops (#1964)
+* Update link to Charmlibs docs (#1985)
+* Remove unnecessary pages from sitemap (#1979)
+* Update the httpbin example charm to Jubilant (#1987)
+* Update the Zero to Hero tutorial to Jubilant (#1988)
+* Add model-config best practice note (#1990)
+* Change some best practices to tips (#2001)
+* Add integration test for invalid config in httpbin charm (#2002)
+* Make a `Layer` instead of a `LayerDict` in the httpbin charm (#2003)
+* Update how-to to feature Jubilant (#2000, #2004)
+* Use Charmcraft-style format and lint for example charms, not Ops-style (#2008)
+* Update broken link to HookVars source code (#2006)
+
+## CI
+
+* Fixes for the SBOM and security scan workflow, and trigger it on publishing (#1916)
+* Store the charmcraft logs if packing fails (#1936)
+* Install release dependencies for the TIOBE analysis (#1930)
+* Add Juju 4/beta to the smoke test matrix (#1963)
+* Adjust permissions block in publish workflow (#1984)
+* Update actions/checkout to v5 (#1993)
+* Enable doctests (#1991)
+* Ignore juju/4 timeouts (#1998)
+* Remove the token for SBOM and security scan workflow (#2009)
+* Speed up integration test (#1978)
+
 # 3.1.0 - 30 July 2025
 
 ## Features
@@ -511,7 +583,7 @@ The minimum version of Python for Ops 3.x is 3.10.
 
 ## Features
 
-* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook command to get details of the cloud where the model is deployed (#1152)
 
 ## Fixes
 

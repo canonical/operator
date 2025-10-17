@@ -12,24 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pathlib
-import subprocess
 
 import jubilant
 import pytest
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
     with jubilant.temp_model() as juju:
         yield juju
 
         if request.session.testsfailed:
             log = juju.debug_log(limit=1000)
-            print(log, end='')
+            print(log, end="")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def charm():
-    subprocess.check_call(['charmcraft', 'pack'])  # noqa
-    return next(pathlib.Path('.').glob('*.charm'))
+    if "CHARM_PATH" in os.environ:
+        charm_path = pathlib.Path(os.environ["CHARM_PATH"])
+        if not charm_path.exists():
+            raise FileNotFoundError(f"Charm does not exist: {charm_path}")
+        return charm_path
+    charm_paths = list(pathlib.Path(".").glob("*.charm"))
+    if not charm_paths:
+        raise FileNotFoundError("No .charm file in current directory")
+    if len(charm_paths) > 1:
+        path_list = ", ".join(str(path) for path in charm_paths)
+        raise ValueError(f"More than one .charm file in current directory: {path_list}")
+    return charm_paths[0]
