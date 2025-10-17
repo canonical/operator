@@ -878,6 +878,12 @@ You should now have the following tests:
 - `test_deploy`, which checks that your charm goes into active status when deployed.
 - `test_workload_version_is_set`, which checks that your charm reports the correct version of tinyproxy to Juju.
 
+You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. Instead of asking APT to install an unspecified version of tinyproxy, the charm code ought to specify a particular version. In general, it's good practice for charms to pin known workload versions.
+
+TODO: Add two more integration tests, to test that the charm blocks and unblocks properly.
+
+TODO: Run the integration tests.
+
 ## Tear things down
 
 TODO:
