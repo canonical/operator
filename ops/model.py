@@ -2844,7 +2844,7 @@ class Container:
             pebble.PathError: If there was an error reading the file at path,
                 for example, if the file doesn't exist or is a directory.
         """
-        return self._pebble.pull(str(path), encoding=encoding)
+        return self._pebble.pull(path, encoding=encoding)
 
     def push(
         self,
@@ -2886,7 +2886,7 @@ class Container:
                 both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.push(
-            str(path),
+            path,
             source,
             encoding=encoding,
             make_dirs=make_dirs,
@@ -2913,7 +2913,7 @@ class Container:
             itself: If path refers to a directory, return information about the
                 directory itself, rather than its contents.
         """
-        return self._pebble.list_files(str(path), pattern=pattern, itself=itself)
+        return self._pebble.list_files(path, pattern=pattern, itself=itself)
 
     def push_path(
         self,
@@ -3173,7 +3173,7 @@ class Container:
     def exists(self, path: str | PurePath) -> bool:
         """Report whether a path exists on the container filesystem."""
         try:
-            self._pebble.list_files(str(path), itself=True)
+            self._pebble.list_files(path, itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -3183,7 +3183,7 @@ class Container:
     def isdir(self, path: str | PurePath) -> bool:
         """Report whether a directory exists at the given path on the container filesystem."""
         try:
-            files = self._pebble.list_files(str(path), itself=True)
+            files = self._pebble.list_files(path, itself=True)
         except pebble.APIError as err:
             if err.code == 404:
                 return False
@@ -3219,7 +3219,7 @@ class Container:
                 if both are specified. May only be specified with ``user_id`` or ``user``.
         """
         self._pebble.make_dir(
-            str(path),
+            path,
             make_parents=make_parents,
             permissions=permissions,
             user_id=user_id,
@@ -3242,7 +3242,7 @@ class Container:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
-        self._pebble.remove_path(str(path), recursive=recursive)
+        self._pebble.remove_path(path, recursive=recursive)
 
     # Exec I/O is str if encoding is provided (the default)
     @typing.overload
@@ -3252,7 +3252,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3273,7 +3273,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3292,7 +3292,7 @@ class Container:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,

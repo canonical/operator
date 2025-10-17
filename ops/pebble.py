@@ -44,6 +44,7 @@ import io
 import json
 import logging
 import os
+import pathlib
 import select
 import shutil
 import signal
@@ -2598,12 +2599,14 @@ class Client:
             return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
-    def pull(self, path: str, *, encoding: None) -> BinaryIO: ...
+    def pull(self, path: str | pathlib.PurePath, *, encoding: None) -> BinaryIO: ...
 
     @typing.overload
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO: ...
+    def pull(self, path: str | pathlib.PurePath, *, encoding: str = 'utf-8') -> TextIO: ...
 
-    def pull(self, path: str, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
+    def pull(
+        self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
+    ) -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
         Args:
@@ -2620,6 +2623,7 @@ class Client:
             PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble pull') as span:
             query = {
                 'action': 'read',
@@ -2672,7 +2676,7 @@ class Client:
 
     def push(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         source: _IOSource,
         *,
         encoding: str = 'utf-8',
@@ -2708,6 +2712,7 @@ class Client:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2804,7 +2809,7 @@ class Client:
         return generator(), content_type
 
     def list_files(
-        self, path: str, *, pattern: str | None = None, itself: bool = False
+        self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
     ) -> list[FileInfo]:
         """Return list of directory entries from given path on remote system.
 
@@ -2823,6 +2828,7 @@ class Client:
             PathError: if there was an error listing the directory; for example, if the directory
                 does not exist.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble list_files') as span:
             query = {'path': path}
             if pattern:
@@ -2837,7 +2843,7 @@ class Client:
 
     def make_dir(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         *,
         make_parents: bool = False,
         permissions: int | None = None,
@@ -2867,6 +2873,7 @@ class Client:
             PathError: if there was an error making the directory; for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble make_dir') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2880,7 +2887,7 @@ class Client:
             resp = self._request('POST', '/v1/files', None, body)
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
@@ -2894,6 +2901,7 @@ class Client:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble remove_path') as span:
             info: dict[str, Any] = {'path': path}
             if recursive:
@@ -2914,7 +2922,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -2935,7 +2943,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -2954,7 +2962,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3120,7 +3128,7 @@ class Client:
                 'command': command,
                 'service-context': service_context,
                 'environment': environment or {},
-                'working-dir': working_dir,
+                'working-dir': str(working_dir) if working_dir is not None else None,
                 'timeout': _format_timeout(timeout) if timeout is not None else None,
                 'user-id': user_id,
                 'user': user,
@@ -3554,8 +3562,9 @@ class _FilesParser:
         """Return a list of filenames from the "files" parts of the response."""
         return list(self._files.keys())
 
-    def get_file(self, path: str, encoding: str | None) -> _TextOrBinaryIO:
+    def get_file(self, path: str | pathlib.PurePath, encoding: str | None) -> _TextOrBinaryIO:
         """Return an open file object containing the data."""
+        path = str(path)
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.

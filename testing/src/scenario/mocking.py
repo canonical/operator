@@ -502,6 +502,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         return SecretInfo(
             id=secret.id,
             label=secret.label,
+            description=secret.description,
             revision=secret._latest_revision,
             expires=secret.expire,
             rotation=secret.rotate,
