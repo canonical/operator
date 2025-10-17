@@ -173,6 +173,12 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
             port = int(port)
         # The type: ignore is required because we know that protocol will be tcp, udp, or icmp
         # but we can't raise if not, because model.py only emits a warning in that case, and
-        # we need to maintain backwards-compatibility.
-        ports.append(Port(protocol=protocol, port=port, to_port=to_port, endpoints=port_endpoints))  # type: ignore
+        # we need to maintain backwards compatibility.
+        port = Port(
+            protocol=protocol,  # type: ignore
+            port=port,
+            to_port=to_port,
+            endpoints=port_endpoints,
+        )
+        ports.append(port)
     return ports
