@@ -65,35 +65,10 @@ from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import NotRequired, TypeAlias
+    from typing_extensions import TypeAlias
 
-    _AddressDict = TypedDict(
-        '_AddressDict',
-        {
-            'hostname': NotRequired[str],
-            'address': NotRequired[str],  # Juju < 2.9
-            'value': NotRequired[str],  # Juju >= 2.9
-            'cidr': str,
-        },
-    )
+    from .hookcmds._types import AddressDict, BindAddressDict
 
-    _BindAddressDict = TypedDict(
-        '_BindAddressDict',
-        {
-            'mac-address': NotRequired[str],
-            'interface-name': str,
-            'addresses': List[_AddressDict],
-        },
-    )
-
-    _NetworkDict = TypedDict(
-        '_NetworkDict',
-        {
-            'bind-addresses': List[_BindAddressDict],
-            'ingress-addresses': List[str],
-            'egress-subnets': List[str],
-        },
-    )
 
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
@@ -121,6 +96,14 @@ _ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'
 _RelationDataContent_Raw: TypeAlias = 'dict[str, str]'
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
+_NetworkDict = TypedDict(
+    '_NetworkDict',
+    {
+        'bind-addresses': list['BindAddressDict'],
+        'ingress-addresses': list[str],
+        'egress-subnets': list[str],
+    },
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1154,7 +1137,7 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name: str = interface_info.get('interface-name')
-            addrs: list[_AddressDict] | None = interface_info.get('addresses')
+            addrs: list[AddressDict] | None = interface_info.get('addresses')
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
@@ -1214,7 +1197,7 @@ class NetworkInterface:
     (for example, '10.0.1.2/32').
     """
 
-    def __init__(self, name: str, address_info: _AddressDict):
+    def __init__(self, name: str, address_info: AddressDict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
 

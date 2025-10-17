@@ -18,6 +18,7 @@ import dataclasses
 import datetime
 import pathlib
 from typing import (
+    TYPE_CHECKING,
     Any,
     Literal,
     Sequence,
@@ -34,10 +35,19 @@ ReadOnlyStatusName = Literal['error', 'unknown']
 StatusName: TypeAlias = SettableStatusName | ReadOnlyStatusName
 
 
-class AddressDict(TypedDict):
-    hostname: str
-    value: str
-    cidr: str
+if TYPE_CHECKING:
+    from typing_extensions import NotRequired
+
+    class AddressDict(TypedDict):
+        hostname: NotRequired[str]
+        address: NotRequired[str]  # Juju < 2.9
+        value: NotRequired[str]  # Juju >= 2.9
+        cidr: str
+
+    BindAddressDict = TypedDict(
+        'BindAddressDict',
+        {'mac-address': NotRequired[str], 'interface-name': str, 'addresses': list[AddressDict]},
+    )
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -59,11 +69,9 @@ class Address:
             cidr=d.get('cidr', ''),
         )
 
-
-BindAddressDict = TypedDict(
-    'BindAddressDict',
-    {'mac-address': str, 'interface-name': str, 'addresses': list[dict[str, str]]},
-)
+    @property
+    def address(self) -> str:
+        return self.value
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
