@@ -5,12 +5,64 @@ fail_not_found() {
     exit 2
 }
 
-case $2 in
-    1) echo '["remote/0"]' ;;
-    2) echo '["remote/0"]' ;;
-    3) fail_not_found $2 ;;
-    4) echo '["remoteapp1/0"]' ;;
-    5) echo '["remoteapp1/0"]' ;;
-    6) echo '["remoteapp2/0"]' ;;
-    *) fail_not_found $2 ;;
-esac
+format_json=false
+app_flag=false
+relation_id=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --format=json)
+            format_json=true
+            shift
+            ;;
+        --app)
+            app_flag=true
+            shift
+            ;;
+        -r)
+            if [[ -n "$2" ]]; then
+                relation_id="$2"
+                shift 2
+            else
+                echo "ERROR: -r requires a value" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            # For backward compatibility, treat second positional argument as relation ID
+            if [[ -z "$relation_id" && "$1" =~ ^[0-9]+$ ]]; then
+                relation_id="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+get_relation_data() {
+    local rel_id="$1"
+    case $rel_id in
+        1) echo "remote/0" ;;
+        2) echo "remote/0" ;;
+        3) fail_not_found $rel_id ;;
+        4) echo "remoteapp1/0" ;;
+        5) echo "remoteapp1/0" ;;
+        6) echo "remoteapp2/0" ;;
+        *) fail_not_found $rel_id ;;
+    esac
+}
+
+if [[ -n "$relation_id" ]]; then
+    data=$(get_relation_data "$relation_id")
+    if [[ "$format_json" == true ]]; then
+        if [[ "$app_flag" == true ]]; then
+            echo "\"$data\""
+        else
+            echo "[\"$data\"]"
+        fi
+    else
+        echo "$data"
+    fi
+else
+    echo "ERROR: relation ID required" >&2
+    exit 1
+fi
