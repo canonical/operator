@@ -66,6 +66,8 @@ from ..pebble import ExecProcess
 from . import yaml
 
 if typing.TYPE_CHECKING:
+    from ..model import _NetworkDict
+
     try:
         from ..testing import State  # type: ignore
     except ImportError:
@@ -74,8 +76,6 @@ if typing.TYPE_CHECKING:
         # the State class, so we just define it as a dummy class.
         class State:
             pass
-
-    from ..model import _NetworkDict
 
 
 ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
