@@ -61,7 +61,7 @@ class Address:
 
 
 BindAddressDict = TypedDict(
-    '_BindAddressDict',
+    'BindAddressDict',
     {'mac-address': str, 'interface-name': str, 'addresses': list[dict[str, str]]},
 )
 
