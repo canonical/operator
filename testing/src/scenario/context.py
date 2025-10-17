@@ -134,9 +134,8 @@ class Manager(Generic[CharmType]):
                 'Doing so implicitly upon exit...',
             )
             self.run()
-        # guaranteed to be set: run was either called before, or right above
-        assert self.ops
-        self.ops.destroy()
+        if exc_type is not None:
+            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
