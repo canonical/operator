@@ -659,7 +659,9 @@ We'll run all the unit tests later in the tutorial. But if you'd like to see whe
 
 We should write unit tests for the charm code that handles events. Each test will be structured as a "state-transition" test, using the testing framework that comes with Ops.
 
-State-transition tests are isolated tests of event handlers. They test how your charm responds to simulated events from Juju. It's helpful to think of each test this way:
+State-transition tests are isolated tests of event handlers. They don't require Juju to be available. Instead, they test how your charm responds to simulated events from Juju.
+
+It's helpful to think of each test this way:
 
 1. Ops mocks the input to a particular event handler, based on details that you provide. You mock the interaction between the event handler and the workload. For tinyproxy, we'll define a mock object that represents the state of tinyproxy and we'll patch the helper module to act on this mock object.
 2. Ops runs the event handler with the mocked input, which simulates your charm receiving the event.
