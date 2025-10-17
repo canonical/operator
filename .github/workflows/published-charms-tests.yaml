@@ -142,6 +142,7 @@ jobs:
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         working-directory: ${{ matrix.charm-root }}
         run: |
+          set -xueo pipefail
           if [ -e "test-requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> test-requirements.txt
@@ -187,6 +188,7 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: ${{ matrix.charm-root }}
         run: |
+          set -xueo pipefail
           if tox list --no-desc | grep '^static$'; then
             echo 'static=true' >> "$GITHUB_OUTPUT"
           else
@@ -204,31 +206,56 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        charmcraft_channel: ["3.x/stable", "latest/edge"]
+        profile: [machine, kubernetes]
         include:
-          - profile: machine
-          - profile: kubernetes
-          - profile: simple
+          - charmcraft_channel: "3.x/stable"  # Last version to include "simple"
+            profile: simple
     steps:
       - name: Install charmcraft
-        run: sudo snap install charmcraft --classic
+        run: sudo snap install charmcraft --classic --channel=${{ matrix.charmcraft_channel }}
 
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
 
+      - name: Install dependencies
+        run: pip install tox~=4.2 uv~=0.9 tox-uv~=1.29
+
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
+          set -xueo pipefail
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+          elif [ -e "uv.lock" ]; then
+            uv remove ops[testing] --group unit --frozen
+            uv remove ops --frozen
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --group unit --raw-sources --prerelease=if-necessary-or-explicit
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+          else
+            echo "Error: no uv.lock file found"
+            exit 1
           fi
-
-      - name: Install dependencies
-        run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
         run: tox -vve unit
 
+      - name: Run the charm's lint tests
+        run: tox -vve lint
+
+      # Charmcraft 4 doesn't have a separate 'static' environment.
+      - name: Check for tox static environment
+        id: has-static
+        run: |
+          set -xueo pipefail
+          if tox list --no-desc | grep '^static$'; then
+            echo 'static_exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'static_exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run the charm's static tests
+        if: ${{ steps.has-static.outputs.static_exists == 'true' }}
         run: tox -vve static
