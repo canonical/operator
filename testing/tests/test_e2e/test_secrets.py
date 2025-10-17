@@ -285,6 +285,7 @@ def test_meta(mycharm, app):
         info = secret.get_info()
 
         assert secret.label is None
+        assert info.description == 'foobarbaz'
         assert info.label == 'mylabel'
         assert info.rotation == SecretRotate.HOURLY
 
@@ -649,8 +650,7 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         assert info['label'] == 'label1'
     if 'description' in fields:
         assert scenario_secret.description == 'description1'
-        # https://github.com/canonical/operator/issues/2037
-        assert info['description'] is None
+        assert info['description'] == 'description1'
     if 'expire' in fields:
         assert scenario_secret.expire == datetime.datetime(2020, 1, 1, 0, 0, 0)
         assert info['expires'] == datetime.datetime(2020, 1, 1, 0, 0, 0)
@@ -675,8 +675,7 @@ def common_assertions(scenario_secret: Secret | None, result: Result):
         assert scenario_secret._latest_revision == info['revision']
         assert scenario_secret.expire == info['expires']
         assert scenario_secret.rotate == info['rotation']
-        # https://github.com/canonical/operator/issues/2037
-        # assert scenario_secret.description == info['description']
+        assert scenario_secret.description == info['description']
         # https://github.com/canonical/operator/issues/2104
         assert info['rotates'] is None
 
