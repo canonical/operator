@@ -465,7 +465,7 @@ class BindAddress(_max_posargs(1)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        """Dumps itself to dict in the same format the hook tool would."""
+        """Dumps itself to dict in the same format the hook command would."""
         dct = {
             'interface-name': self.interface_name,
             'addresses': [dataclasses.asdict(addr) for addr in self.addresses],
@@ -518,7 +518,7 @@ class Network(_max_posargs(2)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
+        # dumps itself to dict in the same format the hook command would
         return {
             'bind-addresses': [ba._hook_tool_output_fmt() for ba in self.bind_addresses],
             'egress-subnets': self.egress_subnets,

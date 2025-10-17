@@ -1811,7 +1811,7 @@ class Relation:
 
         Raises:
             ModelError: if on a version of Juju that doesn't support the
-                "relation-model-get" hook tool.
+                "relation-model-get" hook command.
         """
         if self._remote_model is None:
             d = self._backend.relation_model_get(self.id)
@@ -2481,7 +2481,7 @@ class StorageMapping(Mapping[str, List['Storage']]):
     def request(self, storage_name: str, count: int = 1):
         """Requests new storage instances of a given name.
 
-        Uses storage-add tool to request additional storage. Juju will notify the unit
+        Uses storage-add hook command to request additional storage. Juju will notify the unit
         via ``<storage-name>-storage-attached`` events when it becomes available.
 
         Raises:
@@ -3513,7 +3513,7 @@ def _format_action_result_dict(
     """Turn a nested dictionary into a flattened dictionary, using '.' as a key separator.
 
     This is used to allow nested dictionaries to be translated into the dotted format required by
-    the Juju `action-set` hook tool in order to set nested data on an action.
+    the Juju `action-set` hook command in order to set nested data on an action.
 
     Additionally, this method performs some validation on keys to ensure they only use permitted
     characters.
@@ -3904,7 +3904,7 @@ class _ModelBackend:
             raise ModelError(e.stderr) from e
 
     def action_set(self, results: dict[str, Any]) -> None:
-        # The Juju action-set hook tool cannot interpret nested dicts, so we use a helper to
+        # The Juju action-set hook command cannot interpret nested dicts, so we use a helper to
         # flatten out any nested dict structures into a dotted notation, and validate keys.
         # The hookcmds action_set method will handle flattening nested structures, but does
         # not do validation, so we handle both here.
@@ -4036,7 +4036,7 @@ class _ModelBackend:
         of being started, but will not include units that are being shut down.
 
         """
-        # The goal-state tool will return the information that we need. Goal state as a general
+        # The goal-state will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
         try:
@@ -4242,7 +4242,7 @@ class _ModelBackend:
             raise ModelError(e.stderr) from e
 
     def credential_get(self) -> CloudSpec:
-        """Access cloud credentials by running the credential-get hook tool.
+        """Access cloud credentials by running the credential-get hook command.
 
         Returns the cloud specification used by the model.
         """

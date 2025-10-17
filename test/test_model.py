@@ -1230,7 +1230,7 @@ class TestModel:
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 
-        # Multiple accesses to remote_model are cached (shouldn't call hook tool again).
+        # Multiple accesses to remote_model are cached (shouldn't call the hook command again).
         remote_model = rel.remote_model
         assert remote_model.uuid == 'UUID'
 
@@ -2844,7 +2844,9 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
-    def test_relation_tool_errors(self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch):
+    def test_relation_hook_command_errors(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
+    ):
         monkeypatch.setenv('JUJU_VERSION', '2.8.0')
         backend = _ModelBackend('myapp/0')
         err_msg = 'ERROR invalid value "$2" for option -r: relation not found'
@@ -3035,7 +3037,7 @@ class TestModelBackend:
                     message=message,  # type: ignore[assignment]
                 )
 
-    def test_storage_tool_errors(self, fake_script: FakeScript, backend: _ModelBackend):
+    def test_storage_hook_command_errors(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.storage_list('foobar')
