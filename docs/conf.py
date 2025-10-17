@@ -253,9 +253,8 @@ redirects = {}
 # Link checker exceptions #
 ###########################
 
-# A regex list of URLs that are ignored by 'make linkcheck'
-#
-# TODO: Remove or adjust the ACME entry after you update the contributing guide
+# During linkcheck, if a target URL matches any of these regexes (using re.match)
+# then the URL is skipped.
 
 linkcheck_ignore = [
     # Excluded because the pages don't contain elements with an ID matching the URL fragment.
