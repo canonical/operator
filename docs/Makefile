@@ -109,7 +109,6 @@ lint-md: pymarkdownlnt-install
 	@. $(VENV); pymarkdownlnt --config $(SPHINXDIR)/.pymarkdown.json scan --recurse --exclude=./$(SPHINXDIR)/** $(SOURCEDIR)
 
 vale-install: install
-	@. $(VENV); test -d $(SPHINXDIR)/venv/lib/python*/site-packages/vale || pip install rst2html vale
 	@. $(VENV); test -f $(VALE_CONFIG) || python3 $(SPHINXDIR)/get_vale_conf.py
 	@echo '.Name=="Canonical.400-Enforce-inclusive-terms"' > $(SPHINXDIR)/styles/woke.filter
 	@echo '.Level=="error" and .Name!="Canonical.500-Repeated-words" and .Name!="Canonical.000-US-spellcheck"' > $(SPHINXDIR)/styles/error.filter
