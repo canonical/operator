@@ -65,13 +65,9 @@ class Address:
     def _from_dict(cls, d: AddressDict) -> Address:
         return cls(
             hostname=d.get('hostname', ''),
-            value=d.get('value', ''),
+            value=d.get('value', d.get('address', '')),
             cidr=d.get('cidr', ''),
         )
-
-    @property
-    def address(self) -> str:
-        return self.value
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
