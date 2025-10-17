@@ -128,3 +128,34 @@ def test_run_uncaught_error():
     with pytest.raises(UncaughtCharmError):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
+
+
+def test_context_manager_env_cleared():
+    class GoodCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+            os.environ['TEST_ENV_VAR'] = '1'
+
+        def _on_start(self, event):
+            os.environ['TEST_ENV_VAR'] = '2'
+
+    ctx = Context(GoodCharm, meta={'name': 'crashy'})
+    with ctx(ctx.on.start(), State()) as mgr:
+        assert os.getenv('TEST_ENV_VAR') == '1'
+        mgr.run()
+    assert 'TEST_ENV_VAR' not in os.environ
+
+
+def test_run_env_cleared():
+    class GoodCharm(CharmBase):
+        def __init__(self, framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, event):
+            os.environ['TEST_ENV_VAR'] = '1'
+
+    ctx = Context(GoodCharm, meta={'name': 'crashy'})
+    ctx.run(ctx.on.start(), State())
+    assert 'TEST_ENV_VAR' not in os.environ
