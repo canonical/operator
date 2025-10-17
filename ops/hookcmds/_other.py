@@ -19,7 +19,6 @@ import pathlib
 from typing import (
     Any,
     Literal,
-    Mapping,
     cast,
     overload,
 )
@@ -51,10 +50,10 @@ def app_version_set(version: str):
 @overload
 def config_get(key: str) -> bool | int | float | str: ...
 @overload
-def config_get(key: None = None) -> Mapping[str, bool | int | float | str]: ...
+def config_get(key: None = None) -> dict[str, bool | int | float | str]: ...
 def config_get(
     key: str | None = None,
-) -> Mapping[str, bool | int | float | str] | bool | int | float | str:
+) -> dict[str, bool | int | float | str] | bool | int | float | str:
     """Retrieve application configuration.
 
     Note that 'secret' type options are returned as string secret IDs.

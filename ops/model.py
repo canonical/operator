@@ -3741,7 +3741,7 @@ class _ModelBackend:
     def config_get(self) -> dict[str, bool | int | float | str]:
         try:
             with self._tracing_span('config-get'):
-                return dict(hookcmds.config_get())
+                return hookcmds.config_get()
         except hookcmds.Error as e:
             self._check_for_security_event('relation-model-get', e.returncode, e.stderr)
             raise ModelError(e.stderr) from e
