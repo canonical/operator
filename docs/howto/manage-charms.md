@@ -27,6 +27,7 @@ configures development tooling.
 TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
 -->
 
+(develop-your-charm)=
 ## Develop your charm
 
 The Charmcraft profile has configured some commands to help you develop your charm:
@@ -49,13 +50,6 @@ The following tools can also be useful during development:
 
 - To prepare an environment for running integration tests, such as in continuous integration, use [`concierge`](https://github.com/canonical/concierge) or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
 - The [`charming-actions`](https://github.com/canonical/charming-actions) repository includes actions to ensure that libraries are up-to-date, publish charms and libraries, and more.
-
-```{admonition} Best practice
-:class: hint
-
-The quality assurance pipeline of a charm should be automated using a
-continuous integration (CI) system.
-```
 
 The essence of a charm is the ``src/charm.py`` file. This is the entry point for
 your code whenever Juju emits an event, and defines the interface between Juju
