@@ -3609,7 +3609,7 @@ class _ModelBackend:
         try:
             with tracer.start_as_current_span(cmd) as span:
                 span.set_attribute('call', 'subprocess.run')
-                span.set_attribute('argv', args)
+                span.set_attribute('args', args)
                 span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield span
         except hookcmds.Error as e:
