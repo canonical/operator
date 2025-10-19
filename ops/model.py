@@ -3605,7 +3605,7 @@ class _ModelBackend:
         self._hook_is_running = ''
 
     @contextlib.contextmanager
-    def _trace_and_wrap_errors(self, cmd: str, *args: Any, **kwargs: Any):
+    def _run_hookcmd(self, cmd: str, *args: Any, **kwargs: Any):
         try:
             with tracer.start_as_current_span(cmd) as span:
                 span.set_attribute('call', 'subprocess.run')
@@ -3646,12 +3646,12 @@ class _ModelBackend:
         )
 
     def relation_ids(self, relation_name: str) -> list[int]:
-        with self._trace_and_wrap_errors('relation-ids', relation_name=relation_name):
+        with self._run_hookcmd('relation-ids', relation_name=relation_name):
             relation_ids = hookcmds.relation_ids(relation_name)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id: int) -> list[str]:
-        with self._trace_and_wrap_errors('relation-list', relation_id=relation_id):
+        with self._run_hookcmd('relation-list', relation_id=relation_id):
             return hookcmds.relation_list(relation_id)
 
     def relation_remote_app_name(self, relation_id: int) -> str | None:
@@ -3668,7 +3668,7 @@ class _ModelBackend:
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
         try:
-            with self._trace_and_wrap_errors('relation-list', relation_id=relation_id, app=True):
+            with self._run_hookcmd('relation-list', relation_id=relation_id, app=True):
                 return hookcmds.relation_list(relation_id, app=True)
         except RelationNotFoundError:
             return None
@@ -3685,7 +3685,7 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        with self._trace_and_wrap_errors(
+        with self._run_hookcmd(
             'relation-get', relation_id=relation_id, unit=member_name, app=is_app
         ):
             return hookcmds.relation_get(relation_id, unit=member_name, app=is_app)
@@ -3702,18 +3702,16 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        with self._trace_and_wrap_errors(
-            'relation-set', relation_id=relation_id, data=data, app=is_app
-        ):
+        with self._run_hookcmd('relation-set', relation_id=relation_id, data=data, app=is_app):
             hookcmds.relation_set(data, relation_id, app=is_app)
 
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
-        with self._trace_and_wrap_errors('relation-model-get', relation_id=relation_id):
+        with self._run_hookcmd('relation-model-get', relation_id=relation_id):
             raw = hookcmds.relation_model_get(relation_id)
         return dataclasses.asdict(raw)
 
     def config_get(self) -> dict[str, bool | int | float | str]:
-        with self._trace_and_wrap_errors('config-get'):
+        with self._run_hookcmd('config-get'):
             return hookcmds.config_get()
 
     def is_leader(self) -> bool:
@@ -3731,14 +3729,14 @@ class _ModelBackend:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
-            with self._trace_and_wrap_errors('is-leader'):
+            with self._run_hookcmd('is-leader'):
                 self._is_leader = hookcmds.is_leader()
 
         # We can cast to bool now since if we're here it means we checked.
         return typing.cast('bool', self._is_leader)
 
     def resource_get(self, resource_name: str) -> str:
-        with self._trace_and_wrap_errors('resource-get', resource_name=resource_name):
+        with self._run_hookcmd('resource-get', resource_name=resource_name):
             return str(hookcmds.resource_get(resource_name))
 
     def pod_spec_set(
@@ -3755,9 +3753,7 @@ class _ModelBackend:
                 with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            with self._trace_and_wrap_errors(
-                'pod-spec-set', spec=spec, k8s_resources=k8s_resources
-            ):
+            with self._run_hookcmd('pod-spec-set', spec=spec, k8s_resources=k8s_resources):
                 hookcmds._utils.run('pod-spec-set', *args)
         finally:
             shutil.rmtree(str(tmpdir))
@@ -3769,7 +3765,7 @@ class _ModelBackend:
             is_app: A boolean indicating whether the status should be retrieved for a unit
                 or an application.
         """
-        with self._trace_and_wrap_errors('status-get', app=is_app):
+        with self._run_hookcmd('status-get', app=is_app):
             content = hookcmds.status_get(app=is_app)
 
         # hookcmds doesn't constrain the status to the five that _StatusDict expects,
@@ -3793,18 +3789,18 @@ class _ModelBackend:
             raise TypeError('message parameter must be a string')
         if status not in _SETTABLE_STATUS_NAMES:
             raise InvalidStatusError(f'status must be in {_SETTABLE_STATUS_NAMES}, not {status!r}')
-        with self._trace_and_wrap_errors('status-set', status=status, message=message, app=is_app):
+        with self._run_hookcmd('status-set', status=status, message=message, app=is_app):
             hookcmds.status_set(status, message, app=is_app)
 
     def storage_list(self, name: str) -> list[int]:
-        with self._trace_and_wrap_errors('storage-list', name=name):
+        with self._run_hookcmd('storage-list', name=name):
             storages = hookcmds.storage_list(name)
         return [int(s.split('/')[1]) for s in storages]
 
     # This method is called from _main.py's _get_event_args. It is only called
     # when the hook is a storage event.
     def _storage_event_details(self) -> tuple[int, str]:
-        with self._trace_and_wrap_errors('storage-get', '--help'):
+        with self._run_hookcmd('storage-get', '--help'):
             output = hookcmds._utils.run('storage-get', '--help')
         # Match the entire string at once instead of going line by line
         match = self._STORAGE_KEY_RE.match(output)
@@ -3822,17 +3818,17 @@ class _ModelBackend:
                 'calling storage_get with `attribute=""` will return a dict '
                 'and not a string. This usage is not supported.'
             )
-        with self._trace_and_wrap_errors('storage-get', name=storage_name_id, attribute=attribute):
+        with self._run_hookcmd('storage-get', name=storage_name_id, attribute=attribute):
             return getattr(hookcmds.storage_get(storage_name_id), attribute)
 
     def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
-        with self._trace_and_wrap_errors('storage-add', name=name, count=count):
+        with self._run_hookcmd('storage-add', name=name, count=count):
             hookcmds.storage_add({name: count})
 
     def action_get(self) -> dict[str, Any]:
-        with self._trace_and_wrap_errors('action-get'):
+        with self._run_hookcmd('action-get'):
             return hookcmds.action_get()
 
     def action_set(self, results: dict[str, Any]) -> None:
@@ -3842,19 +3838,19 @@ class _ModelBackend:
         # not do validation, so we handle both here.
         flat_results = _format_action_result_dict(results)
         # We do not trace the arguments here, as they may contain sensitive data.
-        with self._trace_and_wrap_errors('action-set', '...'):
+        with self._run_hookcmd('action-set', '...'):
             hookcmds.action_set(flat_results)
 
     def action_log(self, message: str) -> None:
-        with self._trace_and_wrap_errors('action-log', message=message):
+        with self._run_hookcmd('action-log', message=message):
             hookcmds.action_log(message)
 
     def action_fail(self, message: str = '') -> None:
-        with self._trace_and_wrap_errors('action-fail', message=message):
+        with self._run_hookcmd('action-fail', message=message):
             hookcmds.action_fail(message)
 
     def application_version_set(self, version: str) -> None:
-        with self._trace_and_wrap_errors('app-version-set', version=version):
+        with self._run_hookcmd('app-version-set', version=version):
             hookcmds.app_version_set(version)
 
     @classmethod
@@ -3891,9 +3887,7 @@ class _ModelBackend:
             binding_name: A name of a binding (relation name or extra-binding name).
             relation_id: An optional relation id to get network info for.
         """
-        with self._trace_and_wrap_errors(
-            'network-get', binding_name=binding_name, relation_id=relation_id
-        ):
+        with self._run_hookcmd('network-get', binding_name=binding_name, relation_id=relation_id):
             raw = hookcmds.network_get(binding_name, relation_id=relation_id)
         return {
             'bind-addresses': [
@@ -3929,7 +3923,7 @@ class _ModelBackend:
             metric_value = _ModelBackendValidator.format_metric_value(v)
             metric_args.append(f'{k}={metric_value}')
         cmd.extend(metric_args)
-        with self._trace_and_wrap_errors(*cmd):
+        with self._run_hookcmd(*cmd):
             hookcmds._utils.run(*cmd)
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
@@ -3946,7 +3940,7 @@ class _ModelBackend:
         # The goal-state will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
-        with self._trace_and_wrap_errors('goal-state'):
+        with self._run_hookcmd('goal-state'):
             app_state = hookcmds.goal_state()
 
         # Planned units can be zero. We don't need to do error checking here.
@@ -3972,15 +3966,13 @@ class _ModelBackend:
         # The type: ignore here is because the type checker can't tell that
         # we will always have refresh or peek but not both, and either id or
         # label.
-        with self._trace_and_wrap_errors(
-            'secret-get', id=id, label=label, refresh=refresh, peek=peek
-        ):
+        with self._run_hookcmd('secret-get', id=id, label=label, refresh=refresh, peek=peek):
             return hookcmds.secret_get(id=id, label=label, refresh=refresh, peek=peek)  # type: ignore
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         # The type: ignore here is because the type checker can't tell, even
         # with local overloads, that either id or label must be provided.
-        with self._trace_and_wrap_errors('secret-info-get', id=id, label=label):
+        with self._run_hookcmd('secret-info-get', id=id, label=label):
             raw = hookcmds.secret_info_get(id=id, label=label)  # type: ignore
         assert isinstance(raw, hookcmds.SecretInfo)
         return SecretInfo(
@@ -4005,7 +3997,7 @@ class _ModelBackend:
         rotate: SecretRotate | None = None,
     ):
         # The content is None or has already been validated with Secret._validate_content
-        with self._trace_and_wrap_errors(
+        with self._run_hookcmd(
             'secret-set',
             id=id,
             content=content,
@@ -4034,7 +4026,7 @@ class _ModelBackend:
         owner: str | None = None,
     ) -> str:
         # The content has already been validated with Secret._validate_content
-        with self._trace_and_wrap_errors(
+        with self._run_hookcmd(
             'secret-add',
             content=content,
             label=label,
@@ -4053,31 +4045,27 @@ class _ModelBackend:
             )
 
     def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
-        with self._trace_and_wrap_errors(
-            'secret-grant', id=id, relation_id=relation_id, unit=unit
-        ):
+        with self._run_hookcmd('secret-grant', id=id, relation_id=relation_id, unit=unit):
             hookcmds.secret_grant(id, relation_id=relation_id, unit=unit)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
-        with self._trace_and_wrap_errors(
-            'secret-revoke', id=id, relation_id=relation_id, unit=unit
-        ):
+        with self._run_hookcmd('secret-revoke', id=id, relation_id=relation_id, unit=unit):
             hookcmds.secret_revoke(id, relation_id=relation_id, unit=unit)
 
     def secret_remove(self, id: str, *, revision: int | None = None):
-        with self._trace_and_wrap_errors('secret-remove', id=id, revision=revision):
+        with self._run_hookcmd('secret-remove', id=id, revision=revision):
             hookcmds.secret_remove(id, revision=revision)
 
     def open_port(self, protocol: str, port: int | None = None):
-        with self._trace_and_wrap_errors('open-port', protocol=protocol, port=port):
+        with self._run_hookcmd('open-port', protocol=protocol, port=port):
             hookcmds.open_port(protocol, port)
 
     def close_port(self, protocol: str, port: int | None = None):
-        with self._trace_and_wrap_errors('close-port', protocol=protocol, port=port):
+        with self._run_hookcmd('close-port', protocol=protocol, port=port):
             hookcmds.close_port(protocol, port)
 
     def opened_ports(self) -> set[Port]:
-        with self._trace_and_wrap_errors('opened-ports'):
+        with self._run_hookcmd('opened-ports'):
             results = hookcmds.opened_ports()
         ports: set[Port] = set()
         for raw_port in results:
@@ -4111,7 +4099,7 @@ class _ModelBackend:
 
         Returns the cloud specification used by the model.
         """
-        with self._trace_and_wrap_errors('credential-get'):
+        with self._run_hookcmd('credential-get'):
             raw_spec = hookcmds.credential_get()
         return CloudSpec.from_dict(dataclasses.asdict(raw_spec))
 
