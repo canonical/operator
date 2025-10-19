@@ -38,10 +38,10 @@ StatusName: TypeAlias = SettableStatusName | ReadOnlyStatusName
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
-    class AddressDict(TypedDict):
-        hostname: NotRequired[str]
-        address: NotRequired[str]  # Juju < 2.9
-        value: NotRequired[str]  # Juju >= 2.9
+    class AddressDict(TypedDict, total=False):
+        hostname: str
+        address: str  # Juju < 2.9
+        value: str  # Juju >= 2.9
         cidr: str
 
     BindAddressDict = TypedDict(
