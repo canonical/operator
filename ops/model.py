@@ -3608,13 +3608,10 @@ class _ModelBackend:
     def _trace_and_wrap_errors(self, cmd: str, *args: Any, **kwargs: Any):
         try:
             with tracer.start_as_current_span(cmd) as span:
-                if span:
-                    span.set_attribute('call', 'subprocess.run')
-                    span.set_attribute('argv', args)
-                    span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
-                    yield span
-                else:
-                    yield contextlib.nullcontext()
+                span.set_attribute('call', 'subprocess.run')
+                span.set_attribute('argv', args)
+                span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                yield span
         except hookcmds.Error as e:
             self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
             if (
