@@ -3672,8 +3672,6 @@ class _ModelBackend:
                 return hookcmds.relation_list(relation_id, app=True)
         except RelationNotFoundError:
             return None
-        except ModelError:
-            raise
 
     def relation_get(
         self, relation_id: int, member_name: str, is_app: bool
