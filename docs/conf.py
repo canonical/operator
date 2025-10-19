@@ -450,6 +450,7 @@ nitpicky = True
 # ('envvar', 'LD_LIBRARY_PATH').
 nitpick_ignore = [
     # Please keep this list sorted alphabetically.
+    ('py:class', '_AddressDict'),
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
     ('py:class', '_EntityStatus'),
