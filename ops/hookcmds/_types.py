@@ -24,7 +24,6 @@ from typing import (
     Sequence,
     TypeAlias,
     TypedDict,
-    cast,
 )
 
 from ._utils import datetime_from_iso
@@ -232,10 +231,8 @@ class Network:
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Network:
-        bind: list[BindAddress] = [
-            BindAddress._from_dict(bind_data)
-            for bind_data in cast('list[BindAddressDict]', d.get('bind-addresses', []))
-        ]
+        bind_dicts: list[BindAddressDict] = d.get('bind-addresses', [])
+        bind = [BindAddress._from_dict(bind_dict) for bind_dict in bind_dicts]
         egress = d.get('egress-subnets', [])
         ingress = d.get('ingress-addresses', [])
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
