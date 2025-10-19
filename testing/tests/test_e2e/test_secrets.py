@@ -611,7 +611,8 @@ def test_add_secret(secrets_context: Context[SecretsCharm]):
     state = State(leader=True)
     state = secrets_context.run(secrets_context.on.action('add-secret'), state)
 
-    result = cast('Result', secrets_context.action_results)
+    with pytest.warns(DeprecationWarning):
+        result = cast('Result', secrets_context.action_results)
     assert result is not None
     assert result['secretid']
 
@@ -648,7 +649,8 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         secrets_context.on.action('add-with-meta', params={'fields': fields}), state
     )
     scenario_secret = next(iter(state.secrets))
-    result = cast('Result', secrets_context.action_results)
+    with pytest.warns(DeprecationWarning):
+        result = cast('Result', secrets_context.action_results)
     assert 'after' in result
     assert result['after']
     info = result['after']['info']

@@ -263,9 +263,8 @@ class Manager(Generic[CharmType]):
                 'Doing so implicitly upon exit...',
             )
             self.run()
-        # guaranteed to be set: run was either called before, or right above
-        assert self.ops
-        self.ops.destroy()
+        if exc_type is not None:
+            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -742,44 +741,12 @@ class Context(Generic[CharmType]):
 
     @property
     def app_status_history(self) -> list[_EntityStatus]:
-        """A record of the app statuses the charm has set.
-
-        Assert that the charm has followed the expected path by checking the app
-        status history like so::
-
-            ctx = Context(MyCharm)
-            state_out = ctx.run(ctx.on.start(), State())
-            assert ctx.app_status_history == [
-                UnknownStatus(),
-                MaintenanceStatus('...'),
-            ]
-            assert state_out.app_status == ActiveStatus()
-
-        Note that the *current* status is **not** in the app status history.
-        """
+        """A record of the app statuses the charm has set."""
         return self._deprecated_side_effect_access('app_status_history')
 
     @property
     def unit_status_history(self) -> list[_EntityStatus]:
-        """A record of the unit statuses the charm has set.
-
-        Assert that the charm has followed the expected path by checking the unit
-        status history like so::
-
-            ctx = Context(MyCharm)
-            state_out = ctx.run(ctx.on.start(), State())
-            assert ctx.unit_status_history == [
-                UnknownStatus(),
-                MaintenanceStatus('...'),
-                WaitingStatus('...'),
-            ]
-            assert state_out.unit_status == ActiveStatus()
-
-        Note that the *current* status is **not** in the unit status history.
-
-        Also note that, unless you initialise the State with a preexisting status,
-        the first status in the history will always be ``unknown``.
-        """
+        """A record of the unit statuses the charm has set."""
         return self._deprecated_side_effect_access('unit_status_history')
 
     @property
@@ -789,17 +756,7 @@ class Context(Generic[CharmType]):
 
     @property
     def workload_version_history(self) -> list[str]:
-        """A record of the workload versions the charm has set.
-
-        Assert that the charm has set one or more workload versions during a hook
-        execution::
-
-            ctx = Context(MyCharm)
-            ctx.run(ctx.on.start(), State())
-            assert ctx.workload_version_history == ['1', '1.2', '1.5']
-
-        Note that the *current* version is **not** in the version history.
-        """
+        """A record of the workload versions the charm has set."""
         return self._deprecated_side_effect_access('workload_version_history')
 
     @property
@@ -809,34 +766,7 @@ class Context(Generic[CharmType]):
 
     @property
     def emitted_events(self) -> list[ops.EventBase]:
-        """A record of the events (including custom) that the charm has processed.
-
-        You can configure which events will be captured by passing the following
-        arguments to ``Context``:
-
-        -  `capture_deferred_events`: If you want to include re-emitted deferred events.
-        -  `capture_framework_events`: If you want to include Ops framework events.
-
-        For example::
-
-            def test_emitted():
-                ctx = Context(
-                    MyCharm,
-                    capture_deferred_events=True,
-                    capture_framework_events=True,
-                )
-                deferred = ctx.on.update_status().deferred(MyCharm._on_foo)
-                ctx.run(ctx.on.start(), State(deferred=[deferred]))
-
-                assert len(ctx.emitted_events) == 5
-                assert [e.handle.kind for e in ctx.emitted_events] == [
-                    'update_status',
-                    'start',
-                    'collect_unit_status',
-                    'pre_commit',
-                    'commit',
-                ]
-        """
+        """A record of the events (including custom) that the charm has processed."""
         return self._deprecated_side_effect_access('emitted_events')
 
     @property
@@ -846,28 +776,17 @@ class Context(Generic[CharmType]):
 
     @property
     def trace_data(self) -> list[ReadableSpan]:
-        """Trace data generated during the last run.
-
-        Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on
-        the order of this list. Rather, tests could validate parent/child relationships or
-        containment by start and end timestamps.
-        """
+        """Trace data generated during the last run."""
         return self._deprecated_side_effect_access('trace_data')
 
     @property
     def action_logs(self) -> list[str]:
-        """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
-
-        This will be empty when handling a non-action event.
-        """
+        """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`"""
         return self._deprecated_side_effect_access('action_logs')
 
     @property
     def action_results(self) -> dict[str, Any] | None:
-        """A key-value mapping assigned by the charm as a result of the action.
-
-        This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
-        """
+        """A key-value mapping assigned by the charm as a result of the action."""
         return self._deprecated_side_effect_access('action_results')
 
     def _set_output_state(self, output_state: State):
