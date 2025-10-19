@@ -67,7 +67,8 @@ from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 if typing.TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
-    from .hookcmds._types import AddressDict, BindAddressDict
+    from .hookcmds._types import AddressDict as _AddressDict
+    from .hookcmds._types import BindAddressDict as _BindAddressDict
 
 
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
@@ -99,7 +100,7 @@ UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 _NetworkDict = TypedDict(
     '_NetworkDict',
     {
-        'bind-addresses': list['BindAddressDict'],
+        'bind-addresses': list['_BindAddressDict'],
         'ingress-addresses': list[str],
         'egress-subnets': list[str],
     },
@@ -1137,7 +1138,7 @@ class Network:
         # interfaces with the same name.
         for interface_info in network_info.get('bind-addresses', []):
             interface_name: str = interface_info.get('interface-name')
-            addrs: list[AddressDict] | None = interface_info.get('addresses')
+            addrs: list[_AddressDict] | None = interface_info.get('addresses')
             if addrs is not None:
                 for address_info in addrs:
                     self.interfaces.append(NetworkInterface(interface_name, address_info))
@@ -1197,7 +1198,7 @@ class NetworkInterface:
     (for example, '10.0.1.2/32').
     """
 
-    def __init__(self, name: str, address_info: AddressDict):
+    def __init__(self, name: str, address_info: _AddressDict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
 
@@ -1210,7 +1211,7 @@ class NetworkInterface:
         # The value field may be empty.
         address_ = _cast_network_address(address) if address else None
         self.address = address_
-        cidr: str = address_info.get('cidr')
+        cidr: str = address_info.get('cidr', '')
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
             subnet = ipaddress.ip_network(cidr)
