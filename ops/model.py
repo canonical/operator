@@ -3604,14 +3604,26 @@ class _ModelBackend:
         self._hook_is_running = ''
 
     @contextlib.contextmanager
-    def _tracing_span(self, cmd: str, *args: Any):
-        with tracer.start_as_current_span(cmd) as span:
-            if span:
-                span.set_attribute('call', 'subprocess.run')
-                span.set_attribute('argv', args)
-                yield span
-            else:
-                yield contextlib.nullcontext()
+    def _trace_and_wrap_errors(self, cmd: str, *args: Any, **kwargs: Any):
+        try:
+            with tracer.start_as_current_span(cmd) as span:
+                if span:
+                    span.set_attribute('call', 'subprocess.run')
+                    span.set_attribute('argv', args)
+                    span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                    yield span
+                else:
+                    yield contextlib.nullcontext()
+        except hookcmds.Error as e:
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+            if (
+                cmd.startswith(('relation-', 'network-'))
+                and 'relation not found' in e.stderr.lower()
+            ):
+                raise RelationNotFoundError() from e
+            elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
+                raise SecretNotFoundError() from e
+            raise ModelError(e.stderr) from e
 
     def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
         authz_messages = (
@@ -3635,29 +3647,14 @@ class _ModelBackend:
             description=description,
         )
 
-    @staticmethod
-    def _is_relation_not_found(model_error: Exception) -> bool:
-        return 'relation not found' in str(model_error)
-
     def relation_ids(self, relation_name: str) -> list[int]:
-        try:
-            with self._tracing_span('relation-ids', relation_name):
-                relation_ids = hookcmds.relation_ids(relation_name)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-ids', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('relation-ids', relation_name=relation_name):
+            relation_ids = hookcmds.relation_ids(relation_name)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
     def relation_list(self, relation_id: int) -> list[str]:
-        try:
-            with self._tracing_span('relation-list', relation_id):
-                return hookcmds.relation_list(relation_id)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-list', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                raise RelationNotFoundError() from e
-            raise err from e
+        with self._trace_and_wrap_errors('relation-list', relation_id=relation_id):
+            return hookcmds.relation_list(relation_id)
 
     def relation_remote_app_name(self, relation_id: int) -> str | None:
         """Return remote app name for given relation ID, or None if not known."""
@@ -3673,14 +3670,12 @@ class _ModelBackend:
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
         try:
-            with self._tracing_span('relation-list', relation_id, True):
+            with self._trace_and_wrap_errors('relation-list', relation_id=relation_id, app=True):
                 return hookcmds.relation_list(relation_id, app=True)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-list', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                return None
-            raise err from e
+        except RelationNotFoundError:
+            return None
+        except ModelError:
+            raise
 
     def relation_get(
         self, relation_id: int, member_name: str, is_app: bool
@@ -3694,15 +3689,10 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        try:
-            with self._tracing_span('relation-get', relation_id, member_name, is_app):
-                return hookcmds.relation_get(relation_id, unit=member_name, app=is_app)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-get', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                raise RelationNotFoundError() from e
-            raise err from e
+        with self._trace_and_wrap_errors(
+            'relation-get', relation_id=relation_id, unit=member_name, app=is_app
+        ):
+            return hookcmds.relation_get(relation_id, unit=member_name, app=is_app)
 
     def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
         if not data:
@@ -3716,35 +3706,19 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        try:
-            with self._tracing_span('relation-set', relation_id, data, is_app):
-                hookcmds.relation_set(data, relation_id, app=is_app)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-set', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                raise RelationNotFoundError() from e
-            raise err from e
+        with self._trace_and_wrap_errors(
+            'relation-set', relation_id=relation_id, data=data, app=is_app
+        ):
+            hookcmds.relation_set(data, relation_id, app=is_app)
 
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
-        try:
-            with self._tracing_span('relation-model-get', relation_id):
-                raw = hookcmds.relation_model_get(relation_id)
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-model-get', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                raise RelationNotFoundError() from e
-            raise err from e
+        with self._trace_and_wrap_errors('relation-model-get', relation_id=relation_id):
+            raw = hookcmds.relation_model_get(relation_id)
         return dataclasses.asdict(raw)
 
     def config_get(self) -> dict[str, bool | int | float | str]:
-        try:
-            with self._tracing_span('config-get'):
-                return hookcmds.config_get()
-        except hookcmds.Error as e:
-            self._check_for_security_event('relation-model-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('config-get'):
+            return hookcmds.config_get()
 
     def is_leader(self) -> bool:
         """Obtain the current leadership status for the unit the charm code is executing on.
@@ -3761,23 +3735,15 @@ class _ModelBackend:
             # Current time MUST be saved before running is-leader to ensure the cache
             # is only used inside the window that is-leader itself asserts.
             self._leader_check_time = now
-            try:
-                with self._tracing_span('is-leader'):
-                    self._is_leader = hookcmds.is_leader()
-            except hookcmds.Error as e:
-                self._check_for_security_event('is-leader', e.returncode, e.stderr)
-                raise ModelError(e.stderr) from e
+            with self._trace_and_wrap_errors('is-leader'):
+                self._is_leader = hookcmds.is_leader()
 
-        # we can cast to bool now since if we're here it means we checked.
+        # We can cast to bool now since if we're here it means we checked.
         return typing.cast('bool', self._is_leader)
 
     def resource_get(self, resource_name: str) -> str:
-        try:
-            with self._tracing_span('resource-get', resource_name):
-                return str(hookcmds.resource_get(resource_name))
-        except hookcmds.Error as e:
-            self._check_for_security_event('resource-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('resource-get', resource_name=resource_name):
+            return str(hookcmds.resource_get(resource_name))
 
     def pod_spec_set(
         self, spec: Mapping[str, Any], k8s_resources: Mapping[str, Any] | None = None
@@ -3793,12 +3759,10 @@ class _ModelBackend:
                 with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            try:
-                with self._tracing_span('pod-spec-set', spec, k8s_resources):
-                    hookcmds._utils.run('pod-spec-set', *args)
-            except hookcmds.Error as e:
-                self._check_for_security_event('pod-spec-set', e.returncode, e.stderr)
-                raise ModelError(e.stderr) from e
+            with self._trace_and_wrap_errors(
+                'pod-spec-set', spec=spec, k8s_resources=k8s_resources
+            ):
+                hookcmds._utils.run('pod-spec-set', *args)
         finally:
             shutil.rmtree(str(tmpdir))
 
@@ -3809,14 +3773,10 @@ class _ModelBackend:
             is_app: A boolean indicating whether the status should be retrieved for a unit
                 or an application.
         """
-        try:
-            with self._tracing_span('status-get', is_app):
-                content = hookcmds.status_get(app=is_app)
-        except hookcmds.Error as e:
-            self._check_for_security_event('status-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('status-get', app=is_app):
+            content = hookcmds.status_get(app=is_app)
 
-        # hookcmds doesn't constrain the status to the 5 that _StatusDict expects,
+        # hookcmds doesn't constrain the status to the five that _StatusDict expects,
         # but we know that will be the case, so we type: ignore.
         return {'status': content.status, 'message': content.message}  # type: ignore
 
@@ -3837,31 +3797,19 @@ class _ModelBackend:
             raise TypeError('message parameter must be a string')
         if status not in _SETTABLE_STATUS_NAMES:
             raise InvalidStatusError(f'status must be in {_SETTABLE_STATUS_NAMES}, not {status!r}')
-        try:
-            with self._tracing_span('status-set', status, message, is_app):
-                hookcmds.status_set(status, message, app=is_app)
-        except hookcmds.Error as e:
-            self._check_for_security_event('status-set', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('status-set', status=status, message=message, app=is_app):
+            hookcmds.status_set(status, message, app=is_app)
 
     def storage_list(self, name: str) -> list[int]:
-        try:
-            with self._tracing_span('storage-list', name):
-                storages = hookcmds.storage_list(name)
-        except hookcmds.Error as e:
-            self._check_for_security_event('storage-list', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('storage-list', name=name):
+            storages = hookcmds.storage_list(name)
         return [int(s.split('/')[1]) for s in storages]
 
     # This method is called from _main.py's _get_event_args. It is only called
     # when the hook is a storage event.
     def _storage_event_details(self) -> tuple[int, str]:
-        try:
-            with self._tracing_span('storage-get', '--help'):
-                output = hookcmds._utils.run('storage-get', '--help')
-        except hookcmds.Error as e:
-            self._check_for_security_event('storage-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('storage-get', '--help'):
+            output = hookcmds._utils.run('storage-get', '--help')
         # Match the entire string at once instead of going line by line
         match = self._STORAGE_KEY_RE.match(output)
         if match is None:
@@ -3878,30 +3826,18 @@ class _ModelBackend:
                 'calling storage_get with `attribute=""` will return a dict '
                 'and not a string. This usage is not supported.'
             )
-        try:
-            with self._tracing_span('storage-get', storage_name_id, attribute):
-                return getattr(hookcmds.storage_get(storage_name_id), attribute)
-        except hookcmds.Error as e:
-            self._check_for_security_event('storage-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('storage-get', name=storage_name_id, attribute=attribute):
+            return getattr(hookcmds.storage_get(storage_name_id), attribute)
 
     def storage_add(self, name: str, count: int = 1) -> None:
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(f'storage count must be integer, got: {count} ({type(count)})')
-        try:
-            with self._tracing_span('storage-add', name, count):
-                hookcmds.storage_add({name: count})
-        except hookcmds.Error as e:
-            self._check_for_security_event('storage-add', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('storage-add', name=name, count=count):
+            hookcmds.storage_add({name: count})
 
     def action_get(self) -> dict[str, Any]:
-        try:
-            with self._tracing_span('action-get'):
-                return hookcmds.action_get()
-        except hookcmds.Error as e:
-            self._check_for_security_event('action-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('action-get'):
+            return hookcmds.action_get()
 
     def action_set(self, results: dict[str, Any]) -> None:
         # The Juju action-set hook command cannot interpret nested dicts, so we use a helper to
@@ -3909,37 +3845,21 @@ class _ModelBackend:
         # The hookcmds action_set method will handle flattening nested structures, but does
         # not do validation, so we handle both here.
         flat_results = _format_action_result_dict(results)
-        try:
-            # We do not trace the arguments here, as they may contain sensitive data.
-            with self._tracing_span('action-set', '...'):
-                hookcmds.action_set(flat_results)
-        except hookcmds.Error as e:
-            self._check_for_security_event('action-set', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        # We do not trace the arguments here, as they may contain sensitive data.
+        with self._trace_and_wrap_errors('action-set', '...'):
+            hookcmds.action_set(flat_results)
 
     def action_log(self, message: str) -> None:
-        try:
-            with self._tracing_span('action-log', message):
-                hookcmds.action_log(message)
-        except hookcmds.Error as e:
-            self._check_for_security_event('action-log', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('action-log', message=message):
+            hookcmds.action_log(message)
 
     def action_fail(self, message: str = '') -> None:
-        try:
-            with self._tracing_span('action-fail', message):
-                hookcmds.action_fail(message)
-        except hookcmds.Error as e:
-            self._check_for_security_event('action-fail', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('action-fail', message=message):
+            hookcmds.action_fail(message)
 
     def application_version_set(self, version: str) -> None:
-        try:
-            with self._tracing_span('app-version-set', version):
-                hookcmds.app_version_set(version)
-        except hookcmds.Error as e:
-            self._check_for_security_event('app-version-set', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('app-version-set', version=version):
+            hookcmds.app_version_set(version)
 
     @classmethod
     def log_split(
@@ -3975,15 +3895,10 @@ class _ModelBackend:
             binding_name: A name of a binding (relation name or extra-binding name).
             relation_id: An optional relation id to get network info for.
         """
-        try:
-            with self._tracing_span('network-get', binding_name, relation_id):
-                raw = hookcmds.network_get(binding_name, relation_id=relation_id)
-        except hookcmds.Error as e:
-            self._check_for_security_event('network-get', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if self._is_relation_not_found(err):
-                raise RelationNotFoundError() from e
-            raise err from e
+        with self._trace_and_wrap_errors(
+            'network-get', binding_name=binding_name, relation_id=relation_id
+        ):
+            raw = hookcmds.network_get(binding_name, relation_id=relation_id)
         return {
             'bind-addresses': [
                 {
@@ -4018,12 +3933,8 @@ class _ModelBackend:
             metric_value = _ModelBackendValidator.format_metric_value(v)
             metric_args.append(f'{k}={metric_value}')
         cmd.extend(metric_args)
-        try:
-            with self._tracing_span(*cmd):
-                hookcmds._utils.run(*cmd)
-        except hookcmds.Error as e:
-            self._check_for_security_event('add-metric', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors(*cmd):
+            hookcmds._utils.run(*cmd)
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
@@ -4039,12 +3950,8 @@ class _ModelBackend:
         # The goal-state will return the information that we need. Goal state as a general
         # concept is being deprecated, however, in favor of approaches such as the one that we use
         # here.
-        try:
-            with self._tracing_span('goal-state'):
-                app_state = hookcmds.goal_state()
-        except hookcmds.Error as e:
-            self._check_for_security_event('goal-state', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('goal-state'):
+            app_state = hookcmds.goal_state()
 
         # Planned units can be zero. We don't need to do error checking here.
         # But we need to filter out dying units as they may be reported before being deleted
@@ -4066,30 +3973,19 @@ class _ModelBackend:
         refresh: bool = False,
         peek: bool = False,
     ) -> dict[str, str]:
-        try:
-            # The type: ignore here is because the type checker can't tell that
-            # we will always have refresh or peek but not both.
-            with self._tracing_span('secret-get', id, label, refresh, peek):
-                return hookcmds.secret_get(id=id, label=label, refresh=refresh, peek=peek)  # type: ignore
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-get', e.returncode, e.stderr)
-            err = ModelError(e.stderr)
-            if 'not found' in str(err):
-                raise SecretNotFoundError() from err
-            raise err from e
+        # The type: ignore here is because the type checker can't tell that
+        # we will always have refresh or peek but not both.
+        with self._trace_and_wrap_errors(
+            'secret-get', id=id, label=label, refresh=refresh, peek=peek
+        ):
+            return hookcmds.secret_get(id=id, label=label, refresh=refresh, peek=peek)  # type: ignore
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         # The type: ignore here is because the type checker can't tell, even
         # with local overloads, that either id or label must be provided.
-        try:
-            with self._tracing_span('secret-info-get', id, label):
-                raw = hookcmds.secret_info_get(id=id, label=label)  # type: ignore
-            assert isinstance(raw, hookcmds.SecretInfo)
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-info-get', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('secret-info-get', id=id, label=label):
+            raw = hookcmds.secret_info_get(id=id, label=label)  # type: ignore
+        assert isinstance(raw, hookcmds.SecretInfo)
         return SecretInfo(
             raw.id,
             label=raw.label,
@@ -4112,21 +4008,23 @@ class _ModelBackend:
         rotate: SecretRotate | None = None,
     ):
         # The content is None or has already been validated with Secret._validate_content
-        try:
-            with self._tracing_span('secret-set', id, content, label, description, expire, rotate):
-                hookcmds.secret_set(
-                    id,
-                    content=content,
-                    label=label,
-                    description=description,
-                    expire=expire,
-                    rotate=rotate.value if rotate else None,
-                )
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-set', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors(
+            'secret-set',
+            id=id,
+            content=content,
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate,
+        ):
+            hookcmds.secret_set(
+                id,
+                content=content,
+                label=label,
+                description=description,
+                expire=expire,
+                rotate=rotate.value if rotate else None,
+            )
 
     def secret_add(
         self,
@@ -4139,77 +4037,51 @@ class _ModelBackend:
         owner: str | None = None,
     ) -> str:
         # The content has already been validated with Secret._validate_content
-        try:
-            with self._tracing_span(
-                'secret-add', content, label, description, expire, rotate, owner
-            ):
-                return hookcmds.secret_add(
-                    content,
-                    label=label,
-                    description=description,
-                    expire=expire,
-                    rotate=rotate.value if rotate else None,
-                    owner=owner,  # type: ignore  # lenient for backwards compatibility
-                )
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-add', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors(
+            'secret-add',
+            content=content,
+            label=label,
+            description=description,
+            expire=expire,
+            rotate=rotate,
+            owner=owner,
+        ):
+            return hookcmds.secret_add(
+                content,
+                label=label,
+                description=description,
+                expire=expire,
+                rotate=rotate.value if rotate else None,
+                owner=owner,  # type: ignore  # lenient for backwards compatibility
+            )
 
     def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
-        try:
-            with self._tracing_span('secret-grant', id, relation_id, unit):
-                hookcmds.secret_grant(id, relation_id=relation_id, unit=unit)
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-grant', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors(
+            'secret-grant', id=id, relation_id=relation_id, unit=unit
+        ):
+            hookcmds.secret_grant(id, relation_id=relation_id, unit=unit)
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
-        try:
-            with self._tracing_span('secret-revoke', id, relation_id, unit):
-                hookcmds.secret_revoke(id, relation_id=relation_id, unit=unit)
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-revoke', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors(
+            'secret-revoke', id=id, relation_id=relation_id, unit=unit
+        ):
+            hookcmds.secret_revoke(id, relation_id=relation_id, unit=unit)
 
     def secret_remove(self, id: str, *, revision: int | None = None):
-        try:
-            with self._tracing_span('secret-remove', id, revision):
-                hookcmds.secret_remove(id, revision=revision)
-        except hookcmds.Error as e:
-            self._check_for_security_event('secret-remove', e.returncode, e.stderr)
-            if 'not found' in e.stderr:
-                raise SecretNotFoundError() from e
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('secret-remove', id=id, revision=revision):
+            hookcmds.secret_remove(id, revision=revision)
 
     def open_port(self, protocol: str, port: int | None = None):
-        try:
-            with self._tracing_span('open-port', protocol, port):
-                hookcmds.open_port(protocol, port)
-        except hookcmds.Error as e:
-            self._check_for_security_event('open-port', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('open-port', protocol=protocol, port=port):
+            hookcmds.open_port(protocol, port)
 
     def close_port(self, protocol: str, port: int | None = None):
-        try:
-            with self._tracing_span('close-port', protocol, port):
-                hookcmds.close_port(protocol, port)
-        except hookcmds.Error as e:
-            self._check_for_security_event('close-port', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('close-port', protocol=protocol, port=port):
+            hookcmds.close_port(protocol, port)
 
     def opened_ports(self) -> set[Port]:
-        try:
-            with self._tracing_span('opened-ports'):
-                results = hookcmds.opened_ports()
-        except hookcmds.Error as e:
-            self._check_for_security_event('opened-ports', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('opened-ports'):
+            results = hookcmds.opened_ports()
         ports: set[Port] = set()
         for raw_port in results:
             if raw_port.protocol not in ('tcp', 'udp', 'icmp'):
@@ -4228,30 +4100,22 @@ class _ModelBackend:
             str(os.getuid()),
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )
-        try:
-            with tracer.start_as_current_span('juju-reboot'):
-                if now:
-                    hookcmds.juju_reboot(now=True)
-                    # Juju will kill the Charm process, and in testing no code after
-                    # this point would execute. However, we want to guarantee that for
-                    # Charmers, so we force that to be the case.
-                    sys.exit()
-                hookcmds.juju_reboot()
-        except hookcmds.Error as e:
-            self._check_for_security_event('juju-reboot', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with tracer.start_as_current_span('juju-reboot'):
+            if now:
+                hookcmds.juju_reboot(now=True)
+                # Juju will kill the Charm process, and in testing no code after
+                # this point would execute. However, we want to guarantee that for
+                # Charmers, so we force that to be the case.
+                sys.exit()
+            hookcmds.juju_reboot()
 
     def credential_get(self) -> CloudSpec:
         """Access cloud credentials by running the credential-get hook command.
 
         Returns the cloud specification used by the model.
         """
-        try:
-            with self._tracing_span('credential-get'):
-                raw_spec = hookcmds.credential_get()
-        except hookcmds.Error as e:
-            self._check_for_security_event('credential-get', e.returncode, e.stderr)
-            raise ModelError(e.stderr) from e
+        with self._trace_and_wrap_errors('credential-get'):
+            raw_spec = hookcmds.credential_get()
         return CloudSpec.from_dict(dataclasses.asdict(raw_spec))
 
 
