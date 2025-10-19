@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 def juju(request: pytest.FixtureRequest):
     """Create a temporary Juju model for running tests."""
     with jubilant.temp_model() as juju:
+        juju.wait_timeout = 10 * 60
         yield juju
 
         if request.session.testsfailed:

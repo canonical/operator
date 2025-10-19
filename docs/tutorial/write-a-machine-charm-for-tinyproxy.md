@@ -3,6 +3,7 @@
 TODO:
 
 - What you'll need.
+- Familiarity with Python. Also pytest would be helpful, but not essential.
 - One/two sentence summary of what you'll do.
 - How to get help, including linking to the code in the Ops repo.
 
@@ -56,10 +57,10 @@ ubuntu@juju-sandbox:~$
 
 Now that you have a virtual machine, you need to install the following tools in your virtual machine:
 
-- **Charmcraft, Juju, and LXD** - You'll use Charmcraft to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
-- **uv and tox** - You'll implement your charm using Python code. uv is a Python project manager that will install dependencies for checks and tests. You'll use tox to select which checks or tests to run.
+- **Charmcraft, Juju, and LXD** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
+- **uv and tox** - You'll implement your charm using Python code. [uv](https://docs.astral.sh/uv/) is a Python project manager that will install dependencies for checks and tests. You'll use [tox](https://tox.wiki/en/) to select which checks or tests to run.
 
-Instead of manually installing and configuring each tool, we recommend using Concierge, Canonical's tool for setting up charm development environments.
+Instead of manually installing and configuring each tool, we recommend using [Concierge](https://github.com/canonical/concierge), Canonical's tool for setting up charm development environments.
 
 In your virtual machine, run:
 
@@ -152,7 +153,7 @@ description: |
 Then save the file and exit nano.
 
 ````{tip}
-You'll need to edit Python files later in the tutorial. To make sure that nano inserts spaces instead of tabs, run:
+You'll need to edit Python files later in the tutorial. To configure nano to insert spaces instead of tabs, run:
 
 ```text
 printf "set tabsize 4\nset tabstospaces\n" > ~/.nanorc
@@ -625,11 +626,11 @@ To unblock your charm, reset `slug` to `example`:
 juju config tinyproxy --reset slug
 ```
 
-## Write unit tests for your charm
+## Write unit tests
 
 ### Write tests for the helper module
 
-When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations. To illustrate the approach, we'll write a unit test for the `get_version` function in the helper module.
+When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations. To illustrate the approach, we'll write a test for the `get_version` function in the helper module.
 
 Create a file `tests/unit/test_tinyproxy.py` containing:
 
@@ -653,7 +654,7 @@ def test_version(monkeypatch: pytest.MonkeyPatch):
     assert tinyproxy.get_version() == "1.11.0"
 ```
 
-We'll run all the unit tests later in the tutorial. But if you'd like to see whether this unit test passes, you can run `tox -e unit -- tests/unit/test_tinyproxy.py`.
+We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, you can run `tox -e unit -- tests/unit/test_tinyproxy.py`.
 
 ### Write state-transition tests
 
@@ -861,13 +862,13 @@ TOTAL                119     31     26      7    70%
   congratulations :) (1.30 seconds)
 ```
 
-## Write integration tests for your charm
+## Write integration tests
 
 Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
 
-When you created the initial version of your charm, Charmcraft included some basic integration tests. We'll expand these tests to cover more of your charm's functionality.
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. We'll expand the tests to cover more of your charm's functionality.
 
-In `tests/integration/test_charm.py`, remove the `@pytest.mark.skip ...` line before the `test_workload_version_is_set`. Then change the `assert version == ...` line to:
+In `tests/integration/test_charm.py`, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then, in the test, change `assert version == ...` to:
 
 ```python
     assert version == "1.11.0"
@@ -875,14 +876,51 @@ In `tests/integration/test_charm.py`, remove the `@pytest.mark.skip ...` line be
 
 You should now have the following tests:
 
-- `test_deploy`, which checks that your charm goes into active status when deployed.
-- `test_workload_version_is_set`, which checks that your charm reports the correct version of tinyproxy to Juju.
+- `test_deploy` - Deploys your charm and checks that it goes into active status.
+- `test_workload_version_is_set` - Checks that your charm reports the correct version of tinyproxy to Juju.
 
-You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. Instead of asking APT to install an unspecified version of tinyproxy, the charm code ought to specify a particular version. In general, it's good practice for charms to pin known workload versions.
+You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. Instead of asking APT to install an unspecified version of tinyproxy, the charm code ought to specify a particular version. In general, it's good practice for charms to pin workload versions.
 
-TODO: Add two more integration tests, to test that the charm blocks and unblocks properly.
+Before running the tests, let's add a test to check that an invalid value of `slug` blocks the charm.
 
-TODO: Run the integration tests.
+Add the following function at the end of `tests/integration/test_charm.py`:
+
+```python
+def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
+    """Check that the charm goes into blocked status if slug is invalid."""
+    juju.config("tinyproxy", {"slug": "foo/bar"})
+    juju.wait(jubilant.all_blocked)
+    juju.config("tinyproxy", reset="slug")
+```
+
+Each test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+
+- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available.
+- `juju` - A Jubilant object for interacting with a temporary Juju model.
+
+The `juju` fixture is module-scoped. In other words, each test in `test_charm.py` affects the state of the same Juju model. This means that the order of the tests is significant. This also explains why we reset `slug` at the end of `test_block_on_invalid_config` - to ensure that any subsequent test could assume an unblocked charm.
+
+If you wanted isolated tests, you could change `juju` to be function-scoped (pytest's default scope) and deploy the `.charm` file at the beginning of each test. However, this would slow down the tests.
+
+Now run the tests:
+
+```text
+tox -e integration
+```
+
+It will take a few minutes to run the tests. The output should be similar to:
+
+```text
+...
+
+======================= 3 passed in 277.23s (0:04:37) =======================
+  integration: OK (277.76=setup[0.06]+cmd[277.70] seconds)
+  congratulations :) (277.89 seconds)
+```
+
+```{tip}
+`tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
+```
 
 ## Tear things down
 
