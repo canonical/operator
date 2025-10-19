@@ -3975,7 +3975,8 @@ class _ModelBackend:
         peek: bool = False,
     ) -> dict[str, str]:
         # The type: ignore here is because the type checker can't tell that
-        # we will always have refresh or peek but not both.
+        # we will always have refresh or peek but not both, and either id or
+        # label.
         with self._trace_and_wrap_errors(
             'secret-get', id=id, label=label, refresh=refresh, peek=peek
         ):
