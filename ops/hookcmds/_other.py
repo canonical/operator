@@ -163,7 +163,7 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
         binding_name: A name of a binding (relation name or extra-binding name).
         relation_id: An optional relation id to get network info for.
     """
-    args: list[str] = ['--format=json']
+    args = ['--format=json']
     if relation_id is not None:
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
