@@ -21,15 +21,13 @@ import enum
 import logging
 import pathlib
 import warnings
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    List,
     Literal,
-    Mapping,
     NoReturn,
-    Optional,
     TextIO,
     TypedDict,
     TypeVar,
@@ -1049,7 +1047,7 @@ class SecretEvent(HookEvent):
         Not meant to be called by charm code.
         """
         self._id = cast('str', snapshot['id'])
-        self._label = cast('Optional[str]', snapshot['label'])
+        self._label = cast('str | None', snapshot['label'])
 
 
 class SecretChangedEvent(SecretEvent):
@@ -2029,7 +2027,7 @@ class StorageMeta:
     multiple_range: tuple[int, int | None] | None
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = List[str]
+    properties = list[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: _StorageMetaDict):

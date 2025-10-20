@@ -17,9 +17,8 @@ from typing import (
     Generic,
     TYPE_CHECKING,
     Any,
-    Callable,
-    Mapping,
 )
+from collections.abc import Callable, Mapping
 
 import ops
 from ops._private.harness import ActionFailed

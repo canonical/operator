@@ -20,7 +20,8 @@ import json
 import pathlib
 import subprocess
 import uuid
-from typing import Any, Generator, Literal
+from collections.abc import Generator
+from typing import Any, Literal
 
 import pytest
 

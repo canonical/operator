@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import json
 import pathlib
+from collections.abc import Mapping
 from typing import (
     Any,
     Literal,
-    Mapping,
     cast,
     overload,
 )

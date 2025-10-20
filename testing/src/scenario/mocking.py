@@ -18,12 +18,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    Mapping,
     NoReturn,
     TextIO,
     cast,
     get_args,
 )
+from collections.abc import Mapping
 
 from ops import (
     JujuContext,

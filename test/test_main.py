@@ -224,7 +224,7 @@ class TestDispatch:
         assert event == 'potatos'
 
 
-_event_test = typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]]
+_event_test = list[tuple[EventSpec, dict[str, str | int | None]]]
 
 
 @pytest.fixture

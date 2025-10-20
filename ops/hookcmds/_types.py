@@ -17,10 +17,10 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import pathlib
+from collections.abc import Sequence
 from typing import (
     Any,
     Literal,
-    Sequence,
     TypeAlias,
     TypedDict,
     cast,

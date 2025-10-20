@@ -28,10 +28,9 @@ from numbers import Number
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterable,
     NamedTuple,
 )
+from collections.abc import Callable, Iterable
 
 from .errors import InconsistentScenarioError
 from ._runtime import logger as scenario_logger

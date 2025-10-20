@@ -14,9 +14,9 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    Sequence,
     cast,
 )
+from collections.abc import Sequence
 
 import ops
 import ops.storage

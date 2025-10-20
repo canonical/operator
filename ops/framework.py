@@ -29,20 +29,15 @@ import sys
 import types
 import typing
 import weakref
+from collections.abc import Callable, Hashable, Iterable
 from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Dict,
-    Hashable,
-    Iterable,
-    List,
     Literal,
     NoReturn,
-    Optional,
     Protocol,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -76,10 +71,10 @@ StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
 
 _Path = _Kind = _MethodName = _EventKey = str
 # used to type Framework Attributes
-_ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
-_ObjectPath = Tuple[Optional[_Path], _Kind]
-_PathToObjectMapping = Dict[_Path, 'Object']
-_PathToSerializableMapping = Dict[_Path, Serializable]
+_ObserverPath = list[tuple[_Path, _MethodName, _Path, _EventKey]]
+_ObjectPath = tuple[_Path | None, _Kind]
+_PathToObjectMapping = dict[_Path, 'Object']
+_PathToSerializableMapping = dict[_Path, Serializable]
 
 _T = TypeVar('_T')
 _EventType = TypeVar('_EventType', bound='EventBase')

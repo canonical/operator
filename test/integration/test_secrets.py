@@ -14,7 +14,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 import jubilant
 import pytest

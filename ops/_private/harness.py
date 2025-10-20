@@ -33,6 +33,7 @@ import tempfile
 import typing
 import uuid
 import warnings
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
@@ -40,17 +41,10 @@ from typing import (
     Any,
     AnyStr,
     BinaryIO,
-    Callable,
     ClassVar,
-    Dict,
     Final,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Optional,
-    Sequence,
     TextIO,
     TypedDict,
     TypeVar,
@@ -81,16 +75,16 @@ _StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
 _FileKwargs = TypedDict(
     '_FileKwargs',
     {
-        'permissions': Optional[int],
+        'permissions': int | None,
         'last_modified': datetime.datetime,
-        'user_id': Optional[int],
-        'user': Optional[str],
-        'group_id': Optional[int],
-        'group': Optional[str],
+        'user_id': int | None,
+        'user': str | None,
+        'group_id': int | None,
+        'group': str | None,
     },
 )
 
-_RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[str]})
+_RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': list[str]})
 
 _RawStatus = TypedDict(
     '_RawStatus',
@@ -104,10 +98,10 @@ _ConfigOption = TypedDict(
     {
         'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
         'description': str,
-        'default': Union[str, int, float, bool],
+        'default': str | int | float | bool,
     },
 )
-_RawConfig = TypedDict('_RawConfig', {'options': Dict[str, _ConfigOption]})
+_RawConfig = TypedDict('_RawConfig', {'options': dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
@@ -159,7 +153,7 @@ class ExecResult:
     stderr: str | bytes = b''
 
 
-ExecHandler = Callable[[ExecArgs], Union[ExecResult, None]]
+ExecHandler = Callable[[ExecArgs], ExecResult | None]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -2248,7 +2242,7 @@ def _copy_docstrings(source_cls: type[object]) -> Callable[[_T], _T]:
 
 
 @_record_calls
-class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
+class _TestingConfig(dict[str, str | int | float | bool]):
     """Represents the Juju Config."""
 
     _supported_types: ClassVar[dict[str, Any]] = {
@@ -3090,10 +3084,10 @@ class _TestingExecProcess:
             raise pebble.ExecError[AnyStr](
                 self._command,
                 cast('int', self._exit_code),
-                cast('Union[AnyStr, None]', out_value),
-                cast('Union[AnyStr, None]', err_value),
+                cast('AnyStr | None', out_value),
+                cast('AnyStr | None', err_value),
             )
-        return cast('AnyStr', out_value), cast('Union[AnyStr, None]', err_value)
+        return cast('AnyStr', out_value), cast('AnyStr | None', err_value)
 
     def send_signal(self, sig: int | str):
         # the process is always terminated when ExecProcess is return in the simulation.
@@ -3541,7 +3535,7 @@ class _TestingPebbleClient:
         file_path = self._root / path[1:]
         try:
             return cast(
-                'Union[BinaryIO, TextIO]',
+                'BinaryIO | TextIO',
                 file_path.open('rb' if encoding is None else 'r', encoding=encoding),
             )
         except FileNotFoundError:
@@ -3775,7 +3769,7 @@ class _TestingPebbleClient:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=cast('Union[str, bytes, None]', stdin),
+            stdin=cast('str | bytes | None', stdin),
             encoding=encoding,
             combine_stderr=combine_stderr,
         )
