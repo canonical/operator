@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Generator
 from typing import Any, TypedDict, cast
 
 import ops
@@ -50,6 +51,7 @@ class SecretsCharm(ops.CharmBase):
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on['add-secret'].action, self.add_secret)
         framework.observe(self.on['add-with-meta'].action, self.add_with_meta)
+        framework.observe(self.on['set-secret-flow'].action, self.set_secret_flow)
 
     def _on_start(self, event: ops.StartEvent):
         self.unit.status = ops.ActiveStatus()
@@ -80,6 +82,35 @@ class SecretsCharm(ops.CharmBase):
         }
         event.set_results(cast('dict[str, Any]', result))
 
+    def set_secret_flow(self, event: ops.ActionEvent):
+        id = event.params.get('secertid')
+        label = event.params.get('secretlabel')
+        assert id or label
+        assert not (id and label)
+        secret = self.model.get_secret(
+            **({'id': id} if id else {}),
+            **({'label': label} if label else {}),
+        )
+        contentiter = iter(contents())
+        labeliter = iter(labels())
+        descriptioniter = iter(descriptions())
+        expireiter = iter(expires())
+        rotateiter = iter(rotates())
+        for field in event.params['flow']:
+            match field:
+                case 'content':
+                    secret.set_content(next(contentiter))
+                case 'label':
+                    secret.set_info(label=next(labeliter))
+                case 'description':
+                    secret.set_info(description=next(descriptioniter))
+                case 'expire':
+                    secret.set_info(expire=next(expireiter))
+                case 'rotate':
+                    secret.set_info(rotate=next(rotateiter))
+                case _:
+                    raise ValueError(f'Unsupported {field=}')
+
     def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
         # The `expires` and `rotates` fields are coerced to strings by hook command invocation.
@@ -89,6 +120,35 @@ class SecretsCharm(ops.CharmBase):
             'tracked': secret.get_content(),
             'latest': secret.peek_content(),
         }
+
+
+def contents() -> Generator[dict[str, str]]:
+    """Generate predictable, but different content values every time."""
+    for i in range(10):
+        yield {'val': f'{i}'}
+
+
+def labels() -> Generator[str]:
+    """Generate predictable, but different content values every time."""
+    for i in range(10):
+        yield f'label{i}'
+
+
+def descriptions() -> Generator[str]:
+    """Generate predictable, but different content values every time."""
+    for i in range(10):
+        yield f'description{i}'
+
+
+def expires() -> Generator[datetime.datetime]:
+    """Generate predictable, but different content values every time."""
+    for i in range(10):
+        yield datetime.datetime(2010 + i, 1, 1, 0, 0, 0)
+
+
+def rotates() -> Generator[ops.SecretRotate]:
+    """Generate predictable, but different `rotate` values every time."""
+    yield ops.SecretRotate.NEVER
 
 
 if __name__ == '__main__':
