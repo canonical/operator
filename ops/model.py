@@ -3891,7 +3891,11 @@ class _ModelBackend:
 
     def juju_log(self, level: str, message: str) -> None:
         """Pass a log message on to the juju logger."""
-        # We do not trace this call, to avoid an infinite recursion loop.
+        # We do not trace this call. This is partly because we don't want to
+        # force charms to mix logging in with tracing (if we include the level
+        # and message, that's essentially the entire log), and partly because
+        # it avoids a loop if the tracing or hook command execution itself
+        # causes logging, either directly or via a traceback.
         for line in self.log_split(message):
             # For backwards compatibility we allow arbitrary level strings.
             try:
