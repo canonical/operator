@@ -47,6 +47,7 @@ from typing import (
     ClassVar,
     Literal,
     TextIO,
+    TypeAlias,
     TypedDict,
     TypeVar,
     get_args,
@@ -60,9 +61,6 @@ from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
-if typing.TYPE_CHECKING:
-    from typing import TypeAlias
-
 # JujuVersion is not used in this file, but there are charms that are importing JujuVersion
 # from ops.model, so we keep it here.
 _ = JujuVersion
@@ -75,18 +73,18 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName: TypeAlias = _SettableStatusName | _ReadOnlyStatusName
+_StatusName = _SettableStatusName | _ReadOnlyStatusName
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw: TypeAlias = 'dict[str, list[Relation] | None]'
 # mapping from container name to container metadata
-_ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'
+_ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'  # prevent import loop
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
-_RelationDataContent_Raw: TypeAlias = 'dict[str, str]'
+_RelationDataContent_Raw = dict[str, str]
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
 _AddressDict = TypedDict(
