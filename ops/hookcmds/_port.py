@@ -171,7 +171,14 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
         else:
             protocol = protocol or 'tcp'
             port = int(port)
-        if protocol not in ('tcp', 'udp', 'icmp'):
-            raise RuntimeError(f'Unexpected protocol from Juju: {protocol}')
-        ports.append(Port(protocol=protocol, port=port, to_port=to_port, endpoints=port_endpoints))
+        # The type: ignore is required because we know that protocol will be tcp, udp, or icmp
+        # but we can't raise if not, because model.py only emits a warning in that case, and
+        # we need to maintain backwards compatibility.
+        port = Port(
+            protocol=protocol,  # type: ignore
+            port=port,
+            to_port=to_port,
+            endpoints=port_endpoints,
+        )
+        ports.append(port)
     return ports

@@ -19,7 +19,6 @@ import pathlib
 from typing import (
     Any,
     Literal,
-    Mapping,
     cast,
     overload,
 )
@@ -51,10 +50,10 @@ def app_version_set(version: str):
 @overload
 def config_get(key: str) -> bool | int | float | str: ...
 @overload
-def config_get(key: None = None) -> Mapping[str, bool | int | float | str]: ...
+def config_get(key: None = None) -> dict[str, bool | int | float | str]: ...
 def config_get(
     key: str | None = None,
-) -> Mapping[str, bool | int | float | str] | bool | int | float | str:
+) -> dict[str, bool | int | float | str] | bool | int | float | str:
     """Retrieve application configuration.
 
     Note that 'secret' type options are returned as string secret IDs.
@@ -164,11 +163,11 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
         binding_name: A name of a binding (relation name or extra-binding name).
         relation_id: An optional relation id to get network info for.
     """
-    args: list[str] = []
+    args = ['--format=json']
     if relation_id is not None:
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
-    stdout = run('network-get', *args, '--format=json')
+    stdout = run('network-get', *args)
     result = cast('dict[str, Any]', json.loads(stdout))
     return Network._from_dict(result)
 

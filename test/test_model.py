@@ -1094,7 +1094,7 @@ class TestModel:
         fake_script.write(
             'storage-list',
             """
-            if [ "$1" = disks ]; then
+            if [ "$2" = disks ]; then
                 echo '["disks/0", "disks/1"]'
             else
                 echo '[]'
@@ -1104,10 +1104,10 @@ class TestModel:
         fake_script.write(
             'storage-get',
             """
-            if [ "$2" = disks/0 ]; then
-                echo '"/var/srv/disks/0"'
-            elif [ "$2" = disks/1 ]; then
-                echo '"/var/srv/disks/1"'
+            if [ "$3" = disks/0 ]; then
+                echo '{"kind": "filesystem", "location": "/var/srv/disks/0"}'
+            elif [ "$3" = disks/1 ]; then
+                echo '{"kind": "filesystem", "location": "/var/srv/disks/1"}'
             else
                 exit 2
             fi
@@ -1133,15 +1133,15 @@ class TestModel:
             assert storage.location == test_cases[storage.id]['location']
 
         assert fake_script.calls(clear=True) == [
-            ['storage-list', 'disks', '--format=json'],
-            ['storage-get', '-s', 'disks/0', 'location', '--format=json'],
-            ['storage-get', '-s', 'disks/1', 'location', '--format=json'],
+            ['storage-list', '--format=json', 'disks'],
+            ['storage-get', '--format=json', '-s', 'disks/0'],
+            ['storage-get', '--format=json', '-s', 'disks/1'],
         ]
 
         assert model.storages['data'] == []
         model.storages.request('data', count=3)
         assert fake_script.calls() == [
-            ['storage-list', 'data', '--format=json'],
+            ['storage-list', '--format=json', 'data'],
             ['storage-add', 'data=3'],
         ]
 
@@ -1236,8 +1236,8 @@ class TestModel:
 
         assert fake_script.calls() == [
             ['relation-ids', 'db', '--format=json'],
-            ['relation-list', '-r', '1', '--format=json'],
-            ['relation-model-get', '-r', '1', '--format=json'],
+            ['relation-list', '--format=json', '-r', '1'],
+            ['relation-model-get', '--format=json', '-r', '1'],
         ]
 
 
@@ -2509,7 +2509,7 @@ class TestModelBindings:
         model = ops.Model(meta, backend)
 
         fake_script.write('relation-ids', """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
-        fake_script.write('relation-list', """[ "$2" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        fake_script.write('relation-list', """[ "$3" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
         self.network_get_out = """{
   "bind-addresses": [
     {
@@ -2622,10 +2622,10 @@ class TestModelBindings:
         fake_script.write(
             'network-get',
             f"""
-                if [ "$1" = db0 ] && [ "$2" = --format=json ]; then
+                if [ "$2" = db0 ] && [ "$1" = --format=json ]; then
                     echo '{self.network_get_out}'
                 else
-                    echo ERROR invalid value "$2" for option -r: relation not found >&2
+                    echo ERROR invalid value "$4" for option -r: relation not found >&2
                     exit 2
                 fi
             """,
@@ -2634,8 +2634,8 @@ class TestModelBindings:
         binding = ops.Binding('db0', 42, model._backend)
         assert binding.network.bind_address == ipaddress.ip_address('192.0.2.2')
         assert fake_script.calls(clear=True) == [
-            ['network-get', 'db0', '-r', '42', '--format=json'],
-            ['network-get', 'db0', '--format=json'],
+            ['network-get', '--format=json', '-r', '42', 'db0'],
+            ['network-get', '--format=json', 'db0'],
         ]
 
     def test_broken_relations(self, fake_script: FakeScript, fake_juju_version: None):
@@ -2673,10 +2673,10 @@ class TestModelBindings:
 
     def test_binding_by_relation_name(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write(
-            'network-get', f"""[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1"""
+            'network-get', f"""[ "$2" = db0 ] && echo '{self.network_get_out}' || exit 1"""
         )
         binding_name = 'db0'
-        expected_calls = [['network-get', 'db0', '--format=json']]
+        expected_calls = [['network-get', '--format=json', 'db0']]
 
         binding = self.ensure_binding(model, binding_name)
         self._check_binding_data(binding_name, binding)
@@ -2684,14 +2684,14 @@ class TestModelBindings:
 
     def test_binding_by_relation(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write(
-            'network-get', f"""[ "$1" = db0 ] && echo '{self.network_get_out}' || exit 1"""
+            'network-get', f"""[ "$4" = db0 ] && echo '{self.network_get_out}' || exit 1"""
         )
         binding_name = 'db0'
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
             # The two invocations below are due to the get_relation call.
-            ['relation-list', '-r', '4', '--format=json'],
-            ['network-get', 'db0', '-r', '4', '--format=json'],
+            ['relation-list', '--format=json', '-r', '4'],
+            ['network-get', '--format=json', '-r', '4', 'db0'],
         ]
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         self._check_binding_data(binding_name, binding)
@@ -2711,10 +2711,10 @@ class TestModelBindings:
         }
         network_get_out = json.dumps(network_get_out_obj)
         fake_script.write(
-            'network-get', f"""[ "$1" = db0 ] && echo '{network_get_out}' || exit 1"""
+            'network-get', f"""[ "$2" = db0 ] && echo '{network_get_out}' || exit 1"""
         )
         binding_name = 'db0'
-        expected_calls = [['network-get', 'db0', '--format=json']]
+        expected_calls = [['network-get', '--format=json', 'db0']]
 
         binding = self.ensure_binding(model, binding_name)
         assert binding.name == 'db0'
@@ -2724,21 +2724,21 @@ class TestModelBindings:
 
     def test_missing_bind_addresses(self, fake_script: FakeScript, model: ops.Model):
         network_data = json.dumps({})
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.interfaces == []
 
     def test_empty_bind_addresses(self, fake_script: FakeScript, model: ops.Model):
         network_data = json.dumps({'bind-addresses': [{}]})
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.interfaces == []
 
     def test_no_bind_addresses(self, fake_script: FakeScript, model: ops.Model):
         network_data = json.dumps({'bind-addresses': [{'addresses': None}]})
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.interfaces == []
@@ -2752,7 +2752,7 @@ class TestModelBindings:
                 }
             ],
         })
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert len(binding.network.interfaces) == 1
@@ -2764,7 +2764,7 @@ class TestModelBindings:
         network_data = json.dumps({
             'bind-addresses': [],
         })
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.ingress_addresses == []
@@ -2775,7 +2775,7 @@ class TestModelBindings:
             'bind-addresses': [],
             'ingress-addresses': [],
         })
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.egress_subnets == []
@@ -2786,7 +2786,7 @@ class TestModelBindings:
         network_data = json.dumps({
             'ingress-addresses': ['foo.bar.baz.com'],
         })
-        fake_script.write('network-get', f"""[ "$1" = db0 ] && echo '{network_data}' || exit 1""")
+        fake_script.write('network-get', f"""[ "$4" = db0 ] && echo '{network_data}' || exit 1""")
         binding_name = 'db0'
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.ingress_addresses == ['foo.bar.baz.com']
@@ -2856,13 +2856,13 @@ class TestModelBackend:
                 lambda: fake_script.write('relation-list', 'echo fooerror >&2 ; exit 1'),
                 lambda: backend.relation_list(3),
                 ops.ModelError,
-                [['relation-list', '-r', '3', '--format=json']],
+                [['relation-list', '--format=json', '-r', '3']],
             ),
             (
                 lambda: fake_script.write('relation-list', f'echo {err_msg} >&2 ; exit 2'),
                 lambda: backend.relation_list(3),
                 ops.RelationNotFoundError,
-                [['relation-list', '-r', '3', '--format=json']],
+                [['relation-list', '--format=json', '-r', '3']],
             ),
             (
                 lambda: fake_script.write('relation-set', 'echo fooerror >&2 ; exit 1'),
@@ -2886,19 +2886,19 @@ class TestModelBackend:
                 lambda: fake_script.write('relation-get', 'echo fooerror >&2 ; exit 1'),
                 lambda: backend.relation_get(3, 'remote/0', is_app=False),
                 ops.ModelError,
-                [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+                [['relation-get', '--format=json', '-r', '3', '-', 'remote/0']],
             ),
             (
                 lambda: fake_script.write('relation-get', f'echo {err_msg} >&2 ; exit 2'),
                 lambda: backend.relation_get(3, 'remote/0', is_app=False),
                 ops.RelationNotFoundError,
-                [['relation-get', '-r', '3', '-', 'remote/0', '--format=json']],
+                [['relation-get', '--format=json', '-r', '3', '-', 'remote/0']],
             ),
             (
                 lambda: None,
                 lambda: backend.relation_get(3, 'remote/0', is_app=True),
                 ops.RelationNotFoundError,
-                [['relation-get', '-r', '3', '-', 'remote/0', '--app', '--format=json']],
+                [['relation-get', '--format=json', '-r', '3', '--app', '-', 'remote/0']],
             ),
         ]
 
@@ -2907,65 +2907,6 @@ class TestModelBackend:
             with pytest.raises(exception):
                 run()
             assert fake_script.calls(clear=True) == calls
-
-    @pytest.mark.parametrize('version', ['2.8.0', '2.7.0'])
-    def test_relation_get_juju_version_quirks(
-        self,
-        fake_script: FakeScript,
-        monkeypatch: pytest.MonkeyPatch,
-        version: str,
-    ):
-        fake_script.write('relation-get', """echo '{"foo": "bar"}' """)
-
-        # on 2.7.0+, things proceed as expected
-        monkeypatch.setenv('JUJU_VERSION', version)
-        backend = _ModelBackend('myapp/0')
-        rel_data = backend.relation_get(1, 'foo/0', is_app=True)
-        assert rel_data == {'foo': 'bar'}
-        calls = [' '.join(i) for i in fake_script.calls(clear=True)]
-        assert calls == ['relation-get -r 1 - foo/0 --app --format=json']
-
-        # before 2.7.0, it just fails (no --app support)
-        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
-        backend = _ModelBackend('myapp/0')
-        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
-            backend.relation_get(1, 'foo/0', is_app=True)
-        assert fake_script.calls() == []
-
-    @pytest.mark.parametrize('version', ['2.8.0', '2.7.0'])
-    def test_relation_set_juju_version_quirks(
-        self,
-        fake_script: FakeScript,
-        monkeypatch: pytest.MonkeyPatch,
-        version: str,
-    ):
-        # on 2.7.0+, things proceed as expected
-        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
-        try:
-            fake_script.write(
-                'relation-set',
-                dedent("""
-                cat >> {}
-                """).format(pathlib.Path(t.name).as_posix()),
-            )
-            monkeypatch.setenv('JUJU_VERSION', version)
-            backend = _ModelBackend('myapp/0')
-            backend.relation_set(1, {'foo': 'bar'}, is_app=True)
-            calls = [' '.join(i) for i in fake_script.calls(clear=True)]
-            assert calls == ['relation-set -r 1 --app --file -']
-            t.seek(0)
-            content = t.read()
-        finally:
-            t.close()
-        decoded = content.decode('utf-8').replace('\r\n', '\n')
-        assert decoded == 'foo: bar\n'
-
-        # before 2.7.0, it just fails always (no --app support)
-        monkeypatch.setenv('JUJU_VERSION', '2.6.9')
-        backend = _ModelBackend('myapp/0')
-        with pytest.raises(RuntimeError, match=r'not supported on Juju version 2\.6\.9'):
-            backend.relation_set(1, {'foo': 'bar'}, is_app=True)
-        assert fake_script.calls() == []
 
     def test_status_get(self, fake_script: FakeScript, backend: _ModelBackend):
         # taken from actual Juju output
@@ -2996,8 +2937,8 @@ class TestModelBackend:
         assert s['status'] == 'maintenance'
         assert s['message'] == 'installing'
         assert fake_script.calls(clear=True) == [
-            ['status-get', '--include-data', '--application=False', '--format=json'],
-            ['status-get', '--include-data', '--application=True', '--format=json'],
+            ['status-get', '--include-data', '--format=json', '--application=false'],
+            ['status-get', '--include-data', '--format=json', '--application=true'],
         ]
 
     def test_status_is_app_forced_kwargs(self, fake_script: FakeScript, backend: _ModelBackend):
@@ -3100,13 +3041,11 @@ class TestModelBackend:
         fake_script.write('storage-list', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.storage_list('foobar')
-        assert fake_script.calls(clear=True) == [['storage-list', 'foobar', '--format=json']]
+        assert fake_script.calls(clear=True) == [['storage-list', '--format=json', 'foobar']]
         fake_script.write('storage-get', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.storage_get('foobar', 'someattr')
-        assert fake_script.calls(clear=True) == [
-            ['storage-get', '-s', 'foobar', 'someattr', '--format=json']
-        ]
+        assert fake_script.calls(clear=True) == [['storage-get', '--format=json', '-s', 'foobar']]
         fake_script.write('storage-add', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.storage_add('foobar', count=2)
@@ -3142,17 +3081,22 @@ class TestModelBackend:
     "192.0.2.2"
   ]
 }"""
+        mock_network_get = (
+            f"""([ "$2" = deadbeef ] || [ "$4" = deadbeef ]) """
+            f"""&& echo '{network_get_out}' || exit 1"""
+        )
         fake_script.write(
-            'network-get', f"""[ "$1" = deadbeef ] && echo '{network_get_out}' || exit 1"""
+            'network-get',
+            mock_network_get,
         )
         network_info = backend.network_get('deadbeef')
         assert network_info == json.loads(network_get_out)
-        assert fake_script.calls(clear=True) == [['network-get', 'deadbeef', '--format=json']]
+        assert fake_script.calls(clear=True) == [['network-get', '--format=json', 'deadbeef']]
 
         network_info = backend.network_get('deadbeef', 1)
         assert network_info == json.loads(network_get_out)
         assert fake_script.calls(clear=True) == [
-            ['network-get', 'deadbeef', '-r', '1', '--format=json']
+            ['network-get', '--format=json', '-r', '1', 'deadbeef']
         ]
 
     def test_network_get_errors(self, fake_script: FakeScript, backend: _ModelBackend):
@@ -3164,13 +3108,13 @@ class TestModelBackend:
                 lambda: fake_script.write('network-get', f'echo {err_no_endpoint} >&2 ; exit 1'),
                 lambda: backend.network_get('deadbeef'),
                 ops.ModelError,
-                [['network-get', 'deadbeef', '--format=json']],
+                [['network-get', '--format=json', 'deadbeef']],
             ),
             (
                 lambda: fake_script.write('network-get', f'echo {err_no_rel} >&2 ; exit 2'),
                 lambda: backend.network_get('deadbeef', 3),
                 ops.RelationNotFoundError,
-                [['network-get', 'deadbeef', '-r', '3', '--format=json']],
+                [['network-get', '--format=json', '-r', '3', 'deadbeef']],
             ),
         ]
         for do_fake, run, exception, calls in test_cases:
@@ -3201,7 +3145,7 @@ class TestModelBackend:
         fake_script.write('action-log', 'echo fooerror >&2 ; exit 1')
         with pytest.raises(ops.ModelError):
             backend.action_log('log-message')
-        calls = [['action-log', 'log-message']]
+        calls = [['action-log', '--', 'log-message']]
         assert fake_script.calls(clear=True) == calls
 
     def test_action_get(self, fake_script: FakeScript, backend: _ModelBackend):
@@ -3259,13 +3203,13 @@ class TestModelBackend:
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-fail', 'exit 0')
         backend.action_fail('error 42')
-        assert fake_script.calls() == [['action-fail', 'error 42']]
+        assert fake_script.calls() == [['action-fail', '--', 'error 42']]
 
     def test_action_log(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
         fake_script.write('action-log', 'exit 0')
         backend.action_log('progress: 42%')
-        assert fake_script.calls() == [['action-log', 'progress: 42%']]
+        assert fake_script.calls() == [['action-log', '--', 'progress: 42%']]
 
     def test_application_version_set(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('application-version-set', 'exit 0')
@@ -3405,7 +3349,7 @@ echo '"remoteapp2"'
         backend = _ModelBackend('myapp/0')
         assert backend.relation_remote_app_name(1) == 'remoteapp2'
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '-r', '1', '--app', '--format=json'],
+            ['relation-list', '--format=json', '--app', '-r', '1'],
         ]
 
         # JUJU_RELATION_ID set but JUJU_REMOTE_APP unset
@@ -3436,19 +3380,7 @@ exit 2
         )
         assert backend.relation_remote_app_name(6) is None
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '-r', '6', '--app', '--format=json'],
-        ]
-
-        fake_script.write(
-            'relation-list',
-            r"""
-echo "ERROR option provided but not defined: --app" >&2
-exit 2
-""",
-        )
-        assert backend.relation_remote_app_name(6) is None
-        assert fake_script.calls(clear=True) == [
-            ['relation-list', '-r', '6', '--app', '--format=json'],
+            ['relation-list', '--format=json', '--app', '-r', '6'],
         ]
 
     def test_planned_units(self, fake_script: FakeScript, backend: _ModelBackend):
@@ -3647,7 +3579,7 @@ class TestSecrets:
         assert secret.get_content() == {'foo': 'g'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json']
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/123']
         ]
 
     def test_get_secret_label(self, fake_script: FakeScript, model: ops.Model):
@@ -3658,7 +3590,7 @@ class TestSecrets:
         assert secret.label == 'lbl'
         assert secret.get_content() == {'foo': 'g'}
 
-        assert fake_script.calls(clear=True) == [['secret-get', '--label', 'lbl', '--format=json']]
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
 
     def test_get_secret_id_and_label(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-get', """echo '{"foo": "h"}'""")
@@ -3671,10 +3603,10 @@ class TestSecrets:
         assert fake_script.calls(clear=True) == [
             [
                 'secret-get',
+                '--format=json',
                 f'secret://{model._backend.model_uuid}/123',
                 '--label',
                 'l',
-                '--format=json',
             ]
         ]
 
@@ -3717,10 +3649,10 @@ class TestSecrets:
         assert secret.unique_identifier == '125'
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', '--label', 'lbl', '--format=json'],
-            ['secret-get', f'secret://{model._backend.model_uuid}/123', '--format=json'],
-            ['secret-get', 'secret:124', '--format=json'],
-            ['secret-get', 'secret://modeluuid/125', '--format=json'],
+            ['secret-get', '--format=json', '--label', 'lbl'],
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/123'],
+            ['secret-get', '--format=json', 'secret:124'],
+            ['secret-get', '--format=json', 'secret://modeluuid/125'],
         ]
 
     @pytest.mark.parametrize(
@@ -3896,7 +3828,7 @@ class TestSecretClass:
         assert content == {'foo': 'refreshed'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', f'secret://{model._backend.model_uuid}/y', '--refresh', '--format=json']
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/y', '--refresh']
         ]
 
     def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
@@ -3907,7 +3839,7 @@ class TestSecretClass:
         assert content == {'foo': 'notcached'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z']
         ]
 
     def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
@@ -3920,7 +3852,7 @@ class TestSecretClass:
         assert secret.get_content() == {'foo': 'bar'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', f'secret://{model._backend.model_uuid}/z', '--format=json']
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z']
         ]
 
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
@@ -3933,11 +3865,11 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             [
                 'secret-get',
+                '--format=json',
                 f'secret://{model._backend.model_uuid}/a',
                 '--label',
                 'b',
                 '--peek',
-                '--format=json',
             ]
         ]
 
@@ -3966,9 +3898,15 @@ class TestSecretClass:
         assert info.revision == 7
 
         assert fake_script.calls(clear=True) == [
-            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
-            ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-info-get', f'secret://{model._backend.model_uuid}/x', '--format=json'],
+            ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
+            [
+                'secret-info-get',
+                '--format=json',
+                f'secret://{model._backend.model_uuid}/x',
+                '--label',
+                'y',
+            ],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
@@ -3988,9 +3926,21 @@ class TestSecretClass:
             secret.set_content({'s': 't'})  # ensure it validates content (key too short)
 
         assert fake_script.calls(clear=True) == [
-            ['secret-set', f'secret://{model._backend.model_uuid}/x', mock.ANY],
-            ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', f'secret://{model._backend.model_uuid}/z', mock.ANY],
+            [
+                'secret-set',
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/x',
+                mock.ANY,
+            ],
+            ['secret-info-get', '--format=json', '--label', 'y'],
+            [
+                'secret-set',
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/z',
+                mock.ANY,
+            ],
         ]
         assert fake_script.secrets() == {'foo': 'bar', 'bar': 'foo'}
 
@@ -4016,7 +3966,6 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             [
                 'secret-set',
-                f'secret://{model._backend.model_uuid}/x',
                 '--label',
                 'lab',
                 '--description',
@@ -4025,9 +3974,19 @@ class TestSecretClass:
                 '2022-12-09T16:59:00',
                 '--rotate',
                 'monthly',
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/x',
             ],
-            ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-set', f'secret://{model._backend.model_uuid}/z', '--label', 'lbl'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
+            [
+                'secret-set',
+                '--label',
+                'lbl',
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/z',
+            ],
         ]
 
         with pytest.raises(TypeError):
@@ -4043,19 +4002,26 @@ class TestSecretClass:
         secret.set_info(description=description)
 
         calls = fake_script.calls(clear=True)
-        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][:-1] == [
+            'secret-set',
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
+        ]
         assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
         assert calls[1] == [
             'secret-get',
+            '--format=json',
             f'secret://{model._backend.model_uuid}/q',
             '--peek',
-            '--format=json',
         ]
         assert calls[2][:-1] == [
             'secret-set',
-            f'secret://{model._backend.model_uuid}/q',
             '--description',
             description,
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
         ]
         assert calls[2][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
 
@@ -4070,15 +4036,19 @@ class TestSecretClass:
         calls = fake_script.calls(clear=True)
         assert calls[0] == [
             'secret-set',
-            f'secret://{model._backend.model_uuid}/q',
             '--description',
             description,
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
         ]
         assert calls[1][:-1] == [
             'secret-set',
-            f'secret://{model._backend.model_uuid}/q',
             '--description',
             description,
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
         ]
         assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
 
@@ -4090,8 +4060,18 @@ class TestSecretClass:
         secret.set_content({'baz': 'qux', 'foo': 'newbar'})
 
         calls = fake_script.calls(clear=True)
-        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
-        assert calls[0][:-1] == ['secret-set', f'secret://{model._backend.model_uuid}/q']
+        assert calls[0][:-1] == [
+            'secret-set',
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
+        ]
+        assert calls[0][:-1] == [
+            'secret-set',
+            '--owner',
+            'application',
+            f'secret://{model._backend.model_uuid}/q',
+        ]
         assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}
 
     def test_grant(self, model: ops.Model, fake_script: FakeScript):
@@ -4118,20 +4098,20 @@ class TestSecretClass:
         assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '-r', '123', '--format=json'],
-            ['relation-list', '-r', '234', '--format=json'],
-            ['secret-grant', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            ['relation-list', '--format=json', '-r', '123'],
+            ['relation-list', '--format=json', '-r', '234'],
+            ['secret-grant', '--relation', '123', f'secret://{model._backend.model_uuid}/x'],
             [
                 'secret-grant',
-                f'secret://{model._backend.model_uuid}/x',
                 '--relation',
                 '234',
                 '--unit',
                 'app/0',
+                f'secret://{model._backend.model_uuid}/x',
             ],
-            ['relation-list', '-r', '345', '--format=json'],
-            ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-grant', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
+            ['relation-list', '--format=json', '-r', '345'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
+            ['secret-grant', '--relation', '345', f'secret://{model._backend.model_uuid}/z'],
         ]
 
     def test_revoke(self, model: ops.Model, fake_script: FakeScript):
@@ -4155,20 +4135,20 @@ class TestSecretClass:
         assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '-r', '123', '--format=json'],
-            ['relation-list', '-r', '234', '--format=json'],
-            ['secret-revoke', f'secret://{model._backend.model_uuid}/x', '--relation', '123'],
+            ['relation-list', '--format=json', '-r', '123'],
+            ['relation-list', '--format=json', '-r', '234'],
+            ['secret-revoke', '--relation', '123', f'secret://{model._backend.model_uuid}/x'],
             [
                 'secret-revoke',
-                f'secret://{model._backend.model_uuid}/x',
                 '--relation',
                 '234',
                 '--unit',
                 'app/0',
+                f'secret://{model._backend.model_uuid}/x',
             ],
-            ['relation-list', '-r', '345', '--format=json'],
-            ['secret-info-get', '--label', 'y', '--format=json'],
-            ['secret-revoke', f'secret://{model._backend.model_uuid}/z', '--relation', '345'],
+            ['relation-list', '--format=json', '-r', '345'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
+            ['secret-revoke', '--relation', '345', f'secret://{model._backend.model_uuid}/z'],
         ]
 
     def test_remove_revision(self, model: ops.Model, fake_script: FakeScript):
@@ -4186,7 +4166,7 @@ class TestSecretClass:
 
         assert fake_script.calls(clear=True) == [
             ['secret-remove', f'secret://{model._backend.model_uuid}/x', '--revision', '123'],
-            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
             ['secret-remove', f'secret://{model._backend.model_uuid}/z', '--revision', '234'],
         ]
 
@@ -4205,7 +4185,7 @@ class TestSecretClass:
 
         assert fake_script.calls(clear=True) == [
             ['secret-remove', f'secret://{model._backend.model_uuid}/x'],
-            ['secret-info-get', '--label', 'y', '--format=json'],
+            ['secret-info-get', '--format=json', '--label', 'y'],
             ['secret-remove', f'secret://{model._backend.model_uuid}/z'],
         ]
 
@@ -4265,7 +4245,7 @@ class TestPorts:
         ]
 
     def test_opened_ports(self, fake_script: FakeScript, unit: ops.Unit):
-        fake_script.write('opened-ports', """echo 8080/tcp; echo icmp""")
+        fake_script.write('opened-ports', """echo '["8080/tcp", "icmp"]'""")
 
         ports_set = unit.opened_ports()
         assert isinstance(ports_set, set)
@@ -4279,13 +4259,13 @@ class TestPorts:
         assert ports[1].port == 8080
 
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', ''],
+            ['opened-ports', '--format=json'],
         ]
 
     def test_opened_ports_warnings(
         self, caplog: pytest.LogCaptureFixture, fake_script: FakeScript, unit: ops.Unit
     ):
-        fake_script.write('opened-ports', """echo 8080/tcp; echo 1234/ftp; echo 1000-2000/udp""")
+        fake_script.write('opened-ports', """echo '["8080/tcp", "1234/ftp", "1000-2000/udp"]'""")
 
         with caplog.at_level(level='WARNING', logger='ops.model'):
             ports_set = unit.opened_ports()
@@ -4304,16 +4284,16 @@ class TestPorts:
         assert ports[1].port == 1000
 
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', ''],
+            ['opened-ports', '--format=json'],
         ]
 
     def test_set_ports_all_open(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', 'exit 0')
+        fake_script.write('opened-ports', 'echo []')
         unit.set_ports(8000, 8025)
         calls = fake_script.calls(clear=True)
-        assert calls.pop(0) == ['opened-ports', '']
+        assert calls.pop(0) == ['opened-ports', '--format=json']
         calls.sort()  # We make no guarantee on the order the ports are opened.
         assert calls == [
             ['open-port', '8000/tcp'],
@@ -4324,10 +4304,10 @@ class TestPorts:
         # Two open ports, leave one alone and open another one.
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', 'echo 8025/tcp; echo 8028/tcp')
+        fake_script.write('opened-ports', """echo '["8025/tcp", "8028/tcp"]'""")
         unit.set_ports(ops.Port('udp', 8022), 8028)
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', ''],
+            ['opened-ports', '--format=json'],
             ['close-port', '8025/tcp'],
             ['open-port', '8022/udp'],
         ]
@@ -4335,10 +4315,10 @@ class TestPorts:
     def test_set_ports_replace(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', 'echo 8025/tcp; echo 8028/tcp')
+        fake_script.write('opened-ports', """echo '["8025/tcp", "8028/tcp"]'""")
         unit.set_ports(8001, 8002)
         calls = fake_script.calls(clear=True)
-        assert calls.pop(0) == ['opened-ports', '']
+        assert calls.pop(0) == ['opened-ports', '--format=json']
         calls.sort()
         assert calls == [
             ['close-port', '8025/tcp'],
@@ -4350,20 +4330,20 @@ class TestPorts:
     def test_set_ports_close_all(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', 'echo 8022/udp')
+        fake_script.write('opened-ports', """echo '["8022/udp"]'""")
         unit.set_ports()
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', ''],
+            ['opened-ports', '--format=json'],
             ['close-port', '8022/udp'],
         ]
 
     def test_set_ports_noop(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', 'echo 8000/tcp')
+        fake_script.write('opened-ports', """echo '["8000/tcp"]'""")
         unit.set_ports(ops.Port('tcp', 8000))
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', ''],
+            ['opened-ports', '--format=json'],
         ]
 
 
@@ -4684,10 +4664,10 @@ def test_departing_unit_data_available(fake_script: FakeScript):
     calls = fake_script.calls(clear=True)
     assert calls[:2] == [
         ['relation-ids', 'db', '--format=json'],
-        ['relation-list', '-r', '1', '--format=json'],
+        ['relation-list', '--format=json', '-r', '1'],
     ]
-    assert ['relation-get', '-r', '1', '-', 'db/0', '--format=json'] in calls
-    assert ['relation-get', '-r', '1', '-', 'db/1', '--format=json'] in calls
+    assert ['relation-get', '--format=json', '-r', '1', '-', 'db/0'] in calls
+    assert ['relation-get', '--format=json', '-r', '1', '-', 'db/1'] in calls
 
 
 if __name__ == '__main__':
