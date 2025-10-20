@@ -14,10 +14,13 @@
 
 from __future__ import annotations
 
+import collections.abc
 import os
 import pathlib
 import subprocess
 import sys
+import types
+import typing
 
 import pytest
 
@@ -62,7 +65,17 @@ def test_ops_testing_doc():
         for name in ops.testing.__all__
         if name != 'errors'
         and name not in ops.testing._compatibility_names
-        and getattr(ops.testing, name).__class__.__module__ not in ('typing', 'types')
+        and typing.get_origin(getattr(ops.testing, name))
+        not in (
+            # ReadableBuffer = bytes | ...
+            types.UnionType,
+            # ExecHandler = Callable[...]
+            collections.abc.Callable,
+            # RawDataBagContents = dict[...]  # Py310
+            dict,
+        )
+        # CharmType = TypeVar(...)
+        and getattr(ops.testing, name).__class__ is not typing.TypeVar
     )
     expected_names.update(
         f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')
