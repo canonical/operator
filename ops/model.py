@@ -3770,7 +3770,10 @@ class _ModelBackend:
 
         # hookcmds doesn't constrain the status to the five that _StatusDict expects,
         # but we know that will be the case, so we type: ignore.
-        return {'status': content.status, 'message': content.message}  # type: ignore
+        return {
+            'status': content.status,  # type: ignore
+            'message': content.message,
+        }
 
     def status_set(
         self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
