@@ -3626,8 +3626,10 @@ class _ModelBackend:
             with mgr as span:
                 if span is not None:
                     span.set_attribute('call', 'subprocess.run')
-                    span.set_attribute('args', args)
-                    span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                    if args:
+                        span.set_attribute('args', args)
+                    if kwargs:
+                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield
         except hookcmds.Error as e:
             self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
