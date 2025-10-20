@@ -34,7 +34,7 @@ This application isn't especially realistic in isolation. But it's a good way to
 
 ### Create a virtual machine
 
-You'll work inside an Ubuntu virtual machine that's running on your computer. The virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
+You'll work inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
 
 First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
 
@@ -46,9 +46,9 @@ multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
 
 This creates a virtual machine called `juju-sandbox`.
 
-Multipass allocates some of your computer's memory and disk space to the virtual machine. The options we've chosen for `multipass launch` ensure that the virtual machine will be powerful enough to run Juju and deploy medium-sized charms.
+Multipass allocates some of your computer's memory and disk space to your virtual machine. The options we've chosen for `multipass launch` ensure that your virtual machine will be powerful enough to run Juju and deploy medium-sized charms.
 
-It will take up to 10 minutes for Multipass to create the virtual machine, depending on your computer and network. When the virtual machine has been created, you'll see the message:
+It will take up to 10 minutes for Multipass to create your virtual machine, depending on your computer and network. When your virtual machine has been created, you'll see the message:
 
 ```text
 Launched: juju-sandbox
@@ -60,9 +60,9 @@ Now run:
 multipass shell juju-sandbox
 ```
 
-This switches the terminal so that you're working inside the virtual machine.
+This switches the terminal so that you're working inside your virtual machine.
 
-You'll see a message with information about the virtual machine. You'll also see a new prompt:
+You'll see a message with information about your virtual machine. You'll also see a new prompt:
 
 ```text
 ubuntu@juju-sandbox:~$
@@ -941,13 +941,23 @@ It will take a few minutes to run the tests. The output should be similar to:
 
 ## Tear things down
 
-TODO:
+Congratulations on reaching the end of the tutorial!
 
-- How to remove the application from Juju.
-- How to save the code that you created inside the virtual machine.
-- How to stop the virtual machine.
-- How to delete the virtual machine.
-- How to uninstall Multipass.
+You can keep things running, to explore further, or you can remove what you created:
+
+- If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
+- To remove your charm from Juju, run `juju remove-application tinyproxy`.
+- To exit your virtual machine, run `exit`. The terminal switches back to your usual operating system.
+- To stop your virtual machine, run `multipass stop juju-sandbox`.
+- If you plan to remove your virtual machine, you might want to save your charm somewhere first. Use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to share a directory with your virtual machine:
+    ```text
+    mkdir ~/vm-shared
+    multipass mount --type=classic ~/vm-shared juju-sandbox:/home/ubuntu/shared
+    multipass shell  # Work inside your virtual machine again.
+    ```
+    Then copy files from your charm to `~/shared`. The files will appear in `~/vm-shared` in your usual home directory.
+- To remove your virtual machine, run `multipass delete juju-sandbox`.
+- To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
 
 ## Next steps
 
