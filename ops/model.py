@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import collections
 import contextlib
+import contextvars
 import copy
 import dataclasses
 import datetime
@@ -3603,15 +3604,31 @@ class _ModelBackend:
         self._is_leader: bool | None = None
         self._leader_check_time = None
         self._hook_is_running = ''
+        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
+
+    @contextlib.contextmanager
+    def _prevent_recursion(self):
+        token = self._is_recursive.set(True)
+        try:
+            yield
+        finally:
+            self._is_recursive.reset(token)
 
     @contextlib.contextmanager
     def _wrap_hookcmd(self, cmd: str, *args: Any, **kwargs: Any):
+        if self._is_recursive.get():
+            # Either `juju-log` hook command failed or there's a bug in ops.
+            return
+        # Logs are collected via log integration, omit the subprocess calls that push
+        # the same content to juju from telemetry.
+        mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
         try:
-            with tracer.start_as_current_span(cmd) as span:
-                span.set_attribute('call', 'subprocess.run')
-                span.set_attribute('args', args)
-                span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
-                yield span
+            with mgr as span:
+                if span is not None:
+                    span.set_attribute('call', 'subprocess.run')
+                    span.set_attribute('args', args)
+                    span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                yield
         except hookcmds.Error as e:
             self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
             if (
