@@ -155,9 +155,9 @@ def test_ops_raises_abort(exit_code: int):
 
     ctx = Context(MyCharm, meta={'name': 'foo'})
     if exit_code == 0:
-        with ctx(ctx.on.start(), State()) as mgr:
-            state_out = mgr.run()
-        assert {e.handle.kind for e in mgr.emitted_events} == {'start'}
+        state_out = ctx.run(ctx.on.start(), State())
+        with pytest.warns(DeprecationWarning):
+            assert {e.handle.kind for e in ctx.emitted_events} == {'start'}
         assert state_out.unit_status == ActiveStatus()
     else:
         with pytest.raises(UncaughtCharmError) as exc:
