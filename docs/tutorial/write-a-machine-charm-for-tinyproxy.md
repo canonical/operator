@@ -2,6 +2,8 @@
 
 In this tutorial, you'll write a {external+juju:ref}`machine charm <machine-charm>` for Juju using Ops and other charm development tools.
 
+It will take about 2 hours for you to complete the tutorial.
+
 What you'll need:
 
 - A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
@@ -969,7 +971,7 @@ You can keep things running, to explore further, or you can remove what you crea
 
 ## Next steps
 
-For more information about topics covered in this tutorial, see:
+For more information about topics covered in the tutorial, see:
 
 - [](#write-and-structure-charm-code)
 - [](#manage-configuration)
