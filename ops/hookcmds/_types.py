@@ -19,10 +19,10 @@ import datetime
 import pathlib
 from collections.abc import Sequence
 from typing import (
+    TYPE_CHECKING,
     Any,
     Literal,
     TypedDict,
-    cast,
 )
 
 from ._utils import datetime_from_iso
@@ -33,10 +33,23 @@ ReadOnlyStatusName = Literal['error', 'unknown']
 StatusName = SettableStatusName | ReadOnlyStatusName
 
 
-class AddressDict(TypedDict):
-    hostname: str
-    value: str
-    cidr: str
+if TYPE_CHECKING:
+    from typing_extensions import NotRequired
+
+    class AddressDict(TypedDict, total=False):
+        hostname: str
+        address: str  # Juju < 2.9
+        value: str  # Juju >= 2.9
+        cidr: str
+
+    BindAddressDict = TypedDict(
+        'BindAddressDict',
+        {
+            'mac-address': NotRequired[str],
+            'interface-name': str,
+            'addresses': list[AddressDict] | None,
+        },
+    )
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -53,16 +66,10 @@ class Address:
     @classmethod
     def _from_dict(cls, d: AddressDict) -> Address:
         return cls(
-            hostname=d['hostname'],
-            value=d['value'],
-            cidr=d['cidr'],
+            hostname=d.get('hostname', ''),
+            value=d.get('value', d.get('address', '')),
+            cidr=d.get('cidr', ''),
         )
-
-
-BindAddressDict = TypedDict(
-    '_BindAddressDict',
-    {'mac-address': str, 'interface-name': str, 'addresses': list[dict[str, str]]},
-)
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -75,12 +82,10 @@ class BindAddress:
 
     @classmethod
     def _from_dict(cls, d: BindAddressDict) -> BindAddress:
-        addresses = [
-            Address._from_dict(cast('AddressDict', addr)) for addr in d.get('addresses', [])
-        ]
+        addresses = [Address._from_dict(addr) for addr in d.get('addresses') or []]
         return cls(
-            mac_address=d['mac-address'],
-            interface_name=d['interface-name'],
+            mac_address=d.get('mac-address', ''),
+            interface_name=d.get('interface-name', ''),
             addresses=addresses,
         )
 
@@ -229,10 +234,8 @@ class Network:
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Network:
-        bind: list[BindAddress] = [
-            BindAddress._from_dict(bind_data)
-            for bind_data in cast('list[BindAddressDict]', d['bind-addresses'])
-        ]
+        bind_dicts: list[BindAddressDict] = d.get('bind-addresses', [])
+        bind = [BindAddress._from_dict(bind_dict) for bind_dict in bind_dicts]
         egress = d.get('egress-subnets', [])
         ingress = d.get('ingress-addresses', [])
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)

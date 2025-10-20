@@ -371,7 +371,7 @@ def test_network_get(run: Run):
         'egress-subnets': ['127.0.0.0/24'],
         'ingress-addresses': ['127.0.0.1'],
     }
-    run.handle(['network-get', 'bind', '--format=json'], stdout=json.dumps(net))
+    run.handle(['network-get', '--format=json', 'bind'], stdout=json.dumps(net))
     result = hookcmds.network_get('bind')
     assert result.bind_addresses[0].mac_address == 'aa:bb'
     assert result.bind_addresses[0].interface_name == 'eth0'
@@ -394,7 +394,7 @@ def test_network_get_relation_id(run: Run):
         'egress-subnets': ['127.0.0.0/24'],
         'ingress-addresses': ['127.0.0.1'],
     }
-    run.handle(['network-get', '-r', '123', 'bind', '--format=json'], stdout=json.dumps(net))
+    run.handle(['network-get', '--format=json', '-r', '123', 'bind'], stdout=json.dumps(net))
     hookcmds.network_get('bind', relation_id=123)
 
 
@@ -524,10 +524,10 @@ def test_relation_model_get(run: Run, id: int | None):
 @pytest.mark.parametrize('app', [False, True])
 def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, app: bool):
     cmd = ['relation-set']
-    if app:
-        cmd.append('--app')
     if id is not None:
         cmd.extend(['-r', str(id)])
+    if app:
+        cmd.append('--app')
     cmd.extend(['--file', '-'])
     run.handle(cmd)
     hookcmds.relation_set({'foo': 'bar'}, id=id, app=app)
