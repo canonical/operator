@@ -58,11 +58,6 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
 {content}""".format_map(template_args)
         )
     os.chmod(str(path), 0o755)  # type: ignore  # noqa: S103
-    # TODO: this hardcodes the path to bash.exe, which works for now but might
-    #       need to be set via environ or something like that.
-    path.with_suffix('.bat').write_text(  # type: ignore
-        f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n'
-    )
 
 
 def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> list[list[str]]:
@@ -170,11 +165,6 @@ done
 {content}""".format_map(template_args)
             )
         path.chmod(0o755)
-        # TODO: this hardcodes the path to bash.exe, which works for now but might
-        #       need to be set via environ or something like that.
-        path.with_suffix('.bat').write_text(
-            f'@"C:\\Program Files\\git\\bin\\bash.exe" {path} %*\n'
-        )
 
     def calls(self, clear: bool = False) -> list[list[str]]:
         calls_file: pathlib.Path = self.path / 'calls.txt'
