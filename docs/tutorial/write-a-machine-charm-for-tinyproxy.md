@@ -1,19 +1,34 @@
 # Write a machine charm for tinyproxy
 
-TODO:
+In this tutorial, you'll write a {external+juju:ref}`machine charm <machine-charm>` for Juju using Ops and other charm development tools.
 
-- What you'll need.
-- Familiarity with Python. Also pytest would be helpful, but not essential.
-- One/two sentence summary of what you'll do.
-- How to get help, including linking to the code in the Ops repo.
+What you'll need:
+
+- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+- Familiarity with Linux.
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers. It will be helpful if you're familiar with [pytest](https://docs.pytest.org/en/) too.
+
+What you'll do:
+
+- Use {external+charmcraft:doc}`Charmcraft <index>` to create a machine charm from a template.
+- Add functionality to your charm, so that it can install and manage a workload on its machine.
+- Test your charm, using the Ops testing framework for unit tests and {external+jubilant:doc}`Jubilant <index>` for integration tests.
+
+If you need help, don't hesitate to get in touch at [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix.
+
+You can also [inspect the full charm code](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
 
 ## Study your application
 
-TODO:
+You'll write a charm that uses [tinyproxy](https://tinyproxy.github.io/) to run a reverse proxy. When your charm is deployed and tinyproxy is running, you'll be able to fetch [example.com](http://example.com) by running:
 
-- Briefly introduce tinyproxy. Introduce the term "workload".
-- Briefly introduce how a machine charm works. Mention that the workload and charm code run on the same machine, but that the charm code is usually not running. Explain that "receiving an event" means that Juju runs the charm code on demand, passing data in the environment. Ops provides a higher-level framework for handling events (based on the passed data) and responding to Juju.
-- Summarise the experience the charm will provide: a reverse proxy with a configurable slug.
+```text
+curl <address>:8000/example/
+```
+
+Where `<address>` is the IP address of the machine that tinyproxy is running on. You'll be able to use the `juju config` command to change `/example/` to a custom path.
+
+This application isn't especially realistic in isolation. But it's a good way to illustrate typical interactions between Juju, a charm, a machine, and a workload.
 
 ## Set up your environment
 
@@ -303,6 +318,8 @@ In `src/charm.py`, replace the `_on_install` method of the charm class with:
 ```
 
 When your charm receives the "install" event from Juju, Ops runs this method and responds to Juju with the version of tinyproxy that's installed on the machine. Juju shows the tinyproxy version in its status output.
+
+As you write your charm, keep in mind that the charm code only runs when there's an event to handle. Behind the scenes, Juju runs `charm.py` with event data in the environment. Ops reads the event data, instantiates the charm class, then runs the appropriate method.
 
 ### Define a configuration option
 
@@ -879,7 +896,7 @@ You should now have the following tests:
 - `test_deploy` - Deploys your charm and checks that it goes into active status.
 - `test_workload_version_is_set` - Checks that your charm reports the correct version of tinyproxy to Juju.
 
-You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. Instead of asking APT to install an unspecified version of tinyproxy, the charm code ought to specify a particular version. In general, it's good practice for charms to pin workload versions.
+You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. In general, it's good practice for charms to pin workload versions, so the charm code ought to ask APT to install a specific version of tinyproxy.
 
 Before running the tests, let's add a test to check that an invalid value of `slug` blocks the charm.
 
