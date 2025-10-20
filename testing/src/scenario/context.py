@@ -845,9 +845,8 @@ class Context(Generic[CharmType]):
         ) as ops:
             yield ops
 
-        if event.action:
-            if self._action_failure_message is not None:
-                raise ActionFailed(
-                    self._action_failure_message,
-                    state=self._output_state,  # type: ignore
-                )
+        if event.action and self._action_failure_message is not None:
+            raise ActionFailed(
+                self._action_failure_message,
+                state=self._output_state,  # type: ignore
+            )
