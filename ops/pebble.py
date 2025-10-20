@@ -2477,8 +2477,6 @@ class Client:
             try:
                 return self._wait_change(change_id, this_timeout)
             except builtins.TimeoutError:
-                # NOTE: in Python 3.10 socket.timeout is an alias of TimeoutError,
-                # but we still need to support Python 3.8, so catch both.
                 # Catch timeout from wait endpoint and loop to check deadline.
                 pass
 
