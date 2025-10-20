@@ -885,7 +885,15 @@ Integration tests are an important way to check that your charm works correctly 
 
 When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. We'll expand the tests to cover more of your charm's functionality.
 
-In `tests/integration/test_charm.py`, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then, in the test, change `assert version == ...` to:
+In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
+
+```python
+juju.wait(jubilant.all_active, timeout=600)
+```
+
+This extends the duration that Jubilant waits for your charm to deploy, in case the integration tests run slowly in your virtual machine. The default duration would be sufficient if the integration tests were running in a continuous integration environment.
+
+Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
 
 ```python
     assert version == "1.11.0"
