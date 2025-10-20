@@ -119,12 +119,28 @@ class Manager(Generic[CharmType]):
                 'you should __enter__ this context manager before running it',
             )
         self._emitted = True
+
+        if self._arg.action:
+            # Reset the logs, failure status, and results, in case the context
+            # is reused.
+            self._ctx.action_logs.clear()
+            if self._ctx.action_results is not None:
+                self._ctx.action_results.clear()
+            self._ctx._action_failure_message = None
+
         self.ops.run()
 
         # wrap up Runtime.exec() so that we can gather the output state
         self._wrapped_ctx.__exit__(None, None, None)
 
         assert self._ctx._output_state is not None
+
+        if self._arg.action:
+            if self._ctx._action_failure_message is not None:
+                raise ActionFailed(
+                    self._ctx._action_failure_message,
+                    state=self._ctx._output_state,  # type: ignore
+                )
         return self._ctx._output_state
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
