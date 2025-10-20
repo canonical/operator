@@ -45,7 +45,11 @@ if TYPE_CHECKING:
 
     BindAddressDict = TypedDict(
         'BindAddressDict',
-        {'mac-address': NotRequired[str], 'interface-name': str, 'addresses': list[AddressDict]},
+        {
+            'mac-address': NotRequired[str],
+            'interface-name': str,
+            'addresses': list[AddressDict] | None,
+        },
     )
 
 
