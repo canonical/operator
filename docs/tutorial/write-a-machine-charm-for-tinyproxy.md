@@ -961,8 +961,10 @@ You can keep things running, to explore further, or you can remove what you crea
 
 ## Next steps
 
-TODO:
+For more information about topics covered in this tutorial, see:
 
-- Links to more detail on the concepts covered in the tutorial.
-- Suggestions for real machine charms to look at.
-- Suggestions for what to learn next, e.g., learn about relations.
+- [](#write-and-structure-charm-code)
+- [](#manage-configuration)
+- [](#testing)
+
+You might also want to inspect a real machine charm: [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator)
