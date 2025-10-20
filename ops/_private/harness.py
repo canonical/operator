@@ -46,6 +46,7 @@ from typing import (
     Generic,
     Literal,
     TextIO,
+    TypeAlias,
     TypedDict,
     TypeVar,
     cast,
@@ -107,7 +108,7 @@ _RawConfig = TypedDict('_RawConfig', {'options': dict[str, _ConfigOption]})
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
-YAMLStringOrFile = str | TextIO
+YAMLStringOrFile: TypeAlias = str | TextIO
 
 
 # An instance of an Application or Unit, or the name of either.
