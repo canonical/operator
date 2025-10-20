@@ -3771,7 +3771,7 @@ class _ModelBackend:
         # hookcmds doesn't constrain the status to the five that _StatusDict expects,
         # but we know that will be the case, so we type: ignore.
         return {
-            'status': content.status,  # type: ignore
+            'status': content.status,  # type: ignore[arg-type]
             'message': content.message,
         }
 
@@ -3878,7 +3878,10 @@ class _ModelBackend:
         for line in self.log_split(message):
             # For backwards compatibility we allow arbitrary level strings.
             try:
-                hookcmds.juju_log(line, level=level)  # type: ignore
+                hookcmds.juju_log(
+                    line,
+                    level=level,  # type: ignore[arg-type]
+                )
             except hookcmds.Error as e:  # noqa: PERF203
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
                 raise ModelError(e.stderr) from e
@@ -3970,13 +3973,21 @@ class _ModelBackend:
         # we will always have refresh or peek but not both, and either id or
         # label.
         with self._wrap_hookcmd('secret-get', id=id, label=label, refresh=refresh, peek=peek):
-            return hookcmds.secret_get(id=id, label=label, refresh=refresh, peek=peek)  # type: ignore
+            return hookcmds.secret_get(
+                id=id,
+                label=label,  # type: ignore[arg-type]
+                refresh=refresh,  # type: ignore[arg-type]
+                peek=peek,  # type: ignore[arg-type]
+            )
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         # The type: ignore here is because the type checker can't tell, even
         # with local overloads, that either id or label must be provided.
         with self._wrap_hookcmd('secret-info-get', id=id, label=label):
-            raw = hookcmds.secret_info_get(id=id, label=label)  # type: ignore
+            raw = hookcmds.secret_info_get(  # type: ignore
+                id=id,
+                label=label,
+            )
         assert isinstance(raw, hookcmds.SecretInfo)
         return SecretInfo(
             raw.id,
