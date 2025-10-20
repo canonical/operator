@@ -119,7 +119,6 @@ class Manager(Generic[CharmType]):
                 'you should __enter__ this context manager before running it',
             )
         self._emitted = True
-
         self.ops.run()
 
         # wrap up Runtime.exec() so that we can gather the output state
