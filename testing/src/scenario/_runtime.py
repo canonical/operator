@@ -12,9 +12,7 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING
 
 import yaml
 from ops import JujuContext, pebble

@@ -31,14 +31,7 @@ import typing
 import weakref
 from collections.abc import Callable, Hashable, Iterable
 from contextlib import contextmanager
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    NoReturn,
-    Protocol,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, Protocol, TypeVar
 
 import opentelemetry.trace
 

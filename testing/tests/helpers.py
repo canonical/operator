@@ -3,11 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 from collections.abc import Callable
 
 import jsonpatch

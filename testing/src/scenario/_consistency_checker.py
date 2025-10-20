@@ -25,11 +25,7 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from numbers import Number
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    NamedTuple,
-)
+from typing import TYPE_CHECKING, Any, NamedTuple
 from collections.abc import Callable, Iterable
 
 from .errors import InconsistentScenarioError

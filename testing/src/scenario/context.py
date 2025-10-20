@@ -13,11 +13,7 @@ import functools
 import pathlib
 import tempfile
 from contextlib import contextmanager
-from typing import (
-    Generic,
-    TYPE_CHECKING,
-    Any,
-)
+from typing import Generic, TYPE_CHECKING, Any
 from collections.abc import Callable, Mapping
 
 import ops
