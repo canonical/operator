@@ -134,7 +134,7 @@ def test_action_event_fail_context_manager(mycharm):
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
         with ctx(ctx.on.action('foo'), State()):
-            assert False, "ActionFailed should be raised in the context manager."
+            assert False, 'ActionFailed should be raised in the context manager.'
     assert exc_info.value.message == 'action failed!'
 
 
