@@ -34,12 +34,10 @@ from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Literal,
     NoReturn,
     Protocol,
     TypeVar,
-    Union,
 )
 
 import opentelemetry.trace
@@ -59,15 +57,15 @@ class Serializable(typing.Protocol):
     def handle(self) -> 'Handle': ...  # noqa
     @handle.setter
     def handle(self, val: Handle): ...
-    def snapshot(self) -> Dict[str, Any]: ...  # noqa
-    def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
+    def snapshot(self) -> dict[str, Any]: ...  # noqa
+    def restore(self, snapshot: dict[str, Any]) -> None: ...  # noqa
 
 
 class _StoredObject(Protocol):
     _under: Any = None
 
 
-StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
+StoredObject = 'StoredList | StoredSet | StoredDict'
 
 _Path = _Kind = _MethodName = _EventKey = str
 # used to type Framework Attributes

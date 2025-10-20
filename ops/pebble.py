@@ -70,7 +70,6 @@ from typing import (
     Protocol,
     TextIO,
     TypedDict,
-    Union,
 )
 
 import websocket
@@ -128,7 +127,7 @@ CheckDict = typing.TypedDict(
     'CheckDict',
     {
         'override': str,
-        'level': Union['CheckLevel', str],
+        'level': 'CheckLevel | str',
         'startup': Literal['', 'enabled', 'disabled'],
         'period': str | None,
         'timeout': str | None,
@@ -237,9 +236,9 @@ class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and Bytes
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
-_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-_TextOrBinaryIO = Union[TextIO, BinaryIO]
-_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+_AnyStrFileLikeIO = _FileLikeIO[bytes] | _FileLikeIO[str]
+_TextOrBinaryIO = TextIO | BinaryIO
+_IOSource = str | bytes | _AnyStrFileLikeIO
 
 _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 
@@ -2477,7 +2476,7 @@ class Client:
 
             try:
                 return self._wait_change(change_id, this_timeout)
-            except (socket.timeout, builtins.TimeoutError):
+            except builtins.TimeoutError:
                 # NOTE: in Python 3.10 socket.timeout is an alias of TimeoutError,
                 # but we still need to support Python 3.8, so catch both.
                 # Catch timeout from wait endpoint and loop to check deadline.

@@ -48,7 +48,6 @@ from typing import (
     TextIO,
     TypedDict,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -70,8 +69,8 @@ if typing.TYPE_CHECKING:
             pass
 
 
-ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
-_StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
+ReadableBuffer = bytes | str | StringIO | BytesIO | BinaryIO
+_StringOrPath = str | pathlib.PurePosixPath | pathlib.Path
 _FileKwargs = TypedDict(
     '_FileKwargs',
     {
@@ -106,13 +105,13 @@ _RawConfig = TypedDict('_RawConfig', {'options': dict[str, _ConfigOption]})
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
-YAMLStringOrFile = Union[str, TextIO]
+YAMLStringOrFile = str | TextIO
 
 
 # An instance of an Application or Unit, or the name of either.
 # This is done here to avoid a scoping issue with the `model` property
 # of the Harness class below.
-AppUnitOrName = Union[str, model.Application, model.Unit]
+AppUnitOrName = str | model.Application | model.Unit
 
 
 # CharmType represents user charms that are derived from CharmBase.

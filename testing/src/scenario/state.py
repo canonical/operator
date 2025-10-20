@@ -24,7 +24,6 @@ from typing import (
     Literal,
     NoReturn,
     TypeVar,
-    Union,
     cast,
 )
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -64,7 +63,7 @@ if TYPE_CHECKING:  # pragma: no cover
         workload_version: str
 
 
-AnyJson = Union[str, bool, dict[str, 'AnyJson'], int, float, list['AnyJson']]
+AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
 RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 

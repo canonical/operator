@@ -42,9 +42,7 @@ _Response = typing.TypedDict(
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    _route = list[
-        tuple[typing.Literal['GET', 'POST'], typing.Any, typing.Callable[..., None]]
-    ]
+    _route = list[tuple[typing.Literal['GET', 'POST'], typing.Any, typing.Callable[..., None]]]
 
     def __init__(
         self,

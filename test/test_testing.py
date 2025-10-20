@@ -5005,7 +5005,7 @@ class TestTestingPebbleClient:
             )
 
 
-PebbleClientType = typing.Union[_TestingPebbleClient, pebble.Client]
+PebbleClientType = _TestingPebbleClient | pebble.Client
 
 
 # For testing file-ops of the pebble client.  This is refactored into a
