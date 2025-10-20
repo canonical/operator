@@ -81,7 +81,7 @@ In your virtual machine, run:
 
 ```text
 sudo snap install --classic concierge
-sudo concierge prepare -p machine --extra-snaps astral-uv
+sudo concierge prepare -p machine --extra-snaps astral-uv --charmcraft-channel latest/candidate
 ```
 
 This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p machine` tells Concierge that we want tools for developing machine charms.
