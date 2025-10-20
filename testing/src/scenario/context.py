@@ -120,27 +120,12 @@ class Manager(Generic[CharmType]):
             )
         self._emitted = True
 
-        if self._arg.action:
-            # Reset the logs, failure status, and results, in case the context
-            # is reused.
-            self._ctx.action_logs.clear()
-            if self._ctx.action_results is not None:
-                self._ctx.action_results.clear()
-            self._ctx._action_failure_message = None
-
         self.ops.run()
 
         # wrap up Runtime.exec() so that we can gather the output state
         self._wrapped_ctx.__exit__(None, None, None)
 
         assert self._ctx._output_state is not None
-
-        if self._arg.action:
-            if self._ctx._action_failure_message is not None:
-                raise ActionFailed(
-                    self._ctx._action_failure_message,
-                    state=self._ctx._output_state,  # type: ignore
-                )
         return self._ctx._output_state
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
@@ -829,24 +814,11 @@ class Context(Generic[CharmType]):
                 'You should call the event method. Did you forget to add parentheses?',
             )
 
-        if event.action:
-            # Reset the logs, failure status, and results, in case the context
-            # is reused.
-            self.action_logs.clear()
-            if self.action_results is not None:
-                self.action_results.clear()
-            self._action_failure_message = None
         with self._run(event=event, state=state) as ops:
             ops.run()
         # We know that the output state will have been set by this point,
         # so let the type checkers know that too.
         assert self._output_state is not None
-        if event.action:
-            if self._action_failure_message is not None:
-                raise ActionFailed(
-                    self._action_failure_message,
-                    state=self._output_state,  # type: ignore
-                )
         return self._output_state
 
     @contextmanager
@@ -859,9 +831,24 @@ class Context(Generic[CharmType]):
             unit_id=self.unit_id,
             machine_id=self._machine_id,
         )
+        if event.action:
+            # Reset the logs, failure status, and results, in case the context
+            # is reused.
+            self.action_logs.clear()
+            if self.action_results is not None:
+                self.action_results.clear()
+            self._action_failure_message = None
+
         with runtime.exec(
             state=state,
             event=event,
-            context=self,  # type: ignore
+            context=self,
         ) as ops:
             yield ops
+
+        if event.action:
+            if self._action_failure_message is not None:
+                raise ActionFailed(
+                    self._action_failure_message,
+                    state=self._output_state,  # type: ignore
+                )
