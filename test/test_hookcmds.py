@@ -548,8 +548,19 @@ def test_secret_add(run: Run, mock_temp_dir: str):
     assert result == 'secretid'
 
 
-@pytest.mark.parametrize('owner', ['app', 'unit'])
-def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
+@pytest.mark.parametrize(
+    'ops_owner,juju_owner',
+    [
+        ('app', 'application'),
+        ('unit', 'unit'),
+    ],
+)
+def test_secret_add_with_metadata(
+    run: Run,
+    mock_temp_dir: str,
+    ops_owner: Literal['app', 'unit'],
+    juju_owner: Literal['application', 'unit'],
+):
     run.handle(
         [
             'secret-add',
@@ -562,7 +573,7 @@ def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['
             '--rotate',
             'quarterly',
             '--owner',
-            owner,
+            juju_owner,
             f'foo#file={mock_temp_dir}/foo',
         ],
         stdout='secretid',
@@ -573,7 +584,7 @@ def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['
         description='mydesc',
         expire='3d',
         rotate='quarterly',
-        owner=owner,
+        owner=ops_owner,
     )
     assert result == 'secretid'
 
