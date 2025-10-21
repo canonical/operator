@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import tempfile
 import threading
@@ -216,6 +217,51 @@ class TestRealPebble:
             assert data == content
         os.remove(fname)
 
+    def test_push_pull_path(self, client: pebble.Client, tmp_path: pathlib.Path):
+        path = tmp_path / f'pebbletest-{uuid.uuid4()}'
+        content = 'foo\nbar\nbaz-42'
+        client.push(path, content)
+        with client.pull(path) as f:
+            data = f.read()
+            assert data == content
+
+    @pytest.mark.parametrize('path_type', (str, pathlib.Path))
+    def test_list_files_path_type(
+        self,
+        client: pebble.Client,
+        tmp_path: pathlib.Path,
+        path_type: type[str] | type[pathlib.Path],
+    ):
+        (foo := tmp_path / 'foo').touch()
+        (bar := tmp_path / 'bar').touch()
+        file_infos = client.list_files(path_type(tmp_path))
+        assert {f.path for f in file_infos} == {str(foo), str(bar)}
+
+    @pytest.mark.parametrize('path_type', (str, pathlib.Path))
+    def test_make_dir_path_type(
+        self,
+        client: pebble.Client,
+        tmp_path: pathlib.Path,
+        path_type: type[str] | type[pathlib.Path],
+    ):
+        path = tmp_path / 'my-dir'
+        assert not path.exists()
+        client.make_dir(path_type(path))
+        assert path.is_dir()
+
+    @pytest.mark.parametrize('path_type', (str, pathlib.Path))
+    def test_remove_path_path_type(
+        self,
+        client: pebble.Client,
+        tmp_path: pathlib.Path,
+        path_type: type[str] | type[pathlib.Path],
+    ):
+        path = tmp_path / 'foo'
+        path.touch()
+        assert path.exists()
+        client.remove_path(path_type(path))
+        assert not path.exists()
+
     def test_exec_timeout(self, client: pebble.Client):
         process = client.exec(['sleep', '0.2'], timeout=0.1)
         with pytest.raises(pebble.ChangeError) as excinfo:
@@ -228,6 +274,12 @@ class TestRealPebble:
             out, err = process.wait_output()
             assert out == f'{temp_dir}\n'
             assert err == ''
+
+    def test_exec_working_dir_path(self, client: pebble.Client, tmp_path: pathlib.Path):
+        process = client.exec(['pwd'], working_dir=tmp_path)
+        out, err = process.wait_output()
+        assert out == f'{tmp_path}\n'
+        assert err == ''
 
     def test_exec_environment(self, client: pebble.Client):
         process = client.exec(
@@ -347,6 +399,22 @@ class TestRealPebble:
         client.remove_identities({'web', 'alice'})
         identities = client.get_identities()
         assert len(identities) == 0
+
+    def test_temp_files_cleaned_up_on_failed_pull(
+        self,
+        tmp_path: pathlib.Path,
+        client: pebble.Client,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        client.push(f'{tmp_path}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
+        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        # Patch get_response to force a ProtocolError exception.
+        monkeypatch.setattr(pebble._FilesParser, 'get_response', lambda self: None)  # type: ignore
+        # Use our previously created temp dir so we can verify that it gets cleaned up.
+        monkeypatch.setattr(tempfile, 'NamedTemporaryFile', lambda *args, **kwargs: tf)  # type: ignore
+        with pytest.raises(pebble.ProtocolError):
+            client.pull(f'{tmp_path}/test')
+        assert not pathlib.Path(tf.name).exists()
 
 
 @pytest.mark.skipif(

@@ -16,7 +16,7 @@ Ops communicates with Juju by reading environment variables and running processe
 
 > See also:
 > - {external+juju:ref}`Juju | Hook <hook>`
-> - {external+juju:ref}`Juju |Hook command <list-of-hook-commands>`
+> - {external+juju:ref}`Juju | Hook command <list-of-hook-commands>`
 
 ## Hardening
 

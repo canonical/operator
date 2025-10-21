@@ -134,9 +134,8 @@ class Manager(Generic[CharmType]):
                 'Doing so implicitly upon exit...',
             )
             self.run()
-        # guaranteed to be set: run was either called before, or right above
-        assert self.ops
-        self.ops.destroy()
+        if exc_type is not None:
+            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -614,7 +613,7 @@ class Context(Generic[CharmType]):
         capture_framework_events: bool = False,
         app_name: str | None = None,
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -765,8 +764,8 @@ class Context(Generic[CharmType]):
 
         :arg event: the event that the charm will respond to. Use the :attr:`on` attribute to
             specify the event; for example: ``ctx.on.start()``.
-        :arg state: the :class:`State` instance to use as data source for the hook tool calls that
-            the charm will invoke when handling the event.
+        :arg state: the :class:`State` instance to use as data source for the hook command
+            calls that the charm will invoke when handling the event.
         """
         # Help people transition from Scenario 6:
         if isinstance(event, str):
@@ -814,24 +813,11 @@ class Context(Generic[CharmType]):
                 'You should call the event method. Did you forget to add parentheses?',
             )
 
-        if event.action:
-            # Reset the logs, failure status, and results, in case the context
-            # is reused.
-            self.action_logs.clear()
-            if self.action_results is not None:
-                self.action_results.clear()
-            self._action_failure_message = None
         with self._run(event=event, state=state) as ops:
             ops.run()
         # We know that the output state will have been set by this point,
         # so let the type checkers know that too.
         assert self._output_state is not None
-        if event.action:
-            if self._action_failure_message is not None:
-                raise ActionFailed(
-                    self._action_failure_message,
-                    state=self._output_state,  # type: ignore
-                )
         return self._output_state
 
     @contextmanager
@@ -844,9 +830,23 @@ class Context(Generic[CharmType]):
             unit_id=self.unit_id,
             machine_id=self._machine_id,
         )
+        if event.action:
+            # Reset the logs, failure status, and results, in case the context
+            # is reused.
+            self.action_logs.clear()
+            if self.action_results is not None:
+                self.action_results.clear()
+            self._action_failure_message = None
+
         with runtime.exec(
             state=state,
             event=event,
-            context=self,  # type: ignore
+            context=self,
         ) as ops:
             yield ops
+
+        if event.action and self._action_failure_message is not None:
+            raise ActionFailed(
+                self._action_failure_message,
+                state=self._output_state,  # type: ignore
+            )

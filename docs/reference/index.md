@@ -10,4 +10,5 @@ pebble
 ops-testing
 ops-testing-harness
 ops-tracing
+ops-hookcmds
 ```
