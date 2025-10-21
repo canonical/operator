@@ -138,7 +138,7 @@ def test_set_secret(
     if counts['description']:
         assert info['description'] == f'description{counts["description"]}'
     if counts['expire']:
-        assert info['expires'] == str(datetime.datetime(2010 + counts['expire'], 1, 1, 0, 0))
+        assert secret.expires == f'{ 2010 + counts["expire"] }-01-01T00:00:00Z'
     if counts['rotate']:
         rotation_values = [
             'sentinel',
@@ -150,7 +150,7 @@ def test_set_secret(
             'quarterly',
             'yearly',
         ]
-        assert info['rotation'] == rotation_values[counts['rotate']]
+        assert secret.rotation == rotation_values[counts['rotate']]
 
 
 @pytest.fixture
