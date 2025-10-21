@@ -172,7 +172,7 @@ def good_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
     secrets = juju.secrets()
     assert secrets
     assert secrets[0].owner == 'test-secrets'
-    return secrets[0].uri
+    return secrets[0].uri.unique_identifier
 
 
 @pytest.fixture
