@@ -530,7 +530,7 @@ class Application:
             description=description,
             expire=_calculate_expiry(expire),
             rotate=rotate,
-            owner='application',
+            owner='app',
         )
         return Secret(
             self._backend,

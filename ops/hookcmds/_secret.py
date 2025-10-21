@@ -38,7 +38,7 @@ def secret_add(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] = 'application',
+    owner: Literal['app', 'unit'] = 'app',
 ) -> str:
     """Add a new secret.
 
@@ -65,7 +65,8 @@ def secret_add(
             args.extend(['--expire', datetime_to_iso(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    args.extend(['--owner', owner])
+    # Ops and Scenario call is 'app', while Juju calls it 'application'
+    args.extend(['--owner', 'application' if owner == 'app' else owner])
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
             with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:

@@ -548,10 +548,8 @@ def test_secret_add(run: Run, mock_temp_dir: str):
     assert result == 'secretid'
 
 
-@pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_add_with_metadata(
-    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
-):
+@pytest.mark.parametrize('owner', ['app', 'unit'])
+def test_secret_add_with_metadata(run: Run, mock_temp_dir: str, owner: Literal['app', 'unit']):
     run.handle(
         [
             'secret-add',

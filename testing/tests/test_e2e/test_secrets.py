@@ -663,7 +663,7 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
 
 def common_assertions(scenario_secret: Secret | None, result: Result):
     if scenario_secret:
-        assert scenario_secret.owner == 'application'
+        assert scenario_secret.owner == 'app'
         assert not scenario_secret.remote_grants
 
         assert result.get('after')
