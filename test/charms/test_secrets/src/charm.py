@@ -143,25 +143,25 @@ class SecretsCharm(ops.CharmBase):
 
 def contents() -> Generator[dict[str, str]]:
     """Generate predictable, but different content values every time."""
-    for i in range(10):
+    for i in range(1, 10):
         yield {'val': f'{i}'}
 
 
 def labels() -> Generator[str]:
     """Generate predictable, but different content values every time."""
-    for i in range(10):
+    for i in range(1, 10):
         yield f'label{i}'
 
 
 def descriptions() -> Generator[str]:
     """Generate predictable, but different content values every time."""
-    for i in range(10):
+    for i in range(1, 10):
         yield f'description{i}'
 
 
 def expires() -> Generator[datetime.datetime]:
     """Generate predictable, but different content values every time."""
-    for i in range(10):
+    for i in range(1, 10):
         yield datetime.datetime(2010 + i, 1, 1, 0, 0, 0)
 
 

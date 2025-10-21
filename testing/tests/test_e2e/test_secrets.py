@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import datetime
 from typing import Literal, cast
 from unittest.mock import ANY
@@ -665,8 +666,9 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
 @pytest.mark.parametrize(
     'flow',
     [
+        'content,label,description,expire,rotate',
         'content,description,content,description',
-        'rotate,content,rotate,content',
+        'rotate,content,rotate,content,rotate',
         'label,content,label,content',
     ],
 )
@@ -690,6 +692,19 @@ def test_set_secret(
     assert info
 
     common_assertions(scenario_secret, result)
+
+    counts = collections.Counter(flow.split(','))
+    if counts['content']:
+        assert result['after']['latest'] == {'val': str(counts['content'])}
+    if counts['label']:
+        assert info['label'] == f'label{counts["label"]}'
+    if counts['description']:
+        assert info['description'] == f'description{counts["description"]}'
+    if counts['expire']:
+        assert info['expires'] == datetime.datetime(2010 + counts['expire'], 1, 1, 0, 0)
+    if counts['rotate']:
+        rotation_values = ['sentinel', *SecretRotate.__members__.values()]
+        assert info['rotation'] == rotation_values[counts['rotate']]
 
 
 def common_assertions(scenario_secret: Secret | None, result: Result):

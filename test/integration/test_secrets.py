@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import collections
+import datetime
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -96,7 +98,7 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
     'flow',
     [
         'content,description,content,description',
-        'rotate,content,rotate,content',
+        'rotate,content,rotate,content,rotate',
         'label,content,label,content',
     ],
 )
@@ -114,7 +116,41 @@ def test_set_secret(
         case 'label':
             params['secretlabel'] = 'thelabel'
 
-    # FIXME
+    rv = juju.run(leader, 'set-secret-flow', params=params)
+    result = cast('Result', rv.results)
+    assert not result.get('exception')
+
+    assert 'secretid' in result
+    assert 'after' in result
+    assert result['after']
+    assert result['after']['info']
+    info = result['after']['info']
+
+    secrets = juju.secrets()
+    secret = juju.show_secret(secrets[0].uri, reveal=True)
+    common_checks(secret, result)
+
+    counts = collections.Counter(flow.split(','))
+    if counts['content']:
+        assert result['after']['latest'] == {'val': str(counts['content'])}
+    if counts['label']:
+        assert info['label'] == f'label{counts["label"]}'
+    if counts['description']:
+        assert info['description'] == f'description{counts["description"]}'
+    if counts['expire']:
+        assert info['expires'] == str(datetime.datetime(2010 + counts['expire'], 1, 1, 0, 0))
+    if counts['rotate']:
+        rotation_values = [
+            'sentinel',
+            'never',
+            'hourly',
+            'daily',
+            'weekly',
+            'monthly',
+            'quarterly',
+            'yearly',
+        ]
+        assert info['rotation'] == rotation_values[counts['rotate']]
 
 
 @pytest.fixture
