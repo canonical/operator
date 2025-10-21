@@ -120,10 +120,9 @@ class SecretsCharm(ops.CharmBase):
                     case _:
                         raise ValueError(f'Unsupported {field=}')
 
-            if secretid:
-                result['secretid'] = secretid
-            else:
+            if not secretid:
                 secretid = self.model.get_secret(label=secretlabel).get_info().id
+            result['secretid'] = secretid
             result['after'] = self._snapshot(secretid)
         except Exception as e:
             result['exception'] = str(e)
