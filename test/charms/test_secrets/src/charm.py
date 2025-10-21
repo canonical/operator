@@ -83,33 +83,52 @@ class SecretsCharm(ops.CharmBase):
         event.set_results(cast('dict[str, Any]', result))
 
     def set_secret_flow(self, event: ops.ActionEvent):
-        id = event.params.get('secertid')
-        label = event.params.get('secretlabel')
-        assert id or label
-        assert not (id and label)
-        secret = self.model.get_secret(
-            **({'id': id} if id else {}),
-            **({'label': label} if label else {}),
-        )
+        result: Result = {}
         contentiter = iter(contents())
         labeliter = iter(labels())
         descriptioniter = iter(descriptions())
         expireiter = iter(expires())
         rotateiter = iter(rotates())
-        for field in event.params['flow']:
-            match field:
-                case 'content':
-                    secret.set_content(next(contentiter))
-                case 'label':
-                    secret.set_info(label=next(labeliter))
-                case 'description':
-                    secret.set_info(description=next(descriptioniter))
-                case 'expire':
-                    secret.set_info(expire=next(expireiter))
-                case 'rotate':
-                    secret.set_info(rotate=next(rotateiter))
-                case _:
-                    raise ValueError(f'Unsupported {field=}')
+
+        try:
+            secretid = event.params.get('secretid')
+            secretlabel = event.params.get('secretlabel')
+
+            for field in event.params['flow'].split(','):
+                assert secretid or secretlabel
+                assert not (secretid and secretlabel)
+                secret = self.model.get_secret(
+                    **({'id': secretid} if secretid else {}),
+                    **({'label': secretlabel} if secretlabel else {}),
+                )
+
+                match field:
+                    case 'content':
+                        secret.set_content(next(contentiter))
+                    case 'label':
+                        new_label = next(labeliter)
+                        secret.set_info(label=new_label)
+                        if secretlabel:
+                            # So that we can find the secret again
+                            secretlabel = new_label
+                    case 'description':
+                        secret.set_info(description=next(descriptioniter))
+                    case 'expire':
+                        secret.set_info(expire=next(expireiter))
+                    case 'rotate':
+                        secret.set_info(rotate=next(rotateiter))
+                    case _:
+                        raise ValueError(f'Unsupported {field=}')
+
+            if secretid:
+                result['secretid'] = secretid
+            else:
+                secretid = self.model.get_secret(label=secretlabel).get_info().id
+            result['after'] = self._snapshot(secretid)
+        except Exception as e:
+            result['exception'] = str(e)
+
+        event.set_results(cast('dict[str, Any]', result))
 
     def _snapshot(self, secret_id: str) -> SecretSnapshot:
         secret = self.model.get_secret(id=secret_id)
@@ -148,7 +167,7 @@ def expires() -> Generator[datetime.datetime]:
 
 def rotates() -> Generator[ops.SecretRotate]:
     """Generate predictable, but different `rotate` values every time."""
-    yield ops.SecretRotate.NEVER
+    yield from ops.SecretRotate.__members__.values()
 
 
 if __name__ == '__main__':

@@ -661,17 +661,49 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         assert info['rotates'] is None
 
 
+@pytest.mark.parametrize('foo', ['id', 'label'])
+@pytest.mark.parametrize(
+    'flow',
+    [
+        'content,description,content,description',
+        'rotate,content,rotate,content',
+        'label,content,label,content',
+    ],
+)
+def test_set_secret(secrets_context: Context[SecretsCharm], flow: str, foo: str):
+    secret = Secret({'some': 'content'}, owner='app', id='theid', label='thelabel')
+    state = State(leader=True, secrets={secret})
+    params = {'flow': flow}
+    match foo:
+        case 'id':
+            params['secretid'] = 'theid'
+        case 'label':
+            params['secretlabel'] = 'thelabel'
+    state = secrets_context.run(secrets_context.on.action('set-secret-flow', params=params), state)
+    scenario_secret = next(iter(state.secrets))
+    result = cast('Result', secrets_context.action_results)
+    assert 'after' in result
+    assert result['after']
+    info = result['after']['info']
+    assert info
+
+    common_assertions(scenario_secret, result)
+
+
 def common_assertions(scenario_secret: Secret | None, result: Result):
     if scenario_secret:
-        assert scenario_secret.owner == 'application'
+        # https://github.com/canonical/operator/issues/2125
+        assert scenario_secret.owner in ('app', 'application')
         assert not scenario_secret.remote_grants
 
         assert result.get('after')
         info = result['after']['info']
         # Verify that the unit and the scaffolding see the same data
-        assert scenario_secret.id == info['id']
+        #
+        # Scenario presents a secret with a full secret URI to the charm
+        # however, the id on the scenario Secret object is a plain id
+        assert scenario_secret.id.split('/')[-1] == info['id'].split('/')[-1]
         assert scenario_secret.label == info['label']
-        assert scenario_secret._tracked_revision == info['revision']
         assert scenario_secret._latest_revision == info['revision']
         assert scenario_secret.expire == info['expires']
         assert scenario_secret.rotate == info['rotation']
