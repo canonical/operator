@@ -172,6 +172,7 @@ def good_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
     secrets = juju.secrets()
     assert secrets
     assert secrets[0].owner == 'test-secrets'
+    # https://github.com/canonical/jubilant/issues/211
     return secrets[0].uri.unique_identifier
 
 
