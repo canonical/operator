@@ -97,8 +97,8 @@ msg="Bootstrapped Juju" provider=lxd
 To install tox, run:
 
 ```text
-uv tool install tox --with tox-uv
 export PATH="$HOME/.local/bin:$PATH"
+uv tool install tox --with tox-uv
 ```
 
 ## Create a charm project
