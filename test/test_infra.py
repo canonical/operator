@@ -14,13 +14,11 @@
 
 from __future__ import annotations
 
-import collections.abc
 import os
 import pathlib
 import subprocess
 import sys
 import types
-import typing
 
 import pytest
 
