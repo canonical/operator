@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
+from typing import Literal, cast
 
 import jubilant
 import pytest
@@ -91,8 +91,35 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
         assert info['rotates'] == 'None'
 
 
+@pytest.mark.parametrize('lookup_by', ['id', 'label'])
+@pytest.mark.parametrize(
+    'flow',
+    [
+        'content,description,content,description',
+        'rotate,content,rotate,content',
+        'label,content,label,content',
+    ],
+)
+def test_set_secret(
+    juju: jubilant.Juju,
+    good_secret: str,
+    leader: str,
+    flow: str,
+    lookup_by: Literal['id', 'label'],
+):
+    params = {'flow': flow}
+    match lookup_by:
+        case 'id':
+            params['secretid'] = 'theid'
+        case 'label':
+            params['secretlabel'] = 'thelabel'
+
+    # FIXME
+
+
 @pytest.fixture
 def cleanup(juju: jubilant.Juju, leader: str) -> None:
+    """Remove all secrets from the test app."""
     secrets = juju.secrets()
     for secret in secrets:
         if secret.owner == 'test-secrets':
@@ -100,6 +127,16 @@ def cleanup(juju: jubilant.Juju, leader: str) -> None:
         else:
             # Later, there could be user secrets too.
             juju.remove_secret(secret.uri)
+
+
+@pytest.fixture
+def good_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
+    """Remove all old secrets and add a new secret owned by the test app."""
+    juju.exec('secret-add --label thelabel some=content', unit=leader)
+    secrets = juju.secrets()
+    assert secrets
+    assert secrets[0].owner == 'test-secrets'
+    return secrets[0].uri
 
 
 @pytest.fixture

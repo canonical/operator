@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import cast
+from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
@@ -661,7 +661,7 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         assert info['rotates'] is None
 
 
-@pytest.mark.parametrize('foo', ['id', 'label'])
+@pytest.mark.parametrize('lookup_by', ['id', 'label'])
 @pytest.mark.parametrize(
     'flow',
     [
@@ -670,11 +670,13 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         'label,content,label,content',
     ],
 )
-def test_set_secret(secrets_context: Context[SecretsCharm], flow: str, foo: str):
+def test_set_secret(
+    secrets_context: Context[SecretsCharm], flow: str, lookup_by: Literal['id', 'label']
+):
     secret = Secret({'some': 'content'}, owner='app', id='theid', label='thelabel')
     state = State(leader=True, secrets={secret})
     params = {'flow': flow}
-    match foo:
+    match lookup_by:
         case 'id':
             params['secretid'] = 'theid'
         case 'label':
