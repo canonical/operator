@@ -38,8 +38,8 @@ Where `<preset>` is `machine`, `kubernetes`, or another of Concierge's presets. 
 Use uv to install tox:
 
 ```text
-uv tool install tox --with tox-uv
 export PATH="$HOME/.local/bin:$PATH"
+uv tool install tox --with tox-uv
 ```
 
 ## Prepare the `tox.ini` configuration file
