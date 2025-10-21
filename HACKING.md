@@ -52,6 +52,9 @@ tox -e format
 # Generate a local copy of the Sphinx docs in docs/_build
 make -C docs html
 
+# Check spelling in the doc source files
+make -C docs spelling
+
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
 ```
