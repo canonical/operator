@@ -112,7 +112,7 @@ def test_set_secret(
     params = {'flow': flow}
     match lookup_by:
         case 'id':
-            params['secretid'] = 'theid'
+            params['secretid'] = good_secret
         case 'label':
             params['secretlabel'] = 'thelabel'
 
