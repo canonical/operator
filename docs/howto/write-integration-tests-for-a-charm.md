@@ -17,9 +17,30 @@ The instructions all use the Jubilant library.
 
 ## Prepare your environment
 
-In order to run integrations tests you will need to have your environment set up with a Juju controller and have `tox` installed.
+To run integration tests, you'll need a Juju controller and [tox](https://tox.wiki/en/).
 
-> See more: {external+juju:ref}`Set up your deployment <set-up-your-deployment>`
+We recommend that you set up a Juju controller inside a virtual machine instead of your usual operating system. You can use [Multipass](https://canonical.com/multipass/install) to create a virtual machine:
+
+```text
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass shell  # Open a shell inside your virtual machine.
+```
+
+Then use [Concierge](https://github.com/canonical/concierge) to set up a Juju controller inside your virtual machine:
+
+```text
+sudo snap install --classic concierge
+sudo concierge prepare -p <preset> --extra-snaps astral-uv
+```
+
+Where `<preset>` is `machine`, `kubernetes`, or another of Concierge's presets. This also installs [uv](https://docs.astral.sh/uv/).
+
+Use uv to install tox:
+
+```text
+uv tool install tox --with tox-uv
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 ## Prepare the `tox.ini` configuration file
 
