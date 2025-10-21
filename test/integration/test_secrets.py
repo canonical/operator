@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import collections
-import datetime
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -138,7 +137,7 @@ def test_set_secret(
     if counts['description']:
         assert info['description'] == f'description{counts["description"]}'
     if counts['expire']:
-        assert secret.expires == f'{ 2010 + counts["expire"] }-01-01T00:00:00Z'
+        assert secret.expires == f'{2010 + counts["expire"]}-01-01T00:00:00Z'
     if counts['rotate']:
         rotation_values = [
             'sentinel',
