@@ -109,6 +109,35 @@ def test_action_event_outputs(mycharm, res_value):
     assert ctx.action_logs == ['log1', 'log2']
 
 
+def test_action_event_fail(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        ctx.run(ctx.on.action('foo'), State())
+    assert exc_info.value.message == 'action failed!'
+
+
+def test_action_event_fail_context_manager(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        with ctx(ctx.on.action('foo'), State()):
+            assert False, 'ActionFailed should be raised in the context manager.'
+    assert exc_info.value.message == 'action failed!'
+
+
 def test_action_continues_after_fail():
     class MyCharm(CharmBase):
         def __init__(self, framework):

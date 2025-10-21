@@ -541,14 +541,14 @@ wheels = [
 
 [[package]]
 name = "jubilant"
-version = "1.4.0"
+version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/1a/ba5838825ac99db4ceec68fa146b594c97b682cf3ccf670b1ecf1261209d/jubilant-1.4.0.tar.gz", hash = "sha256:aa377699a8811fea29bfe0febb6b552d4593c02e666f5ba8c3fba24258700199", size = 27502, upload-time = "2025-08-27T00:11:46.295Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/af/2c7d2a677389eb4de3bb841f399b749ca2fd4c6c1b70313e21249536e6be/jubilant-1.5.0.tar.gz", hash = "sha256:055c65a662586191939a1a3d3e2b6d08b71ecf0c7f403a1c7ba0cde6ecaf3bbd", size = 28433, upload-time = "2025-10-10T01:08:06.58Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/06/4965ed70d4b9d405c8bdefc4926d94cae202014b4488a25aa8c1fe9fb462/jubilant-1.4.0-py3-none-any.whl", hash = "sha256:1df7eaf125fad8d0d3d35e6d83eca43bfbb7884debcd6c7f4b0822600e2a485c", size = 27185, upload-time = "2025-08-27T00:11:44.851Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/c9/05e5aa65baa7b71b17c1314b8f25744f36fd9aad60ef9fb46fd84347885a/jubilant-1.5.0-py3-none-any.whl", hash = "sha256:eec58340b9d3d478f31e18e33281638fdf0d9b84608c8935368f7a1bb1972255", size = 28275, upload-time = "2025-10-10T01:08:04.963Z" },
 ]
 
 [[package]]
@@ -717,7 +717,7 @@ benchmark = [{ name = "pytest-benchmark", specifier = "~=5.0" }]
 coverage = [{ name = "coverage", extras = ["toml"], specifier = "~=7.0" }]
 integration = [
     { name = "httpx", specifier = "~=0.28" },
-    { name = "jubilant", specifier = "~=1.2" },
+    { name = "jubilant", specifier = "~=1.5" },
     { name = "jubilant-backports" },
     { name = "minio", specifier = "~=7.2" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },

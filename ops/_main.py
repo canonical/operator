@@ -254,7 +254,7 @@ class _Manager:
 
     Running _Manager consists of three main steps:
     - setup: initialise the following from JUJU_* environment variables:
-      - the Framework (hook tool wrappers)
+      - the Framework (hook command wrappers)
       - the storage backend
       - the event that Juju is emitting on us
       - the charm instance (user-facing)
@@ -414,7 +414,7 @@ class _Manager:
         #       EventBase.defer().
         #
         # Skip reemission of deferred events for collect-metrics events because
-        # they do not have the full access to all hook tools.
+        # they do not have the full access to all hook commands.
         if not self.dispatcher.is_restricted_context():
             # Re-emit any deferred events from the previous run.
             self.framework.reemit()
