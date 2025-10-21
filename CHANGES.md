@@ -583,7 +583,7 @@ The minimum version of Python for Ops 3.x is 3.10.
 
 ## Features
 
-* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook command to get details of the cloud where the model is deployed (#1152)
 
 ## Fixes
 
