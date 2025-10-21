@@ -98,36 +98,12 @@ To install tox, run:
 
 ```text
 uv tool install tox --with tox-uv
-uv tool update-shell
+export PATH="$HOME/.local/bin:$PATH"
 ```
-
-When tox has been installed, you'll see the message:
-
-```text
-Restart your shell to apply changes
-```
-
-It's important to exit your virtual machine at this point. If you don't exit your virtual machine, you won't be able to use tox later in the tutorial.
-
-To exit your virtual machine, run:
-
-```text
-exit
-```
-
-The terminal switches back to your usual operating system. Your virtual machine is still running in the background.
 
 ## Create a charm project
 
-You'll need to work inside your virtual machine again. Open a terminal, then run:
-
-```text
-multipass shell juju-sandbox
-```
-
-The terminal prompt is now `ubuntu@juju-sandbox:~$`.
-
-Next, create a project directory and use Charmcraft to create the initial version of your charm:
+In your virtual machine, make sure that the working directory is `~`. Then create a project directory and use Charmcraft to create the initial version of your charm:
 
 ```text
 mkdir tinyproxy
