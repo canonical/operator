@@ -130,7 +130,7 @@ def get_new_tag_for_release(
             logger.error('Error: No tag specified and no suggestion available')
             continue
 
-        if not re.match(r'^\d+\.\d+\.\d+(?:[abrc]\d+)?$', new_tag):
+        if not re.match(r'^\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?$', new_tag):
             logger.error('Error: Tag must be in format X.Y.Z')
             continue
 
