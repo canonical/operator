@@ -176,6 +176,8 @@ This has added the following Python packages to the `dependencies` list in `pypr
 Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
+"""Functions for interacting with tinyproxy."""
+
 import logging
 import os
 import shutil
