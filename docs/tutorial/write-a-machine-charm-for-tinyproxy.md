@@ -36,7 +36,7 @@ This application isn't especially realistic in isolation. But it's a good way to
 
 ### Create a virtual machine
 
-You'll work inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
+You'll test and deploy your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
 
 First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
 
@@ -56,6 +56,14 @@ This step should take less than 10 minutes, but the time depends on your compute
 Launched: juju-sandbox
 ```
 
+Although you'll test and deploy your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE. Let's use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make a directory available inside your virtual machine:
+
+```text
+multipass stop juju-sandbox
+mkdir ~/tinyproxy-tutorial  # You'll write your charm in this directory.
+multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:~/tinyproxy
+```
+
 Now run:
 
 ```text
@@ -72,7 +80,7 @@ ubuntu@juju-sandbox:~$
 
 ### Install Juju and charm development tools
 
-Now that you have a virtual machine, you need to install the following tools in your virtual machine:
+Now that you have a virtual machine, you need to install the following tools on your virtual machine:
 
 - **Charmcraft, Juju, and LXD** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
 - **uv and tox** - You'll implement your charm using Python code. [uv](https://docs.astral.sh/uv/) is a Python project manager that will install dependencies for checks and tests. You'll use [tox](https://tox.wiki/en/) to select which checks or tests to run.
@@ -103,11 +111,10 @@ uv tool install tox --with tox-uv
 
 ## Create a charm project
 
-In your virtual machine, make sure that the working directory is `~`. Then create a project directory and use Charmcraft to create the initial version of your charm:
+In your virtual machine, use Charmcraft to create the initial version of your charm:
 
 ```text
-mkdir tinyproxy
-cd tinyproxy
+cd ~/tinyproxy
 charmcraft init --profile machine
 ```
 
@@ -124,17 +131,7 @@ These files currently contain placeholder code and configuration. It would be po
 
 ### Edit the metadata
 
-We'll start by editing the metadata in `charmcraft.yaml`.
-
-In your virtual machine, make sure that the working directory is `~/tinyproxy`. Then run:
-
-```text
-nano charmcraft.yaml
-```
-
-This opens the "nano" text editor. If you haven't used nano before, see [nano tips on Ask Ubuntu](https://askubuntu.com/a/54222).
-
-In nano, change the values of `title`, `summary`, and `description` to:
+Open `~/tinyproxy-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
 
 ```yaml
 title: Reverse Proxy Demo
@@ -142,16 +139,6 @@ summary: A demo charm that configures tinyproxy as a reverse proxy.
 description: |
   This charm demonstrates how to write a machine charm with Ops.
 ```
-
-Then save the file and exit nano.
-
-````{tip}
-You'll need to edit Python files later in the tutorial. To configure nano to insert spaces instead of tabs, run:
-
-```text
-printf "set tabsize 4\nset tabstospaces\n" > ~/.nanorc
-```
-````
 
 ### Write a helper module
 
@@ -282,7 +269,9 @@ Notice that the helper module is stateless. In fact, your charm as a whole will 
 3. Report the status back to Juju.
 
 ```{tip}
-After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks.
+After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks. You can run these commands from anywhere in the `~/tinyproxy` directory in your virtual machine.
+
+You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are available on your usual operating system. However, be careful when running the same tox command inside and outside your virtual machine. If tox fails with an error related to the `.tox` directory, use `-re` instead of `-e` in the commands. This recreates the tox environment.
 ```
 
 ### Handle the install event
