@@ -84,11 +84,11 @@ class SecretsCharm(ops.CharmBase):
 
     def set_secret_flow(self, event: ops.ActionEvent):
         result: Result = {}
-        contentiter = iter(contents())
-        labeliter = iter(labels())
-        descriptioniter = iter(descriptions())
-        expireiter = iter(expires())
-        rotateiter = iter(rotates())
+        contentiter = contents()
+        labeliter = labels()
+        descriptioniter = descriptions()
+        expireiter = expires()
+        rotateiter = rotates()
 
         try:
             secretid = event.params.get('secretid')
