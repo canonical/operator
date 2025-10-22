@@ -297,7 +297,7 @@ In `src/charm.py`, replace the `_on_install` method of the charm class with:
             self.unit.set_workload_version(version)
 ```
 
-When your charm receives the "install" event from Juju, Ops runs this method and responds to Juju with the version of tinyproxy that's installed on the machine. Juju shows the tinyproxy version in its status output.
+When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
 As you write your charm, keep in mind that the charm code only runs when there's an event to handle. Behind the scenes, Juju runs `charm.py` with event data in the environment. Ops reads the event data, instantiates the charm class, then runs the appropriate method.
 
