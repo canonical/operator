@@ -21,12 +21,9 @@ In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
 ```{note}
-In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
+In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
 If you are charming an application built with a popular framework, check if
 charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-
-Avoid the default (`--profile=simple`), which provides a demo charm, rather than
-a base for building a charm of your own.
 ```
 
 If your repository will hold multiple charms, or a charm and source for other
