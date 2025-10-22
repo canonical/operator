@@ -16,7 +16,6 @@
 * Ensure `ops.Pebble.pull` cleans up temporary files if it errors (#2087)
 * Make secret info description visible to the charm in ops[testing] (#2115)
 * Raise ActionFailed when using Context as a context manager (#2121)
-* Detect categories with an explanation mark indicating breaking changes (#2132)
 
 ## Documentation
 
@@ -25,7 +24,6 @@
 * Add missing assignment to state_out in unit tests how-to (#2075)
 * Update the holistic/delta explanation with the reconciler pattern (#2029)
 * Fix broken setup/teardown links in README (#2094)
-* Update info about release docs, mark testing changelog as not maintained (#2074)
 * Switch to makefile for building the docs (#2073)
 * Document how to extract the charm instance from the testing context (#2084)
 * Add a how-to guide for migrating away from Harness (#2062)
