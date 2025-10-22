@@ -912,13 +912,6 @@ You can keep things running, to explore further, or you can remove what you crea
 - To remove your charm from Juju, run `juju remove-application tinyproxy`.
 - To exit your virtual machine, run `exit`. The terminal switches back to your usual operating system.
 - To stop your virtual machine, run `multipass stop juju-sandbox`.
-- If you plan to remove your virtual machine, you might want to save your charm somewhere first. Use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to share a directory with your virtual machine:
-    ```text
-    mkdir ~/vm-shared
-    multipass mount --type=classic ~/vm-shared juju-sandbox:/home/ubuntu/shared
-    multipass shell  # Work inside your virtual machine again.
-    ```
-    Then copy files from your charm to `~/shared`. The files will appear in `~/vm-shared` in your usual home directory.
 - To remove your virtual machine, run `multipass delete juju-sandbox`.
 - To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
 
