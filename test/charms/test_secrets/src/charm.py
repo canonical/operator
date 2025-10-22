@@ -42,7 +42,6 @@ class Result(TypedDict, total=False):
     before: SecretSnapshot | None
     after: SecretSnapshot | None
     secretid: str | None
-    exception: str | None
 
 
 class SecretsCharm(ops.CharmBase):
@@ -125,7 +124,7 @@ class SecretsCharm(ops.CharmBase):
             result['secretid'] = secretid
             result['after'] = self._snapshot(secretid)
         except Exception as e:
-            result['exception'] = str(e)
+            event.fail(str(e))
 
         event.set_results(cast('dict[str, Any]', result))
 

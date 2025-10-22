@@ -33,7 +33,6 @@ def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
 def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     rv = juju.run(leader, 'add-secret')
     result = cast('Result', rv.results)
-    assert not result.get('exception')
 
     secrets = juju.secrets()
     secret = juju.show_secret(secrets[0].uri, reveal=True)
@@ -59,7 +58,6 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
 def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
     rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
     result = cast('Result', rv.results)
-    assert not result.get('exception')
 
     assert 'secretid' in result
     assert 'after' in result
@@ -120,7 +118,6 @@ def test_set_secret(
 
     rv = juju.run(leader, 'set-secret-flow', params=params)
     result = cast('Result', rv.results)
-    assert not result.get('exception')
 
     assert 'secretid' in result
     assert 'after' in result
