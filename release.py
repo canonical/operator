@@ -50,6 +50,9 @@ VERSION_FILES = {
     'tracing': pathlib.Path('tracing/pyproject.toml'),
     'uvlock': pathlib.Path('uv.lock'),
 }
+CHANGE_LINE_REGEX = (
+    r'^\* (?P<category>\w+)(?P<breaking>!?): (?P<summary>.*) by [^ ]+ in (?P<pr>.*)'
+)
 
 
 def get_latest_release_tag(repo: github.Repository.Repository, branch_name: str) -> str | None:
@@ -189,16 +192,19 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
         'refactor': [],
         'perf': [],
         'revert': [],
+        'breaking': [],  # a meta category for breaking changes
     }
     full_changelog_line = None
 
     for line in release_notes.splitlines():
-        if match := re.match(r'^\* (\w+): (.*) by [^ ]+ in (.*)', line.strip()):
-            category = match.group(1)
+        if match := re.match(CHANGE_LINE_REGEX, line.strip()):
+            if match.group('breaking') == '!':
+                category = 'breaking'
+            category = match.group('category').strip()
             if category in categories:
-                description = match.group(2).strip()
+                description = match.group('summary').strip()
                 description = description[0].upper() + description[1:]
-                pr_link = match.group(3).strip()
+                pr_link = match.group('pr').strip()
                 categories[category].append((description, pr_link))
 
         elif line.startswith('**Full Changelog**'):
@@ -216,7 +222,19 @@ def format_release_notes(
     If `full_changelog` is provided, it is appended at the end.
     """
     lines = ["## What's Changed", '']
+    if categories['breaking']:
+        lines.append('### Breaking Changes')
+        lines.append('There are breaking changes in this release. Please review them carefully:\n')
+        for description, pr_link in categories['breaking']:
+            lines.append(f'* {description} in {pr_link}')
+        lines.append('')
+        logger.info(
+            'Breaking changes detected in the release notes. '
+            'Please ensure there are sufficient instructions for users to handle them.'
+        )
     for commit_type, items in categories.items():
+        if commit_type == 'breaking':
+            continue
         if items:
             lines.append(f'### {commit_type_to_category(commit_type)}')
             for description, pr_link in items:
@@ -317,6 +335,7 @@ def commit_type_to_category(commit_type: str) -> str:
         'perf': 'Performance',
         'refactor': 'Refactoring',
         'revert': 'Reverted',
+        'breaking': 'Breaking Changes',
     }
     return mapping.get(commit_type, commit_type.capitalize())
 
