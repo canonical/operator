@@ -98,7 +98,7 @@ class SecretsCharm(ops.CharmBase):
                 elif secretlabel:
                     secret = self.model.get_secret(label=secretlabel)
                 else:
-                    event.fail("Must provide secretid or secretlabel")
+                    event.fail('Must provide secretid or secretlabel')
                     return
 
                 match field:

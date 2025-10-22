@@ -101,7 +101,7 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
 )
 def test_set_secret(
     juju: jubilant.Juju,
-    good_secret: str,
+    fresh_secret: str,
     leader: str,
     flow: str,
     lookup_by: Literal['id', 'label'],
@@ -112,7 +112,7 @@ def test_set_secret(
     params = {'flow': flow}
     match lookup_by:
         case 'id':
-            params['secretid'] = good_secret
+            params['secretid'] = fresh_secret
         case 'label':
             params['secretlabel'] = 'thelabel'
 
@@ -165,8 +165,8 @@ def cleanup(juju: jubilant.Juju, leader: str) -> None:
 
 
 @pytest.fixture
-def good_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
-    """Remove all old secrets and add a new secret owned by the test app."""
+def fresh_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
+    """Remove all old secrets (via cleanup) and add a new secret owned by the test app."""
     juju.exec('secret-add --label thelabel some=content', unit=leader)
     secrets = juju.secrets()
     assert secrets
