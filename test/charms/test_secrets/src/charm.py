@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import datetime
-from collections.abc import Generator
+import itertools
 from typing import Any, TypedDict, cast
 
 import ops
@@ -82,40 +82,40 @@ class SecretsCharm(ops.CharmBase):
         event.set_results(cast('dict[str, Any]', result))
 
     def set_secret_flow(self, event: ops.ActionEvent):
+        secretid = event.params.get('secretid')
+        secretlabel = event.params.get('secretlabel')
+        contentses = ({'val': f'{i}'} for i in itertools.count(1))
+        labels = (f'label{i}' for i in itertools.count(1))
+        descriptions = (f'description{i}' for i in itertools.count(1))
+        expires = (datetime.datetime(2010 + i, 1, 1, 0, 0, 0) for i in itertools.count(1))
+        rotates = iter(ops.SecretRotate.__members__.values())
         result: Result = {}
-        contentiter = contents()
-        labeliter = labels()
-        descriptioniter = descriptions()
-        expireiter = expires()
-        rotateiter = rotates()
 
         try:
-            secretid = event.params.get('secretid')
-            secretlabel = event.params.get('secretlabel')
-
             for field in event.params['flow'].split(','):
-                assert secretid or secretlabel
-                assert not (secretid and secretlabel)
-                secret = self.model.get_secret(
-                    **({'id': secretid} if secretid else {}),
-                    **({'label': secretlabel} if secretlabel else {}),
-                )
+                if secretid:
+                    secret = self.model.get_secret(id=secretid)
+                elif secretlabel:
+                    secret = self.model.get_secret(label=secretlabel)
+                else:
+                    event.fail("Must provide secretid or secretlabel")
+                    return
 
                 match field:
                     case 'content':
-                        secret.set_content(next(contentiter))
+                        secret.set_content(next(contentses))
                     case 'label':
-                        new_label = next(labeliter)
+                        new_label = next(labels)
                         secret.set_info(label=new_label)
                         if secretlabel:
                             # So that we can find the secret again
                             secretlabel = new_label
                     case 'description':
-                        secret.set_info(description=next(descriptioniter))
+                        secret.set_info(description=next(descriptions))
                     case 'expire':
-                        secret.set_info(expire=next(expireiter))
+                        secret.set_info(expire=next(expires))
                     case 'rotate':
-                        secret.set_info(rotate=next(rotateiter))
+                        secret.set_info(rotate=next(rotates))
                     case _:
                         raise ValueError(f'Unsupported {field=}')
 
@@ -125,6 +125,7 @@ class SecretsCharm(ops.CharmBase):
             result['after'] = self._snapshot(secretid)
         except Exception as e:
             event.fail(str(e))
+            return
 
         event.set_results(cast('dict[str, Any]', result))
 
@@ -137,35 +138,6 @@ class SecretsCharm(ops.CharmBase):
             'tracked': secret.get_content(),
             'latest': secret.peek_content(),
         }
-
-
-def contents() -> Generator[dict[str, str]]:
-    """Generate predictable, but different content values every time."""
-    for i in range(1, 10):
-        yield {'val': f'{i}'}
-
-
-def labels() -> Generator[str]:
-    """Generate predictable, but different content values every time."""
-    for i in range(1, 10):
-        yield f'label{i}'
-
-
-def descriptions() -> Generator[str]:
-    """Generate predictable, but different content values every time."""
-    for i in range(1, 10):
-        yield f'description{i}'
-
-
-def expires() -> Generator[datetime.datetime]:
-    """Generate predictable, but different content values every time."""
-    for i in range(1, 10):
-        yield datetime.datetime(2010 + i, 1, 1, 0, 0, 0)
-
-
-def rotates() -> Generator[ops.SecretRotate]:
-    """Generate predictable, but different `rotate` values every time."""
-    yield from ops.SecretRotate.__members__.values()
 
 
 if __name__ == '__main__':
