@@ -127,11 +127,11 @@ def get_new_tag_for_release(
         new_tag = user_input or suggested_tag
 
         if not new_tag:
-            logger.error('Error: No tag specified and no suggestion available')
+            logger.error('No tag specified and no suggestion available')
             continue
 
         if not re.match(r'^\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?$', new_tag):
-            logger.error('Error: Tag must be in format X.Y.Z')
+            logger.error('Tag must be in format X.Y.Z')
             continue
 
         release_page = f'https://github.com/{owner}/{repo.name}/releases'
