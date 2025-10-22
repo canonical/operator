@@ -50,10 +50,10 @@ def get_version() -> str:
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    # Install a specific package from ubuntu@22.04
-    # See https://packages.ubuntu.com/jammy/tinyproxy-bin
-    # In general, it’s good practice for charms to pin workload versions.
-    apt.add_package("tinyproxy-bin", "1.11.0-1")
+# Install a specific package from ubuntu@22.04
+# See https://packages.ubuntu.com/jammy/tinyproxy-bin
+# In general, it's good practice for charms to pin workload versions.
+apt.add_package("tinyproxy-bin", "1.11.0-1")
     # If this call fails, the charm will go into error status. The Juju logs will show the error:
     # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
 
