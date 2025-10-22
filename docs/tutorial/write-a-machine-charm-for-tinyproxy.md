@@ -651,7 +651,11 @@ def test_version(monkeypatch: pytest.MonkeyPatch):
     assert tinyproxy.get_version() == "1.11.0"
 ```
 
-We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, you can run `tox -e unit -- tests/unit/test_tinyproxy.py`.
+We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
+
+```text
+tox -e unit -- tests/unit/test_tinyproxy.py
+```
 
 ### Write state-transition tests
 
