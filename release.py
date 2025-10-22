@@ -24,6 +24,7 @@ import pathlib
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 
 import github
 import github.GitRelease
@@ -183,29 +184,30 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     release_notes = re.sub(
         r'(## New Contributors.*?)(\n|$)', r'\2', release_notes, flags=re.DOTALL
     )
-    categories: dict[str, list[tuple[str, str]]] = {
+    categories: Mapping[str, list[tuple[str, str]]] = {
+        'breaking': [],  # a meta category for breaking changes
         'feat': [],
         'fix': [],
         'docs': [],
         'test': [],
-        'ci': [],
         'refactor': [],
         'perf': [],
+        'ci': [],
         'revert': [],
-        'breaking': [],  # a meta category for breaking changes
     }
     full_changelog_line = None
 
     for line in release_notes.splitlines():
         if match := re.match(CHANGE_LINE_REGEX, line.strip()):
             category = match.group('category').strip()
-            if match.group('breaking') == '!':
-                category = 'breaking'
             if category in categories:
                 description = match.group('summary').strip()
                 description = description[0].upper() + description[1:]
                 pr_link = match.group('pr').strip()
-                categories[category].append((description, pr_link))
+                if match.group('breaking') == '!':
+                    categories['breaking'].append((f'{category}: {description}', pr_link))
+                else:
+                    categories[category].append((description, pr_link))
 
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
