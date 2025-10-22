@@ -205,7 +205,10 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
                 description = description[0].upper() + description[1:]
                 pr_link = match.group('pr').strip()
                 if match.group('breaking') == '!':
-                    categories['breaking'].append((f'{category}: {description}', pr_link))
+                    categories['breaking'].append((
+                        f'{category.capitalize()}: {description}',
+                        pr_link,
+                    ))
                 else:
                     categories[category].append((description, pr_link))
 
