@@ -26,6 +26,6 @@ class MockVersionProcess:
 
 def test_version(monkeypatch: pytest.MonkeyPatch):
     """Test that the helper module correctly returns the version of tinyproxy."""
-    version_process = MockVersionProcess("1.11.0")
+    version_process = MockVersionProcess("1.0.0")
     monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
-    assert tinyproxy.get_version() == "1.11.0"
+    assert tinyproxy.get_version() == "1.0.0"

@@ -41,7 +41,7 @@ class MockTinyproxy:
         return self.config != old_config
 
     def get_version(self) -> str:
-        return "1.11.0"
+        return "1.0.0"
 
     def install(self) -> None:
         self.installed = True

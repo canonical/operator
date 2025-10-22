@@ -214,7 +214,10 @@ def get_version() -> str:
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    apt.add_package("tinyproxy-bin")
+    # Install a specific package from ubuntu@22.04.
+    # See https://packages.ubuntu.com/jammy/tinyproxy-bin
+    # In general, it’s good practice for charms to pin workload versions.
+    apt.add_package("tinyproxy-bin", "1.11.0-1")
     # If this call fails, the charm will go into error status. The Juju logs will show the error:
     # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
 
@@ -646,9 +649,9 @@ class MockVersionProcess:
 
 def test_version(monkeypatch: pytest.MonkeyPatch):
     """Test that the helper module correctly returns the version of tinyproxy."""
-    version_process = MockVersionProcess("1.11.0")
+    version_process = MockVersionProcess("1.0.0")
     monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
-    assert tinyproxy.get_version() == "1.11.0"
+    assert tinyproxy.get_version() == "1.0.0"
 ```
 
 We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
@@ -699,7 +702,7 @@ class MockTinyproxy:
         return self.config != old_config
 
     def get_version(self) -> str:
-        return "1.11.0"
+        return "1.0.0"
 
     def install(self) -> None:
         self.installed = True
@@ -870,8 +873,6 @@ You should now have the following tests:
 
 - `test_deploy` - Deploys your charm and checks that it goes into active status.
 - `test_workload_version_is_set` - Checks that your charm reports the correct version of tinyproxy to Juju.
-
-You might have a question at this point: what makes 1.11.0 the "correct" version of tinyproxy? The answer is, we're cheating slightly because we happen to know that APT will install version 1.11.0 on the machine. In general, it's good practice for charms to pin workload versions, so the charm code ought to ask APT to install a specific version of tinyproxy.
 
 Before running the tests, let's add a test to check that an invalid value of `slug` blocks the charm.
 
