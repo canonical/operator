@@ -198,9 +198,9 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
 
     for line in release_notes.splitlines():
         if match := re.match(CHANGE_LINE_REGEX, line.strip()):
+            category = match.group('category').strip()
             if match.group('breaking') == '!':
                 category = 'breaking'
-            category = match.group('category').strip()
             if category in categories:
                 description = match.group('summary').strip()
                 description = description[0].upper() + description[1:]
