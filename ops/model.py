@@ -77,7 +77,7 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName = _SettableStatusName | _ReadOnlyStatusName
+_StatusName: TypeAlias = _SettableStatusName | _ReadOnlyStatusName
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
