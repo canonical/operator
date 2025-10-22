@@ -131,12 +131,7 @@ def test_config_changed(tinyproxy_configured: MockTinyproxy):
     assert tinyproxy_configured.reloaded_config
 
 
-# Define a reusable fixture that provides invalid slugs.
-@pytest.fixture(params=["", "foo_bar", "foo/bar"])
-def invalid_slug(request):
-    return request.param
-
-
+@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
 def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: str):
     """Test that the charm fails to start if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
@@ -149,6 +144,7 @@ def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: 
     assert tinyproxy_installed.config is None
 
 
+@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
 def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, invalid_slug: str):
     """Test that the charm fails to change config if the config is invalid."""
     ctx = testing.Context(TinyproxyCharm)
