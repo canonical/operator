@@ -499,12 +499,12 @@ class CollectMetricsEvent(HookEvent):
     Note that associated callback methods are currently sandboxed in
     how they can interact with Juju.
 
-    .. jujuremoved:: 4.0
+    .. jujuremoved:: 3.6.11
     """
 
     def __init__(self, handle: Handle):
         warnings.warn(
-            'collect-metrics events will not be emitted from Juju 4.0 onwards - '
+            'collect-metrics events are not be emitted from Juju 3.6.11 onwards - '
             'consider using the Canonical Observability Stack',
             DeprecationWarning,
             stacklevel=3,
@@ -1347,7 +1347,7 @@ class CharmEvents(ObjectEvents):
     collect_metrics = EventSource(CollectMetricsEvent)
     """Triggered by Juju to collect metrics (see :class:`~ops.CollectMetricsEvent`).
 
-    .. jujuremoved:: 4.0
+    .. jujuremoved:: 3.6.11
     """
 
     secret_changed = EventSource(SecretChangedEvent)

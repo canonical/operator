@@ -727,8 +727,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         labels: Mapping[str, str] | None = None,
     ) -> NoReturn:
         raise NotImplementedError(
-            'add-metrics is not implemented in Scenario (and probably never will be: '
-            "it's deprecated API)",
+            'add-metrics is not implemented in Scenario '
+            '(and never will be: it was removed in Juju 3.6.11)'
         )
 
     def resource_get(self, resource_name: str) -> str:

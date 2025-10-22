@@ -1,3 +1,50 @@
+# 3.4.0b1 - 22 October 2025
+
+## Breaking Changes
+
+* Fix: Change JujuContext.machine_id from int to str (#2108)
+* Fix: Ensure that the testing context manager is exited when an exception occurs (#2117)
+
+## Features
+
+* Add a low-level API for the Juju hook commands (#2019)
+* Make PebbleClient file methods also accept pathlib.PurePath (#2097)
+
+## Fixes
+
+* Allow actions without params or descriptions in ops[testing] (#2090)
+* Ensure `ops.Pebble.pull` cleans up temporary files if it errors (#2087)
+* Make secret info description visible to the charm in ops[testing] (#2115)
+* Raise ActionFailed when using Context as a context manager (#2121)
+
+## Documentation
+
+* Update referenced examples for managing interfaces (#2068)
+* Tidy up spelling and formatting in several places (#2060)
+* Add missing assignment to state_out in unit tests how-to (#2075)
+* Update the holistic/delta explanation with the reconciler pattern (#2029)
+* Fix broken setup/teardown links in README (#2094)
+* Switch to makefile for building the docs (#2073)
+* Document how to extract the charm instance from the testing context (#2084)
+* Add a how-to guide for migrating away from Harness (#2062)
+* Rename hook tools to hook commands (#2114)
+* Remove legacy how-to guide for Harness (#2122)
+* Update the Juju release the metrics functionality is removed from 4.0 to 3.6.11 (#2126)
+* Clarify that Context is the testing context not only the Juju context (#2123)
+
+## Refactoring
+
+* Use ops.hookcmds in _ModelBackend (#2116)
+
+## CI
+
+* Add integration and state transition tests for the secrets API (#2078)
+* Temporarily disable tracing integration tests (#2102)
+* Add secrets tests follow-up (#2105)
+* Support monorepos in ops charm compatibility testing (#2100)
+* Test both Charmcraft 3 and Charmcraft 4 profiles (#2103)
+* Add automated doc checks (and related starter pack updates) (#2099)
+
 # 3.3.0 - 29 September 2025
 
 ## Features

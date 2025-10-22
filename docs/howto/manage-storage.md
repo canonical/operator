@@ -43,7 +43,7 @@ containers:
 When you use storage mounts with Juju, they will be automatically mounted into the charm container at either:
 
 * the specified location based on the storage section of `charmcraft.yaml`, or
-* the default location `/var/lib/juju/storage/<storage-name>/<num>`, where num is zero for 'normal'/singular storages or an integer ID for storages that support multiple attachments.
+* the default location `/var/lib/juju/storage/<storage-name>/<num>`, where `<num>` is zero for 'normal'/singular storages or an integer ID for storages that support multiple attachments.
 
 However, charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code. For example:
 
