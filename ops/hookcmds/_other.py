@@ -16,12 +16,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import (
-    Any,
-    Literal,
-    cast,
-    overload,
-)
+from typing import Any, Literal, cast, overload
 
 from ._types import CloudSpec, GoalState, GoalStateDict, Network
 from ._utils import run

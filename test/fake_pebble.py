@@ -32,7 +32,7 @@ from typing_extensions import NotRequired
 _Response = typing.TypedDict(
     '_Response',
     {
-        'result': typing.Optional[typing.Dict[str, str]],
+        'result': dict[str, str] | None,
         'status': str,
         'status-code': int,
         'type': str,
@@ -42,9 +42,7 @@ _Response = typing.TypedDict(
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    _route = typing.List[
-        typing.Tuple[typing.Literal['GET', 'POST'], typing.Any, typing.Callable[..., None]]
-    ]
+    _route = list[tuple[typing.Literal['GET', 'POST'], typing.Any, typing.Callable[..., None]]]
 
     def __init__(
         self,

@@ -10,13 +10,8 @@ import marshal
 import re
 import sys
 import warnings
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Sequence,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Generic, cast
+from collections.abc import Sequence
 
 import ops
 import ops.storage

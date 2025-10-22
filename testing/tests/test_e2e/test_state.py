@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import tempfile
 from dataclasses import asdict, replace
-from typing import Any, Callable, Iterable, Generator
+from typing import Any
+from collections.abc import Callable, Iterable, Generator
 
 import yaml
 

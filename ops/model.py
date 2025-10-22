@@ -38,22 +38,17 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping
 from pathlib import Path, PurePath
 from typing import (
     Any,
     BinaryIO,
-    Callable,
     ClassVar,
-    Generator,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    MutableMapping,
     TextIO,
+    TypeAlias,
     TypedDict,
     TypeVar,
-    Union,
     get_args,
     get_type_hints,
 )
@@ -66,8 +61,6 @@ from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import TypeAlias
-
     from .hookcmds._types import AddressDict as _AddressDict
     from .hookcmds._types import BindAddressDict as _BindAddressDict
 
@@ -84,18 +77,18 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName: TypeAlias = '_SettableStatusName | _ReadOnlyStatusName'
+_StatusName: TypeAlias = _SettableStatusName | _ReadOnlyStatusName
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
 # mapping from relation name to a list of relation objects
 _RelationMapping_Raw: TypeAlias = 'dict[str, list[Relation] | None]'
 # mapping from container name to container metadata
-_ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'
+_ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'  # prevent import loop
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
-_RelationDataContent_Raw: TypeAlias = 'dict[str, str]'
+_RelationDataContent_Raw: TypeAlias = dict[str, str]
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
 _NetworkDict = TypedDict(
@@ -920,7 +913,7 @@ class LazyMapping(_GenericLazyMapping[str]):
     """
 
 
-class RelationMapping(Mapping[str, List['Relation']]):
+class RelationMapping(Mapping[str, list['Relation']]):
     """Map of relation names to lists of :class:`Relation` instances."""
 
     def __init__(
@@ -1979,7 +1972,7 @@ class Relation:
         self.data[dst].update(data)
 
 
-class RelationData(Mapping[Union[Unit, Application], 'RelationDataContent']):
+class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
     """Represents the various data buckets of a given relation.
 
     Each unit and application involved in a relation has their own data bucket.
@@ -2452,7 +2445,7 @@ class Pod:
         self._backend.pod_spec_set(spec, k8s_resources)
 
 
-class StorageMapping(Mapping[str, List['Storage']]):
+class StorageMapping(Mapping[str, list['Storage']]):
     """Map of storage names to lists of Storage instances."""
 
     def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):

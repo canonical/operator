@@ -20,7 +20,8 @@ import functools
 import ipaddress
 import json
 import urllib.parse
-from typing import Any, Callable, Iterable, Protocol, cast
+from collections.abc import Callable, Iterable
+from typing import Any, Protocol, cast
 
 import pytest
 

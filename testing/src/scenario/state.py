@@ -18,21 +18,15 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
-    Dict,
     Final,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     NoReturn,
-    Sequence,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from uuid import uuid4
 
 import yaml
@@ -69,8 +63,8 @@ if TYPE_CHECKING:  # pragma: no cover
         workload_version: str
 
 
-AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
-RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
+AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
+RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -216,7 +210,7 @@ def _max_posargs(n: int):
         def __reduce__(self):
             # The default __reduce__ doesn't understand that some arguments have
             # to be passed as keywords, so using the copy module fails.
-            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
+            attrs = cast('dict[str, Any]', super().__reduce__()[2])
             return (lambda: self.__class__(**attrs), ())
 
     return _MaxPositionalArgs

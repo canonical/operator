@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, cast
+from collections.abc import Mapping
+from typing import cast
 
 from ._types import Storage
 from ._utils import run
