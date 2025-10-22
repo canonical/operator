@@ -170,8 +170,8 @@ uv add charmlibs-apt charmlibs-pathops
 
 This has added the following Python packages to the `dependencies` list in `pyproject.toml`:
 
-- [`charmlibs-apt`](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt/) - A library for using APT to manage system packages. This is how your charm will install tinyproxy.
-- [`charmlibs-pathops`](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops/) - A file operations library, similar to `pathlib` from the standard library.
+- {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>` - A library for using APT to manage system packages. This is how your charm will install tinyproxy.
+- {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` - A file operations library, similar to `pathlib` from the standard library.
 
 Next, replace the contents of `src/tinyproxy.py` with:
 

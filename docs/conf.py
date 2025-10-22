@@ -436,6 +436,7 @@ intersphinx_mapping = {
     'jubilant': ('https://documentation.ubuntu.com/jubilant', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest', None),
+    'charmlibs': ('https://documentation.ubuntu.com/charmlibs/', None),
     'multipass': ('https://documentation.ubuntu.com/multipass/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
     'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
