@@ -50,7 +50,7 @@ This creates a virtual machine called `juju-sandbox`.
 
 Multipass allocates some of your computer's memory and disk space to your virtual machine. The options we've chosen for `multipass launch` ensure that your virtual machine will be powerful enough to run Juju and deploy medium-sized charms.
 
-It will take up to 10 minutes for Multipass to create your virtual machine, depending on your computer and network. When your virtual machine has been created, you'll see the message:
+This step should take less than 10 minutes, but the time depends on your computer and network. When your virtual machine has been created, you'll see the message:
 
 ```text
 Launched: juju-sandbox
@@ -88,7 +88,7 @@ sudo concierge prepare -p machine --extra-snaps astral-uv --charmcraft-channel l
 
 This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p machine` tells Concierge that we want tools for developing machine charms.
 
-It will take up to 15 minutes to install the tools, depending on your computer and network. When the tools have been installed, you'll see a message that ends with:
+This step should take less than 15 minutes, but the time depends on your computer and network. When the tools have been installed, you'll see a message that ends with:
 
 ```text
 msg="Bootstrapped Juju" provider=lxd
