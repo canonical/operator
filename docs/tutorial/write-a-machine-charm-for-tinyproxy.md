@@ -499,7 +499,7 @@ In your virtual machine, make sure that the working directory is `~/tinyproxy`. 
 charmcraft pack
 ```
 
-Charmcraft will take about 20 minutes to pack your charm, depending on your computer and network.
+Charmcraft will take up to 20 minutes to pack your charm, depending on your computer and network. If you modify the charm code after completing the tutorial, packing will be faster the second time because Chamcraft has cached the packing environment.
 
 When Charmcraft has packed your charm, you'll see a message similar to:
 
