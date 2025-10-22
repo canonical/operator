@@ -88,7 +88,7 @@ _ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'  # prevent imp
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
-_RelationDataContent_Raw = dict[str, str]
+_RelationDataContent_Raw: TypeAlias = dict[str, str]
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
 _NetworkDict = TypedDict(
