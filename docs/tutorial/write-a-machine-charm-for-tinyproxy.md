@@ -594,8 +594,6 @@ Let's see what happens to the reverse proxy if we change the `slug` configuratio
 juju config tinyproxy slug=foo
 ```
 
-Where `<address>` is the IP address of machine 0 from Juju status.
-
 You might see the message "(config-changed)" briefly appear in Juju status as your charm handles the config-changed event.
 
 Then run:
