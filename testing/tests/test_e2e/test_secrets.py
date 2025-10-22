@@ -677,14 +677,9 @@ def test_set_secret(
 ):
     secret = Secret({'some': 'content'}, owner='app', id='theid', label='thelabel')
     state = State(leader=True, secrets={secret})
-    params = {'flow': flow}
-    match lookup_by:
-        case 'id':
-            params['secretid'] = 'theid'
-        case 'label':
-            params['secretlabel'] = 'thelabel'
+    params = {'flow': flow, f'secret{lookup_by}': f'the{lookup_by}'}
     state = secrets_context.run(secrets_context.on.action('set-secret-flow', params=params), state)
-    scenario_secret = next(iter(state.secrets))
+    scenario_secret = state.get_secret(id='theid')
     result = cast('Result', secrets_context.action_results)
     assert 'after' in result
     assert result['after']
