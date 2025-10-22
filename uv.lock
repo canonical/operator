@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14' and platform_python_implementation != 'PyPy'",
@@ -744,7 +744,7 @@ xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
 
 [[package]]
 name = "ops-scenario"
-version = "8.4.0"
+version = "8.4.0b1"
 source = { editable = "testing" }
 dependencies = [
     { name = "ops" },

@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "8.4.0"
+version = "8.4.0b1"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
