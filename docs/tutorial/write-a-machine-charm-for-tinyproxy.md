@@ -719,25 +719,12 @@ class MockTinyproxy:
         self.installed = False
 
 
-def patch_charm(monkeypatch: pytest.MonkeyPatch, tinyproxy: MockTinyproxy):
-    """Patch the helper module to use mock functions for interacting with tinyproxy."""
-    monkeypatch.setattr("charm.tinyproxy.ensure_config", tinyproxy.ensure_config)
-    monkeypatch.setattr("charm.tinyproxy.get_version", tinyproxy.get_version)
-    monkeypatch.setattr("charm.tinyproxy.install", tinyproxy.install)
-    monkeypatch.setattr("charm.tinyproxy.is_installed", tinyproxy.is_installed)
-    monkeypatch.setattr("charm.tinyproxy.is_running", tinyproxy.is_running)
-    monkeypatch.setattr("charm.tinyproxy.start", tinyproxy.start)
-    monkeypatch.setattr("charm.tinyproxy.stop", tinyproxy.stop)
-    monkeypatch.setattr("charm.tinyproxy.reload_config", tinyproxy.reload_config)
-    monkeypatch.setattr("charm.tinyproxy.uninstall", tinyproxy.uninstall)
-
-
 def test_install(monkeypatch: pytest.MonkeyPatch):
     """Test that the charm correctly handles the install event."""
     # A state-transition test has three broad steps:
     # Step 1. Arrange the input state.
     tinyproxy = MockTinyproxy()
-    patch_charm(monkeypatch, tinyproxy)
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
     ctx = testing.Context(TinyproxyCharm)
     state_in = testing.State()
     # Step 2. Simulate an event, in this case an install event.
@@ -753,7 +740,7 @@ def test_install(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy(installed=True)
-    patch_charm(monkeypatch, tinyproxy)
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
     return tinyproxy
 
 
@@ -770,7 +757,7 @@ def test_start(tinyproxy_installed: MockTinyproxy):
 @pytest.fixture
 def tinyproxy_configured(monkeypatch: pytest.MonkeyPatch):
     tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
-    patch_charm(monkeypatch, tinyproxy)
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
     return tinyproxy
 
 
