@@ -1,3 +1,5 @@
+This changelog is no longer maintained. For the latest changes, see the [full Ops changelog](../CHANGES.md).
+
 # 7.22.0 - 29 May 2025
 
 ## Fixes

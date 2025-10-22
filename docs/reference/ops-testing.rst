@@ -69,7 +69,7 @@ A test consists of three broad steps:
     - declare the context
     - declare the input state
 - **Act**:
-    - run an event (ie. obtain the output state, given the input state and the event)
+    - run an event (obtain the output state, given the input state and the event)
 - **Assert**:
     - verify that the output state is what you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls

@@ -33,6 +33,7 @@ import tempfile
 import typing
 import uuid
 import warnings
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
@@ -40,32 +41,26 @@ from typing import (
     Any,
     AnyStr,
     BinaryIO,
-    Callable,
     ClassVar,
-    Dict,
     Final,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Optional,
-    Sequence,
     TextIO,
     TypedDict,
     TypeVar,
-    Union,
     cast,
 )
 
 from .. import charm, framework, model, pebble, storage
 from ..charm import CharmBase, CharmMeta, RelationRole
-from ..jujucontext import _JujuContext
-from ..model import Container, RelationNotFoundError, StatusName, _NetworkDict
+from ..jujucontext import JujuContext
+from ..model import Container, RelationNotFoundError, _StatusName
 from ..pebble import ExecProcess
 from . import yaml
 
 if typing.TYPE_CHECKING:
+    from ..model import _NetworkDict
+
     try:
         from ..testing import State  # type: ignore
     except ImportError:
@@ -76,26 +71,26 @@ if typing.TYPE_CHECKING:
             pass
 
 
-ReadableBuffer = Union[bytes, str, StringIO, BytesIO, BinaryIO]
-_StringOrPath = Union[str, pathlib.PurePosixPath, pathlib.Path]
+ReadableBuffer = bytes | str | StringIO | BytesIO | BinaryIO
+_StringOrPath = str | pathlib.PurePosixPath | pathlib.Path
 _FileKwargs = TypedDict(
     '_FileKwargs',
     {
-        'permissions': Optional[int],
+        'permissions': int | None,
         'last_modified': datetime.datetime,
-        'user_id': Optional[int],
-        'user': Optional[str],
-        'group_id': Optional[int],
-        'group': Optional[str],
+        'user_id': int | None,
+        'user': str | None,
+        'group_id': int | None,
+        'group': str | None,
     },
 )
 
-_RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': List[str]})
+_RelationEntities = TypedDict('_RelationEntities', {'app': str, 'units': list[str]})
 
 _RawStatus = TypedDict(
     '_RawStatus',
     {
-        'status': StatusName,
+        'status': _StatusName,
         'message': str,
     },
 )
@@ -104,21 +99,21 @@ _ConfigOption = TypedDict(
     {
         'type': Literal['string', 'int', 'float', 'boolean', 'secret'],
         'description': str,
-        'default': Union[str, int, float, bool],
+        'default': str | int | float | bool,
     },
 )
-_RawConfig = TypedDict('_RawConfig', {'options': Dict[str, _ConfigOption]})
+_RawConfig = TypedDict('_RawConfig', {'options': dict[str, _ConfigOption]})
 
 
 # YAMLStringOrFile is something like metadata.yaml or actions.yaml. You can
 # pass in a file-like object or the string directly.
-YAMLStringOrFile = Union[str, TextIO]
+YAMLStringOrFile = str | TextIO
 
 
 # An instance of an Application or Unit, or the name of either.
 # This is done here to avoid a scoping issue with the `model` property
 # of the Harness class below.
-AppUnitOrName = Union[str, model.Application, model.Unit]
+AppUnitOrName = str | model.Application | model.Unit
 
 
 # CharmType represents user charms that are derived from CharmBase.
@@ -159,7 +154,7 @@ class ExecResult:
     stderr: str | bytes = b''
 
 
-ExecHandler = Callable[[ExecArgs], Union[ExecResult, None]]
+ExecHandler = Callable[[ExecArgs], ExecResult | None]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -292,7 +287,7 @@ class Harness(Generic[CharmType]):
         context_environ = os.environ.copy()
         if 'JUJU_VERSION' not in context_environ:
             context_environ['JUJU_VERSION'] = '0.0.0'
-        self._juju_context = _JujuContext.from_dict(context_environ)
+        self._juju_context = JujuContext._from_dict(context_environ)
         self._charm_cls = charm_cls
         self._charm: CharmType | None = None
         self._charm_dir = 'no-disk-path'  # this may be updated by _create_meta
@@ -2248,7 +2243,7 @@ def _copy_docstrings(source_cls: type[object]) -> Callable[[_T], _T]:
 
 
 @_record_calls
-class _TestingConfig(Dict[str, Union[str, int, float, bool]]):
+class _TestingConfig(dict[str, str | int | float | bool]):
     """Represents the Juju Config."""
 
     _supported_types: ClassVar[dict[str, Any]] = {
@@ -2350,7 +2345,7 @@ class _TestingModelBackend:
         unit_name: str,
         meta: charm.CharmMeta,
         config: _RawConfig,
-        juju_context: _JujuContext,
+        juju_context: JujuContext,
     ):
         self._juju_context = juju_context
         self.unit_name = unit_name
@@ -2534,7 +2529,7 @@ class _TestingModelBackend:
         else:
             return self._unit_status
 
-    def status_set(self, status: StatusName, message: str = '', *, is_app: bool = False):
+    def status_set(self, status: _StatusName, message: str = '', *, is_app: bool = False):
         if status in [model.ErrorStatus.name, model.UnknownStatus.name]:
             raise model.ModelError(
                 f'ERROR invalid status "{status}", expected one of'
@@ -3090,10 +3085,10 @@ class _TestingExecProcess:
             raise pebble.ExecError[AnyStr](
                 self._command,
                 cast('int', self._exit_code),
-                cast('Union[AnyStr, None]', out_value),
-                cast('Union[AnyStr, None]', err_value),
+                cast('AnyStr | None', out_value),
+                cast('AnyStr | None', err_value),
             )
-        return cast('AnyStr', out_value), cast('Union[AnyStr, None]', err_value)
+        return cast('AnyStr', out_value), cast('AnyStr | None', err_value)
 
     def send_signal(self, sig: int | str):
         # the process is always terminated when ExecProcess is return in the simulation.
@@ -3532,13 +3527,16 @@ class _TestingPebbleClient:
         if not path.startswith('/'):
             raise pebble.PathError('generic-file-error', f'paths must be absolute, got {path!r}')
 
-    def pull(self, path: str, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
+    def pull(
+        self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
+    ) -> BinaryIO | TextIO:
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
         try:
             return cast(
-                'Union[BinaryIO, TextIO]',
+                'BinaryIO | TextIO',
                 file_path.open('rb' if encoding is None else 'r', encoding=encoding),
             )
         except FileNotFoundError:
@@ -3552,7 +3550,7 @@ class _TestingPebbleClient:
 
     def push(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         source: ReadableBuffer,
         *,
         encoding: str = 'utf-8',
@@ -3563,6 +3561,7 @@ class _TestingPebbleClient:
         group_id: int | None = None,
         group: str | None = None,
     ) -> None:
+        path = str(path)
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -3604,8 +3603,9 @@ class _TestingPebbleClient:
             ) from None
 
     def list_files(
-        self, path: str, *, pattern: str | None = None, itself: bool = False
+        self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
     ) -> list[pebble.FileInfo]:
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
@@ -3632,7 +3632,7 @@ class _TestingPebbleClient:
 
     def make_dir(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         *,
         make_parents: bool = False,
         permissions: int | None = None,
@@ -3641,6 +3641,7 @@ class _TestingPebbleClient:
         group_id: int | None = None,
         group: str | None = None,
     ) -> None:
+        path = str(path)
         self._check_connection()
         if permissions is not None and not (0 <= permissions <= 0o777):
             raise pebble.PathError(
@@ -3673,7 +3674,8 @@ class _TestingPebbleClient:
             # Attempted to create a subdirectory of a file
             raise pebble.PathError('generic-file-error', f'not a directory: {e.args[0]}') from None
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
+        path = str(path)
         self._check_connection()
         self._check_absolute_path(path)
         file_path = self._root / path[1:]
@@ -3768,7 +3770,7 @@ class _TestingPebbleClient:
             user=user,
             group_id=group_id,
             group=group,
-            stdin=cast('Union[str, bytes, None]', stdin),
+            stdin=cast('str | bytes | None', stdin),
             encoding=encoding,
             combine_stderr=combine_stderr,
         )

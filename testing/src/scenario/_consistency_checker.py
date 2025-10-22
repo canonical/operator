@@ -25,13 +25,8 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from numbers import Number
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Iterable,
-    NamedTuple,
-)
+from typing import TYPE_CHECKING, Any, NamedTuple
+from collections.abc import Callable, Iterable
 
 from .errors import InconsistentScenarioError
 from ._runtime import logger as scenario_logger
@@ -338,7 +333,7 @@ def _check_action_param_types(
         'object': dict,
     }
     expected_param_type: dict[str, Any] = {}
-    for par_name, par_spec in actions[action.name].get('params', {}).items():
+    for par_name, par_spec in (actions[action.name] or {}).get('params', {}).items():
         value = par_spec.get('type')
         if not value:
             errors.append(
@@ -543,6 +538,7 @@ def check_relation_consistency(
 ) -> Results:
     """Check the consistency of any relations in the :class:`scenario.State`."""
     errors: list[str] = []
+    warnings: list[str] = []
 
     peer_relations_meta = charm_spec.meta.get('peers', {}).items()
     all_relations_meta = charm_spec.get_all_relations()
@@ -613,7 +609,35 @@ def check_relation_consistency(
                 f'`peers_data={{other_unit: y}}, local_unit_data=x`.',
             )
 
-    return Results(errors, [])
+    # relation-joined, relation-changed, and relation-departed must all provide
+    # a remote unit, either explicitly or by having at least one remote unit
+    # with data.
+    if (
+        event.name.endswith(('_relation_joined', '_relation_changed', '_relation_departed'))
+        and not event.relation_remote_unit_id
+        and event.relation is not None  # Another check will have complained if it is None.
+    ):
+        try:
+            relation = state.get_relation(event.relation.id)
+        except KeyError:
+            # Another check will already have complained about this.
+            pass
+        else:
+            remote_units = relation._remote_unit_ids
+            if len(remote_units) == 0:
+                errors.append(f'{event.name!r} must provide a remote unit. Pass in `remote_unit`.')
+            elif len(remote_units) == 1:
+                warnings.append(
+                    f'{event.name!r} is implicitly using {remote_units[0]} as the remote unit. '
+                    f'Consider passing `remote_unit` explicitly.'
+                )
+            else:
+                warnings.append(
+                    f'{event.name!r} is implicitly using one unit from {remote_units} as the '
+                    f'remote unit. Consider passing `remote_unit` explicitly.'
+                )
+
+    return Results(errors, warnings)
 
 
 def check_containers_consistency(

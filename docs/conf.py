@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import os
 import pathlib
 import sys
@@ -13,6 +14,15 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
+# Check that the ops package is installed in the Sphinx venv.
+if importlib.util.find_spec("ops") is None:
+    print(
+        "Error: The ops package is not available. "
+        "Check whether the $(VENVDIR) target in our Makefile has been changed or reverted."
+    )
+    sys.exit(1)
+
+# Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Configuration for the Sphinx documentation builder.
@@ -243,12 +253,14 @@ redirects = {}
 # Link checker exceptions #
 ###########################
 
-# A regex list of URLs that are ignored by 'make linkcheck'
-#
-# TODO: Remove or adjust the ACME entry after you update the contributing guide
+# During linkcheck, if a target URL matches any of these regexes (using re.match)
+# then the URL is skipped.
 
 linkcheck_ignore = [
-    "http://127.0.0.1:8000"
+    # Excluded because the pages don't contain elements with an ID matching the URL fragment.
+    r"https://matrix\.to/#/",
+    r"https://documentation\.ubuntu\.com/pebble/reference/api/#/",
+    r"https://documentation\.ubuntu\.com/juju/3\.6/reference/hook-command/list-of-hook-commands/#list-of-hook-commands",
 ]
 
 
@@ -440,16 +452,16 @@ nitpicky = True
 # ('envvar', 'LD_LIBRARY_PATH').
 nitpick_ignore = [
     # Please keep this list sorted alphabetically.
+    ('py:class', '_AddressDict'),
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
     ('py:class', '_EntityStatus'),
     ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
-    ('py:class', '_JujuContext'),
+    ('py:class', '_NetworkDict'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
     ('py:class', '_RawPortProtocolLiteral'),
-    ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
     ('py:class', '_StateKwargs'),
@@ -457,7 +469,6 @@ nitpick_ignore = [
     ('py:class', '_TaskDict'),
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
-    ('py:class', '_Writeable'),
     ('py:class', 'AnyJson'),
     ('py:class', 'BasicIdentityDict'),
     ('py:class', 'CharmType'),
@@ -474,7 +485,6 @@ nitpick_ignore = [
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
     ('py:class', 'ops.model._T'),
-    ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),
     ('py:class', 'ops.pebble._ServiceInfoDict'),

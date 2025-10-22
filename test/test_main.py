@@ -36,7 +36,7 @@ import pytest
 
 import ops
 from ops._main import _should_use_controller_storage
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.storage import SQLiteStorage
 
 from .charms.test_main.src.charm import MyCharmEvents
@@ -224,7 +224,7 @@ class TestDispatch:
         assert event == 'potatos'
 
 
-_event_test = typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]]
+_event_test = list[tuple[EventSpec, dict[str, str | int | None]]]
 
 
 @pytest.fixture
@@ -317,7 +317,7 @@ class _TestMain(abc.ABC):
                 meta,
                 None,  # type: ignore
                 event_name,
-                juju_debug_at=_JujuContext.from_dict(env).debug_at,
+                juju_debug_at=JujuContext._from_dict(env).debug_at,
             )
 
             class ThisCharmEvents(MyCharmEvents):
@@ -976,7 +976,9 @@ class _TestMain(abc.ABC):
     @pytest.mark.usefixtures('setup_charm')
     def test_has_valid_status(self, fake_script: FakeScript):
         fake_script.write('action-get', "echo '{}'")
-        fake_script.write('status-get', """echo '{"status": "unknown", "message": ""}'""")
+        fake_script.write(
+            'status-get', """echo '{"status": "unknown", "message": "", "status-data": {}}'"""
+        )
         state = self._simulate_event(
             fake_script,
             EventSpec(
@@ -990,7 +992,8 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'unknown'
         assert state.status_message == ''
         fake_script.write(
-            'status-get', """echo '{"status": "blocked", "message": "help meeee"}'"""
+            'status-get',
+            """echo '{"status": "blocked", "message": "help meeee", "status-data": {}}'""",
         )
         state = self._simulate_event(
             fake_script,
@@ -1331,23 +1334,23 @@ class TestStorageHeuristics:
     def test_fallback_to_current_juju_version__too_old(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '1.0'}):
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
             assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_fallback_to_current_juju_version__new_enough(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
             assert _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_not_in_k8s(self):
         meta = ops.CharmMeta.from_yaml('series: [ecs]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}):
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
             assert not _should_use_controller_storage(Path('/xyzzy'), meta, juju_context)
 
     def test_not_if_already_local(self):
         meta = ops.CharmMeta.from_yaml('series: [kubernetes]')
         with patch.dict(os.environ, {'JUJU_VERSION': '2.8'}), tempfile.NamedTemporaryFile() as fd:
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
             assert not _should_use_controller_storage(Path(fd.name), meta, juju_context)

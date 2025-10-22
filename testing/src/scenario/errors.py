@@ -43,7 +43,7 @@ class MetadataNotFoundError(RuntimeError):
 
 
 class ActionMissingFromContextError(Exception):
-    """Raised when the user attempts to invoke action hook tools outside an action context."""
+    """Raised when the user attempts to invoke action hook commands outside an action context."""
 
     # This is not an ops error: in ops, you'd have to go exceptionally out of
     # your way to trigger this flow.

@@ -79,7 +79,7 @@ def test_pebble_ready_writes_config_file():
     )
 
     # Act:
-    ctx.run(ctx.on.pebble_ready(container=container), state_in)
+    state_out = ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
     container_fs = state_out.get_container("some-container").get_filesystem(ctx)
@@ -160,4 +160,27 @@ def test_charm_runs(my_charm):
 ```{note}
 
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
+```
+
+## Accessing the charm instance
+
+If you need to access the charm instance in a test, use the `testing.Context` instance as a context manager, then access `mgr.charm`. When setting up the context manager, use an event the charm doesn't observe, such as `update_status`. For example:
+
+```python
+# Charm code
+
+class Charm(CharmBase):
+    def workload_is_ready(self):
+        ...  # Some business logic.
+        return True
+
+
+# Testing code
+
+def test_charm_reports_workload_ready():
+    ctx = testing.Context(Charm)
+    state_in = testing.State(...)  # Some state to represent a ready workload.
+    with ctx(ctx.on.update_status(), state_in) as mgr:
+        assert mgr.charm.workload_is_ready()
+        ...
 ```
