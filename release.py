@@ -216,7 +216,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
 
 
 def format_release_notes(
-    categories: dict[str, list[tuple[str, str]]], full_changelog: str | None
+    categories: Mapping[str, list[tuple[str, str]]], full_changelog: str | None
 ) -> str:
     """Format for release notes.
 
@@ -293,7 +293,7 @@ def update_draft_release(release: github.GitRelease.GitRelease, title: str, note
     logger.info('Release updated: %s', release.html_url)
 
 
-def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
+def format_changes(categories: Mapping[str, list[tuple[str, str]]], tag: str) -> str:
     """Format for CHANGES.md.
 
     The header is formatted as a top-level heading with the tag and date.
