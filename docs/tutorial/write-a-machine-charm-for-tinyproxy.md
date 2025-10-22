@@ -381,8 +381,8 @@ In `src/charm.py`, add the following methods to the charm class:
                 return
             time.sleep(1)
         raise RuntimeError("tinyproxy was not running within the expected time")
-        # Raising a runtime error will put the charm into error status. The error message is for
-        # you (the charm author) to see in the Juju logs, not for the user of the charm.
+        # Raising a runtime error will put the charm into error status.
+        # The Juju logs will show the error message, to help you debug the error.
 ```
 
 Then add the following lines at the beginning of `src/charm.py`:
