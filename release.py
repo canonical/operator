@@ -352,7 +352,7 @@ def parse_version(version: str) -> tuple[str, str]:
     Raises:
         ValueError if the version format is invalid.
     """
-    match = re.fullmatch(r'(\d+\.\d+\.\d+)(\.dev\d+)?', version)
+    match = re.fullmatch(r'(\d+\.\d+\.\d+)(?:(?:a|b|rc)\d+)?(\.dev\d+)?', version)
     if not match:
         raise ValueError(f'Invalid version format: {version}')
     base_version = match.group(1)
