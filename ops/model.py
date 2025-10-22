@@ -77,7 +77,7 @@ _BindingDictType: TypeAlias = 'dict[str | Relation, Binding]'
 
 _ReadOnlyStatusName = Literal['error', 'unknown']
 _SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
-_StatusName = _SettableStatusName | _ReadOnlyStatusName
+_StatusName: TypeAlias = _SettableStatusName | _ReadOnlyStatusName
 _StatusDict = TypedDict('_StatusDict', {'status': _StatusName, 'message': str})
 _SETTABLE_STATUS_NAMES: tuple[_SettableStatusName, ...] = get_args(_SettableStatusName)
 
@@ -88,7 +88,7 @@ _ContainerMeta_Raw: TypeAlias = 'dict[str, _charm.ContainerMeta]'  # prevent imp
 
 # relation data is a string key: string value mapping so far as the
 # controller is concerned
-_RelationDataContent_Raw = dict[str, str]
+_RelationDataContent_Raw: TypeAlias = dict[str, str]
 UnitOrApplicationType: TypeAlias = 'type[Unit] | type[Application]'
 
 _NetworkDict = TypedDict(

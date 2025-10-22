@@ -24,6 +24,7 @@ import pathlib
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 
 import github
 import github.GitRelease
@@ -50,6 +51,9 @@ VERSION_FILES = {
     'tracing': pathlib.Path('tracing/pyproject.toml'),
     'uvlock': pathlib.Path('uv.lock'),
 }
+CHANGE_LINE_REGEX = (
+    r'^\* (?P<category>\w+)(?P<breaking>!?): (?P<summary>.*) by [^ ]+ in (?P<pr>.*)'
+)
 
 
 def get_latest_release_tag(repo: github.Repository.Repository, branch_name: str) -> str | None:
@@ -123,11 +127,11 @@ def get_new_tag_for_release(
         new_tag = user_input or suggested_tag
 
         if not new_tag:
-            logger.error('Error: No tag specified and no suggestion available')
+            logger.error('No tag specified and no suggestion available')
             continue
 
-        if not re.match(r'^\d+\.\d+\.\d+$', new_tag):
-            logger.error('Error: Tag must be in format X.Y.Z')
+        if not re.match(r'^\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?$', new_tag):
+            logger.error('Tag must be in format X.Y.Z')
             continue
 
         release_page = f'https://github.com/{owner}/{repo.name}/releases'
@@ -180,26 +184,33 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
     release_notes = re.sub(
         r'(## New Contributors.*?)(\n|$)', r'\2', release_notes, flags=re.DOTALL
     )
-    categories: dict[str, list[tuple[str, str]]] = {
+    categories: Mapping[str, list[tuple[str, str]]] = {
+        'breaking': [],  # a meta category for breaking changes
         'feat': [],
         'fix': [],
         'docs': [],
         'test': [],
-        'ci': [],
         'refactor': [],
         'perf': [],
+        'ci': [],
         'revert': [],
     }
     full_changelog_line = None
 
     for line in release_notes.splitlines():
-        if match := re.match(r'^\* (\w+): (.*) by [^ ]+ in (.*)', line.strip()):
-            category = match.group(1)
+        if match := re.match(CHANGE_LINE_REGEX, line.strip()):
+            category = match.group('category').strip()
             if category in categories:
-                description = match.group(2).strip()
+                description = match.group('summary').strip()
                 description = description[0].upper() + description[1:]
-                pr_link = match.group(3).strip()
-                categories[category].append((description, pr_link))
+                pr_link = match.group('pr').strip()
+                if match.group('breaking') == '!':
+                    categories['breaking'].append((
+                        f'{category.capitalize()}: {description}',
+                        pr_link,
+                    ))
+                else:
+                    categories[category].append((description, pr_link))
 
         elif line.startswith('**Full Changelog**'):
             full_changelog_line = line
@@ -208,7 +219,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
 
 
 def format_release_notes(
-    categories: dict[str, list[tuple[str, str]]], full_changelog: str | None
+    categories: Mapping[str, list[tuple[str, str]]], full_changelog: str | None
 ) -> str:
     """Format for release notes.
 
@@ -216,7 +227,19 @@ def format_release_notes(
     If `full_changelog` is provided, it is appended at the end.
     """
     lines = ["## What's Changed", '']
+    if categories['breaking']:
+        lines.append('### Breaking Changes')
+        lines.append('There are breaking changes in this release. Please review them carefully:\n')
+        for description, pr_link in categories['breaking']:
+            lines.append(f'* {description} in {pr_link}')
+        lines.append('')
+        logger.info(
+            'Breaking changes detected in the release notes. '
+            'Please ensure there are sufficient instructions for users to handle them.'
+        )
     for commit_type, items in categories.items():
+        if commit_type == 'breaking':
+            continue
         if items:
             lines.append(f'### {commit_type_to_category(commit_type)}')
             for description, pr_link in items:
@@ -273,7 +296,7 @@ def update_draft_release(release: github.GitRelease.GitRelease, title: str, note
     logger.info('Release updated: %s', release.html_url)
 
 
-def format_changes(categories: dict[str, list[tuple[str, str]]], tag: str) -> str:
+def format_changes(categories: Mapping[str, list[tuple[str, str]]], tag: str) -> str:
     """Format for CHANGES.md.
 
     The header is formatted as a top-level heading with the tag and date.
@@ -317,6 +340,7 @@ def commit_type_to_category(commit_type: str) -> str:
         'perf': 'Performance',
         'refactor': 'Refactoring',
         'revert': 'Reverted',
+        'breaking': 'Breaking Changes',
     }
     return mapping.get(commit_type, commit_type.capitalize())
 
@@ -331,7 +355,7 @@ def parse_version(version: str) -> tuple[str, str]:
     Raises:
         ValueError if the version format is invalid.
     """
-    match = re.fullmatch(r'(\d+\.\d+\.\d+)(\.dev\d+)?', version)
+    match = re.fullmatch(r'(\d+\.\d+\.\d+)(?:(?:a|b|rc)\d+)?(\.dev\d+)?', version)
     if not match:
         raise ValueError(f'Invalid version format: {version}')
     base_version = match.group(1)
