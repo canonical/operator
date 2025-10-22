@@ -424,3 +424,9 @@ Also, you can reach Prometheus in your web browser (similar to Grafana) at `http
 ## Review the final code
 
 For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe).
+
+## Next steps
+
+Congratulations on reaching the end of the tutorial!
+
+For suggestions of what to explore next, see [](#tutorial-kubernetes-next-steps).
