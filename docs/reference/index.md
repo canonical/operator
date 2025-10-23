@@ -26,7 +26,7 @@ pebble
 
 ## Testing
 
-APIs for testing charms. `Harness` is deprecated. For guidance on how to upgrade, see [](#harness-migration).
+APIs for testing charms. `ops.testing` includes an API for writing state-transition tests, which are the recommend way to write charm unit tests. Harness is deprecated. For guidance on how to upgrade, see [](#harness-migration).
 
 ```{toctree}
 :maxdepth: 1
