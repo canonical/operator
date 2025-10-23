@@ -45,6 +45,11 @@ jobs:
       - name: Run unit tests
         run: tox -e py${{ matrix.python-version }}-unit
 
+      - name: Run unit tests without exception wrapping
+        env:
+          SCENARIO_WRAP_CHARM_ERRORS: False
+        run: tox -e py${{ matrix.python-version }}-unit
+
       - name: Run tracing unit tests
         run: cd tracing && tox -e py${{ matrix.python-version }}-unit
 
