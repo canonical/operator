@@ -618,6 +618,8 @@ def test_add_secret(secrets_context: Context[SecretsCharm]):
         'secretid': ANY,
     }
 
+    assert scenario_secret._tracked_revision == scenario_secret._latest_revision
+
 
 @pytest.mark.parametrize(
     'fields',
@@ -660,6 +662,8 @@ def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields
         assert info['rotation'] == SecretRotate.DAILY
         # https://github.com/canonical/operator/issues/2104
         assert info['rotates'] is None
+
+    assert scenario_secret._tracked_revision == scenario_secret._latest_revision
 
 
 @pytest.mark.parametrize('lookup_by', ['id', 'label'])
