@@ -13,7 +13,11 @@ As you write your charm, you'll use tools and resources from around the charming
 Manage charms <manage-charms>
 ```
 
-## Writing charm code
+Once your charm is ready for wide production use, your next goal should be to get it publicly listed on Charmhub, so that it is visible in searches.
+
+- {doc}`Make your charm discoverable <make-your-charm-discoverable>`
+
+## Writing charm code and tests
 
 Your charm is Python code that depends on Ops, with standard structures for handling events, status, and errors. As you write your charm, make sure to follow best practices.
 
@@ -22,8 +26,6 @@ Your charm is Python code that depends on Ops, with standard structures for hand
 
 Write and structure charm code <write-and-structure-charm-code>
 ```
-
-## Writing tests
 
 Unit tests check that your charm correctly handles simulated events from Juju.
 
@@ -40,8 +42,6 @@ Integration tests check that your charm works correctly when deployed to a real 
 
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 ```
-
-## Logging
 
 Ops enables your charm to output logs to the Juju logs.
 
@@ -61,6 +61,10 @@ Your charm is responsible for interacting with a workload.
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 ```
+
+Kubernetes charms use Pebble to manage containers. Your charm can configure Pebble so that you can access metrics for services and health checks.
+
+- {doc}`Manage metrics <manage-metrics>`
 
 ## Managing features
 
@@ -82,6 +86,13 @@ Manage stored state <manage-stored-state>
 Manage opened ports <manage-opened-ports>
 Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
+```
+
+% TOC only. Nothing shown on the page.
+
+```{toctree}
+:hidden:
+
 Manage metrics <manage-metrics>
 ```
 
@@ -95,12 +106,10 @@ Ops enables you to trace your charm code and send data to sources such as the [C
 Trace your charm <trace-your-charm>
 ```
 
-## Charmhub listing
-
-Once your charm is ready for wide production use, your next goal should be to get it publicly listed on Charmhub, so that it is visible in searches.
+% TOC only. Nothing shown on the page.
 
 ```{toctree}
-:maxdepth: 1
+:hidden:
 
 Make your charm discoverable <make-your-charm-discoverable>
 ```
@@ -110,13 +119,13 @@ Make your charm discoverable <make-your-charm-discoverable>
 ```{toctree}
 :hidden:
 
-legacy/index
+Legacy how-to guides <legacy/index>
 ```
 
 Harness is a deprecated framework for writing unit tests. You should migrate to state-transition tests.
 
-- {doc}`legacy/migrate-unit-tests-from-harness`
+- {doc}`Migrate unit tests from Harness <legacy/migrate-unit-tests-from-harness>`
 
-Hooks-based charms use script files instead of Python code with Ops. This isn't a recommended way of writing charms, so you should migrate to Ops.
+Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
 
-- {doc}`legacy/turn-a-hooks-based-charm-into-an-ops-charm`
+- {doc}`Turn a hooks-based charm into an ops charm <legacy/turn-a-hooks-based-charm-into-an-ops-charm>`

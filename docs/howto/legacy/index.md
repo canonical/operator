@@ -14,7 +14,7 @@ Migrate unit tests from Harness <migrate-unit-tests-from-harness>
 
 ## Hooks-based charms
 
-Hooks-based charms use script files instead of Python code with Ops. This isn't a recommended way of writing charms, so you should migrate to Ops.
+Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
 
 ```{toctree}
 :maxdepth: 1
