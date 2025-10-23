@@ -3,6 +3,8 @@
 
 import os
 
-def wrap_charm_errors(default: str = 'True') -> bool:
+
+def wrap_charm_errors() -> bool:
     """Return whether scenario should wrap charm errors with ``UncaughtCharmError``."""
+    default = 'True'
     return os.getenv('SCENARIO_WRAP_CHARM_ERRORS', default).capitalize() != 'False'
