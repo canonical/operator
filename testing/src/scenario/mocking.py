@@ -424,7 +424,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-        owner: Literal['unit', 'app'] | None = None,
+        owner: Literal['unit', 'application'] | None = None,
     ) -> str:
         from .state import Secret
 
@@ -434,7 +434,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             description=description,
             expire=expire,
             rotate=rotate,
-            owner=owner,
+            # It's called 'application' in Ops, but 'app' in Scenario.
+            owner='app' if owner == 'application' else owner,
         )
         secrets = set(self._state.secrets)
         secrets.add(secret)
