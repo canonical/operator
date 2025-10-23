@@ -27,10 +27,10 @@ jobs:
       - name: Create constraints file for test
         shell: python
         run: |
-          import itertools, pathlib, tomllib
+          import pathlib, tomllib
           toml = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
           extras = toml['project']['optional-dependencies']
-          constraints = '\n'.join(itertools.chain(extras['testing'], extras['tracing']))
+          constraints = '\n'.join(extras['testing'] + extras['tracing'])
           print(constraints)
           pathlib.Path('constraints.txt').write_text(constraints)
       - name: Test if package versions match dependency versions
