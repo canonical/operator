@@ -25,7 +25,7 @@ testing
 
 ## Tracing
 
-Ops enables you to trace your charm code and send data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
+Ops enables you to trace your charm code and send data to sources such as the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
 ```{toctree}
 :maxdepth: 1

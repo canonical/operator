@@ -37,7 +37,7 @@ ops-testing-harness
 
 ## Tracing
 
-An API for tracing charm code and sending data to the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
+An API for tracing charm code and sending data to sources such as the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
 
 ```{toctree}
 :maxdepth: 1
