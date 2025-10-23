@@ -109,12 +109,10 @@ def test_set_secret(
     label_count = collections.Counter(flow.split(','))['label']
     if label_count >= 2 and juju.status().model.version.startswith('3.2.'):
         pytest.skip('Label is sticky on Juju 3.2 in this case')
-    params = {'flow': flow}
-    match lookup_by:
-        case 'id':
-            params['secretid'] = fresh_secret
-        case 'label':
-            params['secretlabel'] = 'thelabel'
+    if lookup_by == 'id':
+        params = {'flow': flow, 'secretid': fresh_secret}
+    else:
+        params = {'flow': flow, 'secretlabel': 'thelabel'}
 
     rv = juju.run(leader, 'set-secret-flow', params=params)
     result = cast('Result', rv.results)

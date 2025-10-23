@@ -88,7 +88,7 @@ class SecretsCharm(ops.CharmBase):
         labels = (f'label{i}' for i in itertools.count(1))
         descriptions = (f'description{i}' for i in itertools.count(1))
         expires = (datetime.datetime(2010 + i, 1, 1, 0, 0, 0) for i in itertools.count(1))
-        rotates = iter(ops.SecretRotate.__members__.values())
+        rotates = itertools.cycle(ops.SecretRotate.__members__.values())
         result: Result = {}
 
         try:
