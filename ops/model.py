@@ -3992,11 +3992,12 @@ class _ModelBackend:
             # To work around that, we perform a smart read-modify-write cycle.
             if content is None:
                 content = self.secret_get(id=id, peek=True)
-            if description is None or expire is None or rotate is None:
+            if description is None or expire is None or rotate is None or label is None:
                 info = self.secret_info_get(id=id)
                 description = description or info.description
                 expire = expire or info.expires
                 rotate = rotate or info.rotation
+                label = label or info.label  # The label fix needed for Juju < 3.5
         with self._wrap_hookcmd(
             'secret-set',
             id=id,
