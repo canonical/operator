@@ -41,17 +41,17 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
       - run: uv tool install tox --with tox-uv
-      - id: setup
-        run: uv python install ${{ matrix.python-version }}
+      - run: uv python install ${{ matrix.python-version }}
+        id: setup
 
       - name: Run unit tests
-        if: ${{ !cancelled() && steps.setup.output == 'success' }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         env:
           SCENARIO_WRAP_CHARM_ERRORS: ${{ matrix.wrap-charm-errors }}
         run: tox -e py${{ matrix.python-version }}-unit
 
       - name: Run tracing unit tests
-        if: ${{ !cancelled() && steps.setup.output == 'success' }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         env:
           SCENARIO_WRAP_CHARM_ERRORS: ${{ matrix.wrap-charm-errors }}
         working-directory: tracing
