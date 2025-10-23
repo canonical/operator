@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import collections
 import contextlib
 import contextvars
 import copy
@@ -3987,7 +3986,7 @@ class _ModelBackend:
         rotate: SecretRotate | None = None,
     ):
         # The content is None or has already been validated with Secret._validate_content
-        if self._juju_context.version < "3.6":
+        if self._juju_context.version < '3.6':
             # Older Juju series don't coalesce multiple secret updates within a hook.
             # To work around that, we perform a smart read-modify-write cycle.
             if content is None:
