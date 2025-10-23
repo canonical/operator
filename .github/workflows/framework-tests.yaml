@@ -33,6 +33,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.12", "3.14"]
+        wrap-charm-errors: ["True", "False"]
 
     steps:
       - uses: actions/checkout@v5
@@ -45,16 +46,14 @@ jobs:
 
       - name: Run unit tests
         if: ${{ !cancelled() && steps.setup.output == 'success' }}
-        run: tox -e py${{ matrix.python-version }}-unit
-
-      - name: Run unit tests without exception wrapping
-        if: ${{ !cancelled() && steps.setup.output == 'success' }}
         env:
-          SCENARIO_WRAP_CHARM_ERRORS: False
+          SCENARIO_WRAP_CHARM_ERRORS: ${{ matrix.wrap-charm-errors }}
         run: tox -e py${{ matrix.python-version }}-unit
 
       - name: Run tracing unit tests
         if: ${{ !cancelled() && steps.setup.output == 'success' }}
+        env:
+          SCENARIO_WRAP_CHARM_ERRORS: ${{ matrix.wrap-charm-errors }}
         working-directory: tracing
         run: tox -e py${{ matrix.python-version }}-unit
 
