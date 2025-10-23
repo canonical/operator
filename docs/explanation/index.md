@@ -23,6 +23,10 @@ Your charm should have unit tests and integration tests. If your charm uses rela
 testing
 ```
 
+State-transition tests are the recommend way to write charm unit tests. They have replaced the older "Harness" framework. For guidance on how to upgrade to state-transition tests, see [](#harness-migration).
+
+- {doc}`state-transition-testing`
+
 ## Tracing
 
 Ops enables you to trace your charm code and send data to sources such as the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
@@ -43,8 +47,6 @@ Charms typically either handle events holistically, using a shared reconciler me
 holistic-vs-delta-charms
 ```
 
-## Deferring events
-
 The `defer()` mechanism in Ops is convenient, but has some limitations.
 
 ```{toctree}
@@ -63,6 +65,16 @@ As you write your charm, follow good security practices and produce security doc
 security
 ```
 
+## Charm maturity
+
+Your charm should increase in maturity and quality over time, especially if you plan for it to be publicly listed on Charmhub.
+
+```{toctree}
+:maxdepth: 1
+
+charm-maturity
+```
+
 ## Tracking state
 
 Charms can track state in several ways, including using `ops.StoredState`. You should be judicious when deciding how to track state.
@@ -73,22 +85,10 @@ Charms can track state in several ways, including using `ops.StoredState`. You s
 storedstate-guidance
 ```
 
-## State-transition testing
-
-State-transition tests have replaced the older "Harness" framework for writing charm unit tests.
+% TOC only. Nothing shown on the page.
 
 ```{toctree}
-:maxdepth: 1
+:hidden:
 
 state-transition-testing
-```
-
-## Charm maturity
-
-Your charm should increase in maturity and quality over time, especially if you plan for it to be publicly listed on Charmhub.
-
-```{toctree}
-:maxdepth: 1
-
-charm-maturity
 ```
