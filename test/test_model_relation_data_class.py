@@ -24,7 +24,6 @@ from collections.abc import Callable, Iterable
 from typing import Any, Protocol, cast
 
 import pytest
-from scenario._environ import wrap_charm_errors
 
 try:
     import pydantic
@@ -240,30 +239,38 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
     assert obj.quux is not None and obj.quux.sub == 28
 
 
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail(charm_class: type[BaseTestCharm]):
+def test_relation_load_fail(
+    charm_class: type[BaseTestCharm], bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
+):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     # 'bar' should be an int, not a string.
     data = {'foo': json.dumps('value'), 'bar': json.dumps('bar'), 'baz': json.dumps(['a', 'b'])}
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ValueError
+    error = ValueError if bare_charm_errors else testing.errors.UncaughtCharmError
     with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
     assert isinstance(exc, ValueError)
 
 
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCharm]):
+def test_relation_load_fail_multi_field_validation(
+    charm_class: type[BaseTestCharm], bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
+):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     # The value of 'foo' cannot be in the 'baz' list.
     data = {
@@ -273,10 +280,10 @@ def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCha
     }
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ValueError
+    error = ValueError if bare_charm_errors else testing.errors.UncaughtCharmError
     with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
     assert isinstance(exc, ValueError)
 
 
@@ -427,22 +434,24 @@ def test_relation_save_simple(charm_class: type[BaseTestCharm]):
     }
 
 
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
+def test_relation_save_no_access(
+    charm_class: type[BaseTestCharm], bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
+):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
             event.relation.save(data, event.app, encoder=self.encoder)
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    error = (
-        testing.errors.UncaughtCharmError if wrap_charm_errors() else ops.RelationDataAccessError
-    )
+    error = ops.RelationDataAccessError if bare_charm_errors else testing.errors.UncaughtCharmError
     with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
     assert isinstance(exc, ops.RelationDataAccessError)
 
 
@@ -476,8 +485,11 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
     }
 
 
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
+def test_relation_save_invalid(
+    charm_class: type[BaseTestCharm], bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
+):
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             def encoder(_: Any) -> int:
@@ -487,13 +499,14 @@ def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
             data = self.databag_class(foo='value')
             event.relation.save(data, self.app, encoder=encoder)  # type: ignore
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ops.RelationDataTypeError
+    error = ops.RelationDataTypeError if bare_charm_errors else testing.errors.UncaughtCharmError
     with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
     assert isinstance(exc, ops.RelationDataTypeError)
 
 

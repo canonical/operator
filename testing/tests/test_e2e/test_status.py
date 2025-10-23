@@ -16,7 +16,6 @@ from scenario.state import (
     WaitingStatus,
 )
 from scenario.errors import UncaughtCharmError
-from scenario._environ import wrap_charm_errors
 from ..helpers import trigger
 
 
@@ -197,6 +196,7 @@ def test_status_success(status: ops.StatusBase):
     ctx.run(ctx.on.update_status(), State())
 
 
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize(
     'status',
     (
@@ -204,7 +204,9 @@ def test_status_success(status: ops.StatusBase):
         UnknownStatus(),
     ),
 )
-def test_status_error(status: ops.StatusBase):
+def test_status_error(
+    status: ops.StatusBase, bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
+):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -213,10 +215,11 @@ def test_status_error(status: ops.StatusBase):
         def _on_update_status(self, _):
             self.unit.status = status
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    error = UncaughtCharmError if wrap_charm_errors() else ops.ModelError
+    error = ops.ModelError if bare_charm_errors else UncaughtCharmError
     with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.update_status(), State())
-    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
     assert isinstance(exc, ops.ModelError)
     assert f'invalid status "{status.name}"' in str(exc)

@@ -9,7 +9,6 @@ from ops import CharmBase
 from scenario import Context, State
 from scenario.errors import UncaughtCharmError
 from scenario.state import _Event, _next_action_id
-from scenario._environ import wrap_charm_errors
 
 
 class MyCharm(CharmBase):
@@ -97,7 +96,8 @@ def test_app_name_and_unit_id():
     assert ctx.unit_id == 42
 
 
-def test_context_manager_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
+def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -107,8 +107,9 @@ def test_context_manager_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    error = UncaughtCharmError if wrap_charm_errors() else RuntimeError
+    error = RuntimeError if bare_charm_errors else UncaughtCharmError
     with pytest.raises(error):
         with ctx(ctx.on.start(), State()) as mgr:
             assert os.getenv('TEST_ENV_VAR') == '1'
@@ -116,7 +117,8 @@ def test_context_manager_uncaught_error():
     assert 'TEST_ENV_VAR' not in os.environ
 
 
-def test_run_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
+def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -126,8 +128,9 @@ def test_run_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    error = UncaughtCharmError if wrap_charm_errors() else RuntimeError
+    error = RuntimeError if bare_charm_errors else UncaughtCharmError
     with pytest.raises(error):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
