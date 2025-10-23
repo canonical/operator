@@ -10,6 +10,7 @@ from ops._main import _Abort
 
 from scenario import Context, ActiveStatus
 from scenario.state import Relation, State, _CharmSpec, _Event
+from scenario._environ import wrap_charm_errors
 from scenario._runtime import Runtime, UncaughtCharmError
 
 
@@ -108,7 +109,8 @@ def test_env_clean_on_charm_error():
 
     remote_name = 'ava'
     rel = Relation('box', remote_app_name=remote_name)
-    with pytest.raises(UncaughtCharmError) as exc:
+    error = UncaughtCharmError if wrap_charm_errors() else ZeroDivisionError
+    with pytest.raises(error) as exc_info:
         with runtime.exec(
             state=State(relations={rel}),
             event=_Event('box_relation_changed', relation=rel),
@@ -118,7 +120,8 @@ def test_env_clean_on_charm_error():
             assert 'JUJU_REMOTE_APP' in os.environ
             _ = 1 / 0  # raise some error
     # Ensure that some other error didn't occur (like AssertionError!).
-    assert 'ZeroDivisionError' in str(exc.value)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ZeroDivisionError)
 
     # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv('JUJU_REMOTE_APP', None) is None
@@ -159,7 +162,9 @@ def test_ops_raises_abort(exit_code: int):
         assert {e.handle.kind for e in ctx.emitted_events} == {'start'}
         assert state_out.unit_status == ActiveStatus()
     else:
-        with pytest.raises(UncaughtCharmError) as exc:
+        error = UncaughtCharmError if wrap_charm_errors() else _Abort
+        with pytest.raises(error) as exc_info:
             ctx.run(ctx.on.start(), State())
-        assert isinstance(exc.value.__cause__, _Abort)
-        assert exc.value.__cause__.exit_code == exit_code
+        exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+        assert isinstance(exc, _Abort)
+        assert exc.exit_code == exit_code

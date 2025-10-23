@@ -16,6 +16,7 @@ from scenario.state import (
     WaitingStatus,
 )
 from scenario.errors import UncaughtCharmError
+from scenario._environ import wrap_charm_errors
 from ..helpers import trigger
 
 
@@ -213,7 +214,9 @@ def test_status_error(status: ops.StatusBase):
             self.unit.status = status
 
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises(UncaughtCharmError) as excinfo:
+    error = UncaughtCharmError if wrap_charm_errors() else ops.ModelError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.update_status(), State())
-    assert isinstance(excinfo.value.__cause__, ops.ModelError)
-    assert f'invalid status "{status.name}"' in str(excinfo.value.__cause__)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ops.ModelError)
+    assert f'invalid status "{status.name}"' in str(exc)

@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterable
 from typing import Any, Protocol, cast
 
 import pytest
+from scenario._environ import wrap_charm_errors
 
 try:
     import pydantic
@@ -250,9 +251,11 @@ def test_relation_load_fail(charm_class: type[BaseTestCharm]):
     data = {'foo': json.dumps('value'), 'bar': json.dumps('bar'), 'baz': json.dumps(['a', 'b'])}
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ValueError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    assert isinstance(exc_info.value.__cause__, ValueError)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ValueError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
@@ -270,9 +273,11 @@ def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCha
     }
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ValueError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    assert isinstance(exc_info.value.__cause__, ValueError)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ValueError)
 
 
 class _AliasProtocol(Protocol):
@@ -432,9 +437,13 @@ def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    error = (
+        testing.errors.UncaughtCharmError if wrap_charm_errors() else ops.RelationDataAccessError
+    )
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    assert isinstance(exc_info.value.__cause__, ops.RelationDataAccessError)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ops.RelationDataAccessError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
@@ -481,9 +490,11 @@ def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    error = testing.errors.UncaughtCharmError if wrap_charm_errors() else ops.RelationDataTypeError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    assert isinstance(exc_info.value.__cause__, ops.RelationDataTypeError)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, ops.RelationDataTypeError)
 
 
 class _OneStringProtocol(Protocol):

@@ -9,6 +9,7 @@ from ops import CharmBase
 from scenario import Context, State
 from scenario.errors import UncaughtCharmError
 from scenario.state import _Event, _next_action_id
+from scenario._environ import wrap_charm_errors
 
 
 class MyCharm(CharmBase):
@@ -107,7 +108,8 @@ def test_context_manager_uncaught_error():
             raise RuntimeError('Crash!')
 
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    error = UncaughtCharmError if wrap_charm_errors() else RuntimeError
+    with pytest.raises(error):
         with ctx(ctx.on.start(), State()) as mgr:
             assert os.getenv('TEST_ENV_VAR') == '1'
             mgr.run()
@@ -125,7 +127,8 @@ def test_run_uncaught_error():
             raise RuntimeError('Crash!')
 
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    error = UncaughtCharmError if wrap_charm_errors() else RuntimeError
+    with pytest.raises(error):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
 

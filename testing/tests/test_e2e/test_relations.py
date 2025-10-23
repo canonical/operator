@@ -29,6 +29,7 @@ from scenario.state import (
     SubordinateRelation,
     _next_relation_id,
 )
+from scenario._environ import wrap_charm_errors
 from tests.helpers import trigger
 
 
@@ -664,9 +665,11 @@ def test_get_relation_when_missing():
 
     # If there's no defined relation with the name, then get_relation raises KeyError.
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises(UncaughtCharmError) as exc:
+    error = UncaughtCharmError if wrap_charm_errors() else KeyError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.update_status(), State())
-    assert isinstance(exc.value.__cause__, KeyError)
+    exc = exc_info.value.__cause__ if wrap_charm_errors() else exc_info.value
+    assert isinstance(exc, KeyError)
 
 
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))
