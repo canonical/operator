@@ -19,6 +19,7 @@ from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
 
+from . import _environ
 from .errors import NoObserverError, UncaughtCharmError
 from .logger import logger as scenario_logger
 from .state import (
@@ -331,7 +332,7 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
-                if os.getenv('SCENARIO_WRAP_CHARM_ERRORS', 'True').capitalize() == 'False':
+                if not _environ.wrap_charm_errors():
                     raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
