@@ -704,8 +704,7 @@ def test_set_secret(
 
 def common_assertions(scenario_secret: Secret | None, result: Result):
     if scenario_secret:
-        # https://github.com/canonical/operator/issues/2125
-        assert scenario_secret.owner in ('app', 'application')
+        assert scenario_secret.owner == 'app'
         assert not scenario_secret.remote_grants
 
         assert result.get('after')
