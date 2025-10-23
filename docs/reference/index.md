@@ -16,7 +16,7 @@ ops
 
 ## Pebble
 
-An API for interacting with {external+pebble:doc}`index`.
+An API for interacting with Pebble. You usually shouldn't use this API directly. Instead, use `ops.Container` for interacting with containers. See [](#run-workloads-with-a-charm-kubernetes).
 
 ```{toctree}
 :maxdepth: 1
@@ -26,7 +26,7 @@ pebble
 
 ## Testing
 
-APIs for testing charms. `ops.testing` includes an API for writing state-transition tests, which are the recommend way to write charm unit tests. Harness is deprecated. For guidance on how to upgrade, see [](#harness-migration).
+APIs for testing charms. `ops.testing` includes an API for writing state-transition tests, which are the recommend way to write charm unit tests. Harness is deprecated; for guidance on how to upgrade to state-transition tests, see [](#harness-migration).
 
 ```{toctree}
 :maxdepth: 1
