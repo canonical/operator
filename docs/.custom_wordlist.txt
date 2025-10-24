@@ -10,6 +10,8 @@ pydantic
 pytest
 repo
 storages
+tinyproxy
 traceback
+uv
 Wordpress
 zizmor
