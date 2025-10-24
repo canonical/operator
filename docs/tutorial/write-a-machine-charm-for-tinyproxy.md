@@ -6,7 +6,7 @@ It will take about 2 hours for you to complete the tutorial.
 
 What you'll need:
 
-- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+- A workstation. For example, a laptop with an amd64 architecture. To deploy and test your charm in a virtual machine, you'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
 - Familiarity with Linux.
 - Familiarity with the Python programming language, including Object-Oriented Programming and event handlers. It will be helpful if you're familiar with [pytest](https://docs.pytest.org/en/) too.
 
@@ -36,7 +36,7 @@ This application isn't especially realistic in isolation. But it's a good way to
 
 ### Create a virtual machine
 
-You'll test and deploy your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system.
+You'll deploy and test your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system. This is especially helpful for the charm's integration tests, which require a local Juju controller and LXD cloud.
 
 First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
 
@@ -56,7 +56,7 @@ This step should take less than 10 minutes, but the time depends on your compute
 Launched: juju-sandbox
 ```
 
-Although you'll test and deploy your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE. Let's use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make a directory available inside your virtual machine:
+Although you'll deploy and test your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE. Let's use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make a directory available inside your virtual machine:
 
 ```text
 multipass stop juju-sandbox
@@ -155,7 +155,7 @@ To add the libraries to your charm's dependencies, run:
 uv add charmlibs-apt charmlibs-pathops
 ```
 
-This has added the following Python packages to the `dependencies` list in `pyproject.toml`:
+This adds the following Python packages to the `dependencies` list in `pyproject.toml`:
 
 - {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>` - A library for using APT to manage system packages. This is how your charm will install tinyproxy.
 - {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` - A file operations library, similar to `pathlib` from the standard library.
@@ -533,7 +533,7 @@ In the `~/tinyproxy` directory, run `juju deploy ./<charm-file>`, where `<charm-
 juju deploy ./tinyproxy_amd64.charm
 ```
 
-Juju creates an "application" from your charm. For each unit in the application, Juju starts a machine and installs your charm on the machine. We didn't tell Juju how many units we want, so Juju assumes one unit and starts one machine. After Juju has installed your charm on the machine, Juju starts sending events to your charm so that your charm can install and start tinyproxy.
+Juju creates an "application" from your charm. For each unit in the application, Juju starts a LXD virtual machine and installs your charm on the machine. We didn't tell Juju how many units we want, so Juju assumes one unit and starts one machine. After Juju has installed your charm on the machine, Juju starts sending events to your charm so that your charm can install and start tinyproxy.
 
 When your charm has started tinyproxy, the application will go into "active" status:
 
@@ -909,7 +909,7 @@ Congratulations on reaching the end of the tutorial!
 You can keep things running, to explore further, or you can remove what you created:
 
 - If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
-- To remove your charm from Juju, run `juju remove-application tinyproxy`.
+- To remove your charm from Juju, run `juju remove-application tinyproxy`. You don't need to do this if you plan to remove your virtual machine.
 - To exit your virtual machine, run `exit`. The terminal switches back to your usual operating system.
 - To stop your virtual machine, run `multipass stop juju-sandbox`.
 - To remove your virtual machine, run `multipass delete juju-sandbox`.
