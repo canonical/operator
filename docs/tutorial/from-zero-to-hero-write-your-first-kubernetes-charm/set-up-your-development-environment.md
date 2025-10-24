@@ -9,7 +9,7 @@ In this chapter of the tutorial you will set up your development environment.
 
 You will need a charm directory, the various tools in the charm SDK, Juju, and a Kubernetes cloud. And it’s a good idea if you can do all your work in an isolated development environment.
 
-To set all of this up, see {external+juju:ref}`Juju | Manage your deployment > Set up your deployment <set-up-your-deployment>`, with the following changes:
+To set all of this up, see {external+juju:ref}`Juju | Manage your deployment > Set up your deployment - local testing and development <set-things-up>`, with the following changes:
 
 - At the directory step, call your directory `fastapi-demo`.
 - At the VM setup step, call your VM `charm-dev`. Also set up Docker:

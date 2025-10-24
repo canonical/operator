@@ -12,6 +12,8 @@ You'll need the following tools:
 
 Instead of installing these tools manually, consider using the `charm-dev` [Multipass](https://canonical.com/multipass) blueprint or [`concierge`](https://github.com/canonical/concierge) to prepare your environment.
 
+A virtual machine is especially useful for running integration tests. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-prepare-your-environment).
+
 ## Initialise your charm project
 
 Use Charmcraft to quickly initialise your charm project. This generates the
