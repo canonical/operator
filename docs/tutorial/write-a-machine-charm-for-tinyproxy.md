@@ -156,7 +156,7 @@ multipass shell juju-sandbox
 
 ## Create a charm project
 
-Inside your virtual machine, go into your project directory and create the initial version of your charm:
+In your virtual machine, go into your project directory and create the initial version of your charm:
 
 ```text
 cd ~/tinyproxy
@@ -533,7 +533,7 @@ In your virtual machine, make sure that the working directory is `~/tinyproxy`. 
 charmcraft pack
 ```
 
-Charmcraft will take up to 20 minutes to pack your charm, depending on your computer and network. If you modify the charm code after completing the tutorial, packing will be faster the second time because Chamcraft has cached the packing environment.
+Charmcraft will take up to 20 minutes to pack your charm, depending on your computer and network. If you modify the charm code after completing the tutorial, packing will be faster the second time because Charmcraft has cached the packing environment.
 
 When Charmcraft has packed your charm, you'll see a message similar to:
 
