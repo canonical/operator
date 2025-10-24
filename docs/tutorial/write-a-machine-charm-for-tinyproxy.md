@@ -56,14 +56,6 @@ This step should take less than 10 minutes, but the time depends on your compute
 Launched: juju-sandbox
 ```
 
-Although you'll deploy and test your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE. Let's use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make a directory available inside your virtual machine:
-
-```text
-multipass stop juju-sandbox
-mkdir ~/tinyproxy-tutorial  # You'll write your charm in this directory.
-multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:~/tinyproxy
-```
-
 Now run:
 
 ```text
@@ -105,13 +97,66 @@ msg="Bootstrapped Juju" provider=lxd
 To install tox, run:
 
 ```text
-export PATH="$HOME/.local/bin:$PATH"
 uv tool install tox --with tox-uv
+```
+
+When tox has been installed, you'll see a confirmation and a warning:
+
+```text
+Installed 1 executable: tox
+warning: `/home/ubuntu/.local/bin` is not on your PATH. To use installed tools,
+run `export PATH="/home/ubuntu/.local/bin:$PATH"` or `uv tool update-shell`.
+```
+
+Instead of following the warning, exit your virtual machine:
+
+```text
+exit
+```
+
+The terminal switches back to your usual operating system. Your virtual machine is still running.
+
+Next, stop your virtual machine:
+
+```text
+multipass stop juju-sandbox
+```
+
+Then use the Multipass {external+multipass:ref}`snapshot <reference-command-line-interface-snapshot>` command to take a snapshot of your virtual machine:
+
+```text
+multipass snapshot juju-sandbox
+```
+
+If you have any problems with your virtual machine during or after completing the tutorial, use the Multipass {external+multipass:ref}`restore <reference-command-line-interface-restore>` command to restore your virtual machine to this point.
+
+### Create a project directory
+
+Although you'll deploy and test your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE.
+
+Outside your virtual machine, create a project directory:
+
+```text
+mkdir ~/tinyproxy-tutorial
+```
+
+You'll write your charm in this directory.
+
+Next, use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make the directory available inside your virtual machine:
+
+```text
+multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:~/tinyproxy
+```
+
+Finally, start your virtual machine and switch to your virtual machine:
+
+```text
+multipass shell juju-sandbox
 ```
 
 ## Create a charm project
 
-In your virtual machine, use Charmcraft to create the initial version of your charm:
+Inside your virtual machine, go into your project directory and create the initial version of your charm:
 
 ```text
 cd ~/tinyproxy
