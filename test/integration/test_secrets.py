@@ -106,9 +106,10 @@ def test_set_secret(
     flow: str,
     lookup_by: Literal['id', 'label'],
 ):
-    label_count = collections.Counter(flow.split(','))['label']
-    if label_count >= 2 and juju.status().model.version.startswith('3.2.'):
+    counts = collections.Counter(flow.split(','))
+    if counts['label'] >= 2 and juju.status().model.version.startswith('3.2.'):
         pytest.skip('Label is sticky on Juju 3.2 in this case')
+
     if lookup_by == 'id':
         params = {'flow': flow, 'secretid': fresh_secret}
     else:
@@ -127,7 +128,6 @@ def test_set_secret(
     secret = juju.show_secret(secrets[0].uri, reveal=True)
     common_checks(secret, result)
 
-    counts = collections.Counter(flow.split(','))
     if counts['content']:
         assert result['after']['latest'] == {'val': str(counts['content'])}
     if counts['label']:
