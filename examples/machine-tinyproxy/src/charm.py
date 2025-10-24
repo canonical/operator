@@ -55,7 +55,7 @@ class TinyproxyCharm(ops.CharmBase):
         try:
             self.load_config(TinyproxyConfig)
         except pydantic.ValidationError as e:
-            slug_error = e.errors()[0]  # Index 0 because 'slug' is the only option validated.
+            (slug_error,) = e.errors()  # 'slug' is the first and only option validated.
             slug_value = slug_error["input"]
             message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
             event.add_status(ops.BlockedStatus(message))

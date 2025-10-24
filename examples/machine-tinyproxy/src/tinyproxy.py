@@ -24,8 +24,8 @@ from charmlibs import apt, pathops
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = "/etc/tinyproxy/tinyproxy.conf"
-PID_FILE = "/var/run/tinyproxy.pid"
+CONFIG_FILE = pathops.LocalPath("/etc/tinyproxy/tinyproxy.conf")
+PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
 
 
 def ensure_config(port: int, slug: str) -> bool:
@@ -93,16 +93,16 @@ def stop() -> None:
 def uninstall() -> None:
     """Uninstall the tinyproxy executable and remove files."""
     apt.remove_package("tinyproxy-bin")
-    pathops.LocalPath(PID_FILE).unlink(missing_ok=True)
-    pathops.LocalPath(CONFIG_FILE).unlink(missing_ok=True)
-    pathops.LocalPath(CONFIG_FILE).parent.rmdir()
+    PID_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.parent.rmdir()
 
 
 def _get_pid() -> int | None:
     """Return the PID of the tinyproxy process, or None if the process can't be found."""
-    if not pathops.LocalPath(PID_FILE).exists():
+    if not PID_FILE.exists():
         return None
-    pid = int(pathops.LocalPath(PID_FILE).read_text())
+    pid = int(PID_FILE.read_text())
     try:
         # Sending signal 0 doesn't terminate the process. It just checks whether the PID exists.
         os.kill(pid, 0)

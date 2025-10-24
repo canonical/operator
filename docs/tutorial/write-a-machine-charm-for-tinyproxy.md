@@ -175,8 +175,8 @@ from charmlibs import apt, pathops
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = "/etc/tinyproxy/tinyproxy.conf"
-PID_FILE = "/var/run/tinyproxy.pid"
+CONFIG_FILE = pathops.LocalPath("/etc/tinyproxy/tinyproxy.conf")
+PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
 
 
 def ensure_config(port: int, slug: str) -> bool:
@@ -201,7 +201,7 @@ def get_version() -> str:
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    # Install a specific package from ubuntu@22.04.
+    # Install a specific package from ubuntu@22.04
     # See https://packages.ubuntu.com/jammy/tinyproxy-bin
     # In general, it's good practice for charms to pin workload versions.
     apt.add_package("tinyproxy-bin", "1.11.0-1")
@@ -230,7 +230,7 @@ def reload_config() -> None:
 
 
 def start() -> None:
-    """configure_and_runproxy."""
+    """Start tinyproxy."""
     subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
 
 
@@ -244,16 +244,16 @@ def stop() -> None:
 def uninstall() -> None:
     """Uninstall the tinyproxy executable and remove files."""
     apt.remove_package("tinyproxy-bin")
-    pathops.LocalPath(PID_FILE).unlink(missing_ok=True)
-    pathops.LocalPath(CONFIG_FILE).unlink(missing_ok=True)
-    pathops.LocalPath(CONFIG_FILE).parent.rmdir()
+    PID_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.parent.rmdir()
 
 
 def _get_pid() -> int | None:
     """Return the PID of the tinyproxy process, or None if the process can't be found."""
-    if not pathops.LocalPath(PID_FILE).exists():
+    if not PID_FILE.exists():
         return None
-    pid = int(pathops.LocalPath(PID_FILE).read_text())
+    pid = int(PID_FILE.read_text())
     try:
         # Sending signal 0 doesn't terminate the process. It just checks whether the PID exists.
         os.kill(pid, 0)
@@ -429,7 +429,7 @@ Then add the following method to the charm class:
         try:
             self.load_config(TinyproxyConfig)
         except pydantic.ValidationError as e:
-            slug_error = e.errors()[0]  # Index 0 because 'slug' is the only option validated.
+            (slug_error,) = e.errors()  # 'slug' is the first and only option validated.
             slug_value = slug_error["input"]
             message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
             event.add_status(ops.BlockedStatus(message))
@@ -853,7 +853,7 @@ This extends the duration that Jubilant waits for your charm to deploy, in case 
 Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
 
 ```python
-    assert version == "1.11.0"
+    assert version == "1.11.0"  # The version installed by tinyproxy.install.
 ```
 
 You should now have the following tests:

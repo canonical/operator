@@ -32,7 +32,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
     """Check that the correct version of the workload is running."""
     version = juju.status().apps["tinyproxy"].version
-    assert version == "1.11.0"
+    assert version == "1.11.0"  # The version installed by tinyproxy.install.
 
 
 def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
