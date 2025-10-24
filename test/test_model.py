@@ -3787,7 +3787,18 @@ class TestSecretInfo:
 
 class TestSecretClass:
     @pytest.fixture
-    def model(self, fake_juju_version: None):
+    def model(self):
+        return ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                'myapp/0',
+                model_uuid='abcd',
+                juju_context=JujuContext._from_dict({'JUJU_VERSION': '3.6.0'}),
+            ),
+        )
+
+    @pytest.fixture
+    def model_pre36(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
 
     def make_secret(
@@ -3995,7 +4006,6 @@ class TestSecretClass:
 
     def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
-        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
 
         secret = self.make_secret(model, id='q')
         secret.set_content({'foo': 'bar'})
@@ -4003,28 +4013,56 @@ class TestSecretClass:
         secret.set_info(description=description)
 
         calls = fake_script.calls(clear=True)
-        assert calls[0][:-1] == [
-            'secret-set',
-            '--owner',
-            'application',
-            f'secret://{model._backend.model_uuid}/q',
+        assert calls == [
+            [
+                'secret-set',
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/q',
+                mock.ANY,
+            ],
+            [
+                'secret-set',
+                '--description',
+                description,
+                '--owner',
+                'application',
+                f'secret://{model._backend.model_uuid}/q',
+            ],
         ]
-        assert calls[0][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
-        assert calls[1] == [
-            'secret-get',
-            '--format=json',
-            f'secret://{model._backend.model_uuid}/q',
-            '--peek',
+        assert re.fullmatch(r'foo#file=.*/foo', calls[0][-1])
+
+    def test_set_content_then_info_pre36(
+        self, model_pre36: ops.Model, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
+    ):
+        fake_script.write('secret-set', """exit 0""")
+        fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
+        fake_script.write('secret-info-get', """echo '{"q": {"revision": 1}}'""")
+
+        secret = self.make_secret(model_pre36, id='q')
+        secret.set_content({'foo': 'bar'})
+        description = 'desc'
+        secret.set_info(description=description)
+
+        calls = fake_script.calls(clear=True)
+        secret_uri = f'secret://{model_pre36._backend.model_uuid}/q'
+        assert calls == [
+            ['secret-info-get', '--format=json', secret_uri],
+            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
+            ['secret-get', '--format=json', secret_uri, '--peek'],
+            ['secret-info-get', '--format=json', secret_uri],
+            [
+                'secret-set',
+                '--description',
+                'desc',
+                '--owner',
+                'application',
+                secret_uri,
+                mock.ANY,
+            ],
         ]
-        assert calls[2][:-1] == [
-            'secret-set',
-            '--description',
-            description,
-            '--owner',
-            'application',
-            f'secret://{model._backend.model_uuid}/q',
-        ]
-        assert calls[2][-1].startswith('foo#file=') and calls[0][-1].endswith('/foo')
+        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
+        assert re.fullmatch(r'foo#file=.*/foo', calls[4][-1])
 
     def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4035,23 +4073,53 @@ class TestSecretClass:
         secret.set_content({'foo': 'bar'})
 
         calls = fake_script.calls(clear=True)
-        assert calls[0] == [
-            'secret-set',
-            '--description',
-            description,
-            '--owner',
-            'application',
-            f'secret://{model._backend.model_uuid}/q',
+        secret_uri = f'secret://{model._backend.model_uuid}/q'
+        assert calls == [
+            ['secret-set', '--description', 'desc', '--owner', 'application', secret_uri],
+            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
         ]
-        assert calls[1][:-1] == [
-            'secret-set',
-            '--description',
-            description,
-            '--owner',
-            'application',
-            f'secret://{model._backend.model_uuid}/q',
+        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
+
+    def test_set_info_then_content_pre36(self, model_pre36: ops.Model, fake_script: FakeScript):
+        fake_script.write('secret-set', """exit 0""")
+        fake_script.write('secret-get', """echo '{"old": "value1"}'""")
+        fake_script.write('secret-info-get', """echo '{"q": {"revision": 1}}'""")
+
+        secret = self.make_secret(model_pre36, id='q')
+        description = 'desc'
+        secret.set_info(description=description)
+        fake_script.write(
+            'secret-info-get', """echo '{"q": {"revision": 1, "description": "desc"}}'"""
+        )
+        secret.set_content({'new': 'value2'})
+
+        calls = fake_script.calls(clear=True)
+        secret_uri = f'secret://{model_pre36._backend.model_uuid}/q'
+        assert calls == [
+            ['secret-get', '--format=json', 'secret://abcd/q', '--peek'],
+            ['secret-info-get', '--format=json', 'secret://abcd/q'],
+            [
+                'secret-set',
+                '--description',
+                'desc',
+                '--owner',
+                'application',
+                secret_uri,
+                mock.ANY,
+            ],
+            ['secret-info-get', '--format=json', 'secret://abcd/q'],
+            [
+                'secret-set',
+                '--description',
+                'desc',
+                '--owner',
+                'application',
+                secret_uri,
+                mock.ANY,
+            ],
         ]
-        assert calls[1][-1].startswith('foo#file=') and calls[1][-1].endswith('/foo')
+        assert re.fullmatch(r'old#file=.*/old', calls[2][-1])
+        assert re.fullmatch(r'new#file=.*/new', calls[4][-1])
 
     def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
