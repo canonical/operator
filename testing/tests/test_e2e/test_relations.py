@@ -623,7 +623,8 @@ def test_broken_relation_not_in_model_relations(mycharm):
         assert charm.model.relations['foo'] == []
 
 
-def test_get_relation_when_missing():
+@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
+def test_get_relation_when_missing(bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch):
     class MyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -637,6 +638,7 @@ def test_get_relation_when_missing():
         def _on_config_changed(self, _):
             self.relation = self.model.get_relation('foo', self.config['relation-id'])
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(
         MyCharm,
         meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
@@ -664,9 +666,11 @@ def test_get_relation_when_missing():
 
     # If there's no defined relation with the name, then get_relation raises KeyError.
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises(UncaughtCharmError) as exc:
+    error = KeyError if bare_charm_errors else UncaughtCharmError
+    with pytest.raises(error) as exc_info:
         ctx.run(ctx.on.update_status(), State())
-    assert isinstance(exc.value.__cause__, KeyError)
+    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
+    assert isinstance(exc, KeyError)
 
 
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))
