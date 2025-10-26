@@ -18,7 +18,7 @@ The instructions all use the Jubilant library.
 (write-integration-tests-for-a-charm-prepare-your-environment)=
 ## Prepare your environment
 
-To run integration tests, you'll need a Juju controller and [tox](https://tox.wiki/en/). We recommend that you set up a Juju controller inside a virtual machine instead of your usual operating system.
+To run integration tests, you'll need a Juju controller and [tox](https://tox.wiki/en/). We recommend that you set up a Juju controller inside a virtual machine instead of your host machine.
 
 ### Create a virtual machine
 
@@ -51,7 +51,7 @@ Your virtual machine is now ready. Before using your virtual machine, we recomme
 Use {external+multipass:ref}`snapshot <reference-command-line-interface-snapshot>` to take a snapshot of your virtual machine:
 
 ```text
-exit  # Switch back to your usual operating system.
+exit  # Switch back to your host machine.
 multipass stop juju-sandbox
 multipass snapshot juju-sandbox
 ```
