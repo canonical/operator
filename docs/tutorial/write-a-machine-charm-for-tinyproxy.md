@@ -36,7 +36,7 @@ This application isn't especially realistic in isolation. But it's a good way to
 
 ### Create a virtual machine
 
-You'll deploy and test your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your usual operating system. This is especially helpful for the charm's integration tests, which require a local Juju controller and LXD cloud.
+You'll deploy and test your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your host machine. This is especially helpful for the charm's integration tests, which require a local Juju controller and LXD cloud.
 
 First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
 
@@ -114,7 +114,7 @@ Instead of following the warning, exit your virtual machine:
 exit
 ```
 
-The terminal switches back to your usual operating system. Your virtual machine is still running.
+The terminal switches back to your host machine. Your virtual machine is still running.
 
 Next, stop your virtual machine:
 
@@ -316,7 +316,7 @@ Notice that the helper module is stateless. In fact, your charm as a whole will 
 ```{tip}
 After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks. You can run these commands from anywhere in the `~/tinyproxy` directory in your virtual machine.
 
-You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are available on your usual operating system. However, be careful when running the same tox command inside and outside your virtual machine. If tox fails with an error related to the `.tox` directory, use `-re` instead of `-e` in the commands. This recreates the tox environment.
+You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are available on your host machine. However, be careful when running the same tox command inside and outside your virtual machine. If tox fails with an error related to the `.tox` directory, use `-re` instead of `-e` in the commands. This recreates the tox environment.
 ```
 
 ### Handle the install event
@@ -955,7 +955,7 @@ You can keep things running, to explore further, or you can remove what you crea
 
 - If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
 - To remove your charm from Juju, run `juju remove-application tinyproxy`. You don't need to do this if you plan to remove your virtual machine.
-- To exit your virtual machine, run `exit`. The terminal switches back to your usual operating system.
+- To exit your virtual machine, run `exit`. The terminal switches back to your host machine.
 - To stop your virtual machine, run `multipass stop juju-sandbox`.
 - To remove your virtual machine, run `multipass delete juju-sandbox`.
 - To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
