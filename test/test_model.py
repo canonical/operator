@@ -28,8 +28,9 @@ import typing
 import unittest
 import warnings
 from collections import OrderedDict
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, Mapping
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -2792,13 +2793,13 @@ class TestModelBindings:
         assert binding.network.ingress_addresses == ['foo.bar.baz.com']
 
 
-_MetricAndLabelPair = typing.Tuple[typing.Dict[str, float], typing.Dict[str, str]]
+_MetricAndLabelPair = tuple[dict[str, float], dict[str, str]]
 
 
-_ValidMetricsTestCase = typing.Tuple[
-    typing.Mapping[str, typing.Union[int, float]],
+_ValidMetricsTestCase = tuple[
+    typing.Mapping[str, int | float],
     typing.Mapping[str, str],
-    typing.List[typing.List[str]],
+    list[list[str]],
 ]
 
 

@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '42 7 25 * *'
+  pull_request:  # FIXME temporary, don't merge!
 
 permissions: {}
 

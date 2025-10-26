@@ -18,12 +18,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    Mapping,
     NoReturn,
     TextIO,
     cast,
     get_args,
 )
+from collections.abc import Mapping
 
 from ops import (
     JujuContext,
@@ -424,7 +424,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-        owner: Literal['unit', 'app'] | None = None,
+        owner: Literal['unit', 'application'] | None = None,
     ) -> str:
         from .state import Secret
 
@@ -434,7 +434,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             description=description,
             expire=expire,
             rotate=rotate,
-            owner=owner,
+            # It's called 'application' in Ops, but 'app' in Scenario.
+            owner='app' if owner == 'application' else owner,
         )
         secrets = set(self._state.secrets)
         secrets.add(secret)
@@ -727,8 +728,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         labels: Mapping[str, str] | None = None,
     ) -> NoReturn:
         raise NotImplementedError(
-            'add-metrics is not implemented in Scenario (and probably never will be: '
-            "it's deprecated API)",
+            'add-metrics is not implemented in Scenario '
+            '(and never will be: it was removed in Juju 3.6.11)'
         )
 
     def resource_get(self, resource_name: str) -> str:

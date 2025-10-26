@@ -12,10 +12,7 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Type,
-)
+from typing import TYPE_CHECKING
 
 import yaml
 from ops import JujuContext, pebble
@@ -194,7 +191,7 @@ class Runtime:
         WrappedCharm.__name__ = charm_type.__name__
         WrappedCharm.__qualname__ = charm_type.__qualname__
         WrappedCharm.__module__ = charm_type.__module__
-        return typing.cast('Type[CharmType]', WrappedCharm)
+        return typing.cast('type[CharmType]', WrappedCharm)
 
     @contextmanager
     def _virtual_charm_root(self):

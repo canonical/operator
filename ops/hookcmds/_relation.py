@@ -15,12 +15,8 @@
 from __future__ import annotations
 
 import json
-from typing import (
-    Literal,
-    Mapping,
-    cast,
-    overload,
-)
+from collections.abc import Mapping
+from typing import Literal, cast, overload
 
 from .._private import yaml
 from ._types import RelationModel, RelationModelDict
