@@ -3473,7 +3473,6 @@ class TestSecrets:
         )
         assert secret.id == 'secret:234'
         assert secret.label == 'lbl'
-        assert secret.get_content() == {'foo': 'x', 'bar': 'y'}
 
         assert fake_script.calls(clear=True) == [
             [
@@ -3518,7 +3517,6 @@ class TestSecrets:
         )
         assert secret.id == 'secret:456'
         assert secret.label == 'l2'
-        assert secret.get_content() == {'foo': 'w', 'bar': 'z'}
 
         assert fake_script.calls(clear=True) == [
             [
@@ -3577,7 +3575,6 @@ class TestSecrets:
         secret = model.get_secret(id='123')
         assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label is None
-        assert secret.get_content() == {'foo': 'g'}
 
         assert fake_script.calls(clear=True) == [
             ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/123']
@@ -3589,17 +3586,39 @@ class TestSecrets:
         secret = model.get_secret(label='lbl')
         assert secret.id is None
         assert secret.label == 'lbl'
-        assert secret.get_content() == {'foo': 'g'}
 
         assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
 
-    def test_get_secret_id_and_label(self, fake_script: FakeScript, model: ops.Model):
+    def test_get_secret_validate(self, fake_script: FakeScript, model: ops.Model):
+        fake_script.write('secret-get', """echo '{"foo": "g"}'""")
+
+        secret = model.get_secret(label='lbl')
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
+
+        assert secret.get_content() == {'foo': 'g'}
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
+
+        secret = model.get_secret(label='lbl', validate=True)
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
+
+        assert secret.get_content() == {'foo': 'g'}
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
+
+        secret = model.get_secret(label='lbl', validate=False)
+        assert fake_script.calls(clear=True) == []
+
+        assert secret.get_content() == {'foo': 'g'}
+        assert fake_script.calls(clear=True) == [['secret-get', '--format=json', '--label', 'lbl']]
+
+    @pytest.mark.parametrize('validate', [True, False])
+    def test_get_secret_id_and_label(
+        self, fake_script: FakeScript, model: ops.Model, validate: bool
+    ):
         fake_script.write('secret-get', """echo '{"foo": "h"}'""")
 
-        secret = model.get_secret(id='123', label='l')
+        secret = model.get_secret(id='123', label='l', validate=validate)
         assert secret.id == f'secret://{model._backend.model_uuid}/123'
         assert secret.label == 'l'
-        assert secret.get_content() == {'foo': 'h'}
 
         assert fake_script.calls(clear=True) == [
             [
@@ -3864,7 +3883,7 @@ class TestSecretClass:
             ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z']
         ]
 
-    def test_get_content_copies_dict(self, model: ops.Model, fake_script: FakeScript):
+    def test_get_content_not_cached(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "bar"}'""")
 
         secret = self.make_secret(model, id='z')
@@ -3874,7 +3893,8 @@ class TestSecretClass:
         assert secret.get_content() == {'foo': 'bar'}
 
         assert fake_script.calls(clear=True) == [
-            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z']
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z'],
+            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/z'],
         ]
 
     def test_peek_content(self, model: ops.Model, fake_script: FakeScript):
