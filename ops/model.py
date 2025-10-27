@@ -286,15 +286,20 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
+        Secret content is not cached. If the hook command is run, the result is
+        discarded.
+
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
 
         Args:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
-            validate: Try to fetch the secret content from Juju secret backend,
+            validate: Try to fetch the secret content from the Juju secret backend,
                 so that an exception is raised early if this unit doesn't have
                 permission to access the secret or the secret doesn't exist.
+                If `False`, the hook command will only be run when both `id` and
+                `label` arguments are specified.
 
         Raises:
             SecretNotFoundError: If a secret with this ID or label doesn't exist.
@@ -306,6 +311,10 @@ class Model:
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
+        # The `validate` keyword is used for backwards compatibility, where
+        # charms expect any errors to be raised in the `get_secret()` call.
+        # If both `id` and `label` are supplied, the charm is trying to set
+        # the consumer label and we must call the hook command.
         if validate or (id and label):
             self._backend.secret_get(id=id, label=label)
         return Secret(self._backend, id=id, label=label)
@@ -1437,7 +1446,7 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> dict[str, str]:
         """Get the secret's content.
 
-        The content of the secret is no longer cached on the :class:`Secret`,
+        The content of the secret is not cached on the :class:`Secret`;
         every call will get the secret content from the Juju secret backend.
 
         Returns:

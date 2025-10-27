@@ -3848,30 +3848,6 @@ class TestSecretClass:
         assert secret.id is None
         assert secret.label == 'y'
 
-    def test_get_content_cached(self, model: ops.Model, fake_script: FakeScript):
-        fake_script.write('secret-get', """exit 1""")
-        return
-        # FIXME
-
-        secret = self.make_secret(model, id='x', label='y')
-        content = secret.get_content()  # will use cached content, not run secret-get
-        assert content == {'foo': 'bar'}
-
-        assert fake_script.calls(clear=True) == []
-
-    def test_get_content_refresh(self, model: ops.Model, fake_script: FakeScript):
-        fake_script.write('secret-get', """echo '{"foo": "refreshed"}'""")
-
-        return
-        # FIXME
-        secret = self.make_secret(model, id='y')
-        content = secret.get_content(refresh=True)
-        assert content == {'foo': 'refreshed'}
-
-        assert fake_script.calls(clear=True) == [
-            ['secret-get', '--format=json', f'secret://{model._backend.model_uuid}/y', '--refresh']
-        ]
-
     def test_get_content_uncached(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-get', """echo '{"foo": "notcached"}'""")
 
