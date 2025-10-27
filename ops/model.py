@@ -1522,14 +1522,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
 
-        self._backend.secret_set(
-            typing.cast('str', self.id),
-            content=content,
-            label=None,
-            description=None,
-            expire=None,
-            rotate=None,
-        )
+        self._backend.secret_set(typing.cast('str', self.id), content=content)
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1566,7 +1559,6 @@ class Secret:
 
         self._backend.secret_set(
             typing.cast('str', self.id),
-            content=None,
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
