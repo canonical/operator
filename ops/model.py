@@ -273,7 +273,9 @@ class Model:
         """
         return self._bindings.get(binding_key)
 
-    def get_secret(self, *, id: str | None = None, label: str | None = None) -> Secret:
+    def get_secret(
+        self, *, id: str | None = None, label: str | None = None, validate: bool = True
+    ) -> Secret:
         """Get the :class:`Secret` with the given ID or label.
 
         The caller must provide at least one of `id` (the secret's locator ID)
@@ -284,17 +286,15 @@ class Model:
         owners set a label using ``add_secret``, whereas secret observers set
         a label using ``get_secret`` (see an example at :attr:`Secret.label`).
 
-        The content of the secret is retrieved, so calls to
-        :meth:`Secret.get_content` do not require querying the secret storage
-        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
-        has been called.
-
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
 
         Args:
             id: Secret ID if fetching by ID.
             label: Secret label if fetching by label (or updating it).
+            validate: Try to fetch the secret content from Juju secret backend,
+                so that an exception is raised early if this unit doesn't have
+                permission to access the secret or the secret doesn't exist.
 
         Raises:
             SecretNotFoundError: If a secret with this ID or label doesn't exist.
@@ -306,13 +306,9 @@ class Model:
         if id is not None:
             # Canonicalize to "secret:<id>" form for consistency in backend calls.
             id = Secret._canonicalize_id(id, self.uuid)
-        content = self._backend.secret_get(id=id, label=label)
-        return Secret(
-            self._backend,
-            id=id,
-            label=label,
-            content=content,
-        )
+        if validate or (id and label):
+            self._backend.secret_get(id=id, label=label)
+        return Secret(self._backend, id=id, label=label)
 
     def get_cloud_spec(self) -> CloudSpec:
         """Get details of the cloud in which the model is deployed.
@@ -520,12 +516,7 @@ class Application:
             rotate=rotate,
             owner='application',
         )
-        return Secret(
-            self._backend,
-            id=id,
-            label=label,
-            content=content,
-        )
+        return Secret(self._backend, id=id, label=label)
 
 
 def _calculate_expiry(
@@ -711,12 +702,7 @@ class Unit:
             rotate=rotate,
             owner='unit',
         )
-        return Secret(
-            self._backend,
-            id=id,
-            label=label,
-            content=content,
-        )
+        return Secret(self._backend, id=id, label=label)
 
     def open_port(
         self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
@@ -1307,7 +1293,6 @@ class Secret:
         backend: _ModelBackend,
         id: str | None = None,
         label: str | None = None,
-        content: dict[str, str] | None = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1316,7 +1301,6 @@ class Secret:
         self._backend = backend
         self._id = id
         self._label = label
-        self._content = content
 
     def __repr__(self):
         fields: list[str] = []
@@ -1453,9 +1437,8 @@ class Secret:
     def get_content(self, *, refresh: bool = False) -> dict[str, str]:
         """Get the secret's content.
 
-        The content of the secret is cached on the :class:`Secret` object, so
-        subsequent calls do not require querying the secret storage again,
-        unless ``refresh=True`` is used, or :meth:`set_content` is called.
+        The content of the secret is no longer cached on the :class:`Secret`,
+        every call will get the secret content from the Juju secret backend.
 
         Returns:
             A copy of the secret's content dictionary.
@@ -1470,9 +1453,7 @@ class Secret:
             ModelError: if the charm does not have permission to access the
                 secret.
         """
-        if refresh or self._content is None:
-            self._content = self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
-        return self._content.copy()
+        return self._backend.secret_get(id=self.id, label=self.label, refresh=refresh)
 
     def peek_content(self) -> dict[str, str]:
         """Get the content of the latest revision of this secret.
