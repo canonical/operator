@@ -21,6 +21,7 @@ import time
 import ops
 import pydantic
 
+# A standalone module for workload-specific logic (no charming concerns):
 import tinyproxy
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class TinyproxyConfig(pydantic.BaseModel):
 class TinyproxyCharm(ops.CharmBase):
     """Charm the application."""
 
-    def __init__(self, framework: ops.Framework) -> None:
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         framework.observe(self.on.install, self._on_install)
