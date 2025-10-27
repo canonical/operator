@@ -3799,7 +3799,14 @@ class TestSecretClass:
 
     @pytest.fixture
     def model_pre36(self, fake_juju_version: None):
-        return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0', model_uuid='abcd'))
+        return ops.Model(
+            ops.CharmMeta(),
+            _ModelBackend(
+                'myapp/0',
+                model_uuid='abcd',
+                juju_context=JujuContext._from_dict({'JUJU_VERSION': '3.5.7'}),
+            ),
+        )
 
     def make_secret(
         self,
