@@ -3981,14 +3981,17 @@ class _ModelBackend:
         if self._juju_context.version < '3.6':
             # Older Juju series don't coalesce multiple secret updates within a hook.
             # To work around that, we perform a smart read-modify-write cycle.
+            # See https://bugs.launchpad.net/juju/+bug/2081034 for details.
             if content is None:
                 content = self.secret_get(id=id, peek=True)
             if description is None or expire is None or rotate is None or label is None:
+                # Metadata fix is needed for Juju < 3.6 or < 3.5.5
                 info = self.secret_info_get(id=id)
                 description = description or info.description
                 expire = expire or info.expires
                 rotate = rotate or info.rotation
-                label = label or info.label  # The label fix needed for Juju < 3.5
+                # The label fix is needed for Juju < 3.5
+                label = label or info.label
         with self._wrap_hookcmd(
             'secret-set',
             id=id,
