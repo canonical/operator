@@ -567,7 +567,7 @@ You should now have two terminals:
 
     ```text
     Model    Controller     Cloud/Region         Version  SLA          Timestamp
-    testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:00:00+08:00
+    testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:00:00+08:00
     ```
 
 You're now ready to deploy your charm.
@@ -584,7 +584,7 @@ When your charm has started tinyproxy, the application will go into "active" sta
 
 ```text
 Model    Controller     Cloud/Region         Version  SLA          Timestamp
-testing  concierge-lxd  localhost/localhost  3.6.8    unsupported  09:01:38+08:00
+testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:01:38+08:00
 
 App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
 tinyproxy  1.11.0   active      1  tinyproxy             0  no
@@ -592,8 +592,8 @@ tinyproxy  1.11.0   active      1  tinyproxy             0  no
 Unit          Workload  Agent  Machine  Public address  Ports  Message
 tinyproxy/0*  active    idle   0        10.71.67.208
 
-Machine  State    Address       Inst id        Base          AZ  Message
-0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04      Running
+Machine  State    Address       Inst id        Base          AZ            Message
+0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04  juju-sandbox  Running
 ```
 
 ```{tip}
@@ -873,10 +873,10 @@ The output should be similar to:
 unit: commands[1]> coverage report
 Name               Stmts   Miss Branch BrPart  Cover   Missing
 --------------------------------------------------------------
-src/charm.py          72      5     20      7    87%   67->exit, 97, 102->exit, 111-112, 121-122
-src/tinyproxy.py      47     26      6      0    40%   34-41, 52-53, 60, 65, 70-75, 80, 85-87, 92-95, 100-108
+src/charm.py          71      5     20      7    87%   71->exit, 101, 106->exit, 115-116, 125-126
+src/tinyproxy.py      47     26      6      0    40%   34-41, 52-56, 63, 68, 73-78, 83, 88-90, 95-98, 103-111
 --------------------------------------------------------------
-TOTAL                119     31     26      7    70%
+TOTAL                118     31     26      7    69%
   unit: OK (1.21=setup[0.05]+cmd[1.03,0.13] seconds)
   congratulations :) (1.30 seconds)
 ```
@@ -890,7 +890,7 @@ When you created the initial version of your charm, Charmcraft included integrat
 In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
 
 ```python
-juju.wait(jubilant.all_active, timeout=600)
+    juju.wait(jubilant.all_active, timeout=600)
 ```
 
 This extends the duration that Jubilant waits for your charm to deploy, in case the integration tests run slowly in your virtual machine. The default duration would be sufficient if the integration tests were running in a continuous integration environment.
@@ -953,8 +953,8 @@ Congratulations on reaching the end of the tutorial!
 
 You can keep things running, to explore further, or you can remove what you created:
 
-- If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
 - To remove your charm from Juju, run `juju remove-application tinyproxy`. You don't need to do this if you plan to remove your virtual machine.
+- If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
 - To exit your virtual machine, run `exit`. The terminal switches back to your host machine.
 - To stop your virtual machine, run `multipass stop juju-sandbox`.
 - To remove your virtual machine, run `multipass delete juju-sandbox`.
