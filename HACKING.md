@@ -370,7 +370,7 @@ The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version
 
     If you don't have [just](https://just.systems/man/en/) installed, use `uvx --from rust-just just` instead.
 
-4. Lock the dependencies the charms and generate `uv.lock.j2` files:
+4. Lock the dependencies of the charms and generate `uv.lock.j2` files:
 
     ```text
     just lock
