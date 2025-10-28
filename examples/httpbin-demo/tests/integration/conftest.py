@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
+    """Create a temporary Juju model for running tests."""
     with jubilant.temp_model() as juju:
         yield juju
 
@@ -38,6 +39,7 @@ def juju(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="session")
 def charm():
+    """Return the path of the charm under test."""
     if "CHARM_PATH" in os.environ:
         charm_path = pathlib.Path(os.environ["CHARM_PATH"])
         if not charm_path.exists():
