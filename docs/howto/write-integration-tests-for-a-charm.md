@@ -139,25 +139,34 @@ A good integration testing suite will check that the charm continues to operate 
 To build and deploy the current charm, in `conftest.py` in your integration test directory, add the functions below:
 
 ```python
+import logging
 import pathlib
 import subprocess
+import sys
+import time
 
 import jubilant
 import pytest
 
+logger = logging.getLogger(__name__)
+
 
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
+    """Create a temporary Juju model for running tests."""
     with jubilant.temp_model() as juju:
         yield juju
 
         if request.session.testsfailed:
+            logger.info("Collecting Juju logs...")
+            time.sleep(0.5)  # Wait for Juju to process logs.
             log = juju.debug_log(limit=1000)
-            print(log, end="")
+            print(log, end="", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")
 def charm():
+    """Return the path of the charm under test."""
     subprocess.check_call(["charmcraft", "pack"])
     # Modify below if you're building for multiple bases or architectures.
     return next(pathlib.Path(".").glob("*.charm"))
