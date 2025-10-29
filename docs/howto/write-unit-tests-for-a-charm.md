@@ -162,7 +162,7 @@ def test_charm_runs(my_charm):
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
 
-## Reusing the state
+## Reusing state
 
 Try to make each test an isolated test of a particular event handler. After checking the `State` that `ctx.run` returns, you shouldn't need to reuse the `State` as input to another event handler.
 
