@@ -35,6 +35,8 @@ event, and based on whether it has leadership or not (according to its input
 state), it will decide to set `active` or `blocked` status (which will be
 reflected in the output state).
 
+When the testing framework runs the event, the input state is not modified. In general, the objects in a `State` are immutable.
+
 Using the state-transition framework for charm unit tests, then, means verifying
 that:
 
