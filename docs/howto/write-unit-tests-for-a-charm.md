@@ -173,7 +173,7 @@ state_out = ctx.run(...)  # The State we want to reuse.
 relation = state_out.get_relation(...)  # A relation we want to modify.
 
 # Copy and modify the relation data.
-new_local_app_data = local_app_data.copy()
+new_local_app_data = relation.local_app_data.copy()
 new_local_app_data["foo"] = "bar"
 
 # Create a State.
