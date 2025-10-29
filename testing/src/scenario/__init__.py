@@ -28,13 +28,14 @@ state.
 .. image:: https://raw.githubusercontent.com/canonical/ops-scenario/main/resources/state-transition-model.png
    :alt: Transition diagram, with the input state and event on the left, the context including the charm in the centre, and the state out on the right
 
-When the testing framework runs the event, the input state is not modified.
-In general, the objects in a `State` are immutable.
-
 Writing unit tests for a charm, then, means verifying that:
 
 - the charm does not raise uncaught exceptions while handling the event
 - the output state (as compared with the input state) is as expected.
+
+When the testing framework runs the event, the input state isn't modified. Instead, the output
+state is a new `State` object. `State` objects are generally immutable - but be careful when
+working with `dict` attributes, as they don't enforce immutability.
 
 A test consists of three broad steps:
 
