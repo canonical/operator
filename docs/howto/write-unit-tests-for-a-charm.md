@@ -166,7 +166,7 @@ If you use pytest, you should put the `my_charm` fixture in a top level `conftes
 
 Try to make each test an isolated test of a particular event handler. After checking the `State` that `ctx.run` returns, you shouldn't need to reuse the `State` as input to another event handler.
 
-However, if you do need to reuse a `State`, don't try to modify the `State`. In general, the objects in a `State` are immutable. To reuse a `State`, create a `State` with the required data. For example:
+However, if you do need to reuse a state, don't try to modify the original `State` object. Instead, create a new `State` object with the required data. For example:
 
 ```python
 state_out = ctx.run(...)  # The State we want to reuse.
@@ -176,7 +176,7 @@ relation = state_out.get_relation(...)  # A relation we want to modify.
 new_local_app_data = relation.local_app_data.copy()
 new_local_app_data["foo"] = "bar"
 
-# Create a State.
+# Create a new State.
 new_relation = dataclasses.replace(relation, local_app_data=new_local_app_data)
 new_state = dataclasses.replace(state_out, relations={new_relation})
 ```
