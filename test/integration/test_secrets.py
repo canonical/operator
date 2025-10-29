@@ -14,8 +14,9 @@
 
 from __future__ import annotations
 
+import collections
 from collections.abc import Callable
-from typing import cast
+from typing import Literal, cast
 
 import jubilant
 import pytest
@@ -32,7 +33,6 @@ def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
 def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     rv = juju.run(leader, 'add-secret')
     result = cast('Result', rv.results)
-    assert not result.get('exception')
 
     secrets = juju.secrets()
     secret = juju.show_secret(secrets[0].uri, reveal=True)
@@ -58,7 +58,6 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
 def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
     rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
     result = cast('Result', rv.results)
-    assert not result.get('exception')
 
     assert 'secretid' in result
     assert 'after' in result
@@ -91,8 +90,69 @@ def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: 
         assert info['rotates'] == 'None'
 
 
+@pytest.mark.parametrize('lookup_by', ['id', 'label'])
+@pytest.mark.parametrize(
+    'flow',
+    [
+        'content,description,content,description',
+        'rotate,content,rotate,content,rotate',
+        'label,content,label,content',
+    ],
+)
+def test_set_secret(
+    juju: jubilant.Juju,
+    fresh_secret: str,
+    leader: str,
+    flow: str,
+    lookup_by: Literal['id', 'label'],
+):
+    counts = collections.Counter(flow.split(','))
+    if counts['label'] >= 2 and juju.status().model.version.startswith('3.2.'):
+        pytest.skip('Label is sticky on Juju 3.2 in this case')
+
+    if lookup_by == 'id':
+        params = {'flow': flow, 'secretid': fresh_secret}
+    else:
+        params = {'flow': flow, 'secretlabel': 'thelabel'}
+
+    rv = juju.run(leader, 'set-secret-flow', params=params)
+    result = cast('Result', rv.results)
+
+    assert 'secretid' in result
+    assert 'after' in result
+    assert result['after']
+    assert result['after']['info']
+    info = result['after']['info']
+
+    secrets = juju.secrets()
+    secret = juju.show_secret(secrets[0].uri, reveal=True)
+    common_checks(secret, result)
+
+    if counts['content']:
+        assert result['after']['latest'] == {'val': str(counts['content'])}
+    if counts['label']:
+        assert info['label'] == f'label{counts["label"]}'
+    if counts['description']:
+        assert info['description'] == f'description{counts["description"]}'
+    if counts['expire']:
+        assert secret.expires == f'{2010 + counts["expire"]}-01-01T00:00:00Z'
+    if counts['rotate']:
+        rotation_values = [
+            'sentinel',
+            'never',
+            'hourly',
+            'daily',
+            'weekly',
+            'monthly',
+            'quarterly',
+            'yearly',
+        ]
+        assert secret.rotation == rotation_values[counts['rotate']]
+
+
 @pytest.fixture
 def cleanup(juju: jubilant.Juju, leader: str) -> None:
+    """Remove all secrets from the test app."""
     secrets = juju.secrets()
     for secret in secrets:
         if secret.owner == 'test-secrets':
@@ -100,6 +160,17 @@ def cleanup(juju: jubilant.Juju, leader: str) -> None:
         else:
             # Later, there could be user secrets too.
             juju.remove_secret(secret.uri)
+
+
+@pytest.fixture
+def fresh_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
+    """Remove all old secrets (via cleanup) and add a new secret owned by the test app."""
+    juju.exec('secret-add --label thelabel some=content', unit=leader)
+    secrets = juju.secrets()
+    assert secrets
+    assert secrets[0].owner == 'test-secrets'
+    # https://github.com/canonical/jubilant/issues/211
+    return secrets[0].uri.unique_identifier
 
 
 @pytest.fixture

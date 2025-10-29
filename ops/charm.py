@@ -1031,7 +1031,6 @@ class SecretEvent(HookEvent):
             backend=backend,
             id=self._id,
             label=self._label,
-            _secret_set_cache=self.framework.model._cache._secret_set_cache,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -1570,7 +1569,6 @@ class CharmBase(Object):
                 value = model.Secret(
                     backend=self.model._backend,
                     id=value,
-                    _secret_set_cache=self.model._cache._secret_set_cache,
                 )
             config[attr] = value
         try:

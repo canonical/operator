@@ -27,3 +27,15 @@ actions:
             fields:
                 type: string
                 description: comma-separated list of metadata fields to set
+    set-secret-flow:
+        params:
+            # Either id or label must be set
+            secretid:
+                type: string
+                description: optional, id of the secret to operate on
+            secretlabel:
+                type: string
+                description: optional, label of the secret to operate on
+            flow:
+                type: string
+                description: data or metadata fields to set, in order
