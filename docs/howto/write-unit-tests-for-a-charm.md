@@ -162,6 +162,25 @@ def test_charm_runs(my_charm):
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
 
+## Reusing the state
+
+Try to make each test an isolated test of a particular event handler. After checking the `State` that `ctx.run` returns, you shouldn't need to reuse the `State` as input to another event handler.
+
+However, if you do need to reuse a `State`, don't try to modify the `State`. In general, the objects in a `State` are immutable. To reuse a `State`, create a `State` with the required data. For example:
+
+```python
+state_out = ctx.run(...)  # The State we want to reuse.
+relation = state_out.get_relation(...)  # A relation we want to modify.
+
+# Copy and modify the relation data.
+new_local_app_data = local_app_data.copy()
+new_local_app_data["foo"] = "bar"
+
+# Create a State.
+new_relation = dataclasses.replace(relation, local_app_data=new_local_app_data)
+new_state = dataclasses.replace(state_out, relations={new_relation})
+```
+
 ## Accessing the charm instance
 
 If you need to access the charm instance in a test, use the `testing.Context` instance as a context manager, then access `mgr.charm`. When setting up the context manager, use an event the charm doesn't observe, such as `update_status`. For example:
