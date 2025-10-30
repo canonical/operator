@@ -21,7 +21,7 @@ storage:
 
 If you don't specify a location for the storage, Juju mounts the storage at the default location:
 
-```
+```text
 /var/lib/juju/storage/<storage-name>/0
 ```
 
