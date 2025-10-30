@@ -262,7 +262,7 @@ def test_my_integration(charm: pathlib.Path, juju: jubilant.Juju):
 
 > See more: [](jubilant.Juju.integrate)
 
-This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available.
+This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available. If all your tests depend on the same charm being deployed, you could make `charm` an `autouse` fixture.
 
 ### Test a configuration
 
