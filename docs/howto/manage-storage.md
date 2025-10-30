@@ -144,10 +144,10 @@ def _update_configuration(self, event: ops.EventBase):
         logger.info("Storage is not yet ready.")
         return
     # Storage is available. Write some data to the cache.
-    cache_in_container = self.meta.containers["my-container"].mounts["cache"]
+    cache_in_container = self.meta.containers["web-service"].mounts["cache"]
     cache_root = pathops.ContainerPath(
         cache_in_container.location,
-        container=self.unit.get_container("my-container"),
+        container=self.unit.get_container("web-service"),
     )
     try:
         (cache_root / "data.json").write_text("...")
@@ -164,10 +164,10 @@ Instead of directly writing data to the storage, your charm could put the storag
 ```python
     ...
     # Storage is available. Pass the storage location to the workload.
-    cache_in_container = self.meta.containers["my-container"].mounts["cache"]
+    cache_in_container = self.meta.containers["web-service"].mounts["cache"]
     config_path = pathops.ContainerPath(
         "/etc/my-app/cache-path.config",
-        container=self.unit.get_container("my-container"),
+        container=self.unit.get_container("web-service"),
     )
     try:
         config_path.write_text(cache_in_container.location)
