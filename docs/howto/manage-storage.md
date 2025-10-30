@@ -2,9 +2,7 @@
 # How to manage storage
 > See first: {external+juju:ref}`Juju | Storage <storage>`, {external+juju:ref}`Juju | Manage storage <manage-storage>`, {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
 
-## Implement the feature
-
-### Declare the storage
+## Declare the storage
 
 To define the storage that can be provided to the charm, define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. For example, for a transient filesystem storage mounted to `/cache/` that is at least 1GB in size:
 
@@ -73,7 +71,7 @@ def _on_mystorage_storage_attached(self, event: ops.StorageAttachedEvent):
     ... # tell workload service to reload config/restart, etc.
 ```
 
-### Observe the `storage-attached` event and define an event handler
+## Observe the `storage-attached` event and define an event handler
 
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the `storage-attached` event associated with your storage and pair that with an event handler, typically a holistic one. For example:
 
@@ -107,7 +105,7 @@ def _update_configuration(self, event: ops.EventBase):
 
 > Examples: [ZooKeeper ensuring that permission and ownership is correct](https://github.com/canonical/zookeeper-operator/blob/106f9c2cd9408a172b0e93f741d8c9f860c4c38e/src/charm.py#L247), [Kafka configuring additional storage](https://github.com/canonical/kafka-k8s-operator/blob/25cc5dd87bc2246c38fc511ac9c52f35f75f6513/src/charm.py#L298)
 
-### Observe the detaching event and define an event handler
+## Observe the detaching event and define an event handler
 
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the detaching event associated with your storage and pair that with an event handler. For example:
 
@@ -127,7 +125,7 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
 
 > Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823), [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
 
-### Request additional storage
+## Request additional storage
 
 ```{note}
 
@@ -166,7 +164,7 @@ The storage will not be available immediately after that call - the charm should
 observe the `storage-attached` event and handle any remaining setup once Juju
 has attached the new storage.
 
-### Write unit tests
+## Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`
 
@@ -229,7 +227,7 @@ ctx.run(ctx.on.storage_attached(foo_1), testing.State(storages={foo_0, foo_1}))
 
 > See more: [](ops.testing.Storage)
 
-### Write integration tests
+## Write integration tests
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
