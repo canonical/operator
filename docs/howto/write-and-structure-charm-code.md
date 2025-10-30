@@ -21,12 +21,9 @@ In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
 ```{note}
-In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
+In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
 If you are charming an application built with a popular framework, check if
 charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-
-Avoid the default (`--profile=simple`), which provides a demo charm, rather than
-a base for building a charm of your own.
 ```
 
 If your repository will hold multiple charms, or a charm and source for other
@@ -372,6 +369,14 @@ letting the charm crash and go into an error state.
 ```{tip}
 By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
+```
+
+(follow-best-practices)=
+## Follow best practices
+
+Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
+
+```{include} ../reuse/best-practices.txt
 ```
 
 (validate-your-charm-with-every-change)=

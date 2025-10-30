@@ -61,7 +61,7 @@ benchmark = [
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
-    "jubilant~=1.2",
+    "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
@@ -117,8 +117,7 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 exclude = ["examples"]
-# FIXME
-target-version = "py38"
+target-version = "py310"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
 # Ruff formatter configuration

@@ -18,14 +18,14 @@ from __future__ import annotations
 import logging
 import pathlib
 import subprocess
-from typing import Callable, Generator
+from collections.abc import Callable, Generator
 
 import jubilant
 import minio
 import pytest
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def juju() -> Generator[jubilant.Juju]:
     """Make a Juju model for testing."""
     with jubilant.temp_model() as juju:
@@ -86,11 +86,10 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
 def tracing_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
     """Prepare and return the test_tracing charm directory.
 
-    Builds and injects `ops` and `ops-tracing` from the local checkout in to the
+    Builds and injects `ops` and `ops-tracing` from the local checkout into the
     charm's dependencies. Cleans up afterwards.
     """
-    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'  # type: ignore
-    assert isinstance(charm_dir, pathlib.Path)
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_tracing'
     yield from _prepare_generic_charm_dir(root_path=pytestconfig.rootpath, charm_dir=charm_dir)
 
 
@@ -98,11 +97,23 @@ def tracing_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
 def relation_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
     """Prepare and return the test_relation charm directory.
 
-    Builds and injects `ops` from the local checkout in to the charm's
+    Builds and injects `ops` from the local checkout into the charm's
     dependencies. Cleans up afterwards.
     """
-    charm_dir = pytestconfig.rootpath / 'test/charms/test_relation'  # type: ignore
-    assert isinstance(charm_dir, pathlib.Path)
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_relation'
+    yield from _prepare_generic_charm_dir(
+        root_path=pytestconfig.rootpath, charm_dir=charm_dir, build_tracing=False
+    )
+
+
+@pytest.fixture(scope='session')
+def secrets_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
+    """Prepare and return the test_secrets charm directory.
+
+    Builds and injects `ops` from the local checkout into the charm's
+    dependencies. Cleans up afterwards.
+    """
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_secrets'
     yield from _prepare_generic_charm_dir(
         root_path=pytestconfig.rootpath, charm_dir=charm_dir, build_tracing=False
     )
@@ -186,6 +197,16 @@ def build_relation_charm(relation_charm_dir: pathlib.Path) -> Generator[Callable
     Call the fixture value to get the built charm file path.
     """
     yield from _build_charm(relation_charm_dir, 'test-relation_amd64.charm')
+
+
+@pytest.fixture(scope='session')
+def build_secrets_charm(secrets_charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
+    """Build the test_secrets charm and provide the artefact path.
+
+    Starts building the test-relation charm early.
+    Call the fixture value to get the built charm file path.
+    """
+    yield from _build_charm(secrets_charm_dir, 'test-secrets_amd64.charm')
 
 
 def _build_charm(charm_dir: pathlib.Path, expected_artifact: str) -> Generator[Callable[[], str]]:

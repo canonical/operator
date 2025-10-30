@@ -15,11 +15,65 @@ The instructions all use the Jubilant library.
 
 > See more: [Jubilant documentation](https://documentation.ubuntu.com/jubilant/)
 
+(write-integration-tests-for-a-charm-prepare-your-environment)=
 ## Prepare your environment
 
-In order to run integrations tests you will need to have your environment set up with a Juju controller and have `tox` installed.
+To run integration tests, you'll need a Juju controller and [tox](https://tox.wiki/en/). We recommend that you set up a Juju controller inside a virtual machine instead of your host machine.
 
-> See more: {external+juju:ref}`Set up your deployment <set-up-your-deployment>`
+### Create a virtual machine
+
+Use [Multipass](https://canonical.com/multipass/install) to create a virtual machine:
+
+```text
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass shell juju-sandbox  # Switch to your virtual machine.
+```
+
+Then use [Concierge](https://github.com/canonical/concierge) to set up a Juju controller inside your virtual machine:
+
+```text
+sudo snap install --classic concierge
+sudo concierge prepare -p <preset> --extra-snaps astral-uv
+```
+
+Where `<preset>` is `machine`, `kubernetes`, or another of Concierge's presets. This also installs [uv](https://docs.astral.sh/uv/).
+
+Next, use uv to install tox:
+
+```text
+uv tool install tox --with tox-uv
+```
+
+Your virtual machine is now ready. Before using your virtual machine, we recommend that you do a couple more setup steps.
+
+### Take a snapshot
+
+Use {external+multipass:ref}`snapshot <reference-command-line-interface-snapshot>` to take a snapshot of your virtual machine:
+
+```text
+exit  # Switch back to your host machine.
+multipass stop juju-sandbox
+multipass snapshot juju-sandbox
+```
+
+If your virtual machine gets into an undesirable state, use {external+multipass:ref}`restore <reference-command-line-interface-restore>` to restore to this point.
+
+### Mount your project directory
+
+With your virtual machine stopped, make your project directory available inside your virtual machine, then start your virtual machine:
+
+```text
+multipass mount --type native /path/to/my-charm juju-sandbox:~/my-charm
+multipass shell juju-sandbox
+```
+
+Then go into your project directory inside the virtual machine:
+
+```text
+cd my-charm
+```
+
+When it's time to run the integration tests, you'll run them from this directory.
 
 ## Prepare the `tox.ini` configuration file
 
@@ -316,6 +370,10 @@ By default you can run all your tests with:
 
 ```text
 tox -e integration
+```
+
+```{note}
+If you set up Juju inside a virtual machine, run this tox command in your project directory inside your virtual machine.
 ```
 
 These tests will use the context of the current controller in Juju, and by default will create a new model per module, that will be destroyed when the test is finished. The cloud, controller and model name can be specified with the parameters `--cloud`, `--controller` and `--model` parameters.

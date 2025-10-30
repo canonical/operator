@@ -41,6 +41,10 @@ Congratulations!
 Writing a charm is also known as "charming", and you are now a charmer!
 ```
 
+As you write your own charm, use [](#write-and-structure-charm-code) as a guide to best practices. For an overview of the whole charm development process, see [](#manage-charms).
+
+As you prepare for other people to use your charm, you'll publish your charm on Charmhub. See {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>`. At this stage, make sure to also review [](#charm-maturity) and [](#make-your-charm-discoverable).
+
 There's plenty more to explore:
 
 | If you're wondering... | visit...             |

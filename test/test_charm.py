@@ -35,7 +35,8 @@ import ops
 import ops.charm
 from ops import testing
 from ops._main import _Abort
-from ops.model import ModelError, StatusName
+from ops.hookcmds import StatusName
+from ops.model import ModelError
 
 from .test_helpers import FakeScript, create_framework
 
@@ -312,10 +313,10 @@ storage:
     fake_script.write(
         'storage-get',
         """
-        if [ "$1" = "-s" ]; then
-            id=${2#*/}
-            key=${2%/*}
-            echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+        if [ "$2" = "-s" ]; then
+            id=${3#*/}
+            key=${3%/*}
+            echo "{\\"kind\\": \\"filesystem\\", \\"location\\": \\"/var/srv/${key}/${id}\\"}"
         elif [ "$1" = '--help' ]; then
             printf '%s\\n' \\
             'Usage: storage-get [options] [<key>]' \\
@@ -705,9 +706,9 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     assert charm.seen_action_params == {'foo-name': 'name', 'silent': True}
     assert fake_script.calls() == [
         ['action-get', '--format=json'],
-        ['action-log', 'test-log'],
+        ['action-log', '--', 'test-log'],
         ['action-set', 'res=val with spaces', f'id={action_id}'],
-        ['action-fail', 'test-fail'],
+        ['action-fail', '--', 'test-fail'],
     ]
 
 
@@ -952,32 +953,6 @@ def test_secret_event_remove_revision(
     ]
 
 
-def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
-    class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.secrets: list[ops.Secret] = []
-            self.framework.observe(self.on.secret_changed, self.on_secret_changed)
-
-        def on_secret_changed(self, event: ops.SecretChangedEvent):
-            event.secret.set_info(description='desc')
-            event.secret.set_content({'key': 'value'})
-            self.secrets.append(event.secret)
-
-    fake_script.write('secret-get', """echo '{"key": "value"}'""")
-    fake_script.write('secret-set', 'exit 0')
-
-    framework = create_framework(request)
-    charm = MyCharm(framework)
-
-    charm.on.secret_changed.emit('secret:changed', None)
-    charm.on.secret_changed.emit('secret:changed', None)
-    cache = charm.secrets[0]._secret_set_cache
-    assert cache is charm.secrets[1]._secret_set_cache
-    assert charm.secrets[0]._secret_set_cache['secret:changed']['description'] == 'desc'
-    assert 'content' in cache['secret:changed']
-
-
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -999,7 +974,7 @@ def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: 
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=True', 'blocked', 'first'],
+        ['status-set', '--application=True', 'blocked', '--', 'first'],
     ]
 
 
@@ -1065,7 +1040,7 @@ def test_collect_unit_status(request: pytest.FixtureRequest, fake_script: FakeSc
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=False', 'blocked', 'first'],
+        ['status-set', '--application=False', 'blocked', '--', 'first'],
     ]
 
 
@@ -1112,8 +1087,8 @@ def test_collect_app_and_unit_status(request: pytest.FixtureRequest, fake_script
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=True', 'active', ''],
-        ['status-set', '--application=False', 'waiting', 'blah'],
+        ['status-set', '--application=True', 'active', '--', ''],
+        ['status-set', '--application=False', 'waiting', '--', 'blah'],
     ]
 
 
@@ -1166,7 +1141,7 @@ def test_collect_status_priority_valid(
     ops.charm._evaluate_status(charm)
 
     status_set_calls = [call for call in fake_script.calls(True) if call[0] == 'status-set']
-    assert status_set_calls == [['status-set', '--application=True', expected, '']]
+    assert status_set_calls == [['status-set', '--application=True', expected, '--', '']]
 
 
 @pytest.mark.parametrize(

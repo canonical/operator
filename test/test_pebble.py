@@ -21,7 +21,6 @@ import email.parser
 import io
 import json
 import signal
-import socket
 import tempfile
 import typing
 import unittest
@@ -2132,7 +2131,7 @@ class TestClient:
     def test_wait_change_socket_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
             time.sleep(n)
-            raise socket.timeout('socket.timeout: timed out')
+            raise TimeoutError('socket.timeout: timed out')
 
         client.responses.append(lambda: timeout_response(3))
 

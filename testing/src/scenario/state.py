@@ -18,21 +18,15 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
-    Dict,
     Final,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     NoReturn,
-    Sequence,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from uuid import uuid4
 
 import yaml
@@ -69,8 +63,8 @@ if TYPE_CHECKING:  # pragma: no cover
         workload_version: str
 
 
-AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
-RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
+AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
+RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -216,7 +210,7 @@ def _max_posargs(n: int):
         def __reduce__(self):
             # The default __reduce__ doesn't understand that some arguments have
             # to be passed as keywords, so using the copy module fails.
-            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
+            attrs = cast('dict[str, Any]', super().__reduce__()[2])
             return (lambda: self.__class__(**attrs), ())
 
     return _MaxPositionalArgs
@@ -452,7 +446,9 @@ class Address(_max_posargs(1)):
 class BindAddress(_max_posargs(1)):
     """An address bound to a network interface in a Juju space."""
 
-    addresses: Sequence[Address]
+    # This has the 'ops.testing.' prefix so that Sphinx knows which
+    # 'Address' class it is (it's not the one from 'hookcmds').
+    addresses: Sequence[ops.testing.Address]
     """The addresses in the space."""
     interface_name: str = ''
     """The name of the network interface."""
@@ -463,7 +459,7 @@ class BindAddress(_max_posargs(1)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        """Dumps itself to dict in the same format the hook tool would."""
+        """Dumps itself to dict in the same format the hook command would."""
         dct = {
             'interface-name': self.interface_name,
             'addresses': [dataclasses.asdict(addr) for addr in self.addresses],
@@ -516,7 +512,7 @@ class Network(_max_posargs(2)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
+        # dumps itself to dict in the same format the hook command would
         return {
             'bind-addresses': [ba._hook_tool_output_fmt() for ba in self.bind_addresses],
             'egress-subnets': self.egress_subnets,
