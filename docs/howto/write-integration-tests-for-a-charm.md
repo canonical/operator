@@ -407,7 +407,7 @@ Your tests will detect a `.charm` file and deploy it. To specify which `.charm` 
 CHARM_PATH=/path/to/foo.charm tox -e integration
 ```
 
-Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when the test is finished. This is determined by the scope of the `juju` fixture.
+Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when all the tests in the module have finished. This is determined by the scope of the `juju` fixture.
 
 Use the `--cloud`, `--controller`, and `--model` parameters to specify the cloud, controller, and model name. If you specify the model name and include the `--keep-models` parameter, you can reuse a model from a previous test run. For example:
 
