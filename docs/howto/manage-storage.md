@@ -2,48 +2,59 @@
 # How to manage storage
 > See first: {external+juju:ref}`Juju | Storage <storage>`, {external+juju:ref}`Juju | Manage storage <manage-storage>`, {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
 
-## Declare the storage
+## Manage storage for a machine charm
 
-To define the storage that can be provided to the charm, define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. For example, for a transient filesystem storage mounted to `/cache/` that is at least 1GB in size:
+### Define storage
+
+Define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. For example, for a transient filesystem storage mounted to `/cache/` that is at least 1GB in size:
 
 ```yaml
 storage:
-  local-cache:
-      type: filesystem
-      description: Somewhere to cache files locally.
-      location: /cache/
-      minimum-size: 1G
-      properties:
-          - transient
+  cache:
+    type: filesystem
+    description: Somewhere to cache files locally.
+    location: /cache/
+    minimum-size: 1G
+    properties:
+      - transient
 ```
 
-For Kubernetes charms, you also need to define where on the workload container the volume will be mounted. For example, to mount a similar cache filesystem in `/var/cache/`:
+If you don't specify a location for the storage, Juju mounts the storage at the default location:
+
+```
+/var/lib/juju/storage/<storage-name>/0
+```
+
+## Manage storage for a Kubernetes charm
+
+### Define storage
+
+Define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. Also specify where to mount the storage in the workload container.
+
+For example, for a transient filesystem storage that is at least 1GB in size:
 
 ```yaml
 storage:
-  local-cache:
-      type: filesystem
-      description: Somewhere to cache files locally.
-      # The location is not required here, because it defines the location on
-      # the charm container, not the workload container.
-      minimum-size: 1G
-      properties:
-          - transient
+  cache:
+    type: filesystem
+    description: Somewhere to cache files locally.
+    minimum-size: 1G
+    properties:
+      - transient
 
 containers:
   web-service:
     resource: app-image
     mounts:
-      - storage: local-cache
+      - storage: cache
         location: /var/cache
 ```
 
-When you use storage mounts with Juju, they will be automatically mounted into the charm container at either:
+Juju mounts the storage at `/var/cache` in the workload container.
 
-* the specified location based on the storage section of `charmcraft.yaml`, or
-* the default location `/var/lib/juju/storage/<storage-name>/<num>`, where num is zero for 'normal'/singular storages or an integer ID for storages that support multiple attachments.
+## Access storage
 
-However, charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code. For example:
+Charms should not hard-code a location for mounted storage. To access mounted storage resources, retrieve the desired storage's mount location from within your charm code. For example:
 
 ```python
 ...
