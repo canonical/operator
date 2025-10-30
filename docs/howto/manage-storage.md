@@ -50,7 +50,7 @@ def _update_configuration(self, event: ops.EventBase):
     (cache_root / "data.json").write_text("...")
 ```
 
-This example uses charmlibs-pathops to write data to the storage.
+This example uses {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` to write data to the storage.
 
 Instead of directly writing data to the storage, your charm could put the storage location in a configuration file. For example:
 
@@ -157,7 +157,7 @@ def _update_configuration(self, event: ops.EventBase):
         return
 ```
 
-This example uses charmlibs-pathops to write data to the storage in the workload container.
+This example uses {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` to write data to the storage in the workload container.
 
 Instead of directly writing data to the storage, your charm could put the storage location in a configuration file. For example:
 
