@@ -164,7 +164,7 @@ If you use pytest, you should put the `my_charm` fixture in a top level `conftes
 
 ## Reusing state
 
-Each test is typically an isolated test of a single event handler. If you need to use the same input state for several events, we recommend using a fixture that produces the input state. For example:
+Each test is typically an isolated test of how your charm responds to a single event. If you need to use the same input state for several events, we recommend using a fixture that produces the input state. For example:
 
 ```python
 @pytest.fixture
@@ -189,9 +189,9 @@ def test_status(state_normal):
     # Check the output state.
 ```
 
-Sometimes it's more convenient to test several event handlers in the same function. For example, to check what happens when your charm receives events in a particular order.
+Sometimes it's more convenient to simulate several events in the same test. For example, to check what happens when your charm receives events in a particular order.
 
-After checking a `State` object that `ctx.run` returns, you can provide the same state as input to another event handler. If you need to modify the state between the event handlers, create a new `State` object instead of modifying the original `State` object. For example:
+After checking a `State` object that `ctx.run` returns, you can provide the same state as input to another simulated event. If you need to modify the state between the events, create a new `State` object instead of modifying the original `State` object. For example:
 
 ```python
 state_out = ctx.run(...)  # The State we want to reuse.
