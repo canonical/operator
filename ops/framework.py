@@ -972,7 +972,8 @@ class Framework(Object):
     def _reemit(self, single_event_path: str | None = None):
         last_event_path = None
         deferred = True
-        for event_path, observer_path, method_name in self._storage.notices(single_event_path):
+        notices = tuple(self._storage.notices(single_event_path))
+        for event_path, observer_path, method_name in notices:
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
@@ -993,7 +994,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug('Re-emitting deferred event %s.', event)
+                    logger.debug('Re-emitting deferred event %s of total %d.', event, len(notices))
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
