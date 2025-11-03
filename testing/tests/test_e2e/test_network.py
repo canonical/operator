@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import pytest
 from ops import RelationNotFoundError
 from ops.charm import CharmBase

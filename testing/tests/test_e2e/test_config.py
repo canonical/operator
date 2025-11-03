@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework

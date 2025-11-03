@@ -33,7 +33,7 @@ def mycharm():
     return MyCharm
 
 
-def test_initial_status(mycharm):
+def test_initial_status(mycharm: type[ops.CharmBase]) -> None:
     def post_event(charm: CharmBase):
         assert charm.unit.status == UnknownStatus()
 
@@ -48,7 +48,7 @@ def test_initial_status(mycharm):
     assert out.unit_status == UnknownStatus()
 
 
-def test_status_history(mycharm):
+def test_status_history(mycharm: type[ops.CharmBase]) -> None:
     class StatusCharm(mycharm):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -82,7 +82,7 @@ def test_status_history(mycharm):
     ]
 
 
-def test_status_history_preservation(mycharm):
+def test_status_history_preservation(mycharm: type[ops.CharmBase]) -> None:
     class StatusCharm(mycharm):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -113,7 +113,7 @@ def test_status_history_preservation(mycharm):
     assert ctx.app_status_history == [ActiveStatus('bar')]
 
 
-def test_workload_history(mycharm):
+def test_workload_history(mycharm: type[ops.CharmBase]) -> None:
     class WorkloadCharm(mycharm):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

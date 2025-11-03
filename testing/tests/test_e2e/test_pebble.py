@@ -34,7 +34,7 @@ def charm_cls():
     return MyCharm
 
 
-def test_no_containers(charm_cls):
+def test_no_containers(charm_cls: type[ops.CharmBase]) -> None:
     def callback(self: CharmBase):
         assert not self.unit.containers
 
@@ -47,7 +47,7 @@ def test_no_containers(charm_cls):
     )
 
 
-def test_containers_from_meta(charm_cls):
+def test_containers_from_meta(charm_cls: type[ops.CharmBase]) -> None:
     def callback(self: CharmBase):
         assert self.unit.containers
         assert self.unit.get_container('foo')
@@ -75,7 +75,7 @@ def test_connectivity(charm_cls, can_connect):
     )
 
 
-def test_fs_push(charm_cls):
+def test_fs_push(charm_cls: type[ops.CharmBase]) -> None:
     text = 'lorem ipsum/n alles amat gloriae foo'
     file = tempfile.NamedTemporaryFile()
     pth = Path(file.name)
@@ -241,7 +241,7 @@ def test_exec_history_stdin(stdin, write):
     assert ctx.exec_history[container.name][0].stdin == 'hello world!'
 
 
-def test_pebble_ready(charm_cls):
+def test_pebble_ready(charm_cls: type[ops.CharmBase]) -> None:
     def callback(self: CharmBase):
         foo = self.unit.get_container('foo')
         assert foo.can_connect()
@@ -333,7 +333,7 @@ def test_pebble_plan(charm_cls, starting_service_status):
     assert container.services['barserv'].startup == pebble.ServiceStartup.DISABLED
 
 
-def test_exec_wait_error(charm_cls):
+def test_exec_wait_error(charm_cls: type[ops.CharmBase]) -> None:
     state = State(
         containers={
             Container(
@@ -375,7 +375,7 @@ def test_exec_wait_output(charm_cls, command):
         assert ctx.exec_history[container.name][0].command == command
 
 
-def test_exec_wait_output_error(charm_cls):
+def test_exec_wait_output_error(charm_cls: type[ops.CharmBase]) -> None:
     state = State(
         containers={
             Container(
@@ -394,7 +394,7 @@ def test_exec_wait_output_error(charm_cls):
             proc.wait_output()
 
 
-def test_pebble_custom_notice(charm_cls):
+def test_pebble_custom_notice(charm_cls: type[ops.CharmBase]) -> None:
     notices = [
         Notice(key='example.com/foo'),
         Notice(key='example.com/bar', last_data={'a': 'b'}),

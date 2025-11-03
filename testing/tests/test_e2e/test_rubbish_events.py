@@ -58,14 +58,14 @@ def test_rubbish_pebble_ready_event_raises(mycharm: CharmBase, monkeypatch: pyte
 
 
 @pytest.mark.parametrize('evt_name', ('qux',))
-def test_custom_events_fail(mycharm, evt_name):
+def test_custom_events_fail(mycharm, evt_name: str) -> None:
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
 
 # cfr: https://github.com/PietroPasotti/ops-scenario/pull/11#discussion_r1101694961
 @pytest.mark.parametrize('evt_name', ('sub',))
-def test_custom_events_sub_raise(mycharm, evt_name):
+def test_custom_events_sub_raise(mycharm, evt_name: str) -> None:
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 

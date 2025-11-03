@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import dataclasses
 
 import pytest
@@ -32,7 +34,7 @@ def mycharm():
     return MyCharm
 
 
-def test_charm_heals_on_start(mycharm):
+def test_charm_heals_on_start(mycharm: type[ops.CharmBase]) -> None:
     def pre_event(charm):
         assert charm.unit.status == BlockedStatus('foo')
         assert not charm.called
@@ -78,7 +80,7 @@ def test_charm_heals_on_start(mycharm):
     ]
 
 
-def test_relation_data_access(mycharm):
+def test_relation_data_access(mycharm: type[ops.CharmBase]) -> None:
     mycharm._call = lambda *_: True
 
     def check_relation_data(charm):
