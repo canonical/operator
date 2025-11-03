@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import sys
 
+from pytest import Pytester
+
 pytest_plugins = 'pytester'
 sys.path.append('.')
 
 
-def test_plugin_ctx_run(pytester):
+def test_plugin_ctx_run(pytester: Pytester) -> None:
     # create a temporary pytest test module
     pytester.makepyfile(
         """
