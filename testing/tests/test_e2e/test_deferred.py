@@ -41,14 +41,14 @@ def mycharm():
     return MyCharm
 
 
-def test_defer(mycharm):
+def test_defer(mycharm: type[ops.CharmBase]) -> None:
     mycharm.defer_next = True
     out = trigger(State(), 'start', mycharm, meta=mycharm.META)
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 
 
-def test_deferred_evt_emitted(mycharm):
+def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]) -> None:
     mycharm.defer_next = 2
 
     out = trigger(
@@ -69,7 +69,7 @@ def test_deferred_evt_emitted(mycharm):
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_relation_event(mycharm):
+def test_deferred_relation_event(mycharm: type[ops.CharmBase]) -> None:
     mycharm.defer_next = 2
 
     rel = Relation(endpoint='foo', remote_app_name='remote')
@@ -99,7 +99,7 @@ def test_deferred_relation_event(mycharm):
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_relation_event_from_relation(mycharm):
+def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(mycharm, meta=mycharm.META)
     mycharm.defer_next = 2
     rel = Relation(endpoint='foo', remote_app_name='remote')
@@ -132,7 +132,7 @@ def test_deferred_relation_event_from_relation(mycharm):
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_workload_event(mycharm):
+def test_deferred_workload_event(mycharm: type[ops.CharmBase]) -> None:
     mycharm.defer_next = 2
 
     ctr = Container('foo')
@@ -160,7 +160,7 @@ def test_deferred_workload_event(mycharm):
     assert isinstance(start, ops.StartEvent)
 
 
-def test_defer_reemit_lifecycle_event(mycharm):
+def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     mycharm.defer_next = 1
@@ -178,7 +178,7 @@ def test_defer_reemit_lifecycle_event(mycharm):
     assert not state_2.deferred
 
 
-def test_defer_reemit_relation_event(mycharm):
+def test_defer_reemit_relation_event(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)
 
     rel = Relation('foo')
@@ -228,7 +228,7 @@ class MyConsumer(ops.Object):
         super().__init__(charm, 'my-consumer')
 
 
-def test_defer_custom_event(mycharm):
+def test_defer_custom_event(mycharm: type[ops.CharmBase]) -> None:
     class MyCharm(mycharm):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

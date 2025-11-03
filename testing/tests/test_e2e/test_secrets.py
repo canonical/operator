@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import collections
 import datetime
 from typing import Literal, cast
@@ -26,7 +28,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
@@ -500,11 +502,11 @@ def test_add_grant_revoke_remove():
 
 def test_secret_removed_event():
     class SecretCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
-        def _on_secret_remove(self, event):
+        def _on_secret_remove(self, event: ops.EventBase):
             event.secret.remove_revision(event.revision)
 
     ctx = Context(SecretCharm, meta={'name': 'foo'})
@@ -520,11 +522,11 @@ def test_secret_removed_event():
 
 def test_secret_expired_event():
     class SecretCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_expired, self._on_secret_expired)
 
-        def _on_secret_expired(self, event):
+        def _on_secret_expired(self, event: ops.EventBase):
             event.secret.set_content({'password': 'newpass'})
             event.secret.remove_revision(event.revision)
 
@@ -541,11 +543,11 @@ def test_secret_expired_event():
 
 def test_remove_bad_revision():
     class SecretCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
-        def _on_secret_remove(self, event):
+        def _on_secret_remove(self, event: ops.EventBase):
             with pytest.raises(ValueError):
                 event.secret.remove_revision(event.revision)
 
@@ -563,7 +565,7 @@ def test_remove_bad_revision():
 
 def test_set_label_on_get():
     class SecretCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 

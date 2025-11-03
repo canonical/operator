@@ -12,7 +12,7 @@ class MyCharm(ops.CharmBase):
         for evt in self.on.events().values():
             self.framework.observe(evt, self._on_event)
 
-    def _on_event(self, event):
+    def _on_event(self, event: ops.EventBase) -> None:
         pass
 
 

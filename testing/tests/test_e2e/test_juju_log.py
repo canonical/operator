@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import ops
 import pytest
 from ops.charm import CharmBase, CollectStatusEvent
 
@@ -12,16 +13,16 @@ logger = logging.getLogger('testing logger')
 
 
 @pytest.fixture(scope='function')
-def mycharm():
+def mycharm() -> type[CharmBase]:
     class MyCharm(CharmBase):
         META = {'name': 'mycharm'}
 
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase) -> None:
             if isinstance(event, CollectStatusEvent):
                 return
             print('foo!')
@@ -30,7 +31,7 @@ def mycharm():
     return MyCharm
 
 
-def test_juju_log(mycharm):
+def test_juju_log(mycharm: type[CharmBase]) -> None:
     ctx = Context(mycharm, meta=mycharm.META)
     ctx.run(ctx.on.start(), State())
     assert JujuLogLine(level='DEBUG', message='Emitting Juju event start.') in ctx.juju_log

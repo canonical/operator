@@ -74,25 +74,25 @@ def create_tempcharm(
         yield charm
 
 
-def test_autoload_no_meta_fails(tmp_path):
+def test_autoload_no_meta_fails(tmp_path: Path) -> None:
     with create_tempcharm(tmp_path) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_no_type_fails(tmp_path):
+def test_autoload_no_type_fails(tmp_path: Path) -> None:
     with create_tempcharm(tmp_path, meta={'name': 'foo'}) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_legacy_no_meta_fails(tmp_path):
+def test_autoload_legacy_no_meta_fails(tmp_path: Path) -> None:
     with create_tempcharm(tmp_path, legacy=True) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_legacy_no_type_passes(tmp_path):
+def test_autoload_legacy_no_type_passes(tmp_path: Path) -> None:
     with create_tempcharm(tmp_path, legacy=True, meta={'name': 'foo'}) as charm:
         _CharmSpec.autoload(charm)
 

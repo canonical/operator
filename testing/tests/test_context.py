@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import os
 from unittest.mock import patch
 
@@ -98,12 +100,12 @@ def test_app_name_and_unit_id():
 
 def test_context_manager_uncaught_error():
     class CrashyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             raise RuntimeError('Crash!')
 
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
@@ -116,12 +118,12 @@ def test_context_manager_uncaught_error():
 
 def test_run_uncaught_error():
     class CrashyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             raise RuntimeError('Crash!')
 
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
@@ -132,12 +134,12 @@ def test_run_uncaught_error():
 
 def test_context_manager_env_cleared():
     class GoodCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             os.environ['TEST_ENV_VAR'] = '2'
 
     ctx = Context(GoodCharm, meta={'name': 'crashy'})
@@ -149,11 +151,11 @@ def test_context_manager_env_cleared():
 
 def test_run_env_cleared():
     class GoodCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             os.environ['TEST_ENV_VAR'] = '1'
 
     ctx = Context(GoodCharm, meta={'name': 'crashy'})

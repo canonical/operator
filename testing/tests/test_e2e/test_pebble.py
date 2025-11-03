@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import dataclasses
 import datetime
 import io
@@ -26,7 +28,7 @@ def charm_cls():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
@@ -258,11 +260,11 @@ def test_pebble_ready(charm_cls):
 @pytest.mark.parametrize('starting_service_status', pebble.ServiceStatus)
 def test_pebble_plan(charm_cls, starting_service_status):
     class PlanCharm(charm_cls):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        def _on_ready(self, event):
+        def _on_ready(self, event: ops.EventBase):
             foo = event.workload
 
             assert foo.get_plan().to_dict() == {'services': {'fooserv': {'startup': 'enabled'}}}
@@ -423,7 +425,7 @@ def test_pebble_custom_notice_in_charm():
     expire_after = datetime.timedelta(days=365)
 
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_custom_notice, self._on_custom_notice)
 
@@ -469,11 +471,11 @@ def test_pebble_check_failed():
     infos = []
 
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_failed, self._on_check_failed)
 
-        def _on_check_failed(self, event):
+        def _on_check_failed(self, event: ops.EventBase):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
@@ -504,11 +506,11 @@ def test_pebble_check_recovered():
     infos = []
 
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_recovered, self._on_check_recovered)
 
-        def _on_check_recovered(self, event):
+        def _on_check_recovered(self, event: ops.EventBase):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
@@ -544,10 +546,10 @@ def test_pebble_check_failed_two_containers():
             framework.observe(self.on.foo_pebble_check_failed, self._on_foo_check_failed)
             framework.observe(self.on.bar_pebble_check_failed, self._on_bar_check_failed)
 
-        def _on_foo_check_failed(self, event):
+        def _on_foo_check_failed(self, event: ops.EventBase):
             foo_infos.append(event.info)
 
-        def _on_bar_check_failed(self, event):
+        def _on_bar_check_failed(self, event: ops.EventBase):
             bar_infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}})

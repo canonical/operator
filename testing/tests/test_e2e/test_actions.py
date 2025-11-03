@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ops
+
 import pytest
 from ops import __version__ as ops_version
 from ops.charm import ActionEvent, CharmBase
@@ -20,7 +22,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if handler := self._evt_handler:
                 handler(event)
 
@@ -45,7 +47,7 @@ def test_action_event(mycharm, baz_value):
 
 def test_action_no_results():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.act_action, self._on_act_action)
 
@@ -109,7 +111,7 @@ def test_action_event_outputs(mycharm, res_value):
     assert ctx.action_logs == ['log1', 'log2']
 
 
-def test_action_event_fail(mycharm):
+def test_action_event_fail(mycharm: type[ops.CharmBase]) -> None:
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
@@ -123,7 +125,7 @@ def test_action_event_fail(mycharm):
     assert exc_info.value.message == 'action failed!'
 
 
-def test_action_event_fail_context_manager(mycharm):
+def test_action_event_fail_context_manager(mycharm: type[ops.CharmBase]) -> None:
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
@@ -140,11 +142,11 @@ def test_action_event_fail_context_manager(mycharm):
 
 def test_action_continues_after_fail():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_action, self._on_foo_action)
 
-        def _on_foo_action(self, event):
+        def _on_foo_action(self, event: ops.EventBase):
             event.log('starting')
             event.set_results({'initial': 'result'})
             event.fail('oh no!')
@@ -168,7 +170,7 @@ def _ops_less_than(wanted_major, wanted_minor):
 
 
 @pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
-def test_action_event_has_id(mycharm):
+def test_action_event_has_id(mycharm: type[ops.CharmBase]) -> None:
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
@@ -181,7 +183,7 @@ def test_action_event_has_id(mycharm):
 
 
 @pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
-def test_action_event_has_override_id(mycharm):
+def test_action_event_has_override_id(mycharm: type[ops.CharmBase]) -> None:
     uuid = '0ddba11-cafe-ba1d-5a1e-dec0debad'
 
     def handle_evt(charm: CharmBase, evt: ActionEvent):
@@ -197,16 +199,16 @@ def test_action_event_has_override_id(mycharm):
 
 def test_two_actions_same_context():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_action, self._on_foo_action)
             framework.observe(self.on.bar_action, self._on_bar_action)
 
-        def _on_foo_action(self, event):
+        def _on_foo_action(self, event: ops.EventBase):
             event.log('foo')
             event.set_results({'foo': 'result'})
 
-        def _on_bar_action(self, event):
+        def _on_bar_action(self, event: ops.EventBase):
             event.log('bar')
             event.set_results({'bar': 'result'})
 

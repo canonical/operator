@@ -24,7 +24,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)

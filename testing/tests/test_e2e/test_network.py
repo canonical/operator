@@ -28,7 +28,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -36,7 +36,7 @@ def mycharm():
     return MyCharm
 
 
-def test_ip_get(mycharm):
+def test_ip_get(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(
         mycharm,
         meta={
@@ -74,7 +74,7 @@ def test_ip_get(mycharm):
         assert str(mgr.charm.model.get_binding('foo').network.bind_address) == '4.4.4.4'
 
 
-def test_no_sub_binding(mycharm):
+def test_no_sub_binding(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(
         mycharm,
         meta={
@@ -96,7 +96,7 @@ def test_no_sub_binding(mycharm):
             mgr.charm.model.get_binding('bar').network
 
 
-def test_no_relation_error(mycharm):
+def test_no_relation_error(mycharm: type[ops.CharmBase]) -> None:
     """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
 
     ctx = Context(
@@ -126,7 +126,7 @@ def test_no_relation_error(mycharm):
             mgr.charm.model.get_binding('foo').network
 
 
-def test_juju_info_network_default(mycharm):
+def test_juju_info_network_default(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(
         mycharm,
         meta={'name': 'foo'},
@@ -140,7 +140,7 @@ def test_juju_info_network_default(mycharm):
         assert str(mgr.charm.model.get_binding('juju-info').network.bind_address) == '192.0.2.0'
 
 
-def test_explicit_juju_info_network_override(mycharm):
+def test_explicit_juju_info_network_override(mycharm: type[ops.CharmBase]) -> None:
     ctx = Context(
         mycharm,
         meta={

@@ -51,7 +51,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if self._call:
                 MyCharm.called = True
                 self._call(event)
@@ -625,7 +625,7 @@ def test_broken_relation_not_in_model_relations(mycharm):
 
 def test_get_relation_when_missing():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.update_status, self._on_update_status)
             self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -722,11 +722,11 @@ def test_peer_relation_default_values():
 
 def test_relation_remote_model():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             relation = self.model.get_relation('foo')
             assert relation is not None
             self.remote_model_uuid = relation.remote_model.uuid
