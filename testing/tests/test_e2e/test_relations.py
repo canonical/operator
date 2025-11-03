@@ -387,7 +387,9 @@ def test_relation_events(mycharm: type[ops.CharmBase], evt_name, remote_app_name
     'remote_unit_id',
     (0, 1),
 )
-def test_relation_events_attrs(mycharm: type[ops.CharmBase], evt_name, has_unit, remote_app_name, remote_unit_id):
+def test_relation_events_attrs(
+    mycharm: type[ops.CharmBase], evt_name, has_unit, remote_app_name, remote_unit_id
+):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
     def callback(charm: CharmBase, event):
