@@ -994,7 +994,7 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug('Re-emitting deferred event %s of total %d.', event, len(notices))
+                    logger.debug('Re-emitting deferred event %s (%d in queue).', event, len(notices))
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass
