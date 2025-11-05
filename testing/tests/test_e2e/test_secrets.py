@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import ops
-
 import collections
 import datetime
 from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
+
+import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ModelError

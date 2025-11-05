@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import typing
 
-import ops
 import pytest
+
+import ops
 from ops.framework import LifecycleEvent
 
 from scenario import Context

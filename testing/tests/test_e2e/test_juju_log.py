@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 
-import ops
 import pytest
+
+import ops
 from ops.charm import CharmBase, CollectStatusEvent
 
 from scenario import Context

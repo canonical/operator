@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import ops
-
 import os
 from unittest.mock import patch
 
 import pytest
+
+import ops
 from ops import CharmBase
 
 from scenario import Context, State

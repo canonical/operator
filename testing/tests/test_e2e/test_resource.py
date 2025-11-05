@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import pathlib
 
-import ops
 import pytest
+
+import ops
 
 from scenario import Context, Resource, State
 

@@ -7,9 +7,9 @@ from typing import Any
 from collections.abc import Callable, Iterable, Generator
 
 import yaml
+import pytest
 
 import ops
-import pytest
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus

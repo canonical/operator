@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ops
-
 import dataclasses
 import datetime
 import io
@@ -9,6 +7,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
+import ops
 from ops import PebbleCustomNoticeEvent, PebbleReadyEvent, pebble
 from ops.charm import CharmBase
 from ops.framework import Framework

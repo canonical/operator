@@ -4,9 +4,9 @@ import copy
 import datetime
 import typing
 
-import ops
 import pytest
 
+import ops
 import scenario
 
 
