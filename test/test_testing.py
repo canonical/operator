@@ -7136,7 +7136,10 @@ class TestChecks:
 
     def test_stop_checks(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
-        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        # This generates a warning because there's a security event
+        # logged, but we haven't set up logging properly.
+        with pytest.warns(RuntimeWarning):
+            changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
 
     def test_stop_then_start(self, request: pytest.FixtureRequest):
