@@ -7,9 +7,9 @@ from typing import Any
 from collections.abc import Callable, Iterable, Generator
 
 import yaml
-import pytest
 
 import ops
+import pytest
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
@@ -75,7 +75,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
                 self._call(event)

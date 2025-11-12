@@ -6,8 +6,6 @@ from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
-
-import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ModelError
@@ -28,13 +26,13 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             pass
 
     return MyCharm
 
 
-def test_get_secret_no_secret(mycharm: type[ops.CharmBase]) -> None:
+def test_get_secret_no_secret(mycharm):
     ctx = Context(mycharm, meta={'name': 'local'})
     with ctx(ctx.on.update_status(), State()) as mgr:
         with pytest.raises(SecretNotFoundError):
@@ -44,7 +42,7 @@ def test_get_secret_no_secret(mycharm: type[ops.CharmBase]) -> None:
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret(mycharm: type[ops.CharmBase], owner):
+def test_get_secret(mycharm, owner):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret({'a': 'b'}, owner=owner)
     with ctx(
@@ -55,7 +53,7 @@ def test_get_secret(mycharm: type[ops.CharmBase], owner):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret_get_refresh(mycharm: type[ops.CharmBase], owner):
+def test_get_secret_get_refresh(mycharm, owner):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -71,7 +69,7 @@ def test_get_secret_get_refresh(mycharm: type[ops.CharmBase], owner):
 
 
 @pytest.mark.parametrize('app', (True, False))
-def test_get_secret_nonowner_peek_update(mycharm: type[ops.CharmBase], app):
+def test_get_secret_nonowner_peek_update(mycharm, app):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -95,7 +93,7 @@ def test_get_secret_nonowner_peek_update(mycharm: type[ops.CharmBase], app):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret_owner_peek_update(mycharm: type[ops.CharmBase], owner):
+def test_get_secret_owner_peek_update(mycharm, owner):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -117,7 +115,7 @@ def test_get_secret_owner_peek_update(mycharm: type[ops.CharmBase], owner):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_secret_changed_owner_evt_fails(mycharm: type[ops.CharmBase], owner):
+def test_secret_changed_owner_evt_fails(mycharm, owner):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -136,7 +134,7 @@ def test_secret_changed_owner_evt_fails(mycharm: type[ops.CharmBase], owner):
         ('remove', 1),
     ],
 )
-def test_consumer_events_failures(mycharm: type[ops.CharmBase], evt_suffix, revision):
+def test_consumer_events_failures(mycharm, evt_suffix, revision):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -150,7 +148,7 @@ def test_consumer_events_failures(mycharm: type[ops.CharmBase], evt_suffix, revi
 
 
 @pytest.mark.parametrize('app', (True, False))
-def test_add(mycharm: type[ops.CharmBase], app):
+def test_add(mycharm, app):
     ctx = Context(mycharm, meta={'name': 'local'})
     with ctx(
         ctx.on.update_status(),
@@ -169,7 +167,7 @@ def test_add(mycharm: type[ops.CharmBase], app):
     assert secret.label == 'mylabel'
 
 
-def test_set_legacy_behaviour(mycharm: type[ops.CharmBase]) -> None:
+def test_set_legacy_behaviour(mycharm):
     # in juju < 3.1.7, secret owners always used to track the latest revision.
     # ref: https://bugs.launchpad.net/juju/+bug/2037120
     ctx = Context(mycharm, meta={'name': 'local'}, juju_version='3.1.6')
@@ -207,7 +205,7 @@ def test_set_legacy_behaviour(mycharm: type[ops.CharmBase]) -> None:
     )
 
 
-def test_set(mycharm: type[ops.CharmBase]) -> None:
+def test_set(mycharm):
     ctx = Context(mycharm, meta={'name': 'local'})
     rev1, rev2 = {'foo': 'bar'}, {'foo': 'baz', 'qux': 'roz'}
     with ctx(
@@ -265,7 +263,7 @@ def test_set_juju33(mycharm):
 
 
 @pytest.mark.parametrize('app', (True, False))
-def test_meta(mycharm: type[ops.CharmBase], app):
+def test_meta(mycharm, app):
     ctx = Context(mycharm, meta={'name': 'local'})
     secret = Secret(
         {'a': 'b'},
@@ -295,7 +293,7 @@ def test_meta(mycharm: type[ops.CharmBase], app):
 
 @pytest.mark.parametrize('leader', (True, False))
 @pytest.mark.parametrize('owner', ('app', 'unit', None))
-def test_secret_permission_model(mycharm: type[ops.CharmBase], leader, owner):
+def test_secret_permission_model(mycharm, leader, owner):
     expect_manage = bool(
         # if you're the leader and own this app secret
         (owner == 'app' and leader)
@@ -348,7 +346,7 @@ def test_secret_permission_model(mycharm: type[ops.CharmBase], leader, owner):
 
 
 @pytest.mark.parametrize('app', (True, False))
-def test_grant(mycharm: type[ops.CharmBase], app):
+def test_grant(mycharm, app):
     ctx = Context(mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'bar'}}})
     secret = Secret(
         {'a': 'b'},
@@ -376,7 +374,7 @@ def test_grant(mycharm: type[ops.CharmBase], app):
     assert vals == [{'remote'}] if app else [{'remote/0'}]
 
 
-def test_update_metadata(mycharm: type[ops.CharmBase]) -> None:
+def test_update_metadata(mycharm):
     exp = datetime.datetime(2050, 12, 12)
 
     ctx = Context(mycharm, meta={'name': 'local'})
@@ -426,7 +424,7 @@ def test_grant_after_add(leader):
     ctx.run(ctx.on.start(), state)
 
 
-def test_grant_nonowner(mycharm: type[ops.CharmBase]) -> None:
+def test_grant_nonowner(mycharm):
     secret = Secret(
         {'a': 'b'},
         label='mylabel',
@@ -502,11 +500,11 @@ def test_add_grant_revoke_remove():
 
 def test_secret_removed_event():
     class SecretCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
-        def _on_secret_remove(self, event: ops.EventBase):
+        def _on_secret_remove(self, event):
             event.secret.remove_revision(event.revision)
 
     ctx = Context(SecretCharm, meta={'name': 'foo'})
@@ -522,11 +520,11 @@ def test_secret_removed_event():
 
 def test_secret_expired_event():
     class SecretCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_expired, self._on_secret_expired)
 
-        def _on_secret_expired(self, event: ops.EventBase):
+        def _on_secret_expired(self, event):
             event.secret.set_content({'password': 'newpass'})
             event.secret.remove_revision(event.revision)
 
@@ -543,11 +541,11 @@ def test_secret_expired_event():
 
 def test_remove_bad_revision():
     class SecretCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
-        def _on_secret_remove(self, event: ops.EventBase):
+        def _on_secret_remove(self, event):
             with pytest.raises(ValueError):
                 event.secret.remove_revision(event.revision)
 
@@ -565,7 +563,7 @@ def test_remove_bad_revision():
 
 def test_set_label_on_get():
     class SecretCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 

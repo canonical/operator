@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import ops
 import pytest
 
-import ops
 import scenario
 
 
@@ -12,7 +12,7 @@ class MyCharm(ops.CharmBase):
         for evt in self.on.events().values():
             self.framework.observe(evt, self._on_event)
 
-    def _on_event(self, event: ops.EventBase) -> None:
+    def _on_event(self, event):
         pass
 
 

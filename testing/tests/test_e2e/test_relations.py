@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import pytest
-
 import ops
+import pytest
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -52,7 +51,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             if self._call:
                 MyCharm.called = True
                 self._call(event)
@@ -60,7 +59,7 @@ def mycharm():
     return MyCharm
 
 
-def test_get_relation(mycharm: type[ops.CharmBase]) -> None:
+def test_get_relation(mycharm):
     def pre_event(charm: CharmBase):
         assert charm.model.get_relation('foo')
         assert charm.model.get_relation('bar') is None
@@ -337,7 +336,7 @@ def test_relation_set_bulk_update(
     'remote_app_name',
     ('remote', 'prometheus', 'aodeok123'),
 )
-def test_relation_events(mycharm: type[ops.CharmBase], evt_name, remote_app_name):
+def test_relation_events(mycharm, evt_name, remote_app_name):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
     def callback(charm: CharmBase, e):
@@ -388,9 +387,7 @@ def test_relation_events(mycharm: type[ops.CharmBase], evt_name, remote_app_name
     'remote_unit_id',
     (0, 1),
 )
-def test_relation_events_attrs(
-    mycharm: type[ops.CharmBase], evt_name, has_unit, remote_app_name, remote_unit_id
-):
+def test_relation_events_attrs(mycharm, evt_name, has_unit, remote_app_name, remote_unit_id):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
     def callback(charm: CharmBase, event):
@@ -430,7 +427,7 @@ def test_relation_events_attrs(
     'remote_app_name',
     ('remote', 'prometheus', 'aodeok123'),
 )
-def test_relation_events_no_attrs(mycharm: type[ops.CharmBase], evt_name, remote_app_name, caplog):
+def test_relation_events_no_attrs(mycharm, evt_name, remote_app_name, caplog):
     relation = Relation(
         endpoint='foo',
         interface='foo',
@@ -490,7 +487,7 @@ def test_relation_default_unit_data_peer():
 
 
 @pytest.mark.parametrize('evt_name', ('broken', 'created'))
-def test_relation_events_no_remote_units(mycharm: type[ops.CharmBase], evt_name, caplog):
+def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
     relation = Relation(
         endpoint='foo',
         interface='foo',
@@ -527,13 +524,13 @@ def test_relation_events_no_remote_units(mycharm: type[ops.CharmBase], evt_name,
 
 
 @pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
-def test_relation_unit_data_bad_types(mycharm: type[ops.CharmBase], data):
+def test_relation_unit_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', remote_units_data={0: {'a': data}})
 
 
 @pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
-def test_relation_app_data_bad_types(mycharm: type[ops.CharmBase], data):
+def test_relation_app_data_bad_types(mycharm, data):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', local_app_data={'a': data})
 
@@ -550,7 +547,7 @@ def test_relation_app_data_bad_types(mycharm: type[ops.CharmBase], data):
         SubordinateRelation('c'),
     ),
 )
-def test_relation_event_trigger(relation, evt_name, mycharm: type[ops.CharmBase]) -> None:
+def test_relation_event_trigger(relation, evt_name, mycharm):
     meta = {
         'name': 'mycharm',
         'requires': {'a': {'interface': 'i1'}},
@@ -571,7 +568,7 @@ def test_relation_event_trigger(relation, evt_name, mycharm: type[ops.CharmBase]
     )
 
 
-def test_trigger_sub_relation(mycharm: type[ops.CharmBase]) -> None:
+def test_trigger_sub_relation(mycharm):
     meta = {
         'name': 'mycharm',
         'provides': {
@@ -615,7 +612,7 @@ def test_relation_ids():
         assert rel.id == initial_id + i
 
 
-def test_broken_relation_not_in_model_relations(mycharm: type[ops.CharmBase]) -> None:
+def test_broken_relation_not_in_model_relations(mycharm):
     rel = Relation('foo')
 
     ctx = Context(mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'foo'}}})
@@ -628,7 +625,7 @@ def test_broken_relation_not_in_model_relations(mycharm: type[ops.CharmBase]) ->
 
 def test_get_relation_when_missing():
     class MyCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.update_status, self._on_update_status)
             self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -725,11 +722,11 @@ def test_peer_relation_default_values():
 
 def test_relation_remote_model():
     class MyCharm(CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, event: ops.EventBase):
+        def _on_start(self, event):
             relation = self.model.get_relation('foo')
             assert relation is not None
             self.remote_model_uuid = relation.remote_model.uuid

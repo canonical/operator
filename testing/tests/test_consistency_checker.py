@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-
 import ops
 
 from scenario._consistency_checker import check_consistency

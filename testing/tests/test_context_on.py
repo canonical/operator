@@ -4,9 +4,9 @@ import copy
 import datetime
 import typing
 
+import ops
 import pytest
 
-import ops
 import scenario
 
 
@@ -152,7 +152,7 @@ def test_revision_secret_events(event_name, event_kind):
 
 
 @pytest.mark.parametrize('event_name', ['secret_expired', 'secret_remove'])
-def test_revision_secret_events_as_positional_arg(event_name: str) -> None:
+def test_revision_secret_events_as_positional_arg(event_name):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
         tracked_content={'password': 'yyyy'},
@@ -273,7 +273,7 @@ def test_relation_complex_name():
 
 
 @pytest.mark.parametrize('event_name', ['relation_created', 'relation_broken'])
-def test_relation_events_as_positional_arg(event_name: str) -> None:
+def test_relation_events_as_positional_arg(event_name):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])

@@ -5,15 +5,14 @@ from __future__ import annotations
 
 import pathlib
 
-import pytest
-
 import ops
+import pytest
 
 from scenario import Context, Resource, State
 
 
 class ResourceCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
+    def __init__(self, framework):
         super().__init__(framework)
 
 

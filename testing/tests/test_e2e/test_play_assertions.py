@@ -3,8 +3,6 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-
-import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
@@ -26,7 +24,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -34,7 +32,7 @@ def mycharm():
     return MyCharm
 
 
-def test_charm_heals_on_start(mycharm: type[ops.CharmBase]) -> None:
+def test_charm_heals_on_start(mycharm):
     def pre_event(charm):
         assert charm.unit.status == BlockedStatus('foo')
         assert not charm.called
@@ -80,7 +78,7 @@ def test_charm_heals_on_start(mycharm: type[ops.CharmBase]) -> None:
     ]
 
 
-def test_relation_data_access(mycharm: type[ops.CharmBase]) -> None:
+def test_relation_data_access(mycharm):
     mycharm._call = lambda *_: True
 
     def check_relation_data(charm):

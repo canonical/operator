@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-import ops
 from ops.charm import CharmBase
 from ops.framework import Framework
 
@@ -18,13 +16,13 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             pass
 
     return MyCharm
 
 
-def test_config_get(mycharm: type[ops.CharmBase]) -> None:
+def test_config_get(mycharm):
     def check_cfg(charm: CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 1
@@ -41,7 +39,7 @@ def test_config_get(mycharm: type[ops.CharmBase]) -> None:
     )
 
 
-def test_config_get_default_from_meta(mycharm: type[ops.CharmBase]) -> None:
+def test_config_get_default_from_meta(mycharm):
     def check_cfg(charm: CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 2
@@ -80,7 +78,7 @@ def test_config_in_not_mutated(mycharm, cfg_in):
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             # access the config to trigger a config-get
             foo_cfg = self.config['foo']  # noqa: F841
             baz_cfg = self.config['baz']  # noqa: F841

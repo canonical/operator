@@ -292,7 +292,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/test_plugin.py", "testing/tests/test_e2e/test_juju_log.py"]
 exclude = ["tracing/*"]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used

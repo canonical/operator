@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
-
 import ops
+import pytest
 from ops.charm import CharmBase
 from ops.framework import Framework
 
@@ -28,13 +27,13 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             pass
 
     return MyCharm
 
 
-def test_initial_status(mycharm: type[ops.CharmBase]) -> None:
+def test_initial_status(mycharm):
     def post_event(charm: CharmBase):
         assert charm.unit.status == UnknownStatus()
 
@@ -49,9 +48,9 @@ def test_initial_status(mycharm: type[ops.CharmBase]) -> None:
     assert out.unit_status == UnknownStatus()
 
 
-def test_status_history(mycharm: type[ops.CharmBase]) -> None:
+def test_status_history(mycharm):
     class StatusCharm(mycharm):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
@@ -83,9 +82,9 @@ def test_status_history(mycharm: type[ops.CharmBase]) -> None:
     ]
 
 
-def test_status_history_preservation(mycharm: type[ops.CharmBase]) -> None:
+def test_status_history_preservation(mycharm):
     class StatusCharm(mycharm):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
@@ -114,9 +113,9 @@ def test_status_history_preservation(mycharm: type[ops.CharmBase]) -> None:
     assert ctx.app_status_history == [ActiveStatus('bar')]
 
 
-def test_workload_history(mycharm: type[ops.CharmBase]) -> None:
+def test_workload_history(mycharm):
     class WorkloadCharm(mycharm):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             framework.observe(self.on.install, self._on_install)
             framework.observe(self.on.start, self._on_start)

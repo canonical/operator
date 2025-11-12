@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-import ops
 from ops import ActiveStatus
 from ops.charm import CharmBase, CollectStatusEvent
 
@@ -16,7 +14,7 @@ def mycharm():
         META = {'name': 'mycharm'}
         ACTIONS = {'do-x': {}}
 
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
@@ -30,7 +28,7 @@ def mycharm():
     return MyCharm
 
 
-def test_manager(mycharm: type[ops.CharmBase]) -> None:
+def test_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
@@ -39,7 +37,7 @@ def test_manager(mycharm: type[ops.CharmBase]) -> None:
     assert isinstance(state_out, State)
 
 
-def test_manager_implicit(mycharm: type[ops.CharmBase]) -> None:
+def test_manager_implicit(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
@@ -49,7 +47,7 @@ def test_manager_implicit(mycharm: type[ops.CharmBase]) -> None:
     assert manager._emitted
 
 
-def test_manager_reemit_fails(mycharm: type[ops.CharmBase]) -> None:
+def test_manager_reemit_fails(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         manager.run()
@@ -57,7 +55,7 @@ def test_manager_reemit_fails(mycharm: type[ops.CharmBase]) -> None:
             manager.run()
 
 
-def test_context_manager(mycharm: type[ops.CharmBase]) -> None:
+def test_context_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META)
     with ctx(ctx.on.start(), State()) as manager:
         state_out = manager.run()
@@ -65,7 +63,7 @@ def test_context_manager(mycharm: type[ops.CharmBase]) -> None:
     assert ctx.emitted_events[0].handle.kind == 'start'
 
 
-def test_context_action_manager(mycharm: type[ops.CharmBase]) -> None:
+def test_context_action_manager(mycharm):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
     with ctx(ctx.on.action('do-x'), State()) as manager:
         state_out = manager.run()

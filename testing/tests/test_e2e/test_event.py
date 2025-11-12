@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
-
 import ops
+import pytest
 from ops import CharmBase
 
 from scenario import Context
@@ -31,7 +30,7 @@ from scenario.state import State, _CharmSpec, _Event, _EventType
         ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
-def test_event_type(evt: str, expected_type: _EventType) -> None:
+def test_event_type(evt, expected_type):
     event = _Event(evt)
     assert event._path.type is expected_type
 

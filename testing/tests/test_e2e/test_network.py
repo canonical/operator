@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
-import ops
 from ops import RelationNotFoundError
 from ops.charm import CharmBase
 from ops.framework import Framework
@@ -30,7 +28,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase):
+        def _on_event(self, event):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -38,7 +36,7 @@ def mycharm():
     return MyCharm
 
 
-def test_ip_get(mycharm: type[ops.CharmBase]) -> None:
+def test_ip_get(mycharm):
     ctx = Context(
         mycharm,
         meta={
@@ -76,7 +74,7 @@ def test_ip_get(mycharm: type[ops.CharmBase]) -> None:
         assert str(mgr.charm.model.get_binding('foo').network.bind_address) == '4.4.4.4'
 
 
-def test_no_sub_binding(mycharm: type[ops.CharmBase]) -> None:
+def test_no_sub_binding(mycharm):
     ctx = Context(
         mycharm,
         meta={
@@ -98,7 +96,7 @@ def test_no_sub_binding(mycharm: type[ops.CharmBase]) -> None:
             mgr.charm.model.get_binding('bar').network
 
 
-def test_no_relation_error(mycharm: type[ops.CharmBase]) -> None:
+def test_no_relation_error(mycharm):
     """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
 
     ctx = Context(
@@ -128,7 +126,7 @@ def test_no_relation_error(mycharm: type[ops.CharmBase]) -> None:
             mgr.charm.model.get_binding('foo').network
 
 
-def test_juju_info_network_default(mycharm: type[ops.CharmBase]) -> None:
+def test_juju_info_network_default(mycharm):
     ctx = Context(
         mycharm,
         meta={'name': 'foo'},
@@ -142,7 +140,7 @@ def test_juju_info_network_default(mycharm: type[ops.CharmBase]) -> None:
         assert str(mgr.charm.model.get_binding('juju-info').network.bind_address) == '192.0.2.0'
 
 
-def test_explicit_juju_info_network_override(mycharm: type[ops.CharmBase]) -> None:
+def test_explicit_juju_info_network_override(mycharm):
     ctx = Context(
         mycharm,
         meta={

@@ -8,9 +8,9 @@ pytest_plugins = 'pytester'
 sys.path.append('.')
 
 
-def test_plugin_ctx_run(pytester: Pytester) -> None:
+def test_plugin_ctx_run(pytester: Pytester):
     # create a temporary pytest test module
-    pytester.makepyfile(
+    pytester.makepyfile(  # type: ignore[misc]
         """
         import pytest
         from scenario import State
