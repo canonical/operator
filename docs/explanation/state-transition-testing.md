@@ -192,9 +192,9 @@ emit multiple events in a single charm execution.
 
 ## The virtual charm root
 
-Before executing the charm, the framework copies the charm's `/src`, any libs,
-and the metadata, config, and actions YAML to a temporary directory. The charm
-will see that temporary directory as its 'root'. This allows us to keep things
+Before executing the charm, the framework copies the charm's `/src`, any Charmhub
+charm libraries, and the metadata, config, and actions YAML to a temporary directory.
+The charm will see that temporary directory as its 'root'. This allows us to keep things
 simple when dealing with metadata that can be either inferred from the charm
 type being passed to `Context` or be passed to it as an argument, thereby
 overriding the inferred one. This also allows you to test charms defined on the
