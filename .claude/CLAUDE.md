@@ -55,8 +55,8 @@ This is a mature, production framework used by thousands of charms. Changes requ
 - Test performance with `test/benchmark/`
 
 ## Before Submitting
-- [ ] Code formatted with Ruff
-- [ ] Type checking passes (Pyright strict)
-- [ ] All tests pass
+- [ ] Code formatted with Ruff (tox -e format)
+- [ ] Type checking passes (tox -e lint)
+- [ ] All tests pass (tox -e unit)
 - [ ] Docstrings updated
 - [ ] Breaking changes documented
