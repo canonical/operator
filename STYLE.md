@@ -128,6 +128,27 @@ if status is not pebble.ServiceStatus.ACTIVE:
     print('Stopped')
 ```
 
+### Provide return type annotations
+
+Function and method signatures should include a type annotation for the returned value, other than for `__init__` or in test code.
+
+**Do:**
+
+```python
+def method1(arg1: type1, arg2: type2) -> None:
+    ...
+
+def method2() -> str:
+    ...
+    return 'Hello world!'
+
+class C:
+    def __init__(self, x: type1):
+        ...
+
+def test_method1():
+    assert ...
+```
 
 ## Docs and docstrings
 
