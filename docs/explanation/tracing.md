@@ -9,7 +9,7 @@ Instrument generously, so that more context is captured than is immediately need
 
 **Field engineers** can inspect the trace data from live deployments, ideally avoiding the need to reproduce failures in staging.
 
-**SREs** may want to set latency and error rate alerts on specific elements of trace data preemptively. They can also get more insights to help root-cause analysis across services.
+**Site Reliability Engineers** may want to set latency and error rate alerts on specific elements of trace data preemptively. They can also get more insights to help root-cause analysis across services.
 
 **QA teams** can incorporate trace assertions into integration tests to simplify interoperability testing.
 

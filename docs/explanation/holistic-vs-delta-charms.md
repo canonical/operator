@@ -193,7 +193,7 @@ There's less boilerplate and flow control is predictable.
 
 ### Developing your charm
 
-However, the charm code and tests can get messy when event interdependencies are accounted for:
+However, the charm code and tests can get messy when dependencies between events are accounted for:
 
 - creating a resource is only possible after the workload has been installed
 - the available data typically needs to be mixed with application's configuration
