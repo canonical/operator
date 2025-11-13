@@ -254,7 +254,7 @@ Similarly all that string parsing we were doing to get a hold of the snap versio
         return microsample_snap.channel
 ```
 
-Also, we can interact with the microsample service via the `operator_libs_linux.v0` charm library, which wraps `systemd` and allows us to write simply:
+Also, we can interact with the `microsample` service via the `operator_libs_linux.v0` charm library, which wraps `systemd` and allows us to write simply:
 
 ```python
     def _on_start(self, _event):  # noqa
