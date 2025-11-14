@@ -465,10 +465,10 @@ def test_cannot_manage_granted_secret(mycharm):
 
     def post_event(charm: CharmBase):
         secret = charm.model.get_secret(id=secret_id)
-        
+
         # Can view the secret
         assert secret.get_content()['a'] == 'b'
-        
+
         # Cannot manage it - should get a clear error message
         with pytest.raises(SecretNotFoundError, match='this secret is not owned by this unit/app'):
             secret.set_content({'new': 'content'})
