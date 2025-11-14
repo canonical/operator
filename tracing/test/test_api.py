@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-from typing import Type
 from unittest.mock import Mock
 
 import ops
@@ -26,7 +25,7 @@ _pydantic = pytest.importorskip('pydantic')
 pytestmark = pytest.mark.filterwarnings('ignore::pydantic.PydanticDeprecatedSince20')
 
 
-def test_charm_runs(sample_charm: Type[ops.CharmBase]):
+def test_charm_runs(sample_charm: type[ops.CharmBase]):
     ctx = ops.testing.Context(sample_charm)
     state_in = ops.testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
@@ -42,7 +41,7 @@ def mock_destination(monkeypatch: pytest.MonkeyPatch) -> Mock:
     return rv
 
 
-def test_no_tracing_destination(sample_charm: Type[ops.CharmBase], mock_destination: Mock):
+def test_no_tracing_destination(sample_charm: type[ops.CharmBase], mock_destination: Mock):
     ctx = ops.testing.Context(sample_charm)
     state = ops.testing.State()
     ctx.run(ctx.on.start(), state)
@@ -50,7 +49,7 @@ def test_no_tracing_destination(sample_charm: Type[ops.CharmBase], mock_destinat
 
 
 def test_http_tracing_destination(
-    sample_charm: Type[ops.CharmBase], mock_destination: Mock, http_relation: ops.testing.Relation
+    sample_charm: type[ops.CharmBase], mock_destination: Mock, http_relation: ops.testing.Relation
 ):
     ctx = ops.testing.Context(sample_charm)
     state = ops.testing.State(relations={http_relation})
@@ -60,7 +59,7 @@ def test_http_tracing_destination(
 
 @pytest.mark.parametrize('relation_to_poke', [0, 1])
 def test_https_tracing_destination(
-    sample_charm: Type[ops.CharmBase],
+    sample_charm: type[ops.CharmBase],
     mock_destination: Mock,
     https_relation: ops.testing.Relation,
     ca_relation: ops.testing.Relation,

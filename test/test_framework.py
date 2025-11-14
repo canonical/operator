@@ -1864,7 +1864,6 @@ class TestBreakpoint:
 
         with patch('pdb.Pdb.set_trace') as mock:
             # We want to verify that there are *no* logs at warning level.
-            # However, assertNoLogs is Python 3.10+.
 
             framework.breakpoint()
             warning_logs = [
