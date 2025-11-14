@@ -448,8 +448,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     ):
         if secret.owner is None:
             raise SecretNotFoundError(
-                'this secret is not owned by this unit/app or granted to it. '
-                'Did you forget passing it to State.secrets?',
+                'this secret is not owned by this unit/app. '
+                'Did you forget to set the owner?',
             )
         if secret.owner == 'app' and not self.is_leader():
             understandable_error = SecretNotFoundError(
