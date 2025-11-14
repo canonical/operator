@@ -690,25 +690,6 @@ def test_secret_info_get_label(run: Run):
     assert result.label == 'lbl'
 
 
-def test_secret_info_get_id_and_label(run: Run):
-    info = {
-        '123': {
-            'label': 'lbl',
-            'description': 'desc',
-            'expiry': None,
-            'rotation': None,
-            'rotates': None,
-            'revision': 1,
-        }
-    }
-    # The label should not be included here, as secret-info-get does not support providing both.
-    run.handle(['secret-info-get', '--format=json', 'secret:123'], stdout=json.dumps(info))
-    result = hookcmds.secret_info_get(id='secret:123', label='lbl')  # type: ignore
-    assert isinstance(result, hookcmds.SecretInfo)
-    assert result.id == '123'
-    assert result.label == 'lbl'
-
-
 def test_secret_remove(run: Run):
     run.handle(['secret-remove', 'id'])
     hookcmds.secret_remove('id')

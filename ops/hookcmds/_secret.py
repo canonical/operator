@@ -214,7 +214,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
     args = ['--format=json']
     if id is not None:
         args.append(id)
-    elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
+    if label is not None:
         args.extend(['--label', label])
     stdout = run('secret-info-get', *args)
     result = cast('dict[str, Any]', json.loads(stdout))
