@@ -59,7 +59,8 @@ def relation_get(
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
         key: The specific key to get data for, or ``None`` to get all data.
-        unit: The unit to get data for, or ``None`` to get data for all units.
+        unit: The unit to get data for, or ``None`` to get data for the unit
+            that triggered the current hook.
     """
     if key == '-':
         raise ValueError('To get all keys, pass None for the key argument; "-" is not supported.')
