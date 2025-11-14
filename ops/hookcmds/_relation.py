@@ -18,7 +18,6 @@ import json
 from collections.abc import Mapping
 from typing import Literal, cast, overload
 
-from .._private import yaml
 from ._types import RelationModel, RelationModelDict
 from ._utils import run
 
@@ -185,5 +184,5 @@ def relation_set(
     if app:
         args.append('--app')
     args.extend(['--file', '-'])
-    content = yaml.safe_dump(data)
+    content = json.dumps(data)
     run('relation-set', *args, input=content)
