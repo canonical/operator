@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from typing import (
     Any,
     cast,
@@ -62,7 +62,7 @@ def format_result_dict(
         if parent_key:
             key = f'{parent_key}.{key}'
 
-        if isinstance(value, MutableMapping):
+        if isinstance(value, Mapping):
             value = cast('dict[str, Any]', value)
             output_ = format_result_dict(value, key, output_)
         elif key in output_:
