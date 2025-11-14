@@ -112,8 +112,6 @@ ignore = [
     "D",
     # asserts are OK in tests
     "S101",
-    # type[xxx] require Python 3.9
-    "UP006",
 ]
 
 [tool.pyright]

@@ -43,6 +43,7 @@ jobs:
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
+            sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
           else

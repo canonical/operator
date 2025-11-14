@@ -1911,11 +1911,7 @@ class Relation:
             # store all the fields that have type annotations. If a charm needs
             # a more specific set of fields, then it should use a dataclass or
             # Pydantic model instead.
-            try:
-                fields = {k: k for k in get_type_hints(obj.__class__)}
-            except TypeError:
-                # Most likely Python 3.8. It's not as good, but use __annotations__.
-                fields = {k: k for k in obj.__class__.__annotations__}
+            fields = {k: k for k in get_type_hints(obj.__class__)}
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
