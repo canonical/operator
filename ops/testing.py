@@ -15,7 +15,10 @@
 
 The module includes:
 
-- :class:`ops.testing.Harness`, a class to set up the simulated environment,
+- :class:`ops.testing.Context`, :class:`ops.testing.State`, and other classes
+  to represent the simulated Juju environment for state-transition testing.
+  These are available when the `ops[testing]` optional extra is installed.
+- :class:`ops.testing.Harness`, a deprecated class to set up the simulated environment,
   that provides:
 
   - :meth:`~ops.testing.Harness.add_relation` method, to declare a relation
