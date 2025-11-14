@@ -3520,9 +3520,6 @@ class _ModelBackend:
     """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
-    _STORAGE_KEY_RE = re.compile(
-        r'.*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$', re.MULTILINE | re.DOTALL
-    )
 
     def __init__(
         self,
@@ -3762,21 +3759,6 @@ class _ModelBackend:
         with self._wrap_hookcmd('storage-list', name=name):
             storages = hookcmds.storage_list(name)
         return [int(s.split('/')[1]) for s in storages]
-
-    # This method is called from _main.py's _get_event_args. It is only called
-    # when the hook is a storage event.
-    def _storage_event_details(self) -> tuple[int, str]:
-        with self._wrap_hookcmd('storage-get', '--help'):
-            output = hookcmds._utils.run('storage-get', '--help')
-        # Match the entire string at once instead of going line by line
-        match = self._STORAGE_KEY_RE.match(output)
-        if match is None:
-            raise RuntimeError(f'unable to find storage key in {output!r}')
-        key = match.groupdict()['storage_key']
-
-        index = int(key.split('/')[1])
-        location = self.storage_get(key, 'location')
-        return index, location
 
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
         if not len(attribute) > 0:  # assume it's an empty string.

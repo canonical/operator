@@ -89,14 +89,17 @@ def _get_event_args(
         storage_name = juju_context.storage_name or '-'.join(
             bound_event.event_kind.split('_')[:-2]
         )
+        storage_index = juju_context.storage_index
 
         storages = model.storages[storage_name]
-        index, storage_location = model._backend._storage_event_details()
+        storage_location = model._backend.storage_get(
+            f'{storage_name}/{storage_index}', 'location'
+        )
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.index == index), None)
+            storage = next((s for s in storages if s.index == storage_index), None)
         storage = cast('_storage.JujuStorage | _storage.SQLiteStorage', storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
