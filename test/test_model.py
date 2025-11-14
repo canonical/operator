@@ -3919,13 +3919,7 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
             ['secret-info-get', '--format=json', '--label', 'y'],
-            [
-                'secret-info-get',
-                '--format=json',
-                f'secret://{model._backend.model_uuid}/x',
-                '--label',
-                'y',
-            ],
+            ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
