@@ -95,8 +95,8 @@ def action_fail(message: str | None = None):
 @overload
 def action_get() -> dict[str, Any]: ...
 @overload
-def action_get(key: str) -> str: ...
-def action_get(key: str | None = None) -> dict[str, Any] | str:
+def action_get(key: str) -> Any: ...
+def action_get(key: str | None = None) -> dict[str, Any] | Any:
     """Get action parameters.
 
     ``action_get`` returns the value of the parameter at the given key. If a
@@ -114,11 +114,7 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
     if key is not None:
         args.append(key)
     stdout = run('action-get', *args)
-    result = (
-        cast('dict[str, Any]', json.loads(stdout))
-        if key is None
-        else cast('str', json.loads(stdout))
-    )
+    result = cast('dict[str, Any]', json.loads(stdout)) if key is None else json.loads(stdout)
     return result
 
 
