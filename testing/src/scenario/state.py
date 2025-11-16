@@ -566,30 +566,9 @@ _DEFAULT_JUJU_DATABAG = {
 }
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class Relation(RelationBase):
     """A relation between the charm and another application."""
-
-    endpoint: str
-    """Relation endpoint name. Must match some endpoint name defined in the metadata."""
-
-    interface: str | None = None
-    """Interface name. Must match the interface name attached to this endpoint in the metadata.
-    If left empty, it will be automatically derived from the metadata."""
-
-    _: dataclasses.KW_ONLY
-
-    id: int = dataclasses.field(default_factory=_next_relation_id)
-    """Juju relation ID. Every new Relation instance gets a unique one,
-    if there's trouble, override."""
-
-    local_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
-    """This application's databag for this relation."""
-
-    local_unit_data: RawDataBagContents = dataclasses.field(
-        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
-    )
-    """This unit's databag for this relation."""
 
     remote_app_name: str = 'remote'
     """The name of the remote application, as in the charm's metadata."""
@@ -634,30 +613,9 @@ class Relation(RelationBase):
         yield from self.remote_units_data.values()
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class SubordinateRelation(RelationBase):
     """A relation to share data between a subordinate and a principal charm."""
-
-    endpoint: str
-    """Relation endpoint name. Must match some endpoint name defined in the metadata."""
-
-    interface: str | None = None
-    """Interface name. Must match the interface name attached to this endpoint in the metadata.
-    If left empty, it will be automatically derived from the metadata."""
-
-    _: dataclasses.KW_ONLY
-
-    id: int = dataclasses.field(default_factory=_next_relation_id)
-    """Juju relation ID. Every new Relation instance gets a unique one,
-    if there's trouble, override."""
-
-    local_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
-    """This application's databag for this relation."""
-
-    local_unit_data: RawDataBagContents = dataclasses.field(
-        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
-    )
-    """This unit's databag for this relation."""
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the remote application databag."""
@@ -702,30 +660,9 @@ class SubordinateRelation(RelationBase):
         return f'{self.remote_app_name}/{self.remote_unit_id}'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
-
-    endpoint: str
-    """Relation endpoint name. Must match some endpoint name defined in the metadata."""
-
-    interface: str | None = None
-    """Interface name. Must match the interface name attached to this endpoint in the metadata.
-    If left empty, it will be automatically derived from the metadata."""
-
-    _: dataclasses.KW_ONLY
-
-    id: int = dataclasses.field(default_factory=_next_relation_id)
-    """Juju relation ID. Every new Relation instance gets a unique one,
-    if there's trouble, override."""
-
-    local_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
-    """This application's databag for this relation."""
-
-    local_unit_data: RawDataBagContents = dataclasses.field(
-        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
-    )
-    """This unit's databag for this relation."""
 
     peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
     """Current contents of the peer databags.
@@ -2046,12 +1983,10 @@ class _EventPath(str):
         instance.name = name = string.split('.')[-1]
         instance.owner_path = string.split('.')[:-1] or ['on']
 
-        instance.suffix, instance.type = suffix, _ = _EventPath._get_suffix_and_type(
-            name,
-        )
-        instance.prefix = string.removesuffix(suffix)
+        instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
+        instance.prefix = string.removesuffix(instance.suffix)
+        instance._is_custom = instance.suffix == ''
 
-        instance.is_custom = suffix == ''
         return instance
 
     @staticmethod
