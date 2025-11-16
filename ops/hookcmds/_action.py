@@ -63,7 +63,6 @@ def format_result_dict(
             key = f'{parent_key}.{key}'
 
         if isinstance(value, Mapping):
-            value = cast('dict[str, Any]', value)
             output_ = format_result_dict(value, key, output_)
         elif key in output_:
             raise ValueError(
