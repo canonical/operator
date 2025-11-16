@@ -30,6 +30,6 @@ traceback
 untyped
 unpatched
 uv
-VM's
+VM
 Wordpress
 zizmor
