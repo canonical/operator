@@ -3948,16 +3948,14 @@ class _ModelBackend:
             )
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
-        # The type: ignore here is because the type checker can't tell, even
-        # with local overloads, that either id or label must be provided.
-        kwargs: dict[str, str] = {}
         if id is not None:
-            kwargs['id'] = id
+            with self._wrap_hookcmd('secret-info-get', id=id):
+                raw = hookcmds.secret_info_get(id=id)
         elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
-            kwargs['label'] = label
-        with self._wrap_hookcmd('secret-info-get', id=id, label=label):
-            raw = hookcmds.secret_info_get(**kwargs)
-        assert isinstance(raw, hookcmds.SecretInfo)
+            with self._wrap_hookcmd('secret-info-get', label=label):
+                raw = hookcmds.secret_info_get(label=label)
+        else:
+            raise TypeError('either `id` or `label` must be provided')
         return SecretInfo(
             raw.id,
             label=raw.label,
