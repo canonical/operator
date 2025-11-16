@@ -208,6 +208,12 @@ def test_action_get_key(run: Run):
     assert param == 'qux'
 
 
+def test_action_get_non_string_key(run: Run):
+    run.handle(['action-get', '--format=json', 'baz'], stdout='42')
+    param = hookcmds.action_get('baz')
+    assert param == 42
+
+
 def test_action_log(run: Run):
     run.handle(['action-log', '--', 'progress update'])
     hookcmds.action_log('progress update')

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from typing import (
     Any,
     cast,
@@ -62,8 +62,7 @@ def format_result_dict(
         if parent_key:
             key = f'{parent_key}.{key}'
 
-        if isinstance(value, MutableMapping):
-            value = cast('dict[str, Any]', value)
+        if isinstance(value, Mapping):
             output_ = format_result_dict(value, key, output_)
         elif key in output_:
             raise ValueError(
@@ -95,8 +94,8 @@ def action_fail(message: str | None = None):
 @overload
 def action_get() -> dict[str, Any]: ...
 @overload
-def action_get(key: str) -> str: ...
-def action_get(key: str | None = None) -> dict[str, Any] | str:
+def action_get(key: str) -> Any: ...
+def action_get(key: str | None = None) -> dict[str, Any] | Any:
     """Get action parameters.
 
     ``action_get`` returns the value of the parameter at the given key. If a
@@ -114,11 +113,7 @@ def action_get(key: str | None = None) -> dict[str, Any] | str:
     if key is not None:
         args.append(key)
     stdout = run('action-get', *args)
-    result = (
-        cast('dict[str, Any]', json.loads(stdout))
-        if key is None
-        else cast('str', json.loads(stdout))
-    )
+    result = cast('dict[str, Any]', json.loads(stdout)) if key is None else json.loads(stdout)
     return result
 
 
