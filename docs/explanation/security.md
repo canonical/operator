@@ -51,7 +51,7 @@ When testing an event with [](ops.testing.Context), the mocked unit state databa
 
 ## Security updates
 
-We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your dev dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
+We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your `dev` dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
 
 Your charm repository should have tooling configured so that any dependencies with security updates are detected automatically (such as [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/)), prompting to you re-lock so that the charm will be built with the latest version.
 
