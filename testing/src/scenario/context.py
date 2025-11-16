@@ -600,8 +600,8 @@ class Context(Generic[CharmType]):
     charm_root: str | pathlib.Path | None
     """The charm root directory to use when executing the charm.
 
-    Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
-    YAML is copied to the charm root. If ``charm_root`` is None, then a temporary directory is
+    Before running the event, the charm's metadata, config, and action YAML files are
+    copied to the charm root. If ``charm_root`` is None, then a temporary directory is
     created and used. To set up the charm root directory with other files, pass in the location of
     the directory to use. If a ``charm_root`` is provided, the tests are also able to inspect the
     content of the directory after the event has run, unlike the temporary directory, which is
