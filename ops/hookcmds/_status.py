@@ -15,11 +15,7 @@
 from __future__ import annotations
 
 import json
-from typing import (
-    Literal,
-    cast,
-    overload,
-)
+from typing import Literal, overload
 
 from ._types import AppStatus, AppStatusDict, SettableStatusName, StatusDict, UnitStatus
 from ._utils import run
