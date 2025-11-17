@@ -29,13 +29,13 @@
 
 ## Tests
 
-* Re-enable scenario consistency checks after disabling them (#2141)
+* Re-enable ops[testing] consistency checks after disabling them (#2141)
 * Expand secrets integration and state transition tests (#2130)
 
 ## Refactoring
 
 * Don't get the storage details from --help (#2172)
-* Drop 3.8 and 3.9 compatibility code (#2173)
+* Drop Python 3.8 and 3.9 compatibility code (#2173)
 
 ## CI
 
