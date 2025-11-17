@@ -22,7 +22,6 @@
 * Change HACKING.md instructions for maintaining Charmcraft profiles (#2151)
 * In integration tests, use consistent approach to logging and packing (#2150)
 * In integration testing how-to, clarify that Juju model is destroyed after module (#2154)
-* Remove Charmcraft channel specifier from machine charm tutorial (#2148)
 * Add AI contribution note and style guideline for type annotation of return values (#2168)
 * Add ops[testing] to the ops.testing docstring (#2171)
 * Add links to the Juju hook from each event class (#2176)
