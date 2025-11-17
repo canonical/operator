@@ -7,7 +7,7 @@
 ## Fixes
 
 * Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
-* Don't cache secrets in Ops (#2143)
+* Don't cache secret metadata in Ops (#2143)
 * Secret-info-get cannot be provided with both an ID and a label (#2170)
 * Minor hookcmds fixes (#2175)
 
