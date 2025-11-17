@@ -44,10 +44,11 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     """
     args = ['--include-data', '--format=json', f'--application={str(app).lower()}']
     stdout = run('status-get', *args)
+    result = json.loads(stdout)
     if app:
-        result = cast('AppStatusDict', json.loads(stdout))
+        result = cast('AppStatusDict', result)
         return AppStatus._from_dict(result)
-    result = cast('StatusDict', json.loads(stdout))
+    result = cast('StatusDict', result)
     return UnitStatus._from_dict(result)
 
 

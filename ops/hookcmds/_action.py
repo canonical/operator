@@ -16,11 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import (
-    Any,
-    cast,
-    overload,
-)
+from typing import Any, overload
 
 from ._utils import run
 
@@ -113,8 +109,7 @@ def action_get(key: str | None = None) -> dict[str, Any] | Any:
     if key is not None:
         args.append(key)
     stdout = run('action-get', *args)
-    result = cast('dict[str, Any]', json.loads(stdout)) if key is None else json.loads(stdout)
-    return result
+    return json.loads(stdout)
 
 
 def action_log(message: str):

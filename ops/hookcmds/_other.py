@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, overload
 
 from ._types import CloudSpec, GoalState, GoalStateDict, Network
 from ._utils import run
@@ -68,11 +68,7 @@ def config_get(
     if key:
         args.append(key)
     stdout = run('config-get', *args)
-    if key:
-        result = cast('bool | int | float | str', json.loads(stdout))
-    else:
-        result = cast('dict[str, bool | int | float | str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 def credential_get() -> CloudSpec:
@@ -82,7 +78,7 @@ def credential_get() -> CloudSpec:
     `Juju | Hook commands | credential-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/credential-get/>`_
     """
     stdout = run('credential-get', '--format=json')
-    result = cast('dict[str, Any]', json.loads(stdout))
+    result: dict[str, Any] = json.loads(stdout)
     return CloudSpec._from_dict(result)
 
 
@@ -93,7 +89,7 @@ def goal_state() -> GoalState:
     `Juju | Hook commands | goal-state <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/goal-state/>`_
     """
     stdout = run('goal-state', '--format=json')
-    result = cast('GoalStateDict', json.loads(stdout))
+    result: GoalStateDict = json.loads(stdout)
     return GoalState._from_dict(result)
 
 
@@ -107,8 +103,7 @@ def is_leader() -> bool:
     `Juju | Hook commands | is-leader <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/>`_
     """
     stdout = run('is-leader', '--format=json')
-    result = cast('bool', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 def juju_log(
@@ -163,7 +158,7 @@ def network_get(binding_name: str, *, relation_id: int | None = None) -> Network
         args.extend(['-r', str(relation_id)])
     args.append(binding_name)
     stdout = run('network-get', *args)
-    result = cast('dict[str, Any]', json.loads(stdout))
+    result: dict[str, Any] = json.loads(stdout)
     return Network._from_dict(result)
 
 

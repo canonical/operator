@@ -17,12 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 import tempfile
-from typing import (
-    Any,
-    Literal,
-    cast,
-    overload,
-)
+from typing import Any, Literal, overload
 
 from ._types import SecretInfo, SecretRotate
 from ._utils import datetime_to_iso, run
@@ -156,8 +151,7 @@ def secret_get(
     if peek:
         args.append('--peek')
     stdout = run('secret-get', '--format=json', *args)
-    result = cast('dict[str, str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
@@ -185,8 +179,7 @@ def secret_ids() -> list[str]:
     `Juju | Hook commands | secret-ids <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-ids/>`_
     """
     stdout = run('secret-ids', '--format=json')
-    result = cast('list[str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 @overload
@@ -217,7 +210,7 @@ def secret_info_get(*, id: str | None = None, label: str | None = None) -> Secre
     if label is not None:
         args.extend(['--label', label])
     stdout = run('secret-info-get', *args)
-    result = cast('dict[str, Any]', json.loads(stdout))
+    result: dict[str, Any] = json.loads(stdout)
     return SecretInfo._from_dict(result)
 
 

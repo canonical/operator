@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Literal, cast, overload
+from typing import Literal, overload
 
 from .._private import yaml
 from ._types import RelationModel, RelationModelDict
@@ -80,11 +80,7 @@ def relation_get(
         # The unit is not required when inside a relation hook other than relation-broken.
         args.append(key)
     stdout = run('relation-get', *args)
-    if key is not None:
-        result = cast('str', json.loads(stdout))
-    else:
-        result = cast('dict[str, str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 def relation_ids(name: str) -> list[str]:
@@ -97,8 +93,7 @@ def relation_ids(name: str) -> list[str]:
         name: the endpoint name.
     """
     stdout = run('relation-ids', name, '--format=json')
-    result = cast('list[str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 @overload
@@ -126,8 +121,7 @@ def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-list', *args)
-    result = cast('str', json.loads(stdout)) if app else cast('list[str]', json.loads(stdout))
-    return result
+    return json.loads(stdout)
 
 
 def relation_model_get(id: int | None = None) -> RelationModel:
@@ -148,7 +142,7 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-model-get', *args)
-    result = cast('RelationModelDict', json.loads(stdout))
+    result: RelationModelDict = json.loads(stdout)
     return RelationModel._from_dict(result)
 
 

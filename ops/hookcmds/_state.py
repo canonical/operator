@@ -16,10 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import (
-    cast,
-    overload,
-)
+from typing import overload
 
 from .._private import yaml
 from ._utils import run
@@ -55,12 +52,7 @@ def state_get(key: str | None) -> dict[str, str] | str:
     if key is not None:
         args.append(key)
     stdout = run('state-get', *args)
-    result = (
-        cast('dict[str, str]', json.loads(stdout))
-        if key is None
-        else cast('str', json.loads(stdout))
-    )
-    return result
+    return json.loads(stdout)
 
 
 # We don't offer a `file` argument here as we expect that charms will generally
