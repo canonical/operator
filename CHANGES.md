@@ -1,6 +1,6 @@
 # 3.4.0b3 - 18 November 2025
 
-No changes to the packages themselves, just fixes the testing optional extra version.
+3.4.0b2 was released on GitHub, but not on PyPI, because the `testing` optional extra had the wrong version for ops. 3.4.0b3 fixes this but has no other changes from 3.4.0b2.
 
 # 3.4.0b2 - 18 November 2025
 
