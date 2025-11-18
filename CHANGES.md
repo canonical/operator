@@ -1,3 +1,7 @@
+# 3.4.0b3 - 18 November 2025
+
+No changes to the packages themselves, just fixes the testing optional extra version.
+
 # 3.4.0b2 - 18 November 2025
 
 ## Features
