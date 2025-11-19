@@ -1,3 +1,51 @@
+# 3.4.0b3 - 18 November 2025
+
+3.4.0b2 was released on GitHub, but not on PyPI, because the `testing` optional extra had the wrong version for ops. 3.4.0b3 fixes this but has no other changes from 3.4.0b2.
+
+# 3.4.0b2 - 18 November 2025
+
+## Features
+
+* Log the total number of deferred events (#2161)
+
+## Fixes
+
+* Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
+* Don't cache secret metadata in Ops (#2143)
+* Secret-info-get cannot be provided with both an ID and a label (#2170)
+* Minor hookcmds fixes (#2175)
+
+## Documentation
+
+* Explain the Charmhub public listing process and add a reference list of best practices (#1989)
+* Expand next steps for K8s tutorial (#2034)
+* Remove mention of the `simple` Charmcraft profile (#2138)
+* Expand landing pages with summaries of pages (#2140)
+* Update environment setup for integration tests and K8s tutorial (#2124)
+* Replace machine charm tutorial by an improved tutorial (#2119)
+* Change HACKING.md instructions for maintaining Charmcraft profiles (#2151)
+* In integration tests, use consistent approach to logging and packing (#2150)
+* In integration testing how-to, clarify that Juju model is destroyed after module (#2154)
+* Add AI contribution note and style guideline for type annotation of return values (#2168)
+* Add ops[testing] to the ops.testing docstring (#2171)
+* Add links to the Juju hook from each event class (#2176)
+
+## Tests
+
+* Re-enable ops[testing] consistency checks after disabling them (#2141)
+* Expand secrets integration and state transition tests (#2130)
+
+## Refactoring
+
+* Don't get the storage details from --help (#2172)
+* Drop Python 3.8 and 3.9 compatibility code (#2173)
+
+## CI
+
+* Clean up accidental workflow trigger (#2144)
+* Test if package versions match dependency versions before publishing (#2139)
+* Update spelling (#2167)
+
 # 3.4.0b1 - 22 October 2025
 
 ## Breaking Changes

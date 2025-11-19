@@ -18,7 +18,6 @@ import json
 from collections.abc import Mapping
 from typing import overload
 
-from .._private import yaml
 from ._utils import run
 
 
@@ -68,5 +67,5 @@ def state_set(data: Mapping[str, str]):
         data: The key-value pairs to set in the server-side state.
     """
     args = ['--file', '-']
-    content = yaml.safe_dump(data)
+    content = json.dumps(data)
     run('state-set', *args, input=content)

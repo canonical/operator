@@ -537,7 +537,7 @@ def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, a
     cmd.extend(['--file', '-'])
     run.handle(cmd)
     hookcmds.relation_set({'foo': 'bar'}, id=id, app=app)
-    assert run.calls[0].stdin == 'foo: bar\n'
+    assert run.calls[0].stdin == '{"foo": "bar"}'
 
 
 def test_resource_get(run: Run):
