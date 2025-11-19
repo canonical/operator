@@ -72,4 +72,5 @@ def storage_list(name: str | None = None) -> list[str]:
     if name is not None:
         args.append(name)
     stdout = run('storage-list', *args)
-    return json.loads(stdout)
+    result: list[str] = json.loads(stdout)
+    return result

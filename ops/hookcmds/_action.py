@@ -109,7 +109,10 @@ def action_get(key: str | None = None) -> dict[str, Any] | Any:
     if key is not None:
         args.append(key)
     stdout = run('action-get', *args)
-    return json.loads(stdout)
+    if key is not None:
+        return json.loads(stdout)
+    result: dict[str, Any] = json.loads(stdout)
+    return result
 
 
 def action_log(message: str):

@@ -68,7 +68,11 @@ def config_get(
     if key:
         args.append(key)
     stdout = run('config-get', *args)
-    return json.loads(stdout)
+    if key:
+        key_result: bool | int | float | str = json.loads(stdout)
+        return key_result
+    result: dict[str, bool | int | float | str] = json.loads(stdout)
+    return result
 
 
 def credential_get() -> CloudSpec:
@@ -103,7 +107,8 @@ def is_leader() -> bool:
     `Juju | Hook commands | is-leader <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/is-leader/>`_
     """
     stdout = run('is-leader', '--format=json')
-    return json.loads(stdout)
+    result: bool = json.loads(stdout)
+    return result
 
 
 def juju_log(

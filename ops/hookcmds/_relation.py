@@ -79,7 +79,11 @@ def relation_get(
         # The unit is not required when inside a relation hook other than relation-broken.
         args.append(key)
     stdout = run('relation-get', *args)
-    return json.loads(stdout)
+    if key is not None:
+        key_result: str = json.loads(stdout)
+        return key_result
+    result: dict[str, str] = json.loads(stdout)
+    return result
 
 
 def relation_ids(name: str) -> list[str]:
@@ -92,7 +96,8 @@ def relation_ids(name: str) -> list[str]:
         name: the endpoint name.
     """
     stdout = run('relation-ids', name, '--format=json')
-    return json.loads(stdout)
+    result: list[str] = json.loads(stdout)
+    return result
 
 
 @overload
@@ -120,7 +125,11 @@ def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-list', *args)
-    return json.loads(stdout)
+    if app:
+        app_result: list[str] = json.loads(stdout)
+        return app_result
+    result: str = json.loads(stdout)
+    return result
 
 
 def relation_model_get(id: int | None = None) -> RelationModel:

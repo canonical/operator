@@ -51,7 +51,11 @@ def state_get(key: str | None) -> dict[str, str] | str:
     if key is not None:
         args.append(key)
     stdout = run('state-get', *args)
-    return json.loads(stdout)
+    if key is not None:
+        key_result: str = json.loads(stdout)
+        return key_result
+    result: dict[str, str] = json.loads(stdout)
+    return result
 
 
 # We don't offer a `file` argument here as we expect that charms will generally

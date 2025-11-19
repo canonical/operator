@@ -151,7 +151,8 @@ def secret_get(
     if peek:
         args.append('--peek')
     stdout = run('secret-get', '--format=json', *args)
-    return json.loads(stdout)
+    result: dict[str, str] = json.loads(stdout)
+    return result
 
 
 def secret_grant(id: str, relation_id: int, *, unit: str | None = None):
@@ -179,7 +180,8 @@ def secret_ids() -> list[str]:
     `Juju | Hook commands | secret-ids <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-ids/>`_
     """
     stdout = run('secret-ids', '--format=json')
-    return json.loads(stdout)
+    result: list[str] = json.loads(stdout)
+    return result
 
 
 @overload
