@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import datetime
+import itertools
 from typing import Any, TypedDict, cast
 
 import ops
@@ -41,7 +42,6 @@ class Result(TypedDict, total=False):
     before: SecretSnapshot | None
     after: SecretSnapshot | None
     secretid: str | None
-    exception: str | None
 
 
 class SecretsCharm(ops.CharmBase):
@@ -50,6 +50,7 @@ class SecretsCharm(ops.CharmBase):
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on['add-secret'].action, self.add_secret)
         framework.observe(self.on['add-with-meta'].action, self.add_with_meta)
+        framework.observe(self.on['set-secret-flow'].action, self.set_secret_flow)
 
     def _on_start(self, event: ops.StartEvent):
         self.unit.status = ops.ActiveStatus()
@@ -78,6 +79,54 @@ class SecretsCharm(ops.CharmBase):
             'secretid': secret.id,
             'after': self._snapshot(secret.id),
         }
+        event.set_results(cast('dict[str, Any]', result))
+
+    def set_secret_flow(self, event: ops.ActionEvent):
+        secretid = event.params.get('secretid')
+        secretlabel = event.params.get('secretlabel')
+        contentses = ({'val': f'{i}'} for i in itertools.count(1))
+        labels = (f'label{i}' for i in itertools.count(1))
+        descriptions = (f'description{i}' for i in itertools.count(1))
+        expires = (datetime.datetime(2010 + i, 1, 1, 0, 0, 0) for i in itertools.count(1))
+        rotates = itertools.cycle(ops.SecretRotate.__members__.values())
+        result: Result = {}
+
+        try:
+            for field in event.params['flow'].split(','):
+                if secretid:
+                    secret = self.model.get_secret(id=secretid)
+                elif secretlabel:
+                    secret = self.model.get_secret(label=secretlabel)
+                else:
+                    event.fail('Must provide secretid or secretlabel')
+                    return
+
+                match field:
+                    case 'content':
+                        secret.set_content(next(contentses))
+                    case 'label':
+                        new_label = next(labels)
+                        secret.set_info(label=new_label)
+                        if secretlabel:
+                            # So that we can find the secret again
+                            secretlabel = new_label
+                    case 'description':
+                        secret.set_info(description=next(descriptions))
+                    case 'expire':
+                        secret.set_info(expire=next(expires))
+                    case 'rotate':
+                        secret.set_info(rotate=next(rotates))
+                    case _:
+                        raise ValueError(f'Unsupported {field=}')
+
+            if not secretid:
+                secretid = self.model.get_secret(label=secretlabel).get_info().id
+            result['secretid'] = secretid
+            result['after'] = self._snapshot(secretid)
+        except Exception as e:
+            event.fail(str(e))
+            return
+
         event.set_results(cast('dict[str, Any]', result))
 
     def _snapshot(self, secret_id: str) -> SecretSnapshot:

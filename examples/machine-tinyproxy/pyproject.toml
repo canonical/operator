@@ -1,0 +1,89 @@
+# Copyright 2025 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[project]
+name = "tinyproxy"
+version = "0.0.1"
+requires-python = ">=3.10"
+
+# Dependencies of the charm code
+# You should include the dependencies of the code in src/. You should also include the
+# dependencies of any charmlibs that the charm uses (copy the dependencies from PYDEPS).
+dependencies = [
+    "charmlibs-apt>=1,<2",
+    "charmlibs-pathops>=1,<2",
+    "ops>=3,<4",
+    "pydantic>=2,<3",
+]
+
+[dependency-groups]
+# Dependencies of linting and static type checks
+lint = [
+    "ruff",
+    "codespell",
+    "pyright",
+]
+# Dependencies of unit tests
+unit = [
+    "coverage[toml]",
+    "ops[testing]",
+    "pytest",
+]
+# Dependencies of integration tests
+integration = [
+    "jubilant",
+    "pytest",
+]
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+
+# Linting tools configuration
+[tool.ruff]
+line-length = 99
+lint.select = ["E", "W", "F", "C", "N", "D", "I001"]
+lint.ignore = [
+    "D105",
+    "D107",
+    "D203",
+    "D204",
+    "D213",
+    "D215",
+    "D400",
+    "D404",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D413",
+]
+lint.per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+extend-exclude = ["__pycache__", "*.egg_info"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.codespell]
+skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+
+[tool.pyright]
+include = ["src", "tests"]

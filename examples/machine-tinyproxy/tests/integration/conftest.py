@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
+# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 import logging
 import os
@@ -45,6 +48,7 @@ def charm():
         if not charm_path.exists():
             raise FileNotFoundError(f"Charm does not exist: {charm_path}")
         return charm_path
+    # Modify below if you're building for multiple bases or architectures.
     charm_paths = list(pathlib.Path(".").glob("*.charm"))
     if not charm_paths:
         raise FileNotFoundError("No .charm file in current directory")

@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import collections
 import contextlib
 import contextvars
 import copy
@@ -313,7 +312,6 @@ class Model:
             id=id,
             label=label,
             content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
         )
 
     def get_cloud_spec(self) -> CloudSpec:
@@ -337,9 +335,6 @@ class _ModelCache:
     def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend):
         self._meta = meta
         self._backend = backend
-        self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
-            collections.defaultdict(dict)
-        )
         # (entity type, name): instance.
         self._weakrefs: weakref.WeakValueDictionary[
             tuple[UnitOrApplicationType, str], Unit | Application | None
@@ -530,7 +525,6 @@ class Application:
             id=id,
             label=label,
             content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
         )
 
 
@@ -722,7 +716,6 @@ class Unit:
             id=id,
             label=label,
             content=content,
-            _secret_set_cache=self._cache._secret_set_cache,
         )
 
     def open_port(
@@ -1315,7 +1308,6 @@ class Secret:
         id: str | None = None,
         label: str | None = None,
         content: dict[str, str] | None = None,
-        _secret_set_cache: collections.defaultdict[str, dict[str, Any]] | None = None,
     ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
@@ -1325,9 +1317,6 @@ class Secret:
         self._id = id
         self._label = label
         self._content = content
-        self._secret_set_cache: collections.defaultdict[str, dict[str, Any]] = (
-            collections.defaultdict(dict) if _secret_set_cache is None else _secret_set_cache
-        )
 
     def __repr__(self):
         fields: list[str] = []
@@ -1533,25 +1522,7 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
 
-        # If `_backend.secret_set` has already been called, this call will
-        # overwrite anything done in the previous call (even if it was in a
-        # different event handler, as long as it was in the same Juju hook
-        # context). We want to provide more predictable behavior, so we cache
-        # the values and provide them in subsequent calls.
-        cached_data = self._secret_set_cache[self._id]
-        expire = _calculate_expiry(cached_data['expire']) if 'expire' in cached_data else None
-        # Don't store the actual secret content in memory, but put a sentinel
-        # there to indicate that the content has been set during this hook.
-        cached_data['content'] = object()
-
-        self._backend.secret_set(
-            typing.cast('str', self.id),
-            content=content,
-            label=cached_data.get('label'),
-            description=cached_data.get('description'),
-            expire=expire,
-            rotate=cached_data.get('rotate'),
-        )
+        self._backend.secret_set(typing.cast('str', self.id), content=content)
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1586,28 +1557,8 @@ class Secret:
         if self._id is None:
             self._id = self.get_info().id
 
-        # If `_backend.secret_set` has already been called, this call will
-        # overwrite anything done in the previous call (even if it was in a
-        # different event handler, as long as it was in the same Juju hook
-        # context). We want to provide more predictable behavior, so we cache
-        # the values and provide them in subsequent calls.
-        cached_data = self._secret_set_cache[self._id]
-        label = cached_data.get('label') if label is None else label
-        cached_data['label'] = label
-        description = cached_data.get('description') if description is None else description
-        cached_data['description'] = description
-        expire = cached_data.get('expire') if expire is None else expire
-        cached_data['expire'] = expire
-        rotate = cached_data.get('rotate') if rotate is None else rotate
-        cached_data['rotate'] = rotate
-        # Get the previous content from the unit agent's cache.
-        content = (
-            self._backend.secret_get(id=self._id, peek=True) if 'content' in cached_data else None
-        )
-
         self._backend.secret_set(
             typing.cast('str', self.id),
-            content=content,
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
@@ -1960,11 +1911,7 @@ class Relation:
             # store all the fields that have type annotations. If a charm needs
             # a more specific set of fields, then it should use a dataclass or
             # Pydantic model instead.
-            try:
-                fields = {k: k for k in get_type_hints(obj.__class__)}
-            except TypeError:
-                # Most likely Python 3.8. It's not as good, but use __annotations__.
-                fields = {k: k for k in obj.__class__.__annotations__}
+            fields = {k: k for k in get_type_hints(obj.__class__)}
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
@@ -3569,9 +3516,6 @@ class _ModelBackend:
     """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
-    _STORAGE_KEY_RE = re.compile(
-        r'.*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$', re.MULTILINE | re.DOTALL
-    )
 
     def __init__(
         self,
@@ -3812,21 +3756,6 @@ class _ModelBackend:
             storages = hookcmds.storage_list(name)
         return [int(s.split('/')[1]) for s in storages]
 
-    # This method is called from _main.py's _get_event_args. It is only called
-    # when the hook is a storage event.
-    def _storage_event_details(self) -> tuple[int, str]:
-        with self._wrap_hookcmd('storage-get', '--help'):
-            output = hookcmds._utils.run('storage-get', '--help')
-        # Match the entire string at once instead of going line by line
-        match = self._STORAGE_KEY_RE.match(output)
-        if match is None:
-            raise RuntimeError(f'unable to find storage key in {output!r}')
-        key = match.groupdict()['storage_key']
-
-        index = int(key.split('/')[1])
-        location = self.storage_get(key, 'location')
-        return index, location
-
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
         if not len(attribute) > 0:  # assume it's an empty string.
             raise RuntimeError(
@@ -3997,14 +3926,14 @@ class _ModelBackend:
             )
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
-        # The type: ignore here is because the type checker can't tell, even
-        # with local overloads, that either id or label must be provided.
-        with self._wrap_hookcmd('secret-info-get', id=id, label=label):
-            raw = hookcmds.secret_info_get(  # type: ignore
-                id=id,
-                label=label,
-            )
-        assert isinstance(raw, hookcmds.SecretInfo)
+        if id is not None:
+            with self._wrap_hookcmd('secret-info-get', id=id):
+                raw = hookcmds.secret_info_get(id=id)
+        elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
+            with self._wrap_hookcmd('secret-info-get', label=label):
+                raw = hookcmds.secret_info_get(label=label)
+        else:
+            raise TypeError('either `id` or `label` must be provided')
         return SecretInfo(
             raw.id,
             label=raw.label,
@@ -4027,6 +3956,20 @@ class _ModelBackend:
         rotate: SecretRotate | None = None,
     ):
         # The content is None or has already been validated with Secret._validate_content
+        if self._juju_context.version < '3.6':
+            # Older Juju series don't coalesce multiple secret updates within a hook.
+            # To work around that, we perform a smart read-modify-write cycle.
+            # See https://bugs.launchpad.net/juju/+bug/2081034 for details.
+            if content is None:
+                content = self.secret_get(id=id, peek=True)
+            if description is None or expire is None or rotate is None or label is None:
+                # Metadata fix is needed for Juju < 3.6 or < 3.5.5
+                info = self.secret_info_get(id=id)
+                description = description or info.description
+                expire = expire or info.expires
+                rotate = rotate or info.rotation
+                # The label fix is needed for Juju < 3.5
+                label = label or info.label
         with self._wrap_hookcmd(
             'secret-set',
             id=id,

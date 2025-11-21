@@ -336,11 +336,6 @@ if pydantic is not None:
 def test_relation_load_custom_naming_pattern(
     relation_data: dict[str, str], relation_data_class: type[_AliasProtocol]
 ):
-    # The latest version of Pydantic available for Python 3.8 does not support
-    # the `alias` metadata, so we need to skip the test for that case.
-    if pydantic is not None and relation_data_class is _PydanticDataclassesAlias:
-        pytest.skip('Pydantic does not support dataclasses alias metadata in this version.')
-
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

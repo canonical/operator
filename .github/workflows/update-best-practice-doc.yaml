@@ -11,18 +11,18 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
           persist-credentials: true
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: canonical/charmcraft
           path: charmcraft
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python .github/update-best-practice-table.py > docs/reuse/best-practices.txt
