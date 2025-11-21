@@ -24,7 +24,11 @@ class ScenarioRuntimeError(RuntimeError):
 
 
 class UncaughtCharmError(ScenarioRuntimeError):
-    """Error raised if the charm raises while handling the event being dispatched."""
+    """Error raised if the charm raises while handling the event being dispatched.
+
+    Set the ``SCENARIO_BARE_CHARM_ERRORS`` environment variable to ``1`` or ``true``
+    (case insensitive) to disable wrapping charm errors with ``UncaughtCharmError``.
+    """
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
