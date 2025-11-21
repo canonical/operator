@@ -171,3 +171,37 @@ def test_ops_raises_abort(exit_code: int, bare_charm_errors: str, monkeypatch: p
         exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
         assert isinstance(exc, _Abort)
         assert exc.exit_code == exit_code
+
+
+class ValueErrorCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.update_status, self._on_update_status)
+
+    def _on_update_status(self, event: ops.EventBase):
+        raise ValueError()
+
+
+@pytest.mark.parametrize(
+    ('expected_error', 'bare_charm_errors'),
+    (
+        (ValueError, '1'),
+        (ValueError, 'tRuE'),  # case insensitive
+        (UncaughtCharmError, ''),
+        (UncaughtCharmError, '✨ aNy ✩ sTrInG ✧ ReAlLy ...'),
+    ),
+)
+def test_bare_charm_errors(
+    monkeypatch: pytest.Monkeypatch, expected_error: type[Exception], bare_charm_errors: str | None
+):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
+    ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
+    with pytest.raises(expected_error):
+        ctx.run(ctx.on.update_status(), State())
+
+
+def test_bare_charm_errors_not_set(monkeypatch: pytest.Monkeypatch):
+    monkeypatch.delenv('SCENARIO_BARE_CHARM_ERRORS', raising=False)
+    ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
+    with pytest.raises(UncaughtCharmError):
+        ctx.run(ctx.on.update_status(), State())
