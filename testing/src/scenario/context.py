@@ -661,7 +661,7 @@ class Context(Generic[CharmType]):
             Only applicable to machine charms. Unset by default.
         :arg availability_zone: Juju availability zone that this charm is deployed to,
             surfaced to the charm as the JUJU_AVAILABILITY_ZONE envvar.
-            Only applicable to machine charms. Unset by default.
+            Unset by default.
         :arg principal_unit: Juju principal unit name for subordinate charms,
             surfaced to the charm as the JUJU_PRINCIPAL_UNIT envvar.
             Only applicable to subordinate charms. Unset by default.
