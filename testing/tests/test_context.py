@@ -67,7 +67,7 @@ def test_app_name(app_name, unit_id):
 @pytest.mark.parametrize('machine_id', ('0', None, '42', '0/lxd/4'))
 def test_machine_id_envvar(machine_id):
     ctx = Context(MyCharm, meta={'name': 'foo'}, machine_id=machine_id)
-    os.unsetenv('JUJU_MACHINE_ID')  # cleanup env to be sure
+    os.environ.pop('JUJU_MACHINE_ID', None)  # cleanup env to be sure
     with ctx(ctx.on.start(), State()):
         assert os.getenv('JUJU_MACHINE_ID') == machine_id
 
