@@ -23,7 +23,9 @@ jobs:
           - charm-repo: canonical/prometheus-k8s-operator
             commit: 78f131863dca08ebe807de98e4743664cfea736e  # rev278 2025-11-20T13:42:21Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 37b7df2ae44a45278222fe45ae83a33bf41cefe8  # rev174 2025-11-21T12:32:56Z
+            # Not updated due to: ModuleNotFoundError: No module named 'ops_tracing'
+            # This needs to be fixed upstream before we can bump this pin
+            commit: 6c099f751c4cee77430d2588f6001f66d6212d7d  # 2025-10-23T16:04:06Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v5
