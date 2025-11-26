@@ -14,9 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        juju-channel: ['2.9/stable', '3/stable', '4/beta']
+        juju-channel: ['2.9/stable', '3/stable', '4/stable']
         preset: ['machine', 'microk8s']
-    continue-on-error: ${{ matrix.juju-channel == '4/beta' && matrix.preset == 'microk8s' }}
+    continue-on-error: ${{ matrix.juju-channel == '4/stable' && matrix.preset == 'microk8s' }}
 
     steps:
       - run: sudo snap install --classic concierge
