@@ -14,6 +14,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+          path: operator
           persist-credentials: true
 
       - uses: actions/checkout@v5
@@ -25,8 +26,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python .github/update-best-practice-table.py --path-to-charmcraft=./charmcraft > docs/reuse/best-practices.txt
+      - run: python .github/update-best-practice-table.py > docs/reuse/best-practices.txt
         shell: bash
+        working-directory: operator
 
       - run: |
           echo "New changes in best practices"
