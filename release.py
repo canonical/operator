@@ -109,7 +109,7 @@ def get_new_tag_for_release(
         try:
             base_version, _, _ = parse_version(latest_tag)
         except ValueError:
-            logger.info('Latest tag %r is not in a recognized version format.', latest_tag)
+            logger.info('Latest tag %r is not in a recognised version format.', latest_tag)
         else:
             if branch_name.endswith('-maintenance'):
                 logger.info(
@@ -469,7 +469,7 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
         base_version, _, _ = parse_version(latest_version)
     except ValueError:
         logger.error(
-            'Latest version %r is not in a recognized format. '
+            'Latest version %r is not in a recognised format. '
             'Please input the new version manually (including the .dev0 suffix).',
             latest_version,
         )
