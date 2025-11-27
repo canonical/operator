@@ -30,6 +30,7 @@ import github
 import github.GitRelease
 import github.Repository
 import rich.logging
+from packaging.version import InvalidVersion, Version
 
 logging.basicConfig(
     level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]
@@ -107,8 +108,9 @@ def get_new_tag_for_release(
     else:
         logger.info('Latest tag in branch %s: %s', branch_name, latest_tag)
         try:
-            base_version, _, _ = parse_version(latest_tag)
-        except ValueError:
+            version = parse_version(latest_tag)
+            base_version = get_base_version(version)
+        except InvalidVersion:
             logger.info('Latest tag %r is not in a recognised version format.', latest_tag)
         else:
             if branch_name.endswith('-maintenance'):
@@ -347,24 +349,20 @@ def commit_type_to_category(commit_type: str) -> str:
     return mapping.get(commit_type, commit_type.capitalize())
 
 
-def parse_version(version: str) -> tuple[str, str, str]:
-    """Parse version string into base version, pre-release suffix, and dev suffix.
+def parse_version(version: str) -> Version:
+    """Parse version string into a Version object.
 
-    The version should be in the format X.Y.Z, X.Y.Z{a|b|rc}N, or X.Y.Z.devN.
-    The "aN", "bN", "rcN" part is the pre-release suffix.
-    The ".devN" part is the dev suffix.
-    If there is no pre-release or dev suffix, returns an empty string for each.
+    Uses the `packaging` library to parse version strings conforming to PEP 440.
 
     Raises:
-        ValueError if the version format is invalid.
+        InvalidVersion if the version format is invalid.
     """
-    match = re.fullmatch(r'(\d+\.\d+\.\d+)((?:a|b|rc)\d+)?(\.dev\d+)?', version)
-    if not match:
-        raise ValueError(f'Invalid version format: {version}')
-    base_version = match.group(1)
-    pre_suffix = match.group(2) or ''
-    dev_suffix = match.group(3) or ''
-    return base_version, pre_suffix, dev_suffix
+    return Version(version)
+
+
+def get_base_version(version: Version) -> str:
+    """Get the base version (X.Y.Z) from a Version object."""
+    return '.'.join(str(x) for x in version.release)
 
 
 def update_pyproject_versions(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
@@ -417,7 +415,7 @@ def update_uv_lock():
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
-def parse_scenario_version() -> tuple[str, str, str]:
+def parse_scenario_version() -> Version:
     """Parse the current scenario version from pyproject.toml."""
     file_path = VERSION_FILES['testing']
     content = file_path.read_text()
@@ -425,8 +423,7 @@ def parse_scenario_version() -> tuple[str, str, str]:
     if not match:
         raise ValueError(f'Could not find version string in {file_path}')
     version_str = match.group(1)
-    base_version, pre_suffix, dev_suffix = parse_version(version_str)
-    return base_version, pre_suffix, dev_suffix
+    return parse_version(version_str)
 
 
 def get_new_scenario_version(ops_version: str) -> str:
@@ -436,9 +433,11 @@ def get_new_scenario_version(ops_version: str) -> str:
     like ops 3.1.2 -> scenario 8.1.2, and ops 3.1.2.dev0 -> scenario 8.1.2.dev0.
     Pre-release versions are also preserved, like ops 3.1.2b1 -> scenario 8.1.2b1.
     """
-    base_version, pre_suffix, dev_suffix = parse_version(ops_version)
-    major, minor, patch = base_version.split('.')
-    return f'{int(major) + 5}.{minor}.{patch}{pre_suffix}{dev_suffix}'
+    version = parse_version(ops_version)
+    major, minor, patch = version.release
+    pre_suffix = f'{version.pre[0]}{version.pre[1]}' if version.pre else ''
+    dev_suffix = f'.dev{version.dev}' if version.dev is not None else ''
+    return f'{major + 5}.{minor}.{patch}{pre_suffix}{dev_suffix}'
 
 
 def update_versions_for_release(tag: str):
@@ -466,8 +465,9 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
 
     # Parse the version, handling pre-release versions like 3.0.0b2.
     try:
-        base_version, _, _ = parse_version(latest_version)
-    except ValueError:
+        version = parse_version(latest_version)
+        base_version = get_base_version(version)
+    except InvalidVersion:
         logger.error(
             'Latest version %r is not in a recognised format. '
             'Please input the new version manually (including the .dev0 suffix).',
