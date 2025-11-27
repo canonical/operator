@@ -166,57 +166,57 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.InstallEvent)
-    def install():
+    def install():  # noqa: D102
         return _Event('install')
 
     @staticmethod
     @_copy_doc(ops.StartEvent)
-    def start():
+    def start():  # noqa: D102
         return _Event('start')
 
     @staticmethod
     @_copy_doc(ops.StopEvent)
-    def stop():
+    def stop():  # noqa: D102
         return _Event('stop')
 
     @staticmethod
     @_copy_doc(ops.RemoveEvent)
-    def remove():
+    def remove():  # noqa: D102
         return _Event('remove')
 
     @staticmethod
     @_copy_doc(ops.UpdateStatusEvent)
-    def update_status():
+    def update_status():  # noqa: D102
         return _Event('update_status')
 
     @staticmethod
     @_copy_doc(ops.ConfigChangedEvent)
-    def config_changed():
+    def config_changed():  # noqa: D102
         return _Event('config_changed')
 
     @staticmethod
     @_copy_doc(ops.UpgradeCharmEvent)
-    def upgrade_charm():
+    def upgrade_charm():  # noqa: D102
         return _Event('upgrade_charm')
 
     @staticmethod
     @_copy_doc(ops.PreSeriesUpgradeEvent)
-    def pre_series_upgrade():
+    def pre_series_upgrade():  # noqa: D102
         return _Event('pre_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.PostSeriesUpgradeEvent)
-    def post_series_upgrade():
+    def post_series_upgrade():  # noqa: D102
         return _Event('post_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.LeaderElectedEvent)
-    def leader_elected():
+    def leader_elected():  # noqa: D102
         return _Event('leader_elected')
 
     @staticmethod
     @_copy_doc(ops.SecretChangedEvent)
-    def secret_changed(secret: Secret):
+    def secret_changed(secret: Secret):  # noqa: D102
         if secret.owner:
             raise ValueError(
                 'This unit will never receive secret-changed for a secret it owns.',
@@ -225,7 +225,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretExpiredEvent)
-    def secret_expired(secret: Secret, *, revision: int):
+    def secret_expired(secret: Secret, *, revision: int):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-expire for a secret it does not own.',
@@ -234,7 +234,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRotateEvent)
-    def secret_rotate(secret: Secret):
+    def secret_rotate(secret: Secret):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-rotate for a secret it does not own.',
@@ -243,7 +243,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRemoveEvent)
-    def secret_remove(secret: Secret, *, revision: int):
+    def secret_remove(secret: Secret, *, revision: int):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-removed for a secret it does not own.',
@@ -262,12 +262,12 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
-    def relation_created(relation: RelationBase):
+    def relation_created(relation: RelationBase):  # noqa: D102
         return _Event(f'{relation.endpoint}_relation_created', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
-    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):
+    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):  # noqa: D102
         return _Event(
             f'{relation.endpoint}_relation_joined',
             relation=relation,
@@ -276,7 +276,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationChangedEvent)
-    def relation_changed(
+    def relation_changed(  # noqa: D102
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -289,7 +289,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationDepartedEvent)
-    def relation_departed(
+    def relation_departed(  # noqa: D102
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -304,27 +304,27 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
-    def relation_broken(relation: RelationBase):
+    def relation_broken(relation: RelationBase):  # noqa: D102
         return _Event(f'{relation.endpoint}_relation_broken', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.StorageAttachedEvent)
-    def storage_attached(storage: Storage):
+    def storage_attached(storage: Storage):  # noqa: D102
         return _Event(f'{storage.name}_storage_attached', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.StorageDetachingEvent)
-    def storage_detaching(storage: Storage):
+    def storage_detaching(storage: Storage):  # noqa: D102
         return _Event(f'{storage.name}_storage_detaching', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.PebbleReadyEvent)
-    def pebble_ready(container: Container):
+    def pebble_ready(container: Container):  # noqa: D102
         return _Event(f'{container.name}_pebble_ready', container=container)
 
     @staticmethod
     @_copy_doc(ops.PebbleCustomNoticeEvent)
-    def pebble_custom_notice(container: Container, notice: Notice):
+    def pebble_custom_notice(container: Container, notice: Notice):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_custom_notice',
             container=container,
@@ -333,7 +333,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckFailedEvent)
-    def pebble_check_failed(container: Container, info: CheckInfo):
+    def pebble_check_failed(container: Container, info: CheckInfo):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_check_failed',
             container=container,
@@ -342,7 +342,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckRecoveredEvent)
-    def pebble_check_recovered(container: Container, info: CheckInfo):
+    def pebble_check_recovered(container: Container, info: CheckInfo):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_check_recovered',
             container=container,
@@ -351,7 +351,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.ActionEvent)
-    def action(
+    def action(  # noqa: D102
         name: str,
         params: Mapping[str, AnyJson] | None = None,
         id: str | None = None,
@@ -487,7 +487,10 @@ class Context(Generic[CharmType]):
     """A record of what the charm has sent to juju-log"""
 
     app_trusted: bool
-    """Whether the charm has Juju trust (deployed with ``--trust`` or added with ``juju trust``)."""
+    """Whether the charm has Juju trust.
+
+    Juju trust means deployed with ``--trust`` or added with ``juju trust``.
+    """
 
     app_status_history: list[_EntityStatus]
     """A record of the app statuses the charm has set.
@@ -582,15 +585,16 @@ class Context(Generic[CharmType]):
     trace_data: list[ReadableSpan]
     """Trace data generated during the last run.
 
-    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
-    order of this list. Rather, tests could validate parent/child relationships or containment by
-    start and end timestamps.
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not
+    rely on the order of this list. Rather, tests could validate parent/child relationships
+    or containment by start and end timestamps.
     """
 
     action_logs: list[str]
-    """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
+    """The logs associated with the action output.
 
-    This will be empty when handling a non-action event.
+    These are set by the charm with :meth:`ops.ActionEvent.log` and will be empty
+    when handling a non-action event.
     """
 
     action_results: dict[str, Any] | None
