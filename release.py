@@ -29,8 +29,8 @@ from collections.abc import Mapping
 import github
 import github.GitRelease
 import github.Repository
+import packaging.version
 import rich.logging
-from packaging.version import InvalidVersion, Version
 
 logging.basicConfig(
     level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]
@@ -110,7 +110,7 @@ def get_new_tag_for_release(
         try:
             version = parse_version(latest_tag)
             base_version = get_base_version(version)
-        except InvalidVersion:
+        except packaging.version.InvalidVersion:
             logger.info('Latest tag %r is not in a recognised version format.', latest_tag)
         else:
             if branch_name.endswith('-maintenance'):
@@ -349,18 +349,18 @@ def commit_type_to_category(commit_type: str) -> str:
     return mapping.get(commit_type, commit_type.capitalize())
 
 
-def parse_version(version: str) -> Version:
+def parse_version(version: str) -> packaging.version.Version:
     """Parse version string into a Version object.
 
     Uses the `packaging` library to parse version strings conforming to PEP 440.
 
     Raises:
-        InvalidVersion if the version format is invalid.
+        packaging.version.InvalidVersion if the version format is invalid.
     """
-    return Version(version)
+    return packaging.version.Version(version)
 
 
-def get_base_version(version: Version) -> str:
+def get_base_version(version: packaging.version.Version) -> str:
     """Get the base version (X.Y.Z) from a Version object."""
     return '.'.join(str(x) for x in version.release)
 
@@ -415,7 +415,7 @@ def update_uv_lock():
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
-def parse_scenario_version() -> Version:
+def parse_scenario_version() -> packaging.version.Version:
     """Parse the current scenario version from pyproject.toml."""
     file_path = VERSION_FILES['testing']
     content = file_path.read_text()
@@ -467,7 +467,7 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
     try:
         version = parse_version(latest_version)
         base_version = get_base_version(version)
-    except InvalidVersion:
+    except packaging.version.InvalidVersion:
         logger.error(
             'Latest version %r is not in a recognised format. '
             'Please input the new version manually (including the .dev0 suffix).',
