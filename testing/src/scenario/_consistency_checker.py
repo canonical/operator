@@ -1,7 +1,9 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""The :meth:`check_consistency` function is the primary entry point for the
+"""Check that the state is consistent with the context.
+
+The :meth:`check_consistency` function is the primary entry point for the
 consistency checks. Calling it ensures that the :class:`State` and the event,
 in combination with the ``Context``, is viable in Juju. For example, Juju can't
 emit a ``foo-relation-changed`` event on your charm unless your charm has
@@ -130,7 +132,7 @@ def check_resource_consistency(
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
-    """Check the internal consistency of the resources from metadata and in :class:`scenario.State`."""
+    """Check the internal consistency of the resources from metadata and in `State`."""
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -171,8 +173,8 @@ def check_event_consistency(
         # consistency possible?
         warnings.append(
             'this is a custom event; if its name makes it look like a builtin one '
-            '(for example, a relation event, or a workload event), you might get some false-negative '
-            'consistency checks.',
+            '(for example, a relation event, or a workload event), you might get '
+            'some false-negative consistency checks.',
         )
         return Results(errors, warnings)
 
@@ -244,7 +246,7 @@ def _check_workload_event(
                     'you **can** fire fire pebble-ready while the container cannot connect, '
                     "but that's most likely not what you want.",
                 )
-        names = Counter(exec.command_prefix for exec in event.container.execs)
+        names = Counter(exe.command_prefix for exe in event.container.execs)
         if dupes := [n for n in names if names[n] > 1]:
             errors.append(
                 f'container {event.container.name} has duplicate command prefixes: {dupes}',
@@ -369,7 +371,7 @@ def check_storages_consistency(
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
-    """Check the consistency of the :class:`scenario.State` storages with the charm_spec metadata."""
+    """Check the consistency of the `State` storages with the charm_spec metadata."""
     state_storage = state.storages
     meta_storage = (charm_spec.meta or {}).get('storage', {})
     errors: list[str] = []
@@ -744,7 +746,7 @@ def check_storedstate_consistency(
     state: State,
     **_kwargs: Any,
 ) -> Results:
-    """Check the internal consistency of any :class:`scenario.StoredState` in the :class:`scenario.State`."""
+    """Check the internal consistency of any `StoredState` in the `State`."""
     errors: list[str] = []
 
     # Attribute names must be unique on each object.
@@ -763,8 +765,9 @@ def check_storedstate_consistency(
         # This is the same "only simple types" check that ops does.
         try:
             marshal.dumps(ss.content)
-        except ValueError:
+        except ValueError:  # noqa: PERF203
             errors.append(
-                f'The StoredState object {ss.owner_path}.{ss.name} should contain only simple types.',
+                f'The StoredState object {ss.owner_path}.{ss.name} '
+                f'should contain only simple types.',
             )
     return Results(errors, [])
