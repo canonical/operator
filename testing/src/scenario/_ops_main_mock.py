@@ -207,7 +207,7 @@ class Ops(_Manager, Generic[CharmType]):
             ops_logger.debug('Event %s not defined for %s.', event_name, self.charm)
             raise NoObserverError(
                 f'Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).',
-            )
+            ) from None
         return event_to_emit
 
     def _object_to_ops_object(self, obj: Any) -> Any:
@@ -247,10 +247,10 @@ class Ops(_Manager, Generic[CharmType]):
         for step in path:
             try:
                 obj = getattr(obj, step)
-            except AttributeError:
+            except AttributeError:  # noqa: PERF203
                 raise BadOwnerPath(
                     f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
-                )
+                ) from None
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
                 f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',
