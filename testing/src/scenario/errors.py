@@ -53,5 +53,5 @@ class NoObserverError(RuntimeError):
     """Error raised when the event being dispatched has no registered observers."""
 
 
-class BadOwnerPath(RuntimeError):
+class BadOwnerPath(RuntimeError):  # noqa: N818  # Need to keep the name for backwards compatibility.
     """Error raised when the owner path does not lead to a valid ObjectEvents instance."""
