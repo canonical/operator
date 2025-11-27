@@ -13,6 +13,7 @@ import pathlib
 import random
 import re
 import string
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
 from typing import (
@@ -25,13 +26,12 @@ from typing import (
     TypeVar,
     cast,
 )
-from collections.abc import Callable, Iterable, Mapping, Sequence
 from uuid import uuid4
 
 import yaml
 
 import ops
-from ops import pebble, CharmBase, CharmEvents, SecretRotate, StatusBase
+from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
@@ -40,7 +40,9 @@ from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import TypedDict
+
     from typing_extensions import Unpack
+
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
@@ -81,9 +83,6 @@ _BUILTIN_EVENTS = {
     'start',
     'stop',
     'install',
-    'install',
-    'start',
-    'stop',
     'remove',
     'update_status',
     'config_changed',
@@ -1100,7 +1099,6 @@ class Container:
         You should run your assertions on this plan, not so much on the layers,
         as those are input data.
         """
-
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
@@ -1726,7 +1724,6 @@ class State:
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
-
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
         # requires:
         #   foo-bar: ...

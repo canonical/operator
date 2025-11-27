@@ -1,8 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""
-The :meth:`check_consistency` function is the primary entry point for the
+"""The :meth:`check_consistency` function is the primary entry point for the
 consistency checks. Calling it ensures that the :class:`State` and the event,
 in combination with the ``Context``, is viable in Juju. For example, Juju can't
 emit a ``foo-relation-changed`` event on your charm unless your charm has
@@ -23,13 +22,12 @@ import marshal
 import os
 import re
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple
-from collections.abc import Callable, Iterable
 
-from .errors import InconsistentScenarioError
 from ._runtime import logger as scenario_logger
+from .errors import InconsistentScenarioError
 from .state import (
     CharmType,
     PeerRelation,
@@ -551,17 +549,19 @@ def check_relation_consistency(
 
     # check relation types
     for endpoint, _ in peer_relations_meta:
-        for relation in _get_relations(endpoint):
-            if not isinstance(relation, PeerRelation):
-                errors.append(
-                    f'endpoint {endpoint} is a peer relation; '
-                    f'expecting relation to be of type PeerRelation, got {type(relation)}',
-                )
+        errors.extend(
+            f'endpoint {endpoint} is a peer relation; '
+            f'expecting relation to be of type PeerRelation, got {type(relation)}'
+            for relation in _get_relations(endpoint)
+            if not isinstance(relation, PeerRelation)
+        )
 
     known_endpoints = [a[0] for a in all_relations_meta]
-    for relation in state.relations:
-        if (ep := relation.endpoint) not in known_endpoints:
-            errors.append(f'relation endpoint {ep} is not declared in metadata.')
+    errors.extend(
+        f'relation endpoint {ep} is not declared in metadata.'
+        for relation in state.relations
+        if (ep := relation.endpoint) not in known_endpoints
+    )
 
     seen_ids: set[int] = set()
     for endpoint, relation_meta in all_relations_meta:
@@ -648,7 +648,6 @@ def check_containers_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :class:`scenario.State` containers with the charm_spec metadata."""
-
     # event names will be normalized; need to compare against normalized container names.
     meta = charm_spec.meta
     meta_containers = list(map(_normalise_name, meta.get('containers', {})))
@@ -709,13 +708,13 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            for attr in ('level', 'startup', 'threshold'):
-                if getattr(check, attr) != getattr(plan_check, attr):
-                    errors.append(
-                        f'container {container.name!r} has a check {check.name!r} with a '
-                        f'different {attr!r} ({getattr(check, attr)}) '
-                        f'than the plan ({getattr(plan_check, attr)}).',
-                    )
+            errors.extend(
+                f'container {container.name!r} has a check {check.name!r} with a '
+                f'different {attr!r} ({getattr(check, attr)}) '
+                f'than the plan ({getattr(plan_check, attr)}).'
+                for attr in ('level', 'startup', 'threshold')
+                if getattr(check, attr) != getattr(plan_check, attr)
+            )
 
     return Results(errors, [])
 
@@ -728,7 +727,6 @@ def check_cloudspec_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check that Kubernetes models don't have :attr:`scenario.State.cloud_spec` set."""
-
     errors: list[str] = []
     warnings: list[str] = []
 

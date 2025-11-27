@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Test framework logger"""
+"""Test framework logger."""
 
 from __future__ import annotations
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+
 from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
@@ -304,7 +305,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(' - entering ops.main (mocked)')
-            from ._ops_main_mock import Ops  # noqa: F811
+            from ._ops_main_mock import Ops
 
             ops = None
 

@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Juju and Pebble mocking
+"""Juju and Pebble mocking.
 
 This module contains mocks for the Juju and Pebble APIs that are used by ops
 to interact with the Juju controller and the Pebble service manager.
@@ -13,6 +13,7 @@ import datetime
 import io
 import shutil
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -23,17 +24,16 @@ from typing import (
     cast,
     get_args,
 )
-from collections.abc import Mapping
 
 from ops import (
     JujuContext,
     JujuVersion,
-    pebble,
+    ModelError,
+    RelationNotFoundError,
     SecretInfo,
     SecretNotFoundError,
-    RelationNotFoundError,
     SecretRotate,
-    ModelError,
+    pebble,
 )
 from ops._private.harness import ExecArgs, _TestingPebbleClient
 from ops.model import CloudSpec as CloudSpec_Ops
@@ -167,10 +167,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
     ):
-        _port = _port_cls_by_protocol[protocol](port=port)  # type: ignore
+        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
-        if _port in ports:
-            ports.remove(_port)
+        if port_ in ports:
+            ports.remove(port_)
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
@@ -270,7 +270,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             return relation.local_unit_data
 
         unit_id = int(member_name.split('/')[-1])
-        return relation._get_databag_for_remote(unit_id)  # noqa
+        return relation._get_databag_for_remote(unit_id)
 
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         if JujuVersion(self._context.juju_version) < '3.6.2':
@@ -784,7 +784,7 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
-        for _, mount in mounts.items():
+        for mount in mounts.values():
             path = Path(mount.location).parts
             mounting_dir = container_root.joinpath(*path[1:])
             mounting_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -841,10 +841,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         """Copy any new or changed check infos into the state."""
         infos: set[CheckInfo] = set()
         for info in self._check_infos.values():
-            if isinstance(info.level, str):
-                level = pebble.CheckLevel(info.level)
-            else:
-                level = info.level
+            level = pebble.CheckLevel(info.level) if isinstance(info.level, str) else info.level
             if isinstance(info.status, str):
                 status = pebble.CheckStatus(info.status)
             else:

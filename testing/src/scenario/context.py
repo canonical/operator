@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Test Context
+"""Test Context.
 
 The test `Context` object provides the context of the wider Juju system that the
 specific `State` exists in, and the events that can be executed on that `State`.
@@ -12,13 +12,14 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
-from contextlib import contextmanager
-from typing import Generic, TYPE_CHECKING, Any
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Generic
 
 import ops
 from ops._private.harness import ActionFailed
 
+from ._runtime import Runtime
 from .errors import (
     AlreadyEmittedError,
     ContextSetupError,
@@ -36,10 +37,12 @@ from .state import (
     _CharmSpec,
     _Event,
 )
-from ._runtime import Runtime
 
 if TYPE_CHECKING:  # pragma: no cover
+    from opentelemetry.sdk.trace import ReadableSpan
+
     from ops._private.harness import ExecArgs
+
     from ._ops_main_mock import Ops
     from .state import (
         AnyJson,
@@ -48,7 +51,6 @@ if TYPE_CHECKING:  # pragma: no cover
         State,
         _EntityStatus,
     )
-    from opentelemetry.sdk.trace import ReadableSpan
 
 logger = scenario_logger.getChild('runtime')
 
@@ -95,7 +97,7 @@ class Manager(Generic[CharmType]):
 
     @property
     def _runner(self):
-        return self._ctx._run  # noqa
+        return self._ctx._run
 
     def __enter__(self):
         self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
@@ -250,12 +252,12 @@ class CharmEvents:
 
     @staticmethod
     def collect_app_status():
-        """Event triggered at the end of every hook to collect app statuses for evaluation"""
+        """Event triggered at the end of every hook to collect app statuses for evaluation."""
         return _Event('collect_app_status')
 
     @staticmethod
     def collect_unit_status():
-        """Event triggered at the end of every hook to collect unit statuses for evaluation"""
+        """Event triggered at the end of every hook to collect unit statuses for evaluation."""
         return _Event('collect_unit_status')
 
     @staticmethod
@@ -661,7 +663,6 @@ class Context(Generic[CharmType]):
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
-
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:

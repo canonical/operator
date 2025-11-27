@@ -10,15 +10,14 @@ import marshal
 import re
 import sys
 import warnings
-from typing import TYPE_CHECKING, Any, Generic, cast
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 import ops
 import ops.storage
-
-from ops.framework import _event_regex
 from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
+from ops.framework import _event_regex
 
 from .context import Context
 from .errors import BadOwnerPath, NoObserverError
@@ -150,15 +149,9 @@ class Ops(_Manager, Generic[CharmType]):
     def _load_charm_meta(self):
         metadata = (self._charm_root / 'metadata.yaml').read_text()
         actions_meta = self._charm_root / 'actions.yaml'
-        if actions_meta.exists():
-            actions_metadata = actions_meta.read_text()
-        else:
-            actions_metadata = None
+        actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
         config_meta = self._charm_root / 'config.yaml'
-        if config_meta.exists():
-            config_metadata = config_meta.read_text()
-        else:
-            config_metadata = None
+        config_metadata = config_meta.read_text() if config_meta.exists() else None
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
 
