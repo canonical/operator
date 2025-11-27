@@ -20,7 +20,7 @@
 * Raise ActionFailed when using Context as a context manager (#2121)
 * Detect categories with an exclamation mark indicating breaking changes (#2132)
 * Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
-* Don't cache secrets in Ops (#2143)
+* Don't cache secret metadata in Ops (#2143)
 * Secret-info-get cannot be provided with both an ID and a label (#2170)
 * Minor hookcmds fixes (#2175)
 
@@ -47,7 +47,7 @@
 * Replace machine charm tutorial by an improved tutorial (#2119)
 * Change HACKING.md instructions for maintaining Charmcraft profiles (#2151)
 * In integration tests, use consistent approach to logging and packing (#2150)
-* In integration testing how-to, clarify that Juju model is destroyed after module (#2154)
+* In integration testing how-to, clarify that Juju model is destroyed after all tests in the model complete (#2154)
 * Remove Charmcraft channel specifier from machine charm tutorial (#2148)
 * Add AI contribution note and style guideline for type annotation of return values (#2168)
 * Add ops[testing] to the ops.testing docstring (#2171)
@@ -56,7 +56,7 @@
 
 ## Tests
 
-* Re-enable scenario consistency checks after disabling them (#2141)
+* Re-enable testing consistency checks after disabling them (#2141)
 * Expand secrets integration and state transition tests (#2130)
 
 ## Refactoring
