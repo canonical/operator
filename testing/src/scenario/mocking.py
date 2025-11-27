@@ -471,12 +471,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if id is not None and label is not None:
             secret._set_label(label)
         juju_version = JujuVersion(self._context.juju_version)
-        if not (juju_version == '3.1.7' or juju_version >= '3.3.1'):
-            # In this medieval Juju chapter,
-            # secret owners always used to track the latest revision.
-            # ref: https://bugs.launchpad.net/juju/+bug/2037120
-            if secret.owner is not None:
-                refresh = True
+        # In this medieval Juju chapter,
+        # secret owners always used to track the latest revision.
+        # ref: https://bugs.launchpad.net/juju/+bug/2037120
+        if not (juju_version == '3.1.7' or juju_version >= '3.3.1') and secret.owner is not None:
+            refresh = True
 
         if peek or refresh:
             if refresh:
@@ -895,7 +894,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                 f'container with name={container_name!r} not found. '
                 f'Did you forget a Container, or is the socket path '
                 f'{self.socket_path!r} wrong?',
-            )
+            ) from None
 
     @property
     def _layers(self) -> dict[str, pebble.Layer]:
@@ -907,7 +906,7 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     # Based on a method of the same name from Harness.
     def _find_exec_handler(self, command: list[str]) -> Exec | None:
-        handlers = {exec.command_prefix: exec for exec in self._container.execs}
+        handlers = {exe.command_prefix: exe for exe in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
         # This includes matching against the empty list, which will match any
