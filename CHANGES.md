@@ -18,7 +18,7 @@
 * Ensure `ops.Pebble.pull` cleans up temporary files if it errors (#2087)
 * Make secret info description visible to the charm in ops[testing] (#2115)
 * Raise ActionFailed when using Context as a context manager (#2121)
-* Detect categories with an explanation mark indicating breaking changes (#2132)
+* Detect categories with an exclamation mark indicating breaking changes (#2132)
 * Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
 * Don't cache secrets in Ops (#2143)
 * Secret-info-get cannot be provided with both an ID and a label (#2170)
