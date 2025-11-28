@@ -112,7 +112,7 @@ def test_app_name_and_unit_id():
     assert ctx.unit_id == 42
 
 
-@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
 def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
@@ -132,7 +132,7 @@ def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pyt
     assert 'TEST_ENV_VAR' not in os.environ
 
 
-@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
 def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
