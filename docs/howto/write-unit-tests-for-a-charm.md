@@ -162,6 +162,50 @@ def test_charm_runs(my_charm):
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
 
+## Reusing state
+
+Each test is typically an isolated test of how your charm responds to a single event. If you need to use the same input state for several events, we recommend using a fixture that produces the input state. For example:
+
+```python
+@pytest.fixture
+def state_normal():
+    container = testing.Container("some-container", can_connect=True)
+    return testing.State(
+        containers={container},
+        config={"server-port": 8080},
+        leader=True,
+    )
+
+
+def test_config_changed(state_normal):
+    ctx = testing.Context(Charm)
+    state_out = ctx.run(ctx.on.config_changed(), state_normal)
+    # Check the output state.
+
+
+def test_status(state_normal):
+    ctx = testing.Context(Charm)
+    state_out = ctx.run(ctx.on.update_status(), state_normal)
+    # Check the output state.
+```
+
+Sometimes it's more convenient to simulate several events in the same test. For example, to check what happens when your charm receives events in a particular order.
+
+After checking a `State` object that `ctx.run` returns, you can provide the same state as input to another simulated event. If you need to modify the state between the events, create a new `State` object instead of modifying the original `State` object. For example:
+
+```python
+state_out = ctx.run(...)  # The State we want to reuse.
+relation = state_out.get_relation(...)  # A relation we want to modify.
+
+# Copy and modify the relation data.
+new_local_app_data = relation.local_app_data.copy()
+new_local_app_data["foo"] = "bar"
+
+# Create a new State.
+new_relation = dataclasses.replace(relation, local_app_data=new_local_app_data)
+new_state = dataclasses.replace(state_out, relations={new_relation})
+```
+
 ## Accessing the charm instance
 
 If you need to access the charm instance in a test, use the `testing.Context` instance as a context manager, then access `mgr.charm`. When setting up the context manager, use an event the charm doesn't observe, such as `update_status`. For example:
