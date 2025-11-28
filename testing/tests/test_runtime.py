@@ -179,10 +179,20 @@ class ValueErrorCharm(ops.CharmBase):
 @pytest.mark.parametrize(
     ('expected_error', 'bare_charm_errors'),
     (
+        # '1' and 'true' (case-insensitive) are treated as logically true
         (ValueError, '1'),
-        (ValueError, 'tRuE'),  # case insensitive
+        (ValueError, 'true'),
+        (ValueError, 'True'),
+        (ValueError, 'tRuE'),
+        # any other value is treated as logically false
+        (UncaughtCharmError, '0'),
+        (UncaughtCharmError, 'false'),
+        (UncaughtCharmError, '11'),
+        (UncaughtCharmError, 'yes'),
+        (UncaughtCharmError, '✩ anything ✨ else ✧'),
+        # the actually unset case is tested separately
+        # the empty string is treated as 'any other value'
         (UncaughtCharmError, ''),
-        (UncaughtCharmError, '✨ aNy ✩ sTrInG ✧ ReAlLy ...'),
     ),
 )
 def test_bare_charm_errors(
