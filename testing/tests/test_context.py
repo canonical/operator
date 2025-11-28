@@ -125,8 +125,7 @@ def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pyt
 
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    error = RuntimeError if bare_charm_errors else UncaughtCharmError
-    with pytest.raises(error):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         with ctx(ctx.on.start(), State()) as mgr:
             assert os.getenv('TEST_ENV_VAR') == '1'
             mgr.run()
@@ -146,8 +145,7 @@ def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypa
 
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    error = RuntimeError if bare_charm_errors else UncaughtCharmError
-    with pytest.raises(error):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
 

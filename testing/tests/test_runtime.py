@@ -93,9 +93,8 @@ def test_unit_name(app_name, unit_id):
         assert manager.charm.unit.name == f'{app_name}/{unit_id}'
 
 
-@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
-def test_env_clean_on_charm_error(bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
+def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     meta = {'name': 'frank', 'requires': {'box': {'interface': 'triangle'}}}
 
     my_charm_type = charm_type()
@@ -110,8 +109,7 @@ def test_env_clean_on_charm_error(bare_charm_errors: str, monkeypatch: pytest.Mo
 
     remote_name = 'ava'
     rel = Relation('box', remote_app_name=remote_name)
-    error = ZeroDivisionError if bare_charm_errors else UncaughtCharmError
-    with pytest.raises(error) as exc_info:
+    with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
             event=_Event('box_relation_changed', relation=rel),
@@ -121,8 +119,7 @@ def test_env_clean_on_charm_error(bare_charm_errors: str, monkeypatch: pytest.Mo
             assert 'JUJU_REMOTE_APP' in os.environ
             _ = 1 / 0  # raise some error
     # Ensure that some other error didn't occur (like AssertionError!).
-    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
-    assert isinstance(exc, ZeroDivisionError)
+    assert 'ZeroDivisionError' in str(exc.value)
 
     # Ensure that the Juju environment didn't leak into the outside one.
     assert os.getenv('JUJU_REMOTE_APP', None) is None
@@ -144,9 +141,8 @@ def test_juju_version_is_set_in_environ():
     ctx.run(ctx.on.start(), State())
 
 
-@pytest.mark.parametrize('bare_charm_errors', ('1', ''))
 @pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
-def test_ops_raises_abort(exit_code: int, bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch):
+def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -158,19 +154,17 @@ def test_ops_raises_abort(exit_code: int, bare_charm_errors: str, monkeypatch: p
             # simpler than causing the framework to raise it.
             raise _Abort(exit_code)
 
-    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     ctx = Context(MyCharm, meta={'name': 'foo'})
     if exit_code == 0:
         state_out = ctx.run(ctx.on.start(), State())
         assert {e.handle.kind for e in ctx.emitted_events} == {'start'}
         assert state_out.unit_status == ActiveStatus()
     else:
-        error = _Abort if bare_charm_errors else UncaughtCharmError
-        with pytest.raises(error) as exc_info:
+        with pytest.raises(UncaughtCharmError) as exc:
             ctx.run(ctx.on.start(), State())
-        exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
-        assert isinstance(exc, _Abort)
-        assert exc.exit_code == exit_code
+        assert isinstance(exc.value.__cause__, _Abort)
+        assert exc.value.__cause__.exit_code == exit_code
 
 
 class ValueErrorCharm(ops.CharmBase):

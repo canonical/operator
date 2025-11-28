@@ -664,10 +664,9 @@ def test_get_relation_when_missing():
 
     # If there's no defined relation with the name, then get_relation raises KeyError.
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises((KeyError, UncaughtCharmError)) as exc_info:
+    with pytest.raises((KeyError, UncaughtCharmError)) as exc:
         ctx.run(ctx.on.update_status(), State())
-    if isinstance(exc_info.value, UncaughtCharmError):
-        assert isinstance(exc_info.value.__cause__, KeyError)
+    assert isinstance(exc.value, KeyError) or isinstance(exc.value.__cause__, KeyError)
 
 
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))

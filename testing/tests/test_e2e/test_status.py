@@ -203,7 +203,7 @@ def test_status_success(status: ops.StatusBase):
         UnknownStatus(),
     ),
 )
-def test_status_error(status: ops.StatusBase):
+def test_status_error(status: ops.StatusBase, monkeypatch: pytest.MonkeyPatch):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -212,12 +212,9 @@ def test_status_error(status: ops.StatusBase):
         def _on_update_status(self, _):
             self.unit.status = status
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises((ops.ModelError, UncaughtCharmError)) as exc_info:
+    with pytest.raises(UncaughtCharmError) as excinfo:
         ctx.run(ctx.on.update_status(), State())
-    exc = exc_info.value if bare_charm_errors else exc_info.value.__cause__
-    exc = exc_info.value
-    if isinstance(exc, UncaughtCharmError):
-        exc = exc.__cause__
-        assert isinstance(exc, ops.ModelError)
-    assert f'invalid status "{status.name}"' in str(exc)
+    assert isinstance(excinfo.value.__cause__, ops.ModelError)
+    assert f'invalid status "{status.name}"' in str(excinfo.value.__cause__)
