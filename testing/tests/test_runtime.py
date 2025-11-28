@@ -195,7 +195,7 @@ class ValueErrorCharm(ops.CharmBase):
         (UncaughtCharmError, ''),
     ),
 )
-def test_bare_charm_errors(
+def test_bare_charm_errors_set(
     monkeypatch: pytest.Monkeypatch, expected_error: type[Exception], bare_charm_errors: str | None
 ):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
