@@ -40,6 +40,7 @@ jobs:
           echo "Total changes in best practices"
           git --no-pager diff main HEAD
           git push -f --set-upstream origin auto-update-best-practice-docs
+        working-directory: operator
       - run: |
           # Ensure a PR if there are changes, no PR otherwise
           PR=$(gh pr list --state open --head auto-update-best-practice-docs --json number -q '.[0].number')
@@ -53,5 +54,6 @@ jobs:
           echo "Opening new PR"
           gh pr create --base main --head auto-update-best-practice-docs --title "chore: update best practices" --body "This is an automated PR to update the best practices documentation.";
           fi
+        working-directory: operator
         env:
             GITHUB_TOKEN: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
