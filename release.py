@@ -29,6 +29,7 @@ from collections.abc import Mapping
 import github
 import github.GitRelease
 import github.Repository
+import packaging.version
 import rich.logging
 
 logging.basicConfig(
@@ -43,7 +44,7 @@ auth = github.Auth.Token(os.environ['GITHUB_TOKEN'])
 gh_client = github.Github(auth=auth)
 
 
-VERSION_REGEX = r'(\d+\.\d+\.\d+(?:\.dev\d+)?)'
+VERSION_REGEX = r'(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.dev\d+)?)'
 VERSION_FILES = {
     'ops/src': pathlib.Path('ops/version.py'),
     'ops/pyproject': pathlib.Path('pyproject.toml'),
@@ -106,17 +107,20 @@ def get_new_tag_for_release(
         logger.info('No version tag found in branch %r', branch_name)
     else:
         logger.info('Latest tag in branch %s: %s', branch_name, latest_tag)
-        if not re.match(r'^\d+\.\d+\.\d+$', latest_tag):
-            logger.info('Latest tag is not in format X.Y.Z.')
+        try:
+            version = parse_version(latest_tag)
+            base_version = get_base_version(version)
+        except packaging.version.InvalidVersion:
+            logger.info('Latest tag %r is not in a recognised version format.', latest_tag)
         else:
             if branch_name.endswith('-maintenance'):
                 logger.info(
                     'Branch is a maintenance branch, bumping patch version of the latest tag.'
                 )
-                suggested_tag = bump_patch_version(latest_tag)
+                suggested_tag = bump_patch_version(base_version)
             else:
                 logger.info('Branch is main, bumping minor version of the latest tag.')
-                suggested_tag = bump_minor_version(latest_tag)
+                suggested_tag = bump_minor_version(base_version)
             logger.info('Suggested new version: %s', suggested_tag)
 
     tag_prompt = f' (press enter to use the tag {suggested_tag})' if suggested_tag else ''
@@ -131,7 +135,7 @@ def get_new_tag_for_release(
             continue
 
         if not re.match(r'^\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?$', new_tag):
-            logger.error('Tag must be in format X.Y.Z')
+            logger.error('Tag must be in format X.Y.Z or X.Y.Z{a|b|rc}N')
             continue
 
         release_page = f'https://github.com/{owner}/{repo.name}/releases'
@@ -345,22 +349,20 @@ def commit_type_to_category(commit_type: str) -> str:
     return mapping.get(commit_type, commit_type.capitalize())
 
 
-def parse_version(version: str) -> tuple[str, str]:
-    """Parse version string into base version and dev suffix.
+def parse_version(version: str) -> packaging.version.Version:
+    """Parse version string into a Version object.
 
-    The version should be in the format X.Y.Z or X.Y.Z.devN.
-    The ".devN" part is the dev suffix.
-    If there is no dev suffix, it returns an empty string for the dev suffix.
+    Uses the `packaging` library to parse version strings conforming to PEP 440.
 
     Raises:
-        ValueError if the version format is invalid.
+        packaging.version.InvalidVersion if the version format is invalid.
     """
-    match = re.fullmatch(r'(\d+\.\d+\.\d+)(?:(?:a|b|rc)\d+)?(\.dev\d+)?', version)
-    if not match:
-        raise ValueError(f'Invalid version format: {version}')
-    base_version = match.group(1)
-    dev_suffix = match.group(2) or ''
-    return base_version, dev_suffix
+    return packaging.version.Version(version)
+
+
+def get_base_version(version: packaging.version.Version) -> str:
+    """Get the base version (X.Y.Z) from a Version object."""
+    return '.'.join(str(x) for x in version.release)
 
 
 def update_pyproject_versions(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
@@ -413,7 +415,7 @@ def update_uv_lock():
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
-def parse_scenario_version() -> tuple[str, str]:
+def parse_scenario_version() -> packaging.version.Version:
     """Parse the current scenario version from pyproject.toml."""
     file_path = VERSION_FILES['testing']
     content = file_path.read_text()
@@ -421,20 +423,21 @@ def parse_scenario_version() -> tuple[str, str]:
     if not match:
         raise ValueError(f'Could not find version string in {file_path}')
     version_str = match.group(1)
-    base_version, dev_suffix = parse_version(version_str)
-    return base_version, dev_suffix
+    return parse_version(version_str)
 
 
 def get_new_scenario_version(ops_version: str) -> str:
-    """Get a new version for scenario based on ops verwsion.
+    """Get a new version for scenario based on ops version.
 
     We want the scenario version to always be exactly ops major version+5,
     like ops 3.1.2 -> scenario 8.1.2, and ops 3.1.2.dev0 -> scenario 8.1.2.dev0.
+    Pre-release versions are also preserved, like ops 3.1.2b1 -> scenario 8.1.2b1.
     """
-    base_version, dev_suffix = parse_version(ops_version)
-    major, minor, patch = base_version.split('.')
-    dev = dev_suffix if dev_suffix else ''
-    return f'{int(major) + 5}.{minor}.{patch}{dev}'
+    version = parse_version(ops_version)
+    major, minor, patch = version.release
+    pre_suffix = f'{version.pre[0]}{version.pre[1]}' if version.pre else ''
+    dev_suffix = f'.dev{version.dev}' if version.dev is not None else ''
+    return f'{major + 5}.{minor}.{patch}{pre_suffix}{dev_suffix}'
 
 
 def update_versions_for_release(tag: str):
@@ -460,10 +463,13 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
 
     logger.info('Latest version in branch %r: %s', branch_name, latest_version)
 
-    # Check if the latest version is in SEMVER, in case it has a suffix like 3.0.0.post1.
-    if not re.match(r'^\d+\.\d+\.\d+$', latest_version):
+    # Parse the version, handling pre-release versions like 3.0.0b2.
+    try:
+        version = parse_version(latest_version)
+        base_version = get_base_version(version)
+    except packaging.version.InvalidVersion:
         logger.error(
-            'Latest version %r must be in format X.Y.Z. '
+            'Latest version %r is not in a recognised format. '
             'Please input the new version manually (including the .dev0 suffix).',
             latest_version,
         )
@@ -471,10 +477,10 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
 
     if branch_name.endswith('-maintenance'):
         logger.info('Branch is a maintenance branch, bumping patch version of the latest tag.')
-        new_version = bump_patch_version(latest_version) + '.dev0'
+        new_version = bump_patch_version(base_version) + '.dev0'
     else:
         logger.info('Branch is main, bumping minor version of the latest tag.')
-        new_version = bump_minor_version(latest_version) + '.dev0'
+        new_version = bump_minor_version(base_version) + '.dev0'
     logger.info('Suggested new version: %s', new_version)
     return new_version
 
