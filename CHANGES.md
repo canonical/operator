@@ -1,3 +1,11 @@
+# 3.5.0a1 - 02 December 2025
+
+## CI
+
+* Avoid jitter in the best practice doc PRs (#2193)
+* Ignore PERF401 (manual list comprehension) across the repo (#2201)
+* The git commands need to be run in the operator directory as well (#2197)
+
 # 3.4.0 - 27 November 2025
 
 ## Breaking Changes
