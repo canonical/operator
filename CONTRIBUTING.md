@@ -4,6 +4,12 @@ Before working on changes, please consider [opening an issue](https://github.com
 
 For detailed technical information about the development of Ops, see [HACKING.md](./HACKING.md).
 
+# AI
+
+You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. If you are not capable of reviewing the PR (for example, if you are not fluent in Python, or are not familiar with Ops), please do not submit the PR (maybe you'd like to open an issue instead). PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
+
+Please do not use tools (such as GitHub Copilot) to provide PR reviews. The Charm Tech team also has access to these tools, and will use them when appropriate.
+
 # Pull requests
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
