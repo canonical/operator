@@ -179,15 +179,19 @@ class ValueErrorCharm(ops.CharmBase):
 @pytest.mark.parametrize(
     ('expected_error', 'bare_charm_errors'),
     (
-        # '1' and 'true' (case-insensitive) are treated as logically true
+        # any non-zero string that `isdigit`
         (ValueError, '1'),
+        (ValueError, '007'),
+        # 'true' (case-insensitive)
         (ValueError, 'true'),
         (ValueError, 'True'),
         (ValueError, 'tRuE'),
-        # any other value is treated as logically false
+        # falsey digits
         (UncaughtCharmError, '0'),
+        (UncaughtCharmError, '00'),
+        # any other value
+        (UncaughtCharmError, '-1'),
         (UncaughtCharmError, 'false'),
-        (UncaughtCharmError, '11'),
         (UncaughtCharmError, 'yes'),
         (UncaughtCharmError, '✩ anything ✨ else ✧'),
         # the actually unset case is tested separately

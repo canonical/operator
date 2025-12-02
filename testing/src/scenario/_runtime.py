@@ -341,7 +341,8 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
-                if os.getenv('SCENARIO_BARE_CHARM_ERRORS', 'false').lower() in {'1', 'true'}:
+                bare = os.getenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+                if bare.lower() == 'true' or (bare.isdigit() and int(bare)):
                     raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
