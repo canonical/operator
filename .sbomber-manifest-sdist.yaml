@@ -15,7 +15,6 @@ artifacts:
         name: 'ops'
         version: ''
         channel: 'stable'
-        cycle: '26.04'
 
   - name: 'ops-scenario'
     type: 'sdist'
@@ -24,7 +23,6 @@ artifacts:
         name: 'ops-scenario'
         version: ''
         channel: 'stable'
-        cycle: '26.04'
 
   - name: 'ops-tracing'
     type: 'sdist'
@@ -34,4 +32,3 @@ artifacts:
         name: 'ops-tracing'
         version: ''
         channel: 'stable'
-        cycle: '26.04'
