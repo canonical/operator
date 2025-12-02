@@ -14,7 +14,7 @@ artifacts:
         name: 'ops'
         version: ''
         channel: 'stable'
-        cycle: '25.10'
+        cycle: '26.04'
 
   - name: 'ops-scenario'
     type: 'wheel'
@@ -22,7 +22,7 @@ artifacts:
         name: 'ops-scenario'
         version: ''
         channel: 'stable'
-        cycle: '25.10'
+        cycle: '26.04'
 
   - name: 'ops-tracing'
     type: 'wheel'
@@ -30,4 +30,4 @@ artifacts:
         name: 'ops-tracing'
         version: ''
         channel: 'stable'
-        cycle: '25.10'
+        cycle: '26.04'
