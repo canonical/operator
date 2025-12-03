@@ -75,7 +75,7 @@ Follow the Diátaxis framework for documentation structure:
 - **Reference** - Generated from docstrings
 - **Explanation** (`docs/explanation/`) - Understanding-oriented
 
-Comments are always full sentences that end with punctutation. Avoid using comments to explain *what* the code is *doing*, use them (sparingly, as required) to explain *why* the code is doing what it is doing.
+Comments are always full sentences that end with punctuation. Avoid using comments to explain *what* the code is *doing*, use them (sparingly, as required) to explain *why* the code is doing what it is doing.
 
 ### Docstring Style
 
