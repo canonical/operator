@@ -244,13 +244,13 @@ class Ops(_Manager, Generic[CharmType]):
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
         """Walk path on root to an ObjectEvents instance."""
         obj = root
-        for step in path:
-            try:
+        try:
+            for step in path:
                 obj = getattr(obj, step)
-            except AttributeError:  # noqa: PERF203
-                raise BadOwnerPath(
-                    f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
-                ) from None
+        except AttributeError:  # noqa: PERF203
+            raise BadOwnerPath(
+                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
+            ) from None
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
                 f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',

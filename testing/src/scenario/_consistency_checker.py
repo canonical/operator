@@ -550,20 +550,17 @@ def check_relation_consistency(
             return ()
 
     # check relation types
-    for endpoint, _ in peer_relations_meta:
-        errors.extend(
-            f'endpoint {endpoint} is a peer relation; '
-            f'expecting relation to be of type PeerRelation, got {type(relation)}'
-            for relation in _get_relations(endpoint)
-            if not isinstance(relation, PeerRelation)
-        )
+    for relation in _get_relations(endpoint):
+        if not isinstance(relation, PeerRelation):
+            errors.append(
+                f'endpoint {endpoint} is a peer relation; '
+                f'expecting relation to be of type PeerRelation, got {type(relation)}',
+            )
 
     known_endpoints = [a[0] for a in all_relations_meta]
-    errors.extend(
-        f'relation endpoint {ep} is not declared in metadata.'
-        for relation in state.relations
-        if (ep := relation.endpoint) not in known_endpoints
-    )
+    for relation in state.relations:
+        if (ep := relation.endpoint) not in known_endpoints:
+            errors.append(f'relation endpoint {ep} is not declared in metadata.')
 
     seen_ids: set[int] = set()
     for endpoint, relation_meta in all_relations_meta:
@@ -710,13 +707,13 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            errors.extend(
-                f'container {container.name!r} has a check {check.name!r} with a '
-                f'different {attr!r} ({getattr(check, attr)}) '
-                f'than the plan ({getattr(plan_check, attr)}).'
-                for attr in ('level', 'startup', 'threshold')
-                if getattr(check, attr) != getattr(plan_check, attr)
-            )
+            for attr in ('level', 'startup', 'threshold'):
+                if getattr(check, attr) != getattr(plan_check, attr):
+                    errors.append(
+                        f'container {container.name!r} has a check {check.name!r} with a '
+                        f'different {attr!r} ({getattr(check, attr)}) '
+                        f'than the plan ({getattr(plan_check, attr)}).',
+                    )
 
     return Results(errors, [])
 
