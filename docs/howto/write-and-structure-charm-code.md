@@ -409,8 +409,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
@@ -428,8 +426,6 @@ Other `tox` environments can be run similarly; for example unit tests:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
@@ -456,8 +452,6 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
         run: sudo concierge prepare -p k8s
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
