@@ -1,0 +1,38 @@
+{
+  "instructions": "You are working on Ops, the official Python framework for Juju charm development. This is a mature, production framework requiring careful attention to backward compatibility, type safety, and comprehensive testing. See AGENTS.md for detailed guidelines.",
+  "enableHooks": true,
+  "defaultModel": "sonnet",
+  "agentModels": {
+    "test-runner": "haiku",
+    "Explore": "haiku"
+  },
+  "memorySettings": {
+    "contextWindow": "large"
+  },
+  "projectContext": {
+    "name": "Ops",
+    "type": "Python Framework",
+    "pythonVersion": "3.10+",
+    "testCommand": "tox",
+    "formatCommand": "tox -e format",
+    "lintCommand": "tox -e lint"
+  },
+  "codeStyle": {
+    "linter": "ruff",
+    "typeChecker": "pyright",
+    "docstringStyle": "google",
+    "formatter": "ruff"
+  },
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:documentation.ubuntu.com)",
+      "WebFetch(domain:docs.zizmor.sh)",
+      "WebFetch(domain:charmhub.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:diataxis.fr)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(tox:*)"
+    ]
+  }
+}
