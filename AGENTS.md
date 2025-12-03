@@ -108,6 +108,8 @@ def my_function(param: str, count: int = 1) -> list[str]:
 - Use **active voice**: "Create a check" not "A check is created"
 - Be **objective**: Avoid "simply", "easily", "just"
 - Be **concise**: No long introductions, get to the point
+- Use short sentences and simple phrasing
+- Be consistent with choice of words
 - Avoid words or phrases specific to US or UK English where possible, and use British English otherwise
 - State conditions **positively**: What should happen, not what shouldn't
 - Spell out abbreviations and avoid Latin: "for example" not "e.g."
