@@ -158,4 +158,5 @@ The project does not use conventional commit "scopes".
 5. Run `tox -e lint` to check linting and types
 6. Run `tox -e unit` to verify unit tests pass - avoid drops in coverage (`tox -e coverage`)
 7. Run `make html` in the `docs` folder to ensure that the documentation can be generated
-8. If a virtual environment or sandbox is available, run `tox -e pebble` and `tox -e integration`
+8. Search the explanation, how-to, and tutorial documentation in the `docs` folder for topics related to the changes, then suggest places that might need expanding/altering
+9. If a virtual environment or sandbox is available, run `tox -e pebble` and `tox -e integration`
