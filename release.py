@@ -209,12 +209,10 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
                 description = description[0].upper() + description[1:]
                 pr_link = match.group('pr').strip()
                 if match.group('breaking') == '!':
-                    categories['breaking'].append(
-                        (
-                            f'{category.capitalize()}: {description}',
-                            pr_link,
-                        )
-                    )
+                    categories['breaking'].append((
+                        f'{category.capitalize()}: {description}',
+                        pr_link,
+                    ))
                 else:
                     categories[category].append((description, pr_link))
 
@@ -588,15 +586,13 @@ def post_release(
     tag = get_latest_release_tag(repo, base_branch)
     new_branch = f'post-release-{tag}'
     local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
-    remote_branch = subprocess.check_output(
-        [
-            '/usr/bin/git',
-            'ls-remote',
-            '--heads',
-            fork_remote,
-            new_branch,
-        ]
-    )
+    remote_branch = subprocess.check_output([
+        '/usr/bin/git',
+        'ls-remote',
+        '--heads',
+        fork_remote,
+        new_branch,
+    ])
     if local_branch or remote_branch:
         logger.error(
             'Branch %r already exists. '
