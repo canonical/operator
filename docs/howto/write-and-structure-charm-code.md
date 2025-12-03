@@ -28,7 +28,7 @@ charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
 
 If your repository will hold multiple charms, or a charm and source for other
 artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft --init` in each charm
+for each charm inside of that one, and run `charmcraft init` in each charm
 folder. You'll end up with a structure similar to:
 
 ```
