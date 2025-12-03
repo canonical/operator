@@ -247,7 +247,7 @@ class Ops(_Manager, Generic[CharmType]):
         try:
             for step in path:
                 obj = getattr(obj, step)
-        except AttributeError:  # noqa: PERF203
+        except AttributeError:
             raise BadOwnerPath(
                 f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
             ) from None

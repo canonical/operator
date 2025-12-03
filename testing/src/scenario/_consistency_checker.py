@@ -550,12 +550,13 @@ def check_relation_consistency(
             return ()
 
     # check relation types
-    for relation in _get_relations(endpoint):
-        if not isinstance(relation, PeerRelation):
-            errors.append(
-                f'endpoint {endpoint} is a peer relation; '
-                f'expecting relation to be of type PeerRelation, got {type(relation)}',
-            )
+    for endpoint, _ in peer_relations_meta:
+        for relation in _get_relations(endpoint):
+            if not isinstance(relation, PeerRelation):
+                errors.append(
+                    f'endpoint {endpoint} is a peer relation; '
+                    f'expecting relation to be of type PeerRelation, got {type(relation)}',
+                )
 
     known_endpoints = [a[0] for a in all_relations_meta]
     for relation in state.relations:
