@@ -144,7 +144,7 @@ on:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3'
+        uses: actions/checkout@v3
       - name: Set up Python
         uses: actions/setup-python@v6
       - name: Set up uv
