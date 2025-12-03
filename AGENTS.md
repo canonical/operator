@@ -7,7 +7,7 @@ This workspace is a monorepo containing:
 - **`ops/`** - Core framework providing the event system, charm base classes, and model abstractions. Note that the tests are in a top-level folder `tests`
 - **`testing/`** - The `ops-scenario` state transition testing framework (accessed as `ops.testing`). This uses src-layout.
 - **`tracing/`** - The `ops-tracing` observability integration. The tests are in a subfolder called `test`.
-- **`docs`/`** - Common documentation, predominately Markdown.
+- **`docs/`** - Common documentation, predominately Markdown.
 
 This is a mature, production framework used by thousands of charms. Changes require careful consideration of backward compatibility and testing.
 
