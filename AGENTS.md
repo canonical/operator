@@ -4,7 +4,7 @@
 Ops is the official Python framework for developing Kubernetes and machine charms within the Juju ecosystem. It provides an event-driven abstraction layer for charm developers.
 
 This workspace is a monorepo containing:
-- **`ops/`** - Core framework providing the event system, charm base classes, and model abstractions. Note that the tests are in a top-level folder `tests`
+- **`ops/`** - Core framework providing the event system, charm base classes, and model abstractions. Note that the tests are in a top-level folder `test`
 - **`testing/`** - The `ops-scenario` state transition testing framework (accessed as `ops.testing`). This uses src-layout.
 - **`tracing/`** - The `ops-tracing` observability integration. The tests are in a subfolder called `test`.
 - **`docs/`** - Common documentation, predominantly Markdown.
