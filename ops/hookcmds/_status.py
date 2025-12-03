@@ -15,11 +15,7 @@
 from __future__ import annotations
 
 import json
-from typing import (
-    Literal,
-    cast,
-    overload,
-)
+from typing import Literal, overload
 
 from ._types import AppStatus, AppStatusDict, SettableStatusName, StatusDict, UnitStatus
 from ._utils import run
@@ -45,9 +41,9 @@ def status_get(*, app: bool = False) -> AppStatus | UnitStatus:
     args = ['--include-data', '--format=json', f'--application={str(app).lower()}']
     stdout = run('status-get', *args)
     if app:
-        result = cast('AppStatusDict', json.loads(stdout))
-        return AppStatus._from_dict(result)
-    result = cast('StatusDict', json.loads(stdout))
+        app_result: AppStatusDict = json.loads(stdout)
+        return AppStatus._from_dict(app_result)
+    result: StatusDict = json.loads(stdout)
     return UnitStatus._from_dict(result)
 
 

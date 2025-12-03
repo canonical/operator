@@ -20,10 +20,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+      - uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41  # v7.1.2
         with:
           enable-cache: false
       - run: uv build --all
+      - name: Test if built package versions and dependency versions match
+        run: |
+          set -xueo pipefail
+          uvx --with "$(echo -n dist/ops-*.whl)[testing,tracing]" --with dist/ops_scenario-*.whl --with dist/ops_tracing-*.whl python -c 'import ops, scenario, ops_tracing; print("OK")'
       - uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'dist/*'

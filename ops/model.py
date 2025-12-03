@@ -1911,11 +1911,7 @@ class Relation:
             # store all the fields that have type annotations. If a charm needs
             # a more specific set of fields, then it should use a dataclass or
             # Pydantic model instead.
-            try:
-                fields = {k: k for k in get_type_hints(obj.__class__)}
-            except TypeError:
-                # Most likely Python 3.8. It's not as good, but use __annotations__.
-                fields = {k: k for k in obj.__class__.__annotations__}
+            fields = {k: k for k in get_type_hints(obj.__class__)}
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
@@ -3520,9 +3516,6 @@ class _ModelBackend:
     """
 
     LEASE_RENEWAL_PERIOD = datetime.timedelta(seconds=30)
-    _STORAGE_KEY_RE = re.compile(
-        r'.*^-s\s+\(=\s+(?P<storage_key>.*?)\)\s*?$', re.MULTILINE | re.DOTALL
-    )
 
     def __init__(
         self,
@@ -3763,21 +3756,6 @@ class _ModelBackend:
             storages = hookcmds.storage_list(name)
         return [int(s.split('/')[1]) for s in storages]
 
-    # This method is called from _main.py's _get_event_args. It is only called
-    # when the hook is a storage event.
-    def _storage_event_details(self) -> tuple[int, str]:
-        with self._wrap_hookcmd('storage-get', '--help'):
-            output = hookcmds._utils.run('storage-get', '--help')
-        # Match the entire string at once instead of going line by line
-        match = self._STORAGE_KEY_RE.match(output)
-        if match is None:
-            raise RuntimeError(f'unable to find storage key in {output!r}')
-        key = match.groupdict()['storage_key']
-
-        index = int(key.split('/')[1])
-        location = self.storage_get(key, 'location')
-        return index, location
-
     def storage_get(self, storage_name_id: str, attribute: str) -> str:
         if not len(attribute) > 0:  # assume it's an empty string.
             raise RuntimeError(
@@ -3948,14 +3926,14 @@ class _ModelBackend:
             )
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
-        # The type: ignore here is because the type checker can't tell, even
-        # with local overloads, that either id or label must be provided.
-        with self._wrap_hookcmd('secret-info-get', id=id, label=label):
-            raw = hookcmds.secret_info_get(  # type: ignore
-                id=id,
-                label=label,
-            )
-        assert isinstance(raw, hookcmds.SecretInfo)
+        if id is not None:
+            with self._wrap_hookcmd('secret-info-get', id=id):
+                raw = hookcmds.secret_info_get(id=id)
+        elif label is not None:  # elif because Juju secret-info-get doesn't allow id and label
+            with self._wrap_hookcmd('secret-info-get', label=label):
+                raw = hookcmds.secret_info_get(label=label)
+        else:
+            raise TypeError('either `id` or `label` must be provided')
         return SecretInfo(
             raw.id,
             label=raw.label,

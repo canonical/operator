@@ -87,6 +87,7 @@ def extract_best_practice_blocks_rst(file_path: pathlib.Path, content: str):
 
         previous_line = line
 
+    results.sort()
     return results
 
 
@@ -130,6 +131,7 @@ def extract_best_practice_blocks_md(file_path: pathlib.Path, content: str):
             current_ref = ref_match.group(1)
             continue
 
+    results.sort()
     return results
 
 

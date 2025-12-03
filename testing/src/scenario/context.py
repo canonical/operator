@@ -600,8 +600,8 @@ class Context(Generic[CharmType]):
     charm_root: str | pathlib.Path | None
     """The charm root directory to use when executing the charm.
 
-    Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
-    YAML is copied to the charm root. If ``charm_root`` is None, then a temporary directory is
+    Before running the event, the charm's metadata, config, and action YAML files are
+    copied to the charm root. If ``charm_root`` is None, then a temporary directory is
     created and used. To set up the charm root directory with other files, pass in the location of
     the directory to use. If a ``charm_root`` is provided, the tests are also able to inspect the
     content of the directory after the event has run, unlike the temporary directory, which is
@@ -628,6 +628,8 @@ class Context(Generic[CharmType]):
         app_name: str | None = None,
         unit_id: int | None = 0,
         machine_id: str | None = None,
+        availability_zone: str | None = None,
+        principal_unit: str | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -657,6 +659,12 @@ class Context(Generic[CharmType]):
         :arg machine_id: Juju Machine ID that this charm is deployed onto,
             surfaced to the charm as the JUJU_MACHINE_ID envvar.
             Only applicable to machine charms. Unset by default.
+        :arg availability_zone: Juju availability zone that this charm is deployed to,
+            surfaced to the charm as the JUJU_AVAILABILITY_ZONE envvar.
+            Unset by default.
+        :arg principal_unit: Juju principal unit name for subordinate charms,
+            surfaced to the charm as the JUJU_PRINCIPAL_UNIT envvar.
+            Only applicable to subordinate charms. Unset by default.
         :arg app_trusted: whether the charm has Juju trust (deployed with ``--trust`` or added with
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
@@ -693,6 +701,8 @@ class Context(Generic[CharmType]):
         self.app_name = app_name or self.charm_spec.meta.get('name')
         self.unit_id = unit_id
         self._machine_id = machine_id
+        self._availability_zone = availability_zone
+        self._principal_unit = principal_unit
         self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
 
@@ -843,6 +853,8 @@ class Context(Generic[CharmType]):
             charm_root=self.charm_root,
             unit_id=self.unit_id,
             machine_id=self._machine_id,
+            availability_zone=self._availability_zone,
+            principal_unit=self._principal_unit,
         )
         if event.action:
             # Reset the logs, failure status, and results, in case the context

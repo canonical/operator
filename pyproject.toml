@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.4.0.dev0",
+    "ops-scenario==8.4.0",
 ]
 tracing = [
-    "ops-tracing==3.4.0.dev0",
+    "ops-tracing==3.4.0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -191,6 +191,8 @@ ignore = [
     # Missing docstring in `__init__`
     "D107",
 
+    # Manual list comprehension.
+    "PERF401",
     # Manual dict comprehension.
     "PERF403",
 

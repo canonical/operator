@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+      - uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41  # v7.1.2
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
 
@@ -47,15 +47,10 @@ jobs:
       fail-fast: false
       matrix:
         juju-channel:
-          - 3.1/stable
-          - 3.2/stable
-          - 3.3/stable
-          - 3.4/stable
-          - 3.5/stable
           - 3.6/stable
-          - 4.0/beta
+          - 4.0/stable
 
-    continue-on-error: ${{ matrix.juju-channel == '4.0/beta' }}
+    continue-on-error: ${{ matrix.juju-channel == '4.0/stable' }}
 
     steps:
       - run: |
@@ -72,7 +67,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6  # v6.6.1
+      - uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41  # v7.1.2
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s test/integration/test_secrets.py
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
