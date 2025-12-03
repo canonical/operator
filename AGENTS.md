@@ -49,7 +49,7 @@ This is a mature, production framework used by thousands of charms. Changes requ
 - Follow conventions in STYLE.md
 - Use Ruff for formatting (`tox -e format`)
 - Python 3.10+ with **full type hints** required (check with `tox -e lint`)
-- Use modern `x: int | None` annotations, not old-stlye `x: Optional[int]`
+- Use modern `x: int | None` annotations, not old-style `x: Optional[int]`
 - Always provide a return type, other than for `__init__` and in test code
 
 ### Import Style
