@@ -283,7 +283,7 @@ class JujuStorage:
         notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: str | None = None):
+    def notices(self, event_path: str | None = None) -> _Notices:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -294,10 +294,7 @@ class JujuStorage:
             Iterable of (event_path, observer_path, method_name) tuples
         """
         notice_list = self._load_notice_list()
-        for row in notice_list:
-            if event_path and row[0] != event_path:
-                continue
-            yield tuple(row)
+        return [tuple(row) for row in notice_list if event_path and row[0] != event_path]
 
     def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
