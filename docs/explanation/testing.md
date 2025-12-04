@@ -145,8 +145,10 @@ on:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install dependencies
-        run: python -m pip install tox
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```
