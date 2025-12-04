@@ -294,7 +294,7 @@ class JujuStorage:
             Iterable of (event_path, observer_path, method_name) tuples
         """
         notice_list = self._load_notice_list()
-        return [tuple(row) for row in notice_list if event_path and row[0] != event_path]
+        return [row for row in notice_list if event_path and row[0] != event_path]
 
     def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
@@ -308,7 +308,7 @@ class JujuStorage:
             return []
         if notice_list is None:
             return []
-        return notice_list
+        return [tuple(notice) for notice in notice_list]
 
     def _save_notice_list(self, notices: _Notices) -> None:
         """Save a notice list under current key.
