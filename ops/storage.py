@@ -26,7 +26,7 @@ import subprocess
 from collections.abc import Callable, Generator
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
