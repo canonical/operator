@@ -1106,7 +1106,7 @@ class Framework(Object):
         for handle_path in self._storage.list_snapshots():
             if event_regex.match(handle_path):
                 notices = self._storage.notices(handle_path)
-                if next(notices, None) is None:
+                if not notices:
                     # There are no notices for this handle_path, it is valid to remove it
                     to_remove.append(handle_path)
         for handle_path in to_remove:
