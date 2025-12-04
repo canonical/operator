@@ -42,7 +42,6 @@ _Notices = list[_Notice]
 # it replaces a method, so the first argument passed to the function
 # (Any) is 'self'.
 _TupleRepresenterType = Callable[[Any, tuple[Any, ...]], yaml.Node]
-_NoticeGenerator = Generator['_Notice', None, None]
 
 
 def _run(args: list[str], **kw: Any):
@@ -187,7 +186,7 @@ class SQLiteStorage:
             (event_path, observer_path, method_name),
         )
 
-    def notices(self, event_path: str | None = None) -> _NoticeGenerator:
+    def notices(self, event_path: str | None = None) -> _Notices:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -195,7 +194,7 @@ class SQLiteStorage:
                 supplied (or None/'') will return all events.
 
         Returns:
-            Iterable of (event_path, observer_path, method_name) tuples
+            List of (event_path, observer_path, method_name) tuples
         """
         if event_path:
             c = self._db.execute(
@@ -213,12 +212,7 @@ class SQLiteStorage:
                   FROM notice
                  ORDER BY sequence
                 """)
-        while True:
-            rows = c.fetchmany()
-            if not rows:
-                break
-            for row in rows:
-                yield cast('_Notice', tuple(row))
+        return c.fetchall()
 
 
 class JujuStorage:
