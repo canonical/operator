@@ -435,9 +435,12 @@ def get_new_scenario_version(ops_version: str) -> str:
     """
     version = parse_version(ops_version)
     major, minor, patch = version.release
-    pre_suffix = f'{version.pre[0]}{version.pre[1]}' if version.pre else ''
-    dev_suffix = f'.dev{version.dev}' if version.dev is not None else ''
-    return f'{major + 5}.{minor}.{patch}{pre_suffix}{dev_suffix}'
+    new_version = f'{major + 5}.{minor}.{patch}'
+    if version.pre is not None:  # then it's in the form ('a', 0)
+        new_version += f'{version.pre[0]}{version.pre[1]}'
+    if version.dev is not None:  # then it's the dev version number
+        new_version += f'.dev{version.dev}'
+    return new_version
 
 
 def update_versions_for_release(tag: str):
