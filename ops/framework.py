@@ -958,7 +958,7 @@ class Framework(Object):
     def _reemit(self, single_event_path: str | None = None):
         last_event_path = None
         deferred = True
-        notices = tuple(self._storage.notices(single_event_path))
+        notices = self._storage.notices(single_event_path)
         for i, (event_path, observer_path, method_name) in enumerate(notices):
             event_handle = Handle.from_path(event_path)
 
