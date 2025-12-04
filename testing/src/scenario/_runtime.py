@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+
 from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
@@ -314,7 +315,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(' - entering ops.main (mocked)')
-            from ._ops_main_mock import Ops  # noqa: F811
+            from ._ops_main_mock import Ops
 
             ops = None
 
@@ -346,7 +347,7 @@ class Runtime:
                     raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip  # noqa: E501
 
             finally:
                 if ops:
