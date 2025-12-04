@@ -28,7 +28,7 @@ charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
 
 If your repository will hold multiple charms, or a charm and source for other
 artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft --init` in each charm
+for each charm inside of that one, and run `charmcraft init` in each charm
 folder. You'll end up with a structure similar to:
 
 ```
@@ -63,7 +63,7 @@ my-charm-set-operators/
 Charms run using the Python version provided by the base Ubuntu version. Write
 charm code that will run with the Python version of the oldest base you support.
 
-> See also: {external+juju:ref}`Juju | Roadmap and releases <juju-roadmap-and-releases>`
+> See also: {external+juju:ref}`Juju | Roadmap and releases <releasenotes>`
 
 ```{admonition} Best practice
 :class: hint
@@ -409,10 +409,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run linters
         run: tox -e lint
 ```
@@ -426,10 +426,10 @@ Other `tox` environments can be run similarly; for example unit tests:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```
@@ -452,10 +452,10 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
         run: sudo concierge prepare -p k8s
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
         run: tox -e integration -- --model testing

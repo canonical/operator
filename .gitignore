@@ -13,6 +13,7 @@ coverage.xml
 .coverage.data
 /.tox
 .*.swp
+.claude/settings.local.json
 
 # Tokens and settings for `act` to run GHA locally
 .env
