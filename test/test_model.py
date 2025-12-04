@@ -86,6 +86,7 @@ def root_logging():
 class TestModel:
     @pytest.fixture
     def harness(self):
+        _get_juju_log_and_app_id.cache_clear()
         harness = ops.testing.Harness(
             ops.CharmBase,
             meta="""
@@ -118,6 +119,7 @@ class TestModel:
         """,
         )
         yield harness
+        _get_juju_log_and_app_id.cache_clear()
         harness.cleanup()
 
     def ensure_relation(
