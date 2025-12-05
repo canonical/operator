@@ -118,7 +118,7 @@ keeping track of upstream versions, particularly around security issues. See [Ou
 
 If you initialised your charm using the `machine` or `kubernetes` profile of `charmcraft init`, your charm uses Charmcraft's {external+charmcraft:ref}`uv plugin <craft_parts_uv_plugin>` and has a lock file called `uv.lock`. After specifying dependencies in `pyproject.toml`, run `uv lock` to update `uv.lock`.
 
-Instead of manually editing `pyproject.toml`, we recommend that you use `uv add` and `uv remove` to manage your charm's dependencies. These commands automatically update `uv.lock`. For more information, see [Managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) in the uv documentation.
+We recommend that you use `uv add` and `uv remove` instead of editing dependencies in `pyproject.toml`. These commands automatically update `pyproject.toml` and `uv.lock`. For more information, see [Managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) in the uv documentation.
 
 ```{admonition} Best practice
 :class: hint
