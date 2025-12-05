@@ -408,7 +408,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
@@ -425,7 +425,7 @@ Other `tox` environments can be run similarly; for example unit tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
@@ -451,7 +451,7 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
       - name: Install Juju and tools
         run: sudo concierge prepare -p k8s
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
