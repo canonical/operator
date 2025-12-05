@@ -40,7 +40,7 @@ jobs:
 
       - name: Archive charmcraft logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: charmcraft-logs
           path: /home/runner/.local/state/charmcraft/log/*.log
