@@ -80,25 +80,32 @@ Specify all the direct dependencies of your charm in your `pyproject.toml`
 file in the top-level charm folder. For example:
 
 ```toml
-# Required group: these are all dependencies required to run the charm.
+# All dependencies required to run the charm
 dependencies = [
-    "ops~=2.19",
+    "ops>=3,<4",
 ]
 
-# Required group: these are all dependencies required to run all the charm's tests.
 [dependency-groups]
-test = [
+# Dependencies of linting and static type checks
+lint = [
+    "ruff",
+    "codespell",
+    "pyright",
+]
+# Dependencies of unit tests
+unit = [
+    "coverage[toml]",
     "ops[testing]",
     "pytest",
-    "coverage[toml]",
-    "jubilant",
 ]
-# Optional additional groups:
+# Dependencies of integration tests
+integration = [
+    "jubilant",
+    "pytest",
+]
+# Additional groups
 docs = [
-    "canonical-sphinx-extensions",
-    "furo",
-    "sphinx ~= 8.0.0",
-    "sphinxext-opengraph",
+    "Sphinx",
 ]
 ```
 
