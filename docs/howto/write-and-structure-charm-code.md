@@ -74,7 +74,7 @@ version in your `pyproject.toml` so that tooling will detect any use of Python
 features not available in the versions you support.
 ```
 
-### Add Python dependencies to pyproject.toml and generate a lock file
+### Add Python dependencies to pyproject.toml and update the lock file
 
 Specify all the direct dependencies of your charm in your `pyproject.toml`
 file in the top-level charm folder. For example:
@@ -111,13 +111,32 @@ keeping track of upstream versions, particularly around security issues.
 > See more: [Our Software Dependency Problem](https://research.swtch.com/deps)
 ```
 
-Use the `pyproject.toml` dependencies to specify *all* dependencies (including
-indirect or transitive dependencies) in a lock file.
+If you initialised your charm using the `machine` or `kubernetes` profile of `charmcraft init`, your charm uses Charmcraft's {external+charmcraft:ref}`uv plugin <craft_parts_uv_plugin>` and has a lock file called `uv.lock`. After specifying dependencies in `pyproject.toml`, run `uv lock` to update `uv.lock`.
+
+Instead of manually editing `pyproject.toml`, we recommend that you use `uv add` and `uv remove` to manage your charm's dependencies. These commands automatically update `uv.lock`. For more information, see [Managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) in the uv documentation.
+
+```{admonition} Best practice
+:class: hint
+
+Ensure that tooling is configured to automatically detect new versions,
+particularly security releases, for all your dependencies.
+```
+
+```{admonition} Best practice
+:class: hint
+
+Ensure that the `pyproject.toml` *and* the lock file are committed to version
+control, so that exact versions of charms can be reproduced.
+```
+
+If you prefer to use Poetry to manage your charm's dependencies, specify the {external+charmcraft:ref}`poetry plugin <craft_parts_poetry_plugin>` in `charmcraft.yaml`. In this case, your charm's lock file will be `requirements.txt`. The `poetry` plugin generates `requirements.txt` from `pyproject.toml`.
+
+If your charm uses Charmcraft's `charm` plugin, you'll need to generate `requirements.txt` from `pyproject.toml`. You can do this using a tool such as [pip-compile](https://pip-tools.readthedocs.io/en/latest/).
 
 ````{admonition} Best practice
 :class: hint
 
-When using the `charm` plugin with charmcraft, ensure that you set strict
+If your charm uses Charmcraft's `charm` plugin, ensure that you set strict
 dependencies to true. For example:
 
 ```yaml
@@ -127,30 +146,6 @@ parts:
     charm-strict-dependencies: true
 ```
 ````
-
-```{admonition} Best practice
-:class: hint
-
-Ensure that tooling is configured to automatically detect new versions,
-particularly security releases, for all your dependencies.
-```
-
-The default lock file is a plain `requirements.txt` file (you can use a tool
-such as [pip-compile](https://pip-tools.readthedocs.io/en/latest/) to produce
-it from `pyproject.toml`).
-
-```{tip}
-Charmcraft provides plugins for {external+charmcraft:ref}`uv <craft_parts_uv_plugin>`
-and {external+charmcraft:ref}`poetry <craft_parts_poetry_plugin>`. Use one of
-these tools to simplify the generation of your lock file.
-```
-
-```{admonition} Best practice
-:class: hint
-
-Ensure that the `pyproject.toml` *and* the lock file are committed to version
-control, so that exact versions of charms can be reproduced.
-```
 
 (design-your-python-modules)=
 ## Design your Python modules
