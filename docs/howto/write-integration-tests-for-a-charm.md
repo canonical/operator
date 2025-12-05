@@ -99,6 +99,17 @@ commands =
         {posargs}
 ```
 
+Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. For example:
+
+```toml
+[dependency-groups]
+...
+integration = [
+    "jubilant",
+    "pytest",
+]
+```
+
 ## Create a test file
 
 By convention, integration tests are kept in the charm’s source tree, in a directory called `tests/integration`.
