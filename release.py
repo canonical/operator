@@ -31,6 +31,7 @@ import github.GitRelease
 import github.Repository
 import packaging.version
 import rich.logging
+import tomllib
 
 logging.basicConfig(
     level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]
@@ -209,10 +210,12 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
                 description = description[0].upper() + description[1:]
                 pr_link = match.group('pr').strip()
                 if match.group('breaking') == '!':
-                    categories['breaking'].append((
-                        f'{category.capitalize()}: {description}',
-                        pr_link,
-                    ))
+                    categories['breaking'].append(
+                        (
+                            f'{category.capitalize()}: {description}',
+                            pr_link,
+                        )
+                    )
                 else:
                     categories[category].append((description, pr_link))
 
@@ -415,15 +418,10 @@ def update_uv_lock():
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
 
 
-def parse_scenario_version() -> packaging.version.Version:
-    """Parse the current scenario version from pyproject.toml."""
-    file_path = VERSION_FILES['testing']
-    content = file_path.read_text()
-    match = re.search(rf'version = "{VERSION_REGEX}"', content)
-    if not match:
-        raise ValueError(f'Could not find version string in {file_path}')
-    version_str = match.group(1)
-    return parse_version(version_str)
+def get_scenario_version() -> packaging.version.Version:
+    """Get the current scenario version from pyproject.toml."""
+    pyproject_toml = tomllib.loads(VERSION_FILES['testing'].read_text())
+    return packaging.version.Version(pyproject_toml['project']['version'])
 
 
 def get_new_scenario_version(ops_version: str) -> str:
@@ -589,13 +587,15 @@ def post_release(
     tag = get_latest_release_tag(repo, base_branch)
     new_branch = f'post-release-{tag}'
     local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
-    remote_branch = subprocess.check_output([
-        '/usr/bin/git',
-        'ls-remote',
-        '--heads',
-        fork_remote,
-        new_branch,
-    ])
+    remote_branch = subprocess.check_output(
+        [
+            '/usr/bin/git',
+            'ls-remote',
+            '--heads',
+            fork_remote,
+            new_branch,
+        ]
+    )
     if local_branch or remote_branch:
         logger.error(
             'Branch %r already exists. '
