@@ -13,11 +13,11 @@ You'll need the following tools:
 
 To run integration tests, you'll also need a Juju controller.
 
-[Concierge](https://github.com/canonical/concierge) can install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
+[Concierge](https://github.com/canonical/concierge) can automatically install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
 
 > See more:
 >
-> - [Prepare your environment to develop a machine charm](#machine-charm-tutorial-environment)
+> - [Prepare your environment to develop machine charms](#machine-charm-tutorial-environment)
 > - [Prepare a continuous integration environment](#validate-your-charm-with-every-change)
 
 ## Initialise your charm project
