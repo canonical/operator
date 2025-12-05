@@ -170,7 +170,13 @@ def _prepare_generic_charm_dir(
             (sdist,) = charm_dir.glob('ops_tracing*.tar.gz')
             sdist.rename(charm_dir / 'ops_tracing.tar.gz')
 
-        subprocess.run(['uv', 'lock'], cwd=charm_dir, text=True, check=True, capture_output=True)
+        subprocess.run(
+            ['uv', 'lock'],  # noqa: S607
+            cwd=charm_dir,
+            text=True,
+            check=True,
+            capture_output=True,
+        )
     except subprocess.CalledProcessError as e:
         logging.error('%s stderr:\n%s', e.cmd, e.stderr)
         raise
