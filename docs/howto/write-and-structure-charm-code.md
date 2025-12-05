@@ -435,7 +435,7 @@ Other `tox` environments can be run similarly; for example unit tests:
 ```
 
 Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
-a cloud in which to deploy it, is required. This example uses a `concierge` in order to set up
+a cloud in which to deploy it, is required. This example uses [Concierge](https://github.com/canonical/concierge) to set up
 `k8s` and Juju:
 
 ```

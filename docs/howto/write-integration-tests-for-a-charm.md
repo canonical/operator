@@ -425,6 +425,7 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 
 > See more:
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
+> - [](#validate-your-charm-with-every-change)
 
 ## Generate crash dumps
 
