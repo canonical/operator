@@ -77,26 +77,26 @@ When it's time to run the integration tests, you'll run them from this directory
 
 ## Prepare the `tox.ini` configuration file
 
-Check that the next information is in your `tox.ini` file. If you initialised the charm with `charmcraft init` it should already be there.
+Check that `tox.ini` has an `integration` environment. If you initialised the charm with `charmcraft init` it should already be there. For example:
 
 ```ini
 [testenv:integration]
 description = Run integration tests
-deps =
-    pytest
-    jubilant
-    -r {tox_root}/requirements.txt
+runner = uv-venv-lock-runner
+dependency_groups =
+    integration
 pass_env =
     # The integration tests don't pack the charm. If CHARM_PATH is set, the tests deploy the
     # specified .charm file. Otherwise, the tests look for a .charm file in the project dir.
     CHARM_PATH
 commands =
-    pytest -v \
-           -s \
-           --tb native \
-           --log-cli-level=INFO \
-           {[vars]tests_path}/integration \
-           {posargs}
+    pytest \
+        -v \
+        -s \
+        --tb native \
+        --log-cli-level=INFO \
+        {[vars]tests_path}/integration \
+        {posargs}
 ```
 
 ## Create a test file
