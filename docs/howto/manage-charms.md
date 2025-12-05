@@ -11,7 +11,7 @@ You'll need the following tools:
 - **uv** - For managing your charm's dependencies, including Ops. See [Installing uv](https://docs.astral.sh/uv/getting-started/installation/).
 - **tox** - For running checks and tests. To install tox: `uv tool install tox --with tox-uv`.
 
-To run integration tests, you'll also need a Juju controller.
+To deploy your charm locally and to run integration tests, you'll also need a Juju controller.
 
 [Concierge](https://github.com/canonical/concierge) can automatically install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
 
