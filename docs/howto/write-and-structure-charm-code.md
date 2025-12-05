@@ -106,9 +106,7 @@ docs = [
 Including an external dependency is a significant choice. It can help with
 reducing the complexity and development cost. However, it also increases the
 complexity of understanding the entire system, and adds a maintenance burden of
-keeping track of upstream versions, particularly around security issues.
-
-> See more: [Our Software Dependency Problem](https://research.swtch.com/deps)
+keeping track of upstream versions, particularly around security issues. See [Our Software Dependency Problem](https://research.swtch.com/deps).
 ```
 
 If you initialised your charm using the `machine` or `kubernetes` profile of `charmcraft init`, your charm uses Charmcraft's {external+charmcraft:ref}`uv plugin <craft_parts_uv_plugin>` and has a lock file called `uv.lock`. After specifying dependencies in `pyproject.toml`, run `uv lock` to update `uv.lock`.
