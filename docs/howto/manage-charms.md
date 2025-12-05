@@ -7,12 +7,13 @@
 
 You'll need the following tools:
 
-- Charmcraft. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
-- tox. See the [tox installation instructions](https://tox.wiki/en/stable/installation.html#as-tool).
+- **Charmcraft** - For initialising and packing your charm. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
+- **uv** - For managing your charm's dependencies, including Ops. See [Installing uv](https://docs.astral.sh/uv/getting-started/installation/).
+- **tox** - For running checks and tests. To install tox: `uv tool install tox --with tox-uv`.
 
-Instead of installing these tools manually, consider using the `charm-dev` [Multipass](https://canonical.com/multipass) blueprint or [`concierge`](https://github.com/canonical/concierge) to prepare your environment.
+To run integration tests, you'll also need a Juju controller. Instead of setting up a Juju controller on your host machine, consider using a virtual machine. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-prepare-your-environment).
 
-A virtual machine is especially useful for running integration tests. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-prepare-your-environment).
+[Concierge](https://github.com/canonical/concierge) is a useful tool for preparing charm development and testing environments. For an example of how to use Concierge to prepare a continuous integration environment, see [](#validate-your-charm-with-every-change).
 
 ## Initialise your charm project
 
