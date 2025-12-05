@@ -109,8 +109,8 @@ def get_new_tag_for_release(
     else:
         logger.info('Latest tag in branch %s: %s', branch_name, latest_tag)
         try:
-            version = parse_version(latest_tag)
-            base_version = get_base_version(version)
+            version = packaging.version.Version(latest_tag)
+            base_version = version.base_version
         except packaging.version.InvalidVersion:
             logger.info('Latest tag %r is not in a recognised version format.', latest_tag)
         else:
@@ -352,22 +352,6 @@ def commit_type_to_category(commit_type: str) -> str:
     return mapping.get(commit_type, commit_type.capitalize())
 
 
-def parse_version(version: str) -> packaging.version.Version:
-    """Parse version string into a Version object.
-
-    Uses the `packaging` library to parse version strings conforming to PEP 440.
-
-    Raises:
-        packaging.version.InvalidVersion if the version format is invalid.
-    """
-    return packaging.version.Version(version)
-
-
-def get_base_version(version: packaging.version.Version) -> str:
-    """Get the base version (X.Y.Z) from a Version object."""
-    return '.'.join(str(x) for x in version.release)
-
-
 def update_pyproject_versions(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
     """Update versions in pyproject.toml."""
     content = path.read_text()
@@ -431,7 +415,7 @@ def get_new_scenario_version(ops_version: str) -> str:
     like ops 3.1.2 -> scenario 8.1.2, and ops 3.1.2.dev0 -> scenario 8.1.2.dev0.
     Pre-release versions are also preserved, like ops 3.1.2b1 -> scenario 8.1.2b1.
     """
-    version = parse_version(ops_version)
+    version = packaging.version.Version(ops_version)
     major, minor, patch = version.release
     new_version = f'{major + 5}.{minor}.{patch}'
     if version.pre is not None:  # then it's in the form ('a', 0)
@@ -469,8 +453,8 @@ def get_new_version_post_release(repo: github.Repository.Repository, branch_name
 
     # Parse the version, handling pre-release versions like 3.0.0b2.
     try:
-        version = parse_version(latest_version)
-        base_version = get_base_version(version)
+        version = packaging.version.Version(latest_version)
+        base_version = version.base_version
     except packaging.version.InvalidVersion:
         logger.error(
             'Latest version %r is not in a recognised format. '
