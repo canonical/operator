@@ -122,7 +122,6 @@ def secrets_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
 def _prepare_generic_charm_dir(
     root_path: pathlib.Path, *, charm_dir: pathlib.Path, build_tracing: bool = True
 ):
-
     def cleanup():
         """Ensure pristine test charm directory."""
         for path in charm_dir.glob('ops*.tar.gz'):
