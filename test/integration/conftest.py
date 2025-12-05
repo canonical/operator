@@ -129,8 +129,6 @@ def _prepare_generic_charm_dir(
             path.unlink()
         for path in charm_dir.glob('*.charm'):
             path.unlink()
-        if requirements_file.exists():
-            requirements_file.unlink()
 
     cleanup()
 
