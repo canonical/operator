@@ -11,9 +11,14 @@ You'll need the following tools:
 - **uv** - For managing your charm's dependencies, including Ops. See [Installing uv](https://docs.astral.sh/uv/getting-started/installation/).
 - **tox** - For running checks and tests. To install tox: `uv tool install tox --with tox-uv`.
 
-To run integration tests, you'll also need a Juju controller. Instead of setting up a Juju controller on your host machine, consider using a virtual machine. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-prepare-your-environment).
+To run integration tests, you'll also need a Juju controller.
 
-[Concierge](https://github.com/canonical/concierge) is a useful tool for preparing charm development and testing environments. For an example of how to use Concierge to prepare a continuous integration environment, see [](#validate-your-charm-with-every-change).
+[Concierge](https://github.com/canonical/concierge) can install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
+
+> See more:
+>
+> - [Prepare your environment to develop a machine charm](#machine-charm-tutorial-environment)
+> - [Prepare a continuous integration environment](#validate-your-charm-with-every-change)
 
 ## Initialise your charm project
 

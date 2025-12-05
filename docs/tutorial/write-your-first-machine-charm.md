@@ -1,3 +1,4 @@
+(machine-charm-tutorial)=
 # Write your first machine charm
 
 In this tutorial, you'll write a {external+juju:ref}`machine charm <machine-charm>` for Juju using Ops and other charm development tools.
@@ -32,6 +33,7 @@ Where `<address>` is the IP address of the machine that tinyproxy is running on.
 
 This application isn't especially realistic in isolation. But it's a good way to illustrate typical interactions between Juju, a charm, a machine, and a workload.
 
+(machine-charm-tutorial-environment)=
 ## Set up your environment
 
 ### Create a virtual machine
