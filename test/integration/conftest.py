@@ -122,16 +122,12 @@ def secrets_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
 def _prepare_generic_charm_dir(
     root_path: pathlib.Path, *, charm_dir: pathlib.Path, build_tracing: bool = True
 ):
-    requirements_file = charm_dir / 'requirements.txt'
-
     def cleanup():
         """Ensure pristine test charm directory."""
         for path in charm_dir.glob('ops*.tar.gz'):
             path.unlink()
         for path in charm_dir.glob('*.charm'):
             path.unlink()
-        if requirements_file.exists():
-            requirements_file.unlink()
 
     cleanup()
 
@@ -150,6 +146,8 @@ def _prepare_generic_charm_dir(
             check=True,
             capture_output=True,
         )
+        (sdist,) = charm_dir.glob('ops*.tar.gz')
+        sdist.rename(charm_dir / 'ops.tar.gz')
 
         if build_tracing:
             subprocess.run(
@@ -166,13 +164,19 @@ def _prepare_generic_charm_dir(
                 check=True,
                 capture_output=True,
             )
+            (sdist,) = charm_dir.glob('ops_tracing*.tar.gz')
+            sdist.rename(charm_dir / 'ops_tracing.tar.gz')
+
+        subprocess.run(
+            ['uv', 'lock'],  # noqa: S607
+            cwd=charm_dir,
+            text=True,
+            check=True,
+            capture_output=True,
+        )
     except subprocess.CalledProcessError as e:
         logging.error('%s stderr:\n%s', e.cmd, e.stderr)
         raise
-
-    requirements_file.write_text(
-        ''.join(f'./{path.name}\n' for path in charm_dir.glob('ops*.tar.gz'))
-    )
 
     yield charm_dir
 

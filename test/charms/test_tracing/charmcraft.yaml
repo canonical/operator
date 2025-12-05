@@ -12,11 +12,9 @@ platforms:
 
 parts:
     test-tracing:
-        plugin: charm
         source: .
-        charm-binary-python-packages:
-            - pydantic
-            - PyYAML
+        plugin: uv
+        build-snaps: [astral-uv]
 
 requires:
     charm-tracing:

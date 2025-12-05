@@ -12,13 +12,9 @@ platforms:
 
 parts:
     test-secrets:
-        plugin: charm
         source: .
-        build-packages:
-            - cargo
-        charm-binary-python-packages:
-            - pydantic
-            - PyYAML
+        plugin: uv
+        build-snaps: [astral-uv]
 
 actions:
     add-secret:

@@ -12,10 +12,9 @@ platforms:
 
 parts:
     test-relation:
-        plugin: charm
         source: .
-        charm-binary-python-packages:
-            - PyYAML
+        plugin: uv
+        build-snaps: [astral-uv]
 
 requires:
     db:
