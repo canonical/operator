@@ -52,9 +52,6 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
     assert proc.returncode == 0
 
 
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
 def test_ops_testing_doc():
     """Ensure that ops.testing's documentation includes all the expected names."""
     # We only document public classes and functions.
