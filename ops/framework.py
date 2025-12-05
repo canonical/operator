@@ -958,7 +958,7 @@ class Framework(Object):
     def _reemit(self, single_event_path: str | None = None):
         last_event_path = None
         deferred = True
-        notices = tuple(self._storage.notices(single_event_path))
+        notices = self._storage.notices(single_event_path)
         for i, (event_path, observer_path, method_name) in enumerate(notices):
             event_handle = Handle.from_path(event_path)
 
@@ -1106,7 +1106,7 @@ class Framework(Object):
         for handle_path in self._storage.list_snapshots():
             if event_regex.match(handle_path):
                 notices = self._storage.notices(handle_path)
-                if next(notices, None) is None:
+                if not notices:
                     # There are no notices for this handle_path, it is valid to remove it
                     to_remove.append(handle_path)
         for handle_path in to_remove:

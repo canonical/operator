@@ -26,7 +26,7 @@ import subprocess
 from collections.abc import Callable, Generator
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
@@ -42,7 +42,6 @@ _Notices = list[_Notice]
 # it replaces a method, so the first argument passed to the function
 # (Any) is 'self'.
 _TupleRepresenterType = Callable[[Any, tuple[Any, ...]], yaml.Node]
-_NoticeGenerator = Generator['_Notice', None, None]
 
 
 def _run(args: list[str], **kw: Any):
@@ -187,7 +186,7 @@ class SQLiteStorage:
             (event_path, observer_path, method_name),
         )
 
-    def notices(self, event_path: str | None = None) -> _NoticeGenerator:
+    def notices(self, event_path: str | None = None) -> _Notices:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -195,7 +194,7 @@ class SQLiteStorage:
                 supplied (or None/'') will return all events.
 
         Returns:
-            Iterable of (event_path, observer_path, method_name) tuples
+            List of (event_path, observer_path, method_name) tuples
         """
         if event_path:
             c = self._db.execute(
@@ -213,12 +212,7 @@ class SQLiteStorage:
                   FROM notice
                  ORDER BY sequence
                 """)
-        while True:
-            rows = c.fetchmany()
-            if not rows:
-                break
-            for row in rows:
-                yield cast('_Notice', tuple(row))
+        return c.fetchall()
 
 
 class JujuStorage:
@@ -289,7 +283,7 @@ class JujuStorage:
         notice_list.remove((event_path, observer_path, method_name))
         self._save_notice_list(notice_list)
 
-    def notices(self, event_path: str | None = None):
+    def notices(self, event_path: str | None = None) -> _Notices:
         """Part of the Storage API, return all notices that begin with event_path.
 
         Args:
@@ -300,10 +294,9 @@ class JujuStorage:
             Iterable of (event_path, observer_path, method_name) tuples
         """
         notice_list = self._load_notice_list()
-        for row in notice_list:
-            if event_path and row[0] != event_path:
-                continue
-            yield tuple(row)
+        if not event_path:
+            return notice_list
+        return [row for row in notice_list if row[0] == event_path]
 
     def _load_notice_list(self) -> _Notices:
         """Load a notice list from current key.
@@ -317,7 +310,7 @@ class JujuStorage:
             return []
         if notice_list is None:
             return []
-        return notice_list
+        return [tuple(notice) for notice in notice_list]
 
     def _save_notice_list(self, notices: _Notices) -> None:
         """Save a notice list under current key.
