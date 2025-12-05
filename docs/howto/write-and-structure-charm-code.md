@@ -38,12 +38,13 @@ my-charm-set-operators/
 │   │   ├── charmcraft.yaml
 │   │   ├── pyproject.toml
 │   │   ├── README.md
-│   │   ├── requirements.txt
 │   │   ├── src
-│   │   │   └── charm.py
+│   │   │   ├── charm.py
+│   │   │   └── core.py
 │   │   ├── tests
 |   |   |   └── ...
-│   │   └── tox.ini
+│   │   ├── tox.ini
+│   │   └── uv.lock
 │   ├── my-charm-dashboard
 |   |   └── ...
 │   └── my-charm-helper
