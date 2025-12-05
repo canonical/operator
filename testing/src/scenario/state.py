@@ -1780,8 +1780,8 @@ class State:
         Items that are found in the metadata and are also in the passed
         arguments will be merged, with the passed values taking precedence.
         """
-        meta = ctx.charm_spec.meta
-        spec_config = ctx.charm_spec.config
+        meta = ctx._charm_spec.meta
+        spec_config = ctx._charm_spec.config
         config = {} if config is None else config
         if spec_config:
             options = spec_config.get('options', {})
@@ -1811,10 +1811,10 @@ class State:
                 continue
             storages.add(Storage(name=storage_name))
         stored_states = set(stored_states or ())
-        for attr in dir(ctx.charm_spec.charm_type):
-            value = getattr(ctx.charm_spec.charm_type, attr)
+        for attr in dir(ctx._charm_spec.charm_type):
+            value = getattr(ctx._charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
-                owner_path = ctx.charm_spec.charm_type.handle_kind
+                owner_path = ctx._charm_spec.charm_type.handle_kind
                 if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
