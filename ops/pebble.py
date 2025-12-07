@@ -58,26 +58,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from typing import (
     IO,
     TYPE_CHECKING,
     Any,
     AnyStr,
     BinaryIO,
-    Callable,
-    Dict,
-    Generator,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Optional,
     Protocol,
-    Sequence,
     TextIO,
     TypedDict,
-    Union,
 )
 
 import websocket
@@ -96,24 +88,24 @@ ServiceDict = typing.TypedDict(
         'after': Sequence[str],
         'before': Sequence[str],
         'requires': Sequence[str],
-        'environment': Dict[str, str],
+        'environment': dict[str, str],
         'user': str,
-        'user-id': Optional[int],
+        'user-id': int | None,
         'group': str,
-        'group-id': Optional[int],
+        'group-id': int | None,
         'working-dir': str,
         'on-success': str,
         'on-failure': str,
-        'on-check-failure': Dict[str, Any],
+        'on-check-failure': dict[str, Any],
         'backoff-delay': str,
-        'backoff-factor': Optional[int],
+        'backoff-factor': int | None,
         'backoff-limit': str,
-        'kill-delay': Optional[str],
+        'kill-delay': str | None,
     },
     total=False,
 )
 
-HttpDict = typing.TypedDict('HttpDict', {'url': str, 'headers': Dict[str, str]}, total=False)
+HttpDict = typing.TypedDict('HttpDict', {'url': str, 'headers': dict[str, str]}, total=False)
 TcpDict = typing.TypedDict('TcpDict', {'port': int, 'host': str}, total=False)
 ExecDict = typing.TypedDict(
     'ExecDict',
@@ -121,10 +113,10 @@ ExecDict = typing.TypedDict(
         'command': str,
         # see JujuVersion.supports_exec_service_context
         'service-context': str,
-        'environment': Dict[str, str],
-        'user-id': Optional[int],
+        'environment': dict[str, str],
+        'user-id': int | None,
         'user': str,
-        'group-id': Optional[int],
+        'group-id': int | None,
         'group': str,
         'working-dir': str,
     },
@@ -135,14 +127,14 @@ CheckDict = typing.TypedDict(
     'CheckDict',
     {
         'override': str,
-        'level': Union['CheckLevel', str],
+        'level': 'CheckLevel | str',
         'startup': Literal['', 'enabled', 'disabled'],
-        'period': Optional[str],
-        'timeout': Optional[str],
-        'http': Optional[HttpDict],
-        'tcp': Optional[TcpDict],
-        'exec': Optional[ExecDict],
-        'threshold': Optional[int],
+        'period': str | None,
+        'timeout': str | None,
+        'http': HttpDict | None,
+        'tcp': TcpDict | None,
+        'exec': ExecDict | None,
+        'threshold': int | None,
     },
     total=False,
 )
@@ -151,11 +143,11 @@ CheckDict = typing.TypedDict(
 LogTargetDict = typing.TypedDict(
     'LogTargetDict',
     {
-        'override': Union[Literal['merge'], Literal['replace']],
+        'override': Literal['merge'] | Literal['replace'],
         'type': Literal['loki', 'opentelemetry'],
         'location': str,
-        'services': List[str],
-        'labels': Dict[str, str],
+        'services': list[str],
+        'labels': dict[str, str],
     },
     total=False,
 )
@@ -165,9 +157,9 @@ LayerDict = typing.TypedDict(
     {
         'summary': str,
         'description': str,
-        'services': Dict[str, ServiceDict],
-        'checks': Dict[str, CheckDict],
-        'log-targets': Dict[str, LogTargetDict],
+        'services': dict[str, ServiceDict],
+        'checks': dict[str, CheckDict],
+        'log-targets': dict[str, LogTargetDict],
     },
     total=False,
 )
@@ -175,9 +167,9 @@ LayerDict = typing.TypedDict(
 PlanDict = typing.TypedDict(
     'PlanDict',
     {
-        'services': Dict[str, ServiceDict],
-        'checks': Dict[str, CheckDict],
-        'log-targets': Dict[str, LogTargetDict],
+        'services': dict[str, ServiceDict],
+        'checks': dict[str, CheckDict],
+        'log-targets': dict[str, LogTargetDict],
     },
     total=False,
 )
@@ -198,14 +190,14 @@ IdentityDict = typing.TypedDict(
 _AuthDict = TypedDict(
     '_AuthDict',
     {
-        'permissions': Optional[str],
-        'user-id': Optional[int],
-        'user': Optional[str],
-        'group-id': Optional[int],
-        'group': Optional[str],
-        'path': Optional[str],
-        'make-dirs': Optional[bool],
-        'make-parents': Optional[bool],
+        'permissions': str | None,
+        'user-id': int | None,
+        'user': str | None,
+        'group-id': int | None,
+        'group': str | None,
+        'path': str | None,
+        'make-dirs': bool | None,
+        'make-parents': bool | None,
     },
     total=False,
 )
@@ -244,9 +236,9 @@ class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and Bytes
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
-_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-_TextOrBinaryIO = Union[TextIO, BinaryIO]
-_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+_AnyStrFileLikeIO = _FileLikeIO[bytes] | _FileLikeIO[str]
+_TextOrBinaryIO = TextIO | BinaryIO
+_IOSource = str | bytes | _AnyStrFileLikeIO
 
 _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 
@@ -271,13 +263,13 @@ if TYPE_CHECKING:
         {
             'path': str,
             'name': str,
-            'size': NotRequired[Optional[int]],
+            'size': NotRequired[int | None],
             'permissions': str,
             'last-modified': str,
-            'user-id': NotRequired[Optional[int]],
-            'user': NotRequired[Optional[str]],
-            'group-id': NotRequired[Optional[int]],
-            'group': NotRequired[Optional[str]],
+            'user-id': NotRequired[int | None],
+            'user': NotRequired[str | None],
+            'group-id': NotRequired[int | None],
+            'group': NotRequired[str | None],
             'type': str,
         },
     )
@@ -290,11 +282,11 @@ if TYPE_CHECKING:
             'kind': str,
             'summary': str,
             'status': str,
-            'log': NotRequired[Optional[List[str]]],
+            'log': NotRequired[list[str] | None],
             'progress': _ProgressDict,
             'spawn-time': str,
-            'ready-time': NotRequired[Optional[str]],
-            'data': NotRequired[Optional[Dict[str, Any]]],
+            'ready-time': NotRequired[str | None],
+            'data': NotRequired[dict[str, Any] | None],
         },
     )
     _ChangeDict = TypedDict(
@@ -306,16 +298,16 @@ if TYPE_CHECKING:
             'status': str,
             'ready': bool,
             'spawn-time': str,
-            'tasks': NotRequired[Optional[List[_TaskDict]]],
-            'err': NotRequired[Optional[str]],
-            'ready-time': NotRequired[Optional[str]],
-            'data': NotRequired[Optional[Dict[str, Any]]],
+            'tasks': NotRequired[list[_TaskDict] | None],
+            'err': NotRequired[str | None],
+            'ready-time': NotRequired[str | None],
+            'data': NotRequired[dict[str, Any] | None],
         },
     )
 
     _Error = TypedDict('_Error', {'kind': str, 'message': str})
     _Item = TypedDict('_Item', {'path': str, 'error': NotRequired[_Error]})
-    _FilesResponse = TypedDict('_FilesResponse', {'result': List[_Item]})
+    _FilesResponse = TypedDict('_FilesResponse', {'result': list[_Item]})
 
     _WarningDict = TypedDict(
         '_WarningDict',
@@ -323,7 +315,7 @@ if TYPE_CHECKING:
             'message': str,
             'first-added': str,
             'last-added': str,
-            'last-shown': NotRequired[Optional[str]],
+            'last-shown': NotRequired[str | None],
             'expire-after': str,
             'repeat-after': str,
         },
@@ -333,14 +325,14 @@ if TYPE_CHECKING:
         '_NoticeDict',
         {
             'id': str,
-            'user-id': NotRequired[Optional[int]],
+            'user-id': NotRequired[int | None],
             'type': str,
             'key': str,
             'first-occurred': str,
             'last-occurred': str,
             'last-repeated': str,
             'occurrences': int,
-            'last-data': NotRequired[Optional[Dict[str, str]]],
+            'last-data': NotRequired[dict[str, str] | None],
             'repeat-after': NotRequired[str],
             'expire-after': NotRequired[str],
         },
@@ -2484,9 +2476,7 @@ class Client:
 
             try:
                 return self._wait_change(change_id, this_timeout)
-            except (socket.timeout, builtins.TimeoutError):
-                # NOTE: in Python 3.10 socket.timeout is an alias of TimeoutError,
-                # but we still need to support Python 3.8, so catch both.
+            except builtins.TimeoutError:
                 # Catch timeout from wait endpoint and loop to check deadline.
                 pass
 

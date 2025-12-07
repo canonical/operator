@@ -15,14 +15,9 @@
 from __future__ import annotations
 
 import json
-from typing import (
-    Literal,
-    Mapping,
-    cast,
-    overload,
-)
+from collections.abc import Mapping
+from typing import Literal, overload
 
-from .._private import yaml
 from ._types import RelationModel, RelationModelDict
 from ._utils import run
 
@@ -63,7 +58,8 @@ def relation_get(
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
         key: The specific key to get data for, or ``None`` to get all data.
-        unit: The unit to get data for, or ``None`` to get data for all units.
+        unit: The unit to get data for, or ``None`` to get data for the unit
+            that triggered the current hook.
     """
     if key == '-':
         raise ValueError('To get all keys, pass None for the key argument; "-" is not supported.')
@@ -84,9 +80,9 @@ def relation_get(
         args.append(key)
     stdout = run('relation-get', *args)
     if key is not None:
-        result = cast('str', json.loads(stdout))
-    else:
-        result = cast('dict[str, str]', json.loads(stdout))
+        key_result: str = json.loads(stdout)
+        return key_result
+    result: dict[str, str] = json.loads(stdout)
     return result
 
 
@@ -100,7 +96,7 @@ def relation_ids(name: str) -> list[str]:
         name: the endpoint name.
     """
     stdout = run('relation-ids', name, '--format=json')
-    result = cast('list[str]', json.loads(stdout))
+    result: list[str] = json.loads(stdout)
     return result
 
 
@@ -129,7 +125,10 @@ def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-list', *args)
-    result = cast('str', json.loads(stdout)) if app else cast('list[str]', json.loads(stdout))
+    if app:
+        app_result: list[str] = json.loads(stdout)
+        return app_result
+    result: str = json.loads(stdout)
     return result
 
 
@@ -151,7 +150,7 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     if id is not None:
         args.extend(['-r', str(id)])
     stdout = run('relation-model-get', *args)
-    result = cast('RelationModelDict', json.loads(stdout))
+    result: RelationModelDict = json.loads(stdout)
     return RelationModel._from_dict(result)
 
 
@@ -189,5 +188,5 @@ def relation_set(
     if app:
         args.append('--app')
     args.extend(['--file', '-'])
-    content = yaml.safe_dump(data)
+    content = json.dumps(data)
     run('relation-set', *args, input=content)

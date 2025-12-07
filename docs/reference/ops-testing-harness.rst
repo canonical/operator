@@ -7,6 +7,7 @@
     The Harness framework is deprecated and will be moved out of the base
     install in a future ops release. Charm authors that don't want to upgrade
     will still be able to use it with ``pip install ops[harness]``.
+    For guidance on how to upgrade, see :ref:`harness-migration`.
 
 The Harness API includes:
 

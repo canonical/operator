@@ -3,13 +3,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Type,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
+from collections.abc import Callable
 
 import jsonpatch
 
@@ -19,7 +14,7 @@ from scenario.state import _Event
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State
 
-    _CT = TypeVar('_CT', bound=Type[CharmType])
+    _CT = TypeVar('_CT', bound=type[CharmType])
 
 logger = logging.getLogger()
 

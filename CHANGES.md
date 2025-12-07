@@ -1,3 +1,87 @@
+# 3.4.0 - 27 November 2025
+
+## Breaking Changes
+
+* Fix: Change JujuContext.machine_id from int to str (#2108)
+* Fix: Ensure that the testing context manager is exited when an exception occurs (#2117)
+
+## Features
+
+* Add a low-level API for the Juju hook commands (#2019)
+* Make PebbleClient file methods also accept pathlib.PurePath (#2097)
+* Log the total number of deferred events (#2161)
+* Allow setting the Juju availability zone and principal unit in the testing Context (#2187)
+
+## Fixes
+
+* Allow actions without params or descriptions in ops[testing] (#2090)
+* Ensure `ops.Pebble.pull` cleans up temporary files if it errors (#2087)
+* Make secret info description visible to the charm in ops[testing] (#2115)
+* Raise ActionFailed when using Context as a context manager (#2121)
+* Detect categories with an exclamation mark indicating breaking changes (#2132)
+* Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
+* Don't cache secret metadata in Ops (#2143)
+* Secret-info-get cannot be provided with both an ID and a label (#2170)
+* Minor hookcmds fixes (#2175)
+
+## Documentation
+
+* Update referenced examples for managing interfaces (#2068)
+* Tidy up spelling and formatting in several places (#2060)
+* Add missing assignment to state_out in unit tests how-to (#2075)
+* Update the holistic/delta explanation with the reconciler pattern (#2029)
+* Fix broken setup/teardown links in README (#2094)
+* Update info about release docs, mark testing changelog as not maintained (#2074)
+* Switch to makefile for building the docs (#2073)
+* Document how to extract the charm instance from the testing context (#2084)
+* Add a how-to guide for migrating away from Harness (#2062)
+* Rename hook tools to hook commands (#2114)
+* Remove legacy how-to guide for Harness (#2122)
+* Update the Juju release the metrics functionality is removed from 4.0 to 3.6.11 (#2126)
+* Clarify that Context is the testing context not only the Juju context (#2123)
+* Explain the Charmhub public listing process and add a reference list of best practices (#1989)
+* Expand next steps for K8s tutorial (#2034)
+* Remove mention of the `simple` Charmcraft profile (#2138)
+* Expand landing pages with summaries of pages (#2140)
+* Update environment setup for integration tests and K8s tutorial (#2124)
+* Replace machine charm tutorial by an improved tutorial (#2119)
+* Change HACKING.md instructions for maintaining Charmcraft profiles (#2151)
+* In integration tests, use consistent approach to logging and packing (#2150)
+* In integration testing how-to, clarify that Juju model is destroyed after all tests in the model complete (#2154)
+* Remove Charmcraft channel specifier from machine charm tutorial (#2148)
+* Add AI contribution note and style guideline for type annotation of return values (#2168)
+* Add ops[testing] to the ops.testing docstring (#2171)
+* Add links to the Juju hook from each event class (#2176)
+* Add a short umask note (#2184)
+
+## Tests
+
+* Re-enable testing consistency checks after disabling them (#2141)
+* Expand secrets integration and state transition tests (#2130)
+
+## Refactoring
+
+* Use ops.hookcmds in _ModelBackend (#2116)
+* Don't get the storage details from --help (#2172)
+* Drop 3.8 and 3.9 compatibility code (#2173)
+* Use json.dumps to produce the YAML in relation-set and state-set (#2174)
+* Rely on type annotations instead of casts in hookcmds (#2179)
+
+## CI
+
+* Add integration and state transition tests for the secrets API (#2078)
+* Temporarily disable tracing integration tests (#2102)
+* Add secrets tests follow-up (#2105)
+* Support monorepos in ops charm compatibility testing (#2100)
+* Test both Charmcraft 3 and Charmcraft 4 profiles (#2103)
+* Add automated doc checks (and related starter pack updates) (#2099)
+* Clean up accidental workflow trigger (#2144)
+* Test if package versions match dependency versions before publishing (#2139)
+* Update spelling (#2167)
+* Test against 4.0/stable (#2186)
+* Store charmcraft logs if smoke tests fail (#2192)
+* Use Juju channel 4/stable in Ops smoke tests (#2190)
+
 # 3.3.0 - 29 September 2025
 
 ## Features

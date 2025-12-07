@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import dataclasses
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .jujuversion import JujuVersion
 

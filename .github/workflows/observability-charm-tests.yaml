@@ -19,14 +19,16 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 535172141c55236ca82ce6e2e13e8bd1c5460f81  # 2025-09-19T12:47:33Z
+            commit: 7f64241676c4ad33320a9b16f01242868ed3abf4  # rev195 2025-11-21T19:52:29Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 424fa3299eb11e91c3a9bdda9822e21de70e0edf  # rev264 2025-09-24T12:54:57Z
+            commit: 78f131863dca08ebe807de98e4743664cfea736e  # rev278 2025-11-20T13:42:21Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 319a3e697d31cbf1d901d485ed674babbc9b778e  # 2025-09-19T18:43:22Z
+            # Not updated due to: ModuleNotFoundError: No module named 'ops_tracing'
+            # This needs to be fixed upstream before we can bump this pin
+            commit: 6c099f751c4cee77430d2588f6001f66d6212d7d  # 2025-10-23T16:04:06Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
@@ -43,6 +45,7 @@ jobs:
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
+            sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
           else

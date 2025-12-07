@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import json
-from typing import Mapping, cast
+from collections.abc import Mapping
 
 from ._types import Storage
 from ._utils import run
@@ -72,5 +72,5 @@ def storage_list(name: str | None = None) -> list[str]:
     if name is not None:
         args.append(name)
     stdout = run('storage-list', *args)
-    result = cast('list[str]', json.loads(stdout))
+    result: list[str] = json.loads(stdout)
     return result

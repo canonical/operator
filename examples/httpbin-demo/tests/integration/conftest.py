@@ -12,25 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import pathlib
+import sys
+import time
 
 import jubilant
 import pytest
 
+logger = logging.getLogger(__name__)
+
 
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
+    """Create a temporary Juju model for running tests."""
     with jubilant.temp_model() as juju:
         yield juju
 
         if request.session.testsfailed:
+            logger.info("Collecting Juju logs...")
+            time.sleep(0.5)  # Wait for Juju to process logs.
             log = juju.debug_log(limit=1000)
-            print(log, end="")
+            print(log, end="", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")
 def charm():
+    """Return the path of the charm under test."""
     if "CHARM_PATH" in os.environ:
         charm_path = pathlib.Path(os.environ["CHARM_PATH"])
         if not charm_path.exists():

@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.4.0.dev0",
+    "ops-scenario==8.5.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.4.0.dev0",
+    "ops-tracing==3.5.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -117,8 +117,7 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 exclude = ["examples"]
-# FIXME
-target-version = "py38"
+target-version = "py310"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
 # Ruff formatter configuration
@@ -192,6 +191,8 @@ ignore = [
     # Missing docstring in `__init__`
     "D107",
 
+    # Manual list comprehension.
+    "PERF401",
     # Manual dict comprehension.
     "PERF403",
 
@@ -220,32 +221,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 
     # "Useless" expression.
     "B018"
-]
-"testing/*" = [
-    # TODO: the below ignores should be fixed
-    "A001",  # Variable is shadowing a Python builtin
-    "B033",  # Sets should not contain duplicate item
-    "B904",  # Use raise from within except
-    "D101",  # Missing docstring in public class
-    "D102",  # Missing docstring in public method
-    "D202",  # No blank lines allowed after function docstring
-    "D205",  # 1 blank line required between summary line and description
-    "D212",  # Multi-line docstring summary should start at the first line
-    "D403",  # First word of the docstring should be capitalized
-    "D415",  # First line should end with a period, question mark, or exclamation point
-    "E501",  # Line too long
-    "I001",  # isort
-    "N818",  # Exception name should end with Error
-    "S105",  # Possible hardcoded password
-    "S311",  # Standard pseudo-random generators are not suitable for cryptographic purposes
-    "RUF009",  # Do not perform function call in dataclass defaults
-    "RUF052",  # Local dummy variable is accessed
-    "RUF100",  # Unused `noqa` directive
-    "SIM102",  # Use single if instead of nested if
-    "SIM108",  # Use ternary operator instead if if-else block
-    "PERF102",  # Use dict.values()
-    "PERF203",  # try-except in loop body
-    "PERF401",  # Use list.extend
 ]
 "testing/tests/*" = [
     # All documentation linting.

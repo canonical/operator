@@ -67,9 +67,25 @@ def test_app_name(app_name, unit_id):
 @pytest.mark.parametrize('machine_id', ('0', None, '42', '0/lxd/4'))
 def test_machine_id_envvar(machine_id):
     ctx = Context(MyCharm, meta={'name': 'foo'}, machine_id=machine_id)
-    os.unsetenv('JUJU_MACHINE_ID')  # cleanup env to be sure
+    os.environ.pop('JUJU_MACHINE_ID', None)  # cleanup env to be sure
     with ctx(ctx.on.start(), State()):
         assert os.getenv('JUJU_MACHINE_ID') == machine_id
+
+
+@pytest.mark.parametrize('availability_zone', ('zone1', None, 'us-east-1a'))
+def test_availability_zone_envvar(availability_zone):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, availability_zone=availability_zone)
+    os.environ.pop('JUJU_AVAILABILITY_ZONE', None)  # cleanup env to be sure
+    with ctx(ctx.on.start(), State()):
+        assert os.getenv('JUJU_AVAILABILITY_ZONE') == availability_zone
+
+
+@pytest.mark.parametrize('principal_unit', ('main/0', None, 'app/42'))
+def test_principal_unit_envvar(principal_unit):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, principal_unit=principal_unit)
+    os.environ.pop('JUJU_PRINCIPAL_UNIT', None)  # cleanup env to be sure
+    with ctx(ctx.on.start(), State()):
+        assert os.getenv('JUJU_PRINCIPAL_UNIT') == principal_unit
 
 
 def test_context_manager():
@@ -96,7 +112,8 @@ def test_app_name_and_unit_id():
     assert ctx.unit_id == 42
 
 
-def test_context_manager_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
+def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -106,15 +123,17 @@ def test_context_manager_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         with ctx(ctx.on.start(), State()) as mgr:
             assert os.getenv('TEST_ENV_VAR') == '1'
             mgr.run()
     assert 'TEST_ENV_VAR' not in os.environ
 
 
-def test_run_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
+def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -124,8 +143,9 @@ def test_run_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
 

@@ -953,32 +953,6 @@ def test_secret_event_remove_revision(
     ]
 
 
-def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
-    class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.secrets: list[ops.Secret] = []
-            self.framework.observe(self.on.secret_changed, self.on_secret_changed)
-
-        def on_secret_changed(self, event: ops.SecretChangedEvent):
-            event.secret.set_info(description='desc')
-            event.secret.set_content({'key': 'value'})
-            self.secrets.append(event.secret)
-
-    fake_script.write('secret-get', """echo '{"key": "value"}'""")
-    fake_script.write('secret-set', 'exit 0')
-
-    framework = create_framework(request)
-    charm = MyCharm(framework)
-
-    charm.on.secret_changed.emit('secret:changed', None)
-    charm.on.secret_changed.emit('secret:changed', None)
-    cache = charm.secrets[0]._secret_set_cache
-    assert cache is charm.secrets[1]._secret_set_cache
-    assert charm.secrets[0]._secret_set_cache['secret:changed']['description'] == 'desc'
-    assert 'content' in cache['secret:changed']
-
-
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -1381,9 +1355,7 @@ class _MyConfigCharm(BaseTestConfigCharm):
         return MyConfig
 
 
-# Note that we would really like to have kw_only=True here as well, but that's
-# not available in Python 3.8.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MyDataclassConfig:
     my_bool: bool | None = None
     my_int: int = 42
@@ -1695,9 +1667,7 @@ class _MyActionCharm(BaseTestActionCharm):
         return MyAction
 
 
-# Note that we would really like to have kw_only=True here as well, but that's
-# not available in Python 3.8.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MyDataclassAction:
     my_str: str
     my_bool: bool = False
@@ -1918,11 +1888,6 @@ if pydantic is not None:
 def test_action_custom_naming_pattern(
     action_params: dict[str, int], action_class: type[object], request: pytest.FixtureRequest
 ):
-    # The latest version of Pydantic available for Python 3.8 does not support
-    # the `alias` metadata, so we need to skip the test for that case.
-    if pydantic is not None and action_class is _PydanticDataclassesAlias:
-        pytest.skip('Pydantic does not support dataclasses alias metadata in this version.')
-
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

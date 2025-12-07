@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import subprocess
-from typing import Callable, Generator
+from collections.abc import Callable, Generator
 
 import jubilant
 import minio

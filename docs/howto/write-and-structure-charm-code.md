@@ -21,17 +21,14 @@ In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
 ```{note}
-In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
+In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
 If you are charming an application built with a popular framework, check if
 charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-
-Avoid the default (`--profile=simple`), which provides a demo charm, rather than
-a base for building a charm of your own.
 ```
 
 If your repository will hold multiple charms, or a charm and source for other
 artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft --init` in each charm
+for each charm inside of that one, and run `charmcraft init` in each charm
 folder. You'll end up with a structure similar to:
 
 ```
@@ -66,7 +63,7 @@ my-charm-set-operators/
 Charms run using the Python version provided by the base Ubuntu version. Write
 charm code that will run with the Python version of the oldest base you support.
 
-> See also: {external+juju:ref}`Juju | Roadmap and releases <juju-roadmap-and-releases>`
+> See also: {external+juju:ref}`Juju | Roadmap and releases <releasenotes>`
 
 ```{admonition} Best practice
 :class: hint
@@ -374,6 +371,14 @@ By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
 ```
 
+(follow-best-practices)=
+## Follow best practices
+
+Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
+
+```{include} ../reuse/best-practices.txt
+```
+
 (validate-your-charm-with-every-change)=
 ## Validate your charm with every change
 
@@ -403,11 +408,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run linters
         run: tox -e lint
 ```
@@ -420,17 +425,17 @@ Other `tox` environments can be run similarly; for example unit tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```
 
 Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
-a cloud in which to deploy it, is required. This example uses a `concierge` in order to set up
+a cloud in which to deploy it, is required. This example uses [Concierge](https://github.com/canonical/concierge) to set up
 `k8s` and Juju:
 
 ```
@@ -446,11 +451,11 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
       - name: Install Juju and tools
         run: sudo concierge prepare -p k8s
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
         run: tox -e integration -- --model testing
