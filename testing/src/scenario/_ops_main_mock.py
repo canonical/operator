@@ -279,6 +279,7 @@ class Ops(_Manager, Generic[CharmType]):
         for handler in logger.handlers[:]:
             if isinstance(handler, JujuLogHandler):
                 logger.removeHandler(handler)
+        # Clear app ID cached when logging security events.
         _get_juju_log_and_app_id.cache_clear()
 
 

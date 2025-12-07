@@ -87,6 +87,7 @@ def root_logging():
 class TestModel:
     @pytest.fixture
     def harness(self):
+        # Clear app ID cached when logging security events.
         _get_juju_log_and_app_id.cache_clear()
         harness = ops.testing.Harness(
             ops.CharmBase,
@@ -120,6 +121,7 @@ class TestModel:
         """,
         )
         yield harness
+        # Clear app ID cached when logging security events.
         _get_juju_log_and_app_id.cache_clear()
         harness.cleanup()
 

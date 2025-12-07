@@ -51,7 +51,7 @@ def backend():
 @pytest.fixture()
 def logger():
     logger = logging.getLogger()
-    orig_showwarning = warnings.showwarning
+    orig_showwarning = warnings.showwarning  # Modified when setting up logging in ops.log.
     yield logger
     logging.getLogger().handlers.clear()
     sys.excepthook = sys.__excepthook__

@@ -7137,7 +7137,7 @@ class TestChecks:
     def test_stop_checks(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
         # This generates a warning because there's a security event
-        # logged, but we haven't set up logging properly.
+        # logged, but we haven't set up logging for Harness in these tests.
         with pytest.warns(RuntimeWarning):
             changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
