@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import ops
 import ops.storage
-
 from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 from ops.framework import _event_regex
