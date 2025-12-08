@@ -172,15 +172,15 @@ Instead of directly writing data to the storage, your charm could put the storag
 
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the detaching event associated with your storage and pair that with an event handler. For example:
 
-```
-self.framework.observe(self.on.cache_storage_detaching, self._on_storage_detaching)
+```python
+    framework.observe(self.on["cache"].storage_detaching, self._on_storage_detaching)
 ```
 
 > See more: [](ops.StorageDetachingEvent)
 
 Now, in the body of the charm definition, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
 
-```
+```python
 def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
     """Handle the storage being detached."""
     self.unit.status = ops.ActiveStatus("Caching disabled; provide storage to boost performance)
@@ -238,7 +238,7 @@ this request will trigger Juju to provision the storage and execute the charm
 again with foo-storage-attached. So a natural follow-up test suite for
 this case would be:
 
-```
+```python
 ctx = testing.Context(MyCharm)
 foo_0 = testing.Storage('foo')
 # The charm is notified that one of the storage volumes it has requested is ready:
