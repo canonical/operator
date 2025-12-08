@@ -96,21 +96,14 @@ def get_new_tag_for_release(owner: str, repo_name: str, branch_name: str) -> str
     base_version = current_version.base_version
     suggested_tag = ''
 
-    if branch_name.endswith('-maintenance'):
-        # Maintenance branch: bump patch version
-        logger.info('Branch is a maintenance branch, bumping patch version.')
+    if current_version.pre or current_version.dev:
+        logger.info('Dropping pre-release qualifiers and suggesting base version.')
+        suggested_tag = base_version
+    elif branch_name.endswith('-maintenance'):
+        logger.info('Bumping patch version since this is a maintenance branch.')
         suggested_tag = bump_patch_version(base_version)
-    elif current_version.pre is not None:
-        # Pre-release (alpha, beta, rc): suggest the base version (final release)
-        logger.info('Current version is a pre-release, suggesting base version.')
-        suggested_tag = base_version
-    elif current_version.dev is not None:
-        # Dev version: drop the .devN suffix
-        logger.info('Current version is a dev version, dropping dev suffix.')
-        suggested_tag = base_version
     else:
-        # Final release: bump minor version
-        logger.info('Current version is a final release, bumping minor version.')
+        logger.info('Bumping minor version.')
         suggested_tag = bump_minor_version(base_version)
 
     logger.info('Suggested new version: %s', suggested_tag)
@@ -201,12 +194,10 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
                 description = description[0].upper() + description[1:]
                 pr_link = match.group('pr').strip()
                 if match.group('breaking') == '!':
-                    categories['breaking'].append(
-                        (
-                            f'{category.capitalize()}: {description}',
-                            pr_link,
-                        )
-                    )
+                    categories['breaking'].append((
+                        f'{category.capitalize()}: {description}',
+                        pr_link,
+                    ))
                 else:
                     categories[category].append((description, pr_link))
 
