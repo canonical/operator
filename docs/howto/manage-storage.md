@@ -6,95 +6,84 @@
 
 ### Define the storage
 
-Define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. For example, for a transient filesystem storage mounted to `/cache/` that is at least 1GB in size:
+Each named storage can be defined as supporting a single or multiple storage instances. If you define a storage as supporting multiple instances, your charm's users can use `juju add-storage` to increase the number of instances attached to your charm. (This command doesn't 'grow' existing instances, as you might have expected.)
+
+Let's define a storage called `cache` that supports multiple instances. In `charmcraft.yaml`:
 
 ```yaml
 storage:
   cache:
-    type: filesystem
     description: Somewhere to cache files locally.
-    location: /cache/
-    minimum-size: 1G
+    type: filesystem
     properties:
       - transient
+    minimum-size: 1G
+    multiple:
+      range: 1-10
 ```
 
-If you don't specify a location for the storage, Juju mounts the storage at the default location:
+When your charm is deployed, Juju attaches one storage instance to each unit - the minimum of the range 1-10. The instance is at least 1GB in size. Each additional instance that's attached will also be at least 1GB in size.
 
-```text
-/var/lib/juju/storage/<storage-name>/0
-```
+TODO: Confirm that this ^ is true!
 
-### Access the storage
+Juju mounts each storage instance in the unit's filesystem. Your charm should configure the workload with the path of each mounted instance.
+
+You can specify where to mount the instances by adding a `location` key to the `cache` definition, but we don't recommend doing this. Even if you specify a mount location, the path of each mounted instance will contain an identifier that Juju determines, so you won't be able to hard-code storage instance paths in the workload configuration.
+
+### Configure the workload
 
 In your charm's `__init__` method, observe the [storage-attached](ops.StorageAttachedEvent) event:
 
 ```python
-framework.observe(self.on["cache"].storage_attached, self._update_configuration)
+    framework.observe(self.on["cache"].storage_attached, self._update_configuration)
 ```
 
 In this example, we use a holistic event handler called `_update_configuration`. Alternatively, you could use a dedicated handler for the storage-attached event. To learn more about the different approaches, see [](#holistic-vs-delta-charms).
 
-Next, access the storage in `_update_configuration`. Don't hard-code the location of the storage. Instead, get the location from [`self.model.storages`](ops.Model.storages):
+Next, in `_update_configuration`, get the storage instance paths that Juju creates:
 
 ```python
 def _update_configuration(self, event: ops.EventBase):
     """Update the workload configuration."""
     cache = self.model.storages["cache"]
     if not cache:
-        # The storage-attached event hasn't happened yet.
-        logger.info("Storage is not yet ready.")
+        logger.info("No instances available for storage 'cache'.")
         return
-    # Storage is available. Write some data to the cache.
-    cache_root = pathops.LocalPath(cache[0].location)
-    (cache_root / "data.json").write_text("...")
-```
-
-This example uses {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` to write data to the storage.
-
-Instead of directly writing data to the storage, your charm could put the storage location in a configuration file. For example:
-
-```python
+    cache_paths = [instance.location for instance in cache]
+    # Configure the workload to use the available storage instance paths.
     ...
-    # Storage is available. Pass the storage location to the workload.
-    config_path = pathops.LocalPath("/etc/my-app/cache-path.config")
-    config_path.write_text(cache[0].location)
-    # Ask the workload to reload its configuration.
 ```
 
-### Request additional storage
+The length of `cache_paths` matches the number of storage instances attached to the unit. If we hadn't specified `multiple` in the storage definition, `cache_paths` would be a singleton list.
 
-While Juju provides an `add-storage` command, this does not 'grow' existing storage instances/mounts like you might expect. Rather, it works by increasing the number of storage instances available/mounted for storages configured with the multiple parameter. Handling storage scaling is done by handling `['<name>'].storage_attached` and `['<name>'].storage_detaching` events. For example, with the following in your `charmcraft.yaml` file:
+> See more: [](ops.Model.storages)
 
-```yaml
-storage:
-    my-storage:
-        type: filesystem
-        multiple:
-            range: 1-10
-```
-
-Juju will deploy the application with the minimum of the range (1 storage instance). Running `juju add-storage <unit> my-storage=32G,2` will add two additional instances to this storage. Adding storage does not modify existing storage mounts. This would generate two separate storage-attached events that should be handled.
-
-If the *charm* needs additional units of a storage, it can request that with the `storages.request` method. The storage must be defined in the metadata as allowing multiple, for example:
-
-```yaml
-storage:
-    scratch:
-        type: filesystem
-        location: /scratch
-        multiple: 1-10
-```
-
-For example, if the charm needs to request two additional units of this storage:
+To access the storage instances in charm code, use {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations. For example:
 
 ```python
-self.model.storages.request("scratch", 2)
+    # Prepare each storage instance for use by the workload.
+    for path in cache_paths:
+        (pathops.LocalPath(path) / "uploaded-data").mkdir()
+        (pathops.LocalPath(path) / "processed-data").mkdir()
 ```
 
-The storage will not be available immediately after that call - the charm should
-observe the `storage-attached` event and handle any remaining setup once Juju
-has attached the new storage.
+### Request more storage instances
+
+If `multiple` is specified in the storage definition in `charmcraft.yaml`, your charm's users can use `juju add-storage` to increase the number of instances attached to your charm. For example:
+
+```text
+juju add-storage <unit> cache=2  # Request two more instances.
+```
+
+Your charm will receive a storage-attached event as each additional instance becomes available.
+
+To request more instances in charm code, use [](ops.StorageMapping.request). For example:
+
+```python
+    self.model.storages.request("cache", 2)  # Request two more instances.
+```
+
+The additional instances won't be available immediately after the call. As with `juju add-storage`, your charm will receive a storage-attached event as each additional instance becomes available.
 
 ## Manage storage for a Kubernetes charm
 
