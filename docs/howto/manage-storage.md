@@ -63,8 +63,9 @@ To access the storage instances in charm code, use {external+charmlibs:ref}`path
 ```python
     # Prepare each storage instance for use by the workload.
     for path in cache_paths:
-        (pathops.LocalPath(path) / "uploaded-data").mkdir()
-        (pathops.LocalPath(path) / "processed-data").mkdir()
+        root = pathops.LocalPath(path)
+        (root / "uploaded-data").mkdir(exist_ok=True)
+        (root / "processed-data").mkdir(exist_ok=True)
 ```
 
 ### Request more storage instances
