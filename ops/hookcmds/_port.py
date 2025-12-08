@@ -16,10 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from typing import (
-    cast,
-    overload,
-)
+from typing import overload
 
 from ._types import Port
 from ._utils import run
@@ -140,7 +137,7 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     if endpoints:
         args.append('--endpoints')
     stdout = run('opened-ports', *args, '--format=json')
-    result = cast('list[str]', json.loads(stdout))
+    result: list[str] = json.loads(stdout)
     ports: list[Port] = []
     # Each port from Juju will look like one of these:
     # 'icmp'
