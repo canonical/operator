@@ -54,7 +54,9 @@ def _update_configuration(self, event: ops.EventBase):
     ...
 ```
 
-The length of `cache_paths` matches the number of storage instances attached to the unit. If we hadn't specified `multiple` in the storage definition, `cache_paths` would be a singleton list.
+The length of `cache_paths` matches the number of storage instances attached to the unit.
+
+If we hadn't specified `multiple` in the storage definition, `cache` would either be a singleton list or empty, depending on whether a storage instance is attached.
 
 > See more: [](ops.Model.storages)
 
