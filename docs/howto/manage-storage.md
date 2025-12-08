@@ -6,7 +6,7 @@
 
 ### Define the storage
 
-Each named storage can be defined as supporting a single or multiple storage instances. If you define a storage as supporting multiple instances, your charm's users can use `juju add-storage` to increase the number of instances attached to your charm. (This command doesn't 'grow' existing instances, as you might have expected.)
+Each storage can be defined as supporting a single or multiple storage instances. If you define a storage as supporting multiple instances, your charm's users can use `juju add-storage` to increase the number of instances attached to your charm. (This command doesn't 'grow' existing instances).
 
 Let's define a storage called `cache` that supports multiple instances. In `charmcraft.yaml`:
 
@@ -24,13 +24,11 @@ storage:
 
 When your charm is deployed, Juju attaches one storage instance to each unit - the minimum of the range 1-10. The instance is at least 1GB in size. Each additional instance that's attached will also be at least 1GB in size.
 
-TODO: Confirm that this ^ is true!
-
 Juju mounts each storage instance in the unit's filesystem. Your charm should configure the workload with the path of each mounted instance.
 
-You can specify where to mount the instances by adding a `location` key to the `cache` definition, but we don't recommend doing this. Even if you specify a mount location, the path of each mounted instance will contain an identifier that Juju determines, so you won't be able to hard-code storage instance paths in the workload configuration.
+You can specify where to mount the storage instances by adding a `location` key to the `cache` definition, but we don't recommend doing this. Even if you specify a mount location, the path of each mounted instance will contain an identifier that Juju determines, so you won't be able to hard-code storage instance paths in the workload configuration.
 
-### Configure the workload
+### Configure the workload or access the storage
 
 In your charm's `__init__` method, observe the [storage-attached](ops.StorageAttachedEvent) event:
 
@@ -50,7 +48,7 @@ def _update_configuration(self, event: ops.EventBase):
         logger.info("No instances available for storage 'cache'.")
         return
     cache_paths = [instance.location for instance in cache]
-    # Configure the workload to use the available storage instance paths.
+    # Configure the workload to use the storage instance paths.
     ...
 ```
 
@@ -65,9 +63,9 @@ To access the storage instances in charm code, use {external+charmlibs:ref}`path
 ```python
     # Prepare each storage instance for use by the workload.
     for path in cache_paths:
-        root = pathops.LocalPath(path)
-        (root / "uploaded-data").mkdir(exist_ok=True)
-        (root / "processed-data").mkdir(exist_ok=True)
+        cache_root = pathops.LocalPath(path)
+        (cache_root / "uploaded-data").mkdir(exist_ok=True)
+        (cache_root / "processed-data").mkdir(exist_ok=True)
 ```
 
 ### Request more storage instances
@@ -92,81 +90,84 @@ The additional instances won't be available immediately after the call. As with 
 
 ### Define the storage
 
-Define a `storage` section in `charmcraft.yaml` that lists the storage volumes and information about each storage. Also specify where to mount the storage in the workload container.
+```{note}
+Each storage in a Kubernetes charm supports a single storage instance. Multiple storage instances aren't supported.
+```
 
-For example, for a transient filesystem storage that is at least 1GB in size:
+Let's define a storage called `cache`. In `charmcraft.yaml`:
 
 ```yaml
 storage:
   cache:
-    type: filesystem
     description: Somewhere to cache files locally.
-    minimum-size: 1G
+    type: filesystem
     properties:
       - transient
+    minimum-size: 1G
 
 containers:
-  web-service:
-    resource: app-image
+  web:
+    resource: web-image
     mounts:
       - storage: cache
         location: /var/cache
 ```
 
-Juju mounts the storage at `/var/cache` in the workload container.
+When your charm is deployed, Juju attaches a storage instance to each unit and mounts the instance in the charm container's filesystem. The instance is at least 1GB in size.
 
-### Access the storage
+Juju also mounts the storage instance in the workload container's filesystem, at `/var/cache`. Depending on the workload, your charm might need to configure the workload to expect storage at this location.
+
+### Configure the workload or access the storage
 
 In your charm's `__init__` method, observe the [storage-attached](ops.StorageAttachedEvent) event:
 
 ```python
-framework.observe(self.on["cache"].storage_attached, self._update_configuration)
+    framework.observe(self.on["cache"].storage_attached, self._update_configuration)
 ```
 
 In this example, we use a holistic event handler called `_update_configuration`. Alternatively, you could use a dedicated handler for the storage-attached event. To learn more about the different approaches, see [](#holistic-vs-delta-charms).
 
-Next, access the storage in `_update_configuration`. Don't hard-code the location of the storage. Instead, get the location from [`ContainerMeta.mounts`](ops.ContainerMeta.mounts) for the workload container:
+Next, in `_update_configuration`, get the storage instance path in the workload container:
 
 ```python
 def _update_configuration(self, event: ops.EventBase):
     """Update the workload configuration."""
     cache = self.model.storages["cache"]
     if not cache:
-        # The storage-attached event hasn't happened yet.
-        logger.info("Storage is not yet ready.")
+        logger.info("No instance available for storage 'cache'.")
         return
-    # Storage is available. Write some data to the cache.
-    cache_in_container = self.meta.containers["web-service"].mounts["cache"]
-    cache_root = pathops.ContainerPath(
-        cache_in_container.location,
-        container=self.unit.get_container("web-service"),
-    )
-    try:
-        (cache_root / "data.json").write_text("...")
-    except ops.pebble.ConnectionError:
-        # Pebble isn't ready yet. Return and wait for the pebble-ready event.
-        logger.info("Pebble is not yet ready.")
-        return
-```
-
-This example uses {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` to write data to the storage in the workload container.
-
-Instead of directly writing data to the storage, your charm could put the storage location in a configuration file. For example:
-
-```python
+    web_cache_path = self.meta.containers["web"].mounts["cache"].location
+    # Configure the workload to use the storage instance path.
     ...
-    # Storage is available. Pass the storage location to the workload.
-    cache_in_container = self.meta.containers["web-service"].mounts["cache"]
-    config_path = pathops.ContainerPath(
-        "/etc/my-app/cache-path.config",
-        container=self.unit.get_container("web-service"),
-    )
-    try:
-        config_path.write_text(cache_in_container.location)
-    except ops.pebble.ConnectionError:
-        ...
-    # Ask the workload to reload its configuration.
 ```
+
+> See more: [](ops.Model.storages), [](ops.ContainerMeta.mounts)
+
+To access the storage instance in charm code, use one of the following approaches. The approaches are essentially equivalent - choose whichever you prefer.
+
+- Access the instance in the workload container, using {external+charmlibs:ref}`pathops <charmlibs-pathops>`. For example:
+
+    ```python
+        # Prepare the storage instance for use by the workload.
+        web_container = self.unit.get_container("web")
+        web_cache_root = pathops.ContainerPath(web_cache_path, container=web_container)
+        try:
+            (web_cache_root / "uploaded-data").mkdir(exist_ok=True)
+            (web_cache_root / "processed-data").mkdir(exist_ok=True)
+        except ops.pebble.ConnectionError:
+            logger.info("Unable to access container. Waiting for pebble-ready.")
+            return
+    ```
+
+- Access the instance in the charm container, using {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations. For example:
+
+    ```python
+        # Prepare the storage instance for use by the workload.
+        charm_cache_path = cache[0].location  # Always index 0 in a K8s charm.
+        charm_cache_root = pathops.LocalPath(charm_cache_path)
+        (charm_cache_root / "uploaded-data").mkdir(exist_ok=True)
+        (charm_cache_root / "processed-data").mkdir(exist_ok=True)
+    ```
 
 ## Handle storage detaching
 
