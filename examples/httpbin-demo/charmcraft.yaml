@@ -1,11 +1,5 @@
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "24.04"
-    run-on:
-    - name: ubuntu
-      channel: "24.04"
+base: ubuntu@24.04
 
 name: httpbin-demo
 title: |
