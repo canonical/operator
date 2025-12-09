@@ -537,15 +537,13 @@ def post_release(
     current_version = get_current_ops_version()
     new_branch = f'post-release-{current_version}'
     local_branch = subprocess.check_output(['/usr/bin/git', 'branch', '--list', new_branch])
-    remote_branch = subprocess.check_output(
-        [
-            '/usr/bin/git',
-            'ls-remote',
-            '--heads',
-            fork_remote,
-            new_branch,
-        ]
-    )
+    remote_branch = subprocess.check_output([
+        '/usr/bin/git',
+        'ls-remote',
+        '--heads',
+        fork_remote,
+        new_branch,
+    ])
     if local_branch or remote_branch:
         logger.error(
             'Branch %r already exists. '
