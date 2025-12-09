@@ -344,6 +344,10 @@ When your charm receives the "install" event from Juju, Ops runs this method and
 
 As you write your charm, keep in mind that the charm code only runs when there's an event to handle. Behind the scenes, Juju runs `charm.py` with event data in the environment. Ops reads the event data, instantiates the charm class, then runs the appropriate method.
 
+```{important}
+The charm class will be newly instantiated on every event. In general, when you write a charm, you can't persist data between events by storing the data in the charm class.
+```
+
 ### Define a configuration option
 
 After deploying your charm, you'll use the `juju config` command to change the path of the reverse proxy, so we need to define a configuration option called `slug`. We'll do this in two places:
