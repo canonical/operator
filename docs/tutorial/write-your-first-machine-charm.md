@@ -342,10 +342,10 @@ In `src/charm.py`, replace the `_on_install` method of the charm class with:
 
 When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
-As you write your charm, keep in mind that the charm code only runs when there's an event to handle. Behind the scenes, Juju runs `charm.py` with event data in the environment. Ops reads the event data, instantiates the charm class, then runs the appropriate method.
+As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
 
 ```{important}
-The charm class will be newly instantiated on every event. In general, when you write a charm, you can't persist data between events by storing the data in the charm class.
+Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
 ```
 
 ### Define a configuration option
