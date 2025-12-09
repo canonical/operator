@@ -21,7 +21,9 @@ What you'll do:
 
 If you need help, don't hesitate to get in touch at [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix.
 
-You can also [inspect the full charm code](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
+```{tip}
+As you work through the tutorial, you'll write your charm piece by piece. You can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
+```
 
 ## Study your application
 
@@ -525,6 +527,8 @@ Then add the following methods to the charm class:
         raise RuntimeError("tinyproxy was still running after the expected time")
 ```
 
+That's all the charm code! If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
+
 ## Try your charm
 
 ### Pack your charm
@@ -965,6 +969,8 @@ You can keep things running, to explore further, or you can remove what you crea
 - To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
 
 ## Next steps
+
+If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
 
 For more information about topics covered in the tutorial, see:
 
