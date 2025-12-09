@@ -1,7 +1,9 @@
 (machine-charm-tutorial)=
 # Write your first machine charm
 
-In this tutorial, you'll write a {external+juju:ref}`machine charm <machine-charm>` for Juju using Ops and other charm development tools.
+In this tutorial, you'll write a machine charm for Juju using Ops and other charm development tools.
+
+If you're new to charm development, you might find it helpful to read [Charms architecture](https://canonical.com/juju/charms-architecture) and {external+juju:ref}`Machine charm <machine-charm>` before starting the tutorial. Or jump straight in!
 
 It will take about 2 hours for you to complete the tutorial.
 
