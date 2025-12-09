@@ -184,7 +184,7 @@ Now, in the body of the charm definition, define the event handler, or adjust an
 ```python
 def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
     """Handle the storage being detached."""
-    self.unit.status = ops.ActiveStatus("Caching disabled; provide storage to boost performance)
+    self.unit.status = ops.ActiveStatus("Caching disabled; provide storage to boost performance")
 ```
 
 > Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823), [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
