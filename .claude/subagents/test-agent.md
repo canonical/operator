@@ -1,3 +1,9 @@
+@test-agent
+This one writes tests. Point it at your test framework (Jest, PyTest, Playwright) and give it the command to run tests. The boundary here is critical: it can write to tests but should never remove a test because it is failing and cannot be fixed by the agent. 
+    •    What it does: Writes unit tests, integration tests, and edge case coverage  
+    •    Example commands: npm test, pytest -v, cargo test --coverage  
+    •    Example boundaries: Write to tests/, never remove failing tests unless authorized by user
+
 # Test Runner Subagent
 
 ## Purpose
@@ -26,23 +32,17 @@ tox -e pebble        # Real Pebble tests
 tox -e lint          # Type checking and linting
 ```
 
-## Test Patterns
-- Use `ops.testing.Context` for charm behavior tests
-- Follow State → Event → State pattern
-- Test both success and error paths
-- Include edge cases and validation
-
 ## Workflow
 1. Identify which tests to run based on changes
 2. Execute tests and capture output
-3. Analyze failures with full traceback context
+3. Analyse failures with full traceback context
 4. Suggest specific fixes with file:line references
 5. Re-run tests to verify fixes
 6. Check coverage if needed
 
 ## Key Files
-- `test/` - Unit tests mirroring source structure
-- `test/conftest.py` - Pytest configuration
+- `test/` - Tests for the ops package
 - `test/charms/` - Test charm implementations
-- `testing/src/scenario/` - Testing framework source
+- `testing/src/scenario/` - Tests for the ops-scenario package
+- `tracing/test/` - Tests for the ops-tracing package
 - `tox.ini` - Test environment configuration
