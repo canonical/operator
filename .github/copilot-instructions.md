@@ -1,6 +1,6 @@
 # Copilot Instructions for Ops Library Code Review
 
-These instructions are specifically for GitHub Copilot when reviewing code in the `ops` library repository. For more general instructions ignore this file and refer to [AGENTS.md](AGENTS.md).
+These instructions are specifically for GitHub Copilot when reviewing code in the `ops` library repository. For more general instructions ignore this file and refer to [AGENTS.md](../AGENTS.md).
 
 Remember: The ops library is foundational infrastructure. Prioritise stability, clarity, and maintainability over cleverness.
 
@@ -8,7 +8,7 @@ Remember: The ops library is foundational infrastructure. Prioritise stability, 
 
 ### Python Style and Standards
 
-For the most part, style and coding standards are enforced by ruff and do *not* need to be considered in code review. There are some additional recommendations in [STYLE.md](STYLE.md) that should be followed.
+For the most part, style and coding standards are enforced by ruff and do *not* need to be considered in code review. There are some additional recommendations in [STYLE.md](../STYLE.md) that should be followed.
 
 ### Import modules, not objects
 
