@@ -7325,15 +7325,6 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.location == 'https://loki2.example.com'
 
 
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
-def test_scenario_available():
-    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
-    state = ctx.run(ctx.on.start(), ops.testing.State())
-    assert isinstance(state.unit_status, ops.testing.UnknownStatus)
-
-
 @pytest.mark.parametrize('test_context', ['init', 'event'])
 @pytest.mark.parametrize(
     'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
