@@ -227,7 +227,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
     # TODO: the below ignores should be fixed
-    "S108",  # Probably insecure usage of /tmp
     "W291",  # Trailing whitespace
     "UP037",  # Remove quotes from type annotation
     "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
