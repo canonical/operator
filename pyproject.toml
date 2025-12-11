@@ -273,7 +273,6 @@ include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py
 exclude = [
     "tracing/*",
     "testing/tests/helpers.py",
-    "testing/tests/test_consistency_checker.py",
     "testing/tests/test_context_on.py",
     "testing/tests/test_context.py",
     "testing/tests/test_emitted_events_util.py",
