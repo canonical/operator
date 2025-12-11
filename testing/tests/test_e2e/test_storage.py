@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import pytest
-from ops import CharmBase, ModelError
-
 from scenario import Context, State, Storage
+
+from ops import CharmBase, ModelError
 
 
 class MyCharmWithStorage(CharmBase):

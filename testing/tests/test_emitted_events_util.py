@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
-from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
-
 from scenario import Context, State
 from scenario.state import _Event
+
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
+from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
 
 class Foo(EventBase):

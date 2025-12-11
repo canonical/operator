@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import pytest
-from ops import CharmBase, Framework, StartEvent, StopEvent
-
 from scenario import Context, State
 from scenario.state import Port, StateValidationError, TCPPort, UDPPort
+
+from ops import CharmBase, Framework, StartEvent, StopEvent
 
 
 class MyCharm(CharmBase):

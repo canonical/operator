@@ -7,11 +7,10 @@ import copy
 import datetime
 import typing
 
-import ops
 import pytest
-
 import scenario
 
+import ops
 
 META = {
     'name': 'context-charm',

@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import typing
 
-import ops
 import pytest
-from ops.framework import LifecycleEvent
-
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
+
+import ops
+from ops.framework import LifecycleEvent
+
 from ..helpers import trigger
 
 CHARM_CALLED = 0

@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import pathlib
 
-import ops
 import pytest
-
 from scenario import Context, Resource, State
+
+import ops
 
 
 class ResourceCharm(ops.CharmBase):

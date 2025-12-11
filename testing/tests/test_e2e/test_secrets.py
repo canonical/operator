@@ -9,14 +9,13 @@ from typing import Literal, cast
 from unittest.mock import ANY
 
 import pytest
-from ops.charm import CharmBase
-from ops.framework import Framework
-from ops.model import ModelError
-from ops.model import Secret as ops_Secret
-from ops.model import SecretNotFoundError, SecretRotate
-
 from scenario import Context
 from scenario.state import Relation, Secret, State
+
+from ops.charm import CharmBase
+from ops.framework import Framework
+from ops.model import ModelError, SecretNotFoundError, SecretRotate
+from ops.model import Secret as ops_Secret
 from test.charms.test_secrets.src.charm import Result, SecretsCharm
 from tests.helpers import trigger
 

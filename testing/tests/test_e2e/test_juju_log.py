@@ -6,10 +6,10 @@ from __future__ import annotations
 import logging
 
 import pytest
-from ops.charm import CharmBase, CollectStatusEvent
-
 from scenario import Context
 from scenario.state import JujuLogLine, State
+
+from ops.charm import CharmBase, CollectStatusEvent
 
 logger = logging.getLogger('testing logger')
 

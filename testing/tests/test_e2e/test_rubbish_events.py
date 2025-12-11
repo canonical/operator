@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import pytest
+from scenario.state import State, _CharmSpec, _Event
+
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
-from scenario.state import State, _CharmSpec, _Event
 from ..helpers import trigger
 
 

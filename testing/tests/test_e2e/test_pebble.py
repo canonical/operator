@@ -10,14 +10,15 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from scenario import Context
+from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
+
 from ops import PebbleCustomNoticeEvent, PebbleReadyEvent, pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.log import _get_juju_log_and_app_id
 from ops.pebble import ExecError, Layer, ServiceStartup, ServiceStatus
 
-from scenario import Context
-from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 from ..helpers import jsonpatch_delta, trigger
 
 

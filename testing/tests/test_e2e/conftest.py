@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Generator
+from typing import Any
 
 import pytest
 import yaml
-
 from scenario import Context
+
 from test.charms.test_secrets.src.charm import SecretsCharm
 
 

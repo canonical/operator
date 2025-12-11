@@ -5,8 +5,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import ops
 import pytest
+import scenario
+from scenario import Context
+from scenario.errors import UncaughtCharmError
+from scenario.state import (
+    _DEFAULT_JUJU_DATABAG,
+    PeerRelation,
+    Relation,
+    RelationBase,
+    State,
+    StateValidationError,
+    SubordinateRelation,
+    _Event,
+    _next_relation_id,
+)
+
+import ops
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -17,21 +32,6 @@ from ops.charm import (
     RelationEvent,
 )
 from ops.framework import EventBase, Framework
-
-import scenario
-from scenario import Context
-from scenario.errors import UncaughtCharmError
-from scenario.state import (
-    _DEFAULT_JUJU_DATABAG,
-    _Event,
-    PeerRelation,
-    Relation,
-    RelationBase,
-    State,
-    StateValidationError,
-    SubordinateRelation,
-    _next_relation_id,
-)
 from tests.helpers import trigger
 
 

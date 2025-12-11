@@ -8,11 +8,12 @@ from pathlib import Path
 
 import pytest
 import yaml
+from scenario import Context, State
+
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus
 
-from scenario import Context, State
 from ..helpers import trigger
 
 

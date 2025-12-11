@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import pytest
-from ops import ActiveStatus
-from ops.charm import CharmBase, CollectStatusEvent
-
 from scenario import Context, State
 from scenario.context import AlreadyEmittedError, Manager
+
+from ops import ActiveStatus
+from ops.charm import CharmBase, CollectStatusEvent
 
 
 @pytest.fixture(scope='function')

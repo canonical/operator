@@ -6,8 +6,6 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-import ops
-
 from scenario._consistency_checker import check_consistency
 from scenario.context import Context
 from scenario.errors import InconsistentScenarioError
@@ -31,6 +29,8 @@ from scenario.state import (
     _CharmSpec,
     _Event,
 )
+
+import ops
 
 
 class MyCharm(ops.CharmBase):

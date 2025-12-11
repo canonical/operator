@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import pytest
+from scenario.state import State, StoredState
 
 import ops
 from ops.framework import StoredState as ops_storedstate
-
-from scenario.state import State, StoredState
 from tests.helpers import trigger
 
 

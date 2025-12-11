@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import ops
 import pytest
-
 import scenario
+
+import ops
 
 
 class MyCharm(ops.CharmBase):

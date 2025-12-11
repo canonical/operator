@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import pytest
+from scenario.state import State
+
 from ops.charm import CharmBase
 from ops.framework import Framework
 
-from scenario.state import State
 from ..helpers import trigger
 
 

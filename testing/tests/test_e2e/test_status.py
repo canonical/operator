@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import ops
 import pytest
-from ops.charm import CharmBase
-from ops.framework import Framework
-
 from scenario import Context
+from scenario.errors import UncaughtCharmError
 from scenario.state import (
     ActiveStatus,
     BlockedStatus,
@@ -18,7 +15,11 @@ from scenario.state import (
     UnknownStatus,
     WaitingStatus,
 )
-from scenario.errors import UncaughtCharmError
+
+import ops
+from ops.charm import CharmBase
+from ops.framework import Framework
+
 from ..helpers import trigger
 
 

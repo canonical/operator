@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-import ops
 import pytest
-from ops import CharmBase
-
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
+
+import ops
+from ops import CharmBase
 
 
 @pytest.mark.parametrize(

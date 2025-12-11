@@ -4,10 +4,6 @@
 from __future__ import annotations
 
 import pytest
-from ops import RelationNotFoundError
-from ops.charm import CharmBase
-from ops.framework import Framework
-
 from scenario import Context
 from scenario.state import (
     Address,
@@ -17,6 +13,10 @@ from scenario.state import (
     State,
     SubordinateRelation,
 )
+
+from ops import RelationNotFoundError
+from ops.charm import CharmBase
+from ops.framework import Framework
 
 
 @pytest.fixture(scope='function')

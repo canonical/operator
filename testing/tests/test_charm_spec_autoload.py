@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from scenario import Context, Relation, State
 from scenario.context import ContextSetupError
 from scenario.state import CharmType, MetadataNotFoundError, _CharmSpec

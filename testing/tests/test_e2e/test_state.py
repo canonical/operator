@@ -5,22 +5,15 @@ from __future__ import annotations
 
 import copy
 import tempfile
+from collections.abc import Callable, Generator, Iterable
 from dataclasses import asdict, replace
 from typing import Any
-from collections.abc import Callable, Iterable, Generator
 
-import yaml
-
-import ops
 import pytest
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
-from ops.framework import EventBase, Framework
-from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
-
+import yaml
+from scenario.context import Context
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
-    _Event,
-    _next_storage_index,
     Address,
     BindAddress,
     CheckInfo,
@@ -40,9 +33,15 @@ from scenario.state import (
     StoredState,
     SubordinateRelation,
     TCPPort,
+    _Event,
+    _next_storage_index,
     layer_from_rockcraft,
 )
-from scenario.context import Context
+
+import ops
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
+from ops.framework import EventBase, Framework
+from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {

@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
-from collections.abc import Callable
 
 import jsonpatch
-
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 

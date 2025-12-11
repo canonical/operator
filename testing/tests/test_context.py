@@ -7,11 +7,11 @@ import os
 from unittest.mock import patch
 
 import pytest
-from ops import CharmBase
-
 from scenario import Context, State
 from scenario.errors import UncaughtCharmError
 from scenario.state import _Event, _next_action_id
+
+from ops import CharmBase
 
 
 class MyCharm(CharmBase):
