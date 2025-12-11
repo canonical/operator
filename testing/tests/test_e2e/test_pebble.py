@@ -141,8 +141,6 @@ def test_fs_pull(charm_cls, make_dirs):
         callback(mgr.charm)
 
     if make_dirs:
-        # file = (out.get_container("foo").mounts["foo"].source + "bar/baz.txt").open("/foo/bar/baz.txt")
-
         # this is one way to retrieve the file
         file = Path(td.name + '/bar/baz.txt')
 
