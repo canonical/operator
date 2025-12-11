@@ -96,7 +96,7 @@ def test_no_sub_binding(mycharm):
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding('bar').network
+            mgr.charm.model.get_binding('bar').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_no_relation_error(mycharm):
@@ -126,7 +126,7 @@ def test_no_relation_error(mycharm):
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
-            mgr.charm.model.get_binding('foo').network
+            mgr.charm.model.get_binding('foo').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_juju_info_network_default(mycharm):
