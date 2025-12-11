@@ -32,8 +32,6 @@ jobs:
             charm-root: .
           - charm-repo: canonical/charm-ubuntu
             charm-root: .
-          - charm-repo: canonical/charm-weebl
-            charm-root: .
           - charm-repo: canonical/conserver-charm
             charm-root: .
           - charm-repo: canonical/content-cache-k8s-operator

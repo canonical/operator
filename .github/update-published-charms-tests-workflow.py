@@ -67,6 +67,8 @@ SKIP = {
     'charm-sysconfig',
     # A bundle, not a charm.
     'cos-lite-bundle',
+    # Source is not public.
+    'charm-weebl',
 }
 CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
