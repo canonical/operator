@@ -38,9 +38,9 @@ class MyCharm(ops.CharmBase):
 
 
 def assert_inconsistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
@@ -49,9 +49,9 @@ def assert_inconsistent(
 
 
 def assert_consistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
