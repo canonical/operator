@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from scenario import Context, State
 from scenario.state import Port, StateValidationError, TCPPort, UDPPort
@@ -11,7 +13,7 @@ from ops import CharmBase, Framework, StartEvent, StopEvent
 
 
 class MyCharm(CharmBase):
-    META = {'name': 'edgar'}
+    META: ClassVar[dict[str, Any]] = {'name': 'edgar'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

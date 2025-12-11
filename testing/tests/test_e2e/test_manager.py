@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from scenario import Context, State
 from scenario.context import AlreadyEmittedError, Manager
@@ -14,8 +16,8 @@ from ops.charm import CharmBase, CollectStatusEvent
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META = {'name': 'mycharm'}
-        ACTIONS = {'do-x': {}}
+        META: ClassVar[dict[str, Any]] = {'name': 'mycharm'}
+        ACTIONS: ClassVar[dict[str, Any]] = {'do-x': {}}
 
         def __init__(self, framework):
             super().__init__(framework)

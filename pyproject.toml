@@ -227,7 +227,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
     # TODO: the below ignores should be fixed
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
     "RUF015",  # Prefer `next` over single element slice
     "SIM115",  # Use a context manager for opening files
 ]

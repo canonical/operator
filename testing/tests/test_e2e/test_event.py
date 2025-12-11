@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
@@ -65,7 +67,7 @@ def test_event_type(evt, expected_type):
 
 def test_emitted_framework():
     class MyCharm(CharmBase):
-        META = {'name': 'joop'}
+        META: ClassVar[dict[str, Any]] = {'name': 'joop'}
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
@@ -80,7 +82,7 @@ def test_emitted_framework():
 
 def test_emitted_deferred():
     class MyCharm(CharmBase):
-        META = {'name': 'joop'}
+        META: ClassVar[dict[str, Any]] = {'name': 'joop'}
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

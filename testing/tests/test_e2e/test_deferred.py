@@ -20,13 +20,13 @@ CHARM_CALLED = 0
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(ops.CharmBase):
-        META: dict[str, typing.Any] = {
+        META: typing.ClassVar[dict[str, typing.Any]] = {
             'name': 'mycharm',
             'requires': {'foo': {'interface': 'bar'}},
             'containers': {'foo': {'type': 'oci-image'}},
         }
         defer_next = 0
-        captured: list[ops.EventBase] = []
+        captured: typing.ClassVar[list[ops.EventBase]] = []
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

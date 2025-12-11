@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from scenario.state import State, _CharmSpec, _Event
 
@@ -33,7 +35,7 @@ def mycharm():
 
     class MyCharm(CharmBase):
         on = MyCharmEvents()
-        evts = []
+        evts: ClassVar[list[EventBase]] = []
 
         def __init__(self, framework: Framework):
             super().__init__(framework)

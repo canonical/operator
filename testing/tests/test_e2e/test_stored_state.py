@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from scenario.state import State, StoredState
 
@@ -14,9 +16,9 @@ from tests.helpers import trigger
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(ops.CharmBase):
-        META = {'name': 'mycharm'}
+        META: ClassVar[dict[str, Any]] = {'name': 'mycharm'}
 
-        _read = {}
+        _read: ClassVar[dict[str, Any]] = {}
         _stored = OpsStoredstate()
         _stored2 = OpsStoredstate()
 

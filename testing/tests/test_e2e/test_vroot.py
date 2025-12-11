@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import Any, ClassVar
 
 import pytest
 import yaml
@@ -18,7 +19,7 @@ from ..helpers import trigger
 
 
 class MyCharm(CharmBase):
-    META = {'name': 'my-charm'}
+    META: ClassVar[dict[str, Any]] = {'name': 'my-charm'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)
