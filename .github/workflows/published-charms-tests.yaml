@@ -38,8 +38,6 @@ jobs:
             charm-root: .
           - charm-repo: canonical/content-cache-k8s-operator
             charm-root: .
-          - charm-repo: canonical/cos-lite-bundle
-            charm-root: .
           - charm-repo: canonical/dex-auth-operator
             charm-root: .
           - charm-repo: canonical/digest-squid-auth-helper
@@ -75,9 +73,27 @@ jobs:
           - charm-repo: canonical/kafka-operator
             charm-root: .
           - charm-repo: canonical/katib-operators
-            charm-root: .
+            charm-root: charms/katib-controller
+          - charm-repo: canonical/katib-operators
+            charm-root: charms/katib-db-manager
+          - charm-repo: canonical/katib-operators
+            charm-root: charms/katib-ui
           - charm-repo: canonical/kfp-operators
-            charm-root: .
+            charm-root: charms/kfp-api
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-metadata-writer
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-persistence
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-profile-controller
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-schedwf
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-ui
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-viewer
+          - charm-repo: canonical/kfp-operators
+            charm-root: charms/kfp-viz
           - charm-repo: canonical/kratos-operator
             charm-root: .
           - charm-repo: canonical/kubeflow-profiles-operator
