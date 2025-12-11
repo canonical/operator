@@ -7,7 +7,7 @@ import pytest
 from scenario.state import State, StoredState
 
 import ops
-from ops.framework import StoredState as ops_storedstate
+from ops.framework import StoredState as OpsStoredstate
 from tests.helpers import trigger
 
 
@@ -17,8 +17,8 @@ def mycharm():
         META = {'name': 'mycharm'}
 
         _read = {}
-        _stored = ops_storedstate()
-        _stored2 = ops_storedstate()
+        _stored = OpsStoredstate()
+        _stored2 = OpsStoredstate()
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

@@ -227,7 +227,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
     # TODO: the below ignores should be fixed
-    "N813",  # CamelCase imported as lowercase
     "S105",  # Possible hardcoded password
     "S108",  # Probably insecure usage of /tmp
     "W291",  # Trailing whitespace
