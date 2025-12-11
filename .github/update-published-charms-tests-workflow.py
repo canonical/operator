@@ -65,11 +65,24 @@ SKIP = {
     'charm-openstack-service-checks',
     # Maintenance mode / archived.
     'charm-sysconfig',
+    # A bundle, not a charm.
+    'cos-lite-bundle',
 }
 CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
     'jimm': ['charms/jimm'],
     'k8s-operator': ['charms/worker', 'charms/worker/k8s'],
+    'katib-operators': ['charms/katib-controller', 'charms/katib-db-manager', 'charms/katib-ui'],
+    'kfp-operators': [
+        'charms/kfp-api',
+        'charms/kfp-metadata-writer',
+        'charms/kfp-persistence',
+        'charms/kfp-profile-controller',
+        'charms/kfp-schedwf',
+        'charms/kfp-ui',
+        'charms/kfp-viewer',
+        'charms/kfp-viz',
+    ],
     'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
     'vault-k8s-operator': ['k8s', 'machine'],
 }
