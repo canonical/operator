@@ -227,7 +227,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
     # TODO: the below ignores should be fixed
-    "B017",  # Do not assert blind exception
     "B018",  # Useless attribute access
     "E501",  # Line too long
     "N999",  # Invalid module name

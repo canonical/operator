@@ -218,9 +218,9 @@ def test_relation_set(mycharm):
 
         # this will NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        with pytest.raises(Exception):
+        with pytest.raises(ops.RelationDataAccessError):
             rel.data[rel.app]['a'] = 'b'
-        with pytest.raises(Exception):
+        with pytest.raises(ops.RelationDataAccessError):
             rel.data[charm.model.get_unit('remote/1')]['c'] = 'd'
 
         assert charm.unit.is_leader()
