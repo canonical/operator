@@ -227,7 +227,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
     # TODO: the below ignores should be fixed
-    "RUF015",  # Prefer `next` over single element slice
     "SIM115",  # Use a context manager for opening files
 ]
 "ops/_private/timeconv.py" = [

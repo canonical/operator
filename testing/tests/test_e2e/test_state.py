@@ -506,14 +506,14 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
     elif attribute == 'opened_ports':
         # There's no State.get_opened_ports, because in a charm tests you just
         # want to assert the port is/is not in the set.
-        obj_out = [p for p in state_out.opened_ports if p == obj_in][0]
+        obj_out = next(p for p in state_out.opened_ports if p == obj_in)
     elif attribute == 'secrets':
         # State.get_secret only takes keyword arguments, while the others take
         # only positional arguments.
         obj_out = state_out.get_secret(id=obj_in.id)
     elif attribute == 'resources':
         # Charms can't change resources, so there's no State.get_resource.
-        obj_out = [r for r in state_out.resources if r == obj_in][0]
+        obj_out = next(r for r in state_out.resources if r == obj_in)
     else:
         obj_out = getattr(state_out, get_method)(getattr(obj_in, key_attr))
     assert obj_in is not obj_out
@@ -832,7 +832,7 @@ def test_state_from_context():
     assert state.get_relations('sub')[0].interface == 'below'
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert tuple(state.storages)[0].name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
@@ -883,7 +883,7 @@ def test_state_from_context_extend():
     assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert tuple(state.storages)[0].name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'

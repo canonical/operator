@@ -44,10 +44,10 @@ def trigger(
     if isinstance(event, str):
         if event.startswith('relation_'):
             assert len(tuple(state.relations)) == 1, 'shortcut only works with one relation'
-            event = getattr(ctx.on, event)(tuple(state.relations)[0])
+            event = getattr(ctx.on, event)(next(iter(state.relations)))
         elif event.startswith('pebble_'):
             assert len(tuple(state.containers)) == 1, 'shortcut only works with one container'
-            event = getattr(ctx.on, event)(tuple(state.containers)[0])
+            event = getattr(ctx.on, event)(next(iter(state.containers)))
         else:
             event = getattr(ctx.on, event)()
     assert isinstance(event, _Event)
