@@ -226,8 +226,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
-    # TODO: the below ignores should be fixed
-    "SIM115",  # Use a context manager for opening files
 ]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
