@@ -10,7 +10,6 @@ from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
 
 import ops
-from ops import CharmBase
 
 
 @pytest.mark.parametrize(
@@ -45,7 +44,7 @@ def test_event_type(evt, expected_type):
     assert event._is_secret_event is (expected_type is _EventType.SECRET)
     assert event._is_action_event is (expected_type is _EventType.ACTION)
 
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         pass
 
     spec = _CharmSpec(
@@ -66,7 +65,7 @@ def test_event_type(evt, expected_type):
 
 
 def test_emitted_framework():
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         META: ClassVar[dict[str, Any]] = {'name': 'joop'}
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
@@ -81,7 +80,7 @@ def test_emitted_framework():
 
 
 def test_emitted_deferred():
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         META: ClassVar[dict[str, Any]] = {'name': 'joop'}
 
         def __init__(self, framework: ops.Framework):
