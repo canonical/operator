@@ -1,0 +1,65 @@
+(tool-versions)=
+# Tool versions
+
+In deciding which version of tools to use within the charming ecosystem, the base is the key constraint. Once the base is selected, use the latest supported version of each tool whenever possible.
+
+Charms should only support deployment on the LTS versions of Juju that are not yet end-of-life.
+
+## Find tool versions by base
+
+Choosing the base or bases that your charm will support in turn selects the versions of Juju, Ops, and Charmcraft that you should use, and the default version of Python available.
+
+| Base | Python | Juju | Ops | Charmcraft |
+|------|----------------|---------------|--------------|-------------------|
+| 18.04 (Bionic Beaver) | [3.6](https://documentation.ubuntu.com/ubuntu-for-developers/reference/availability/python/) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 1.x | [2.x](https://documentation.ubuntu.com/charmcraft/latest/explanation/bases/) |
+| 20.04 (Focal Fossa) | [3.8](https://documentation.ubuntu.com/ubuntu-for-developers/reference/availability/python/) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://github.com/canonical/operator/blob/2.23-maintenance/SECURITY.md) | [2.x](https://documentation.ubuntu.com/charmcraft/latest/explanation/bases/) |
+| 22.04 (Jammy Jellyfish) | [3.10](https://documentation.ubuntu.com/ubuntu-for-developers/reference/availability/python/) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://github.com/canonical/operator/blob/2.23-maintenance/SECURITY.md), [3.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/reference/platforms/#base), [4.x](https://documentation.ubuntu.com/charmcraft/stable/reference/platforms/#base) |
+| 24.04 (Noble Numbat) | [3.12](https://documentation.ubuntu.com/ubuntu-for-developers/reference/availability/python/) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://github.com/canonical/operator/blob/2.23-maintenance/SECURITY.md), [3.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/reference/platforms/#base), [4.x](https://documentation.ubuntu.com/charmcraft/stable/reference/platforms/#base) |
+
+## Find your Pebble version from the Juju version
+
+Each version of Juju uses a specific version of Pebble. To determine which Pebble features are available to you, look up the Pebble version from the Juju version.
+
+| Juju Version | Pebble Version |
+|--------------|----------------|
+| 2.9 | [1.1.1](https://github.com/canonical/pebble/releases/v1.1.1) |
+| 3.1 | [1.4.2](https://github.com/canonical/pebble/releases/v1.4.2) |
+| 3.2 | [1.4.0](https://github.com/canonical/pebble/releases/v1.4.0) |
+| 3.3 | [1.4.2](https://github.com/canonical/pebble/releases/v1.4.2) |
+| 3.4 | [1.7.4](https://github.com/canonical/pebble/releases/v1.7.4) |
+| 3.5 | [1.10.2](https://github.com/canonical/pebble/releases/v1.10.2) |
+| 3.6 | [1.19.2](https://github.com/canonical/pebble/releases/v1.19.2) |
+| 4.0 | [1.26.0](https://github.com/canonical/pebble/releases/v1.26.0) |
+
+## Find the support dates for Juju and Ops
+
+Juju releases new minor versions approximately every 3 months, which are supported with bug fixes for four months from their release date and security fixes for another two months. Long Term Support (LTS) releases receive security fixes for 15 years.
+
+Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version.
+
+### Juju
+
+| Version | Status | Release Date | End of Bug Fixes | End of Life |
+|---------|--------|--------------|-------------------|-------------|
+| [Juju 2.9 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 🟢 Active | 2021-04-28 |  | 2035-04-28 |
+| [Juju 3.0](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2022-10-22 | 2023-02-22 | 2023-04-23 |
+| [Juju 3.1](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2023-02-06 | 2023-06-06 | 2023-08-06 |
+| [Juju 3.2](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2023-05-26 | 2023-09-26 | 2023-11-06 |
+| [Juju 3.3](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2023-11-10 | 2024-03-10 | 2024-05-10 |
+| [Juju 3.4](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2024-02-15 | 2024-06-15 | 2024-08-15 |
+| [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2024-05-07 | 2024-09-07 | 2025-04-01 |
+| [Juju 3.6 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/) | 🟢 Active | 2024-12-11 |  | 2039-04-11 |
+| [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | 🟢 Active | 2025-11-14 | 2026-03-14 | 2026-05-14 |
+
+### Ops
+
+| Version | Status | Release Date | End of Life |
+|---------|--------|--------------|-------------|
+| [Ops 1.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | 🔴 EOL | 2020-10-31 | 2024-04-26 |
+| [Ops 2.x](https://github.com/canonical/operator/blob/2.23-maintenance/SECURITY.md) | 🟡 Active | 2023-01-25 | 2026-07-30 |
+| [Ops 3.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | 🟢 Active | 2025-07-02 | 2027-01-01 |
+
+**Legend:**
+- 🟢 Active: Currently supported
+- 🟡 Active: Supported but approaching EOL
+- 🔴 EOL: End of life, no longer supported
