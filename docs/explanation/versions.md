@@ -22,14 +22,14 @@ Each version of Juju uses a specific version of Pebble. To determine which Pebbl
 
 | Juju Version | Pebble Version |
 |--------------|----------------|
-| 2.9 | [1.1.1](https://github.com/canonical/pebble/releases/v1.1.1) |
-| 3.1 | [1.4.2](https://github.com/canonical/pebble/releases/v1.4.2) |
-| 3.2 | [1.4.0](https://github.com/canonical/pebble/releases/v1.4.0) |
-| 3.3 | [1.4.2](https://github.com/canonical/pebble/releases/v1.4.2) |
-| 3.4 | [1.7.4](https://github.com/canonical/pebble/releases/v1.7.4) |
-| 3.5 | [1.10.2](https://github.com/canonical/pebble/releases/v1.10.2) |
-| 3.6 | [1.19.2](https://github.com/canonical/pebble/releases/v1.19.2) |
-| 4.0 | [1.26.0](https://github.com/canonical/pebble/releases/v1.26.0) |
+| 2.9 | [1.1.1](https://github.com/canonical/pebble/releases/tag/v1.1.1) |
+| 3.1 | [1.4.2](https://github.com/canonical/pebble/releases/tag/v1.4.2) |
+| 3.2 | [1.4.0](https://github.com/canonical/pebble/releases/tag/v1.4.0) |
+| 3.3 | [1.4.2](https://github.com/canonical/pebble/releases/tag/v1.4.2) |
+| 3.4 | [1.7.4](https://github.com/canonical/pebble/releases/tag/v1.7.4) |
+| 3.5 | [1.10.2](https://github.com/canonical/pebble/releases/tag/v1.10.2) |
+| 3.6 | [1.19.2](https://github.com/canonical/pebble/releases/tag/v1.19.2) |
+| 4.0 | [1.26.0](https://github.com/canonical/pebble/releases/tag/v1.26.0) |
 
 ## Find the support dates for Juju and Ops
 
