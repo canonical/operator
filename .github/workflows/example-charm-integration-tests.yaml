@@ -1,0 +1,39 @@
+name: Example Charm Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 1 * * 2'  # 01:15 Tuesdays
+  pull_request: # FOR TESTING - DON'T MERGE
+
+permissions: {}
+
+jobs:
+  # Pack & run integration tests for uv-based machine charms.
+  integration-example-uv-machine:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - examples/machine-tinyproxy
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
+      - name: Install Concierge
+        run: sudo snap install --classic concierge
+      - name: Prepare for deploying machine charms
+        run: sudo concierge prepare -p machine
+      - name: Pack charm
+        run: |
+          cd ${{ matrix.dir }}
+          charmcraft pack
+      - name: Run integration tests
+        run: |
+          cd ${{ matrix.dir }}
+          tox -e integration
