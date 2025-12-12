@@ -19,11 +19,11 @@ assumes:
   - juju >= 3.1
   - k8s-api
 
+# Workaround for a build error.
 parts:
   charm:
-    build-packages:
-      # Required for the cos-lite packages, which have a Rust dependency.
-      - cargo
+    charm-binary-python-packages:
+      - cosl
 
 config:
   options:
