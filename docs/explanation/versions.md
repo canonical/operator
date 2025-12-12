@@ -47,7 +47,7 @@ Ops releases new minor versions approximately once per month. Major versions are
 | [Juju 3.2](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2023-05-26 | 2023-09-26 | 2023-11-06 |
 | [Juju 3.3](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2023-11-10 | 2024-03-10 | 2024-05-10 |
 | [Juju 3.4](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2024-02-15 | 2024-06-15 | 2024-08-15 |
-| [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2024-05-07 | 2024-09-07 | 2025-04-01 |
+| [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | 🔴 EOL | 2024-05-07 | 2024-09-07 | 2024-11-07 |
 | [Juju 3.6 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/) | 🟢 Active | 2024-12-11 |  | 2039-04-11 |
 | [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | 🟢 Active | 2025-11-14 | 2026-03-14 | 2026-05-14 |
 
