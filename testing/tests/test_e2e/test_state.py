@@ -40,7 +40,7 @@ from scenario.state import (
     layer_from_rockcraft,
 )
 from scenario.context import Context
-from tests.helpers import jsonpatch_delta, sort_patch, trigger
+from tests.helpers import jsonpatch_delta, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     'relation_created',
@@ -137,12 +137,16 @@ def test_status_setting(state, mycharm):
 
     # ignore stored state in the delta
     out_purged = replace(out, stored_states=state.stored_states)
-    assert jsonpatch_delta(out_purged, state) == sort_patch([
-        {'op': 'replace', 'path': '/app_status/message', 'value': 'foo barz'},
-        {'op': 'replace', 'path': '/app_status/name', 'value': 'waiting'},
-        {'op': 'replace', 'path': '/unit_status/message', 'value': 'foo test'},
-        {'op': 'replace', 'path': '/unit_status/name', 'value': 'active'},
-    ])
+    expected = sorted(
+        [
+            {'op': 'replace', 'path': '/app_status/message', 'value': 'foo barz'},
+            {'op': 'replace', 'path': '/app_status/name', 'value': 'waiting'},
+            {'op': 'replace', 'path': '/unit_status/message', 'value': 'foo test'},
+            {'op': 'replace', 'path': '/unit_status/name', 'value': 'active'},
+        ],
+        key=lambda obj: obj['path'] + obj['op'],
+    )
+    assert jsonpatch_delta(out_purged, state) == expected
 
 
 @pytest.mark.parametrize('connect', (True, False))
