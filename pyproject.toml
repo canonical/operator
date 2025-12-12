@@ -277,7 +277,6 @@ exclude = [
     "testing/tests/test_e2e/test_cloud_spec.py",
     "testing/tests/test_e2e/test_play_assertions.py",
     "testing/tests/test_e2e/test_vroot.py",
-    "testing/tests/test_e2e/__init__.py",
     "testing/tests/test_e2e/test_resource.py",
     "testing/tests/test_e2e/test_state.py",
     "testing/tests/test_e2e/test_actions.py",
