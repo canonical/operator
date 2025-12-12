@@ -3,10 +3,10 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, cast
 from collections.abc import Callable
 
-import jsonpatch
+import jsonpatch  # type: ignore[import-untyped]
 
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
@@ -14,14 +14,12 @@ from scenario.state import _Event
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State
 
-    _CT = TypeVar('_CT', bound=type[CharmType])
-
 logger = logging.getLogger()
 
 
 def trigger(
     state: 'State',
-    event: str | '_Event',
+    event: 'str | _Event',
     charm_type: type['CharmType'],
     pre_event: Callable[['CharmType'], None] | None = None,
     post_event: Callable[['CharmType'], None] | None = None,
@@ -58,7 +56,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self, other: 'State'):
+def jsonpatch_delta(self: 'State', other: 'State') -> list[dict[str, Any]]:
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
@@ -73,9 +71,6 @@ def jsonpatch_delta(self, other: 'State'):
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch
-    return sort_patch(patch)
-
-
-def sort_patch(patch: list[dict], key=lambda obj: obj['path'] + obj['op']):
-    return sorted(patch, key=key)
+    patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
+    patch = cast('list[dict[str, Any]]', patch)
+    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])

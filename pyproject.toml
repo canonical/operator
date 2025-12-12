@@ -272,7 +272,6 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
-    "testing/tests/helpers.py",
     "testing/tests/test_e2e/test_network.py",
     "testing/tests/test_e2e/test_cloud_spec.py",
     "testing/tests/test_e2e/test_play_assertions.py",
