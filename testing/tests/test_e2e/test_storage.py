@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 from scenario import Context, State, Storage
@@ -12,14 +13,14 @@ from ops import CharmBase, ModelError
 
 
 class MyCharmWithStorage(CharmBase):
-    META: ClassVar[dict[str, Any]] = {
+    META: Mapping[str, Any] = {
         'name': 'charlene',
         'storage': {'foo': {'type': 'filesystem'}},
     }
 
 
 class MyCharmWithoutStorage(CharmBase):
-    META: ClassVar[dict[str, Any]] = {'name': 'patrick'}
+    META: Mapping[str, Any] = {'name': 'patrick'}
 
 
 @pytest.fixture

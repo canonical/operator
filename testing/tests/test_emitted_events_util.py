@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from collections.abc import Mapping
+from typing import Any
 
 from scenario import Context, State
 from scenario.state import _Event
@@ -21,7 +22,7 @@ class MyCharmEvents(CharmEvents):
 
 
 class MyCharm(CharmBase):
-    META: ClassVar[dict[str, Any]] = {'name': 'mycharm'}
+    META: Mapping[str, Any] = {'name': 'mycharm'}
     on = MyCharmEvents()
 
     def __init__(self, *args, **kwargs):

@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 import pytest
 import yaml
@@ -19,7 +20,7 @@ from ..helpers import trigger
 
 
 class MyCharm(CharmBase):
-    META: ClassVar[dict[str, Any]] = {'name': 'my-charm'}
+    META: Mapping[str, Any] = {'name': 'my-charm'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

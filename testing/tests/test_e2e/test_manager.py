@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 from scenario import Context, State
@@ -16,8 +17,8 @@ from ops.charm import CharmBase, CollectStatusEvent
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META: ClassVar[dict[str, Any]] = {'name': 'mycharm'}
-        ACTIONS: ClassVar[dict[str, Any]] = {'do-x': {}}
+        META: Mapping[str, Any] = {'name': 'mycharm'}
+        ACTIONS: Mapping[str, Any] = {'do-x': {}}
 
         def __init__(self, framework):
             super().__init__(framework)

@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 from scenario import Context, State
@@ -13,7 +14,7 @@ from ops import CharmBase, Framework, StartEvent, StopEvent
 
 
 class MyCharm(CharmBase):
-    META: ClassVar[dict[str, Any]] = {'name': 'edgar'}
+    META: Mapping[str, Any] = {'name': 'edgar'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

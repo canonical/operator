@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import typing
+from collections.abc import Mapping
 
 import pytest
 from scenario import Context
@@ -20,7 +21,7 @@ CHARM_CALLED = 0
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(ops.CharmBase):
-        META: typing.ClassVar[dict[str, typing.Any]] = {
+        META: Mapping[str, typing.Any] = {
             'name': 'mycharm',
             'requires': {'foo': {'interface': 'bar'}},
             'containers': {'foo': {'type': 'oci-image'}},

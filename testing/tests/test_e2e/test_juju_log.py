@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 from scenario import Context
@@ -18,7 +19,7 @@ logger = logging.getLogger('testing logger')
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META: ClassVar[dict[str, Any]] = {'name': 'mycharm'}
+        META: Mapping[str, Any] = {'name': 'mycharm'}
 
         def __init__(self, framework):
             super().__init__(framework)
