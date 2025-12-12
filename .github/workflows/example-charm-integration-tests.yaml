@@ -100,10 +100,6 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
-      - name: Pack charm
-        run: |
-          cd ${{ matrix.dir }}
-          charmcraft pack
       - name: Run integration tests
         run: |
           cd ${{ matrix.dir }}
