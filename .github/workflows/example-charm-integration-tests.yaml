@@ -9,14 +9,43 @@ on:
 permissions: {}
 
 jobs:
-  # Pack & run integration tests for uv-based machine charms.
-  integration-example-uv-machine:
+  # # Pack & run integration tests for uv-plugin machine charms.
+  # integration-example-machine:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       dir:
+  #         - examples/machine-tinyproxy
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #       with:
+  #         persist-credentials: false
+  #     - name: Set up uv
+  #       uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
+  #     - name: Set up tox and tox-uv
+  #       run: uv tool install tox --with tox-uv
+  #     - name: Install Concierge
+  #       run: sudo snap install --classic concierge
+  #     - name: Prepare for deploying machine charms
+  #       run: sudo concierge prepare -p machine
+  #     - name: Pack charm
+  #       run: |
+  #         cd ${{ matrix.dir }}
+  #         charmcraft pack
+  #     - name: Run integration tests
+  #       run: |
+  #         cd ${{ matrix.dir }}
+  #         tox -e integration
+
+  # Pack & run integration tests for uv-plugin K8s charms.
+  integration-example-k8s:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         dir:
-          - examples/machine-tinyproxy
+          - examples/httpbin-demo
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,8 +56,45 @@ jobs:
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
         run: sudo snap install --classic concierge
-      - name: Prepare for deploying machine charms
-        run: sudo concierge prepare -p machine
+      - name: Prepare for deploying K8s charms
+        run: sudo concierge prepare -p microk8s
+      - name: Pack charm
+        run: |
+          cd ${{ matrix.dir }}
+          charmcraft pack
+      - name: Run integration tests
+        run: |
+          cd ${{ matrix.dir }}
+          tox -e integration
+
+  # Pack & run integration tests for charm-plugin K8s charms.
+  integration-example-k8s-legacy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - examples/k8s-1-minimal
+          - examples/k8s-2-configurable
+          - examples/k8s-3-postgresql
+          - examples/k8s-4-action
+          - examples/k8s-5-observe
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up tox
+        run: pip install tox
+      - name: Install Concierge
+        run: sudo snap install --classic concierge
+      - name: Prepare for deploying K8s charms
+        run: sudo concierge prepare -p microk8s
+      - name: Fetch any charmlibs
+        run: |
+          cd ${{ matrix.dir }}
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
