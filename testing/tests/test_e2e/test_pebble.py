@@ -6,7 +6,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import io
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -77,37 +76,36 @@ def test_connectivity(charm_cls, can_connect):
     )
 
 
-def test_fs_push(charm_cls):
+def test_fs_push(tmp_path, charm_cls):
     text = 'lorem ipsum/n alles amat gloriae foo'
+
+    pth = tmp_path / 'textfile'
+    pth.write_text(text)
 
     def callback(self: CharmBase):
         container = self.unit.get_container('foo')
         baz = container.pull('/bar/baz.txt')
         assert baz.read() == text
 
-    with tempfile.NamedTemporaryFile() as file:
-        pth = Path(file.name)
-        pth.write_text(text)
-
-        trigger(
-            State(
-                containers={
-                    Container(
-                        name='foo',
-                        can_connect=True,
-                        mounts={'bar': Mount(location='/bar/baz.txt', source=pth)},
-                    )
-                }
-            ),
-            charm_type=charm_cls,
-            meta={'name': 'foo', 'containers': {'foo': {}}},
-            event='start',
-            post_event=callback,
-        )
+    trigger(
+        State(
+            containers={
+                Container(
+                    name='foo',
+                    can_connect=True,
+                    mounts={'bar': Mount(location='/bar/baz.txt', source=pth)},
+                )
+            }
+        ),
+        charm_type=charm_cls,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+        event='start',
+        post_event=callback,
+    )
 
 
 @pytest.mark.parametrize('make_dirs', (True, False))
-def test_fs_pull(charm_cls, make_dirs):
+def test_fs_pull(tmp_path, charm_cls, make_dirs):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
     def callback(self: CharmBase):
@@ -125,43 +123,42 @@ def test_fs_pull(charm_cls, make_dirs):
             with pytest.raises((FileNotFoundError, pebble.PathError)):
                 container.pull('/foo/bar/baz.txt')
 
-    with tempfile.TemporaryDirectory() as td:
-        container = Container(
-            name='foo',
-            can_connect=True,
-            mounts={'foo': Mount(location='/foo', source=td)},
-        )
-        state = State(containers={container})
+    container = Container(
+        name='foo',
+        can_connect=True,
+        mounts={'foo': Mount(location='/foo', source=tmp_path)},
+    )
+    state = State(containers={container})
 
-        ctx = Context(
-            charm_type=charm_cls,
-            meta={'name': 'foo', 'containers': {'foo': {}}},
-        )
-        with ctx(ctx.on.start(), state=state) as mgr:
-            out = mgr.run()
-            callback(mgr.charm)
+    ctx = Context(
+        charm_type=charm_cls,
+        meta={'name': 'foo', 'containers': {'foo': {}}},
+    )
+    with ctx(ctx.on.start(), state=state) as mgr:
+        out = mgr.run()
+        callback(mgr.charm)
 
-        if make_dirs:
-            # this is one way to retrieve the file
-            file = Path(td) / 'bar' / 'baz.txt'
+    if make_dirs:
+        # this is one way to retrieve the file
+        file = tmp_path / 'bar' / 'baz.txt'
 
-            # another is:
-            assert file == Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'
+        # another is:
+        assert file == Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'
 
-            # but that is actually a symlink to the context's root tmp folder:
-            assert (
-                Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
-            ).read_text() == text
-            assert file.read_text() == text
+        # but that is actually a symlink to the context's root tmp folder:
+        assert (
+            Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
+        ).read_text() == text
+        assert file.read_text() == text
 
-            # shortcut for API niceness purposes:
-            file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'
-            assert file.read_text() == text
+        # shortcut for API niceness purposes:
+        file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'
+        assert file.read_text() == text
 
-        else:
-            # nothing has changed
-            out_purged = dataclasses.replace(out, stored_states=state.stored_states)
-            assert not jsonpatch_delta(out_purged, state)
+    else:
+        # nothing has changed
+        out_purged = dataclasses.replace(out, stored_states=state.stored_states)
+        assert not jsonpatch_delta(out_purged, state)
 
 
 LS = """
