@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ops
 import pytest
-from ops import CharmBase
 
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
@@ -30,7 +29,7 @@ from scenario.state import State, _CharmSpec, _Event, _EventType
         ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
-def test_event_type(evt, expected_type):
+def test_event_type(evt: str, expected_type: _EventType) -> None:
     event = _Event(evt)
     assert event._path.type is expected_type
 
@@ -40,10 +39,10 @@ def test_event_type(evt, expected_type):
     assert event._is_secret_event is (expected_type is _EventType.SECRET)
     assert event._is_action_event is (expected_type is _EventType.ACTION)
 
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         pass
 
-    spec = _CharmSpec(
+    spec = _CharmSpec[MyCharm](
         MyCharm,
         meta={
             'requires': {
@@ -60,8 +59,8 @@ def test_event_type(evt, expected_type):
     assert event._is_builtin_event(spec) is (expected_type is not _EventType.CUSTOM)
 
 
-def test_emitted_framework():
-    class MyCharm(CharmBase):
+def test_emitted_framework() -> None:
+    class MyCharm(ops.CharmBase):
         META = {'name': 'joop'}
 
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
@@ -75,15 +74,15 @@ def test_emitted_framework():
     ]
 
 
-def test_emitted_deferred():
-    class MyCharm(CharmBase):
+def test_emitted_deferred() -> None:
+    class MyCharm(ops.CharmBase):
         META = {'name': 'joop'}
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: ops.UpdateStatusEvent):
+        def _on_update_status(self, _: ops.UpdateStatusEvent) -> None:
             pass
 
     ctx = Context(
