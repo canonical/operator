@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import pathlib
 
-import ops
 import pytest
-
 from scenario import Context, Resource, State
+
+import ops
 
 
 class ResourceCharm(ops.CharmBase):
@@ -24,7 +24,7 @@ def test_get_resource():
             'resources': {'foo': {'type': 'file'}, 'bar': {'type': 'file'}},
         },
     )
-    resource1 = Resource(name='foo', path=pathlib.Path('/tmp/foo'))
+    resource1 = Resource(name='foo', path=pathlib.Path('/var/charm/foo'))
     resource2 = Resource(name='bar', path=pathlib.Path('~/bar'))
     with ctx(ctx.on.update_status(), state=State(resources={resource1, resource2})) as mgr:
         assert mgr.charm.model.resources.fetch('foo') == resource1.path

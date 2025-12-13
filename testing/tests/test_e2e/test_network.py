@@ -1,10 +1,9 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import pytest
-from ops import RelationNotFoundError
-from ops.charm import CharmBase
-from ops.framework import Framework
-
 from scenario import Context
 from scenario.state import (
     Address,
@@ -14,6 +13,10 @@ from scenario.state import (
     State,
     SubordinateRelation,
 )
+
+from ops import RelationNotFoundError
+from ops.charm import CharmBase
+from ops.framework import Framework
 
 
 @pytest.fixture(scope='function')
@@ -93,7 +96,7 @@ def test_no_sub_binding(mycharm):
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding('bar').network
+            mgr.charm.model.get_binding('bar').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_no_relation_error(mycharm):
@@ -123,7 +126,7 @@ def test_no_relation_error(mycharm):
         ),
     ) as mgr:
         with pytest.raises(RelationNotFoundError):
-            mgr.charm.model.get_binding('foo').network
+            mgr.charm.model.get_binding('foo').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_juju_info_network_default(mycharm):

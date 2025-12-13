@@ -1,8 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
-
 from scenario import Context, State
+
+import ops
 
 META = {
     'name': 'traced_charm',

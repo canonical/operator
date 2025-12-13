@@ -1,9 +1,12 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
 import pytest
-
 import scenario
+
+import ops
 
 
 class MyCharm(ops.CharmBase):

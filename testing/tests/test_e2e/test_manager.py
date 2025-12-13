@@ -1,18 +1,24 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import pytest
-from ops import ActiveStatus
-from ops.charm import CharmBase, CollectStatusEvent
+from collections.abc import Mapping
+from typing import Any
 
+import pytest
 from scenario import Context, State
 from scenario.context import AlreadyEmittedError, Manager
+
+from ops import ActiveStatus
+from ops.charm import CharmBase, CollectStatusEvent
 
 
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META = {'name': 'mycharm'}
-        ACTIONS = {'do-x': {}}
+        META: Mapping[str, Any] = {'name': 'mycharm'}
+        ACTIONS: Mapping[str, Any] = {'do-x': {}}
 
         def __init__(self, framework):
             super().__init__(framework)

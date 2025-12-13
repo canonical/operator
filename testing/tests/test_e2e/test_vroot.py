@@ -1,20 +1,26 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
+from scenario import Context, State
+
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus
 
-from scenario import Context, State
 from ..helpers import trigger
 
 
 class MyCharm(CharmBase):
-    META = {'name': 'my-charm'}
+    META: Mapping[str, Any] = {'name': 'my-charm'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

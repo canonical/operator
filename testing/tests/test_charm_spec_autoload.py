@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import importlib
@@ -7,7 +10,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from scenario import Context, Relation, State
 from scenario.context import ContextSetupError
 from scenario.state import CharmType, MetadataNotFoundError, _CharmSpec

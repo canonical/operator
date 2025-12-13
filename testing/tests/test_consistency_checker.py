@@ -1,10 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
 import pytest
-import ops
-
 from scenario._consistency_checker import check_consistency
 from scenario.context import Context
 from scenario.errors import InconsistentScenarioError
@@ -29,15 +30,17 @@ from scenario.state import (
     _Event,
 )
 
+import ops
+
 
 class MyCharm(ops.CharmBase):
     pass
 
 
 def assert_inconsistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
@@ -46,9 +49,9 @@ def assert_inconsistent(
 
 
 def assert_consistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
