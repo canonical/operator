@@ -130,9 +130,11 @@ def new_feature():
 
 Don't document Ops version changes in docstrings - that's in the changelog.
 
-## Pull Request Guidelines
+## Commit and Pull Request Guidelines
 
-See CONTRIBUTING.md for more details.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+
+Use informative, detailed, conventional-commit styled commit messages as you work through a change. Each commit should be self-contained, building up to the overall PR story.
 
 Follow conventional commit style in PR titles:
 - `feat:` - New feature
