@@ -10,9 +10,10 @@ import dataclasses
 import os
 import tempfile
 import typing
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic
 
 import yaml
 
@@ -23,21 +24,23 @@ from ops._private.harness import ActionFailed
 from .errors import NoObserverError, UncaughtCharmError
 from .logger import logger as scenario_logger
 from .state import (
+    CharmType,
     PeerRelation,
     Relation,
     SubordinateRelation,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from ._ops_main_mock import Ops
     from .context import Context
-    from .state import CharmType, State, _CharmSpec, _Event
+    from .state import State, _CharmSpec, _Event
 
 logger = scenario_logger.getChild('runtime')
 
 RUNTIME_MODULE = Path(__file__).parent
 
 
-class Runtime:
+class Runtime(Generic[CharmType]):
     """Charm runtime wrapper.
 
     This object bridges a local environment and a charm artifact.
@@ -278,8 +281,8 @@ class Runtime:
         self,
         state: State,
         event: _Event,
-        context: Context,
-    ):
+        context: Context[CharmType],
+    ) -> Generator[Ops[CharmType]]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the

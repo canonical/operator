@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import pytest
 
@@ -10,10 +11,11 @@ from ops._main import _Abort
 
 from scenario import Context, ActiveStatus
 from scenario.state import Relation, State, _CharmSpec, _Event
-from scenario._runtime import Runtime, UncaughtCharmError
+from scenario._runtime import Runtime
+from scenario.errors import UncaughtCharmError
 
 
-def charm_type():
+def charm_type() -> type[ops.CharmBase]:
     class _CharmEvents(ops.CharmEvents):
         pass
 
@@ -21,12 +23,12 @@ def charm_type():
         on = _CharmEvents()  # type: ignore
         _event = None
 
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework: ops.Framework) -> None:
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._catchall)
 
-        def _catchall(self, e: ops.EventBase):
+        def _catchall(self, e: ops.EventBase) -> None:
             if self._event:
                 return
             MyCharm._event = e
@@ -34,9 +36,9 @@ def charm_type():
     return MyCharm
 
 
-def test_event_emission():
+def test_event_emission() -> None:
     with TemporaryDirectory():
-        meta = {
+        meta: dict[str, Any] = {
             'name': 'foo',
             'requires': {'ingress-per-unit': {'interface': 'ingress_per_unit'}},
         }
@@ -46,74 +48,80 @@ def test_event_emission():
         class MyEvt(ops.EventBase):
             pass
 
-        my_charm_type.on.define_event('bar', MyEvt)
+        my_charm_type.on.define_event('bar', MyEvt)  # type: ignore[attr-defined]
 
+        charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
+            my_charm_type,
+            meta=meta,
+        )
         runtime = Runtime(
             'foo',
-            _CharmSpec(
-                my_charm_type,
-                meta=meta,
-            ),
+            charm_spec,
         )
 
+        ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
         with runtime.exec(
             state=State(),
             event=_Event('bar'),
-            context=Context(my_charm_type, meta=meta),
+            context=ctx,
         ) as manager:
             manager.run()
 
-        assert my_charm_type._event
-        assert isinstance(my_charm_type._event, MyEvt)
+        assert my_charm_type._event  # type: ignore[attr-defined]
+        assert isinstance(my_charm_type._event, MyEvt)  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize('app_name', ('foo', 'bar-baz', 'QuX2'))
 @pytest.mark.parametrize('unit_id', (1, 2, 42))
-def test_unit_name(app_name, unit_id):
-    meta = {
+def test_unit_name(app_name: str, unit_id: int) -> None:
+    meta: dict[str, Any] = {
         'name': app_name,
     }
 
     my_charm_type = charm_type()
 
+    charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
+        my_charm_type,
+        meta=meta,
+    )
     runtime = Runtime(
         app_name,
-        _CharmSpec(
-            my_charm_type,
-            meta=meta,
-        ),
+        charm_spec,
         unit_id=unit_id,
     )
 
+    ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with runtime.exec(
         state=State(),
         event=_Event('start'),
-        context=Context(my_charm_type, meta=meta),
+        context=ctx,
     ) as manager:
         assert manager.charm.unit.name == f'{app_name}/{unit_id}'
 
 
-def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
+def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
-    meta = {'name': 'frank', 'requires': {'box': {'interface': 'triangle'}}}
+    meta: dict[str, Any] = {'name': 'frank', 'requires': {'box': {'interface': 'triangle'}}}
 
     my_charm_type = charm_type()
 
+    charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
+        my_charm_type,
+        meta=meta,
+    )
     runtime = Runtime(
         'frank',
-        _CharmSpec(
-            my_charm_type,
-            meta=meta,
-        ),
+        charm_spec,
     )
 
     remote_name = 'ava'
     rel = Relation('box', remote_app_name=remote_name)
+    ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
             event=_Event('box_relation_changed', relation=rel),
-            context=Context(my_charm_type, meta=meta),
+            context=ctx,
         ) as manager:
             assert manager._juju_context.remote_app_name == remote_name
             assert 'JUJU_REMOTE_APP' in os.environ
@@ -125,15 +133,15 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
     assert os.getenv('JUJU_REMOTE_APP', None) is None
 
 
-def test_juju_version_is_set_in_environ():
+def test_juju_version_is_set_in_environ() -> None:
     version = '2.9'
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework: ops.Framework) -> None:
             super().__init__(framework)
             framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, _: ops.StartEvent):
+        def _on_start(self, _: ops.StartEvent) -> None:
             with pytest.warns(DeprecationWarning):
                 assert ops.JujuVersion.from_environ() == version
 
@@ -142,13 +150,13 @@ def test_juju_version_is_set_in_environ():
 
 
 @pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
-def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
+def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch) -> None:
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
+        def __init__(self, framework: ops.Framework) -> None:
             super().__init__(framework)
             framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, _: ops.StartEvent):
+        def _on_start(self, _: ops.StartEvent) -> None:
             self.unit.status = ops.ActiveStatus()
             # Charms can't actually do this (_Abort is private), but this is
             # simpler than causing the framework to raise it.
@@ -168,11 +176,11 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
 
 
 class ValueErrorCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
+    def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
         framework.observe(self.on.update_status, self._on_update_status)
 
-    def _on_update_status(self, event: ops.EventBase):
+    def _on_update_status(self, event: ops.EventBase) -> None:
         raise ValueError()
 
 
@@ -200,15 +208,15 @@ class ValueErrorCharm(ops.CharmBase):
     ),
 )
 def test_bare_charm_errors_set(
-    monkeypatch: pytest.Monkeypatch, expected_error: type[Exception], bare_charm_errors: str | None
-):
+    monkeypatch: pytest.MonkeyPatch, expected_error: type[Exception], bare_charm_errors: str
+) -> None:
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
     with pytest.raises(expected_error):
         ctx.run(ctx.on.update_status(), State())
 
 
-def test_bare_charm_errors_not_set(monkeypatch: pytest.Monkeypatch):
+def test_bare_charm_errors_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv('SCENARIO_BARE_CHARM_ERRORS', raising=False)
     ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
     with pytest.raises(UncaughtCharmError):
