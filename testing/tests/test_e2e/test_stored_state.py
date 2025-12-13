@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
 import ops
-from ops.framework import StoredState as ops_storedstate
+import pytest
 
 from scenario.state import State, StoredState
 from tests.helpers import trigger
 
 
 @pytest.fixture(scope='function')
-def mycharm():
+def mycharm() -> type[ops.CharmBase]:
     class MyCharm(ops.CharmBase):
         META = {'name': 'mycharm'}
 
-        _read = {}
-        _stored = ops_storedstate()
-        _stored2 = ops_storedstate()
+        _read: dict[str, Any] = {}
+        _stored = ops.StoredState()
+        _stored2 = ops.StoredState()
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -25,15 +25,15 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, _: ops.EventBase):
+        def _on_event(self, _: ops.EventBase) -> None:
             self._read['foo'] = self._stored.foo
             self._read['baz'] = self._stored.baz
 
     return MyCharm
 
 
-def test_stored_state_default(mycharm):
-    out = trigger(State(), 'start', mycharm, meta=mycharm.META)
+def test_stored_state_default(mycharm: type[ops.CharmBase]) -> None:
+    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'bar',
         'baz': {12: 142},
@@ -44,7 +44,7 @@ def test_stored_state_default(mycharm):
     }
 
 
-def test_stored_state_initialized(mycharm):
+def test_stored_state_initialized(mycharm: type[ops.CharmBase]) -> None:
     out = trigger(
         State(
             stored_states={
@@ -53,7 +53,7 @@ def test_stored_state_initialized(mycharm):
         ),
         'start',
         mycharm,
-        meta=mycharm.META,
+        meta=mycharm.META,  # type: ignore[attr-defined]
     )
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'FOOX',
@@ -65,12 +65,12 @@ def test_stored_state_initialized(mycharm):
     }
 
 
-def test_positional_arguments():
+def test_positional_arguments() -> None:
     with pytest.raises(TypeError):
-        StoredState('_stored', '')
+        StoredState('_stored', '')  # type: ignore[call-arg]
 
 
-def test_default_arguments():
+def test_default_arguments() -> None:
     s = StoredState()
     assert s.name == '_stored'
     assert s.owner_path is None

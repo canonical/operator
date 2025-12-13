@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ class MyCharm(CharmBase):
 
 
 @pytest.fixture
-def charm_virtual_root():
+def charm_virtual_root() -> Generator[Path]:
     with tempfile.TemporaryDirectory() as mycharm_virtual_root:
         t = Path(mycharm_virtual_root)
         src = t / 'src'
@@ -41,7 +42,7 @@ def charm_virtual_root():
         yield t
 
 
-def test_charm_virtual_root(charm_virtual_root):
+def test_charm_virtual_root(charm_virtual_root: Path) -> None:
     out = trigger(
         State(),
         'start',
@@ -52,7 +53,7 @@ def test_charm_virtual_root(charm_virtual_root):
     assert out.unit_status == ActiveStatus('hello world')
 
 
-def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
+def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path) -> None:
     meta_file = charm_virtual_root / 'metadata.yaml'
     raw_ori_meta = yaml.safe_dump({'name': 'karl'})
     meta_file.write_text(raw_ori_meta)
@@ -73,7 +74,7 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root):
     assert meta_file.exists()
 
 
-def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root):
+def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root: Path) -> None:
     meta_file = charm_virtual_root / 'metadata.yaml'
 
     assert not meta_file.exists()

@@ -16,7 +16,6 @@ from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
-    _Event,
     _next_storage_index,
     Address,
     BindAddress,
@@ -57,7 +56,7 @@ CUSTOM_EVT_SUFFIXES = {
 
 
 @pytest.fixture(scope='function')
-def mycharm():
+def mycharm() -> type[CharmBase]:
     class MyCharmEvents(CharmEvents):
         @classmethod
         def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
@@ -66,16 +65,16 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call: Callable[[MyCharm, _Event], None] | None = None
+        _call: Callable[[EventBase], None] | None = None
         called = False
-        on = MyCharmEvents()
+        on = MyCharmEvents()  # type: ignore[assignment]
 
         def __init__(self, framework: Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: EventBase) -> None:
             if self._call:
                 MyCharm.called = True
                 self._call(event)
@@ -84,11 +83,11 @@ def mycharm():
 
 
 @pytest.fixture
-def state():
+def state() -> State:
     return State(config={'foo': 'bar'}, leader=True)
 
 
-def test_bare_event(state, mycharm):
+def test_bare_event(state: State, mycharm: type[CharmBase]) -> None:
     out = trigger(
         state,
         'start',
@@ -100,8 +99,8 @@ def test_bare_event(state, mycharm):
     assert jsonpatch_delta(state, out_purged) == []
 
 
-def test_leader_get(state, mycharm):
-    def pre_event(charm):
+def test_leader_get(state: State, mycharm: type[CharmBase]) -> None:
+    def pre_event(charm: CharmBase) -> None:
         assert charm.unit.is_leader()
 
     trigger(
@@ -114,8 +113,8 @@ def test_leader_get(state, mycharm):
     )
 
 
-def test_status_setting(state, mycharm):
-    def call(charm: CharmBase, e):
+def test_status_setting(state: State, mycharm: type[CharmBase]) -> None:
+    def call(charm: CharmBase, e: EventBase) -> None:
         if isinstance(e, CollectStatusEvent):
             return
 
@@ -123,7 +122,7 @@ def test_status_setting(state, mycharm):
         charm.unit.status = ActiveStatus('foo test')
         charm.app.status = WaitingStatus('foo barz')
 
-    mycharm._call = call
+    mycharm._call = call  # type: ignore[attr-defined]
     out = trigger(
         state,
         'start',
@@ -146,8 +145,8 @@ def test_status_setting(state, mycharm):
 
 
 @pytest.mark.parametrize('connect', (True, False))
-def test_container(connect, mycharm):
-    def pre_event(charm: CharmBase):
+def test_container(connect: bool, mycharm: type[CharmBase]) -> None:
+    def pre_event(charm: CharmBase) -> None:
         container = charm.unit.get_container('foo')
         assert container is not None
         assert container.name == 'foo'
@@ -165,8 +164,8 @@ def test_container(connect, mycharm):
     )
 
 
-def test_relation_get(mycharm):
-    def pre_event(charm: CharmBase):
+def test_relation_get(mycharm: type[CharmBase]) -> None:
+    def pre_event(charm: CharmBase) -> None:
         rel = charm.model.get_relation('foo')
         assert rel is not None
         assert rel.data[charm.app]['a'] == 'because'
@@ -207,8 +206,8 @@ def test_relation_get(mycharm):
     )
 
 
-def test_relation_set(mycharm):
-    def event_handler(charm: CharmBase, _):
+def test_relation_set(mycharm: type[CharmBase]) -> None:
+    def event_handler(charm: CharmBase, _: EventBase) -> None:
         rel = charm.model.get_relation('foo')
         assert rel is not None
         rel.data[charm.app]['a'] = 'b'
@@ -223,7 +222,7 @@ def test_relation_set(mycharm):
 
         assert charm.unit.is_leader()
 
-    def pre_event(charm: CharmBase):
+    def pre_event(charm: CharmBase) -> None:
         assert charm.model.get_relation('foo')
         assert charm.model.app.planned_units() == 4
 
@@ -234,7 +233,7 @@ def test_relation_set(mycharm):
         # with pytest.raises(Exception):
         #     rel.data[charm.model.get_unit("remote/1")]["c"] = "d"
 
-    mycharm._call = event_handler
+    mycharm._call = event_handler  # type: ignore[attr-defined]
     relation = Relation(
         endpoint='foo',
         interface='bar',
@@ -247,7 +246,7 @@ def test_relation_set(mycharm):
         relations={relation},
     )
 
-    assert not mycharm.called
+    assert not mycharm.called  # type: ignore[attr-defined]
     out = trigger(
         state,
         event='start',
@@ -258,7 +257,7 @@ def test_relation_set(mycharm):
         },
         pre_event=pre_event,
     )
-    assert mycharm.called
+    assert mycharm.called  # type: ignore[attr-defined]
 
     assert asdict(out.get_relation(relation.id)) == asdict(
         replace(
@@ -274,7 +273,7 @@ def test_relation_set(mycharm):
     }
 
 
-def test_checkinfo_changeid_none():
+def test_checkinfo_changeid_none() -> None:
     info = CheckInfo('foo', change_id=None)
     assert info.change_id, 'None should result in a random change_id'
     info2 = CheckInfo('foo')  # None is also the default.
@@ -282,7 +281,7 @@ def test_checkinfo_changeid_none():
 
 
 @pytest.mark.parametrize('id', ('', '28'))
-def test_checkinfo_changeid(id: str | None):
+def test_checkinfo_changeid(id: str | None) -> None:
     info = CheckInfo('foo', change_id=ops.pebble.ChangeID(id))
     assert info.change_id == ops.pebble.ChangeID(id)
 
@@ -297,24 +296,24 @@ def test_checkinfo_changeid(id: str | None):
         (Network, (0, 3)),
     ],
 )
-def test_positional_arguments(klass, num_args):
+def test_positional_arguments(klass: type[Any], num_args: tuple[int, ...]) -> None:
     for num in num_args:
         args = (None,) * num
         with pytest.raises(TypeError):
             klass(*args)
 
 
-def test_model_positional_arguments():
+def test_model_positional_arguments() -> None:
     with pytest.raises(TypeError):
-        Model('', '')
+        Model('', '')  # type: ignore[misc]
 
 
-def test_container_positional_arguments():
+def test_container_positional_arguments() -> None:
     with pytest.raises(TypeError):
-        Container('', True)
+        Container('', True)  # type: ignore[misc]
 
 
-def test_container_default_values():
+def test_container_default_values() -> None:
     name = 'foo'
     container = Container(name)
     assert container.name == name
@@ -327,7 +326,7 @@ def test_container_default_values():
     assert container._base_plan == {}
 
 
-def test_state_default_values():
+def test_state_default_values() -> None:
     state = State()
     assert state.config == {}
     assert state.relations == frozenset()
@@ -346,7 +345,7 @@ def test_state_default_values():
     assert state.workload_version == ''
 
 
-def test_deepcopy_state():
+def test_deepcopy_state() -> None:
     containers = [Container('foo'), Container('bar')]
     state = State(containers=containers)
     state_copy = copy.deepcopy(state)
@@ -355,7 +354,7 @@ def test_deepcopy_state():
         assert container.name == copied_container.name
 
 
-def test_replace_state():
+def test_replace_state() -> None:
     containers = [Container('foo'), Container('bar')]
     state = State(containers=containers, leader=True)
     state2 = replace(state, leader=False)
@@ -389,7 +388,7 @@ def test_replace_state():
 )
 def test_immutable_content_dict(
     component: type[object], attribute: str, required_args: dict[str, Any]
-):
+) -> None:
     content = {'foo': 'bar'}
     obj1 = component(**required_args, **{attribute: content})
     obj2 = component(**required_args, **{attribute: content})
@@ -417,7 +416,7 @@ def test_immutable_content_dict(
 )
 def test_immutable_content_list(
     component: type[object], attribute: str, required_args: dict[str, Any]
-):
+) -> None:
     content = ['foo', 'bar']
     obj1 = component(**required_args, **{attribute: content})
     obj2 = component(**required_args, **{attribute: content})
@@ -441,7 +440,7 @@ def test_immutable_content_list(
 )
 def test_immutable_content_dict_of_dicts(
     component: type[object], attribute: str, required_args: dict[str, Any]
-):
+) -> None:
     content = {0: {'foo': 'bar'}, 1: {'baz': 'qux'}}
     obj1 = component(**required_args, **{attribute: content})
     obj2 = component(**required_args, **{attribute: content})
@@ -476,8 +475,11 @@ def test_immutable_content_dict_of_dicts(
         (StoredState(), 'stored_states', 'get_stored_state', 'name'),
     ],
 )
-def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str, mycharm):
-    state_in = State(**{attribute: obj_in if isinstance(obj_in, dict) else [obj_in]})
+def test_state_immutable(
+    obj_in: Any, attribute: str, get_method: str, key_attr: str, mycharm: type[CharmBase]
+) -> None:
+    kwargs: dict[str, Any] = {attribute: obj_in if isinstance(obj_in, dict) else [obj_in]}
+    state_in = State(**kwargs)
 
     state_out: State = trigger(
         state_in,
@@ -508,11 +510,14 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
     elif attribute == 'secrets':
         # State.get_secret only takes keyword arguments, while the others take
         # only positional arguments.
+        assert isinstance(obj_in, Secret)
         obj_out = state_out.get_secret(id=obj_in.id)
     elif attribute == 'resources':
         # Charms can't change resources, so there's no State.get_resource.
         obj_out = [r for r in state_out.resources if r == obj_in][0]
     else:
+        # This handles: Relation, PeerRelation, SubordinateRelation, Network, Container, Storage, StoredState
+        assert isinstance(obj_in, (RelationBase, Network, Container, Storage, StoredState))
         obj_out = getattr(state_out, get_method)(getattr(obj_in, key_attr))
     assert obj_in is not obj_out
 
@@ -525,14 +530,16 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
         SubordinateRelation,
     ],
 )
-def test_state_immutable_with_changed_data_relation(relation_type: type[RelationBase], mycharm):
-    def event_handler(charm: CharmBase, _):
+def test_state_immutable_with_changed_data_relation(
+    relation_type: type[RelationBase], mycharm: type[CharmBase]
+) -> None:
+    def event_handler(charm: CharmBase, _: EventBase) -> None:
         rel = charm.model.get_relation(relation_type.__name__)
         assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
-    mycharm._call = event_handler
+    mycharm._call = event_handler  # type: ignore[attr-defined]
 
     relation_in = relation_type(relation_type.__name__)
 
@@ -558,7 +565,7 @@ def test_state_immutable_with_changed_data_relation(relation_type: type[Relation
     assert relation_out.local_unit_data == {'c': 'd', **_DEFAULT_JUJU_DATABAG}
 
 
-def test_state_immutable_with_changed_data_container(mycharm):
+def test_state_immutable_with_changed_data_container(mycharm: type[CharmBase]) -> None:
     layer_name = 'my-layer'
     layer = ops.pebble.Layer({
         'services': {
@@ -569,11 +576,11 @@ def test_state_immutable_with_changed_data_container(mycharm):
         }
     })
 
-    def event_handler(charm: CharmBase, _):
+    def event_handler(charm: CharmBase, _: EventBase) -> None:
         container = charm.model.unit.get_container('foo')
         container.add_layer(layer_name, layer, combine=True)
 
-    mycharm._call = event_handler
+    mycharm._call = event_handler  # type: ignore[attr-defined]
 
     container_in = Container('foo', can_connect=True)
     state_in = State(containers={container_in})
@@ -593,11 +600,11 @@ def test_state_immutable_with_changed_data_container(mycharm):
     assert container_out.layers == {layer_name: layer}
 
 
-def test_state_immutable_with_changed_data_ports(mycharm):
-    def event_handler(charm: CharmBase, _):
+def test_state_immutable_with_changed_data_ports(mycharm: type[CharmBase]) -> None:
+    def event_handler(charm: CharmBase, _: EventBase) -> None:
         charm.model.unit.open_port(protocol='tcp', port=80)
 
-    mycharm._call = event_handler
+    mycharm._call = event_handler  # type: ignore[attr-defined]
 
     state_in = State()
     state_out = trigger(
@@ -611,12 +618,12 @@ def test_state_immutable_with_changed_data_ports(mycharm):
     assert state_out.opened_ports == {TCPPort(80)}
 
 
-def test_state_immutable_with_changed_data_secret(mycharm):
-    def event_handler(charm: CharmBase, _):
+def test_state_immutable_with_changed_data_secret(mycharm: type[CharmBase]) -> None:
+    def event_handler(charm: CharmBase, _: EventBase) -> None:
         secret = charm.model.get_secret(label='my-secret')
         secret.set_content({'password': 'bar'})
 
-    mycharm._call = event_handler
+    mycharm._call = event_handler  # type: ignore[attr-defined]
 
     secret_in = Secret({'password': 'foo'}, label='my-secret', owner='unit')
     state_in = State(secrets={secret_in})
@@ -633,7 +640,7 @@ def test_state_immutable_with_changed_data_secret(mycharm):
     assert secret_out.latest_content == {'password': 'bar'}
 
 
-def test_state_immutable_with_changed_data_stored_state():
+def test_state_immutable_with_changed_data_stored_state() -> None:
     class MyCharm(ops.CharmBase):
         _stored = ops.StoredState()
 
@@ -751,7 +758,7 @@ def test_state_immutable_with_changed_data_stored_state():
         ),
     ],
 )
-def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
+def test_layer_from_rockcraft(rockcraft: dict[str, Any]) -> None:
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
         yaml.safe_dump(rockcraft, f)
         rockcraft_path = f.name
@@ -780,13 +787,15 @@ def test_layer_from_rockcraft(rockcraft: dict[str, Any]):
         assert layer_check_level == check.get('level', ops.pebble.CheckLevel.UNSET.value)
         if 'exec' in check:
             assert layer_check.exec is not None and 'command' in check['exec']
+            assert 'command' in layer_check.exec
             assert layer_check.exec['command'] == check['exec']['command']
         if 'tcp' in check:
             assert layer_check.tcp is not None and 'port' in check['tcp']
+            assert 'port' in layer_check.tcp
             assert layer_check.tcp['port'] == check['tcp']['port']
 
 
-def test_layer_from_rockcraft_safe():
+def test_layer_from_rockcraft_safe() -> None:
     dangerous_yaml = """
     !!python/object/apply:os.system ["echo unsafe"]
     """
@@ -798,8 +807,8 @@ def test_layer_from_rockcraft_safe():
             layer_from_rockcraft(rockcraft_path)
 
 
-def test_state_from_context():
-    meta = {
+def test_state_from_context() -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'containers': {'container': {}},
         'peers': {'peer': {'interface': 'friend'}},
@@ -836,8 +845,8 @@ def test_state_from_context():
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
 
 
-def test_state_from_context_extend():
-    meta = {
+def test_state_from_context_extend() -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'containers': {'container': {}},
         'peers': {'peer': {'interface': 'friend'}},
@@ -878,7 +887,9 @@ def test_state_from_context_extend():
     assert state.get_relations('relreq')[0].interface == 'across'
     assert state.get_relations('relpro')[0].interface == 'around'
     assert state.get_relations('sub')[0].interface == 'below'
-    assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
+    retrieved_relation = state.get_relation(relation.id)
+    assert isinstance(retrieved_relation, Relation)
+    assert retrieved_relation.remote_app_data == {'a': 'b'}
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
     assert tuple(state.storages)[0].name == 'storage'
@@ -888,7 +899,7 @@ def test_state_from_context_extend():
     assert state.get_stored_state('_stored', owner_path='Charm').content == {'foo': 'bar'}
 
 
-def test_state_from_context_merge_config():
+def test_state_from_context_merge_config() -> None:
     ctx = Context(
         ops.CharmBase,
         meta={'name': 'alex'},
@@ -902,8 +913,10 @@ def test_state_from_context_merge_config():
     'rel_type,endpoint',
     [(Relation, 'relreq'), (PeerRelation, 'peer'), (SubordinateRelation, 'sub')],
 )
-def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], endpoint: str):
-    meta = {
+def test_state_from_context_skip_exiting_relation(
+    rel_type: type[RelationBase], endpoint: str
+) -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'peers': {'peer': {'interface': 'friend'}},
         'requires': {
@@ -919,8 +932,8 @@ def test_state_from_context_skip_exiting_relation(rel_type: type[RelationBase], 
     assert state.get_relation(rel.id).local_app_data == {'a': 'b'}
 
 
-def test_state_from_context_skip_exiting_container():
-    meta = {
+def test_state_from_context_skip_exiting_container() -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'containers': {'container': {}},
     }
@@ -934,8 +947,8 @@ def test_state_from_context_skip_exiting_container():
     assert state.get_container(container.name).can_connect is False
 
 
-def test_state_from_context_skip_exiting_storage():
-    meta = {
+def test_state_from_context_skip_exiting_storage() -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'storage': {'storage': {}},
     }
@@ -951,11 +964,11 @@ def test_state_from_context_skip_exiting_storage():
     assert _next_storage_index(update=False) == next_index
 
 
-def test_state_from_context_skip_exiting_stored_state():
+def test_state_from_context_skip_exiting_stored_state() -> None:
     class Charm(ops.CharmBase):
         _stored = ops.StoredState()
 
-    meta = {
+    meta: dict[str, Any] = {
         'name': 'sam',
     }
     stored_state = StoredState(name='_stored', owner_path='Charm', content={'foo': 'bar'})
@@ -973,8 +986,8 @@ def _make_generator(items: Iterable[Any]) -> Generator[Any]:
 
 
 @pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
-def test_state_from_non_sets(iterable: Callable[..., Any]):
-    meta = {
+def test_state_from_non_sets(iterable: Callable[..., Any]) -> None:
+    meta: dict[str, Any] = {
         'name': 'sam',
         'containers': {'container': {}},
         'peers': {'peer': {'interface': 'friend'}},
