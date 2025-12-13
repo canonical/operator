@@ -4,7 +4,8 @@ import pytest
 from ops import CharmBase, Framework, StartEvent, StopEvent
 
 from scenario import Context, State
-from scenario.state import Port, StateValidationError, TCPPort, UDPPort
+from scenario.errors import StateValidationError
+from scenario.state import Port, TCPPort, UDPPort
 
 
 class MyCharm(CharmBase):
@@ -24,31 +25,32 @@ class MyCharm(CharmBase):
 
 
 @pytest.fixture
-def ctx():
+def ctx() -> Context[MyCharm]:
     return Context(MyCharm, meta=MyCharm.META)
 
 
-def test_open_port(ctx):
+def test_open_port(ctx: Context[MyCharm]) -> None:
     out = ctx.run(ctx.on.start(), State())
-    assert len(out.opened_ports) == 1
-    port = tuple(out.opened_ports)[0]
+    ports = tuple(out.opened_ports)
+    assert len(ports) == 1
+    port = ports[0]
 
     assert port.protocol == 'tcp'
     assert port.port == 12
 
 
-def test_close_port(ctx):
+def test_close_port(ctx: Context[MyCharm]) -> None:
     out = ctx.run(ctx.on.stop(), State(opened_ports={TCPPort(42)}))
     assert not out.opened_ports
 
 
-def test_port_no_arguments():
+def test_port_no_arguments() -> None:
     with pytest.raises(RuntimeError):
         Port()
 
 
 @pytest.mark.parametrize('klass', (TCPPort, UDPPort))
-def test_port_port(klass):
+def test_port_port(klass: type[Port]) -> None:
     with pytest.raises(StateValidationError):
         klass(port=0)
     with pytest.raises(StateValidationError):

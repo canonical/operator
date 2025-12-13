@@ -293,7 +293,6 @@ exclude = [
     "testing/tests/test_e2e/test_deferred.py",
     "testing/tests/test_e2e/test_stored_state.py",
     "testing/tests/test_e2e/conftest.py",
-    "testing/tests/test_e2e/test_ports.py",
     "testing/tests/test_e2e/test_rubbish_events.py",
     "testing/tests/test_e2e/test_pebble.py",
 ]
