@@ -12,6 +12,7 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
+import warnings
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generic
@@ -695,7 +696,7 @@ class Context(Generic[CharmType]):
                 config=config,
             )
 
-        self.charm_spec = spec
+        self._charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
         if juju_version.split('.')[0] == '2':
@@ -703,7 +704,7 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self.charm_spec.meta.get('name')
+        self.app_name = app_name or self._charm_spec.meta.get('name')
         self.unit_id = unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
@@ -735,6 +736,12 @@ class Context(Generic[CharmType]):
         self._action_failure_message: str | None = None
 
         self.on = CharmEvents()
+
+    @property
+    def charm_spec(self):
+        """Deprecated property for accessing the Context's charm spec."""
+        warnings.warn('Accessing Context.charm_spec is deprecated.', DeprecationWarning)
+        return self._charm_spec
 
     def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
@@ -853,7 +860,7 @@ class Context(Generic[CharmType]):
     def _run(self, event: _Event, state: State):
         runtime = Runtime(
             app_name=self.app_name,
-            charm_spec=self.charm_spec,
+            charm_spec=self._charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
             unit_id=self.unit_id,
