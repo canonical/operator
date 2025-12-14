@@ -42,7 +42,7 @@ def mycharm():
             return super().define_event(event_kind, event_type)
 
     class MyCharm(CharmBase):
-        _call: Callable[[MyCharm, _Event], None] | None = None
+        _call: Callable[[_Event], None] | None = None
         called = False
         on: CharmEvents = MyCharmEvents()
 
@@ -54,7 +54,7 @@ def mycharm():
         def _on_event(self, event: EventBase):
             if self._call:
                 MyCharm.called = True
-                self._call(self, cast('Any', event))
+                self._call(cast('Any', event))
 
     return MyCharm
 
