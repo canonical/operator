@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
@@ -25,11 +27,11 @@ def mycharm():
         sub = EventSource(SubEvent)
 
     class Sub(Object):
-        on = MySubEvents()
+        on: ClassVar[MySubEvents] = MySubEvents()
 
     class MyCharm(CharmBase):
-        on = MyCharmEvents()
-        evts = []
+        on: ClassVar[MyCharmEvents] = MyCharmEvents()
+        evts: ClassVar[list[EventBase]] = []
 
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -37,19 +39,21 @@ def mycharm():
             self.framework.observe(self.sub.on.sub, self._on_event)
             self.framework.observe(self.on.qux, self._on_event)
 
-        def _on_event(self, e):
+        def _on_event(self, e: EventBase) -> None:
             MyCharm.evts.append(e)
 
     return MyCharm
 
 
 @pytest.mark.parametrize('evt_name', ('rubbish', 'foo', 'bar'))
-def test_rubbish_event_raises(mycharm: CharmBase, evt_name: str):
+def test_rubbish_event_raises(mycharm: type[CharmBase], evt_name: str) -> None:
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
 
-def test_rubbish_pebble_ready_event_raises(mycharm: CharmBase, monkeypatch: pytest.MonkeyPatch):
+def test_rubbish_pebble_ready_event_raises(
+    mycharm: type[CharmBase], monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv('SCENARIO_SKIP_CONSISTENCY_CHECKS', '1')
     # else it will whine about the container not being in state and meta;
     # but if we put the container in meta, it will actually register an event!
@@ -58,14 +62,14 @@ def test_rubbish_pebble_ready_event_raises(mycharm: CharmBase, monkeypatch: pyte
 
 
 @pytest.mark.parametrize('evt_name', ('qux',))
-def test_custom_events_fail(mycharm, evt_name):
+def test_custom_events_fail(mycharm: type[CharmBase], evt_name: str) -> None:
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
 
 # cfr: https://github.com/PietroPasotti/ops-scenario/pull/11#discussion_r1101694961
 @pytest.mark.parametrize('evt_name', ('sub',))
-def test_custom_events_sub_raise(mycharm, evt_name):
+def test_custom_events_sub_raise(mycharm: type[CharmBase], evt_name: str) -> None:
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
@@ -82,6 +86,8 @@ def test_custom_events_sub_raise(mycharm, evt_name):
         ('bar-relation-changed', True),
     ),
 )
-def test_is_custom_event(mycharm, evt_name, expected):
-    spec = _CharmSpec(charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}})
+def test_is_custom_event(mycharm: type[CharmBase], evt_name: str, expected: bool) -> None:
+    spec: _CharmSpec[CharmBase] = _CharmSpec(
+        charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}}
+    )
     assert _Event(evt_name)._is_builtin_event(spec) is expected
