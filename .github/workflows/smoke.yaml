@@ -26,7 +26,7 @@ jobs:
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - name: Checkout the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Archive charmcraft logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: charmcraft-logs
           path: /home/runner/.local/state/charmcraft/log/*.log

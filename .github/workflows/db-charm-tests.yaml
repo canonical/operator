@@ -26,14 +26,14 @@ jobs:
             commit: 3405d6943c4e631f7b9388d412b084168e8b84e8  # 2025-11-24T14:29:53Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Checkout the operator repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: myops
           persist-credentials: false

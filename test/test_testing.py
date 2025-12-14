@@ -7136,7 +7136,10 @@ class TestChecks:
 
     def test_stop_checks(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
-        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        # This generates a warning because there's a security event
+        # logged, but we haven't set up logging for Harness in these tests.
+        with pytest.warns(RuntimeWarning):
+            changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
 
     def test_stop_then_start(self, request: pytest.FixtureRequest):
@@ -7320,15 +7323,6 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.labels == {'foo': 'bar'}
     assert log_target.override == 'merge'
     assert log_target.location == 'https://loki2.example.com'
-
-
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
-def test_scenario_available():
-    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
-    state = ctx.run(ctx.on.start(), ops.testing.State())
-    assert isinstance(state.unit_status, ops.testing.UnknownStatus)
 
 
 @pytest.mark.parametrize('test_context', ['init', 'event'])

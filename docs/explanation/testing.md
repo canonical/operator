@@ -144,7 +144,7 @@ on:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
@@ -164,7 +164,7 @@ Integration tests are a bit more complex, because these tests require a Juju con
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:

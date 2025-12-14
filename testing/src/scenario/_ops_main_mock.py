@@ -18,6 +18,7 @@ import ops.storage
 from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 from ops.framework import _event_regex
+from ops.log import JujuLogHandler, _get_juju_log_and_app_id
 
 from .context import Context
 from .errors import BadOwnerPath, NoObserverError
@@ -272,6 +273,14 @@ class Ops(_Manager, Generic[CharmType]):
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()
             self._tracing_mock.__exit__(None, None, None)
+
+        # Clean up logging handlers to avoid test pollution.
+        logger = logging.getLogger()
+        for handler in logger.handlers[:]:
+            if isinstance(handler, JujuLogHandler):
+                logger.removeHandler(handler)
+        # Clear app ID cached when logging security events.
+        _get_juju_log_and_app_id.cache_clear()
 
 
 class CapturingFramework(ops.Framework):

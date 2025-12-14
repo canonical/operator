@@ -11,13 +11,13 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
           path: operator
           persist-credentials: true
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: canonical/charmcraft
           path: charmcraft
