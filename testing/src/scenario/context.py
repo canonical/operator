@@ -741,13 +741,13 @@ class Context(Generic[CharmType]):
     @property
     @deprecated('Use State.from_context to generate a State from charm metadata.', stacklevel=2)
     def charm_spec(self):
-        """Deprecated property for accessing the Context's charm spec.
+        """Deprecated property for accessing the Context's charm specification.
 
-        The _CharmSpec class is private and intended for internal use only.
-        Context.charm_spec will be removed in a future major version.
+        The ``_CharmSpec`` class is private and intended for internal use only.
+        ``Context.charm_spec`` will be removed in a future major version.
 
-        Consider accessing the charm class or metadata directly, or using State.from_context to
-        generate a State from your charm's metadata.
+        Consider accessing the charm class or metadata directly, or using
+        :meth:`State.from_context` to generate a ``State`` from your charm's metadata.
         """
         return self._charm_spec
 
