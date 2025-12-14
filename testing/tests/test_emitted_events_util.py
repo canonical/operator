@@ -21,7 +21,7 @@ class MyCharm(CharmBase):
     META = {'name': 'mycharm'}
     on = MyCharmEvents()  # type: ignore[assignment]
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.foo, self._on_foo)

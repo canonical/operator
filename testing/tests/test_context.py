@@ -118,7 +118,7 @@ def test_context_manager_uncaught_error(
     bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     class CrashyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
@@ -138,7 +138,7 @@ def test_context_manager_uncaught_error(
 @pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
 def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch) -> None:
     class CrashyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
@@ -155,7 +155,7 @@ def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.MonkeyPa
 
 def test_context_manager_env_cleared() -> None:
     class GoodCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
@@ -172,7 +172,7 @@ def test_context_manager_env_cleared() -> None:
 
 def test_run_env_cleared() -> None:
     class GoodCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 

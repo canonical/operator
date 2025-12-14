@@ -23,7 +23,7 @@ def charm_type() -> type[ops.CharmBase]:
         on = _CharmEvents()  # type: ignore
         _event = None
 
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._catchall)
@@ -137,7 +137,7 @@ def test_juju_version_is_set_in_environ() -> None:
     version = '2.9'
 
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.start, self._on_start)
 
@@ -152,7 +152,7 @@ def test_juju_version_is_set_in_environ() -> None:
 @pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
 def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch) -> None:
     class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework) -> None:
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.start, self._on_start)
 
@@ -176,7 +176,7 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 class ValueErrorCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework) -> None:
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on.update_status, self._on_update_status)
 
