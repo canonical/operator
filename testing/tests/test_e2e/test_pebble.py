@@ -884,8 +884,8 @@ def test_layers_merge_in_plan(layer1_name: str, layer2_name: str) -> None:
     check = plan.checks['server-ready']
     assert check.startup == pebble.CheckStartup.ENABLED
     assert check.threshold == 10
-    assert check.period == 1
-    assert check.timeout == 28
+    assert check.period == '1s'
+    assert check.timeout == '28s'
     assert check.override == 'merge'
     assert check.level == pebble.CheckLevel.ALIVE
     http = check.http
