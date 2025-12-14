@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
-from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
+from ops.framework import CommitEvent, EventBase, EventSource, Framework, PreCommitEvent
 
 from scenario import Context, State
 from scenario.state import _Event
@@ -21,10 +19,10 @@ class MyCharm(CharmBase):
     META = {'name': 'mycharm'}
     on = MyCharmEvents()  # type: ignore[assignment]
 
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-        self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.foo, self._on_foo)
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.foo, self._on_foo)
 
     def _on_start(self, e: EventBase) -> None:
         self.on.foo.emit()
