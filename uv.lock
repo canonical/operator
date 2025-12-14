@@ -751,12 +751,14 @@ source = { editable = "testing" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
+    { name = "typing-extensions" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "typing-extensions", specifier = ">=4.9.0" },
 ]
 
 [[package]]

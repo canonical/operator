@@ -12,10 +12,11 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
-import warnings
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generic
+
+from typing_extensions import deprecated
 
 import ops
 from ops._private.harness import ActionFailed
@@ -738,9 +739,16 @@ class Context(Generic[CharmType]):
         self.on = CharmEvents()
 
     @property
+    @deprecated('Use State.from_context to generate a State from charm metadata.', stacklevel=2)
     def charm_spec(self):
-        """Deprecated property for accessing the Context's charm spec."""
-        warnings.warn('Accessing Context.charm_spec is deprecated.', DeprecationWarning)
+        """Deprecated property for accessing the Context's charm spec.
+
+        The _CharmSpec class is private and intended for internal use only.
+        Context.charm_spec will be removed in a future major version.
+
+        Consider accessing the charm class or metadata directly, or using State.from_context to
+        generate a State from your charm's metadata.
+        """
         return self._charm_spec
 
     def _set_output_state(self, output_state: State):
