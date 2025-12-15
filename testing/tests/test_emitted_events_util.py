@@ -24,14 +24,14 @@ class MyCharm(CharmBase):
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.foo, self._on_foo)
 
-    def _on_start(self, e: EventBase) -> None:
+    def _on_start(self, e: EventBase):
         self.on.foo.emit()
 
-    def _on_foo(self, e: EventBase) -> None:
+    def _on_foo(self, e: EventBase):
         pass
 
 
-def test_capture_custom_evt_nonspecific_capture_include_fw_evts() -> None:
+def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
     ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
     ctx.run(ctx.on.start(), State())
 
@@ -44,7 +44,7 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts() -> None:
     assert isinstance(emitted[4], CommitEvent)
 
 
-def test_capture_juju_evt() -> None:
+def test_capture_juju_evt():
     ctx = Context(MyCharm, meta=MyCharm.META)
     ctx.run(ctx.on.start(), State())
 
@@ -54,7 +54,7 @@ def test_capture_juju_evt() -> None:
     assert isinstance(emitted[1], Foo)
 
 
-def test_capture_deferred_evt() -> None:
+def test_capture_deferred_evt():
     ctx = Context(MyCharm, meta=MyCharm.META, capture_deferred_events=True)
     deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
@@ -66,7 +66,7 @@ def test_capture_deferred_evt() -> None:
     assert isinstance(emitted[2], Foo)
 
 
-def test_capture_no_deferred_evt() -> None:
+def test_capture_no_deferred_evt():
     ctx = Context(MyCharm, meta=MyCharm.META)
     deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))

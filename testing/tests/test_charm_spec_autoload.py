@@ -77,31 +77,31 @@ def create_tempcharm(
         yield charm_class
 
 
-def test_autoload_no_meta_fails(tmp_path: Path) -> None:
+def test_autoload_no_meta_fails(tmp_path: Path):
     with create_tempcharm(tmp_path) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_no_type_fails(tmp_path: Path) -> None:
+def test_autoload_no_type_fails(tmp_path: Path):
     with create_tempcharm(tmp_path, meta={'name': 'foo'}) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_legacy_no_meta_fails(tmp_path: Path) -> None:
+def test_autoload_legacy_no_meta_fails(tmp_path: Path):
     with create_tempcharm(tmp_path, legacy=True) as charm:
         with pytest.raises(MetadataNotFoundError):
             _CharmSpec.autoload(charm)
 
 
-def test_autoload_legacy_no_type_passes(tmp_path: Path) -> None:
+def test_autoload_legacy_no_type_passes(tmp_path: Path):
     with create_tempcharm(tmp_path, legacy=True, meta={'name': 'foo'}) as charm:
         _CharmSpec.autoload(charm)
 
 
 @pytest.mark.parametrize('config_type', ('charm', 'foo'))
-def test_autoload_legacy_type_passes(tmp_path: Path, config_type: str) -> None:
+def test_autoload_legacy_type_passes(tmp_path: Path, config_type: str):
     with create_tempcharm(
         tmp_path, legacy=True, meta={'type': config_type, 'name': 'foo'}
     ) as charm:
@@ -109,7 +109,7 @@ def test_autoload_legacy_type_passes(tmp_path: Path, config_type: str) -> None:
 
 
 @pytest.mark.parametrize('legacy', (True, False))
-def test_meta_autoload(tmp_path: Path, legacy: bool) -> None:
+def test_meta_autoload(tmp_path: Path, legacy: bool):
     with create_tempcharm(
         tmp_path,
         legacy=legacy,
@@ -120,7 +120,7 @@ def test_meta_autoload(tmp_path: Path, legacy: bool) -> None:
 
 
 @pytest.mark.parametrize('legacy', (True, False))
-def test_no_meta_raises(tmp_path: Path, legacy: bool) -> None:
+def test_no_meta_raises(tmp_path: Path, legacy: bool):
     with create_tempcharm(
         tmp_path,
         legacy=legacy,
@@ -131,7 +131,7 @@ def test_no_meta_raises(tmp_path: Path, legacy: bool) -> None:
 
 
 @pytest.mark.parametrize('legacy', (True, False))
-def test_relations_ok(tmp_path: Path, legacy: bool) -> None:
+def test_relations_ok(tmp_path: Path, legacy: bool):
     with create_tempcharm(
         tmp_path,
         legacy=legacy,
@@ -149,7 +149,7 @@ def test_relations_ok(tmp_path: Path, legacy: bool) -> None:
 
 
 @pytest.mark.parametrize('legacy', (True, False))
-def test_config_defaults(tmp_path: Path, legacy: bool) -> None:
+def test_config_defaults(tmp_path: Path, legacy: bool):
     with create_tempcharm(
         tmp_path,
         legacy=legacy,

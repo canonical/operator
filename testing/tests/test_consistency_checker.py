@@ -42,7 +42,7 @@ def assert_inconsistent(
     charm_spec: _CharmSpec[ops.CharmBase],
     juju_version: str = '3.0',
     unit_id: int = 0,
-) -> None:
+):
     with pytest.raises(InconsistentScenarioError):
         check_consistency(state, event, charm_spec, juju_version, unit_id)
 
@@ -53,11 +53,11 @@ def assert_consistent(
     charm_spec: _CharmSpec[ops.CharmBase],
     juju_version: str = '3.0',
     unit_id: int = 0,
-) -> None:
+):
     check_consistency(state, event, charm_spec, juju_version, unit_id)
 
 
-def test_base() -> None:
+def test_base():
     state = State()
     event = _Event('update_status')
     spec: _CharmSpec[ops.CharmBase] = _CharmSpec(MyCharm, {})
@@ -216,7 +216,7 @@ def test_evt_bad_container_name():
         (CheckInfo('chk2'), False),
     ],
 )
-def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool) -> None:
+def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
     layer = ops.pebble.Layer({
         'checks': {
             'chk1': {
@@ -303,7 +303,7 @@ def test_bad_config_option_type():
         ('boolean', False, 'foo'),
     ),
 )
-def test_config_types(config_type: tuple[str, Any, Any]) -> None:
+def test_config_types(config_type: tuple[str, Any, Any]):
     type_name, valid_value, invalid_value = config_type
     assert_consistent(
         State(config={'foo': valid_value}),
@@ -318,7 +318,7 @@ def test_config_types(config_type: tuple[str, Any, Any]) -> None:
 
 
 @pytest.mark.parametrize('juju_version', ('3.4', '3.5', '4.0'))
-def test_config_secret(juju_version: str) -> None:
+def test_config_secret(juju_version: str):
     assert_consistent(
         State(config={'foo': 'secret:co28kefmp25c77utl3n0'}),
         _Event('bar'),
@@ -348,7 +348,7 @@ def test_config_secret(juju_version: str) -> None:
 
 
 @pytest.mark.parametrize('juju_version', ('2.9', '3.3'))
-def test_config_secret_old_juju(juju_version: str) -> None:
+def test_config_secret_old_juju(juju_version: str):
     assert_inconsistent(
         State(config={'foo': 'secret:co28kefmp25c77utl3n0'}),
         _Event('bar'),
@@ -361,7 +361,7 @@ def test_config_secret_old_juju(juju_version: str) -> None:
     "The right exception is raised but pytest.raises doesn't catch it - figure this out!"
 )
 @pytest.mark.parametrize('bad_v', ('1.0', '0', '1.2', '2.35.42', '2.99.99', '2.99'))
-def test_secrets_jujuv_bad(bad_v: str) -> None:
+def test_secrets_jujuv_bad(bad_v: str):
     secret = Secret({'a': 'b'})
     assert_inconsistent(
         State(secrets={secret}),
@@ -385,7 +385,7 @@ def test_secrets_jujuv_bad(bad_v: str) -> None:
 
 
 @pytest.mark.parametrize('good_v', ('3.0', '3.1', '3', '3.33', '4', '100'))
-def test_secrets_jujuv_good(good_v: str) -> None:
+def test_secrets_jujuv_good(good_v: str):
     assert_consistent(
         State(secrets={Secret({'a': 'b'})}),
         _Event('bar'),
@@ -540,7 +540,7 @@ _ACTION_TYPE_CHECKS = [
 
 
 @pytest.mark.parametrize('ptype,good,bad', _ACTION_TYPE_CHECKS)
-def test_action_params_type(ptype: str, good: Any, bad: Any) -> None:
+def test_action_params_type(ptype: str, good: Any, bad: Any):
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     assert_consistent(
         State(),

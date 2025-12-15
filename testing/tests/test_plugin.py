@@ -8,7 +8,7 @@ pytest_plugins = 'pytester'
 sys.path.append('.')
 
 
-def test_plugin_ctx_run(pytester: pytest.Pytester) -> None:
+def test_plugin_ctx_run(pytester: pytest.Pytester):
     # create a temporary pytest test module
     pytester.makepyfile(  # type: ignore
         """
