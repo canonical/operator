@@ -20,7 +20,7 @@ logger = logging.getLogger()
 
 
 def trigger(
-    state: 'State',
+    state: State,
     event: str | '_Event',
     charm_type: type['CharmType'],
     pre_event: Callable[['CharmType'], None] | None = None,
@@ -30,7 +30,7 @@ def trigger(
     config: dict[str, Any] | None = None,
     charm_root: str | Path | None = None,
     juju_version: str = _DEFAULT_JUJU_VERSION,
-) -> 'State':
+) -> State:
     ctx = Context(
         charm_type=charm_type,
         meta=meta,
@@ -58,7 +58,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self: 'State', other: 'State') -> list[dict[str, Any]]:
+def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
