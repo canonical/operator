@@ -23,7 +23,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: EventBase) -> None:
+        def _on_event(self, event: EventBase):
             if isinstance(event, CollectStatusEvent):
                 return
             print('foo!')

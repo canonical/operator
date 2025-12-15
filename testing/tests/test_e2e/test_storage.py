@@ -24,13 +24,13 @@ def no_storage_ctx() -> Context[MyCharmWithoutStorage]:
     return Context(MyCharmWithoutStorage, meta=MyCharmWithoutStorage.META)
 
 
-def test_storage_get_null(no_storage_ctx: Context[MyCharmWithoutStorage]) -> None:
+def test_storage_get_null(no_storage_ctx: Context[MyCharmWithoutStorage]):
     with no_storage_ctx(no_storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         assert not len(storages)
 
 
-def test_storage_get_unknown_name(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_get_unknown_name(storage_ctx: Context[MyCharmWithStorage]):
     with storage_ctx(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # not in metadata
@@ -38,7 +38,7 @@ def test_storage_get_unknown_name(storage_ctx: Context[MyCharmWithStorage]) -> N
             storages['bar']
 
 
-def test_storage_request_unknown_name(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_request_unknown_name(storage_ctx: Context[MyCharmWithStorage]):
     with storage_ctx(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # not in metadata
@@ -46,7 +46,7 @@ def test_storage_request_unknown_name(storage_ctx: Context[MyCharmWithStorage]) 
             storages.request('bar')
 
 
-def test_storage_get_some(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_get_some(storage_ctx: Context[MyCharmWithStorage]):
     with storage_ctx(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         # known but none attached
@@ -54,7 +54,7 @@ def test_storage_get_some(storage_ctx: Context[MyCharmWithStorage]) -> None:
 
 
 @pytest.mark.parametrize('n', (1, 3, 5))
-def test_storage_add(storage_ctx: Context[MyCharmWithStorage], n: int) -> None:
+def test_storage_add(storage_ctx: Context[MyCharmWithStorage], n: int):
     with storage_ctx(storage_ctx.on.update_status(), State()) as mgr:
         storages = mgr.charm.model.storages
         storages.request('foo', n)
@@ -62,7 +62,7 @@ def test_storage_add(storage_ctx: Context[MyCharmWithStorage], n: int) -> None:
     assert storage_ctx.requested_storages['foo'] == n
 
 
-def test_storage_usage(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_usage(storage_ctx: Context[MyCharmWithStorage]):
     storage = Storage('foo')
     # setup storage with some content
     (storage.get_filesystem(storage_ctx) / 'myfile.txt').write_text('helloworld')  # type: ignore[reportUnknownMemberType]
@@ -83,11 +83,11 @@ def test_storage_usage(storage_ctx: Context[MyCharmWithStorage]) -> None:
     ).read_text() == 'helloworlds'
 
 
-def test_storage_attached_event(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_attached_event(storage_ctx: Context[MyCharmWithStorage]):
     storage = Storage('foo')
     storage_ctx.run(storage_ctx.on.storage_attached(storage), State(storages={storage}))
 
 
-def test_storage_detaching_event(storage_ctx: Context[MyCharmWithStorage]) -> None:
+def test_storage_detaching_event(storage_ctx: Context[MyCharmWithStorage]):
     storage = Storage('foo')
     storage_ctx.run(storage_ctx.on.storage_detaching(storage), State(storages={storage}))

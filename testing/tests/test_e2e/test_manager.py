@@ -23,7 +23,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, e: EventBase) -> None:
+        def _on_event(self, e: EventBase):
             if isinstance(e, CollectStatusEvent):
                 return
 
@@ -32,7 +32,7 @@ def mycharm():
     return MyCharm
 
 
-def test_manager(mycharm: Any) -> None:
+def test_manager(mycharm: Any):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
@@ -41,7 +41,7 @@ def test_manager(mycharm: Any) -> None:
     assert isinstance(state_out, State)
 
 
-def test_manager_implicit(mycharm: Any) -> None:
+def test_manager_implicit(mycharm: Any):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         assert isinstance(manager.charm, mycharm)
@@ -51,7 +51,7 @@ def test_manager_implicit(mycharm: Any) -> None:
     assert manager._emitted
 
 
-def test_manager_reemit_fails(mycharm: Any) -> None:
+def test_manager_reemit_fails(mycharm: Any):
     ctx = Context(mycharm, meta=mycharm.META)
     with Manager(ctx, ctx.on.start(), State()) as manager:
         manager.run()
@@ -59,7 +59,7 @@ def test_manager_reemit_fails(mycharm: Any) -> None:
             manager.run()
 
 
-def test_context_manager(mycharm: Any) -> None:
+def test_context_manager(mycharm: Any):
     ctx = Context(mycharm, meta=mycharm.META)
     with ctx(ctx.on.start(), State()) as manager:
         state_out = manager.run()
@@ -67,7 +67,7 @@ def test_context_manager(mycharm: Any) -> None:
     assert ctx.emitted_events[0].handle.kind == 'start'
 
 
-def test_context_action_manager(mycharm: Any) -> None:
+def test_context_action_manager(mycharm: Any):
     ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
     with ctx(ctx.on.action('do-x'), State()) as manager:
         state_out = manager.run()

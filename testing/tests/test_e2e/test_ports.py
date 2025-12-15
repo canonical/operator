@@ -29,7 +29,7 @@ def ctx() -> Context[MyCharm]:
     return Context(MyCharm, meta=MyCharm.META)
 
 
-def test_open_port(ctx: Context[MyCharm]) -> None:
+def test_open_port(ctx: Context[MyCharm]):
     out = ctx.run(ctx.on.start(), State())
     ports = tuple(out.opened_ports)
     assert len(ports) == 1
@@ -39,18 +39,18 @@ def test_open_port(ctx: Context[MyCharm]) -> None:
     assert port.port == 12
 
 
-def test_close_port(ctx: Context[MyCharm]) -> None:
+def test_close_port(ctx: Context[MyCharm]):
     out = ctx.run(ctx.on.stop(), State(opened_ports={TCPPort(42)}))
     assert not out.opened_ports
 
 
-def test_port_no_arguments() -> None:
+def test_port_no_arguments():
     with pytest.raises(RuntimeError):
         Port()
 
 
 @pytest.mark.parametrize('klass', (TCPPort, UDPPort))
-def test_port_port(klass: type[Port]) -> None:
+def test_port_port(klass: type[Port]):
     with pytest.raises(StateValidationError):
         klass(port=0)
     with pytest.raises(StateValidationError):

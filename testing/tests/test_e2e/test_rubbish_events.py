@@ -39,21 +39,21 @@ def mycharm():
             self.framework.observe(self.sub.on.sub, self._on_event)
             self.framework.observe(self.on.qux, self._on_event)
 
-        def _on_event(self, e: EventBase) -> None:
+        def _on_event(self, e: EventBase):
             MyCharm.evts.append(e)
 
     return MyCharm
 
 
 @pytest.mark.parametrize('evt_name', ('rubbish', 'foo', 'bar'))
-def test_rubbish_event_raises(mycharm: type[CharmBase], evt_name: str) -> None:
+def test_rubbish_event_raises(mycharm: type[CharmBase], evt_name: str):
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
 
 def test_rubbish_pebble_ready_event_raises(
     mycharm: type[CharmBase], monkeypatch: pytest.MonkeyPatch
-) -> None:
+):
     monkeypatch.setenv('SCENARIO_SKIP_CONSISTENCY_CHECKS', '1')
     # else it will whine about the container not being in state and meta;
     # but if we put the container in meta, it will actually register an event!
@@ -62,14 +62,14 @@ def test_rubbish_pebble_ready_event_raises(
 
 
 @pytest.mark.parametrize('evt_name', ('qux',))
-def test_custom_events_fail(mycharm: type[CharmBase], evt_name: str) -> None:
+def test_custom_events_fail(mycharm: type[CharmBase], evt_name: str):
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
 
 # cfr: https://github.com/PietroPasotti/ops-scenario/pull/11#discussion_r1101694961
 @pytest.mark.parametrize('evt_name', ('sub',))
-def test_custom_events_sub_raise(mycharm: type[CharmBase], evt_name: str) -> None:
+def test_custom_events_sub_raise(mycharm: type[CharmBase], evt_name: str):
     with pytest.raises(AttributeError):
         trigger(State(), evt_name, mycharm, meta={'name': 'foo'})
 
@@ -86,7 +86,7 @@ def test_custom_events_sub_raise(mycharm: type[CharmBase], evt_name: str) -> Non
         ('bar-relation-changed', True),
     ),
 )
-def test_is_custom_event(mycharm: type[CharmBase], evt_name: str, expected: bool) -> None:
+def test_is_custom_event(mycharm: type[CharmBase], evt_name: str, expected: bool):
     spec: _CharmSpec[CharmBase] = _CharmSpec(
         charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}}
     )

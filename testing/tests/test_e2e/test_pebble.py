@@ -38,14 +38,14 @@ def charm_cls() -> type[CharmBase]:
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: EventBase) -> None:
+        def _on_event(self, event: EventBase):
             pass
 
     return MyCharm
 
 
-def test_no_containers(charm_cls: type[CharmBase]) -> None:
-    def callback(self: CharmBase) -> None:
+def test_no_containers(charm_cls: type[CharmBase]):
+    def callback(self: CharmBase):
         assert not self.unit.containers
 
     trigger(
@@ -57,8 +57,8 @@ def test_no_containers(charm_cls: type[CharmBase]) -> None:
     )
 
 
-def test_containers_from_meta(charm_cls: type[CharmBase]) -> None:
-    def callback(self: CharmBase) -> None:
+def test_containers_from_meta(charm_cls: type[CharmBase]):
+    def callback(self: CharmBase):
         assert self.unit.containers
         assert self.unit.get_container('foo')
 
@@ -72,8 +72,8 @@ def test_containers_from_meta(charm_cls: type[CharmBase]) -> None:
 
 
 @pytest.mark.parametrize('can_connect', (True, False))
-def test_connectivity(charm_cls: type[CharmBase], can_connect: bool) -> None:
-    def callback(self: CharmBase) -> None:
+def test_connectivity(charm_cls: type[CharmBase], can_connect: bool):
+    def callback(self: CharmBase):
         assert can_connect == self.unit.get_container('foo').can_connect()
 
     trigger(
@@ -85,13 +85,13 @@ def test_connectivity(charm_cls: type[CharmBase], can_connect: bool) -> None:
     )
 
 
-def test_fs_push(charm_cls: type[CharmBase]) -> None:
+def test_fs_push(charm_cls: type[CharmBase]):
     text = 'lorem ipsum/n alles amat gloriae foo'
     file = tempfile.NamedTemporaryFile()
     pth = Path(file.name)
     pth.write_text(text)
 
-    def callback(self: CharmBase) -> None:
+    def callback(self: CharmBase):
         container = self.unit.get_container('foo')
         baz = container.pull('/bar/baz.txt')
         assert baz.read() == text
@@ -114,10 +114,10 @@ def test_fs_push(charm_cls: type[CharmBase]) -> None:
 
 
 @pytest.mark.parametrize('make_dirs', (True, False))
-def test_fs_pull(charm_cls: type[CharmBase], make_dirs: bool) -> None:
+def test_fs_pull(charm_cls: type[CharmBase], make_dirs: bool):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
-    def callback(self: CharmBase) -> None:
+    def callback(self: CharmBase):
         container = self.unit.get_container('foo')
         if make_dirs:
             container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
@@ -201,8 +201,8 @@ PS = """
         ('ps', PS),
     ),
 )
-def test_exec(charm_cls: type[CharmBase], cmd: str, out: str) -> None:
-    def callback(self: CharmBase) -> None:
+def test_exec(charm_cls: type[CharmBase], cmd: str, out: str):
+    def callback(self: CharmBase):
         container = self.unit.get_container('foo')
         proc = container.exec([cmd])
         proc.wait()
@@ -234,13 +234,13 @@ def test_exec(charm_cls: type[CharmBase], cmd: str, out: str) -> None:
         [io.StringIO('hello world!'), None],
     ),
 )
-def test_exec_history_stdin(stdin: str | io.StringIO | None, write: str | None) -> None:
+def test_exec_history_stdin(stdin: str | io.StringIO | None, write: str | None):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             self.framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        def _on_ready(self, _: EventBase) -> None:
+        def _on_ready(self, _: EventBase):
             proc = self.unit.get_container('foo').exec(['ls'], stdin=stdin)
             if write:
                 assert proc.stdin is not None
@@ -253,8 +253,8 @@ def test_exec_history_stdin(stdin: str | io.StringIO | None, write: str | None) 
     assert ctx.exec_history[container.name][0].stdin == 'hello world!'
 
 
-def test_pebble_ready(charm_cls: type[CharmBase]) -> None:
-    def callback(self: CharmBase) -> None:
+def test_pebble_ready(charm_cls: type[CharmBase]):
+    def callback(self: CharmBase):
         foo = self.unit.get_container('foo')
         assert foo.can_connect()
 
@@ -270,13 +270,13 @@ def test_pebble_ready(charm_cls: type[CharmBase]) -> None:
 
 
 @pytest.mark.parametrize('starting_service_status', pebble.ServiceStatus)
-def test_pebble_plan(charm_cls: type[CharmBase], starting_service_status: ServiceStatus) -> None:
+def test_pebble_plan(charm_cls: type[CharmBase], starting_service_status: ServiceStatus):
     class PlanCharm(charm_cls):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        def _on_ready(self, event: PebbleReadyEvent) -> None:
+        def _on_ready(self, event: PebbleReadyEvent):
             foo = event.workload
 
             assert foo.get_plan().to_dict() == {'services': {'fooserv': {'startup': 'enabled'}}}
@@ -345,7 +345,7 @@ def test_pebble_plan(charm_cls: type[CharmBase], starting_service_status: Servic
     assert container.services['barserv'].startup == pebble.ServiceStartup.DISABLED
 
 
-def test_exec_wait_error(charm_cls: type[CharmBase]) -> None:
+def test_exec_wait_error(charm_cls: type[CharmBase]):
     state = State(
         containers={
             Container(
@@ -366,7 +366,7 @@ def test_exec_wait_error(charm_cls: type[CharmBase]) -> None:
 
 
 @pytest.mark.parametrize('command', (['foo'], ['foo', 'bar'], ['foo', 'bar', 'baz']))
-def test_exec_wait_output(charm_cls: type[CharmBase], command: list[str]) -> None:
+def test_exec_wait_output(charm_cls: type[CharmBase], command: list[str]):
     state = State(
         containers={
             Container(
@@ -387,7 +387,7 @@ def test_exec_wait_output(charm_cls: type[CharmBase], command: list[str]) -> Non
         assert ctx.exec_history[container.name][0].command == command
 
 
-def test_exec_wait_output_error(charm_cls: type[CharmBase]) -> None:
+def test_exec_wait_output_error(charm_cls: type[CharmBase]):
     state = State(
         containers={
             Container(
@@ -406,7 +406,7 @@ def test_exec_wait_output_error(charm_cls: type[CharmBase]) -> None:
             proc.wait_output()
 
 
-def test_pebble_custom_notice(charm_cls: type[CharmBase]) -> None:
+def test_pebble_custom_notice(charm_cls: type[CharmBase]):
     notices = [
         Notice(key='example.com/foo'),
         Notice(key='example.com/bar', last_data={'a': 'b'}),
@@ -425,7 +425,7 @@ def test_pebble_custom_notice(charm_cls: type[CharmBase]) -> None:
         assert container.get_notices() == [n._to_ops() for n in notices]
 
 
-def test_pebble_custom_notice_in_charm() -> None:
+def test_pebble_custom_notice_in_charm():
     key = 'example.com/test/charm'
     data = {'foo': 'bar'}
     user_id = 100
@@ -441,7 +441,7 @@ def test_pebble_custom_notice_in_charm() -> None:
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_custom_notice, self._on_custom_notice)
 
-        def _on_custom_notice(self, event: PebbleCustomNoticeEvent) -> None:
+        def _on_custom_notice(self, event: PebbleCustomNoticeEvent):
             notice = event.notice
             assert notice.type == pebble.NoticeType.CUSTOM
             assert notice.key == key
@@ -479,7 +479,7 @@ def test_pebble_custom_notice_in_charm() -> None:
     ctx.run(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state)
 
 
-def test_pebble_check_failed() -> None:
+def test_pebble_check_failed():
     infos: list[LazyCheckInfo] = []
 
     class MyCharm(CharmBase):
@@ -487,7 +487,7 @@ def test_pebble_check_failed() -> None:
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_failed, self._on_check_failed)
 
-        def _on_check_failed(self, event: PebbleCheckFailedEvent) -> None:
+        def _on_check_failed(self, event: PebbleCheckFailedEvent):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
@@ -514,7 +514,7 @@ def test_pebble_check_failed() -> None:
     assert infos[0].failures == 7
 
 
-def test_pebble_check_recovered() -> None:
+def test_pebble_check_recovered():
     infos: list[LazyCheckInfo] = []
 
     class MyCharm(CharmBase):
@@ -522,7 +522,7 @@ def test_pebble_check_recovered() -> None:
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_recovered, self._on_check_recovered)
 
-        def _on_check_recovered(self, event: PebbleCheckRecoveredEvent) -> None:
+        def _on_check_recovered(self, event: PebbleCheckRecoveredEvent):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
@@ -548,7 +548,7 @@ def test_pebble_check_recovered() -> None:
     assert infos[0].failures == 0
 
 
-def test_pebble_check_failed_two_containers() -> None:
+def test_pebble_check_failed_two_containers():
     foo_infos: list[LazyCheckInfo] = []
     bar_infos: list[LazyCheckInfo] = []
 
@@ -558,10 +558,10 @@ def test_pebble_check_failed_two_containers() -> None:
             framework.observe(self.on.foo_pebble_check_failed, self._on_foo_check_failed)
             framework.observe(self.on.bar_pebble_check_failed, self._on_bar_check_failed)
 
-        def _on_foo_check_failed(self, event: PebbleCheckFailedEvent) -> None:
+        def _on_foo_check_failed(self, event: PebbleCheckFailedEvent):
             foo_infos.append(event.info)
 
-        def _on_bar_check_failed(self, event: PebbleCheckFailedEvent) -> None:
+        def _on_bar_check_failed(self, event: PebbleCheckFailedEvent):
             bar_infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}})
@@ -590,13 +590,13 @@ def test_pebble_check_failed_two_containers() -> None:
     assert len(bar_infos) == 0
 
 
-def test_pebble_add_layer() -> None:
+def test_pebble_add_layer():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_foo_ready)
 
-        def _on_foo_ready(self, _: EventBase) -> None:
+        def _on_foo_ready(self, _: EventBase):
             self.unit.get_container('foo').add_layer(
                 'foo',
                 {'checks': {'chk1': {'override': 'replace'}}},
@@ -609,14 +609,14 @@ def test_pebble_add_layer() -> None:
     assert chk1_info.status == pebble.CheckStatus.UP
 
 
-def test_pebble_start_check() -> None:
+def test_pebble_start_check():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_foo_ready)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_foo_ready(self, _: EventBase) -> None:
+        def _on_foo_ready(self, _: EventBase):
             container = self.unit.get_container('foo')
             container.add_layer(
                 'foo',
@@ -631,7 +631,7 @@ def test_pebble_start_check() -> None:
                 },
             )
 
-        def _on_config_changed(self, _: EventBase) -> None:
+        def _on_config_changed(self, _: EventBase):
             container = self.unit.get_container('foo')
             container.start_checks('chk1')
 
@@ -657,13 +657,13 @@ def reset_security_logging() -> Iterator[None]:
     _get_juju_log_and_app_id.cache_clear()
 
 
-def test_pebble_stop_check(reset_security_logging: None) -> None:
+def test_pebble_stop_check(reset_security_logging: None):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_config_changed(self, _: EventBase) -> None:
+        def _on_config_changed(self, _: EventBase):
             container = self.unit.get_container('foo')
             container.stop_checks('chk1')
 
@@ -691,13 +691,13 @@ def test_pebble_stop_check(reset_security_logging: None) -> None:
     assert info_out.status == pebble.CheckStatus.INACTIVE
 
 
-def test_pebble_replan_checks() -> None:
+def test_pebble_replan_checks():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_config_changed(self, _: EventBase) -> None:
+        def _on_config_changed(self, _: EventBase):
             container = self.unit.get_container('foo')
             container.replan()
 
@@ -756,15 +756,13 @@ def test_pebble_replan_checks() -> None:
         },
     ],
 )
-def test_add_layer_merge_check(
-    new_layer_name: str, combine: bool, new_layer_dict: LayerDict
-) -> None:
+def test_add_layer_merge_check(new_layer_name: str, combine: bool, new_layer_dict: LayerDict):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on['my-container'].pebble_ready, self._on_pebble_ready)
 
-        def _on_pebble_ready(self, _: PebbleReadyEvent) -> None:
+        def _on_pebble_ready(self, _: PebbleReadyEvent):
             container = self.unit.get_container('my-container')
             container.add_layer(new_layer_name, Layer(new_layer_dict), combine=combine)
 
@@ -806,7 +804,7 @@ def test_add_layer_merge_check(
 
 
 @pytest.mark.parametrize('layer1_name,layer2_name', [('a-base', 'b-base'), ('b-base', 'a-base')])
-def test_layers_merge_in_plan(layer1_name: str, layer2_name: str) -> None:
+def test_layers_merge_in_plan(layer1_name: str, layer2_name: str):
     layer1_dict: LayerDict = {
         'services': {
             'server': {
