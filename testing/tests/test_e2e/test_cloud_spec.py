@@ -12,11 +12,11 @@ class MyCharm(ops.CharmBase):
         for evt in self.on.events().values():
             self.framework.observe(evt, self._on_event)
 
-    def _on_event(self, event: ops.EventBase) -> None:
+    def _on_event(self, event: ops.EventBase):
         pass
 
 
-def test_get_cloud_spec() -> None:
+def test_get_cloud_spec():
     scenario_cloud_spec = scenario.CloudSpec(
         type='lxd',
         name='localhost',
@@ -51,7 +51,7 @@ def test_get_cloud_spec() -> None:
         assert mgr.charm.model.get_cloud_spec() == expected_cloud_spec
 
 
-def test_get_cloud_spec_error() -> None:
+def test_get_cloud_spec_error():
     ctx = scenario.Context(MyCharm, meta={'name': 'foo'})
     state = scenario.State(model=scenario.Model(name='lxd-model', type='lxd'))
     with ctx(ctx.on.start(), state) as mgr:
@@ -59,7 +59,7 @@ def test_get_cloud_spec_error() -> None:
             mgr.charm.model.get_cloud_spec()
 
 
-def test_get_cloud_spec_untrusted() -> None:
+def test_get_cloud_spec_untrusted():
     cloud_spec = scenario.CloudSpec(type='lxd', name='localhost')
     ctx = scenario.Context(MyCharm, meta={'name': 'foo'})
     state = scenario.State(

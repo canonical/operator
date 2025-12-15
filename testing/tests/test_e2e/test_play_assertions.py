@@ -22,7 +22,7 @@ def mycharm() -> type[ops.CharmBase]:
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase) -> None:
+        def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -30,16 +30,16 @@ def mycharm() -> type[ops.CharmBase]:
     return MyCharm
 
 
-def test_charm_heals_on_start(mycharm: type[ops.CharmBase]) -> None:
-    def pre_event(charm: ops.CharmBase) -> None:
+def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
+    def pre_event(charm: ops.CharmBase):
         assert charm.unit.status == ops.BlockedStatus('foo')
         assert not charm.called  # type: ignore[attr-defined]
 
-    def call(charm: ops.CharmBase, _: ops.EventBase) -> None:
+    def call(charm: ops.CharmBase, _: ops.EventBase):
         if charm.unit.status.message == 'foo':
             charm.unit.status = ops.ActiveStatus('yabadoodle')
 
-    def post_event(charm: ops.CharmBase) -> None:
+    def post_event(charm: ops.CharmBase):
         assert charm.unit.status == ops.ActiveStatus('yabadoodle')
         assert charm.called  # type: ignore[attr-defined]
 
@@ -74,10 +74,10 @@ def test_charm_heals_on_start(mycharm: type[ops.CharmBase]) -> None:
     ]
 
 
-def test_relation_data_access(mycharm: type[ops.CharmBase]) -> None:
+def test_relation_data_access(mycharm: type[ops.CharmBase]):
     mycharm._call = lambda *_: True  # type: ignore[misc]
 
-    def check_relation_data(charm: ops.CharmBase) -> None:
+    def check_relation_data(charm: ops.CharmBase):
         foo_relations = charm.model.relations['relation_test']
         assert len(foo_relations) == 1
         foo_rel = foo_relations[0]

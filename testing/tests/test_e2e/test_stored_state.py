@@ -25,14 +25,14 @@ def mycharm() -> type[ops.CharmBase]:
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, _: ops.EventBase) -> None:
+        def _on_event(self, _: ops.EventBase):
             self._read['foo'] = self._stored.foo
             self._read['baz'] = self._stored.baz
 
     return MyCharm
 
 
-def test_stored_state_default(mycharm: type[ops.CharmBase]) -> None:
+def test_stored_state_default(mycharm: type[ops.CharmBase]):
     out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'bar',
@@ -44,7 +44,7 @@ def test_stored_state_default(mycharm: type[ops.CharmBase]) -> None:
     }
 
 
-def test_stored_state_initialized(mycharm: type[ops.CharmBase]) -> None:
+def test_stored_state_initialized(mycharm: type[ops.CharmBase]):
     out = trigger(
         State(
             stored_states={
@@ -65,12 +65,12 @@ def test_stored_state_initialized(mycharm: type[ops.CharmBase]) -> None:
     }
 
 
-def test_positional_arguments() -> None:
+def test_positional_arguments():
     with pytest.raises(TypeError):
         StoredState('_stored', '')  # type: ignore[call-arg]
 
 
-def test_default_arguments() -> None:
+def test_default_arguments():
     s = StoredState()
     assert s.name == '_stored'
     assert s.owner_path is None

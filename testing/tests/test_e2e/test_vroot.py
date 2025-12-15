@@ -42,7 +42,7 @@ def charm_virtual_root() -> Generator[Path]:
         yield t
 
 
-def test_charm_virtual_root(charm_virtual_root: Path) -> None:
+def test_charm_virtual_root(charm_virtual_root: Path):
     out = trigger(
         State(),
         'start',
@@ -53,7 +53,7 @@ def test_charm_virtual_root(charm_virtual_root: Path) -> None:
     assert out.unit_status == ActiveStatus('hello world')
 
 
-def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path) -> None:
+def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path):
     meta_file = charm_virtual_root / 'metadata.yaml'
     raw_ori_meta = yaml.safe_dump({'name': 'karl'})
     meta_file.write_text(raw_ori_meta)
@@ -74,7 +74,7 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path) -> None:
     assert meta_file.exists()
 
 
-def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root: Path) -> None:
+def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root: Path):
     meta_file = charm_virtual_root / 'metadata.yaml'
 
     assert not meta_file.exists()

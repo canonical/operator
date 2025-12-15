@@ -31,7 +31,7 @@ def mycharm() -> type[ops.CharmBase]:
 
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase) -> None:
+        def _on_event(self, event: ops.EventBase):
             self.captured.append(event)
             if self.defer_next > 0:
                 self.defer_next -= 1
@@ -40,14 +40,14 @@ def mycharm() -> type[ops.CharmBase]:
     return MyCharm
 
 
-def test_defer(mycharm: type[ops.CharmBase]) -> None:
+def test_defer(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = True  # type: ignore[attr-defined]
     out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 
 
-def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]) -> None:
+def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore[attr-defined]
 
     out = trigger(
@@ -68,7 +68,7 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]) -> None:
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_relation_event(mycharm: type[ops.CharmBase]) -> None:
+def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore[attr-defined]
 
     rel = Relation(endpoint='foo', remote_app_name='remote')
@@ -98,7 +98,7 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]) -> None:
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]) -> None:
+def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]):
     ctx = Context(mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
     mycharm.defer_next = 2  # type: ignore[attr-defined]
     rel = Relation(endpoint='foo', remote_app_name='remote')
@@ -131,7 +131,7 @@ def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]) -> 
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_workload_event(mycharm: type[ops.CharmBase]) -> None:
+def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore[attr-defined]
 
     ctr = Container('foo')
@@ -159,7 +159,7 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]) -> None:
     assert isinstance(start, ops.StartEvent)
 
 
-def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]) -> None:
+def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]):
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore[attr-defined]
 
     mycharm.defer_next = 1  # type: ignore[attr-defined]
@@ -177,7 +177,7 @@ def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]) -> None:
     assert not state_2.deferred
 
 
-def test_defer_reemit_relation_event(mycharm: type[ops.CharmBase]) -> None:
+def test_defer_reemit_relation_event(mycharm: type[ops.CharmBase]):
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore[attr-defined]
 
     rel = Relation('foo')
@@ -227,7 +227,7 @@ class MyConsumer(ops.Object):
         super().__init__(charm, 'my-consumer')
 
 
-def test_defer_custom_event(mycharm: type[ops.CharmBase]) -> None:
+def test_defer_custom_event(mycharm: type[ops.CharmBase]):
     class MyCharm(mycharm):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

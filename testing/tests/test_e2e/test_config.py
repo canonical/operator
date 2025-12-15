@@ -17,14 +17,14 @@ def mycharm() -> type[ops.CharmBase]:
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase) -> None:
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
 
 
-def test_config_get(mycharm: type[ops.CharmBase]) -> None:
-    def check_cfg(charm: ops.CharmBase) -> None:
+def test_config_get(mycharm: type[ops.CharmBase]):
+    def check_cfg(charm: ops.CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 1
 
@@ -40,8 +40,8 @@ def test_config_get(mycharm: type[ops.CharmBase]) -> None:
     )
 
 
-def test_config_get_default_from_meta(mycharm: type[ops.CharmBase]) -> None:
-    def check_cfg(charm: ops.CharmBase) -> None:
+def test_config_get_default_from_meta(mycharm: type[ops.CharmBase]):
+    def check_cfg(charm: ops.CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 2
         assert charm.config['qux'] is False
@@ -72,14 +72,14 @@ def test_config_get_default_from_meta(mycharm: type[ops.CharmBase]) -> None:
         {'baz': 4, 'foo': 'bar', 'qux': True},
     ),
 )
-def test_config_in_not_mutated(mycharm: type[ops.CharmBase], cfg_in: dict[str, Any]) -> None:
+def test_config_in_not_mutated(mycharm: type[ops.CharmBase], cfg_in: dict[str, Any]):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: ops.EventBase) -> None:
+        def _on_event(self, event: ops.EventBase):
             # access the config to trigger a config-get
             _foo_cfg = self.config['foo']
             _baz_cfg = self.config['baz']

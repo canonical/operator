@@ -29,7 +29,7 @@ from scenario.state import State, _CharmSpec, _Event, _EventType
         ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
-def test_event_type(evt: str, expected_type: _EventType) -> None:
+def test_event_type(evt: str, expected_type: _EventType):
     event = _Event(evt)
     assert event._path.type is expected_type
 
@@ -59,7 +59,7 @@ def test_event_type(evt: str, expected_type: _EventType) -> None:
     assert event._is_builtin_event(spec) is (expected_type is not _EventType.CUSTOM)
 
 
-def test_emitted_framework() -> None:
+def test_emitted_framework():
     class MyCharm(ops.CharmBase):
         META = {'name': 'joop'}
 
@@ -74,7 +74,7 @@ def test_emitted_framework() -> None:
     ]
 
 
-def test_emitted_deferred() -> None:
+def test_emitted_deferred():
     class MyCharm(ops.CharmBase):
         META = {'name': 'joop'}
 
@@ -82,7 +82,7 @@ def test_emitted_deferred() -> None:
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: ops.UpdateStatusEvent) -> None:
+        def _on_update_status(self, _: ops.UpdateStatusEvent):
             pass
 
     ctx = Context(
