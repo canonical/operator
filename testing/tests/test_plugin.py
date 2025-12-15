@@ -10,7 +10,7 @@ sys.path.append('.')
 
 def test_plugin_ctx_run(pytester: pytest.Pytester) -> None:
     # create a temporary pytest test module
-    pytester.makepyfile(  # type: ignore[misc]
+    pytester.makepyfile(  # type: ignore
         """
         import pytest
         from scenario import State

@@ -17,7 +17,7 @@ class MyCharmEvents(CharmEvents):
 
 class MyCharm(CharmBase):
     META = {'name': 'mycharm'}
-    on = MyCharmEvents()  # type: ignore[assignment]
+    on = MyCharmEvents()  # type: ignore
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from collections.abc import Callable
 
-import jsonpatch  # type: ignore[import-untyped]
+import jsonpatch  # type: ignore
 
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event

@@ -48,7 +48,9 @@ def test_event_emission() -> None:
         class MyEvt(ops.EventBase):
             pass
 
-        my_charm_type.on.define_event('bar', MyEvt)  # type: ignore[attr-defined]
+        my_charm_type.on.define_event(  # type: ignore
+            'bar', MyEvt
+        )
 
         charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
             my_charm_type,
@@ -67,8 +69,11 @@ def test_event_emission() -> None:
         ) as manager:
             manager.run()
 
-        assert my_charm_type._event  # type: ignore[attr-defined]
-        assert isinstance(my_charm_type._event, MyEvt)  # type: ignore[attr-defined]
+        assert my_charm_type._event  # type: ignore
+        assert isinstance(
+            my_charm_type._event,  # type: ignore
+            MyEvt,
+        )
 
 
 @pytest.mark.parametrize('app_name', ('foo', 'bar-baz', 'QuX2'))
