@@ -265,7 +265,7 @@ def test_relation_app_events(as_kwarg: bool, event_name: str, event_kind: type[o
 
 
 def test_relation_complex_name():
-    meta: dict[str, Any] = copy.deepcopy(META)
+    meta = copy.deepcopy(META)
     meta['requires']['foo-bar-baz'] = {'interface': 'another-one'}
     ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
     relation = scenario.Relation('foo-bar-baz')
@@ -296,7 +296,7 @@ def test_relation_events_as_positional_arg(event_name: str):
         ('relation_changed', ops.RelationChangedEvent),
     ],
 )
-def test_relation_unit_events_default_unit(event_name: str, event_kind: type[ops.EventBase]):
+def test_relation_unit_events_default_unit(event_name: str, event_kind: type[ops.RelationEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}})
     state_in = scenario.State(relations=[relation])
@@ -307,7 +307,6 @@ def test_relation_unit_events_default_unit(event_name: str, event_kind: type[ops
         mgr.run()
         relation_event, collect_status = mgr.charm.observed
         assert isinstance(relation_event, event_kind)
-        relation_event = typing.cast('ops.RelationEvent', relation_event)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
         assert relation_event.unit is not None
@@ -322,7 +321,7 @@ def test_relation_unit_events_default_unit(event_name: str, event_kind: type[ops
         ('relation_changed', ops.RelationChangedEvent),
     ],
 )
-def test_relation_unit_events(event_name: str, event_kind: type[ops.EventBase]):
+def test_relation_unit_events(event_name: str, event_kind: type[ops.RelationEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}, 2: {'x': 'z'}})
     state_in = scenario.State(relations=[relation])
@@ -332,7 +331,6 @@ def test_relation_unit_events(event_name: str, event_kind: type[ops.EventBase]):
         mgr.run()
         relation_event, collect_status = mgr.charm.observed
         assert isinstance(relation_event, event_kind)
-        relation_event = typing.cast('ops.RelationEvent', relation_event)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
         assert relation_event.unit is not None
@@ -541,7 +539,7 @@ def test_custom_event_is_hookevent():
 
 
 def test_custom_event_with_scenario_args():
-    meta: dict[str, Any] = META.copy()
+    meta = META.copy()
     meta['requires']['endpoint'] = {'interface': 'int1'}
     meta['requires']['sub-endpoint'] = {'interface': 'int2', 'scope': 'container'}
     meta['peers'] = {'peer-endpoint': {'interface': 'int3'}}
