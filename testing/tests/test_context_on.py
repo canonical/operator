@@ -244,7 +244,7 @@ def test_pebble_ready_event() -> None:
     ],
 )
 def test_relation_app_events(
-    as_kwarg: bool, event_name: str, event_kind: type[ops.EventBase]
+    as_kwarg: bool, event_name: str, event_kind: type[ops.RelationEvent]
 ) -> None:
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz')
@@ -261,7 +261,6 @@ def test_relation_app_events(
         mgr.run()
         relation_event, collect_status = mgr.charm.observed
         assert isinstance(relation_event, event_kind)
-        relation_event = typing.cast('ops.RelationEvent', relation_event)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
         assert relation_event.unit is None
