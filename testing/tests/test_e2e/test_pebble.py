@@ -24,7 +24,7 @@ from ops.pebble import ExecError, Layer, ServiceStartup, ServiceStatus
 
 from scenario import Context
 from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
-from ..helpers import jsonpatch_delta, trigger  # type: ignore[reportUnknownVariableType]
+from ..helpers import jsonpatch_delta, trigger  # type: ignore
 
 if TYPE_CHECKING:
     from ops.pebble import LayerDict, ServiceDict
@@ -164,7 +164,7 @@ def test_fs_pull(charm_cls: type[CharmBase], make_dirs: bool):
         assert file.read_text() == text
 
         # shortcut for API niceness purposes:
-        file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'  # type: ignore[reportUnknownMemberType]
+        file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'  # type: ignore
         assert file.read_text() == text
 
     else:
@@ -360,9 +360,9 @@ def test_exec_wait_error(charm_cls: type[CharmBase]):
     with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container('foo')
         proc = container.exec(['foo'])
-        with pytest.raises(ExecError) as exc_info:  # type: ignore[reportUnknownVariableType]
+        with pytest.raises(ExecError) as exc_info:  # type: ignore
             proc.wait_output()
-        assert exc_info.value.stdout == 'hello pebble'  # type: ignore[reportUnknownMemberType]
+        assert exc_info.value.stdout == 'hello pebble'  # type: ignore
 
 
 @pytest.mark.parametrize('command', (['foo'], ['foo', 'bar'], ['foo', 'bar', 'baz']))

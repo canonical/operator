@@ -538,13 +538,13 @@ def test_relation_events_no_remote_units(
         assert 'remote unit ID unset; no remote unit data present' in caplog.text
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore[reportUnknownArgumentType]
+@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore
 def test_relation_unit_data_bad_types(mycharm: Any, data: object):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', remote_units_data={0: {'a': cast('Any', data)}})
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore[reportUnknownArgumentType]
+@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore
 def test_relation_app_data_bad_types(mycharm: Any, data: object):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', local_app_data={'a': cast('Any', data)})
