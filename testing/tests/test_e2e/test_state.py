@@ -67,7 +67,7 @@ def mycharm() -> type[CharmBase]:
     class MyCharm(CharmBase):
         _call: Callable[[EventBase], None] | None = None
         called = False
-        on = MyCharmEvents()  # type: ignore[assignment]
+        on = MyCharmEvents()  # type: ignore
 
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -122,7 +122,7 @@ def test_status_setting(state: State, mycharm: type[CharmBase]):
         charm.unit.status = ActiveStatus('foo test')
         charm.app.status = WaitingStatus('foo barz')
 
-    mycharm._call = call  # type: ignore[attr-defined]
+    mycharm._call = call  # type: ignore
     out = trigger(
         state,
         'start',
@@ -233,7 +233,7 @@ def test_relation_set(mycharm: type[CharmBase]):
         # with pytest.raises(Exception):
         #     rel.data[charm.model.get_unit("remote/1")]["c"] = "d"
 
-    mycharm._call = event_handler  # type: ignore[attr-defined]
+    mycharm._call = event_handler  # type: ignore
     relation = Relation(
         endpoint='foo',
         interface='bar',
@@ -246,7 +246,7 @@ def test_relation_set(mycharm: type[CharmBase]):
         relations={relation},
     )
 
-    assert not mycharm.called  # type: ignore[attr-defined]
+    assert not mycharm.called  # type: ignore
     out = trigger(
         state,
         event='start',
@@ -257,7 +257,7 @@ def test_relation_set(mycharm: type[CharmBase]):
         },
         pre_event=pre_event,
     )
-    assert mycharm.called  # type: ignore[attr-defined]
+    assert mycharm.called  # type: ignore
 
     assert asdict(out.get_relation(relation.id)) == asdict(
         replace(
@@ -305,12 +305,12 @@ def test_positional_arguments(klass: type[Any], num_args: tuple[int, ...]):
 
 def test_model_positional_arguments():
     with pytest.raises(TypeError):
-        Model('', '')  # type: ignore[misc]
+        Model('', '')  # type: ignore
 
 
 def test_container_positional_arguments():
     with pytest.raises(TypeError):
-        Container('', True)  # type: ignore[misc]
+        Container('', True)  # type: ignore
 
 
 def test_container_default_values():
@@ -539,7 +539,7 @@ def test_state_immutable_with_changed_data_relation(
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
-    mycharm._call = event_handler  # type: ignore[attr-defined]
+    mycharm._call = event_handler  # type: ignore
 
     relation_in = relation_type(relation_type.__name__)
 
@@ -580,7 +580,7 @@ def test_state_immutable_with_changed_data_container(mycharm: type[CharmBase]):
         container = charm.model.unit.get_container('foo')
         container.add_layer(layer_name, layer, combine=True)
 
-    mycharm._call = event_handler  # type: ignore[attr-defined]
+    mycharm._call = event_handler  # type: ignore
 
     container_in = Container('foo', can_connect=True)
     state_in = State(containers={container_in})
@@ -604,7 +604,7 @@ def test_state_immutable_with_changed_data_ports(mycharm: type[CharmBase]):
     def event_handler(charm: CharmBase, _: EventBase):
         charm.model.unit.open_port(protocol='tcp', port=80)
 
-    mycharm._call = event_handler  # type: ignore[attr-defined]
+    mycharm._call = event_handler  # type: ignore
 
     state_in = State()
     state_out = trigger(
@@ -623,7 +623,7 @@ def test_state_immutable_with_changed_data_secret(mycharm: type[CharmBase]):
         secret = charm.model.get_secret(label='my-secret')
         secret.set_content({'password': 'bar'})
 
-    mycharm._call = event_handler  # type: ignore[attr-defined]
+    mycharm._call = event_handler  # type: ignore
 
     secret_in = Secret({'password': 'foo'}, label='my-secret', owner='unit')
     state_in = State(secrets={secret_in})

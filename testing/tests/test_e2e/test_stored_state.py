@@ -33,7 +33,7 @@ def mycharm() -> type[ops.CharmBase]:
 
 
 def test_stored_state_default(mycharm: type[ops.CharmBase]):
-    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
+    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'bar',
         'baz': {12: 142},
@@ -53,7 +53,7 @@ def test_stored_state_initialized(mycharm: type[ops.CharmBase]):
         ),
         'start',
         mycharm,
-        meta=mycharm.META,  # type: ignore[attr-defined]
+        meta=mycharm.META,  # type: ignore
     )
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'FOOX',
@@ -67,7 +67,7 @@ def test_stored_state_initialized(mycharm: type[ops.CharmBase]):
 
 def test_positional_arguments():
     with pytest.raises(TypeError):
-        StoredState('_stored', '')  # type: ignore[call-arg]
+        StoredState('_stored', '')  # type: ignore
 
 
 def test_default_arguments():

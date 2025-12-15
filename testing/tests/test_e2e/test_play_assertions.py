@@ -33,7 +33,7 @@ def mycharm() -> type[ops.CharmBase]:
 def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
     def pre_event(charm: ops.CharmBase):
         assert charm.unit.status == ops.BlockedStatus('foo')
-        assert not charm.called  # type: ignore[attr-defined]
+        assert not charm.called  # type: ignore
 
     def call(charm: ops.CharmBase, _: ops.EventBase):
         if charm.unit.status.message == 'foo':
@@ -41,9 +41,9 @@ def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
 
     def post_event(charm: ops.CharmBase):
         assert charm.unit.status == ops.ActiveStatus('yabadoodle')
-        assert charm.called  # type: ignore[attr-defined]
+        assert charm.called  # type: ignore
 
-    mycharm._call = call  # type: ignore[attr-defined]
+    mycharm._call = call  # type: ignore
 
     initial_state = State(config={'foo': 'bar'}, leader=True, unit_status=BlockedStatus('foo'))
 
@@ -75,7 +75,7 @@ def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
 
 
 def test_relation_data_access(mycharm: type[ops.CharmBase]):
-    mycharm._call = lambda *_: True  # type: ignore[misc]
+    mycharm._call = lambda *_: True  # type: ignore
 
     def check_relation_data(charm: ops.CharmBase):
         foo_relations = charm.model.relations['relation_test']

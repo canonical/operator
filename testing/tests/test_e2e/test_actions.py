@@ -64,9 +64,9 @@ def test_action_no_results():
 def test_action_event_results_invalid(mycharm: type[CharmBase], res_value: object):
     def handle_evt(charm: CharmBase, evt: ActionEvent):
         with pytest.raises((TypeError, AttributeError)):
-            evt.set_results(res_value)  # type: ignore[arg-type]
+            evt.set_results(res_value)  # type: ignore
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo'), State())
@@ -81,7 +81,7 @@ def test_action_event_results_valid(mycharm: type[CharmBase], res_value: dict[st
         evt.log('foo')
         evt.log('bar')
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
 
@@ -101,7 +101,7 @@ def test_action_event_outputs(mycharm: type[CharmBase], res_value: dict[str, Any
         evt.log('log2')
         evt.fail('failed becozz')
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -117,7 +117,7 @@ def test_action_event_fail(mycharm: type[CharmBase]):
             return
         evt.fail('action failed!')
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -131,7 +131,7 @@ def test_action_event_fail_context_manager(mycharm: type[CharmBase]):
             return
         evt.fail('action failed!')
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -176,7 +176,7 @@ def test_action_event_has_id(mycharm: type[CharmBase]):
             return
         assert isinstance(evt.id, str) and evt.id != ''
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo'), State())
@@ -191,7 +191,7 @@ def test_action_event_has_override_id(mycharm: type[CharmBase]):
             return
         assert evt.id == uuid
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo', id=uuid), State())
@@ -224,7 +224,7 @@ def test_two_actions_same_context():
 
 def test_positional_arguments():
     with pytest.raises(TypeError):
-        _Action('foo', {})  # type: ignore[misc]
+        _Action('foo', {})  # type: ignore
 
 
 def test_default_arguments():

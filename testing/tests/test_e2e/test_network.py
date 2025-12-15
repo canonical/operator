@@ -104,7 +104,7 @@ def test_no_sub_binding(mycharm: type[ops.CharmBase]):
     ) as mgr:
         with pytest.raises(ops.RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding('bar').network  # type: ignore[union-attr]
+            mgr.charm.model.get_binding('bar').network  # type: ignore
 
 
 def test_no_relation_error(mycharm: type[ops.CharmBase]):
@@ -134,7 +134,7 @@ def test_no_relation_error(mycharm: type[ops.CharmBase]):
         ),
     ) as mgr:
         with pytest.raises(ops.RelationNotFoundError):
-            mgr.charm.model.get_binding('foo').network  # type: ignore[union-attr]
+            mgr.charm.model.get_binding('foo').network  # type: ignore
 
 
 def test_juju_info_network_default(mycharm: type[ops.CharmBase]):

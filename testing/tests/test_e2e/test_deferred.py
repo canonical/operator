@@ -41,20 +41,20 @@ def mycharm() -> type[ops.CharmBase]:
 
 
 def test_defer(mycharm: type[ops.CharmBase]):
-    mycharm.defer_next = True  # type: ignore[attr-defined]
-    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
+    mycharm.defer_next = True  # type: ignore
+    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore
     assert len(out.deferred) == 1
     assert out.deferred[0].name == 'start'
 
 
 def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
-    mycharm.defer_next = 2  # type: ignore[attr-defined]
+    mycharm.defer_next = 2  # type: ignore
 
     out = trigger(
-        State(deferred=[_Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore[attr-defined]
+        State(deferred=[_Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
         'start',
         mycharm,
-        meta=mycharm.META,  # type: ignore[attr-defined]
+        meta=mycharm.META,  # type: ignore
     )
 
     # we deferred the first 2 events we saw: update-status, start.
@@ -63,13 +63,13 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     assert update_status.name == 'update_status'
 
     # we saw start and update-status.
-    upstat, start = mycharm.captured  # type: ignore[attr-defined]
+    upstat, start = mycharm.captured  # type: ignore
     assert isinstance(upstat, ops.UpdateStatusEvent)
     assert isinstance(start, ops.StartEvent)
 
 
 def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
-    mycharm.defer_next = 2  # type: ignore[attr-defined]
+    mycharm.defer_next = 2  # type: ignore
 
     rel = Relation(endpoint='foo', remote_app_name='remote')
 
@@ -78,13 +78,13 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
             relations={rel},
             deferred=[
                 _Event('foo_relation_changed', relation=rel).deferred(
-                    handler=mycharm._on_event,  # type: ignore[attr-defined]
+                    handler=mycharm._on_event,  # type: ignore
                 )
             ],
         ),
         'start',
         mycharm,
-        meta=mycharm.META,  # type: ignore[attr-defined]
+        meta=mycharm.META,  # type: ignore
     )
 
     # we deferred the first 2 events we saw: relation-changed, start.
@@ -93,25 +93,25 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
     assert start.name == 'start'
 
     # we saw start and relation-changed.
-    relation_changed, start = mycharm.captured  # type: ignore[attr-defined]
+    relation_changed, start = mycharm.captured  # type: ignore
     assert isinstance(relation_changed, ops.RelationChangedEvent)
     assert isinstance(start, ops.StartEvent)
 
 
 def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]):
-    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore[attr-defined]
-    mycharm.defer_next = 2  # type: ignore[attr-defined]
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    mycharm.defer_next = 2  # type: ignore
     rel = Relation(endpoint='foo', remote_app_name='remote')
     out = trigger(
         State(
             relations={rel},
             deferred=[
-                ctx.on.relation_changed(rel, remote_unit=1).deferred(handler=mycharm._on_event)  # type: ignore[attr-defined]
+                ctx.on.relation_changed(rel, remote_unit=1).deferred(handler=mycharm._on_event)  # type: ignore
             ],
         ),
         'start',
         mycharm,
-        meta=mycharm.META,  # type: ignore[attr-defined]
+        meta=mycharm.META,  # type: ignore
     )
 
     # we deferred the first 2 events we saw: foo_relation_changed, start.
@@ -126,13 +126,13 @@ def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]):
     assert start.name == 'start'
 
     # we saw start and foo_relation_changed.
-    relation_changed, start = mycharm.captured  # type: ignore[attr-defined]
+    relation_changed, start = mycharm.captured  # type: ignore
     assert isinstance(relation_changed, ops.RelationChangedEvent)
     assert isinstance(start, ops.StartEvent)
 
 
 def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
-    mycharm.defer_next = 2  # type: ignore[attr-defined]
+    mycharm.defer_next = 2  # type: ignore
 
     ctr = Container('foo')
 
@@ -140,12 +140,12 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
         State(
             containers={ctr},
             deferred=[
-                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)  # type: ignore[attr-defined]
+                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
             ],
         ),
         'start',
         mycharm,
-        meta=mycharm.META,  # type: ignore[attr-defined]
+        meta=mycharm.META,  # type: ignore
     )
 
     # we deferred the first 2 events we saw: foo_pebble_ready, start.
@@ -154,18 +154,18 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
     assert start.name == 'start'
 
     # we saw start and foo_pebble_ready.
-    ready, start = mycharm.captured  # type: ignore[attr-defined]
+    ready, start = mycharm.captured  # type: ignore
     assert isinstance(ready, ops.WorkloadEvent)
     assert isinstance(start, ops.StartEvent)
 
 
 def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]):
-    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore[attr-defined]
+    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore
 
-    mycharm.defer_next = 1  # type: ignore[attr-defined]
+    mycharm.defer_next = 1  # type: ignore
     state_1 = ctx.run(ctx.on.update_status(), State())
 
-    mycharm.defer_next = 0  # type: ignore[attr-defined]
+    mycharm.defer_next = 0  # type: ignore
     state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
@@ -178,13 +178,13 @@ def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]):
 
 
 def test_defer_reemit_relation_event(mycharm: type[ops.CharmBase]):
-    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore[attr-defined]
+    ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore
 
     rel = Relation('foo')
-    mycharm.defer_next = 1  # type: ignore[attr-defined]
+    mycharm.defer_next = 1  # type: ignore
     state_1 = ctx.run(ctx.on.relation_created(rel), State(relations={rel}))
 
-    mycharm.defer_next = 0  # type: ignore[attr-defined]
+    mycharm.defer_next = 0  # type: ignore
     state_2 = ctx.run(ctx.on.start(), state_1)
 
     assert [type(e).__name__ for e in ctx.emitted_events] == [
@@ -232,11 +232,11 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.consumer = MyConsumer(self)
-            framework.observe(self.consumer.on.foo_changed, self._on_event)  # type: ignore[attr-defined]
+            framework.observe(self.consumer.on.foo_changed, self._on_event)  # type: ignore
 
-    ctx = Context(MyCharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore[attr-defined]
+    ctx = Context(MyCharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore
 
-    mycharm.defer_next = 1  # type: ignore[attr-defined]
+    mycharm.defer_next = 1  # type: ignore
     state_1 = ctx.run(
         ctx.on.custom(typing.cast('typing.Any', MyConsumer.on).foo_changed, 'foo', 28), State()
     )
@@ -244,7 +244,7 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
     assert ctx.emitted_events[0].snapshot() == {'arg0': 'foo', 'arg1': 28}
     assert len(state_1.deferred) == 1
 
-    mycharm.defer_next = 0  # type: ignore[attr-defined]
+    mycharm.defer_next = 0  # type: ignore
     state_2 = ctx.run(ctx.on.start(), state_1)
     assert [type(e).__name__ for e in ctx.emitted_events] == [
         'CustomEventWithArgs',
