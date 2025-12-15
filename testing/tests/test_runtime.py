@@ -61,7 +61,7 @@ def test_event_emission():
             charm_spec,
         )
 
-        ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
+        ctx = Context(my_charm_type, meta=meta)
         with runtime.exec(
             state=State(),
             event=_Event('bar'),
