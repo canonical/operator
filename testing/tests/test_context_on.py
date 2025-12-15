@@ -105,7 +105,7 @@ def test_simple_deprecated_events(event_name: str, event_kind: type[ops.EventBas
 def test_simple_secret_events(
     as_kwarg: bool,
     event_name: str,
-    event_kind: type[ops.EventBase],
+    event_kind: type[ops.SecretEvent],
     owner: Literal['unit', 'app'] | None,
 ):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
@@ -125,7 +125,6 @@ def test_simple_secret_events(
         mgr.run()
         secret_event, collect_status = mgr.charm.observed
         assert isinstance(secret_event, event_kind)
-        secret_event = typing.cast('ops.SecretEvent', secret_event)
         assert secret_event.secret.id == secret.id
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
@@ -137,7 +136,9 @@ def test_simple_secret_events(
         ('secret_remove', ops.SecretRemoveEvent),
     ],
 )
-def test_revision_secret_events(event_name: str, event_kind: type[ops.EventBase]):
+def test_revision_secret_events(
+    event_name: str, event_kind: type[ops.SecretExpiredEvent | ops.SecretRemoveEvent]
+):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
         tracked_content={'password': 'yyyy'},
@@ -153,7 +154,6 @@ def test_revision_secret_events(event_name: str, event_kind: type[ops.EventBase]
         mgr.run()
         secret_event, collect_status = mgr.charm.observed
         assert isinstance(secret_event, event_kind)
-        secret_event = typing.cast('ops.SecretExpiredEvent | ops.SecretRemoveEvent', secret_event)
         assert secret_event.secret.id == secret.id
         assert secret_event.revision == 42
         assert isinstance(collect_status, ops.CollectStatusEvent)
@@ -179,7 +179,7 @@ def test_revision_secret_events_as_positional_arg(event_name: str):
         ('storage_detaching', ops.StorageDetachingEvent),
     ],
 )
-def test_storage_events(event_name: str, event_kind: type[ops.EventBase]):
+def test_storage_events(event_name: str, event_kind: type[ops.StorageEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     storage = scenario.Storage('foo')
     state_in = scenario.State(storages=[storage])
@@ -189,7 +189,6 @@ def test_storage_events(event_name: str, event_kind: type[ops.EventBase]):
         mgr.run()
         storage_event, collect_status = mgr.charm.observed
         assert isinstance(storage_event, event_kind)
-        storage_event = typing.cast('ops.StorageEvent', storage_event)
         assert storage_event.storage.name == storage.name
         assert storage_event.storage.index == storage.index
         assert isinstance(collect_status, ops.CollectStatusEvent)
