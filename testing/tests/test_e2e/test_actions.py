@@ -7,7 +7,6 @@ import pytest
 from scenario import Context
 from scenario.state import State, _Action, _next_action_id
 
-from ops import __version__ as ops_version
 from ops._private.harness import ActionFailed
 from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
@@ -161,16 +160,6 @@ def test_action_continues_after_fail():
     assert ctx.action_results == {'initial': 'result', 'final': 'result'}
 
 
-def _ops_less_than(wanted_major, wanted_minor):
-    major, minor = (int(v) for v in ops_version.split('.')[:2])
-    if major < wanted_major:
-        return True
-    if major == wanted_major and minor < wanted_minor:
-        return True
-    return False
-
-
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
 def test_action_event_has_id(mycharm):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
@@ -183,7 +172,6 @@ def test_action_event_has_id(mycharm):
     ctx.run(ctx.on.action('foo'), State())
 
 
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
 def test_action_event_has_override_id(mycharm):
     uuid = '0ddba11-cafe-ba1d-5a1e-dec0debad'
 
