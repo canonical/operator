@@ -19,8 +19,8 @@ def mycharm() -> type[ops.CharmBase]:
         META: Mapping[str, Any] = {'name': 'mycharm'}
 
         _read: ClassVar[dict[str, Any]] = {}
-        _stored = ops.Storedstate()
-        _stored2 = ops.Storedstate()
+        _stored = ops.StoredState()
+        _stored2 = ops.StoredState()
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
