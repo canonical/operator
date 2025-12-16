@@ -1,11 +1,15 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 from typing import Any
 
-import ops
 import pytest
-
 from scenario.state import State
+
+import ops
+
 from ..helpers import trigger
 
 

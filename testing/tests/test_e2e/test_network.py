@@ -1,8 +1,9 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
 import pytest
-
 from scenario import Context
 from scenario.state import (
     Address,
@@ -12,6 +13,8 @@ from scenario.state import (
     State,
     SubordinateRelation,
 )
+
+import ops
 
 
 @pytest.fixture(scope='function')
@@ -24,7 +27,7 @@ def mycharm() -> type[ops.CharmBase]:
             super().__init__(framework)
 
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
         def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
@@ -104,7 +107,7 @@ def test_no_sub_binding(mycharm: type[ops.CharmBase]):
     ) as mgr:
         with pytest.raises(ops.RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding('bar').network  # type: ignore
+            mgr.charm.model.get_binding('bar').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_no_relation_error(mycharm: type[ops.CharmBase]):
@@ -134,7 +137,7 @@ def test_no_relation_error(mycharm: type[ops.CharmBase]):
         ),
     ) as mgr:
         with pytest.raises(ops.RelationNotFoundError):
-            mgr.charm.model.get_binding('foo').network  # type: ignore
+            mgr.charm.model.get_binding('foo').network  # noqa: B018  # Used to trigger the error.
 
 
 def test_juju_info_network_default(mycharm: type[ops.CharmBase]):

@@ -1,20 +1,23 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 import datetime
 import io
-import tempfile
 from pathlib import Path
 
 import pytest
+from scenario import Context
+from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
+
 from ops import PebbleCustomNoticeEvent, PebbleReadyEvent, pebble
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.log import _get_juju_log_and_app_id
 from ops.pebble import ExecError, Layer, ServiceStartup, ServiceStatus
 
-from scenario import Context
-from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 from ..helpers import jsonpatch_delta, trigger
 
 
@@ -73,10 +76,10 @@ def test_connectivity(charm_cls, can_connect):
     )
 
 
-def test_fs_push(charm_cls):
+def test_fs_push(tmp_path, charm_cls):
     text = 'lorem ipsum/n alles amat gloriae foo'
-    file = tempfile.NamedTemporaryFile()
-    pth = Path(file.name)
+
+    pth = tmp_path / 'textfile'
     pth.write_text(text)
 
     def callback(self: CharmBase):
@@ -102,7 +105,7 @@ def test_fs_push(charm_cls):
 
 
 @pytest.mark.parametrize('make_dirs', (True, False))
-def test_fs_pull(charm_cls, make_dirs):
+def test_fs_pull(tmp_path, charm_cls, make_dirs):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
     def callback(self: CharmBase):
@@ -120,11 +123,10 @@ def test_fs_pull(charm_cls, make_dirs):
             with pytest.raises((FileNotFoundError, pebble.PathError)):
                 container.pull('/foo/bar/baz.txt')
 
-    td = tempfile.TemporaryDirectory()
     container = Container(
         name='foo',
         can_connect=True,
-        mounts={'foo': Mount(location='/foo', source=td.name)},
+        mounts={'foo': Mount(location='/foo', source=tmp_path)},
     )
     state = State(containers={container})
 
@@ -137,10 +139,8 @@ def test_fs_pull(charm_cls, make_dirs):
         callback(mgr.charm)
 
     if make_dirs:
-        # file = (out.get_container("foo").mounts["foo"].source + "bar/baz.txt").open("/foo/bar/baz.txt")
-
         # this is one way to retrieve the file
-        file = Path(td.name + '/bar/baz.txt')
+        file = tmp_path / 'bar' / 'baz.txt'
 
         # another is:
         assert file == Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'

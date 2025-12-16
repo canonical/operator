@@ -1,22 +1,26 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, ClassVar
+
+import pytest
+from scenario.state import State, StoredState
 
 import ops
-import pytest
-
-from scenario.state import State, StoredState
 from tests.helpers import trigger
 
 
 @pytest.fixture(scope='function')
 def mycharm() -> type[ops.CharmBase]:
     class MyCharm(ops.CharmBase):
-        META = {'name': 'mycharm'}
+        META: Mapping[str, Any] = {'name': 'mycharm'}
 
-        _read: dict[str, Any] = {}
-        _stored = ops.StoredState()
-        _stored2 = ops.StoredState()
+        _read: ClassVar[dict[str, Any]] = {}
+        _stored = ops.Storedstate()
+        _stored2 = ops.Storedstate()
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

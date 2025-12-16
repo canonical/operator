@@ -1,12 +1,15 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
-import ops
 import pytest
+from scenario.state import BlockedStatus, Relation, State
 
-from scenario.state import Relation, State
-from scenario.state import BlockedStatus
+import ops
+
 from ..helpers import jsonpatch_delta, trigger
 
 

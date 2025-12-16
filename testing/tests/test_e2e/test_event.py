@@ -1,10 +1,15 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
-import pytest
+from typing import Any, ClassVar
 
+import pytest
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
+
+import ops
 
 
 @pytest.mark.parametrize(
@@ -60,10 +65,7 @@ def test_event_type(evt: str, expected_type: _EventType):
 
 
 def test_emitted_framework():
-    class MyCharm(ops.CharmBase):
-        META = {'name': 'joop'}
-
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    ctx = Context(ops.CharmBase, meta={'name': 'joop'}, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
     assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
@@ -76,7 +78,7 @@ def test_emitted_framework():
 
 def test_emitted_deferred():
     class MyCharm(ops.CharmBase):
-        META = {'name': 'joop'}
+        META: ClassVar[dict[str, Any]] = {'name': 'joop'}
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -87,7 +89,7 @@ def test_emitted_deferred():
 
     ctx = Context(
         MyCharm,
-        meta=MyCharm.META,
+        meta={'name': 'joop'},
         capture_deferred_events=True,
         capture_framework_events=True,
     )
