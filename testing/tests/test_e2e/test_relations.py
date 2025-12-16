@@ -1,57 +1,49 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any, cast
 
-import ops
 import pytest
-from ops.charm import (
-    CharmBase,
-    CharmEvents,
-    CollectStatusEvent,
-    RelationBrokenEvent,
-    RelationCreatedEvent,
-    RelationDepartedEvent,
-    RelationEvent,
-)
-from ops.framework import EventBase, Framework
-
-import scenario
-from scenario import Context
+from scenario.context import Context
 from scenario.errors import StateValidationError, UncaughtCharmError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
-    _Event,
     PeerRelation,
     Relation,
     RelationBase,
     State,
     SubordinateRelation,
+    _Event,
     _next_relation_id,
 )
+
+import ops
 from tests.helpers import trigger
 
 
 @pytest.fixture(scope='function')
 def mycharm():
-    class MyCharmEvents(CharmEvents):
+    class MyCharmEvents(ops.CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: type[ops.EventBase]):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)
 
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         _call: Callable[[_Event], None] | None = None
         called = False
-        on: CharmEvents = MyCharmEvents()
+        on: ops.CharmEvents = MyCharmEvents()
 
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: EventBase):
+        def _on_event(self, event: ops.EventBase):
             if self._call:
                 MyCharm.called = True
                 self._call(cast('Any', event))
@@ -60,7 +52,7 @@ def mycharm():
 
 
 def test_get_relation(mycharm: Any):
-    def pre_event(charm: CharmBase):
+    def pre_event(charm: ops.CharmBase):
         assert charm.model.get_relation('foo')
         assert charm.model.get_relation('bar') is None
         assert charm.model.get_relation('qux')
@@ -148,7 +140,7 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
         },
         actions={'my-act': {}},
     )
-    rel_in = scenario.Relation(
+    rel_in = Relation(
         endpoint='my-rel',
         local_app_data={'k': 'local val'},
         remote_app_data={'k': 'remote val'},
@@ -161,12 +153,12 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
 def test_relation_set_single_add_del_change():
     relation_name = 'relation-name'
 
-    class Charm(CharmBase):
-        def __init__(self, framework: Framework):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
 
-        def _update_status(self, event: EventBase):
+        def _update_status(self, event: ops.EventBase):
             rel = self.model.get_relation(relation_name)
             assert rel is not None
             data = rel.data[self.unit]
@@ -304,12 +296,12 @@ def test_relation_set_bulk_update(
 ):
     relation_name = 'relation-name'
 
-    class Charm(CharmBase):
-        def __init__(self, framework: Framework):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
 
-        def _update_status(self, event: EventBase):
+        def _update_status(self, event: ops.EventBase):
             rel = self.model.get_relation(relation_name)
             assert rel is not None
             data = rel.data[self.unit]
@@ -339,8 +331,8 @@ def test_relation_set_bulk_update(
 def test_relation_events(mycharm: Any, evt_name: str, remote_app_name: str):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
-    def callback(charm: CharmBase, e: EventBase):
-        if not isinstance(e, RelationEvent):
+    def callback(charm: ops.CharmBase, e: ops.EventBase):
+        if not isinstance(e, ops.RelationEvent):
             return  # filter out collect status events
 
         if evt_name == 'broken':
@@ -398,15 +390,15 @@ def test_relation_events_attrs(
 ):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
-    def callback(charm: CharmBase, event: EventBase):
-        if isinstance(event, CollectStatusEvent):
+    def callback(charm: ops.CharmBase, event: ops.EventBase):
+        if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, RelationEvent):
+        if isinstance(event, ops.RelationEvent):
             assert event.app
-            if not isinstance(event, RelationCreatedEvent | RelationBrokenEvent):
+            if not isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
                 assert event.unit
-            if isinstance(event, RelationDepartedEvent):
+            if isinstance(event, ops.RelationDepartedEvent):
                 assert event.departing_unit
 
     mycharm._call = callback
@@ -446,14 +438,14 @@ def test_relation_events_no_attrs(
         remote_units_data={0: {}, 1: {}},  # 2 units
     )
 
-    def callback(charm: CharmBase, event: EventBase):
-        if isinstance(event, CollectStatusEvent):
+    def callback(charm: ops.CharmBase, event: ops.EventBase):
+        if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, RelationEvent):
+        if isinstance(event, ops.RelationEvent):
             assert event.app  # that's always present
             # .unit is always None for created and broken.
-            if isinstance(event, RelationCreatedEvent | RelationBrokenEvent):
+            if isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
                 assert event.unit is None
             else:
                 assert event.unit
@@ -508,11 +500,11 @@ def test_relation_events_no_remote_units(
         remote_units_data={},  # no units
     )
 
-    def callback(charm: CharmBase, event: EventBase):
-        if isinstance(event, CollectStatusEvent):
+    def callback(charm: ops.CharmBase, event: ops.EventBase):
+        if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, RelationEvent):
+        if isinstance(event, ops.RelationEvent):
             assert event.app  # that's always present
             assert not event.unit
 
@@ -598,7 +590,7 @@ def test_trigger_sub_relation(mycharm: Any):
     sub1 = SubordinateRelation('foo', remote_unit_data={'1': '2'}, remote_app_name='primary1')
     sub2 = SubordinateRelation('foo', remote_unit_data={'3': '4'}, remote_app_name='primary2')
 
-    def post_event(charm: CharmBase):
+    def post_event(charm: ops.CharmBase):
         b_relations = charm.model.relations['foo']
         assert len(b_relations) == 2
         for relation in b_relations:
@@ -639,17 +631,17 @@ def test_broken_relation_not_in_model_relations(mycharm: Any):
 
 
 def test_get_relation_when_missing():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.update_status, self._on_update_status)
             self.framework.observe(self.on.config_changed, self._on_config_changed)
             self.relation = None
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             self.relation = self.model.get_relation('foo')
 
-        def _on_config_changed(self, _: EventBase):
+        def _on_config_changed(self, _: ops.EventBase):
             relation_id = self.config['relation-id']
             assert isinstance(relation_id, int)
             self.relation = self.model.get_relation('foo', relation_id)
@@ -740,12 +732,12 @@ def test_peer_relation_default_values():
 
 
 def test_relation_remote_model():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, event: EventBase):
+        def _on_start(self, event: ops.EventBase):
             relation = self.model.get_relation('foo')
             assert relation is not None
             self.remote_model_uuid = relation.remote_model.uuid
@@ -767,12 +759,12 @@ def test_relation_remote_model():
 def test_peer_relation_units_does_not_contain_this_unit():
     relation_name = 'relation-name'
 
-    class Charm(CharmBase):
-        def __init__(self, framework: Framework):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
 
-        def _update_status(self, _: EventBase):
+        def _update_status(self, _: ops.EventBase):
             rel = self.model.get_relation(relation_name)
             assert rel is not None
             assert self.unit not in rel.units

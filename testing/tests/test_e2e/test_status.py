@@ -1,11 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
 import pytest
-from ops.charm import CharmBase
-from ops.framework import EventBase, Framework
-
 from scenario import Context
+from scenario.errors import UncaughtCharmError
 from scenario.state import (
     ActiveStatus,
     BlockedStatus,
@@ -15,26 +15,28 @@ from scenario.state import (
     UnknownStatus,
     WaitingStatus,
 )
-from scenario.errors import UncaughtCharmError
+
+import ops
+
 from ..helpers import trigger
 
 
 @pytest.fixture(scope='function')
-def mycharm() -> type[CharmBase]:
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def mycharm() -> type[ops.CharmBase]:
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
-        def _on_event(self, event: EventBase):
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
 
 
-def test_initial_status(mycharm: type[CharmBase]):
-    def post_event(charm: CharmBase):
+def test_initial_status(mycharm: type[ops.CharmBase]):
+    def post_event(charm: ops.CharmBase):
         assert charm.unit.status == UnknownStatus()
 
     out = trigger(
@@ -48,13 +50,13 @@ def test_initial_status(mycharm: type[CharmBase]):
     assert out.unit_status == UnknownStatus()
 
 
-def test_status_history(mycharm: type[CharmBase]):
+def test_status_history(mycharm: type[ops.CharmBase]):
     class StatusCharm(mycharm):
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             for obj in (self.unit, self.app):
                 obj.status = ops.ActiveStatus('1')
                 obj.status = ops.BlockedStatus('2')
@@ -82,13 +84,13 @@ def test_status_history(mycharm: type[CharmBase]):
     ]
 
 
-def test_status_history_preservation(mycharm: type[CharmBase]):
+def test_status_history_preservation(mycharm: type[ops.CharmBase]):
     class StatusCharm(mycharm):
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             for obj in (self.unit, self.app):
                 obj.status = WaitingStatus('3')
 
@@ -113,21 +115,21 @@ def test_status_history_preservation(mycharm: type[CharmBase]):
     assert ctx.app_status_history == [ActiveStatus('bar')]
 
 
-def test_workload_history(mycharm: type[CharmBase]):
+def test_workload_history(mycharm: type[ops.CharmBase]):
     class WorkloadCharm(mycharm):
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.install, self._on_install)
             framework.observe(self.on.start, self._on_start)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_install(self, _: EventBase):
+        def _on_install(self, _: ops.EventBase):
             self.unit.set_workload_version('1')
 
-        def _on_start(self, _: EventBase):
+        def _on_start(self, _: ops.EventBase):
             self.unit.set_workload_version('1.1')
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             self.unit.set_workload_version('1.2')
 
     ctx = Context(
@@ -184,12 +186,12 @@ def test_status_comparison(status: ops.StatusBase):
     ),
 )
 def test_status_success(status: ops.StatusBase):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             self.unit.status = status
 
     ctx = Context(MyCharm, meta={'name': 'foo'})
@@ -204,12 +206,12 @@ def test_status_success(status: ops.StatusBase):
     ),
 )
 def test_status_error(status: ops.StatusBase, monkeypatch: pytest.MonkeyPatch):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
 
-        def _on_update_status(self, _: EventBase):
+        def _on_update_status(self, _: ops.EventBase):
             self.unit.status = status
 
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')

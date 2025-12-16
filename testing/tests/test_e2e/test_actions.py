@@ -1,13 +1,16 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import pytest
-from ops import __version__ as ops_version
-from ops.charm import ActionEvent, CharmBase
-from ops.framework import Framework
-from ops._private.harness import ActionFailed
-
 from scenario import Context
 from scenario.state import State, _Action, _next_action_id
+
+from ops import __version__ as ops_version
+from ops._private.harness import ActionFailed
+from ops.charm import ActionEvent, CharmBase
+from ops.framework import Framework
 
 
 @pytest.fixture(scope='function')

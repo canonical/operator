@@ -1,15 +1,21 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import pytest
-from ops import CharmBase, Framework, StartEvent, StopEvent
+from collections.abc import Mapping
+from typing import Any
 
+import pytest
 from scenario import Context, State
 from scenario.errors import StateValidationError
 from scenario.state import Port, TCPPort, UDPPort
 
+from ops import CharmBase, Framework, StartEvent, StopEvent
+
 
 class MyCharm(CharmBase):
-    META = {'name': 'edgar'}
+    META: Mapping[str, Any] = {'name': 'edgar'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

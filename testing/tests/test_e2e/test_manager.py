@@ -1,33 +1,35 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
-from ops import ActiveStatus, EventBase
-from ops.charm import CharmBase, CollectStatusEvent
-from ops.framework import Framework
-
 from scenario import Context, State
 from scenario.context import Manager
 from scenario.errors import AlreadyEmittedError
 
+import ops
+
 
 @pytest.fixture(scope='function')
 def mycharm():
-    class MyCharm(CharmBase):
-        META: dict[str, Any] = {'name': 'mycharm'}
-        ACTIONS: dict[str, Any] = {'do-x': {}}
+    class MyCharm(ops.CharmBase):
+        META: Mapping[str, Any] = {'name': 'mycharm'}
+        ACTIONS: Mapping[str, Any] = {'do-x': {}}
 
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
-        def _on_event(self, e: EventBase):
-            if isinstance(e, CollectStatusEvent):
+        def _on_event(self, e: ops.EventBase):
+            if isinstance(e, ops.CollectStatusEvent):
                 return
 
-            self.unit.status = ActiveStatus(e.handle.kind)
+            self.unit.status = ops.ActiveStatus(e.handle.kind)
 
     return MyCharm
 
