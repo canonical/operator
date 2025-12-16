@@ -25,12 +25,12 @@ class MyCharmWithoutStorage(CharmBase):
 
 @pytest.fixture
 def storage_ctx() -> Context[MyCharmWithStorage]:
-    return Context(MyCharmWithStorage, meta=MyCharmWithStorage.META)
+    return Context(MyCharmWithStorage, meta=dict(MyCharmWithStorage.META))
 
 
 @pytest.fixture
 def no_storage_ctx() -> Context[MyCharmWithoutStorage]:
-    return Context(MyCharmWithoutStorage, meta=MyCharmWithoutStorage.META)
+    return Context(MyCharmWithoutStorage, meta=dict(MyCharmWithoutStorage.META))
 
 
 def test_storage_get_null(no_storage_ctx: Context[MyCharmWithoutStorage]):

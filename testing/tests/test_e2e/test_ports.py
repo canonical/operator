@@ -32,7 +32,7 @@ class MyCharm(CharmBase):
 
 @pytest.fixture
 def ctx() -> Context[MyCharm]:
-    return Context(MyCharm, meta=MyCharm.META)
+    return Context(MyCharm, meta=dict(MyCharm.META))
 
 
 def test_open_port(ctx: Context[MyCharm]):

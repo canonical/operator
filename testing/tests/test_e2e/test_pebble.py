@@ -78,7 +78,7 @@ def test_connectivity(charm_cls: type[ops.CharmBase], can_connect: bool):
     )
 
 
-def test_fs_push(tmp_path, charm_cls: type[ops.CharmBase]):
+def test_fs_push(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase]):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
     pth = tmp_path / 'textfile'
@@ -107,7 +107,7 @@ def test_fs_push(tmp_path, charm_cls: type[ops.CharmBase]):
 
 
 @pytest.mark.parametrize('make_dirs', (True, False))
-def test_fs_pull(tmp_path, charm_cls: type[ops.CharmBase], make_dirs: bool):
+def test_fs_pull(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase], make_dirs: bool):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
     def callback(self: ops.CharmBase):
