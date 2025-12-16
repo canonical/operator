@@ -1,13 +1,15 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
-from collections.abc import Callable
 
 import jsonpatch
-
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
@@ -20,17 +22,17 @@ logger = logging.getLogger()
 
 
 def trigger(
-    state: 'State',
-    event: str | '_Event',
-    charm_type: type['CharmType'],
-    pre_event: Callable[['CharmType'], None] | None = None,
-    post_event: Callable[['CharmType'], None] | None = None,
+    state: State,
+    event: str | _Event,
+    charm_type: type[CharmType],
+    pre_event: Callable[[CharmType], None] | None = None,
+    post_event: Callable[[CharmType], None] | None = None,
     meta: dict[str, Any] | None = None,
     actions: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
     charm_root: str | Path | None = None,
     juju_version: str = _DEFAULT_JUJU_VERSION,
-) -> 'State':
+) -> State:
     ctx = Context(
         charm_type=charm_type,
         meta=meta,
@@ -42,10 +44,10 @@ def trigger(
     if isinstance(event, str):
         if event.startswith('relation_'):
             assert len(tuple(state.relations)) == 1, 'shortcut only works with one relation'
-            event = getattr(ctx.on, event)(tuple(state.relations)[0])
+            event = getattr(ctx.on, event)(next(iter(state.relations)))
         elif event.startswith('pebble_'):
             assert len(tuple(state.containers)) == 1, 'shortcut only works with one container'
-            event = getattr(ctx.on, event)(tuple(state.containers)[0])
+            event = getattr(ctx.on, event)(next(iter(state.containers)))
         else:
             event = getattr(ctx.on, event)()
     assert isinstance(event, _Event)
@@ -58,7 +60,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self, other: 'State'):
+def jsonpatch_delta(self, other: State):
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (

@@ -1,16 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import os
 from tempfile import TemporaryDirectory
 
 import pytest
+from scenario import ActiveStatus, Context
+from scenario._runtime import Runtime, UncaughtCharmError
+from scenario.state import Relation, State, _CharmSpec, _Event
 
 import ops
 from ops._main import _Abort
-
-from scenario import Context, ActiveStatus
-from scenario.state import Relation, State, _CharmSpec, _Event
-from scenario._runtime import Runtime, UncaughtCharmError
 
 
 def charm_type():

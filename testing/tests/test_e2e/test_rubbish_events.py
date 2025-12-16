@@ -1,10 +1,16 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
+from scenario.state import State, _CharmSpec, _Event
+
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
 
-from scenario.state import State, _CharmSpec, _Event
 from ..helpers import trigger
 
 
@@ -29,7 +35,7 @@ def mycharm():
 
     class MyCharm(CharmBase):
         on = MyCharmEvents()
-        evts = []
+        evts: ClassVar[list[EventBase]] = []
 
         def __init__(self, framework: Framework):
             super().__init__(framework)
