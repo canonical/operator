@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import jsonpatch
+import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
@@ -58,7 +58,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self, other: State):
+def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
@@ -74,4 +74,4 @@ def jsonpatch_delta(self, other: State):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
     patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
-    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])
+    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])  # type: ignore

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -42,9 +41,9 @@ class MyCharm(ops.CharmBase):
 def assert_inconsistent(
     state: State,
     event: _Event,
-    charm_spec: _CharmSpec,
-    juju_version='3.0',
-    unit_id=0,
+    charm_spec: _CharmSpec[ops.CharmBase],
+    juju_version: str = '3.0',
+    unit_id: int = 0,
 ):
     with pytest.raises(InconsistentScenarioError):
         check_consistency(state, event, charm_spec, juju_version, unit_id)
@@ -53,9 +52,9 @@ def assert_inconsistent(
 def assert_consistent(
     state: State,
     event: _Event,
-    charm_spec: _CharmSpec,
-    juju_version='3.0',
-    unit_id=0,
+    charm_spec: _CharmSpec[ops.CharmBase],
+    juju_version: str = '3.0',
+    unit_id: int = 0,
 ):
     check_consistency(state, event, charm_spec, juju_version, unit_id)
 
@@ -232,7 +231,7 @@ def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
         }
     })
     state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
-    asserter: Callable[..., None] = assert_consistent if consistent else assert_inconsistent
+    asserter = assert_consistent if consistent else assert_inconsistent
     asserter(
         state,
         _Event('foo-pebble-ready', container=Container('foo')),
