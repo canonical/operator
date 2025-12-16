@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import importlib
@@ -9,11 +12,11 @@ from typing import Any
 
 import pytest
 import yaml
-from ops import CharmBase
-
 from scenario import Context, Relation, State
 from scenario.errors import ContextSetupError, MetadataNotFoundError
 from scenario.state import _CharmSpec
+
+from ops import CharmBase
 
 CHARM = """
 from ops import CharmBase

@@ -1,9 +1,27 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 from collections.abc import Callable
 
-import ops
 import pytest
+import scenario
+from scenario import Context
+from scenario.errors import UncaughtCharmError
+from scenario.state import (
+    _DEFAULT_JUJU_DATABAG,
+    PeerRelation,
+    Relation,
+    RelationBase,
+    State,
+    StateValidationError,
+    SubordinateRelation,
+    _Event,
+    _next_relation_id,
+)
+
+import ops
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -14,21 +32,6 @@ from ops.charm import (
     RelationEvent,
 )
 from ops.framework import EventBase, Framework
-
-import scenario
-from scenario import Context
-from scenario.errors import UncaughtCharmError
-from scenario.state import (
-    _DEFAULT_JUJU_DATABAG,
-    _Event,
-    PeerRelation,
-    Relation,
-    RelationBase,
-    State,
-    StateValidationError,
-    SubordinateRelation,
-    _next_relation_id,
-)
 from tests.helpers import trigger
 
 
@@ -36,7 +39,7 @@ from tests.helpers import trigger
 def mycharm():
     class MyCharmEvents(CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: type[EventBase]):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)

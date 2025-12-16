@@ -226,21 +226,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
-    # TODO: the below ignores should be fixed
-    "CPY",  # flake8-copyright
-    "I001",  # isort
-    "B017",  # Do not assert blind exception
-    "B018",  # Useless attribute access
-    "E501",  # Line too long
-    "N999",  # Invalid module name
-    "N813",  # CamelCase imported as lowercase
-    "S105",  # Possible hardcoded password
-    "S108",  # Probably insecure usage of /tmp
-    "W291",  # Trailing whitespace
-    "UP037",  # Remove quotes from type annotation
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
-    "RUF015",  # Prefer `next` over single element slice
-    "SIM115",  # Use a context manager for opening files
 ]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?

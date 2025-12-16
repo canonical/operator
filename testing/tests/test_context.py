@@ -1,14 +1,17 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import os
 from unittest.mock import patch
 
-import ops
 import pytest
-
 from scenario import Context, State
 from scenario.errors import UncaughtCharmError
 from scenario.state import _Event, _next_action_id
+
+import ops
 
 
 class MyCharm(ops.CharmBase):

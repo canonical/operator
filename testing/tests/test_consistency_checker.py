@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
@@ -5,8 +8,6 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-import ops
-
 from scenario._consistency_checker import check_consistency
 from scenario.context import Context
 from scenario.errors import InconsistentScenarioError
@@ -31,6 +32,8 @@ from scenario.state import (
     _Event,
 )
 
+import ops
+
 
 class MyCharm(ops.CharmBase):
     pass
@@ -39,9 +42,9 @@ class MyCharm(ops.CharmBase):
 def assert_inconsistent(
     state: State,
     event: _Event,
-    charm_spec: _CharmSpec[ops.CharmBase],
-    juju_version: str = '3.0',
-    unit_id: int = 0,
+    charm_spec: _CharmSpec,
+    juju_version='3.0',
+    unit_id=0,
 ):
     with pytest.raises(InconsistentScenarioError):
         check_consistency(state, event, charm_spec, juju_version, unit_id)
@@ -50,9 +53,9 @@ def assert_inconsistent(
 def assert_consistent(
     state: State,
     event: _Event,
-    charm_spec: _CharmSpec[ops.CharmBase],
-    juju_version: str = '3.0',
-    unit_id: int = 0,
+    charm_spec: _CharmSpec,
+    juju_version='3.0',
+    unit_id=0,
 ):
     check_consistency(state, event, charm_spec, juju_version, unit_id)
 

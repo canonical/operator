@@ -1,13 +1,15 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
 from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-import jsonpatch  # type: ignore
-
+import jsonpatch
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
@@ -19,10 +21,10 @@ logger = logging.getLogger()
 
 def trigger(
     state: State,
-    event: 'str | _Event',
-    charm_type: type['CharmType'],
-    pre_event: Callable[['CharmType'], None] | None = None,
-    post_event: Callable[['CharmType'], None] | None = None,
+    event: str | _Event,
+    charm_type: type[CharmType],
+    pre_event: Callable[[CharmType], None] | None = None,
+    post_event: Callable[[CharmType], None] | None = None,
     meta: dict[str, Any] | None = None,
     actions: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
@@ -40,10 +42,10 @@ def trigger(
     if isinstance(event, str):
         if event.startswith('relation_'):
             assert len(tuple(state.relations)) == 1, 'shortcut only works with one relation'
-            event = getattr(ctx.on, event)(tuple(state.relations)[0])
+            event = getattr(ctx.on, event)(next(iter(state.relations)))
         elif event.startswith('pebble_'):
             assert len(tuple(state.containers)) == 1, 'shortcut only works with one container'
-            event = getattr(ctx.on, event)(tuple(state.containers)[0])
+            event = getattr(ctx.on, event)(next(iter(state.containers)))
         else:
             event = getattr(ctx.on, event)()
     assert isinstance(event, _Event)
@@ -56,7 +58,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
+def jsonpatch_delta(self, other: State):
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
@@ -72,5 +74,4 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
     patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
-    patch = cast('list[dict[str, Any]]', patch)
     return sorted(patch, key=lambda obj: obj['path'] + obj['op'])
