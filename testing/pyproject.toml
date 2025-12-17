@@ -23,6 +23,7 @@ keywords = ["juju", "test"]
 dependencies = [
     "ops==3.5.0.dev0",
     "PyYAML>=6.0.1",
+    "typing_extensions>=4.9.0",  # for `deprecated` decorator, replace with stdlib `warnings.deprecated` when we're Python 3.13+
 ]
 readme = "README.md"
 requires-python = ">=3.10"

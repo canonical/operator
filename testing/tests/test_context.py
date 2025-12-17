@@ -182,3 +182,9 @@ def test_run_env_cleared():
     ctx = Context(GoodCharm, meta={'name': 'crashy'})
     ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
+
+
+def test_charm_spec_is_deprecated():
+    ctx = Context(CharmBase, meta={'name': 'some-name'})
+    with pytest.warns(DeprecationWarning):
+        ctx.charm_spec  # type: ignore
