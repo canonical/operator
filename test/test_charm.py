@@ -644,6 +644,18 @@ def test_actions_from_charm_root():
         assert meta.actions['foo'].description == 'foos the bar'
 
 
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [('2.9', True), ('3.6.12', True), ('4.0.0', False), ('4.1', False)],
+)
+def test_actions_additional_properties(
+    monkeypatch: pytest.MonkeyPatch, juju_version: str, additional_properties: bool
+):
+    monkeypatch.setenv('JUJU_VERSION', juju_version)
+    action = ops.ActionMeta('foo', {})
+    assert action.additional_properties == additional_properties
+
+
 def _setup_test_action(fake_script: FakeScript):
     fake_script.write('action-get', """echo '{"foo-name": "name", "silent": true}'""")
     fake_script.write('action-set', '')
