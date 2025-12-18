@@ -1139,7 +1139,7 @@ class Container:
             infos[name] = info
         return infos
 
-    def get_filesystem(self, ctx: Context) -> pathlib.Path:
+    def get_filesystem(self, ctx: Context[CharmBase]) -> pathlib.Path:
         """Simulated Pebble filesystem in this context.
 
         Returns:

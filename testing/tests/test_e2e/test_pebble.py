@@ -156,7 +156,7 @@ def test_fs_pull(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase], make_di
         assert file.read_text() == text
 
         # shortcut for API niceness purposes:
-        file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'  # type: ignore
+        file = container.get_filesystem(ctx) / 'foo' / 'bar' / 'baz.txt'
         assert file.read_text() == text
 
     else:
