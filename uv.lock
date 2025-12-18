@@ -746,22 +746,24 @@ xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
 
 [[package]]
 name = "ops-scenario"
-version = "8.5.0.dev0"
+version = "8.6.0.dev0"
 source = { editable = "testing" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
+    { name = "typing-extensions" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "typing-extensions", specifier = ">=4.9.0" },
 ]
 
 [[package]]
 name = "ops-tracing"
-version = "3.5.0.dev0"
+version = "3.6.0.dev0"
 source = { editable = "tracing" }
 dependencies = [
     { name = "opentelemetry-api" },
