@@ -187,4 +187,4 @@ def test_run_env_cleared():
 def test_charm_spec_is_deprecated():
     ctx = Context(CharmBase, meta={'name': 'some-name'})
     with pytest.warns(DeprecationWarning):
-        ctx.charm_spec  # type: ignore  # noqa: B018
+        _ = ctx.charm_spec  # type: ignore
