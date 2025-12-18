@@ -37,6 +37,7 @@ actions:
         description: Show username and password in output information
         type: boolean
         default: False
+    additionalProperties: False
 ```
 
 ## Define an action class
