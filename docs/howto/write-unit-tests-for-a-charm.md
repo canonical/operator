@@ -184,3 +184,11 @@ def test_charm_reports_workload_ready():
         assert mgr.charm.workload_is_ready()
         ...
 ```
+
+## Run your tests
+
+Run all your tests with:
+
+```text
+tox -e unit
+```
