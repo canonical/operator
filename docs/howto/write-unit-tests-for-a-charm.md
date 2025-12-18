@@ -194,3 +194,15 @@ Run all your tests with:
 ```text
 tox -e unit
 ```
+
+## Examples
+
+Machine charms:
+
+- Our [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy/tests/unit) example charm, from [](machine-charm-tutorial)
+- [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator/tree/main/tests/unit)
+
+Kubernetes charms:
+
+- Our [k8s-3-postgresql](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql/tests/unit) example charm, from the [](#integrate-your-charm-with-postgresql) chapter in our Kubernetes charm tutorial
+- Our [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/unit) example charm
