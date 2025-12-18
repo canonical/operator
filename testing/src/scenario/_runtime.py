@@ -10,7 +10,7 @@ import dataclasses
 import os
 import tempfile
 import typing
-from collections.abc import Generator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic
@@ -282,7 +282,7 @@ class Runtime(Generic[CharmType]):
         state: State,
         event: _Event,
         context: Context[CharmType],
-    ) -> Generator[Ops[CharmType]]:
+    ) -> Iterator[Ops[CharmType]]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
