@@ -1,6 +1,8 @@
 (write-unit-tests-for-a-charm)=
 # How to write unit tests for a charm
 
+> See also: [](#testing)
+
 ## Set up your environment
 
 First of all, install the Ops testing framework. To do this in a virtual environment while we're developing, use `pip` or a different package manager. For example:
