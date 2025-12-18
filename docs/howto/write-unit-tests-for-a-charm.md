@@ -1,7 +1,7 @@
 (write-unit-tests-for-a-charm)=
 # How to write unit tests for a charm
 
-## Setting up your environment
+## Set up your environment
 
 First of all, install the Ops testing framework. To do this in a virtual environment while we're developing, use `pip` or a different package manager. For example:
 
@@ -24,7 +24,7 @@ test = [
 ]
 ```
 
-## Creating the charm and test files
+## Create the charm and test files
 
 So that we have a charm to test, declare a placeholder charm type in `charm.py`:
 
@@ -40,7 +40,7 @@ import ops
 from ops import testing
 ```
 
-## Writing a test
+## Write a test
 
 To write a test function, use a `Context` object to encapsulate the charm type (`MyCharm`) and any necessary metadata. The test should then define the initial `State` and call `Context.run` with an `event` and initial `State`.
 
@@ -126,7 +126,7 @@ def test_peer_changed():
 
 > See more: [](ops.testing.State.from_context)
 
-## Mocking beyond the State
+## Mock beyond the State
 
 If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
@@ -162,7 +162,7 @@ def test_charm_runs(my_charm):
 If you use pytest, you should put the `my_charm` fixture in a top level `conftest.py`, as it will likely be shared between all your unit tests.
 ```
 
-## Accessing the charm instance
+## Access the charm instance
 
 If you need to access the charm instance in a test, use the `testing.Context` instance as a context manager, then access `mgr.charm`. When setting up the context manager, use an event the charm doesn't observe, such as `update_status`. For example:
 
