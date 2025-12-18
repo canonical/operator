@@ -10,7 +10,7 @@ from scenario import Context, State
 from scenario.state import _Event
 
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
-from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
+from ops.framework import CommitEvent, EventBase, EventSource, Framework, PreCommitEvent
 
 
 class Foo(EventBase):
@@ -23,22 +23,22 @@ class MyCharmEvents(CharmEvents):
 
 class MyCharm(CharmBase):
     META: Mapping[str, Any] = {'name': 'mycharm'}
-    on = MyCharmEvents()
+    on = MyCharmEvents()  # type: ignore
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.foo, self._on_foo)
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.foo, self._on_foo)
 
-    def _on_start(self, e):
+    def _on_start(self, e: EventBase):
         self.on.foo.emit()
 
-    def _on_foo(self, e):
+    def _on_foo(self, e: EventBase):
         pass
 
 
 def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    ctx = Context(MyCharm, meta=dict(MyCharm.META), capture_framework_events=True)
     ctx.run(ctx.on.start(), State())
 
     emitted = ctx.emitted_events
@@ -51,7 +51,7 @@ def test_capture_custom_evt_nonspecific_capture_include_fw_evts():
 
 
 def test_capture_juju_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META)
+    ctx = Context(MyCharm, meta=dict(MyCharm.META))
     ctx.run(ctx.on.start(), State())
 
     emitted = ctx.emitted_events
@@ -61,7 +61,7 @@ def test_capture_juju_evt():
 
 
 def test_capture_deferred_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_deferred_events=True)
+    ctx = Context(MyCharm, meta=dict(MyCharm.META), capture_deferred_events=True)
     deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
@@ -73,7 +73,7 @@ def test_capture_deferred_evt():
 
 
 def test_capture_no_deferred_evt():
-    ctx = Context(MyCharm, meta=MyCharm.META)
+    ctx = Context(MyCharm, meta=dict(MyCharm.META))
     deferred = [_Event('foo').deferred(handler=MyCharm._on_foo)]
     ctx.run(ctx.on.start(), State(deferred=deferred))
 
