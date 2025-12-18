@@ -145,14 +145,12 @@ def test_fs_pull(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase], make_di
         file = tmp_path / 'bar' / 'baz.txt'
 
         # another is:
-        assert (
-            file == pathlib.Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'
-        )
+        base = pathlib.Path(out.get_container('foo').mounts['foo'].source)
+        assert file == base / 'bar' / 'baz.txt'
 
         # but that is actually a symlink to the context's root tmp folder:
-        assert (
-            pathlib.Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
-        ).read_text() == text
+        base = pathlib.Path(ctx._tmp.name)
+        assert (base / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt').read_text() == text
         assert file.read_text() == text
 
         # shortcut for API niceness purposes:
