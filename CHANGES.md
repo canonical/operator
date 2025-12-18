@@ -1,3 +1,38 @@
+# 3.5.0 - 18 December 2025
+
+## Features
+
+* Env var to control exception wrapping in tests (#2142)
+* Deprecate testing.Context.charm_spec (#2219)
+
+## Documentation
+
+* Fix charmcraft init command (#2210)
+* Update CI examples to use uv and tox-uv (#2213)
+* Update and clarify info about environment prep (#2217)
+* Match Charmcraft profiles in tox.ini example for integration testing (#2221)
+* Use base 24.04 for httpbin-demo charm (#2222)
+* Clarify parts of the machine charm tutorial (#2223)
+* Match Charmcraft profiles in "Write and structure charm code" (#2220)
+* Use cosl binary in K8s tutorial charm to work around error (#2232)
+* Fix URL issues by updating doc starter pack (#2238)
+
+## Tests
+
+* Don't skip tests if ops[testing] isn't installed (#2215)
+* Switch the integration test charms to use the uv plugin (#2218)
+
+## CI
+
+* Avoid jitter in the best practice doc PRs (#2193)
+* Ignore PERF401 (manual list comprehension) across the repo (#2201)
+* The git commands need to be run in the operator directory as well (#2197)
+* Have cycle in the sbomber manifests use the default value (#2209)
+* Add pytest.warns to note an expected warning (#2092)
+* Update release script to handle non-final versions (#2199)
+* Add ops-tracing as a dependency for the observability tests (#2239)
+* Add scheduled workflow for packing and integration testing example charms (#2233)
+
 # 3.4.0 - 27 November 2025
 
 ## Breaking Changes
