@@ -54,10 +54,14 @@ jobs:
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
             sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
+            # Get absolute paths to the wheels
+            ops_wheel="$(echo "$(pwd)/operator-wheels/ops-*.whl")"
+            ops_scenario_wheel="$(echo "$(pwd)/operator-wheels/ops_scenario-*.whl")"
+            ops_tracing_wheel="$(echo "$(pwd)/operator-wheels/ops_tracing-*.whl")"
             # Add ops first, then ops-scenario (for testing), then ops-tracing
-            uv add "$(echo operator-wheels/ops-*.whl)" --raw-sources --prerelease=if-necessary-or-explicit
-            uv add "$(echo operator-wheels/ops_scenario-*.whl)" --optional dev --raw-sources --prerelease=if-necessary-or-explicit
-            uv add "$(echo operator-wheels/ops_tracing-*.whl)" --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no uv.lock file found"
             exit 1
