@@ -20,25 +20,35 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
 
-      - name: Build operator wheels
-        run: uv build --all
-
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          if [ -z "$CLONE_SHA" ]
+          then
+            ops_source="ops @ git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops"
+          else
+            # If on a PR, we need to reference the PR branch's repo and commit (not the GITHUB_SHA
+            # temporary merge commit), because charmcraft pack does a git checkout which
+            # can't see the temporary merge commit.
+            ops_source="ops @ git+$CLONE_URL@$CLONE_SHA#egg=ops"
+          fi
           cd examples/httpbin-demo
-          ops_wheel="$(echo "$(pwd)/../../dist/ops-*.whl")"
-          uv add "$ops_wheel"
+          uv add "$ops_source"
           cat pyproject.toml
+        env:
+          CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
+          CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Install yq
         run: sudo snap install yq
 
-      - name: Remove 'git' from build packages (no longer needed)
+      - name: Add 'git' as a build package
         run: |
           cd examples/httpbin-demo
           if yq --exit-status '.parts.charm | has("build-packages")' charmcraft.yaml; then
-            yq --inplace 'del(.parts.charm.build-packages[] | select(. == "git"))' charmcraft.yaml
+            echo "'parts.charm.build-packages' already exists in charmcraft.yaml"
+            exit 1
           fi
+          yq --inplace '.parts.charm.build-packages = ["git"]' charmcraft.yaml
           cat charmcraft.yaml
 
       - name: Set up LXD
