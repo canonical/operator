@@ -11,8 +11,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/build-wheels.yaml
+
   charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -192,6 +196,12 @@ jobs:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Install patch dependencies
         run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
@@ -199,29 +209,31 @@ jobs:
         working-directory: ${{ matrix.charm-root }}
         run: |
           set -xueo pipefail
+          ops_wheel="$(realpath ../operator-wheels/ops-*.whl)"
+          ops_scenario_wheel="$(realpath ../operator-wheels/ops_scenario-*.whl)"
           if [ -e "test-requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> test-requirements.txt
+            echo -e "\n${ops_wheel}" >> test-requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" test-requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> test-requirements.txt
+            echo -e "\n${ops_scenario_wheel}" >> test-requirements.txt
           fi
           if [ -e "requirements-charmcraft.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements-charmcraft.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements-charmcraft.txt
+            echo -e "\n${ops_wheel}" >> requirements-charmcraft.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements-charmcraft.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements-charmcraft.txt
+            echo -e "\n${ops_scenario_wheel}" >> requirements-charmcraft.txt
           fi
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+            echo -e "\n${ops_scenario_wheel}" >> requirements.txt
           elif [ -e "poetry.lock" ]; then
-            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --lock
-            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --lock
+            poetry add "${ops_wheel}" --lock
+            poetry add "${ops_scenario_wheel}" --lock
           elif [ -e "uv.lock" ]; then
-            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
-            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
+            uv add --frozen --raw-sources "${ops_scenario_wheel}"
+            uv add --frozen --raw-sources "${ops_wheel}"
             uv lock
           else
             echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
@@ -259,6 +271,7 @@ jobs:
 
   charmcraft-profile-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -274,22 +287,30 @@ jobs:
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Install dependencies
         run: pip install tox~=4.2 uv~=0.9 tox-uv~=1.29
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
           set -xueo pipefail
+          ops_wheel="$(realpath operator-wheels/ops-*.whl)"
+          ops_scenario_wheel="$(realpath operator-wheels/ops_scenario-*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
+            echo -e "\n${ops_scenario_wheel}" >> requirements.txt
           elif [ -e "uv.lock" ]; then
             uv remove ops[testing] --group unit --frozen
             uv remove ops --frozen
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --group unit --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_scenario_wheel}" --group unit --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no uv.lock file found"
             exit 1

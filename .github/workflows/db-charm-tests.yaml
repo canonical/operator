@@ -10,8 +10,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/build-wheels.yaml
+
   db-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +36,12 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Checkout the operator repository
         uses: actions/checkout@v6
         with:
@@ -45,7 +55,7 @@ jobs:
         run: |
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\n$(realpath operator-wheels/ops-*.whl)" >> requirements.txt
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
             poetry lock
