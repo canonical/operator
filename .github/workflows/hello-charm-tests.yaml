@@ -46,7 +46,7 @@ jobs:
       - name: Remove 'ops' from charm requirements.txt
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          TEST_OPS="$(realpath operator-wheels/ops-*.whl)"
+          TEST_OPS="$(echo "$(pwd)/operator-wheels/ops-*.whl")"
           echo -e "\n${TEST_OPS}" >> requirements.txt
 
       - name: Install dependencies

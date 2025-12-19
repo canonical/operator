@@ -209,8 +209,9 @@ jobs:
         working-directory: ${{ matrix.charm-root }}
         run: |
           set -xueo pipefail
-          ops_wheel="$(realpath ../operator-wheels/ops-*.whl)"
-          ops_scenario_wheel="$(realpath ../operator-wheels/ops_scenario-*.whl)"
+          # Get the absolute paths to the wheels
+          ops_wheel="$(cd .. && echo "$(pwd)/operator-wheels/ops-*.whl")"
+          ops_scenario_wheel="$(cd .. && echo "$(pwd)/operator-wheels/ops_scenario-*.whl")"
           if [ -e "test-requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
             echo -e "\n${ops_wheel}" >> test-requirements.txt
@@ -232,8 +233,8 @@ jobs:
             poetry add "${ops_wheel}" --lock
             poetry add "${ops_scenario_wheel}" --lock
           elif [ -e "uv.lock" ]; then
-            uv add --frozen --raw-sources "${ops_scenario_wheel}"
             uv add --frozen --raw-sources "${ops_wheel}"
+            uv add --frozen --raw-sources "${ops_scenario_wheel}"
             uv lock
           else
             echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
@@ -299,8 +300,9 @@ jobs:
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
           set -xueo pipefail
-          ops_wheel="$(realpath operator-wheels/ops-*.whl)"
-          ops_scenario_wheel="$(realpath operator-wheels/ops_scenario-*.whl)"
+          # Get the absolute paths to the wheels
+          ops_wheel="$(echo "$(pwd)/operator-wheels/ops-*.whl")"
+          ops_scenario_wheel="$(echo "$(pwd)/operator-wheels/ops_scenario-*.whl")"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
@@ -309,8 +311,8 @@ jobs:
           elif [ -e "uv.lock" ]; then
             uv remove ops[testing] --group unit --frozen
             uv remove ops --frozen
-            uv add "${ops_scenario_wheel}" --group unit --raw-sources --prerelease=if-necessary-or-explicit
             uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_scenario_wheel}" --group unit --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no uv.lock file found"
             exit 1

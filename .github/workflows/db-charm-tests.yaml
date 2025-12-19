@@ -53,9 +53,10 @@ jobs:
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          ops_wheel="$(echo "$(pwd)/operator-wheels/ops-*.whl")"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\n$(realpath operator-wheels/ops-*.whl)" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
           else
             sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
             poetry lock

@@ -26,7 +26,7 @@ jobs:
       - name: Update 'ops' dependency in test charm to latest
         run: |
           cd examples/httpbin-demo
-          ops_wheel="$(realpath ../../dist/ops-*.whl)"
+          ops_wheel="$(echo "$(pwd)/../../dist/ops-*.whl")"
           uv add "$ops_wheel"
           cat pyproject.toml
 
