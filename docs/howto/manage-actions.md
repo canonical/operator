@@ -39,7 +39,7 @@ actions:
     additionalProperties: false
 ```
 
-Note that you should **always** include the `additionalProperties` field, which controls whether users can provide properties that are not in the definition, as the default changed from `true` in Juju 3 to `false` in Juju 4. If you don't explicitly include it in the YAML, then the charm behaviour will differ depending on which Juju version the charm is deployed to.
+You should **always** include the `additionalProperties` field, which controls whether users can provide properties that are not in the definition. The default value of the field changed from `true` in Juju 3 to `false` in Juju 4. If you don't explicitly include the field, the charm behaviour will differ depending on which Juju version the charm is deployed to.
 
 In the `src/charm.py` file of the charm, add a class that mirrors the
 configuration from `charmcraft.yaml`. This lets your static type checker and
