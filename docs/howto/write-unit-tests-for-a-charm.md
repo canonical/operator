@@ -204,5 +204,5 @@ Machine charms:
 
 Kubernetes charms:
 
-- Our [k8s-3-postgresql](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql/tests/unit) example charm, from the [](#integrate-your-charm-with-postgresql) chapter in our Kubernetes charm tutorial
+- Our [k8s-3-postgresql](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql/tests/unit) example charm, from the [](#integrate-your-charm-with-postgresql) chapter in our Kubernetes charm tutorial (the charms from other chapters also have unit tests)
 - Our [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/unit) example charm
