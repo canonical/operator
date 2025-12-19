@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   build-wheels:
-    uses: ./.github/workflows/build-wheels.yaml
+    uses: ./.github/workflows/_build-wheels.yaml
 
   o11y-charm-tests:
     runs-on: ubuntu-latest
