@@ -53,7 +53,7 @@ jobs:
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
-          ops_wheel="$(echo "$(pwd)/operator-wheels/ops-*.whl")"
+          ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\n${ops_wheel}" >> requirements.txt
