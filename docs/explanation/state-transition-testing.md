@@ -62,7 +62,7 @@ Comparing these tests with `Harness` tests:
   time. This ensures that the execution environment is as clean as possible
   (for a unit test).
 - Harness maintains a model of the Juju Model, which is a maintenance burden and
-  adds complexity. These tests mock at the level of hook tools and store all
+  adds complexity. These tests mock at the level of hook commands and store all
   mocking data in a monolithic data structure (the `State`), which makes it more
   lightweight and portable.
 
@@ -192,13 +192,12 @@ emit multiple events in a single charm execution.
 
 ## The virtual charm root
 
-Before executing the charm, the framework copies the charm's `/src`, any libs,
-and the metadata, config, and actions YAML to a temporary directory. The charm
-will see that temporary directory as its 'root'. This allows us to keep things
-simple when dealing with metadata that can be either inferred from the charm
-type being passed to `Context` or be passed to it as an argument, thereby
-overriding the inferred one. This also allows you to test charms defined on the
-fly, as in:
+Before executing the charm, the framework writes the metadata, config, and actions
+YAML files to a temporary directory. The charm will see that temporary directory as its
+'root'. This allows us to keep things simple when dealing with metadata that can be
+either inferred from the charm type being passed to `Context` or be passed to it
+as an argument, thereby overriding the inferred one. This also allows you to test
+charms defined on the fly, as in:
 
 ```python
 class MyCharmType(ops.CharmBase):

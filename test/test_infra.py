@@ -18,6 +18,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -51,18 +52,14 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
     assert proc.returncode == 0
 
 
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
 def test_ops_testing_doc():
     """Ensure that ops.testing's documentation includes all the expected names."""
-    # We don't document the type aliases.
+    # We only document public classes and functions.
     expected_names = set(
         name
         for name in ops.testing.__all__
-        if name != 'errors'
-        and name not in ops.testing._compatibility_names
-        and getattr(ops.testing, name).__class__.__module__ != 'typing'
+        if name not in ops.testing._compatibility_names
+        and type(getattr(ops.testing, name)) in (type, types.FunctionType)
     )
     expected_names.update(
         f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')

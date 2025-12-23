@@ -1,16 +1,22 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
+import collections
 import datetime
+from typing import Literal, cast
+from unittest.mock import ANY
 
 import pytest
-from ops.charm import CharmBase
-from ops.framework import Framework
-from ops.model import ModelError
-from ops.model import Secret as ops_Secret
-from ops.model import SecretNotFoundError, SecretRotate
-
 from scenario import Context
 from scenario.state import Relation, Secret, State
+
+from ops.charm import CharmBase
+from ops.framework import Framework
+from ops.model import ModelError, SecretNotFoundError, SecretRotate
+from ops.model import Secret as ops_Secret
+from test.charms.test_secrets.src.charm import Result, SecretsCharm
 from tests.helpers import trigger
 
 
@@ -282,6 +288,7 @@ def test_meta(mycharm, app):
         info = secret.get_info()
 
         assert secret.label is None
+        assert info.description == 'foobarbaz'
         assert info.label == 'mylabel'
         assert info.rotation == SecretRotate.HOURLY
 
@@ -590,3 +597,136 @@ def test_default_values():
     assert secret.rotate is None
     assert secret.expire is None
     assert secret.remote_grants == {}
+
+
+def test_add_secret(secrets_context: Context[SecretsCharm]):
+    state = State(leader=True)
+    state = secrets_context.run(secrets_context.on.action('add-secret'), state)
+
+    result = cast('Result', secrets_context.action_results)
+    assert result is not None
+    assert result['secretid']
+
+    scenario_secret = next(iter(state.secrets))
+
+    common_assertions(scenario_secret, result)
+
+    assert result == {
+        'after': {
+            'info': ANY,  # relying on scaffolding check
+            'tracked': {'foo': 'bar'},
+            'latest': {'foo': 'bar'},
+        },
+        'secretid': ANY,
+    }
+
+    assert scenario_secret._tracked_revision == scenario_secret._latest_revision
+
+
+@pytest.mark.parametrize(
+    'fields',
+    [
+        '',
+        'label',
+        'description',
+        'expire',
+        'rotate',
+        'label,description',
+        'description,expire,rotate',
+        'label,description,expire,rotate',
+    ],
+)
+def test_add_secret_with_metadata(secrets_context: Context[SecretsCharm], fields: str):
+    state = State(leader=True)
+    state = secrets_context.run(
+        secrets_context.on.action('add-with-meta', params={'fields': fields}), state
+    )
+    scenario_secret = next(iter(state.secrets))
+    result = cast('Result', secrets_context.action_results)
+    assert 'after' in result
+    assert result['after']
+    info = result['after']['info']
+    assert info
+
+    common_assertions(scenario_secret, result)
+
+    if 'label' in fields:
+        assert scenario_secret.label == 'label1'
+        assert info['label'] == 'label1'
+    if 'description' in fields:
+        assert scenario_secret.description == 'description1'
+        assert info['description'] == 'description1'
+    if 'expire' in fields:
+        assert scenario_secret.expire == datetime.datetime(2020, 1, 1, 0, 0, 0)
+        assert info['expires'] == datetime.datetime(2020, 1, 1, 0, 0, 0)
+    if 'rotate' in fields:
+        assert scenario_secret.rotate == SecretRotate.DAILY
+        assert info['rotation'] == SecretRotate.DAILY
+        # https://github.com/canonical/operator/issues/2104
+        assert info['rotates'] is None
+
+    assert scenario_secret._tracked_revision == scenario_secret._latest_revision
+
+
+@pytest.mark.parametrize('lookup_by', ['id', 'label'])
+@pytest.mark.parametrize(
+    'flow',
+    [
+        'content,label,description,expire,rotate',
+        'content,description,content,description',
+        'rotate,content,rotate,content,rotate',
+        'label,content,label,content',
+    ],
+)
+def test_set_secret(
+    secrets_context: Context[SecretsCharm], flow: str, lookup_by: Literal['id', 'label']
+):
+    secret = Secret({'some': 'content'}, owner='app', id='theid', label='thelabel')
+    state = State(leader=True, secrets={secret})
+    params = {'flow': flow, f'secret{lookup_by}': f'the{lookup_by}'}
+    state = secrets_context.run(secrets_context.on.action('set-secret-flow', params=params), state)
+    scenario_secret = state.get_secret(id='theid')
+    result = cast('Result', secrets_context.action_results)
+    assert 'after' in result
+    assert result['after']
+    info = result['after']['info']
+    assert info
+
+    common_assertions(scenario_secret, result)
+
+    counts = collections.Counter(flow.split(','))
+    if counts['content']:
+        assert result['after']['latest'] == {'val': str(counts['content'])}
+    if counts['label']:
+        assert info['label'] == f'label{counts["label"]}'
+    if counts['description']:
+        assert info['description'] == f'description{counts["description"]}'
+    if counts['expire']:
+        assert info['expires'] == datetime.datetime(2010 + counts['expire'], 1, 1, 0, 0)
+    if counts['rotate']:
+        rotation_values = ['sentinel', *SecretRotate.__members__.values()]
+        assert info['rotation'] == rotation_values[counts['rotate']]
+
+
+def common_assertions(scenario_secret: Secret | None, result: Result):
+    if scenario_secret:
+        assert scenario_secret.owner == 'app'
+        assert not scenario_secret.remote_grants
+
+        assert result.get('after')
+        info = result['after']['info']
+        # Verify that the unit and the scaffolding see the same data
+        #
+        # Scenario presents a secret with a full secret URI to the charm
+        # however, the id on the scenario Secret object is a plain id
+        assert scenario_secret.id.split('/')[-1] == info['id'].split('/')[-1]
+        assert scenario_secret.label == info['label']
+        assert scenario_secret._latest_revision == info['revision']
+        assert scenario_secret.expire == info['expires']
+        assert scenario_secret.rotate == info['rotation']
+        assert scenario_secret.description == info['description']
+        # https://github.com/canonical/operator/issues/2104
+        assert info['rotates'] is None
+
+        assert scenario_secret.tracked_content == result['after']['tracked']
+        assert scenario_secret.latest_content == result['after']['latest']

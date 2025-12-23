@@ -52,7 +52,7 @@ At this point, Ops will trace:
 - The `ops.main()` call
 - Observer invocations for the Juju event
 - Observer invocations for custom and life-cycle events
-- Ops calls that inspect and update Juju (also called "hook tools")
+- Ops calls that inspect and update Juju (also called "hook commands")
 - Pebble API access
 
 This provides coarse-grained tracing, focused on the boundaries between the

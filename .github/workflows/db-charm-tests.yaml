@@ -17,23 +17,23 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: d72e37f80ce9b56013efe1392ab310ea8bfade02  # 2025-09-24T12:47:06Z
+            commit: 8fe608dc251e2d734cc0417aa415bfb119ec2d16  # 2025-12-16T20:15:01Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: 28f4fce16e5a3a3f959877aa11dd87ca4e684af8  # rev669 rev668 2025-09-24T12:40:27Z
+            commit: 762aeedf177b73dfd2b81780fa4288543410859a  # 2025-12-17T15:42:17Z
           - charm-repo: canonical/mysql-operator
-            commit: 4f0bab6f77fafd5ed06500b6faa85bd6b14832f2  # rev426 rev425 rev424 2025-09-12T14:18:57Z
+            commit: bd8b3ddabe24d6bcb1b181c4ecedf8515cd98ce0  # 2025-12-15T20:38:04Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: fe104a341266cf118b89dfdb1e2f21feb573a64d  # 2025-09-19T07:20:43Z
+            commit: 2bce272828c2462df6ee4f11f677019ecbf982f8  # 2025-12-15T20:17:50Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Checkout the operator repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: myops
           persist-credentials: false

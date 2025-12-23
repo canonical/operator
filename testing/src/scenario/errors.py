@@ -24,7 +24,11 @@ class ScenarioRuntimeError(RuntimeError):
 
 
 class UncaughtCharmError(ScenarioRuntimeError):
-    """Error raised if the charm raises while handling the event being dispatched."""
+    """Error raised if the charm raises while handling the event being dispatched.
+
+    Set the ``SCENARIO_BARE_CHARM_ERRORS`` environment variable to ``1`` or ``true``
+    (case insensitive) to disable wrapping charm errors with ``UncaughtCharmError``.
+    """
 
 
 class InconsistentScenarioError(ScenarioRuntimeError):
@@ -43,7 +47,7 @@ class MetadataNotFoundError(RuntimeError):
 
 
 class ActionMissingFromContextError(Exception):
-    """Raised when the user attempts to invoke action hook tools outside an action context."""
+    """Raised when the user attempts to invoke action hook commands outside an action context."""
 
     # This is not an ops error: in ops, you'd have to go exceptionally out of
     # your way to trigger this flow.
@@ -53,5 +57,5 @@ class NoObserverError(RuntimeError):
     """Error raised when the event being dispatched has no registered observers."""
 
 
-class BadOwnerPath(RuntimeError):
+class BadOwnerPath(RuntimeError):  # noqa: N818  # Need to keep the name for backwards compatibility.
     """Error raised when the owner path does not lead to a valid ObjectEvents instance."""

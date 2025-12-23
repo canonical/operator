@@ -211,19 +211,21 @@ Now, in your `src` directory, create a subdirectory called `grafana_dashboards` 
 
 ```
 
-## Specify packages required to build
+## Specify binary packages required to build
 
-When packing a charm, charmcraft uses source distributions for the dependencies. When a charm has a dependency that includes a binary package charmcraft will build the package, but may require additional packages to be installed.
+When packing a charm, Charmcraft builds the charm's dependencies from source.
 
-The `cos-lite` packages include a dependency that has Rust code, and the default charmcraft build environment does not have a Rust compiler, so you need to instruct charmcraft to install one for the build. In your `charmcraft.yaml` file, add a new `parts` section:
+Charmcraft currently encounters an error when building the `cos-lite` packages from source. As a workaround, add a new `parts` section in your `charmcraft.yaml` file:
 
 ```yaml
+# Workaround for a build error.
 parts:
   charm:
-    build-packages:
-      # Required for the cos-lite packages, which have a Rust dependency.
-      - cargo
+    charm-binary-python-packages:
+      - cosl
 ```
+
+You wouldn't usually need to use this workaround in a charm. We're planning to update this tutorial to modernise the charm and remove the workaround.
 
 ## Validate your charm
 
@@ -424,3 +426,9 @@ Also, you can reach Prometheus in your web browser (similar to Grafana) at `http
 ## Review the final code
 
 For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe).
+
+## Next steps
+
+Congratulations on reaching the end of the tutorial!
+
+For suggestions of what to explore next, see [](#tutorial-kubernetes-next-steps).

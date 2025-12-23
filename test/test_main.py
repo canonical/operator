@@ -224,7 +224,7 @@ class TestDispatch:
         assert event == 'potatos'
 
 
-_event_test = typing.List[typing.Tuple[EventSpec, typing.Dict[str, typing.Union[str, int, None]]]]
+_event_test = list[tuple[EventSpec, dict[str, str | int | None]]]
 
 
 @pytest.fixture
@@ -976,7 +976,9 @@ class _TestMain(abc.ABC):
     @pytest.mark.usefixtures('setup_charm')
     def test_has_valid_status(self, fake_script: FakeScript):
         fake_script.write('action-get', "echo '{}'")
-        fake_script.write('status-get', """echo '{"status": "unknown", "message": ""}'""")
+        fake_script.write(
+            'status-get', """echo '{"status": "unknown", "message": "", "status-data": {}}'"""
+        )
         state = self._simulate_event(
             fake_script,
             EventSpec(
@@ -990,7 +992,8 @@ class _TestMain(abc.ABC):
         assert state.status_name == 'unknown'
         assert state.status_message == ''
         fake_script.write(
-            'status-get', """echo '{"status": "blocked", "message": "help meeee"}'"""
+            'status-get',
+            """echo '{"status": "blocked", "message": "help meeee", "status-data": {}}'""",
         )
         state = self._simulate_event(
             fake_script,

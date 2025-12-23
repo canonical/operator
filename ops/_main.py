@@ -23,7 +23,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import opentelemetry.trace
 
@@ -89,15 +89,18 @@ def _get_event_args(
         storage_name = juju_context.storage_name or '-'.join(
             bound_event.event_kind.split('_')[:-2]
         )
+        storage_index = juju_context.storage_index
 
         storages = model.storages[storage_name]
-        index, storage_location = model._backend._storage_event_details()
+        storage_location = model._backend.storage_get(
+            f'{storage_name}/{storage_index}', 'location'
+        )
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.index == index), None)
-        storage = cast('Union[_storage.JujuStorage, _storage.SQLiteStorage]', storage)
+            storage = next((s for s in storages if s.index == storage_index), None)
+        storage = cast('_storage.JujuStorage | _storage.SQLiteStorage', storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, _charm.ActionEvent):
@@ -254,7 +257,7 @@ class _Manager:
 
     Running _Manager consists of three main steps:
     - setup: initialise the following from JUJU_* environment variables:
-      - the Framework (hook tool wrappers)
+      - the Framework (hook command wrappers)
       - the storage backend
       - the event that Juju is emitting on us
       - the charm instance (user-facing)
@@ -414,7 +417,7 @@ class _Manager:
         #       EventBase.defer().
         #
         # Skip reemission of deferred events for collect-metrics events because
-        # they do not have the full access to all hook tools.
+        # they do not have the full access to all hook commands.
         if not self.dispatcher.is_restricted_context():
             # Re-emit any deferred events from the previous run.
             self.framework.reemit()
