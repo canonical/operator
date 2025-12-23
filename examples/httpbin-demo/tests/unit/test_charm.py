@@ -120,7 +120,7 @@ def test_config_changed(user_log_level: str, gunicorn_log_level: str):
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
     assert gunicorn_args == f"--log-level {gunicorn_log_level}"
-    assert isinstance(state_out.unit_status, testing.ActiveStatus)
+    assert state_out.unit_status == testing.ActiveStatus()
 
 
 @pytest.mark.parametrize(
