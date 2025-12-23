@@ -18,7 +18,9 @@ from ops import pebble, testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
 
-layer = pebble.Layer(
+# A mock Pebble layer - useful for testing the charm's status reporting code.
+# The status reporting code shouldn't start the service, so the layer doesn't need a real command.
+MOCK_LAYER = pebble.Layer(
     {
         "services": {
             SERVICE_NAME: {
@@ -32,7 +34,7 @@ layer = pebble.Layer(
 
 
 def test_pebble_ready():
-    """Test that the charm correctly starts the service in the container."""
+    """Check that the charm correctly starts the service in the container."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
@@ -60,35 +62,65 @@ def test_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_pebble_service_inactive():
-    """Test that the charm goes into maintenance status if the service isn't active."""
+def test_status_service_active():
+    """Check that the charm goes into active status if the service is active.
+
+    This test is useful in addition to ``test_pebble_ready()`` because it checks that the charm
+    consistently sets active status, regardless of which event was handled.
+    """
+    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(
         CONTAINER_NAME,
-        layers={"base": layer},
+        layers={"base": MOCK_LAYER},
+        service_statuses={SERVICE_NAME: pebble.ServiceStatus.ACTIVE},
+        can_connect=True,
+    )
+    state_in = testing.State(containers={container})
+    # Act:
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    # Assert:
+    assert state_out.unit_status == testing.ActiveStatus()
+
+
+def test_status_service_inactive():
+    """Check that the charm goes into maintenance status if the service isn't active."""
+    # Arrange:
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(
+        CONTAINER_NAME,
+        layers={"base": MOCK_LAYER},
         service_statuses={SERVICE_NAME: pebble.ServiceStatus.INACTIVE},
         can_connect=True,
     )
     state_in = testing.State(containers={container})
+    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
+    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload")
 
 
-def test_pebble_no_service():
-    """Test that the charm goes into maintenance status if the service hasn't been defined."""
+def test_status_no_service():
+    """Check that the charm goes into maintenance status if the service hasn't been defined."""
+    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container})
+    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
+    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
-def test_pebble_unavailable():
-    """Test that the charm goes into maintenance status if the container is down."""
+def test_status_no_pebble():
+    """Check that the charm goes into maintenance status if the container is down."""
+    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=False)
     state_in = testing.State(containers={container})
+    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
+    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
