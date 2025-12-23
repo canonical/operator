@@ -18,8 +18,8 @@ from ops import pebble, testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
 
-# A mock Pebble layer - useful for testing the charm's status reporting code.
-# The status reporting code shouldn't start the service, so the layer doesn't need a real command.
+# A mock Pebble layer - useful for testing the charm's status reporting code. The status reporting
+# code shouldn't care how the service was started, so the layer doesn't need the real command.
 MOCK_LAYER = pebble.Layer(
     {
         "services": {
