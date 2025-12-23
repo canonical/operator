@@ -138,7 +138,7 @@ framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_
 
 ```{tip}
 
-**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event.
+**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event. You can't persist data between Juju events by storing it in memory.
 
 ```
 
