@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import ops
+import pytest
 from ops import pebble, testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
-
 
 layer = pebble.Layer(
     {
@@ -103,32 +103,19 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_config_changed_valid_can_connect():
-    """Test a config-changed event when the config is valid and the container can be reached."""
-    # Arrange:
-    ctx = testing.Context(HttpbinDemoCharm)  # The default config will be read from charmcraft.yaml
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        config={"log-level": "debug"},  # This is the config the charmer passed with `juju config`
-    )
-
-    # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
-    updated_plan = state_out.get_container(container.name).plan
-    gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
-    assert state_out.unit_status == testing.ActiveStatus()
-
-
-def test_config_changed_valid_uppercase():
-    """Test a config-changed event when the config is valid and uppercase."""
+@pytest.mark.parametrize(
+    "user_log_level, gunicorn_log_level",
+    [
+        ("debug", "debug"),
+        ("DEBUG", "debug"),
+    ],
+)
+def test_config_changed(user_log_level: str, gunicorn_log_level: str):
+    """Test a config-changed event when the config is valid."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": "DEBUG"})
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
 
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
@@ -136,21 +123,27 @@ def test_config_changed_valid_uppercase():
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
+    assert gunicorn_args == f"--log-level {gunicorn_log_level}"
     assert isinstance(state_out.unit_status, testing.ActiveStatus)
 
 
-def test_config_changed_invalid():
+@pytest.mark.parametrize(
+    "user_log_level",
+    [
+        "",
+        "foobar",
+    ],
+)
+def test_config_changed_invalid(user_log_level: str):
     """Test a config-changed event when the config is invalid."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
-    invalid_level = "foobar"
-    state_in = testing.State(containers={container}, config={"log-level": invalid_level})
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
 
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
 
     # Assert:
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
-    assert invalid_level in state_out.unit_status.message
+    assert f"'{user_log_level}'" in state_out.unit_status.message
