@@ -13,7 +13,7 @@ jobs:
   update-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
           persist-credentials: true

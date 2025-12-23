@@ -349,27 +349,45 @@ If the release automation script fails, delete the draft release and the newly c
 
 The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
 
-First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
+1. Fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
 
-> See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
+    See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
 
-Next, do the following for the `kubernetes` profile:
+2. In your Charmcraft development branch, modify the Ops version specifier in:
 
-1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the Ops version specifier.
-2. At the repo root, create a directory called `generated-temp`.
-3. Inside `generated-temp`, run:
+    - `charmcraft/templates/init-kubernetes/pyproject.toml.j2`
+    - `charmcraft/templates/init-machine/pyproject.toml.j2`
+
+2. Clone [charmcraft-profile-tools](https://github.com/canonical/charmcraft-profile-tools) locally.
+
+3. In your clone of charmcraft-profile-tools, run:
+
     ```text
-    CHARMCRAFT_DEVELOPER=1 python -m charmcraft init --profile=kubernetes
+    CHARMCRAFT_DIR=/path/to/charmcraft just init
     ```
-4. Inside `generated-temp`, run `uv lock`.
-5. Copy `generated-temp/uv.lock` to `charmcraft/templates/init-kubernetes/uv.lock.j2`, overwriting the existing file.
-6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
-7. Delete the `generated-temp` directory.
 
-For the `machine` profile, modify the Ops version specifier in `charmcraft/templates/init-machine/pyproject.toml.j2`. Then run a diff between `.../init-machine/pyproject.toml.j2` and `.../init-kubernetes/pyproject.toml.j2`. If the files match, copy `uv.lock.j2` from the `kubernetes` profile to the `machine` profile. Otherwise, repeat the full process for the `machine` profile.
+    This initialises a Kubernetes charm and a machine charm based on your Charmcraft development branch.
 
-Commit your changes. You should have changed these files:
-* charmcraft/templates/init-kubernetes/pyproject.toml.j2
-* charmcraft/templates/init-kubernetes/uv.lock.j2
-* charmcraft/templates/init-machine/pyproject.toml.j2
-* charmcraft/templates/init-machine/uv.lock.j2
+    If you don't have [just](https://just.systems/man/en/) installed, use `uvx --from rust-just just` instead.
+
+4. Lock the dependencies of the charms and generate `uv.lock.j2` files:
+
+    ```text
+    just lock
+    ```
+
+5. Copy the `uv.lock.j2` files to your Charmcraft development branch:
+
+    ```text
+    cp .templates/init-kubernetes/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-kubernetes
+    cp .templates/init-machine/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-machine
+    ```
+
+6. In your Charmcraft development branch, commit your changes.
+
+    You should have changed these files:
+
+    * charmcraft/templates/init-kubernetes/pyproject.toml.j2
+    * charmcraft/templates/init-kubernetes/uv.lock.j2
+    * charmcraft/templates/init-machine/pyproject.toml.j2
+    * charmcraft/templates/init-machine/uv.lock.j2

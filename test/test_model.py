@@ -87,6 +87,8 @@ def root_logging():
 class TestModel:
     @pytest.fixture
     def harness(self):
+        # Clear app ID cached when logging security events.
+        _get_juju_log_and_app_id.cache_clear()
         harness = ops.testing.Harness(
             ops.CharmBase,
             meta="""
@@ -119,6 +121,8 @@ class TestModel:
         """,
         )
         yield harness
+        # Clear app ID cached when logging security events.
+        _get_juju_log_and_app_id.cache_clear()
         harness.cleanup()
 
     def ensure_relation(
@@ -3919,13 +3923,7 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
             ['secret-info-get', '--format=json', '--label', 'y'],
-            [
-                'secret-info-get',
-                '--format=json',
-                f'secret://{model._backend.model_uuid}/x',
-                '--label',
-                'y',
-            ],
+            ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
         ]
 
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+
 from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
@@ -50,6 +51,8 @@ class Runtime:
         juju_version: str = '3.0.0',
         unit_id: int | None = 0,
         machine_id: str | None = None,
+        availability_zone: str | None = None,
+        principal_unit: str | None = None,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -58,6 +61,8 @@ class Runtime:
         self._app_name = app_name
         self._unit_id = unit_id
         self._machine_id = machine_id
+        self._availability_zone = availability_zone
+        self._principal_unit = principal_unit
 
     def _get_event_env(self, state: State, event: _Event, charm_root: Path):
         """Build the simulated environment the operator framework expects."""
@@ -74,6 +79,12 @@ class Runtime:
 
         if self._machine_id is not None:
             env['JUJU_MACHINE_ID'] = self._machine_id
+
+        if self._availability_zone is not None:
+            env['JUJU_AVAILABILITY_ZONE'] = self._availability_zone
+
+        if self._principal_unit is not None:
+            env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
         if event._is_action_event and (action := event.action):
             env.update(
@@ -304,7 +315,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(' - entering ops.main (mocked)')
-            from ._ops_main_mock import Ops  # noqa: F811
+            from ._ops_main_mock import Ops
 
             ops = None
 
@@ -331,9 +342,12 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
+                bare = os.getenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+                if bare.lower() == 'true' or (bare.isdigit() and int(bare)):
+                    raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip  # noqa: E501
 
             finally:
                 if ops:
