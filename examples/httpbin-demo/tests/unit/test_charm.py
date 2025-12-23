@@ -74,6 +74,7 @@ def test_status_container_no_plan():
 
 
 def test_httpbin_pebble_ready():
+    """Test that the charm correctly starts the service in the container."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
