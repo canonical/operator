@@ -31,7 +31,7 @@ layer = pebble.Layer(
 )
 
 
-def test_httpbin_pebble_ready():
+def test_pebble_ready():
     """Test that the charm correctly starts the service in the container."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
