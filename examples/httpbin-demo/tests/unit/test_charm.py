@@ -68,7 +68,6 @@ def test_status_service_active():
     This test is useful in addition to ``test_pebble_ready()`` because it checks that the charm
     consistently sets active status, regardless of which event was handled.
     """
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(
         CONTAINER_NAME,
@@ -77,15 +76,12 @@ def test_status_service_active():
         can_connect=True,
     )
     state_in = testing.State(containers={container})
-    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
-    # Assert:
     assert state_out.unit_status == testing.ActiveStatus()
 
 
 def test_status_service_inactive():
     """Check that the charm goes into maintenance status if the service isn't active."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(
         CONTAINER_NAME,
@@ -94,33 +90,25 @@ def test_status_service_inactive():
         can_connect=True,
     )
     state_in = testing.State(containers={container})
-    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
-    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload")
 
 
 def test_status_no_service():
     """Check that the charm goes into maintenance status if the service hasn't been defined."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container})
-    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
-    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
 def test_status_no_pebble():
     """Check that the charm goes into maintenance status if the container is down."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=False)
     state_in = testing.State(containers={container})
-    # Act:
     state_out = ctx.run(ctx.on.update_status(), state_in)
-    # Assert:
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
@@ -133,13 +121,10 @@ def test_status_no_pebble():
 )
 def test_config_changed(user_log_level: str, gunicorn_log_level: str):
     """Test a config-changed event when the config is valid."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container}, config={"log-level": user_log_level})
-    # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    # Assert:
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
     assert gunicorn_args == f"--log-level {gunicorn_log_level}"
@@ -155,12 +140,9 @@ def test_config_changed(user_log_level: str, gunicorn_log_level: str):
 )
 def test_config_changed_invalid(user_log_level: str):
     """Test a config-changed event when the config is invalid."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container}, config={"log-level": user_log_level})
-    # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    # Assert:
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
     assert f"'{user_log_level}'" in state_out.unit_status.message
