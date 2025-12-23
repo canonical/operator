@@ -268,8 +268,8 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: ${{ matrix.charm-root }}
         run: |
-          echo "=== All installed packages in tox unit environment ==="
-          .tox/unit/bin/pip list || echo "Could not list packages from tox environment"
+          echo "=== All installed packages in unit test environment ==="
+          uv pip freeze --python .tox/unit/bin/python || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
 
       - name: Check for tox static environment
         id: has-static

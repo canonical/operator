@@ -81,5 +81,5 @@ jobs:
       - name: Show all installed dependencies in test environment
         if: ${{ !cancelled() }}
         run: |
-          echo "=== All installed packages in tox unit environment ==="
-          .tox/unit/bin/pip list || echo "Could not list packages from tox environment"
+          echo "=== All installed packages in unit test environment ==="
+          uv pip freeze --python .tox/unit/bin/python || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
