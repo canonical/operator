@@ -78,10 +78,8 @@ def test_httpbin_pebble_ready():
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container})
-
     # Act:
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     expected_plan = {
@@ -116,10 +114,8 @@ def test_config_changed(user_log_level: str, gunicorn_log_level: str):
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container}, config={"log-level": user_log_level})
-
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
@@ -140,10 +136,8 @@ def test_config_changed_invalid(user_log_level: str):
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container}, config={"log-level": user_log_level})
-
     # Act:
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
     # Assert:
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
     assert f"'{user_log_level}'" in state_out.unit_status.message
