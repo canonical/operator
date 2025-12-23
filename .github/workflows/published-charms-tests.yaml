@@ -241,6 +241,18 @@ jobs:
             exit 1
           fi
 
+      - name: Show installed ops package versions
+        working-directory: ${{ matrix.charm-root }}
+        run: |
+          echo "=== Wheel files downloaded ==="
+          ls -lh ../operator-wheels/*.whl || echo "No wheel files found"
+          echo ""
+          echo "=== Updated requirements files ==="
+          [ -f requirements.txt ] && (echo "requirements.txt:" && tail -n 10 requirements.txt) || echo "No requirements.txt"
+          [ -f test-requirements.txt ] && (echo "test-requirements.txt:" && tail -n 10 test-requirements.txt) || echo "No test-requirements.txt"
+          echo ""
+          echo "=== Installed ops package version (after tox install) will be checked during test run ==="
+
       - name: Install dependencies
         id: deps
         run: pip install tox~=4.2

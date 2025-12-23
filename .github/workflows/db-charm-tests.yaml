@@ -62,6 +62,16 @@ jobs:
             poetry lock
           fi
 
+      - name: Show installed ops package versions
+        run: |
+          echo "=== Wheel files downloaded ==="
+          ls -lh operator-wheels/*.whl || echo "No wheel files found"
+          echo ""
+          echo "=== Updated requirements.txt ==="
+          cat requirements.txt | tail -n 10 || echo "No requirements.txt"
+          echo ""
+          echo "=== Installed ops package version (after tox install) will be checked during test run ==="
+
       - name: Install dependencies
         run: pip install tox~=4.2
 
