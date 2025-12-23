@@ -77,3 +77,9 @@ jobs:
 
       - name: Run the charm's unit tests
         run: tox -vve unit
+
+      - name: Show all installed dependencies in test environment
+        if: ${{ !cancelled() }}
+        run: |
+          echo "=== All installed packages in tox unit environment ==="
+          .tox/unit/bin/pip list || echo "Could not list packages from tox environment"

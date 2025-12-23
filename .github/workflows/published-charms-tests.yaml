@@ -264,6 +264,13 @@ jobs:
         working-directory: ${{ matrix.charm-root }}
         run: tox -vve unit
 
+      - name: Show all installed dependencies in test environment
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: ${{ matrix.charm-root }}
+        run: |
+          echo "=== All installed packages in tox unit environment ==="
+          .tox/unit/bin/pip list || echo "Could not list packages from tox environment"
+
       - name: Check for tox static environment
         id: has-static
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}

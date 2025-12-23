@@ -65,6 +65,9 @@ jobs:
         run: |
           echo "=== Installed ops package version ==="
           pip list | grep -E "(ops|scenario|tracing)" || echo "No ops packages found"
+          echo ""
+          echo "=== All installed packages ==="
+          pip list
 
       - name: Run the charm tests
         run: |
