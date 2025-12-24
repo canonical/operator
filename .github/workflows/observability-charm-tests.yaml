@@ -87,7 +87,7 @@ jobs:
         if: ${{ !(matrix.disabled) && !cancelled() }}
         run: |
           echo "=== All installed packages in unit test environment ==="
-          uv pip freeze --python .tox/unit/bin/python || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
+          uv pip freeze || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
 
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario
