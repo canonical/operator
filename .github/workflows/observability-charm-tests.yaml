@@ -67,6 +67,14 @@ jobs:
             exit 1
           fi
 
+      - name: Force upgrade pytest-interface-tester to fix compatibility
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          if [ -e "uv.lock" ]; then
+            echo "Upgrading pytest-interface-tester to >=3.4 to ensure compatibility"
+            uv add "pytest-interface-tester>=3.4" --optional dev --upgrade || echo "Could not upgrade pytest-interface-tester"
+          fi
+
       - name: Show installed ops package versions
         if: ${{ !(matrix.disabled) }}
         run: |
