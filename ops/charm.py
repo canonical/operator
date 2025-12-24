@@ -380,7 +380,7 @@ class ConfigChangedEvent(HookEvent):
     - Right after the unit starts up for the first time.
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`~ops.InstallEvent`
-      and a :class:~`ops.StartEvent` during the startup sequence
+      and a :class:`~ops.StartEvent` during the startup sequence
       (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
