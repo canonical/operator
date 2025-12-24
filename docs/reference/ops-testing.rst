@@ -47,7 +47,7 @@ another state.
 Writing these tests should nudge you into thinking of a charm as a black-box
 'input to output' function. The inputs are:
 
-- Event (:class:`CharmEvents <ops.testing.CharmEvents>`): why am I, the charm, being executed
+- Event (:class:`CharmEvents <ops.testing.CharmEvents>`): why am I, the charm, being executed?
 - :class:`State <ops.testing.State>`: am I the leader? what is my relation data? what is my config?
 - :class:`Context <ops.testing.Context>`: what relations can I have? what containers can I have?
 
