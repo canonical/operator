@@ -1139,7 +1139,7 @@ class Container:
             infos[name] = info
         return infos
 
-    def get_filesystem(self, ctx: Context) -> pathlib.Path:
+    def get_filesystem(self, ctx: Context[Any]) -> pathlib.Path:
         """Simulated Pebble filesystem in this context.
 
         Returns:
@@ -1490,7 +1490,7 @@ class Storage:
             return (self.name, self.index) == (other.name, other.index)
         return False
 
-    def get_filesystem(self, ctx: Context) -> pathlib.Path:
+    def get_filesystem(self, ctx: Context[Any]) -> pathlib.Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
 
