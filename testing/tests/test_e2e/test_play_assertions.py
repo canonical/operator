@@ -6,29 +6,26 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-from scenario.state import BlockedStatus as ScenarioBlockedStatus
-from scenario.state import Relation, State
+from scenario.state import BlockedStatus, Relation, State
 
-from ops.charm import CharmBase
-from ops.framework import Framework
-from ops.model import ActiveStatus, BlockedStatus
+import ops
 
 from ..helpers import jsonpatch_delta, trigger
 
 
 @pytest.fixture(scope='function')
-def mycharm():
-    class MyCharm(CharmBase):
+def mycharm() -> type[ops.CharmBase]:
+    class MyCharm(ops.CharmBase):
         _call = None
         called = False
 
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
 
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -36,24 +33,22 @@ def mycharm():
     return MyCharm
 
 
-def test_charm_heals_on_start(mycharm):
-    def pre_event(charm):
-        assert charm.unit.status == BlockedStatus('foo')
-        assert not charm.called
+def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
+    def pre_event(charm: ops.CharmBase):
+        assert charm.unit.status == ops.BlockedStatus('foo')
+        assert not charm.called  # type: ignore
 
-    def call(charm, _):
+    def call(charm: ops.CharmBase, _: ops.EventBase):
         if charm.unit.status.message == 'foo':
-            charm.unit.status = ActiveStatus('yabadoodle')
+            charm.unit.status = ops.ActiveStatus('yabadoodle')
 
-    def post_event(charm):
-        assert charm.unit.status == ActiveStatus('yabadoodle')
-        assert charm.called
+    def post_event(charm: ops.CharmBase):
+        assert charm.unit.status == ops.ActiveStatus('yabadoodle')
+        assert charm.called  # type: ignore
 
-    mycharm._call = call
+    mycharm._call = call  # type: ignore
 
-    initial_state = State(
-        config={'foo': 'bar'}, leader=True, unit_status=ScenarioBlockedStatus('foo')
-    )
+    initial_state = State(config={'foo': 'bar'}, leader=True, unit_status=BlockedStatus('foo'))
 
     out = trigger(
         initial_state,
@@ -65,7 +60,7 @@ def test_charm_heals_on_start(mycharm):
         pre_event=pre_event,
     )
 
-    assert out.unit_status == ActiveStatus('yabadoodle')
+    assert out.unit_status == ops.ActiveStatus('yabadoodle')
 
     out_purged = dataclasses.replace(out, stored_states=initial_state.stored_states)
     assert jsonpatch_delta(out_purged, initial_state) == [
@@ -82,10 +77,10 @@ def test_charm_heals_on_start(mycharm):
     ]
 
 
-def test_relation_data_access(mycharm):
-    mycharm._call = lambda *_: True
+def test_relation_data_access(mycharm: type[ops.CharmBase]):
+    mycharm._call = lambda *_: True  # type: ignore
 
-    def check_relation_data(charm):
+    def check_relation_data(charm: ops.CharmBase):
         foo_relations = charm.model.relations['relation_test']
         assert len(foo_relations) == 1
         foo_rel = foo_relations[0]
