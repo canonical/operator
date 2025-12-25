@@ -1,12 +1,6 @@
 (integrate-your-charm-with-postgresql)=
 # Integrate your charm with PostgreSQL
 
-<!-- UPDATE LINKS
-
-Please add a link to `fetch-lib` documentation in the charmcraft docs, and maybe in the observers section a link to information about custom events (Juju docs?).
-
--->
-
 > <small> {ref}`From Zero to Hero: Write your first Kubernetes charm <from-zero-to-hero-write-your-first-kubernetes-charm>` > Integrate your charm with PostgreSQL</small>
 >
 > **See previous: {ref}`Make your charm configurable <make-your-charm-configurable>`**

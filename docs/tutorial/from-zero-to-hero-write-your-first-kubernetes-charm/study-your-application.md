@@ -11,18 +11,6 @@ Of course, what exactly you'll need to know and how exactly you'll have to go ab
 
 In this part of the tutorial we will choose an application for you and tell you all you need to know about it to start charming. Our demo app is called  'FastAPI Demo' and we have designed it specifically for this tutorial so that, by creating a Kubernetes charm for it, you can master all the fundamentals of Kubernetes charming.
 
-
-<!--
-This tutorial will introduce you to writing a Kubernetes charm with the Juju SDK. You will go through the process of charming the web application.
-What does charming and Charmed Operator mean? Charmed Operator means all of the domain knowledge and expertise about an application distilled in clean and maintainable Python code.
-Application that we use in current tutorial is based on Python FastAPI framework, utilizes PostgreSQL database and has Prometheus metrics scrape target. Once it is charmed, we will integrate our charm with existing PostgreSQL charm and Canonical Observability Stack (COS) bundle for monitoring purpose.
-
-Before you start charming, it is essential to understand the application that you would like to charm. In this chapter of the tutorial we will thus familiarise ourselves with our demo app.
-
--->
-
-
-
 ## Features
 
 The FastAPI app was built using the Python [FastAPI](https://fastapi.tiangolo.com/) framework to deliver a very simple web server. It offers a couple of API endpoints that the user can interact with.
@@ -64,40 +52,10 @@ The application is set up such that, once deployed, you can access the deployed 
 | To get Prometheus metrics: | `http://<IP>:8000/metrics` |
 | To get a Swagger UI to interact with API: |`http://<IP>:8000/docs`|
 
-<!--
-`http://<IP>:8000/metrics` - to get Prometheus metrics
-`http://<IP>:8000/docs` - to get a Swagger UI to interact with API
--->
-
 ## OCI image
 
 Our app's OCI image is at
 
 https://github.com/canonical/api_demo_server/pkgs/container/api_demo_server
-
-<!--
-If you want to proceed with your own copy of an image please proceed with the following instruction.
-
-Since charm framework operates around OCI images we need to build and publish our image.
-
-You can inspect `Dockerfile` in the root of the app directory. We will build our image using docker on top of ubuntu:22.04 base. Later push it to the GitHub container registry (ghcr.io).
-
-```
-# Log in using environment variables for GitHub username and API token
-docker login ghcr.io --username $gh_user --password=$ghcr_token
-
-# Build image, execute from the directory with `Dockerfile`
-docker build -t api_demo_server .
-
-# Tag an image with registry tag and version.
-# Specify your username and repo name where to push
-docker tag api_demo_server ghcr.io/beliaev-maksim/api_demo_server:1.0.0
-
-# now push your image to web host
-docker push ghcr.io/beliaev-maksim/api_demo_server:1.0.0
-
-```
--->
-
 
 > **See next: {ref}`Set up your development environment <set-up-your-development-environment>`**
