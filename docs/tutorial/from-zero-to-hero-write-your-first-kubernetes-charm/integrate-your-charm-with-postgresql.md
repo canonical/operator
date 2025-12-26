@@ -153,7 +153,7 @@ def _on_database_created(
     self._update_layer_and_restart()
 ```
 
-Now we need to make sure that our application knows how to access the database.
+We now need to make sure that our application knows how to access the database.
 
 ### Fetch the database authentication data
 
@@ -243,7 +243,7 @@ def _update_layer_and_restart(self) -> None:
         logger.info('Unable to connect to Pebble: %s', e)
 ```
 
-In this version of the method, we removed three `self.unit.status = ` lines. We'll handle replacing those shortly.
+We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
 
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
@@ -274,9 +274,14 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
     return ops.pebble.Layer(pebble_layer)
 ```
 
-The diagram below illustrates the workflow for the case where the database relation exists and for the case where it does not:
+With these changes, we've made sure that our application knows how to access the database.
 
-![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png)
+When Pebble starts or restarts the service:
+
+* If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
+* Otherwise, the service environment is empty, so our application can't get database authentication data. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+
+We'll now make sure that the unit status is set correctly.
 
 (integrate-your-charm-with-postgresql-update-unit-status)=
 ## Update the unit status to reflect the relation state
@@ -478,7 +483,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the PostgreSQL database, if there isn't a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
 import logging
