@@ -137,8 +137,17 @@ def _update_configuration(self, event: ops.EventBase):
         logger.info("No instance available for storage 'cache'.")
         return
     web_cache_path = self.meta.containers["web"].mounts["cache"].location
-    # Configure the workload to use the storage instance path.
-    ...
+    # Configure the workload to use the storage instance path (assuming that
+    # the workload container image isn't preconfigured to expect storage at
+    # the location specified in charmcraft.yaml).
+    # For example, provide the storage instance path in the Pebble layer.
+    web_container = self.unit.get_container("web")
+    try:
+        web_container.add_layer(...)
+    except ops.pebble.ConnectionError:
+        logger.info("Workload container is not available.")
+        return
+    web_container.replan()
 ```
 
 > See more: [](ops.Model.storages), [](ops.ContainerMeta.mounts)
@@ -149,14 +158,9 @@ To access the storage instance in charm code, use one of the following approache
 
     ```python
         # Prepare the storage instance for use by the workload.
-        web_container = self.unit.get_container("web")
         web_cache_root = pathops.ContainerPath(web_cache_path, container=web_container)
-        try:
-            (web_cache_root / "uploaded-data").mkdir(exist_ok=True)
-            (web_cache_root / "processed-data").mkdir(exist_ok=True)
-        except ops.pebble.ConnectionError:
-            logger.info("Unable to access container. Waiting for pebble-ready.")
-            return
+        (web_cache_root / "uploaded-data").mkdir(exist_ok=True)
+        (web_cache_root / "processed-data").mkdir(exist_ok=True)
     ```
 
 - Access the instance in the charm container, using {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations. For example:
