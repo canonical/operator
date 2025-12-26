@@ -143,7 +143,7 @@ framework.observe(self.database.on.database_created, self._on_database_created)
 framework.observe(self.database.on.endpoints_changed, self._on_database_created)
 ```
 
-Finally, define the method that is called on the database created event:
+Finally, define the method that is called on the database events:
 
 ```python
 def _on_database_created(
@@ -200,7 +200,7 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
     return {}
 ```
 
-### Share the authentication information with your application
+### Share the authentication data with your application
 
 Let's change the Pebble service definition to include a dynamic `environment` key.
 
@@ -483,7 +483,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there isn't a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
 import logging
