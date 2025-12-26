@@ -228,14 +228,11 @@ class FastAPIDemoCharm(ops.CharmBase):
         return env
 
     def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """Fetch postgres relation data.
+        """Retrieve relation data from a postgres database.
 
-        This function retrieves relation data from a postgres database using
-        the `fetch_relation_data` method of the `database` object. The retrieved data is
-        then logged for debugging purposes, and any non-empty data is processed to extract
-        endpoint information, username, and password. This processed data is then returned as
-        a dictionary. If no data is retrieved, the unit is set to waiting status and
-        the program exits with a zero status code.
+        Any non-empty data is processed to extract endpoint information, username,
+        and password. If no data is retrieved, return an empty dictionary so that
+        the caller knows that the database is not yet ready.
         """
         relations = self.database.fetch_relation_data()
         logger.debug('Got following database data: %s', relations)
