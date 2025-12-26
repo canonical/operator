@@ -1,10 +1,16 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
-from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
+from collections.abc import Mapping
+from typing import Any
 
 from scenario import Context, State
 from scenario.state import _Event
+
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent, StartEvent
+from ops.framework import CommitEvent, EventBase, EventSource, PreCommitEvent
 
 
 class Foo(EventBase):
@@ -16,7 +22,7 @@ class MyCharmEvents(CharmEvents):
 
 
 class MyCharm(CharmBase):
-    META = {'name': 'mycharm'}
+    META: Mapping[str, Any] = {'name': 'mycharm'}
     on = MyCharmEvents()
 
     def __init__(self, *args, **kwargs):

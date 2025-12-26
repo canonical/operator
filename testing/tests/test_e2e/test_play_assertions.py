@@ -1,14 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
 import pytest
+from scenario.state import BlockedStatus as ScenarioBlockedStatus
+from scenario.state import Relation, State
+
 from ops.charm import CharmBase
 from ops.framework import Framework
 from ops.model import ActiveStatus, BlockedStatus
 
-from scenario.state import Relation, State
-from scenario.state import BlockedStatus as ScenarioBlockedStatus
 from ..helpers import jsonpatch_delta, trigger
 
 

@@ -1,0 +1,11 @@
+[project]
+name = "test-relation"
+version = "0.0.0.dev0"
+description = "A simple charm for integration tests."
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+]
+
+[tool.uv.sources]
+ops = { path = "ops.tar.gz" }

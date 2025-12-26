@@ -1,14 +1,17 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import os
 from unittest.mock import patch
 
 import pytest
-from ops import CharmBase
-
 from scenario import Context, State
 from scenario.errors import UncaughtCharmError
 from scenario.state import _Event, _next_action_id
+
+from ops import CharmBase
 
 
 class MyCharm(CharmBase):
@@ -112,7 +115,8 @@ def test_app_name_and_unit_id():
     assert ctx.unit_id == 42
 
 
-def test_context_manager_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
+def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -122,15 +126,17 @@ def test_context_manager_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         with ctx(ctx.on.start(), State()) as mgr:
             assert os.getenv('TEST_ENV_VAR') == '1'
             mgr.run()
     assert 'TEST_ENV_VAR' not in os.environ
 
 
-def test_run_uncaught_error():
+@pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
+def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
     class CrashyCharm(CharmBase):
         def __init__(self, framework):
             super().__init__(framework)
@@ -140,8 +146,9 @@ def test_run_uncaught_error():
         def _on_start(self, event):
             raise RuntimeError('Crash!')
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
     ctx = Context(CrashyCharm, meta={'name': 'crashy'})
-    with pytest.raises(UncaughtCharmError):
+    with pytest.raises((UncaughtCharmError, RuntimeError)):
         ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
 
@@ -175,3 +182,9 @@ def test_run_env_cleared():
     ctx = Context(GoodCharm, meta={'name': 'crashy'})
     ctx.run(ctx.on.start(), State())
     assert 'TEST_ENV_VAR' not in os.environ
+
+
+def test_charm_spec_is_deprecated():
+    ctx = Context(CharmBase, meta={'name': 'some-name'})
+    with pytest.warns(DeprecationWarning):
+        _ = ctx.charm_spec  # type: ignore

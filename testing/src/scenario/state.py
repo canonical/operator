@@ -13,6 +13,7 @@ import pathlib
 import random
 import re
 import string
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
 from typing import (
@@ -25,13 +26,12 @@ from typing import (
     TypeVar,
     cast,
 )
-from collections.abc import Callable, Iterable, Mapping, Sequence
 from uuid import uuid4
 
 import yaml
 
 import ops
-from ops import pebble, CharmBase, CharmEvents, SecretRotate, StatusBase
+from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
@@ -40,7 +40,9 @@ from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import TypedDict
+
     from typing_extensions import Unpack
+
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
@@ -81,9 +83,6 @@ _BUILTIN_EVENTS = {
     'start',
     'stop',
     'install',
-    'install',
-    'start',
-    'stop',
     'remove',
     'update_status',
     'config_changed',
@@ -152,7 +151,7 @@ class JujuLogLine:
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class CloudCredential:
+class CloudCredential:  # noqa: D101
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
@@ -181,7 +180,7 @@ class CloudCredential:
 
 
 @dataclasses.dataclass(frozen=True)
-class CloudSpec:
+class CloudSpec:  # noqa: D101
     __doc__ = ops.CloudSpec.__doc__
 
     type: str
@@ -237,7 +236,7 @@ class CloudSpec:
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
+    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # noqa: S311
     return f'secret:{secret_id}'
 
 
@@ -695,7 +694,7 @@ class PeerRelation(RelationBase):
 
 def _random_model_name():
     space = string.ascii_letters + string.digits
-    return ''.join(random.choice(space) for _ in range(20))
+    return ''.join(random.choice(space) for _ in range(20))  # noqa: S311
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1022,8 +1021,9 @@ class Container:
     When your charm runs, the simulated container filesystem will have symlinks to
     ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
 
-    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
-    container filesystem, make sure to specify source files/directories that can be safely modified.
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files
+    to the container filesystem, make sure to specify source files/directories that can
+    be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()
@@ -1100,7 +1100,6 @@ class Container:
         You should run your assertions on this plan, not so much on the layers,
         as those are input data.
         """
-
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
@@ -1178,9 +1177,13 @@ def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
         raise ValueError(f'rockcraft.yaml file not found at {path}')
     with path.open('r') as f:
         rockcraft = yaml.safe_load(f)
+    description = (
+        f'{rockcraft.get("description", "(no description)")} '
+        f'(built from the rockcraft.yaml at {path})'
+    )
     layer_dict: pebble.LayerDict = {
         'summary': rockcraft['summary'],
-        'description': f'{rockcraft.get("description", "(no description)")} (built from the rockcraft.yaml at {path})',
+        'description': description,
         'services': rockcraft.get('services', {}),
         'checks': rockcraft.get('checks', {}),
     }
@@ -1242,7 +1245,7 @@ class _EntityStatus:
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class UnknownStatus(_EntityStatus, ops.UnknownStatus):
+class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
     __doc__ = ops.UnknownStatus.__doc__
 
     name: Literal['unknown'] = 'unknown'
@@ -1252,7 +1255,7 @@ class UnknownStatus(_EntityStatus, ops.UnknownStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ErrorStatus(_EntityStatus, ops.ErrorStatus):
+class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
     __doc__ = ops.ErrorStatus.__doc__
 
     name: Literal['error'] = 'error'
@@ -1262,7 +1265,7 @@ class ErrorStatus(_EntityStatus, ops.ErrorStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ActiveStatus(_EntityStatus, ops.ActiveStatus):
+class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
     __doc__ = ops.ActiveStatus.__doc__
 
     name: Literal['active'] = 'active'
@@ -1272,7 +1275,7 @@ class ActiveStatus(_EntityStatus, ops.ActiveStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class BlockedStatus(_EntityStatus, ops.BlockedStatus):
+class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
     __doc__ = ops.BlockedStatus.__doc__
 
     name: Literal['blocked'] = 'blocked'
@@ -1282,7 +1285,7 @@ class BlockedStatus(_EntityStatus, ops.BlockedStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
+class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
     __doc__ = ops.MaintenanceStatus.__doc__
 
     name: Literal['maintenance'] = 'maintenance'
@@ -1292,7 +1295,7 @@ class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class WaitingStatus(_EntityStatus, ops.WaitingStatus):
+class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # noqa: D101
     __doc__ = ops.WaitingStatus.__doc__
 
     name: Literal['waiting'] = 'waiting'
@@ -1547,7 +1550,7 @@ class State:
     """Ports opened by Juju on this charm."""
     leader: bool = False
     """Whether this charm has leadership."""
-    model: Model = Model()
+    model: Model = dataclasses.field(default_factory=Model)
     """The model this charm lives in."""
     secrets: Iterable[Secret] = dataclasses.field(default_factory=frozenset)
     """The secrets this charm has access to (as an owner, or as a grantee).
@@ -1573,9 +1576,9 @@ class State:
     """Contents of a charm's stored state."""
 
     # the current statuses.
-    app_status: _EntityStatus = UnknownStatus()
+    app_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
     """Status of the application."""
-    unit_status: _EntityStatus = UnknownStatus()
+    unit_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
     """Status of the unit."""
     workload_version: str = ''
     """Workload version."""
@@ -1605,7 +1608,8 @@ class State:
         if self.storages != normalised_storage:
             object.__setattr__(self, 'storages', normalised_storage)
 
-        # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by charmers.
+        # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by
+        # charmers.
         # ops.Network does not have the relation name, so cannot be converted.
         # ops.Resources does not contain the source of the resource, so cannot be converted.
         # ops.StoredState is not convenient to initialise with data, so not useful here.
@@ -1726,7 +1730,6 @@ class State:
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
-
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
         # requires:
         #   foo-bar: ...
@@ -1777,8 +1780,8 @@ class State:
         Items that are found in the metadata and are also in the passed
         arguments will be merged, with the passed values taking precedence.
         """
-        meta = ctx.charm_spec.meta
-        spec_config = ctx.charm_spec.config
+        meta = ctx._charm_spec.meta
+        spec_config = ctx._charm_spec.config
         config = {} if config is None else config
         if spec_config:
             options = spec_config.get('options', {})
@@ -1808,10 +1811,10 @@ class State:
                 continue
             storages.add(Storage(name=storage_name))
         stored_states = set(stored_states or ())
-        for attr in dir(ctx.charm_spec.charm_type):
-            value = getattr(ctx.charm_spec.charm_type, attr)
+        for attr in dir(ctx._charm_spec.charm_type):
+            value = getattr(ctx._charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
-                owner_path = ctx.charm_spec.charm_type.handle_kind
+                owner_path = ctx._charm_spec.charm_type.handle_kind
                 if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
@@ -1961,7 +1964,7 @@ class _EventType(str, Enum):
     BUILTIN = 'builtin'
     RELATION = 'relation'
     ACTION = 'action'
-    SECRET = 'secret'
+    SECRET = 'secret'  # noqa: S105  # This is not an actual secret.
     STORAGE = 'storage'
     WORKLOAD = 'workload'
     CUSTOM = 'custom'

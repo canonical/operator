@@ -7,12 +7,18 @@
 
 You'll need the following tools:
 
-- Charmcraft. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
-- tox. See the [tox installation instructions](https://tox.wiki/en/stable/installation.html#as-tool).
+- **Charmcraft** - For initialising and packing your charm. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
+- **uv** - For managing your charm's dependencies, including Ops. See [Installing uv](https://docs.astral.sh/uv/getting-started/installation/).
+- **tox** - For running checks and tests. To install tox: `uv tool install tox --with tox-uv`.
 
-Instead of installing these tools manually, consider using the `charm-dev` [Multipass](https://canonical.com/multipass) blueprint or [`concierge`](https://github.com/canonical/concierge) to prepare your environment.
+To deploy your charm locally and to run integration tests, you'll also need a Juju controller.
 
-A virtual machine is especially useful for running integration tests. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-prepare-your-environment).
+[Concierge](https://github.com/canonical/concierge) can automatically install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
+
+> See more:
+>
+> - [Prepare your environment to develop machine charms](#machine-charm-tutorial-environment)
+> - [Prepare a continuous integration environment](#validate-your-charm-with-every-change)
 
 ## Initialise your charm project
 
@@ -50,7 +56,7 @@ command names and meanings that the profile provides.
 
 The following tools can also be useful during development:
 
-- To prepare an environment for running integration tests, such as in continuous integration, use [`concierge`](https://github.com/canonical/concierge) or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
+- To prepare an environment for running integration tests, such as in continuous integration, use [Concierge](https://github.com/canonical/concierge) or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
 - The [`charming-actions`](https://github.com/canonical/charming-actions) repository includes actions to ensure that libraries are up-to-date, publish charms and libraries, and more.
 
 The essence of a charm is the ``src/charm.py`` file. This is the entry point for

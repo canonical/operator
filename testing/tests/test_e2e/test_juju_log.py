@@ -1,12 +1,17 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
-from ops.charm import CharmBase, CollectStatusEvent
-
 from scenario import Context
 from scenario.state import JujuLogLine, State
+
+from ops.charm import CharmBase, CollectStatusEvent
 
 logger = logging.getLogger('testing logger')
 
@@ -14,7 +19,7 @@ logger = logging.getLogger('testing logger')
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(CharmBase):
-        META = {'name': 'mycharm'}
+        META: Mapping[str, Any] = {'name': 'mycharm'}
 
         def __init__(self, framework):
             super().__init__(framework)

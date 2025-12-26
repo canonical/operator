@@ -1,6 +1,9 @@
+(machine-charm-tutorial)=
 # Write your first machine charm
 
-In this tutorial, you'll write a {external+juju:ref}`machine charm <machine-charm>` for Juju using Ops and other charm development tools.
+In this tutorial, you'll write a machine charm for Juju using Ops and other charm development tools.
+
+If you're new to charm development, you might find it helpful to read [Charms architecture](https://canonical.com/juju/charms-architecture) and {external+juju:ref}`Machine charm <machine-charm>` before starting the tutorial. Or jump straight in!
 
 It will take about 2 hours for you to complete the tutorial.
 
@@ -18,7 +21,9 @@ What you'll do:
 
 If you need help, don't hesitate to get in touch at [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix.
 
-You can also [inspect the full charm code](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
+```{tip}
+As you work through the tutorial, you'll write your charm piece by piece. You can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
+```
 
 ## Study your application
 
@@ -32,6 +37,7 @@ Where `<address>` is the IP address of the machine that tinyproxy is running on.
 
 This application isn't especially realistic in isolation. But it's a good way to illustrate typical interactions between Juju, a charm, a machine, and a workload.
 
+(machine-charm-tutorial-environment)=
 ## Set up your environment
 
 ### Create a virtual machine
@@ -336,7 +342,11 @@ In `src/charm.py`, replace the `_on_install` method of the charm class with:
 
 When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
-As you write your charm, keep in mind that the charm code only runs when there's an event to handle. Behind the scenes, Juju runs `charm.py` with event data in the environment. Ops reads the event data, instantiates the charm class, then runs the appropriate method.
+As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
+
+```{important}
+Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
+```
 
 ### Define a configuration option
 
@@ -520,6 +530,8 @@ Then add the following methods to the charm class:
             time.sleep(1)
         raise RuntimeError("tinyproxy was still running after the expected time")
 ```
+
+That's all the charm code! If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
 
 ## Try your charm
 
@@ -961,6 +973,8 @@ You can keep things running, to explore further, or you can remove what you crea
 - To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
 
 ## Next steps
+
+If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
 
 For more information about topics covered in the tutorial, see:
 
