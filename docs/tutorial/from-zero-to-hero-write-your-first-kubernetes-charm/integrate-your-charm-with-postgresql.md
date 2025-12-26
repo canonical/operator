@@ -84,7 +84,7 @@ To do so, we need to update our charm `src/charm.py` to do all of the following:
 
 ### Import the database interface libraries
 
-First, at the top of the file, import the database interfaces library:
+At the top of `src/charm.py`, import the database interfaces library:
 
 ```python
 # Import the 'data_interfaces' library.
@@ -126,7 +126,7 @@ export PYTHONPATH=lib:$PYTHONPATH
 
 ### Add relation event observers
 
-Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
+In the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
 
 
 ```python
@@ -135,13 +135,25 @@ Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' 
 self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
 ```
 
-Now, add event observers for all the database events:
+Next, add event observers for all the database events:
 
 ```python
 # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
 framework.observe(self.database.on.database_created, self._on_database_created)
 framework.observe(self.database.on.endpoints_changed, self._on_database_created)
 ```
+
+Finally, define the method that is called on the database created event:
+
+```python
+def _on_database_created(
+    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+) -> None:
+    """Event is fired when postgres database is created or endpoint is changed."""
+    self._update_layer_and_restart()
+```
+
+Now we need to make sure that our application knows how to access the database.
 
 ### Fetch the database authentication data
 
@@ -260,16 +272,6 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
         },
     }
     return ops.pebble.Layer(pebble_layer)
-```
-
-Finally, let's define the method that is called on the database created event:
-
-```python
-def _on_database_created(
-    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
-) -> None:
-    """Event is fired when postgres database is created or endpoint is changed."""
-    self._update_layer_and_restart()
 ```
 
 The diagram below illustrates the workflow for the case where the database relation exists and for the case where it does not:
