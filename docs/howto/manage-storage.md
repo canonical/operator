@@ -6,7 +6,7 @@
 
 ### Define the storage
 
-Each storage can be defined as supporting a single or multiple storage instances. If you define a storage as supporting multiple instances, your charm's users can use `juju add-storage` to increase the number of instances attached to your charm. (This command doesn't 'grow' existing instances).
+Each storage can be defined as supporting a single or multiple storage instances. If you define a storage as supporting multiple instances, your charm's users can use `juju add-storage` to increase the number of instances attached to the current unit. (Note that this command doesn't 'grow' existing instances).
 
 Let's define a storage called `cache` that supports multiple instances. In `charmcraft.yaml`:
 
@@ -22,7 +22,7 @@ storage:
       range: 1-10
 ```
 
-When your charm is deployed, Juju attaches one storage instance to each unit - the minimum of the range 1-10. The instance is at least 1GB in size. Each additional instance that's attached will also be at least 1GB in size.
+When your charm is deployed, by default Juju attaches one storage instance to each unit - the minimum of the range 1-10. The instance is at least 1GB in size. Each additional instance that's attached will also be at least 1GB in size.
 
 Juju mounts each storage instance in the unit's filesystem. Your charm should configure the workload with the path of each mounted instance.
 
@@ -52,7 +52,7 @@ def _update_configuration(self, event: ops.EventBase):
     ...
 ```
 
-The length of `cache_paths` matches the number of storage instances attached to the unit.
+The length of `cache_paths` matches the number of storage instances currently attached to the unit.
 
 If we hadn't specified `multiple` in the storage definition, `cache` would either be a singleton list or empty, depending on whether a storage instance is attached.
 
