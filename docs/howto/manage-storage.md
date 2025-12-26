@@ -152,26 +152,17 @@ def _update_configuration(self, event: ops.EventBase):
 
 > See more: [](ops.Model.storages), [](ops.ContainerMeta.mounts)
 
-To access the storage instance in charm code, use one of the following approaches. The approaches are essentially equivalent - choose whichever you prefer.
+To access the storage instance in charm code, use {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations in the charm container. For example:
 
-- Access the instance in the workload container, using {external+charmlibs:ref}`pathops <charmlibs-pathops>`. For example:
+```python
+    # Prepare the storage instance for use by the workload.
+    charm_cache_path = cache[0].location  # Always index 0 in a K8s charm.
+    charm_cache_root = pathops.LocalPath(charm_cache_path)
+    (charm_cache_root / "uploaded-data").mkdir(exist_ok=True)
+    (charm_cache_root / "processed-data").mkdir(exist_ok=True)
+```
 
-    ```python
-        # Prepare the storage instance for use by the workload.
-        web_cache_root = pathops.ContainerPath(web_cache_path, container=web_container)
-        (web_cache_root / "uploaded-data").mkdir(exist_ok=True)
-        (web_cache_root / "processed-data").mkdir(exist_ok=True)
-    ```
-
-- Access the instance in the charm container, using {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations. For example:
-
-    ```python
-        # Prepare the storage instance for use by the workload.
-        charm_cache_path = cache[0].location  # Always index 0 in a K8s charm.
-        charm_cache_root = pathops.LocalPath(charm_cache_path)
-        (charm_cache_root / "uploaded-data").mkdir(exist_ok=True)
-        (charm_cache_root / "processed-data").mkdir(exist_ok=True)
-    ```
+Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `web_cache_path` in the workload container. This approach is more appropriate if you need to manipulate lots of data in the workload container.
 
 ## Handle storage detaching
 
