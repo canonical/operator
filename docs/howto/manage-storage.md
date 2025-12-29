@@ -162,7 +162,7 @@ To access the storage instance in charm code, use {external+charmlibs:ref}`patho
     (charm_cache_root / "processed-data").mkdir(exist_ok=True)
 ```
 
-Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `web_cache_path` in the workload container. This approach is more appropriate if you need to manipulate lots of data in the workload container.
+Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `web_cache_path` in the workload container. This approach is more appropriate if you need to reference additional data in the workload container.
 
 ## Handle storage detaching
 
