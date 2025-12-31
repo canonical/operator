@@ -374,64 +374,9 @@ We'll also use the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.
 
 In this section we'll write a test to check that Pebble is configured as expected.
 
-### Prepare your test environment
-
-Create a file called `tox.ini` in your project root directory and add the following configuration:
-
-```
-[tox]
-no_package = True
-skip_missing_interpreters = True
-min_version = 4.0.0
-env_list = unit
-
-[vars]
-src_path = {tox_root}/src
-tests_path = {tox_root}/tests
-all_path = {[vars]src_path} {[vars]tests_path}
-
-[testenv]
-set_env =
-    PYTHONPATH = {tox_root}/lib:{[vars]src_path}
-    PYTHONBREAKPOINT=pdb.set_trace
-    PY_COLORS=1
-pass_env =
-    PYTHONPATH
-    CHARM_BUILD_DIR
-    MODEL_SETTINGS
-
-[testenv:unit]
-description = Run unit tests
-deps =
-    pytest
-    cosl
-    coverage[toml]
-    ops[testing]
-    -r {tox_root}/requirements.txt
-commands =
-    coverage run --source={[vars]src_path} -m pytest \
-        -v \
-        -s \
-        --tb native \
-        {[vars]tests_path}/unit \
-        {posargs}
-    coverage report
-```
-> Read more: [`tox.ini`](https://tox.wiki/en/latest/config.html#tox-ini)
-
-If you used `charmcraft init --profile kubernetes` at the beginning of your project, you will already have the `tox.ini` file.
-
-### Prepare your test directory
-
-In your project root directory, create directory for the unit test:
-
-```text
-mkdir -p tests/unit
-```
-
 ### Write a test
 
-In your `tests/unit` directory, create a new file called `test_charm.py` and add the test below. This test will check the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test will first set up a context, then define the input state, run the action, and check whether the results match the expected values.
+Replace the contents of `tests/unit/test_charm.py` with:
 
 ```python
 import ops
@@ -442,7 +387,7 @@ from charm import FastAPIDemoCharm
 
 def test_pebble_layer():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -450,12 +395,12 @@ def test_pebble_layer():
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {
-        'services': {
-            'fastapi-service': {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': 'uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000',
-                'startup': 'enabled',
+        "services": {
+            "fastapi-service": {
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
+                "startup": "enabled",
                 # Since the environment is empty, Layer.to_dict() will not
                 # include it.
             }
@@ -468,11 +413,12 @@ def test_pebble_layer():
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
-        state_out.get_container(container.name).service_statuses['fastapi-service']
+        state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
-
 ```
+
+This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
 
 ### Run the test
 
@@ -485,25 +431,25 @@ ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e unit
 The result should be similar to the following output:
 
 ```text
-unit: install_deps> python -I -m pip install cosl 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/fastapi-demo/requirements.txt
-unit: commands[0]> coverage run --source=/home/ubuntu/fastapi-demo/src -m pytest -v -s --tb native /home/ubuntu/fastapi-demo/tests/unit
-==================================================================================== test session starts =====================================================================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python
+...
+============================================ test session starts =============================================
+platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
 cachedir: .tox/unit/.pytest_cache
 rootdir: /home/ubuntu/fastapi-demo
+configfile: pyproject.toml
 collected 1 item
 
 tests/unit/test_charm.py::test_pebble_layer PASSED
 
-===================================================================================== 1 passed in 0.19s ======================================================================================
+============================================= 1 passed in 1.21s ==============================================
 unit: commands[1]> coverage report
-Name           Stmts   Miss  Cover
-----------------------------------
-src/charm.py      17      0   100%
-----------------------------------
-TOTAL             17      0   100%
-  unit: OK (12.33=setup[11.76]+cmd[0.50,0.07] seconds)
-  congratulations :) (12.42 seconds)
+Name           Stmts   Miss Branch BrPart  Cover   Missing
+----------------------------------------------------------
+src/charm.py      18      0      0      0   100%
+----------------------------------------------------------
+TOTAL             18      0      0      0   100%
+  unit: OK (4.26=setup[0.23]+cmd[3.33,0.70] seconds)
+  congratulations :) (4.30 seconds)
 ```
 
 Congratulations, you have written your first unit test!
