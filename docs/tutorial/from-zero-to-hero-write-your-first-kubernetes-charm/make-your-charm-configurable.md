@@ -174,21 +174,21 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
+  --path="./fastapi-demo_ubuntu-22.04-amd64.charm" \
+  fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
 Now, check the available configuration options:
 
 ```text
-juju config demo-api-charm
+juju config fastapi-demo
 ```
 
 Our newly defined `server-port` option is there. Let's try to configure it to something else, e.g., `5000`:
 
 ```text
-juju config demo-api-charm server-port=5000
+juju config fastapi-demo server-port=5000
 ```
 
 Now, let's validate that the app is actually running and reachable on the new port by sending the HTTP  request below, where `10.1.157.74` is the IP of our pod and `5000` is the new application port:
@@ -202,7 +202,7 @@ You should see JSON string with the version of the application: `{"version":"1.0
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
 
 ```text
-juju config demo-api-charm server-port=22
+juju config fastapi-demo server-port=22
 juju status
 ```
 
@@ -213,10 +213,10 @@ Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.12   unsupported  18:19:24+01:00
 
 App             Version  Status   Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           blocked      1  demo-api-charm             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
+fastapi-demo           blocked      1  fastapi-demo             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
+fastapi-demo/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
 ```
 
 Congratulations, you now know how to make your charm configurable!
@@ -224,7 +224,7 @@ Congratulations, you now know how to make your charm configurable!
 Before continuing, reset the port to `8000` and check that the application is in `active` status:
 
 ```text
-juju config demo-api-charm server-port=8000
+juju config fastapi-demo server-port=8000
 juju status
 ```
 

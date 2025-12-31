@@ -351,8 +351,8 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
+  --path="./fastapi-demo_ubuntu-22.04-amd64.charm" \
+  fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
@@ -365,7 +365,7 @@ juju deploy postgresql-k8s --channel=14/stable --trust
 Now,  integrate our charm with the newly deployed `postgresql-k8s` charm:
 
 ```text
-juju integrate postgresql-k8s demo-api-charm
+juju integrate postgresql-k8s fastapi-demo
 ```
 
 > Read more: {external+juju:ref}`Juju | Relation (integration) <relation>`, [`juju integrate`](inv:juju:std:label#command-juju-integrate)
@@ -376,22 +376,22 @@ Finally, run:
 juju status --relations --watch 1s
 ```
 
-You should see both applications get to the `active` status, and also that the `postgresql-k8s` charm has a relation to the `demo-api-charm` over the `postgresql_client` interface, as below:
+You should see both applications get to the `active` status, and also that the `postgresql-k8s` charm has a relation to the `fastapi-demo` over the `postgresql_client` interface, as below:
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.12   unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel    Rev  Address         Exposed  Message
-demo-api-charm           active      1  demo-api-charm               2  10.152.183.233  no
+fastapi-demo             active      1  fastapi-demo                 2  10.152.183.233  no
 postgresql-k8s  14.15    active      1  postgresql-k8s  14/stable  495  10.152.183.195  no
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.90
+fastapi-demo/0*    active    idle   10.1.157.90
 postgresql-k8s/0*  active    idle   10.1.157.92         Primary
 
 Integration provider           Requirer                       Interface          Type     Message
-postgresql-k8s:database        demo-api-charm:database        postgresql_client  regular
+postgresql-k8s:database        fastapi-demo:database          postgresql_client  regular
 postgresql-k8s:database-peers  postgresql-k8s:database-peers  postgresql_peers   peer
 postgresql-k8s:restart         postgresql-k8s:restart         rolling_op         peer
 postgresql-k8s:upgrade         postgresql-k8s:upgrade         upgrade            peer
@@ -547,9 +547,9 @@ When it's done, the output should show two passing tests:
 tests/integration/test_charm.py::test_deploy
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'executing'
-- .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.message = 'running start hook'
-+ .apps['demo-api-charm'].units['demo-api-charm/0'].juju_status.current = 'idle'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running start hook'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
 PASSED
 ```
 

@@ -44,87 +44,63 @@ As a charm developer, your first job is to use this knowledge to create the basi
  - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
 - executable files (like the `src/charm.py` file that we will see shortly) where you will use Ops-enriched Python to write all the logic of your charm.
 
+## Create a charm project
 
-## Set the basic information, requirements, and workload for your charm
-
-In your virtual machine, go into your project directory `~/fastapi-demo`, then create a file called `charmcraft.yaml`. This is a file that describes metadata such as the charm name, purpose, environment constraints, workload containers, etc., in short, all the information that tells Juju what it can do with your charm.
-
-In this file, do all of the following:
-
-First, add basic information about your charm:
+In your virtual machine, go into your project directory and create the initial version of your charm:
 
 ```text
-name: demo-api-charm
-title: |
-  demo-fastapi-k8s
+cd ~/fastapi-demo
+charmcraft init --profile kubernetes
+```
+
+Charmcraft created several files, including:
+
+- `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
+- `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
+- `src/charm.py` - The Python file that will contain the main logic of your charm.
+
+These files currently contain placeholder code and configuration.
+
+## Write your charm
+
+### Edit the metadata
+
+Open `~/k8s-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
+
+```yaml
+title: Web Server Demo
+summary: A demo charm that operates a small Python FastAPI server.
 description: |
-  This is a demo charm built on top of a small Python FastAPI server.
-summary: |
-  FastAPI Demo charm for Kubernetes
+  This charm demonstrates how to write a Kubernetes charm with Ops.
 ```
 
-Second, add a constraint assuming a Juju version with the required features and a Kubernetes-type cloud:
+Next, describe the workload container and its OCI image.
 
-```text
-assumes:
-  - juju >= 3.1
-  - k8s-api
-```
+In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 
-Third, describe the workload container, as below. Below, `demo-server` is the name of the container, and `demo-server-image` is the name of its OCI image.
-
-```text
+```yaml
 containers:
   demo-server:
     resource: demo-server-image
-```
 
-
-Fourth, describe the workload container resources, as below. The name of the resource below, `demo-server-image`, is the one you defined above.
-
-```text
 resources:
-  # An OCI image resource for each container listed above.
-  # You may remove this if your charm will run without a workload sidecar container.
+  # An OCI image resource for the container listed above.
   demo-server-image:
     type: oci-image
     description: OCI image from GitHub Container Repository
-    # The upstream-source field is ignored by Juju. It is included here as a reference
-    # so the integration testing suite knows which image to deploy during testing. This field
-    # is also used by the 'canonical/charming-actions' GitHub action for automated releasing.
+    # The upstream-source field is ignored by Charmcraft and Juju, but it can be
+    # useful to developers in identifying the source of the OCI image.  It is also
+    # used by the 'canonical/charming-actions' GitHub action for automated releases.
+    # The test_deploy function in tests/integration/test_charm.py reads upstream-source
+    # to determine which OCI image to use when running the charm's integration tests.
     upstream-source: ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
+### Define the charm class
 
+We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic.
 
-## Define the charm initialisation and application services
-
-<!--
-The recommended way to develop charms is by using a Python library called Ops (`ops`) (also known as the Charmed Operator Framework, as in 'the framework for building charmed operators').
--->
-
-Create a file called `requirements.txt`. This is a  file that describes all the required external Python dependencies that will be used by your charm.
-
-
-In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
-
-```
-ops>2,<4
-```
-
-
-Create a file called `src/charm.py`. This is the file that you will use to write all the Python code that you want your charm to execute in response to events it receives from the Juju controller.
-
-
-This file needs to be executable. One way you can do this is:
-
-```text
-chmod a+x src/charm.py
-```
-
-In this file, do all of the following:
-
-First, add a shebang to ensure that the file is directly executable. Then, import the `ops` package to access the`CharmBase` class and the `main` function. Next, use `CharmBase` to create a charm class `FastAPIDemoCharm` and then invoke this class  in the  `main` function of Ops. As you can see, a charm  is a pure Python class that inherits from the CharmBase class of Ops and which we pass to the `main` function defined in the `ops.main` module.
+Replace the contents of `src/charm.py` with:
 
 ```python
 #!/usr/bin/env python3
@@ -141,12 +117,15 @@ class FastAPIDemoCharm(ops.CharmBase):
         super().__init__(framework)
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     ops.main(FastAPIDemoCharm)
 ```
 
+As you can see, a charm is a pure Python class that inherits from the `CharmBase` class of Ops and which we pass to the `main` function defined in the `ops.main` module. We'll refer to `FastAPIDemoCharm` as the "charm class".
 
-Now, in the `__init__` function of your charm class, use Ops constructs to add an observer for when the Juju controller informs the charm that the Pebble in its workload container is up and running, as below. As you can see, the observer is a function that takes as an argument an event and an event handler. The event name is created automatically by Ops for each container on the template `<container>-pebble-ready`. The event handler is a method in your charm class that will be executed when the event is fired; in this case, you will use it to tell Pebble how to start your application.
+### Handle the pebble-ready event
+
+In the `__init__` function of your charm class, use Ops constructs to add an observer for when the Juju controller informs the charm that the Pebble in its workload container is up and running, as below. As you can see, the observer is a function that takes as an argument an event and an event handler. The event name is created automatically by Ops for each container on the template `<container>-pebble-ready`. The event handler is a method in your charm class that will be executed when the event is fired; in this case, you will use it to tell Pebble how to start your application.
 
 ```python
 framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
@@ -195,20 +174,11 @@ In case it helps, the definition of a Pebble layer is very similar to the defini
 
 ```python
 def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
-    """Define and start a workload using the Pebble API.
-
-    Change this example to suit your needs. You'll need to specify the right entrypoint and
-    environment configuration for your specific workload.
-
-    Learn more about interacting with Pebble at
-        https://documentation.ubuntu.com/ops/latest/reference/pebble/
-    Learn more about Pebble layers at
-        https://documentation.ubuntu.com/pebble/how-to/use-layers/
-    """
+    """Define and start a workload using the Pebble API."""
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload
     # Add initial Pebble config layer using the Pebble API
-    container.add_layer('fastapi_demo', self._get_pebble_layer(), combine=True)
+    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
     # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
     container.replan()
     # Learn more about statuses at
@@ -221,7 +191,7 @@ The custom Pebble layer that you just added is defined in the  `self._get_pebble
 In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute :
 
 ```python
-self.pebble_service_name = 'fastapi-service'
+self.pebble_service_name = "fastapi-service"
 ```
 
 Finally, define  the `_get_pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
@@ -229,34 +199,32 @@ Finally, define  the `_get_pebble_layer` function as below. The `command` variab
 ```python
 def _get_pebble_layer(self) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
+    command = " ".join(
         [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            '--port=8000',
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            "--port=8000",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
-        'summary': 'FastAPI demo service',
-        'description': 'pebble config layer for FastAPI demo server',
-        'services': {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {
             self.pebble_service_name: {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': command,
-                'startup': 'enabled',
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": command,
+                "startup": "enabled",
             }
         },
     }
     return ops.pebble.Layer(pebble_layer)
 ```
 
+### Add logger functionality
 
-
-## Add logger functionality
-
-In the `src/charm.py` file, in the imports section, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
+In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
 
 ```python
 import logging
@@ -265,40 +233,9 @@ import logging
 logger = logging.getLogger(__name__)
 ```
 
-## Tell Charmcraft how to build your charm
+## Try your charm
 
-In the same `charmcraft.yaml` file you created earlier, you need to describe all the information needed for Charmcraft to be able to pack your charm. In this file, do the following:
-
-First, add the block below. This will identify your charm as a charm (as opposed to something else you might know from using Juju, namely, a bundle).
-
-```
-type: charm
-```
-
-
-Also add the block below. This declares that your charm will build and run charm on Ubuntu 22.04.
-
-```
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
-```
-
-
-And that's it! Time to validate your charm!
-
-```{tip}
-
-Once you've mastered the basics, you can speed things up by navigating to your empty charm project directory and running `charmcraft init --profile kubernetes`. This will create all the files above and more, along with helpful descriptor keys and code scaffolding.
-
-```
-
-
-## Validate your charm
+### Pack your charm
 
 First, ensure that you are inside the Multipass Ubuntu VM, in the `~/fastapi-demo` folder:
 
@@ -307,11 +244,11 @@ multipass shell juju-sandbox-k8s
 cd ~/fastapi-demo
 ```
 
-Now, pack your charm project directory into a `.charm` file, as below. This will produce a `.charm` file.  In our case it was named `demo-api-charm_ubuntu-22.04-amd64.charm`; yours should be named similarly, though the name might vary slightly depending on your architecture.
+Now, pack your charm project directory into a `.charm` file, as below. This will produce a `.charm` file.  In our case it was named `fastapi-demo_ubuntu-22.04-amd64.charm`; yours should be named similarly, though the name might vary slightly depending on your architecture.
 
 ```
 charmcraft pack
-# Packed demo-api-charm_ubuntu-22.04-amd64.charm
+# Packed fastapi-demo_ubuntu-22.04-amd64.charm
 ```
 
 ```{important}
@@ -338,10 +275,12 @@ This name might vary slightly, depending on your architecture. E.g., for an `arm
 ```
 -->
 
+### Deploy your charm
+
 Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` named after your application with one replica.
 
 ```text
-juju deploy ./demo-api-charm_ubuntu-22.04-amd64.charm --resource \
+juju deploy ./fastapi-demo_ubuntu-22.04-amd64.charm --resource \
      demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
@@ -365,14 +304,16 @@ When all units are settled down, you should see the output below, where `10.152.
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.12   unsupported  13:38:19+01:00
 
-App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           active      1  demo-api-charm             0  10.152.183.215  no
+App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
+fastapi-demo           active      1  fastapi-demo             0  10.152.183.215  no
 
-Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.73
+Unit             Workload  Agent  Address      Ports  Message
+fastapi-demo/0*  active    idle   10.1.157.73
 ```
 
-Now, validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
+### Try the web server
+
+Validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
 
 ```
 curl 10.1.157.73:8000/version
@@ -381,7 +322,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.0"}
+{"version":"1.0.1"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
@@ -407,13 +348,13 @@ You should see that your application has been deployed in a pod that has 2 conta
 ```text
 NAME                             READY   STATUS    RESTARTS   AGE
 modeloperator-5df6588d89-ghxtz   1/1     Running   0          10m
-demo-api-charm-0                 2/2     Running   0          10m
+fastapi-demo-0                 2/2     Running   0          10m
 ```
 
 3. Check also:
 
 ```text
-kubectl -n testing describe pod demo-api-charm-0
+kubectl -n testing describe pod fastapi-demo-0
 ```
 
 In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
@@ -685,14 +626,14 @@ tests/integration/test_charm.py::test_deploy
 -------------------------------- live log setup --------------------------------
 INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
 -------------------------------- live log call ---------------------------------
-INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./demo-api-charm_ubuntu-22.04-amd64.charm demo-api-charm --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./fastapi-demo_ubuntu-22.04-amd64.charm fastapi-demo --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 + .model.name = 'jubilant-823cf1fd'
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['demo-api-charm'].app_status.current = 'waiting'
-- .apps['demo-api-charm'].app_status.message = 'installing agent'
-+ .apps['demo-api-charm'].app_status.current = 'active'
+- .apps['fastapi-demo'].app_status.current = 'waiting'
+- .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].app_status.current = 'active'
 PASSED
 ------------------------------ live log teardown -------------------------------
 INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-823cf1fd --no-prompt --destroy-storage --force
