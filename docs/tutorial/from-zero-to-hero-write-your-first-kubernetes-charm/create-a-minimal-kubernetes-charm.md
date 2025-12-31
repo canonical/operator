@@ -57,9 +57,11 @@ Charmcraft created several files, including:
 
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
 - `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
-- `src/charm.py` - The Python file that will contain the main logic of your charm.
+- `src/charm.py` - The Python file that will contain the logic of your charm.
 
 These files currently contain placeholder code and configuration.
+
+Charmcraft also created a module called `src/fastapi_demo.py`. We won't need this module. In general, it's a good place to put functions that interact with the running workload.
 
 ## Write your charm
 
