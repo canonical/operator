@@ -39,7 +39,7 @@ This tells Charmcraft that your charm requires the [`data_interfaces`](https://c
 Next, run the following command to download the library:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now contain the structure below:
@@ -536,7 +536,7 @@ def test_database_integration(juju: jubilant.Juju):
 In your Multipass Ubuntu VM, run the test again:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
 ```
 
 The test may again take some time to run.

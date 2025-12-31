@@ -240,7 +240,7 @@ logger = logging.getLogger(__name__)
 First, ensure that you are inside the Multipass Ubuntu VM, in the `~/fastapi-demo` folder:
 
 ```
-multipass shell charm-dev
+multipass shell juju-sandbox-k8s
 cd ~/fastapi-demo
 ```
 
@@ -263,7 +263,7 @@ If packing failed - perhaps you forgot to make `charm.py` executable earlier - y
 
 ```
 
-<!--ubuntu@charm-dev:~/fastapi-demo$ charmcraft pack-->
+<!--ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft pack-->
 
 <!-- `charmcraft pack` just fetches the dependencies, compiles any modules, makes sure you have all the right pieces of metadata, and zips it up for easy distribution.
 -->
@@ -477,7 +477,7 @@ def test_pebble_layer():
 In your Multipass Ubuntu VM shell, run your test:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e unit
 ```
 
 The result should be similar to the following output:

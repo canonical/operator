@@ -81,7 +81,8 @@ ubuntu@juju-sandbox:~$
 Now that you have a virtual machine, you need to install the following tools on your virtual machine:
 
 - **Charmcraft, Juju, and LXD** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
-- **uv and tox** - You'll implement your charm using Python code. [uv](https://docs.astral.sh/uv/) is a Python project manager that will install dependencies for checks and tests. You'll use [tox](https://tox.wiki/en/) to select which checks or tests to run.
+- **uv** - Your charm will be a Python project. You'll use [uv](https://docs.astral.sh/uv/) to manage your charm's runtime and development dependencies.
+- **tox** - You'll use [tox](https://tox.wiki/en/) to run your charm's checks and tests.
 
 Instead of manually installing and configuring each tool, we recommend using [Concierge](https://github.com/canonical/concierge), Canonical's tool for setting up charm development environments.
 
