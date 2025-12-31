@@ -47,7 +47,7 @@ As a charm developer, your first job is to use this knowledge to create the basi
 
 ## Set the basic information, requirements, and workload for your charm
 
-Create a file called `charmcraft.yaml`. This is a file that describes metadata such as the charm name, purpose, environment constraints, workload containers, etc., in short, all the information that tells Juju what it can do with your charm.
+In your virtual machine, go into your project directory `~/fastapi-demo`, then create a file called `charmcraft.yaml`. This is a file that describes metadata such as the charm name, purpose, environment constraints, workload containers, etc., in short, all the information that tells Juju what it can do with your charm.
 
 In this file, do all of the following:
 
