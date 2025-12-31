@@ -422,10 +422,10 @@ This test checks the behaviour of the `_on_demo_server_pebble_ready` function th
 
 ### Run the test
 
-In your Multipass Ubuntu VM shell, run your test:
+Run the following command from anywhere in the `~/fastapi-demo` directory:
 
 ```text
-ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e unit
+tox -e unit
 ```
 
 The result should be similar to the following output:
@@ -466,68 +466,11 @@ You can ensure this by writing integration tests for your charm. In the charming
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
-### Prepare your test environment
+### Write a test
 
-In your `tox.ini` file, add the following new environment:
+Let's write the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will deploy the charm, then verify that the installation event is handled without errors.
 
-```
-[testenv:integration]
-description = Run integration tests
-deps =
-    pytest
-    jubilant
-    -r {tox_root}/requirements.txt
-commands =
-    pytest \
-        -v \
-        -s \
-        --tb native \
-        --log-cli-level=INFO \
-        {[vars]tests_path}/integration \
-        {posargs}
-```
-
-If you used `charmcraft init --profile kubernetes` at the beginning of your project, the `testenv:integration` section is already in the `tox.ini` file.
-
-### Prepare your test directory
-
-In your project root directory, create a directory for the integration test:
-
-```text
-mkdir -p tests/integration
-```
-
-### Write and run a pack-and-deploy integration test
-
-Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm, then verify that the installation event is handled without errors.
-
-In your `tests/integration` directory, create a file called `conftest.py` and add the following fixtures:
-
-```python
-import pathlib
-import subprocess
-
-import jubilant
-import pytest
-
-
-@pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest):
-    with jubilant.temp_model() as juju:
-        yield juju
-
-        if request.session.testsfailed:
-            log = juju.debug_log(limit=1000)
-            print(log, end='')
-
-
-@pytest.fixture(scope='session')
-def charm():
-    subprocess.check_call(['charmcraft', 'pack'])  # noqa
-    return next(pathlib.Path('.').glob('*.charm'))
-```
-
-In the same directory, create a file called `test_charm.py` and add the following test:
+Replace the contents of `tests/integration/test_charm.py` with:
 
 ```python
 import logging
@@ -538,22 +481,30 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
-APP_NAME = METADATA['name']
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
+APP_NAME = METADATA["name"]
 
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy the charm under test."""
     resources = {
-        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
+        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
-
-    # Deploy the charm and wait for active/idle status
-    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+```
+
+This test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+
+- `charm` - The `.charm` file to deploy.
+- `juju` - A Jubilant object for interacting with a temporary Juju model.
+
+### Run the test
+
+Run the following command from anywhere in the `~/fastapi-demo` directory:
+
+```text
+tox -e integration
 ```
 
 The test takes some time to run as Jubilant adds a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
@@ -561,35 +512,15 @@ The test takes some time to run as Jubilant adds a new model to an existing clus
 The result should be similar to the following output:
 
 ```text
-integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
-============================= test session starts ==============================
-platform linux -- Python 3.10.18, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python3
-cachedir: .tox/integration/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
-
-tests/integration/test_charm.py::test_deploy
-
--------------------------------- live log setup --------------------------------
-INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
--------------------------------- live log call ---------------------------------
-INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./fastapi-demo_amd64.charm fastapi-demo --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-+ .model.name = 'jubilant-823cf1fd'
 ...
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['fastapi-demo'].app_status.current = 'waiting'
-- .apps['fastapi-demo'].app_status.message = 'installing agent'
-+ .apps['fastapi-demo'].app_status.current = 'active'
-PASSED
------------------------------- live log teardown -------------------------------
-INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-823cf1fd --no-prompt --destroy-storage --force
 
+============================= 1 passed in 55.43s =============================
+  integration: OK (57.79=setup[0.23]+cmd[57.57] seconds)
+  congratulations :) (57.84 seconds)
+```
 
-========================= 1 passed in 63.92s (0:01:03) =========================
-  integration: OK (64.10=setup[0.01]+cmd[64.10] seconds)
-  congratulations :) (64.15 seconds)
+```{tip}
+`tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
 
 ## Review the final code
