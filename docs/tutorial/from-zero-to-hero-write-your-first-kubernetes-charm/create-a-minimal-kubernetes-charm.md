@@ -348,7 +348,7 @@ You should see that your application has been deployed in a pod that has 2 conta
 ```text
 NAME                             READY   STATUS    RESTARTS   AGE
 modeloperator-5df6588d89-ghxtz   1/1     Running   0          10m
-fastapi-demo-0                 2/2     Running   0          10m
+fastapi-demo-0                   2/2     Running   0          10m
 ```
 
 3. Check also:
