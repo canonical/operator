@@ -174,7 +174,7 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./fastapi-demo_ubuntu-22.04-amd64.charm" \
+  --path="./fastapi-demo_amd64.charm" \
   fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
