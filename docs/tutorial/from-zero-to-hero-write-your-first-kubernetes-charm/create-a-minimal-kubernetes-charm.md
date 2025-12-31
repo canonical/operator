@@ -362,8 +362,8 @@ juju status --watch 1s
 When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod.
 
 ```text
-Model        Controller  Cloud/Region        Version  SLA          Timestamp
-welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  13:38:19+01:00
+Model    Controller  Cloud/Region        Version  SLA          Timestamp
+testing  microk8s    microk8s/localhost  3.6.8    unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
 demo-api-charm           active      1  demo-api-charm             0  10.152.183.215  no
@@ -394,12 +394,12 @@ Congratulations, you've successfully created a minimal Kubernetes charm!
 kubectl get namespaces
 ```
 
-You should see that Juju has created a namespace called `welcome-k8s`.
+You should see that Juju has created a namespace called `testing`.
 
 2. Try:
 
 ```text
-kubectl -n welcome-k8s get pods
+kubectl -n testing get pods
 ```
 
 You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
@@ -413,7 +413,7 @@ demo-api-charm-0                 2/2     Running   0          10m
 3. Check also:
 
 ```text
-kubectl -n welcome-k8s describe pod demo-api-charm-0
+kubectl -n testing describe pod demo-api-charm-0
 ```
 
 In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).

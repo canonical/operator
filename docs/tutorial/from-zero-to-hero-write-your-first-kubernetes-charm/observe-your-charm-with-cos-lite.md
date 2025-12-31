@@ -282,14 +282,14 @@ microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
 microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
-As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `welcome-k8s` model.
+As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
 
 ## Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
 ```text
-juju switch welcome-k8s
+juju switch testing
 juju integrate demo-api-charm admin/cos-lite.grafana
 juju integrate demo-api-charm admin/cos-lite.loki
 juju integrate demo-api-charm admin/cos-lite.prometheus
@@ -390,7 +390,7 @@ http://10.152.183.132:3000/?orgId=1&search=open
 Click on `FastAPI Monitoring`
 -->
 
-Next, in the `Juju model` drop down field, select `welcome-k8s`.
+Next, in the `Juju model` drop down field, select `testing`.
 
 Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
 
