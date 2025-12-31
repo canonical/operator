@@ -349,7 +349,7 @@ Image hash:     1d24e397489d (Ubuntu 22.04 LTS)
 Load:           0.31 0.25 0.28
 Disk usage:     15.9G out of 19.2G
 Memory usage:   2.1G out of 7.8G
-Mounts:         /home/maksim/k8s-tutorial => ~/fastapi-demo
+Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     UID map: 1000:default
                     GID map: 1000:default
 ```
