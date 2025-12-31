@@ -48,7 +48,7 @@ charm-libs:
 Next, run the following command to download the libraries:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now include the structure below:
@@ -236,8 +236,8 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
@@ -282,17 +282,17 @@ microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
 microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
-As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `welcome-k8s` model.
+As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
 
 ## Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
 ```text
-juju switch welcome-k8s
-juju integrate demo-api-charm admin/cos-lite.grafana
-juju integrate demo-api-charm admin/cos-lite.loki
-juju integrate demo-api-charm admin/cos-lite.prometheus
+juju switch testing
+juju integrate fastapi-demo admin/cos-lite.grafana
+juju integrate fastapi-demo admin/cos-lite.loki
+juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
 <a href="#heading--access-your-applications-from-the-host-machine"><h3 id="heading--access-your-applications-from-the-host-machine">Access your applications from the host machine</h3></a>
@@ -311,8 +311,8 @@ juju status -m cos-lite
 This should result in an output similar to the one below:
 
 ```text
-Model     Controller  Cloud/Region        Version  SLA          Timestamp
-cos-lite  microk8s    microk8s/localhost  3.6.8    unsupported  18:05:07+01:00
+Model     Controller          Cloud/Region        Version  SLA          Timestamp
+cos-lite  concierge-microk8s  microk8s/localhost  3.6.12   unsupported  18:05:07+01:00
 
 App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
 alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no
@@ -333,13 +333,13 @@ Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps repre
 Now open a terminal on your host machine and run:
 
 ```text
-multipass info charm-dev
+multipass info juju-sandbox-k8s
 ```
 
 This should result in an output similar to the one below:
 
 ```text
-Name:           charm-dev
+Name:           juju-sandbox-k8s
 State:          Running
 IPv4:           10.112.13.157
                 10.49.132.1
@@ -349,7 +349,7 @@ Image hash:     1d24e397489d (Ubuntu 22.04 LTS)
 Load:           0.31 0.25 0.28
 Disk usage:     15.9G out of 19.2G
 Memory usage:   2.1G out of 7.8G
-Mounts:         /home/maksim/fastapi-demo => ~/fastapi-demo
+Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     UID map: 1000:default
                     GID map: 1000:default
 ```
@@ -390,7 +390,7 @@ http://10.152.183.132:3000/?orgId=1&search=open
 Click on `FastAPI Monitoring`
 -->
 
-Next, in the `Juju model` drop down field, select `welcome-k8s`.
+Next, in the `Juju model` drop down field, select `testing`.
 
 Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
 
