@@ -244,11 +244,11 @@ multipass shell juju-sandbox-k8s
 cd ~/fastapi-demo
 ```
 
-Now, pack your charm project directory into a `.charm` file, as below. This will produce a `.charm` file.  In our case it was named `fastapi-demo_ubuntu-22.04-amd64.charm`; yours should be named similarly, though the name might vary slightly depending on your architecture.
+Now, pack your charm project directory into a `.charm` file, as below. This will produce a `.charm` file.  In our case it was named `fastapi-demo_amd64.charm`; yours should be named similarly, though the name might vary slightly depending on your architecture.
 
 ```
 charmcraft pack
-# Packed fastapi-demo_ubuntu-22.04-amd64.charm
+# Packed fastapi-demo_amd64.charm
 ```
 
 ```{important}
@@ -280,7 +280,7 @@ This name might vary slightly, depending on your architecture. E.g., for an `arm
 Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` named after your application with one replica.
 
 ```text
-juju deploy ./fastapi-demo_ubuntu-22.04-amd64.charm --resource \
+juju deploy ./fastapi-demo_amd64.charm --resource \
      demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
@@ -626,7 +626,7 @@ tests/integration/test_charm.py::test_deploy
 -------------------------------- live log setup --------------------------------
 INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
 -------------------------------- live log call ---------------------------------
-INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./fastapi-demo_ubuntu-22.04-amd64.charm fastapi-demo --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./fastapi-demo_amd64.charm fastapi-demo --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 + .model.name = 'jubilant-823cf1fd'
 ...
