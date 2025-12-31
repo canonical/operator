@@ -48,7 +48,7 @@ charm-libs:
 Next, run the following command to download the libraries:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now include the structure below:
@@ -333,13 +333,13 @@ Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps repre
 Now open a terminal on your host machine and run:
 
 ```text
-multipass info charm-dev
+multipass info juju-sandbox-k8s
 ```
 
 This should result in an output similar to the one below:
 
 ```text
-Name:           charm-dev
+Name:           juju-sandbox-k8s
 State:          Running
 IPv4:           10.112.13.157
                 10.49.132.1
@@ -349,7 +349,7 @@ Image hash:     1d24e397489d (Ubuntu 22.04 LTS)
 Load:           0.31 0.25 0.28
 Disk usage:     15.9G out of 19.2G
 Memory usage:   2.1G out of 7.8G
-Mounts:         /home/maksim/fastapi-demo => ~/fastapi-demo
+Mounts:         /home/maksim/k8s-tutorial => ~/fastapi-demo
                     UID map: 1000:default
                     GID map: 1000:default
 ```
