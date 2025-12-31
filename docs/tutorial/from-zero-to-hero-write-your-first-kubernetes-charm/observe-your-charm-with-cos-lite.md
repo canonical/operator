@@ -312,7 +312,7 @@ This should result in an output similar to the one below:
 
 ```text
 Model     Controller  Cloud/Region        Version  SLA          Timestamp
-cos-lite  microk8s    microk8s/localhost  3.6.8    unsupported  18:05:07+01:00
+cos-lite  microk8s    microk8s/localhost  3.6.12   unsupported  18:05:07+01:00
 
 App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
 alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no

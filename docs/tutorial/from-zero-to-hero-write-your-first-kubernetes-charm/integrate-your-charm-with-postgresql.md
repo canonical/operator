@@ -380,7 +380,7 @@ You should see both applications get to the `active` status, and also that the `
 
 ```text
 Model    Controller  Cloud/Region        Version  SLA          Timestamp
-testing  microk8s    microk8s/localhost  3.6.8    unsupported  13:50:39+01:00
+testing  microk8s    microk8s/localhost  3.6.12   unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel    Rev  Address         Exposed  Message
 demo-api-charm           active      1  demo-api-charm               2  10.152.183.233  no
