@@ -66,7 +66,7 @@ jobs:
 
       - name: Archive charmcraft logs
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: charmcraft-logs
           path: /root/.local/state/charmcraft/log/*.log
