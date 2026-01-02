@@ -84,7 +84,7 @@ To do so, we need to update our charm `src/charm.py` to do all of the following:
 
 ### Import the database interface libraries
 
-First, at the top of the file, import the database interfaces library:
+At the top of `src/charm.py`, import the database interfaces library:
 
 ```python
 # Import the 'data_interfaces' library.
@@ -126,7 +126,7 @@ export PYTHONPATH=lib:$PYTHONPATH
 
 ### Add relation event observers
 
-Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
+In the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
 
 
 ```python
@@ -135,7 +135,7 @@ Next, in the `__init__` method, define a new instance of the 'DatabaseRequires' 
 self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
 ```
 
-Now, add event observers for all the database events:
+Next, add event observers for all the database events:
 
 ```python
 # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
@@ -143,21 +143,46 @@ framework.observe(self.database.on.database_created, self._on_database_created)
 framework.observe(self.database.on.endpoints_changed, self._on_database_created)
 ```
 
+Finally, define the method that is called on the database events:
+
+```python
+def _on_database_created(
+    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+) -> None:
+    """Event is fired when postgres database is created or endpoint is changed."""
+    self._update_layer_and_restart()
+```
+
+We now need to make sure that our application knows how to access the database.
+
 ### Fetch the database authentication data
 
-Now we need to extract the database authentication data and endpoints information. We can do that by adding a `fetch_postgres_relation_data` method to our charm class. Inside this method, we first retrieve relation data from the PostgreSQL using the `fetch_relation_data`  method of the `database` object. We then log the retrieved data for debugging purposes. Next we process any non-empty data to extract endpoint information, the username, and the password and return this process data as a dictionary. Finally, we ensure that, if no data is retrieved, we return an empty dictionary, so that the caller knows that the database is not yet ready.
+Our application consumes database authentication data in the form of environment variables. Let's define a method that prepares database authentication data in that form:
+
+```python
+def get_app_environment(self) -> dict[str, str]:
+    """Return a dictionary of environment variables for the application."""
+    db_data = self.fetch_postgres_relation_data()
+    if not db_data:
+        return {}
+    env = {
+        key: value
+        for key, value in {
+            'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
+            'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
+            'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
+            'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
+        }.items()
+        if value is not None
+    }
+    return env
+```
+
+This method depends on the following method, which extracts the database authentication data:
 
 ```python
 def fetch_postgres_relation_data(self) -> dict[str, str]:
-    """Fetch postgres relation data.
-
-    This function retrieves relation data from a postgres database using
-    the `fetch_relation_data` method of the `database` object. The retrieved data is
-    then logged for debugging purposes, and any non-empty data is processed to extract
-    endpoint information, username, and password. This processed data is then returned as
-    a dictionary. If no data is retrieved, the unit is set to waiting status and
-    the program exits with a zero status code.
-    """
+    """Retrieve relation data from a postgres database."""
     relations = self.database.fetch_relation_data()
     logger.debug('Got following database data: %s', relations)
     for data in relations.values():
@@ -175,9 +200,11 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
     return {}
 ```
 
-### Share the authentication information with your application
+### Share the authentication data with your application
 
-Our application consumes database authentication information in the form of environment variables. Let's update the Pebble service definition with an `environment` key and let's set this key to a dynamic value. Update the `_update_layer_and_restart()` method to read in the environment and pass it in when creating the Pebble layer:
+Let's change the Pebble service definition to include a dynamic `environment` key.
+
+First, update `_update_layer_and_restart()` to provide environment variables when creating the Pebble layer:
 
 ```python
 def _update_layer_and_restart(self) -> None:
@@ -216,9 +243,9 @@ def _update_layer_and_restart(self) -> None:
         logger.info('Unable to connect to Pebble: %s', e)
 ```
 
-We've also removed three `self.unit.status = ` lines. We'll handle replacing those shortly.
+We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
 
-Now, update your `_get_pebble_layer()` method to use the passed environment:
+Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
 ```python
 def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
@@ -247,47 +274,14 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
     return ops.pebble.Layer(pebble_layer)
 ```
 
-Now, let's define this method such that, every time it is called, it dynamically fetches database authentication data and also prepares the output in a form that our application can consume, as below:
+With these changes, we've made sure that our application knows how to access the database.
 
-```python
-def get_app_environment(self) -> dict[str, str]:
-    """Prepare environment variables for the application.
+When Pebble starts or restarts the service:
 
-    This property method creates a dictionary containing environment variables
-    for the application. It retrieves the database authentication data by calling
-    the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
-    If any of the values are not present, it will be set to None.
-    The method returns this dictionary as output.
-    """
-    db_data = self.fetch_postgres_relation_data()
-    if not db_data:
-        return {}
-    env = {
-        key: value
-        for key, value in {
-            'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
-            'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
-            'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
-            'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
-        }.items()
-        if value is not None
-    }
-    return env
-```
+* If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
+* Otherwise, the service environment is empty, so our application can't get database authentication data. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
 
-Finally, let's define the method that is called on the database created event:
-
-```python
-def _on_database_created(
-    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
-) -> None:
-    """Event is fired when postgres database is created or endpoint is changed."""
-    self._update_layer_and_restart()
-```
-
-The diagram below illustrates the workflow for the case where the database relation exists and for the case where it does not:
-
-![Integrate your charm with PostgreSQL](../../resources/integrate_your_charm_with_postgresql.png)
+We'll now make sure that the unit status is set correctly.
 
 (integrate-your-charm-with-postgresql-update-unit-status)=
 ## Update the unit status to reflect the relation state

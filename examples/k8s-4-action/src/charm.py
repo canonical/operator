@@ -204,14 +204,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         return ops.pebble.Layer(pebble_layer)
 
     def get_app_environment(self) -> dict[str, str]:
-        """Prepare environment variables for the application.
-
-        This property method creates a dictionary containing environment variables
-        for the application. It retrieves the database authentication data by calling
-        the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
-        If any of the values are not present, it will be set to None.
-        The method returns this dictionary as output.
-        """
+        """Return a dictionary of environment variables for the application."""
         db_data = self.fetch_postgres_relation_data()
         if not db_data:
             return {}
@@ -228,15 +221,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         return env
 
     def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """Fetch postgres relation data.
-
-        This function retrieves relation data from a postgres database using
-        the `fetch_relation_data` method of the `database` object. The retrieved data is
-        then logged for debugging purposes, and any non-empty data is processed to extract
-        endpoint information, username, and password. This processed data is then returned as
-        a dictionary. If no data is retrieved, the unit is set to waiting status and
-        the program exits with a zero status code.
-        """
+        """Retrieve relation data from a postgres database."""
         relations = self.database.fetch_relation_data()
         logger.debug('Got following database data: %s', relations)
         for data in relations.values():
