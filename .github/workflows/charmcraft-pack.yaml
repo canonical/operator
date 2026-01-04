@@ -52,7 +52,7 @@ jobs:
           cat charmcraft.yaml
 
       - name: Set up LXD
-        uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
+        uses: canonical/setup-lxd@8c6a87bfb56aa48f3fb9b830baa18562d8bfd4ee
         with:
           channel: 5.0/stable
 
