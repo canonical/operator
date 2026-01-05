@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 import subprocess
 
 
@@ -57,7 +58,24 @@ def run(
 def datetime_from_iso(dt: str) -> datetime.datetime:
     """Converts a Juju-specific ISO 8601 string to a datetime object."""
     # Older versions of Python cannot handle the 'Z'.
-    return datetime.datetime.fromisoformat(dt.replace('Z', '+00:00'))
+    dt = dt.replace('Z', '+00:00')
+    
+    # Python 3.10 requires fractional seconds to be exactly 3 or 6 digits.
+    # Juju 4.0+ can produce timestamps with varying precision (e.g., 5 or 8 digits).
+    # We normalize to 6 digits (microseconds) for compatibility.
+    pattern = r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:\d{2})$'
+    match = re.match(pattern, dt)
+    if match:
+        base_time, fraction, tz = match.groups()
+        if fraction and len(fraction) != 3 and len(fraction) != 6:
+            # Normalize to exactly 6 digits (microseconds)
+            if len(fraction) < 6:
+                fraction = fraction.ljust(6, '0')
+            else:
+                fraction = fraction[:6]
+            dt = f'{base_time}.{fraction}{tz}'
+    
+    return datetime.datetime.fromisoformat(dt)
 
 
 def datetime_to_iso(dt: datetime.datetime) -> str:
