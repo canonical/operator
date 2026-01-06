@@ -42,6 +42,8 @@ class HttpbinConfig:
     def __post_init__(self):
         log_level = self.log_level.lower()
         valid_log_levels = {"info", "debug", "warning", "error", "critical"}
+        if not log_level:
+            raise ValueError(f"Empty log level. Valid values are: {', '.join(valid_log_levels)}.")
         if log_level not in valid_log_levels:
             raise ValueError(
                 f"Invalid log level: '{self.log_level}'. "
