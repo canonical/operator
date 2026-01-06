@@ -15,8 +15,9 @@
 from __future__ import annotations
 
 import datetime
-import re
 import subprocess
+
+from .._private import timeconv
 
 
 class Error(Exception):
@@ -57,21 +58,11 @@ def run(
 
 def datetime_from_iso(dt: str) -> datetime.datetime:
     """Converts a Juju-specific ISO 8601 string to a datetime object."""
-    # Older versions of Python cannot handle the 'Z'.
-    dt = dt.replace('Z', '+00:00')
-
-    # Python 3.10 requires fractional seconds to be exactly 3 or 6 digits.
-    # Juju 4.0+ can produce timestamps with varying precision (e.g., 5 or 8 digits).
-    # We normalize to 6 digits (microseconds) for compatibility.
-    pattern = r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:\d{2})$'
-    match = re.match(pattern, dt)
-    if match:
-        base_time, fraction, tz = match.groups()
-        if fraction and len(fraction) != 3 and len(fraction) != 6:
-            fraction = fraction.ljust(6, '0') if len(fraction) < 6 else fraction[:6]
-            dt = f'{base_time}.{fraction}{tz}'
-
-    return datetime.datetime.fromisoformat(dt)
+    # parse_rfc3339 handles arbitrary precision fractional seconds, but requires a timezone.
+    # If no timezone is present, assume UTC (add 'Z').
+    if not dt.endswith('Z') and not ('+' in dt[-6:] or '-' in dt[-6:]):
+        dt = dt + 'Z'
+    return timeconv.parse_rfc3339(dt)
 
 
 def datetime_to_iso(dt: datetime.datetime) -> str:

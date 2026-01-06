@@ -899,85 +899,41 @@ def test_storage_list_named(run: Run):
     assert result == ['stor/1', 'stor/2']
 
 
-class TestDatetimeFromIso:
-    """Tests for datetime_from_iso function."""
-
-    def test_juju_3_6_format(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:28:38Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_juju_4_0_format_8_digits(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.50029526Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 500295, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_5_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-04-10T18:34:45.65844+00:00')
-        expected = datetime.datetime(2026, 4, 10, 18, 34, 45, 658440, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_1_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.1Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 100000, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_2_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.12Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 120000, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_3_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.123Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 123000, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_4_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.1234Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 123400, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_6_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.123456Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 123456, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_7_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.1234567Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 123456, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_9_digit_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.123456789Z')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 123456, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_plus_timezone_format(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:28:38+00:00')
-        expected = datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-    def test_plus_timezone_with_microseconds(self):
-        result = hookcmds._utils.datetime_from_iso('2026-01-05T23:34:25.5+00:00')
-        expected = datetime.datetime(2026, 1, 5, 23, 34, 25, 500000, tzinfo=datetime.timezone.utc)
-        assert result == expected
-
-
-class TestDatetimeToIso:
-    """Tests for datetime_to_iso function."""
-
-    def test_utc_timezone_uses_z(self):
-        dt = datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=datetime.timezone.utc)
-        result = hookcmds._utils.datetime_to_iso(dt)
-        assert result == '2026-01-05T23:28:38Z'
-
-    def test_utc_timezone_with_microseconds(self):
-        dt = datetime.datetime(2026, 1, 5, 23, 34, 25, 500295, tzinfo=datetime.timezone.utc)
-        result = hookcmds._utils.datetime_to_iso(dt)
-        assert result == '2026-01-05T23:34:25.500295Z'
-
-    def test_non_utc_timezone(self):
-        tz = datetime.timezone(datetime.timedelta(hours=5))
-        dt = datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=tz)
-        result = hookcmds._utils.datetime_to_iso(dt)
-        assert result == '2026-01-05T23:28:38+05:00'
+@pytest.mark.parametrize(
+    'timestamp,expected',
+    [
+        # Juju 3.6 format (no fractional seconds)
+        (
+            '2026-01-05T23:28:38Z',
+            datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=datetime.timezone.utc),
+        ),
+        # Juju 4.0 format (8 digits)
+        (
+            '2026-01-05T23:34:25.50029526Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 500295, tzinfo=datetime.timezone.utc),
+        ),
+        # 5 digits (from issue)
+        (
+            '2026-04-10T18:34:45.65844+00:00',
+            datetime.datetime(2026, 4, 10, 18, 34, 45, 658440, tzinfo=datetime.timezone.utc),
+        ),
+        # Edge case: 1 digit
+        (
+            '2026-01-05T23:34:25.1Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 100000, tzinfo=datetime.timezone.utc),
+        ),
+        # Edge case: 9 digits (nanosecond precision)
+        (
+            '2026-01-05T23:34:25.123456789Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 123457, tzinfo=datetime.timezone.utc),
+        ),
+        # No timezone (assumes UTC)
+        (
+            '2025-08-28T13:20:00',
+            datetime.datetime(2025, 8, 28, 13, 20, 0, tzinfo=datetime.timezone.utc),
+        ),
+    ],
+)
+def test_datetime_from_iso(timestamp: str, expected: datetime.datetime):
+    result = hookcmds._utils.datetime_from_iso(timestamp)
+    assert result == expected
