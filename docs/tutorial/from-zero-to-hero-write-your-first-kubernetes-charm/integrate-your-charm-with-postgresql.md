@@ -39,7 +39,7 @@ This tells Charmcraft that your charm requires the [`data_interfaces`](https://c
 Next, run the following command to download the library:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
 Your charm directory should now contain the structure below:
@@ -379,8 +379,8 @@ juju status --relations --watch 1s
 You should see both applications get to the `active` status, and also that the `postgresql-k8s` charm has a relation to the `demo-api-charm` over the `postgresql_client` interface, as below:
 
 ```text
-Model        Controller  Cloud/Region        Version  SLA          Timestamp
-welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  13:50:39+01:00
+Model    Controller     Cloud/Region  Version  SLA          Timestamp
+testing  concierge-k8s  k8s           3.6.12   unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel    Rev  Address         Exposed  Message
 demo-api-charm           active      1  demo-api-charm               2  10.152.183.233  no
@@ -536,7 +536,7 @@ def test_database_integration(juju: jubilant.Juju):
 In your Multipass Ubuntu VM, run the test again:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e integration
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
 ```
 
 The test may again take some time to run.

@@ -47,7 +47,7 @@ As a charm developer, your first job is to use this knowledge to create the basi
 
 ## Set the basic information, requirements, and workload for your charm
 
-Create a file called `charmcraft.yaml`. This is a file that describes metadata such as the charm name, purpose, environment constraints, workload containers, etc., in short, all the information that tells Juju what it can do with your charm.
+In your virtual machine, go into your project directory `~/fastapi-demo`, then create a file called `charmcraft.yaml`. This is a file that describes metadata such as the charm name, purpose, environment constraints, workload containers, etc., in short, all the information that tells Juju what it can do with your charm.
 
 In this file, do all of the following:
 
@@ -303,7 +303,7 @@ Once you've mastered the basics, you can speed things up by navigating to your e
 First, ensure that you are inside the Multipass Ubuntu VM, in the `~/fastapi-demo` folder:
 
 ```
-multipass shell charm-dev
+multipass shell juju-sandbox-k8s
 cd ~/fastapi-demo
 ```
 
@@ -326,7 +326,7 @@ If packing failed - perhaps you forgot to make `charm.py` executable earlier - y
 
 ```
 
-<!--ubuntu@charm-dev:~/fastapi-demo$ charmcraft pack-->
+<!--ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft pack-->
 
 <!-- `charmcraft pack` just fetches the dependencies, compiles any modules, makes sure you have all the right pieces of metadata, and zips it up for easy distribution.
 -->
@@ -362,8 +362,8 @@ juju status --watch 1s
 When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod.
 
 ```text
-Model        Controller  Cloud/Region        Version  SLA          Timestamp
-welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  13:38:19+01:00
+Model    Controller     Cloud/Region  Version  SLA          Timestamp
+testing  concierge-k8s  k8s           3.6.12   unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
 demo-api-charm           active      1  demo-api-charm             0  10.152.183.215  no
@@ -394,12 +394,12 @@ Congratulations, you've successfully created a minimal Kubernetes charm!
 kubectl get namespaces
 ```
 
-You should see that Juju has created a namespace called `welcome-k8s`.
+You should see that Juju has created a namespace called `testing`.
 
 2. Try:
 
 ```text
-kubectl -n welcome-k8s get pods
+kubectl -n testing get pods
 ```
 
 You should see that your application has been deployed in a pod that has 2 containers running in it, one for the charm and one for the application. The containers talk to each other via the Pebble API using the UNIX socket.
@@ -413,7 +413,7 @@ demo-api-charm-0                 2/2     Running   0          10m
 3. Check also:
 
 ```text
-kubectl -n welcome-k8s describe pod demo-api-charm-0
+kubectl -n testing describe pod demo-api-charm-0
 ```
 
 In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
@@ -536,7 +536,7 @@ def test_pebble_layer():
 In your Multipass Ubuntu VM shell, run your test:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e unit
 ```
 
 The result should be similar to the following output:

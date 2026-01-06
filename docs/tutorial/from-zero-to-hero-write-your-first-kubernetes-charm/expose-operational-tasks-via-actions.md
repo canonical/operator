@@ -127,7 +127,7 @@ Running operation 1 with 1 task
   - task 2 on unit-demo-api-charm-0
 
 Waiting for task 2...
-db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
+db-host: postgresql-k8s-primary.testing.svc.cluster.local
 db-port: "5432"
 ```
 
@@ -144,7 +144,7 @@ Running operation 3 with 1 task
   - task 4 on unit-demo-api-charm-0
 
 Waiting for task 4...
-db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
+db-host: postgresql-k8s-primary.testing.svc.cluster.local
 db-password: RGv80aF9WAJJtExn
 db-port: "5432"
 db-username: relation_id_4
