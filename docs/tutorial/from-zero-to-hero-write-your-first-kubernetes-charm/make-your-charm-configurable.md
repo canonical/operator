@@ -213,10 +213,10 @@ Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.12   unsupported  18:19:24+01:00
 
 App             Version  Status   Scale  Charm           Channel  Rev  Address         Exposed  Message
-fastapi-demo           blocked      1  fastapi-demo             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
+fastapi-demo             blocked      1  fastapi-demo             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
 
 Unit               Workload  Agent  Address      Ports  Message
-fastapi-demo/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
+fastapi-demo/0*    blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
 ```
 
 Congratulations, you now know how to make your charm configurable!
