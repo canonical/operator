@@ -109,22 +109,22 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
 Next, test that the basic action invocation works:
 
 ```text
-juju run demo-api-charm/0 get-db-info
+juju run fastapi-demo/0 get-db-info
 ```
 
 It might take a few seconds, but soon you should see an output similar to the one below, showing the database host and port:
 
 ```text
 Running operation 1 with 1 task
-  - task 2 on unit-demo-api-charm-0
+  - task 2 on unit-fastapi-demo-0
 
 Waiting for task 2...
 db-host: postgresql-k8s-primary.testing.svc.cluster.local
@@ -134,14 +134,14 @@ db-port: "5432"
 Now, test that the action parameter (`show-password`) works as well by setting it to `True`:
 
 ```text
-juju run demo-api-charm/0 get-db-info show-password=True
+juju run fastapi-demo/0 get-db-info show-password=True
 ```
 
 The output should now include the username and the password:
 
 ```text
 Running operation 3 with 1 task
-  - task 4 on unit-demo-api-charm-0
+  - task 4 on unit-fastapi-demo-0
 
 Waiting for task 4...
 db-host: postgresql-k8s-primary.testing.svc.cluster.local
