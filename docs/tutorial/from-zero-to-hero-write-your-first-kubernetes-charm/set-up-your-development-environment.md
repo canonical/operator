@@ -45,7 +45,7 @@ ubuntu@juju-sandbox-k8s:~$
 
 Now that you have a virtual machine, you need to install the following tools on your virtual machine:
 
-- **Charmcraft, Juju, and MicroK8s** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use MicroK8s to create a Kubernetes cloud for your charm.
+- **Charmcraft, Juju, and Canonical Kubernetes** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use Canonical Kubernetes to create a Kubernetes cloud for your charm.
 - **uv** - Your charm will be a Python project. You'll use [uv](https://docs.astral.sh/uv/) to manage your charm's runtime and development dependencies.
 - **tox** - You'll use [tox](https://tox.wiki/en/) to run your charm's checks and tests.
 
@@ -55,15 +55,15 @@ In your virtual machine, run:
 
 ```text
 sudo snap install --classic concierge
-sudo concierge prepare -p microk8s --extra-snaps astral-uv
+sudo concierge prepare -p k8s --extra-snaps astral-uv
 ```
 
-This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p microk8s` tells Concierge that we want tools for developing Kubernetes charms, with a local cloud managed by MicroK8s.
+This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p k8s` tells Concierge that we want tools for developing Kubernetes charms, with a local cloud managed by Canonical Kubernetes.
 
 This step should take less than 15 minutes, but the time depends on your computer and network. When the tools have been installed, you'll see a message that ends with:
 
 ```text
-msg="Bootstrapped Juju" provider=microk8s
+msg="Bootstrapped Juju" provider=k8s
 ```
 
 To install tox, run:

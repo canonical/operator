@@ -362,8 +362,8 @@ juju status --watch 1s
 When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod.
 
 ```text
-Model    Controller          Cloud/Region        Version  SLA          Timestamp
-testing  concierge-microk8s  microk8s/localhost  3.6.12   unsupported  13:38:19+01:00
+Model    Controller     Cloud/Region  Version  SLA          Timestamp
+testing  concierge-k8s  k8s           3.6.12   unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
 demo-api-charm           active      1  demo-api-charm             0  10.152.183.215  no

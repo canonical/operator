@@ -276,10 +276,10 @@ juju find-offers cos-lite
 You should something similar to the output below:
 
 ```text
-Store     URL                        Access  Interfaces
-microk8s  admin/cos-lite.loki        admin   loki_push_api:logging
-microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
-microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
+Store          URL                        Access  Interfaces
+concierge-k8s  admin/cos-lite.loki        admin   loki_push_api:logging
+concierge-k8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
+concierge-k8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
 As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
@@ -299,7 +299,7 @@ juju integrate demo-api-charm admin/cos-lite.prometheus
 
 ```{important}
 
-The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes (MicroK8s) network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
+The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
 ```
 
 First, run:
@@ -311,8 +311,8 @@ juju status -m cos-lite
 This should result in an output similar to the one below:
 
 ```text
-Model     Controller          Cloud/Region        Version  SLA          Timestamp
-cos-lite  concierge-microk8s  microk8s/localhost  3.6.12   unsupported  18:05:07+01:00
+Model     Controller     Cloud/Region  Version  SLA          Timestamp
+cos-lite  concierge-k8s  k8s           3.6.12   unsupported  18:05:07+01:00
 
 App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
 alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no
