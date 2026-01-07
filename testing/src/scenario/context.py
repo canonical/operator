@@ -759,7 +759,7 @@ class Context(Generic[CharmType]):
 
     def __del__(self):
         """Clean up the temporary directory."""
-        tmp = getattr(self, "_tmp", None)
+        tmp = getattr(self, '_tmp', None)
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)
 
