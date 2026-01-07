@@ -66,8 +66,8 @@ class FastAPIDemoCharm(ops.CharmBase):
         # The 'database_name' is the name of the database that our application requires.
         self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
         # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-        framework.observe(self.database.on.database_created, self._on_database_created)
-        framework.observe(self.database.on.endpoints_changed, self._on_database_created)
+        framework.observe(self.database.on.database_created, self._on_database_endpoint)
+        framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
 
     def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
         self._update_layer_and_restart()
@@ -96,7 +96,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(
+    def _on_database_endpoint(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
         """Event is fired when postgres database is created or endpoint is changed."""

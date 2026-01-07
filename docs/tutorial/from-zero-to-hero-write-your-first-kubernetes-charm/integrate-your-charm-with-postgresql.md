@@ -139,14 +139,14 @@ Next, add event observers for all the database events:
 
 ```python
 # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-framework.observe(self.database.on.database_created, self._on_database_created)
-framework.observe(self.database.on.endpoints_changed, self._on_database_created)
+framework.observe(self.database.on.database_created, self._on_database_endpoint)
+framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
 ```
 
 Finally, define the method that is called on the database events:
 
 ```python
-def _on_database_created(
+def _on_database_endpoint(
     self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
 ) -> None:
     """Event is fired when postgres database is created or endpoint is changed."""

@@ -78,8 +78,8 @@ class FastAPIDemoCharm(ops.CharmBase):
         # The 'database_name' is the name of the database that our application requires.
         self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
         # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-        framework.observe(self.database.on.database_created, self._on_database_created)
-        framework.observe(self.database.on.endpoints_changed, self._on_database_created)
+        framework.observe(self.database.on.database_created, self._on_database_endpoint)
+        framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
         # Events on charm actions that are run via 'juju run'.
         framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
         # Enable pushing application logs to Loki.
@@ -128,7 +128,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(
+    def _on_database_endpoint(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
         """Event is fired when postgres database is created."""
