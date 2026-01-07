@@ -759,9 +759,7 @@ class Context(Generic[CharmType]):
 
     def __del__(self):
         """Clean up the temporary directory."""
-        tmp = getattr(self, '_tmp', None)
-        if tmp:
-            shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
