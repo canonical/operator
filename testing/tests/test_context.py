@@ -205,7 +205,7 @@ def test_context_tmp_cleanup():
     ctx = Context(MyCharm, meta={'name': 'foo'})
 
     # Get the temporary directory path
-    tmp_path = pathlib.Path(ctx._tmp.name)
+    tmp_path = pathlib.Path(ctx._tmp)
 
     # Verify the temp directory exists after Context creation
     assert tmp_path.exists()
