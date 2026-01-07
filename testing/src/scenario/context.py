@@ -711,7 +711,7 @@ class Context(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
         self.app_trusted = app_trusted
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = tempfile.TemporaryDirectory(delete=False)
 
         # config for what events to be captured in emitted_events.
         self.capture_deferred_events = capture_deferred_events
@@ -754,6 +754,10 @@ class Context(Generic[CharmType]):
     def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
         self._output_state = output_state
+
+    def __del__(self):
+        """Clean up the temporary directory."""
+        self._tmp.cleanup()
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
