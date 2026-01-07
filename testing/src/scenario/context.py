@@ -712,6 +712,7 @@ class Context(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
         self.app_trusted = app_trusted
+        # use mkdtemp as TemporaryDirectory only added "delete=False" feature in Python 3.12
         self._tmp = tempfile.mkdtemp()
 
         # config for what events to be captured in emitted_events.
@@ -758,7 +759,9 @@ class Context(Generic[CharmType]):
 
     def __del__(self):
         """Clean up the temporary directory."""
-        shutil.rmtree(self._tmp)
+        tmp = getattr(self, "_tmp", None)
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
