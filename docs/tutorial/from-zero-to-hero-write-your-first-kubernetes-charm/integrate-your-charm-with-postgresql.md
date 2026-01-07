@@ -150,7 +150,7 @@ def _on_database_endpoint(
     self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
 ) -> None:
     """Event is fired when postgres database is created or endpoint is changed."""
-    self._update_layer_and_restart()
+    self._replan_workload()
 ```
 
 We now need to make sure that our application knows how to access the database.
@@ -204,10 +204,10 @@ def fetch_postgres_relation_data(self) -> dict[str, str]:
 
 Let's change the Pebble service definition to include a dynamic `environment` key.
 
-First, update `_update_layer_and_restart()` to provide environment variables when creating the Pebble layer:
+First, update `_replan_workload()` to provide environment variables when creating the Pebble layer:
 
 ```python
-def _update_layer_and_restart(self) -> None:
+def _replan_workload(self) -> None:
     """Define and start a workload using the Pebble API.
 
     You'll need to specify the right entrypoint and environment
@@ -322,7 +322,7 @@ def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
     event.add_status(ops.ActiveStatus())
 ```
 
-We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_update_layer_and_restart`, remove the lines:
+We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_replan_workload`, remove the lines:
 
 ```python
 self.unit.status = ops.ActiveStatus()
