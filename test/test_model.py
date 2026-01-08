@@ -4543,6 +4543,13 @@ class TestCloudCredential:
         assert cloud_cred.attributes == d['attrs']
         assert cloud_cred.redacted == d['redacted']
 
+    def test_from_dict_empty(self):
+        d = {}
+        cloud_cred = ops.CloudCredential.from_dict(d)
+        assert cloud_cred.auth_type == ""
+        assert cloud_cred.attributes == {}
+        assert cloud_cred.redacted == []
+
     def test_credential_failure_log(
         self,
         fake_script: FakeScript,
