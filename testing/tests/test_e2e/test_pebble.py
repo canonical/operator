@@ -6,37 +6,38 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import io
-from pathlib import Path
+import pathlib
+from typing import TYPE_CHECKING
 
 import pytest
 from scenario import Context
 from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
 
-from ops import PebbleCustomNoticeEvent, PebbleReadyEvent, pebble
-from ops.charm import CharmBase
-from ops.framework import Framework
+import ops
 from ops.log import _get_juju_log_and_app_id
-from ops.pebble import ExecError, Layer, ServiceStartup, ServiceStatus
 
-from ..helpers import jsonpatch_delta, trigger
+from ..helpers import jsonpatch_delta, trigger  # type: ignore
+
+if TYPE_CHECKING:
+    from ops.pebble import LayerDict, ServiceDict
 
 
 @pytest.fixture(scope='function')
-def charm_cls():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def charm_cls() -> type[ops.CharmBase]:
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
 
 
-def test_no_containers(charm_cls):
-    def callback(self: CharmBase):
+def test_no_containers(charm_cls: type[ops.CharmBase]):
+    def callback(self: ops.CharmBase):
         assert not self.unit.containers
 
     trigger(
@@ -48,8 +49,8 @@ def test_no_containers(charm_cls):
     )
 
 
-def test_containers_from_meta(charm_cls):
-    def callback(self: CharmBase):
+def test_containers_from_meta(charm_cls: type[ops.CharmBase]):
+    def callback(self: ops.CharmBase):
         assert self.unit.containers
         assert self.unit.get_container('foo')
 
@@ -63,8 +64,8 @@ def test_containers_from_meta(charm_cls):
 
 
 @pytest.mark.parametrize('can_connect', (True, False))
-def test_connectivity(charm_cls, can_connect):
-    def callback(self: CharmBase):
+def test_connectivity(charm_cls: type[ops.CharmBase], can_connect: bool):
+    def callback(self: ops.CharmBase):
         assert can_connect == self.unit.get_container('foo').can_connect()
 
     trigger(
@@ -76,13 +77,13 @@ def test_connectivity(charm_cls, can_connect):
     )
 
 
-def test_fs_push(tmp_path, charm_cls):
+def test_fs_push(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase]):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
     pth = tmp_path / 'textfile'
     pth.write_text(text)
 
-    def callback(self: CharmBase):
+    def callback(self: ops.CharmBase):
         container = self.unit.get_container('foo')
         baz = container.pull('/bar/baz.txt')
         assert baz.read() == text
@@ -105,10 +106,10 @@ def test_fs_push(tmp_path, charm_cls):
 
 
 @pytest.mark.parametrize('make_dirs', (True, False))
-def test_fs_pull(tmp_path, charm_cls, make_dirs):
+def test_fs_pull(tmp_path: pathlib.Path, charm_cls: type[ops.CharmBase], make_dirs: bool):
     text = 'lorem ipsum/n alles amat gloriae foo'
 
-    def callback(self: CharmBase):
+    def callback(self: ops.CharmBase):
         container = self.unit.get_container('foo')
         if make_dirs:
             container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
@@ -116,11 +117,11 @@ def test_fs_pull(tmp_path, charm_cls, make_dirs):
             baz = container.pull('/foo/bar/baz.txt')
             assert baz.read() == text
         else:
-            with pytest.raises(pebble.PathError):
+            with pytest.raises(ops.pebble.PathError):
                 container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
 
             # check that nothing was changed
-            with pytest.raises((FileNotFoundError, pebble.PathError)):
+            with pytest.raises((FileNotFoundError, ops.pebble.PathError)):
                 container.pull('/foo/bar/baz.txt')
 
     container = Container(
@@ -143,12 +144,12 @@ def test_fs_pull(tmp_path, charm_cls, make_dirs):
         file = tmp_path / 'bar' / 'baz.txt'
 
         # another is:
-        assert file == Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'
+        base = pathlib.Path(out.get_container('foo').mounts['foo'].source)
+        assert file == base / 'bar' / 'baz.txt'
 
         # but that is actually a symlink to the context's root tmp folder:
-        assert (
-            Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
-        ).read_text() == text
+        base = pathlib.Path(ctx._tmp.name)
+        assert (base / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt').read_text() == text
         assert file.read_text() == text
 
         # shortcut for API niceness purposes:
@@ -189,11 +190,12 @@ PS = """
         ('ps', PS),
     ),
 )
-def test_exec(charm_cls, cmd, out):
-    def callback(self: CharmBase):
+def test_exec(charm_cls: type[ops.CharmBase], cmd: str, out: str):
+    def callback(self: ops.CharmBase):
         container = self.unit.get_container('foo')
         proc = container.exec([cmd])
         proc.wait()
+        assert proc.stdout is not None
         assert proc.stdout.read() == out
 
     trigger(
@@ -221,15 +223,16 @@ def test_exec(charm_cls, cmd, out):
         [io.StringIO('hello world!'), None],
     ),
 )
-def test_exec_history_stdin(stdin, write):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def test_exec_history_stdin(stdin: str | io.StringIO | None, write: str | None):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        def _on_ready(self, _):
+        def _on_ready(self, _: ops.EventBase):
             proc = self.unit.get_container('foo').exec(['ls'], stdin=stdin)
             if write:
+                assert proc.stdin is not None
                 proc.stdin.write(write)
             proc.wait()
 
@@ -239,8 +242,8 @@ def test_exec_history_stdin(stdin, write):
     assert ctx.exec_history[container.name][0].stdin == 'hello world!'
 
 
-def test_pebble_ready(charm_cls):
-    def callback(self: CharmBase):
+def test_pebble_ready(charm_cls: type[ops.CharmBase]):
+    def callback(self: ops.CharmBase):
         foo = self.unit.get_container('foo')
         assert foo.can_connect()
 
@@ -255,20 +258,22 @@ def test_pebble_ready(charm_cls):
     )
 
 
-@pytest.mark.parametrize('starting_service_status', pebble.ServiceStatus)
-def test_pebble_plan(charm_cls, starting_service_status):
+@pytest.mark.parametrize('starting_service_status', ops.pebble.ServiceStatus)
+def test_pebble_plan(
+    charm_cls: type[ops.CharmBase], starting_service_status: ops.pebble.ServiceStatus
+):
     class PlanCharm(charm_cls):
-        def __init__(self, framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_ready)
 
-        def _on_ready(self, event):
+        def _on_ready(self, event: ops.PebbleReadyEvent):
             foo = event.workload
 
             assert foo.get_plan().to_dict() == {'services': {'fooserv': {'startup': 'enabled'}}}
             fooserv = foo.get_services('fooserv')['fooserv']
-            assert fooserv.startup == ServiceStartup.ENABLED
-            assert fooserv.current == ServiceStatus.ACTIVE
+            assert fooserv.startup == ops.pebble.ServiceStartup.ENABLED
+            assert fooserv.current == ops.pebble.ServiceStatus.ACTIVE
 
             foo.add_layer(
                 'bar',
@@ -290,20 +295,20 @@ def test_pebble_plan(charm_cls, starting_service_status):
             assert foo.get_service('barserv').current == starting_service_status
             foo.start('barserv')
             # whatever the original state, starting a service sets it to active
-            assert foo.get_service('barserv').current == ServiceStatus.ACTIVE
+            assert foo.get_service('barserv').current == ops.pebble.ServiceStatus.ACTIVE
 
     container = Container(
         name='foo',
         can_connect=True,
         layers={
-            'foo': pebble.Layer({
+            'foo': ops.pebble.Layer({
                 'summary': 'bla',
                 'description': 'deadbeef',
                 'services': {'fooserv': {'startup': 'enabled'}},
             })
         },
         service_statuses={
-            'fooserv': pebble.ServiceStatus.ACTIVE,
+            'fooserv': ops.pebble.ServiceStatus.ACTIVE,
             # todo: should we disallow setting status for services that aren't known YET?
             'barserv': starting_service_status,
         },
@@ -316,22 +321,22 @@ def test_pebble_plan(charm_cls, starting_service_status):
         event='pebble_ready',
     )
 
-    def serv(name, obj):
-        return pebble.Service(name, raw=obj)
+    def serv(name: str, obj: ServiceDict) -> ops.pebble.Service:
+        return ops.pebble.Service(name, raw=obj)
 
     container = out.get_container(container.name)
     assert container.plan.services == {
         'barserv': serv('barserv', {'startup': 'disabled'}),
         'fooserv': serv('fooserv', {'startup': 'enabled'}),
     }
-    assert container.services['fooserv'].current == pebble.ServiceStatus.ACTIVE
-    assert container.services['fooserv'].startup == pebble.ServiceStartup.ENABLED
+    assert container.services['fooserv'].current == ops.pebble.ServiceStatus.ACTIVE
+    assert container.services['fooserv'].startup == ops.pebble.ServiceStartup.ENABLED
 
-    assert container.services['barserv'].current == pebble.ServiceStatus.ACTIVE
-    assert container.services['barserv'].startup == pebble.ServiceStartup.DISABLED
+    assert container.services['barserv'].current == ops.pebble.ServiceStatus.ACTIVE
+    assert container.services['barserv'].startup == ops.pebble.ServiceStartup.DISABLED
 
 
-def test_exec_wait_error(charm_cls):
+def test_exec_wait_error(charm_cls: type[ops.CharmBase]):
     state = State(
         containers={
             Container(
@@ -346,13 +351,13 @@ def test_exec_wait_error(charm_cls):
     with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container('foo')
         proc = container.exec(['foo'])
-        with pytest.raises(ExecError) as exc_info:
+        with pytest.raises(ops.pebble.ExecError) as exc_info:  # type: ignore
             proc.wait_output()
-        assert exc_info.value.stdout == 'hello pebble'
+        assert exc_info.value.stdout == 'hello pebble'  # type: ignore
 
 
 @pytest.mark.parametrize('command', (['foo'], ['foo', 'bar'], ['foo', 'bar', 'baz']))
-def test_exec_wait_output(charm_cls, command):
+def test_exec_wait_output(charm_cls: type[ops.CharmBase], command: list[str]):
     state = State(
         containers={
             Container(
@@ -373,7 +378,7 @@ def test_exec_wait_output(charm_cls, command):
         assert ctx.exec_history[container.name][0].command == command
 
 
-def test_exec_wait_output_error(charm_cls):
+def test_exec_wait_output_error(charm_cls: type[ops.CharmBase]):
     state = State(
         containers={
             Container(
@@ -388,11 +393,11 @@ def test_exec_wait_output_error(charm_cls):
     with ctx(ctx.on.start(), state) as mgr:
         container = mgr.charm.unit.get_container('foo')
         proc = container.exec(['foo'])
-        with pytest.raises(ExecError):
+        with pytest.raises(ops.pebble.ExecError):
             proc.wait_output()
 
 
-def test_pebble_custom_notice(charm_cls):
+def test_pebble_custom_notice(charm_cls: type[ops.CharmBase]):
     notices = [
         Notice(key='example.com/foo'),
         Notice(key='example.com/bar', last_data={'a': 'b'}),
@@ -422,14 +427,14 @@ def test_pebble_custom_notice_in_charm():
     repeat_after = datetime.timedelta(days=7)
     expire_after = datetime.timedelta(days=365)
 
-    class MyCharm(CharmBase):
-        def __init__(self, framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_custom_notice, self._on_custom_notice)
 
-        def _on_custom_notice(self, event: PebbleCustomNoticeEvent):
+        def _on_custom_notice(self, event: ops.PebbleCustomNoticeEvent):
             notice = event.notice
-            assert notice.type == pebble.NoticeType.CUSTOM
+            assert notice.type == ops.pebble.NoticeType.CUSTOM
             assert notice.key == key
             assert notice.last_data == data
             assert notice.user_id == user_id
@@ -466,18 +471,18 @@ def test_pebble_custom_notice_in_charm():
 
 
 def test_pebble_check_failed():
-    infos = []
+    infos: list[ops.LazyCheckInfo] = []
 
-    class MyCharm(CharmBase):
-        def __init__(self, framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_failed, self._on_check_failed)
 
-        def _on_check_failed(self, event):
+        def _on_check_failed(self, event: ops.PebbleCheckFailedEvent):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({
+    layer = ops.pebble.Layer({
         'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
     assert layer.checks['http-check'].threshold is not None
@@ -485,9 +490,9 @@ def test_pebble_check_failed():
         'http-check',
         successes=3,
         failures=7,
-        status=pebble.CheckStatus.DOWN,
-        level=layer.checks['http-check'].level,
-        startup=layer.checks['http-check'].startup,
+        status=ops.pebble.CheckStatus.DOWN,
+        level=ops.pebble.CheckLevel(layer.checks['http-check'].level),
+        startup=ops.pebble.CheckStartup(layer.checks['http-check'].startup),
         threshold=layer.checks['http-check'].threshold,
     )
     container = Container('foo', check_infos={check}, layers={'layer1': layer})
@@ -495,33 +500,33 @@ def test_pebble_check_failed():
     ctx.run(ctx.on.pebble_check_failed(container, check), state=state)
     assert len(infos) == 1
     assert infos[0].name == 'http-check'
-    assert infos[0].status == pebble.CheckStatus.DOWN
+    assert infos[0].status == ops.pebble.CheckStatus.DOWN
     assert infos[0].successes == 3
     assert infos[0].failures == 7
 
 
 def test_pebble_check_recovered():
-    infos = []
+    infos: list[ops.LazyCheckInfo] = []
 
-    class MyCharm(CharmBase):
-        def __init__(self, framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_recovered, self._on_check_recovered)
 
-        def _on_check_recovered(self, event):
+        def _on_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
             infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({
+    layer = ops.pebble.Layer({
         'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
     assert layer.checks['http-check'].threshold is not None
     check = CheckInfo(
         'http-check',
         successes=None,
-        status=pebble.CheckStatus.UP,
-        level=layer.checks['http-check'].level,
-        startup=layer.checks['http-check'].startup,
+        status=ops.pebble.CheckStatus.UP,
+        level=ops.pebble.CheckLevel(layer.checks['http-check'].level),
+        startup=ops.pebble.CheckStartup(layer.checks['http-check'].startup),
         threshold=layer.checks['http-check'].threshold,
     )
     container = Container('foo', check_infos={check}, layers={'layer1': layer})
@@ -529,39 +534,39 @@ def test_pebble_check_recovered():
     ctx.run(ctx.on.pebble_check_recovered(container, check), state=state)
     assert len(infos) == 1
     assert infos[0].name == 'http-check'
-    assert infos[0].status == pebble.CheckStatus.UP
+    assert infos[0].status == ops.pebble.CheckStatus.UP
     assert infos[0].successes is None
     assert infos[0].failures == 0
 
 
 def test_pebble_check_failed_two_containers():
-    foo_infos = []
-    bar_infos = []
+    foo_infos: list[ops.LazyCheckInfo] = []
+    bar_infos: list[ops.LazyCheckInfo] = []
 
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_check_failed, self._on_foo_check_failed)
             framework.observe(self.on.bar_pebble_check_failed, self._on_bar_check_failed)
 
-        def _on_foo_check_failed(self, event):
+        def _on_foo_check_failed(self, event: ops.PebbleCheckFailedEvent):
             foo_infos.append(event.info)
 
-        def _on_bar_check_failed(self, event):
+        def _on_bar_check_failed(self, event: ops.PebbleCheckFailedEvent):
             bar_infos.append(event.info)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}})
 
-    layer = pebble.Layer({
+    layer = ops.pebble.Layer({
         'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
     assert layer.checks['http-check'].threshold is not None
     check = CheckInfo(
         'http-check',
         failures=7,
-        status=pebble.CheckStatus.DOWN,
-        level=layer.checks['http-check'].level,
-        startup=layer.checks['http-check'].startup,
+        status=ops.pebble.CheckStatus.DOWN,
+        level=ops.pebble.CheckLevel(layer.checks['http-check'].level),
+        startup=ops.pebble.CheckStartup(layer.checks['http-check'].startup),
         threshold=layer.checks['http-check'].threshold,
     )
     foo_container = Container('foo', check_infos={check}, layers={'layer1': layer})
@@ -570,19 +575,19 @@ def test_pebble_check_failed_two_containers():
     ctx.run(ctx.on.pebble_check_failed(foo_container, check), state=state)
     assert len(foo_infos) == 1
     assert foo_infos[0].name == 'http-check'
-    assert foo_infos[0].status == pebble.CheckStatus.DOWN
+    assert foo_infos[0].status == ops.pebble.CheckStatus.DOWN
     assert foo_infos[0].successes == 0
     assert foo_infos[0].failures == 7
     assert len(bar_infos) == 0
 
 
 def test_pebble_add_layer():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_foo_ready)
 
-        def _on_foo_ready(self, _):
+        def _on_foo_ready(self, _: ops.EventBase):
             self.unit.get_container('foo').add_layer(
                 'foo',
                 {'checks': {'chk1': {'override': 'replace'}}},
@@ -592,17 +597,17 @@ def test_pebble_add_layer():
     container = Container('foo', can_connect=True)
     state_out = ctx.run(ctx.on.pebble_ready(container), state=State(containers={container}))
     chk1_info = state_out.get_container('foo').get_check_info('chk1')
-    assert chk1_info.status == pebble.CheckStatus.UP
+    assert chk1_info.status == ops.pebble.CheckStatus.UP
 
 
 def test_pebble_start_check():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_pebble_ready, self._on_foo_ready)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_foo_ready(self, _):
+        def _on_foo_ready(self, _: ops.EventBase):
             container = self.unit.get_container('foo')
             container.add_layer(
                 'foo',
@@ -617,7 +622,7 @@ def test_pebble_start_check():
                 },
             )
 
-        def _on_config_changed(self, _):
+        def _on_config_changed(self, _: ops.EventBase):
             container = self.unit.get_container('foo')
             container.start_checks('chk1')
 
@@ -627,12 +632,12 @@ def test_pebble_start_check():
     # Ensure that it starts as inactive.
     state_out = ctx.run(ctx.on.pebble_ready(container), state=State(containers={container}))
     chk1_info = state_out.get_container('foo').get_check_info('chk1')
-    assert chk1_info.status == pebble.CheckStatus.INACTIVE
+    assert chk1_info.status == ops.pebble.CheckStatus.INACTIVE
 
     # Verify that start_checks works.
     state_out = ctx.run(ctx.on.config_changed(), state=state_out)
     chk1_info = state_out.get_container('foo').get_check_info('chk1')
-    assert chk1_info.status == pebble.CheckStatus.UP
+    assert chk1_info.status == ops.pebble.CheckStatus.UP
 
 
 @pytest.fixture
@@ -644,26 +649,26 @@ def reset_security_logging():
 
 
 def test_pebble_stop_check(reset_security_logging: None):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_config_changed(self, _):
+        def _on_config_changed(self, _: ops.EventBase):
             container = self.unit.get_container('foo')
             container.stop_checks('chk1')
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
 
-    layer = pebble.Layer({
+    layer = ops.pebble.Layer({
         'checks': {'chk1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
     assert layer.checks['chk1'].threshold is not None
     info_in = CheckInfo(
         'chk1',
-        status=pebble.CheckStatus.UP,
-        level=layer.checks['chk1'].level,
-        startup=layer.checks['chk1'].startup,
+        status=ops.pebble.CheckStatus.UP,
+        level=ops.pebble.CheckLevel(layer.checks['chk1'].level),
+        startup=ops.pebble.CheckStartup(layer.checks['chk1'].startup),
         threshold=layer.checks['chk1'].threshold,
     )
     container = Container(
@@ -674,29 +679,29 @@ def test_pebble_stop_check(reset_security_logging: None):
     )
     state_out = ctx.run(ctx.on.config_changed(), state=State(containers={container}))
     info_out = state_out.get_container('foo').get_check_info('chk1')
-    assert info_out.status == pebble.CheckStatus.INACTIVE
+    assert info_out.status == ops.pebble.CheckStatus.INACTIVE
 
 
 def test_pebble_replan_checks():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.config_changed, self._on_config_changed)
 
-        def _on_config_changed(self, _):
+        def _on_config_changed(self, _: ops.EventBase):
             container = self.unit.get_container('foo')
             container.replan()
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
-    layer = pebble.Layer({
+    layer = ops.pebble.Layer({
         'checks': {'chk1': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
     assert layer.checks['chk1'].threshold is not None
     info_in = CheckInfo(
         'chk1',
-        status=pebble.CheckStatus.INACTIVE,
-        level=layer.checks['chk1'].level,
-        startup=layer.checks['chk1'].startup,
+        status=ops.pebble.CheckStatus.INACTIVE,
+        level=ops.pebble.CheckLevel(layer.checks['chk1'].level),
+        startup=ops.pebble.CheckStartup(layer.checks['chk1'].startup),
         threshold=layer.checks['chk1'].threshold,
     )
     container = Container(
@@ -707,7 +712,7 @@ def test_pebble_replan_checks():
     )
     state_out = ctx.run(ctx.on.config_changed(), state=State(containers={container}))
     info_out = state_out.get_container('foo').get_check_info('chk1')
-    assert info_out.status == pebble.CheckStatus.UP
+    assert info_out.status == ops.pebble.CheckStatus.UP
 
 
 @pytest.mark.parametrize(
@@ -742,20 +747,18 @@ def test_pebble_replan_checks():
         },
     ],
 )
-def test_add_layer_merge_check(
-    new_layer_name: str, combine: bool, new_layer_dict: pebble.LayerDict
-):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def test_add_layer_merge_check(new_layer_name: str, combine: bool, new_layer_dict: LayerDict):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on['my-container'].pebble_ready, self._on_pebble_ready)
 
-        def _on_pebble_ready(self, _: PebbleReadyEvent):
+        def _on_pebble_ready(self, _: ops.PebbleReadyEvent):
             container = self.unit.get_container('my-container')
-            container.add_layer(new_layer_name, Layer(new_layer_dict), combine=combine)
+            container.add_layer(new_layer_name, ops.pebble.Layer(new_layer_dict), combine=combine)
 
     ctx = Context(MyCharm, meta={'name': 'foo', 'containers': {'my-container': {}}})
-    layer_in = pebble.Layer({
+    layer_in = ops.pebble.Layer({
         'checks': {
             'server-ready': {
                 'override': 'replace',
@@ -769,9 +772,9 @@ def test_add_layer_merge_check(
     assert layer_in.checks['server-ready'].threshold is not None
     check_in = CheckInfo(
         'server-ready',
-        level=layer_in.checks['server-ready'].level,
+        level=ops.pebble.CheckLevel(layer_in.checks['server-ready'].level),
         threshold=layer_in.checks['server-ready'].threshold,
-        startup=layer_in.checks['server-ready'].startup,
+        startup=ops.pebble.CheckStartup(layer_in.checks['server-ready'].startup),
     )
     container_in = Container(
         'my-container',
@@ -779,21 +782,21 @@ def test_add_layer_merge_check(
         layers={'base': layer_in},
         check_infos={check_in},
     )
-    assert container_in.get_check_info('server-ready').level == pebble.CheckLevel.READY
+    assert container_in.get_check_info('server-ready').level == ops.pebble.CheckLevel.READY
     state_in = State(containers={container_in})
 
     state_out = ctx.run(ctx.on.pebble_ready(container_in), state_in)
 
     check_out = state_out.get_container(container_in.name).get_check_info('server-ready')
-    new_layer_check = new_layer_dict['checks']['server-ready']
-    assert check_out.level == pebble.CheckLevel(new_layer_check.get('level', 'ready'))
-    assert check_out.startup == pebble.CheckStartup(new_layer_check.get('startup', 'enabled'))
+    new_layer_check = new_layer_dict.get('checks', {}).get('server-ready', {})
+    assert check_out.level == ops.pebble.CheckLevel(new_layer_check.get('level', 'ready'))
+    assert check_out.startup == ops.pebble.CheckStartup(new_layer_check.get('startup', 'enabled'))
     assert check_out.threshold == new_layer_check.get('threshold', 10)
 
 
 @pytest.mark.parametrize('layer1_name,layer2_name', [('a-base', 'b-base'), ('b-base', 'a-base')])
-def test_layers_merge_in_plan(layer1_name, layer2_name):
-    layer1 = pebble.Layer({
+def test_layers_merge_in_plan(layer1_name: str, layer2_name: str):
+    layer1_dict: LayerDict = {
         'services': {
             'server': {
                 'override': 'replace',
@@ -809,8 +812,8 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
                 'level': 'ready',
                 'startup': 'enabled',
                 'threshold': 10,
-                'period': 1,
-                'timeout': 28,
+                'period': '1s',
+                'timeout': '28s',
                 'http': {'url': 'http://localhost:5000/version'},
             }
         },
@@ -823,8 +826,8 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
                 'labels': {'foo': 'bar'},
             }
         },
-    })
-    layer2 = pebble.Layer({
+    }
+    layer2_dict: LayerDict = {
         'services': {
             'server': {
                 'override': 'merge',
@@ -844,9 +847,11 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
                 'location': 'https://loki2.example.com',
             },
         },
-    })
+    }
+    layer1 = ops.pebble.Layer(layer1_dict)
+    layer2 = ops.pebble.Layer(layer2_dict)
 
-    ctx = Context(CharmBase, meta={'name': 'foo', 'containers': {'my-container': {}}})
+    ctx = Context(ops.CharmBase, meta={'name': 'foo', 'containers': {'my-container': {}}})
     # TODO also a starting layer.
     container = Container('my-container', can_connect=True)
 
@@ -861,18 +866,20 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert service.summary == 'sum'
     assert service.description == 'desc'
     # Service.startup is always a string, even though we have the enum.
-    assert service.startup == pebble.ServiceStartup.ENABLED.value
+    assert service.startup == ops.pebble.ServiceStartup.ENABLED.value
     assert service.override == 'merge'
     assert service.command == '/bin/sleep 20'
 
     check = plan.checks['server-ready']
-    assert check.startup == pebble.CheckStartup.ENABLED
+    assert check.startup == ops.pebble.CheckStartup.ENABLED
     assert check.threshold == 10
-    assert check.period == 1
-    assert check.timeout == 28
+    assert check.period == '1s'
+    assert check.timeout == '28s'
     assert check.override == 'merge'
-    assert check.level == pebble.CheckLevel.ALIVE
-    assert check.http['url'] == 'http://localhost:5050/version'
+    assert check.level == ops.pebble.CheckLevel.ALIVE
+    http = check.http
+    assert http is not None
+    assert http.get('url') == 'http://localhost:5050/version'
 
     log_target = plan.log_targets['loki']
     assert log_target.type == 'loki'
