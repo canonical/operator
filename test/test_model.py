@@ -4543,7 +4543,7 @@ class TestCloudCredential:
         assert cloud_cred.attributes == d['attrs']
         assert cloud_cred.redacted == d['redacted']
 
-    def test_from_dict_empty(self):
+    def test_from_dict_without_auth_type(self):
         d = {
             'redacted': ['foo'],
         }
