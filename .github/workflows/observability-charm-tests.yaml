@@ -11,8 +11,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   o11y-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
 
     strategy:
       fail-fast: false
@@ -32,6 +36,12 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Install dependencies
         run: pip install tox~=4.2 uv~=0.6
 
@@ -44,17 +54,48 @@ jobs:
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
             sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=tracing --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            # Get absolute paths to the wheels
+            ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+            ops_scenario_wheel="$(ls operator-wheels/ops_scenario-*.whl)"
+            ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
+            # Add ops first, then ops-scenario (for testing), then ops-tracing
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no uv.lock file found"
             exit 1
           fi
 
+      - name: Force upgrade pytest-interface-tester to fix compatibility
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          if [ -e "uv.lock" ]; then
+            echo "Upgrading pytest-interface-tester to >=3.4 to ensure compatibility"
+            uv add "pytest-interface-tester>=3.4" --optional dev --upgrade || echo "Could not upgrade pytest-interface-tester"
+          fi
+
+      - name: Show installed ops package versions
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          echo "=== Installed ops-related packages ==="
+          uv pip list | grep -E "(ops|scenario|tracing)" || echo "No ops packages found"
+          echo ""
+          echo "=== Wheel files downloaded ==="
+          ls -lh operator-wheels/*.whl || echo "No wheel files found"
+          echo ""
+          echo "=== Package versions from pyproject.toml ==="
+          grep -A 5 "dependencies =" pyproject.toml || echo "No dependencies section found"
+
       - name: Run the charm's unit tests
         if: ${{ !(matrix.disabled) }}
         run: tox -vve unit
+
+      - name: Show all installed dependencies in test environment
+        if: ${{ !(matrix.disabled) && !cancelled() }}
+        run: |
+          echo "=== All installed packages in unit test environment ==="
+          uv pip freeze || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
 
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario

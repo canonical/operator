@@ -10,8 +10,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   hello-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
 
     strategy:
       matrix:
@@ -33,14 +37,37 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Remove 'ops' from charm requirements.txt
         run: |
           sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-          TEST_OPS="git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops"
+          # Find the ops wheel (not ops_scenario or ops_tracing)
+          TEST_OPS="$(ls operator-wheels/ops-[0-9]*.whl)"
           echo -e "\n${TEST_OPS}" >> requirements.txt
+
+      - name: Show installed ops package versions
+        run: |
+          echo "=== Wheel files downloaded ==="
+          ls -lh operator-wheels/*.whl || echo "No wheel files found"
+          echo ""
+          echo "=== Updated requirements.txt ==="
+          cat requirements.txt | tail -n 10 || echo "No requirements.txt"
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+
+      - name: Show installed package versions after install
+        run: |
+          echo "=== Installed ops package version ==="
+          pip list | grep -E "(ops|scenario|tracing)" || echo "No ops packages found"
+          echo ""
+          echo "=== All installed packages ==="
+          pip list
 
       - name: Run the charm tests
         run: |
