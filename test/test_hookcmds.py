@@ -930,7 +930,7 @@ def test_storage_list_named(run: Run):
     ],
 )
 def test_secret_expiry_formats(timestamp: str, expected: datetime.datetime):
-    si = hookcmds.SecretInfo._from_dict({'test-id': {'revision': 1, 'expiry': timestamp}})
-    assert si.id == 'test-id'
-    assert si.revision == 1
-    assert si.expiry == expected
+    secret_info = hookcmds.SecretInfo._from_dict({'test-id': {'revision': 1, 'expiry': timestamp}})
+    assert secret_info.id == 'test-id'
+    assert secret_info.revision == 1
+    assert secret_info.expiry == expected
