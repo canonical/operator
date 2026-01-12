@@ -912,7 +912,7 @@ def test_storage_list_named(run: Run):
             '2026-01-05T23:34:25.50029526Z',
             datetime.datetime(2026, 1, 5, 23, 34, 25, 500295, tzinfo=datetime.timezone.utc),
         ),
-        # 5 digits (from issue)
+        # 5 digits (reported in https://github.com/canonical/operator/issues/2263)
         (
             '2026-04-10T18:34:45.65844+00:00',
             datetime.datetime(2026, 4, 10, 18, 34, 45, 658440, tzinfo=datetime.timezone.utc),
