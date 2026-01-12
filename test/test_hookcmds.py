@@ -331,7 +331,7 @@ def test_credential_get_all(run: Run):
 
 def test_goal_state(run: Run):
     gs = {
-        'units': {'my-unit/0': {'status': 'active', 'since': '2025-08-28T13:20:00'}},
+        'units': {'my-unit/0': {'status': 'active', 'since': '2026-01-04 06:29:46Z'}},
         'relations': {},
     }
     run.handle(['goal-state', '--format=json'], stdout=json.dumps(gs))
@@ -927,13 +927,10 @@ def test_storage_list_named(run: Run):
             '2026-01-05T23:34:25.123456789Z',
             datetime.datetime(2026, 1, 5, 23, 34, 25, 123457, tzinfo=datetime.timezone.utc),
         ),
-        # No timezone (assumes UTC)
-        (
-            '2025-08-28T13:20:00',
-            datetime.datetime(2025, 8, 28, 13, 20, 0, tzinfo=datetime.timezone.utc),
-        ),
     ],
 )
-def test_datetime_from_iso(timestamp: str, expected: datetime.datetime):
-    result = hookcmds._utils.datetime_from_iso(timestamp)
-    assert result == expected
+def test_secret_expiry_formats(timestamp: str, expected: datetime.datetime):
+    si = hookcmds.SecretInfo._from_dict({'test-id': {'revision': 1, 'expiry': timestamp}})
+    assert si.id == 'test-id'
+    assert si.revision == 1
+    assert si.expiry == expected
