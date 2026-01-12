@@ -4592,7 +4592,7 @@ class TestCloudSpec:
 
     def test_from_dict_full(self):
         cred = {
-            'auth-type': 'certificate',
+            'auth_type': 'certificate',
             'attrs': {'client-cert': 'foo', 'client-key': 'bar', 'server-cert': 'baz'},
             'redacted': ['foo'],
         }
