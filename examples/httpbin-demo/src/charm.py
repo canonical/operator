@@ -42,6 +42,8 @@ class HttpbinConfig:
     def __post_init__(self):
         log_level = self.log_level.lower()
         valid_log_levels = {"info", "debug", "warning", "error", "critical"}
+        if not log_level:
+            raise ValueError(f"Empty log level. Valid values are: {', '.join(valid_log_levels)}.")
         if log_level not in valid_log_levels:
             raise ValueError(
                 f"Invalid log level: '{self.log_level}'. "
@@ -67,9 +69,7 @@ class HttpbinDemoCharm(ops.CharmBase):
         except ValueError as e:
             event.add_status(ops.BlockedStatus(str(e)))
         try:
-            if not self.container.get_service(SERVICE_NAME).is_running():
-                # We can connect to Pebble in the container, but the service hasn't started yet.
-                event.add_status(ops.MaintenanceStatus("waiting for workload"))
+            service = self.container.get_service(SERVICE_NAME)
         except ops.ModelError:
             # We can connect to Pebble in the container, but the service doesn't exist. This is
             # most likely because we haven't added a layer yet.
@@ -82,6 +82,10 @@ class HttpbinDemoCharm(ops.CharmBase):
             # It's technically possible (but unlikely) for Pebble to have an internal error.
             logger.error("Unable to fetch service info from Pebble")
             raise
+        else:
+            if not service.is_running():
+                # We can connect to Pebble in the container, but the service hasn't started yet.
+                event.add_status(ops.MaintenanceStatus("waiting for workload"))
         event.add_status(ops.ActiveStatus())
 
     def _on_httpbin_pebble_ready(self, event: ops.PebbleReadyEvent):
