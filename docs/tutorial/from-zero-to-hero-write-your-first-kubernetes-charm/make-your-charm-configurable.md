@@ -75,10 +75,10 @@ Now, define the handler, as below. Since configuring something like a port affec
 
 ```python
 def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
-    self._update_layer_and_restart()
+    self._replan_workload()
 ```
 
-We'll define `_update_layer_and_restart` shortly.
+We'll define `_replan_workload` shortly.
 
 ```{caution}
 
@@ -95,7 +95,7 @@ self.container = self.unit.get_container('demo-server')
 Create a new method, as below. This method will get the current Pebble layer configuration and compare the new and the existing service definitions -- if they differ, it will update the layer and restart the service.
 
 ```python
-def _update_layer_and_restart(self) -> None:
+def _replan_workload(self) -> None:
     """Define and start a workload using the Pebble API.
 
     You'll need to specify the right entrypoint and environment
@@ -130,7 +130,7 @@ def _update_layer_and_restart(self) -> None:
         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
 ```
 
-When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
 
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
@@ -160,11 +160,11 @@ def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     return ops.pebble.Layer(pebble_layer)
 ```
 
-As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
+As you may have noticed, the new `_replan_workload` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_replan_workload` like this:
 
 ```python
 def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
-    self._update_layer_and_restart()
+    self._replan_workload()
 ```
 
 ## Validate your charm
