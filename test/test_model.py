@@ -37,7 +37,7 @@ import pytest
 
 import ops
 import ops.testing
-from ops import pebble
+from ops import hookcmds, pebble
 from ops._private import yaml
 from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
@@ -4522,6 +4522,16 @@ class TestCloudCredential:
     @pytest.fixture()
     def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_credential_get_from_hookcmds(self, monkeypatch: pytest.MonkeyPatch, model: ops.Model):
+        hook_credential = hookcmds.CloudCredential(auth_type='test-auth', attributes={'foo': 'bar'}, redacted=['one', 'two'])
+        hook_spec = hookcmds.CloudSpec(type="test", name='test-cloud', credential=hook_credential)
+        monkeypatch.setattr(hookcmds, 'credential_get', lambda: hook_spec)
+        model_credential = model.get_cloud_spec().credential
+        assert model_credential is not None
+        assert model_credential.auth_type == hook_credential.auth_type
+        assert model_credential.attributes == hook_credential.attributes
+        assert model_credential.redacted == hook_credential.redacted
 
     def test_from_dict(self):
         d = {
