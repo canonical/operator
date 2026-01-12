@@ -17,8 +17,6 @@ from __future__ import annotations
 import datetime
 import subprocess
 
-from .._private import timeconv
-
 
 class Error(Exception):
     """Raised when a hook command exits with a non-zero code."""
@@ -56,18 +54,8 @@ def run(
     return result.stdout
 
 
-def datetime_from_iso(dt: str) -> datetime.datetime:
-    """Converts a Juju-specific ISO 8601 string to a datetime object."""
-    # parse_rfc3339 handles arbitrary precision fractional seconds, but requires a timezone.
-    # If no timezone is present, assume UTC (add 'Z').
-    if not dt.endswith('Z') and not ('+' in dt[-6:] or '-' in dt[-6:]):
-        dt = dt + 'Z'
-    return timeconv.parse_rfc3339(dt)
-
-
-def datetime_to_iso(dt: datetime.datetime) -> str:
-    """Converts a datetime object to a Juju-specific ISO 8601 string."""
-    # Older versions of Python cannot generate the 'Z'.
+def datetime_to_rfc3339(dt: datetime.datetime) -> str:
+    """Converts a datetime object to a RFC 3339 string."""
     if dt.tzinfo == datetime.timezone.utc:
         return dt.isoformat().replace('+00:00', 'Z')
     return dt.isoformat()
