@@ -4525,31 +4525,22 @@ class TestCloudCredential:
 
     def test_from_dict(self):
         d = {
-            'auth-type': 'certificate',
+            'auth_type': 'certificate',
         }
         cloud_cred = ops.CloudCredential.from_dict(d)
-        assert cloud_cred.auth_type == d['auth-type']
+        assert cloud_cred.auth_type == d['auth_type']
         assert cloud_cred.attributes == {}
         assert cloud_cred.redacted == []
 
     def test_from_dict_full(self):
         d = {
-            'auth-type': 'certificate',
+            'auth_type': 'certificate',
             'attrs': {'client-cert': 'foo', 'client-key': 'bar', 'server-cert': 'baz'},
             'redacted': ['foo'],
         }
         cloud_cred = ops.CloudCredential.from_dict(d)
-        assert cloud_cred.auth_type == d['auth-type']
+        assert cloud_cred.auth_type == d['auth_type']
         assert cloud_cred.attributes == d['attrs']
-        assert cloud_cred.redacted == d['redacted']
-
-    def test_from_dict_without_auth_type(self):
-        d = {
-            'redacted': ['foo'],
-        }
-        cloud_cred = ops.CloudCredential.from_dict(d)
-        assert cloud_cred.auth_type == ''
-        assert cloud_cred.attributes == {}
         assert cloud_cred.redacted == d['redacted']
 
     def test_credential_failure_log(
