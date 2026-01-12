@@ -147,7 +147,7 @@ def test_fs_pull(tmp_path, charm_cls, make_dirs):
 
         # but that is actually a symlink to the context's root tmp folder:
         assert (
-            Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
+            Path(ctx._tmp) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
         ).read_text() == text
         assert file.read_text() == text
 

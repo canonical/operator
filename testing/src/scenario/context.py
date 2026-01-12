@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import pathlib
+import shutil
 import tempfile
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
@@ -711,7 +712,8 @@ class Context(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
         self.app_trusted = app_trusted
-        self._tmp = tempfile.TemporaryDirectory()
+        # use mkdtemp as TemporaryDirectory only added "delete=False" feature in Python 3.12
+        self._tmp = tempfile.mkdtemp()
 
         # config for what events to be captured in emitted_events.
         self.capture_deferred_events = capture_deferred_events
@@ -755,13 +757,17 @@ class Context(Generic[CharmType]):
         """Hook for Runtime to set the output state."""
         self._output_state = output_state
 
+    def __del__(self):
+        """Clean up the temporary directory."""
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
-        return pathlib.Path(self._tmp.name) / 'containers' / container_name
+        return pathlib.Path(self._tmp) / 'containers' / container_name
 
     def _get_storage_root(self, name: str, index: int) -> pathlib.Path:
         """Get the path to a tempdir where this storage's simulated root will live."""
-        storage_root = pathlib.Path(self._tmp.name) / 'storages' / f'{name}-{index}'
+        storage_root = pathlib.Path(self._tmp) / 'storages' / f'{name}-{index}'
         # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root
