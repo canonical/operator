@@ -292,7 +292,7 @@ def test_credential_get(run: Run):
 
 def test_credential_get_all(run: Run):
     cred = {
-        'auth_type': 'certificate',
+        'auth-type': 'certificate',
         'attrs': {'client-cert': 'foo', 'client-key': 'bar', 'server-cert': 'baz'},
         'redacted': ['foo'],
     }

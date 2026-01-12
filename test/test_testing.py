@@ -7065,7 +7065,7 @@ class TestCloudSpec:
             'type': 'lxd',
             'endpoint': 'https://127.0.0.1:8443',
             'credential': {
-                'auth_type': 'certificate',
+                'auth-type': 'certificate',
                 'attrs': {'client-cert': 'foo', 'client-key': 'bar', 'server-cert': 'baz'},
             },
         }

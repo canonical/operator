@@ -4230,7 +4230,7 @@ class CloudCredential:
     def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
         return cls(
-            auth_type=d['auth_type'],
+            auth_type=d['auth-type'],
             attributes=d.get('attrs') or {},
             redacted=d.get('redacted') or [],
         )
