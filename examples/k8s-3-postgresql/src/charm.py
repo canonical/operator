@@ -99,7 +99,7 @@ class FastAPIDemoCharm(ops.CharmBase):
     def _on_database_endpoint(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
-        """Event is fired when postgres database is created or endpoint is changed."""
+        """Event is fired when the database is created or its endpoint is changed."""
         self._replan_workload()
 
     def _replan_workload(self) -> None:
@@ -164,7 +164,7 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def get_app_environment(self) -> dict[str, str]:
         """Return a dictionary of environment variables for the application."""
-        db_data = self.fetch_postgres_relation_data()
+        db_data = self.fetch_database_relation_data()
         if not db_data:
             return {}
         env = {
@@ -179,8 +179,8 @@ class FastAPIDemoCharm(ops.CharmBase):
         }
         return env
 
-    def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """Retrieve relation data from a postgres database."""
+    def fetch_database_relation_data(self) -> dict[str, str]:
+        """Retrieve relation data from a database."""
         relations = self.database.fetch_relation_data()
         logger.debug('Got following database data: %s', relations)
         for data in relations.values():

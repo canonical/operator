@@ -22,7 +22,7 @@ cd operator/examples/k8s-2-configurable
 
 ````
 
-A charm often requires or supports relations to other charms. For example, to make our application fully functional we need to connect it to the PostgreSQL database. In this chapter of the tutorial we will update our charm so that it can be integrated with the existing [PostgreSQL charm](https://charmhub.io/postgresql-k8s?channel=14/stable).
+A charm often requires or supports relations to other charms. For example, to make our application fully functional we need to connect it to the database. In this chapter of the tutorial we will update our charm so that it can be integrated with the existing [PostgreSQL charm](https://charmhub.io/postgresql-k8s?channel=14/stable).
 
 ## Fetch the required database interface charm libraries
 
@@ -149,7 +149,7 @@ Finally, define the method that is called on the database events:
 def _on_database_endpoint(
     self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
 ) -> None:
-    """Event is fired when postgres database is created or endpoint is changed."""
+    """Event is fired when the database is created or its endpoint is changed."""
     self._replan_workload()
 ```
 
@@ -162,7 +162,7 @@ Our application consumes database authentication data in the form of environment
 ```python
 def get_app_environment(self) -> dict[str, str]:
     """Return a dictionary of environment variables for the application."""
-    db_data = self.fetch_postgres_relation_data()
+    db_data = self.fetch_database_relation_data()
     if not db_data:
         return {}
     env = {
@@ -181,8 +181,8 @@ def get_app_environment(self) -> dict[str, str]:
 This method depends on the following method, which extracts the database authentication data:
 
 ```python
-def fetch_postgres_relation_data(self) -> dict[str, str]:
-    """Retrieve relation data from a postgres database."""
+def fetch_database_relation_data(self) -> dict[str, str]:
+    """Retrieve relation data from a database."""
     relations = self.database.fetch_relation_data()
     logger.debug('Got following database data: %s', relations)
     for data in relations.values():
@@ -422,7 +422,7 @@ Congratulations, your relation with PostgreSQL is functional!
 
 ## Write unit tests
 
-Now that our charm uses `fetch_postgres_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_postgres_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
+Now that our charm uses `fetch_database_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_database_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
 
 ```python
 def test_relation_data():
@@ -483,7 +483,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the PostgreSQL database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
 
 ```python
 import logging
