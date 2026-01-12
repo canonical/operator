@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
+import os
 import pathlib
 import warnings
 from typing import (
@@ -47,6 +48,7 @@ from .framework import (
     Object,
     ObjectEvents,
 )
+from .jujuversion import JujuVersion
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -2157,7 +2159,9 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        self.additional_properties = raw.get('additionalProperties', True)
+        # The default in Juju 4 is False. The default in earlier Juju versions is True.
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+        self.additional_properties = raw.get('additionalProperties', juju_version < '4.0.0')
 
 
 @dataclasses.dataclass(frozen=True)
