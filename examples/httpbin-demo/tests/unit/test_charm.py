@@ -14,13 +14,13 @@
 
 import ops
 import pytest
-from ops import pebble, testing
+from ops import testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
 
 # A mock Pebble layer - useful for testing the charm's status reporting code. The status reporting
 # code shouldn't care how the service is started, so the layer doesn't need the real command.
-MOCK_LAYER = pebble.Layer(
+MOCK_LAYER = ops.pebble.Layer(
     {
         "services": {
             SERVICE_NAME: {
@@ -72,7 +72,7 @@ def test_status_service_active():
     container = testing.Container(
         CONTAINER_NAME,
         layers={"base": MOCK_LAYER},
-        service_statuses={SERVICE_NAME: pebble.ServiceStatus.ACTIVE},
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.ACTIVE},
         can_connect=True,
     )
     state_in = testing.State(containers={container})
@@ -86,7 +86,7 @@ def test_status_service_inactive():
     container = testing.Container(
         CONTAINER_NAME,
         layers={"base": MOCK_LAYER},
-        service_statuses={SERVICE_NAME: pebble.ServiceStatus.INACTIVE},
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.INACTIVE},
         can_connect=True,
     )
     state_in = testing.State(containers={container})
