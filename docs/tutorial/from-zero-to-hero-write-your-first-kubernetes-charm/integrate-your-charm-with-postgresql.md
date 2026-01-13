@@ -165,17 +165,12 @@ def get_app_environment(self) -> dict[str, str]:
     db_data = self.fetch_database_relation_data()
     if not db_data:
         return {}
-    env = {
-        key: value
-        for key, value in {
-            'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
-            'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
-            'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
-            'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
-        }.items()
-        if value is not None
+    return {
+        'DEMO_SERVER_DB_HOST': db_data['db_host'],
+        'DEMO_SERVER_DB_PORT': db_data['db_port'],
+        'DEMO_SERVER_DB_USER': db_data['db_username'],
+        'DEMO_SERVER_DB_PASSWORD': db_data['db_password'],
     }
-    return env
 ```
 
 This method depends on the following method, which extracts the database authentication data:
