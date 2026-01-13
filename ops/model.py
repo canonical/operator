@@ -3664,7 +3664,7 @@ class _ModelBackend:
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         with self._wrap_hookcmd('relation-model-get', relation_id=relation_id):
             raw = hookcmds.relation_model_get(relation_id)
-        return dataclasses.asdict(raw)
+        return {"uuid": raw.uuid}
 
     def config_get(self) -> dict[str, bool | int | float | str]:
         with self._wrap_hookcmd('config-get'):
