@@ -4305,7 +4305,7 @@ class CloudSpec:
             endpoint=o.endpoint,
             identity_endpoint=o.identity_endpoint,
             storage_endpoint=o.storage_endpoint,
-            credential=CloudCredential._from_hookcmds(o.credential),
+            credential=CloudCredential._from_hookcmds(o.credential) if o.credential else None,
             ca_certificates=o.ca_certificates,
             skip_tls_verify=o.skip_tls_verify,
             is_controller_cloud=o.is_controller_cloud,
