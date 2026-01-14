@@ -2531,7 +2531,7 @@ class Client:
             span.set_attribute('checks', checks)
             body = {'action': action, 'checks': checks}
             resp = self._request('POST', '/v1/checks', body=body)
-            return resp['result']['changed']
+            return resp['result']['changed'] or []
 
     def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
