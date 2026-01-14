@@ -131,21 +131,18 @@ def test_config_changed(user_log_level: str, gunicorn_log_level: str):
     assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_config_changed_empty():
+@pytest.mark.parametrize(
+    "user_log_level",
+    [
+        "",
+        "foobar",
+    ],
+)
+def test_config_changed_invalid(user_log_level: str):
     """Test a config-changed event when the config is invalid."""
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": ""})
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
-    assert state_out.unit_status.message.startswith("Empty log level.")
-
-
-def test_config_changed_invalid():
-    """Test a config-changed event when the config is invalid."""
-    ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": "foobar"})
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert isinstance(state_out.unit_status, testing.BlockedStatus)
-    assert state_out.unit_status.message.startswith("Invalid log level: 'foobar'.")
+    assert state_out.unit_status.message.startswith(f"Invalid log level: '{user_log_level}'.")
