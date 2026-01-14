@@ -23,7 +23,7 @@ jobs:
           - charm-repo: canonical/prometheus-k8s-operator
             commit: 74bd4a8b98ee750ab401a652a3cf9bb2317ded15  # rev281 2025-12-12T14:20:39Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 2a0b282c0edcffdf46f84bb808529b5c0a705061 # rev175 2025-12-05T18:18:09Z
+            commit: 2a0b282c0edcffdf46f84bb808529b5c0a705061  # rev175 2025-12-05T18:18:09Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v6

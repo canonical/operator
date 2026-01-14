@@ -29,11 +29,19 @@ def test_parse_rfc3339():
         2020, 12, 25, 13, 45, 50, 0, tzinfo=nzdt
     )
 
+    assert timeconv.parse_rfc3339('2020-12-25 13:45:50+13:00') == datetime.datetime(
+        2020, 12, 25, 13, 45, 50, 0, tzinfo=nzdt
+    )
+
     assert timeconv.parse_rfc3339('2020-12-25T13:45:50.123456789+13:00') == datetime.datetime(
         2020, 12, 25, 13, 45, 50, 123457, tzinfo=nzdt
     )
 
     assert timeconv.parse_rfc3339('2021-02-10T04:36:22Z') == datetime.datetime(
+        2021, 2, 10, 4, 36, 22, 0, tzinfo=utc
+    )
+
+    assert timeconv.parse_rfc3339('2021-02-10 04:36:22Z') == datetime.datetime(
         2021, 2, 10, 4, 36, 22, 0, tzinfo=utc
     )
 

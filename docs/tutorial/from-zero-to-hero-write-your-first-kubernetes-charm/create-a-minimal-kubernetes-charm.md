@@ -5,14 +5,6 @@
 >
 > **See previous: {ref}`Set up your development environment <set-up-your-development-environment>`**
 
-<!--
-Assuming you are familiar with Juju, you will know that to start using a charm you should run `juju deploy thischarm`. When you run this command targeting a Kubernetes cloud, the following things happen:
--->
-
-<!--
-If you are familiar with  Juju, as we assume here, you'll know that, to start using a charm, you run `juju deploy`, and also that, when you do that on a Kubernetes-type cloud, this triggers all of the following:
--->
-
 As you already know from your knowledge of Juju, when you deploy a Kubernetes charm, the following things happen:
 
 1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`.
@@ -22,18 +14,7 @@ As you already know from your knowledge of Juju, when you deploy a Kubernetes ch
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
-<!--the container for the unit agent and the charm is named 'charm'-->
-<!--PIETRO'S ORIGINAL WORDING:
-1. Typically, at this point the charm will configure and start its workload (through pebble calls) and begin operations.
--->
-
-<!--Pebble is a lightweight, API-driven process supervisor designed to give workload containers something akin to an `init` system that will allow the charm container to interact with it. -->
-<!--The charm already knows how to contact Pebble (because the information can be predicted from the container name).
-<!--
-Conceptually, a charm is code that instructs Juju to deploy and manage an application in the cloud. For every Kubernetes charm Juju will deploy a pod with two containers, one for the Juju agent and the charm code and one for the application workload. The communication between these containers, and the orchestration of the local service processes for the workload application, both happen via Pebble, a lightweight API-driven process supervisor. For a visual representation of the deployment see the picture below.
--->
-
-All  subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
+All subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
 
 
 ![Create a minimal Kubernetes charm](../../resources/create_a_minimal_kubernetes_charm.png)
@@ -142,36 +123,15 @@ framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_
 
 ```{tip}
 
-**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event.
+**Pro tip:** Use `__init__` to hold references (pointers) to other `Object`s or immutable state only. That is because a charm is reinitialised on every event. You can't persist data between Juju events by storing it in memory.
 
 ```
-
-<!--
-TOO ADVANCED:
-Pro tip:** Use `__init__` to hold references (pointers) to other objects (e.g., relation wrappers) or immutable state only. That is because a fresh charm instance is created on every event, so attaching mutable state to it is error-prone. (You should rather think of all data attached to a charm instance as single-use.) See {ref}`Talking to a workload: Control flow from A to Z <talking-to-a-workload-control-flow-from-a-to-z>`.
-
-"relation wrapper" is advanced Pietro jargon:
-
-like, the FooRelationProvider/FooRelationRequirer objects most relation charm libs offer
-
-these are objects that wrap a relation (a relation endpoint, to be more precise) and expose a high-level API to the charm
-
-so that instead of read/writing relation data directly, the charm can call methods on the wrapper that will take care of the low-level work
-
-not sure if it's generally adopted terminology, but I call them relation endpoint wrappers
-
--->
-
 
 Next, define the event handler, as follows:
 
 We'll use the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
 
 Use `ActiveStatus` as well as further Ops constructs to define the event handler, as below. As you can see, what is happening is that, from the `event` argument, you extract the workload container object in which you add a custom layer. Once the layer is set you replan your service and set the charm status to active.
-
-<!--
-In case it helps, the definition of a Pebble layer is very similar to the definition of a Linux service.
--->
 
 
 ```python
@@ -264,18 +224,6 @@ If packing failed - perhaps you forgot to make `charm.py` executable earlier - y
 **Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents.
 
 ```
-
-<!--ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft pack-->
-
-<!-- `charmcraft pack` just fetches the dependencies, compiles any modules, makes sure you have all the right pieces of metadata, and zips it up for easy distribution.
--->
-
-<!--```{caution}
-
-This name might vary slightly, depending on your architecture. E.g., for an `arm` processor, you will see `arm64` rather than `amd64`. In the commands below make sure to enter the correct charm name.
-
-```
--->
 
 ### Deploy your charm
 

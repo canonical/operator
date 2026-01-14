@@ -196,12 +196,6 @@ self._grafana_dashboards = GrafanaDashboardProvider(
 )
 ```
 
-<!-- UPDATE LINKS
-
-We probably shouldn't link to a file on Discourse any more. Do we want to have this template file in the ops repo? Maybe it's best to just link to file in the tutorial repo?
-
--->
-
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
 [FastAPI-Monitoring.json.tmpl](https://raw.githubusercontent.com/canonical/operator/refs/heads/main/examples/k8s-5-observe/src/grafana_dashboards/FastAPI-Monitoring.json.tmpl). Once your charm has been integrated with Grafana, the `GrafanaDashboardProvider` you defined just before will take this file as well as any other files defined in this directory and put them into a Grafana files tree to be read by Grafana.
 
@@ -382,14 +376,6 @@ In your Grafana web page, do all of the following:
 
 Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm.
 
-<!--
-Open following URL (replace to your IP address):
-```
-http://10.152.183.132:3000/?orgId=1&search=open
-```
-Click on `FastAPI Monitoring`
--->
-
 Next, in the `Juju model` drop down field, select `testing`.
 
 Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
@@ -405,9 +391,6 @@ curl 10.1.157.94:8000/error
 ```
 
 where `10.1.157.94` is the IP of our application unit (pod).
-
-<!--Now, generate some data that you can then visualise on the dashboard. Let's call a couple of API endpoints on our application.
--->
 
 In a while you should see the following data appearing on the dashboard:
 
