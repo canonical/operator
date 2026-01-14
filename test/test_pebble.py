@@ -1803,6 +1803,17 @@ class TestClient:
             ('GET', '/v1/changes/70', None, None),
         ]
 
+    def test_checks_action_empty(self, client: MockClient):
+        client.responses.append({
+            'result': {'changed': None},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+
+        result = client._checks_action('start', ['chk1', 'chk2'])
+        assert result == []
+
     def test_get_change_str(self, client: MockClient):
         client.responses.append({
             'result': build_mock_change_dict(),
