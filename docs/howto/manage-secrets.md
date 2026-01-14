@@ -53,6 +53,7 @@ Note that:
 - We call `add_secret` on `self.app` (the application). That is because we want the secret to be owned by this application, not by this unit. If we wanted to create a secret owned by the unit, we'd call `self.unit.add_secret` instead.
 - The only data shared in plain text is the secret ID (a locator URI). The secret ID can be publicly shared. Juju will ensure that only remote apps/units to which the secret has explicitly been granted by the owner will be able to fetch the actual secret payload from that ID.
 - The secret needs to be granted to a remote entity (app or unit), and that always goes via a relation instance. By passing a relation to `grant` (in this case the event's relation), we are explicitly declaring the scope of the secret -- its lifetime will be bound to that of this relation instance.
+- In `Cross Model Relation` (`CMR`) scenario, the offering side of the relation is the one that can share secrets. Juju does not support `apps` on the consuming side sharing secrets.
 
 > See more: [](ops.Application.add_secret)
 
