@@ -66,7 +66,7 @@ In the  charm  `__init__` method, add an action event observer, as below. As you
 framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
 ```
 
-Now, define the action event handler, as below:  First, read the value of the parameter defined in the `charmcraft.yaml` file (`show-password`). Then, use the `fetch_postgres_relation_data` method (that we defined in a previous chapter) to read the contents of the database relation data and, if the parameter value read earlier is `True`, add the username and password to the output. Finally, use `event.set_results` to attach the results to the event that has called the action; this will print the output to the terminal.
+Now, define the action event handler, as below:  First, read the value of the parameter defined in the `charmcraft.yaml` file (`show-password`). Then, use the `fetch_database_relation_data` method (that we defined in a previous chapter) to read the contents of the database relation data and, if the parameter value read earlier is `True`, add the username and password to the output. Finally, use `event.set_results` to attach the results to the event that has called the action; this will print the output to the terminal.
 
 If we are not able to get the data (for example, if the charm has not yet been integrated with the postgresql-k8s application) then we use the `fail` method of the event to let the user know.
 
@@ -75,7 +75,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
     """Return information about the integrated database.
 
     This method is called when "get_db_info" action is called. It shows information about
-    database access points by calling the `fetch_postgres_relation_data` method and creates
+    database access points by calling the `fetch_database_relation_data` method and creates
     an output dictionary containing the host, port, if show_password is True, then include
     username, and password of the database.
 
@@ -84,7 +84,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
     Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
     """
     params = event.load_params(GetDbInfoAction, errors='fail')
-    db_data = self.fetch_postgres_relation_data()
+    db_data = self.fetch_database_relation_data()
     if not db_data:
         event.fail('No database connected')
         return
