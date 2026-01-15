@@ -1,7 +1,7 @@
 (tool-versions)=
 # Tool versions
 
-In deciding which version of tools to use within the charming ecosystem, the base is the key constraint. Once the base is selected, use the latest supported version of each tool whenever possible.
+When you're deciding which version of tools to use within the charming ecosystem, the base is the key constraint. Once you have selected the base, use the latest supported version of each tool whenever possible.
 
 Charms should only support deployment on the LTS versions of Juju that are not yet end-of-life.
 
