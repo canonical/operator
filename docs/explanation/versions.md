@@ -18,7 +18,7 @@ Choosing the base or bases that your charm will support in turn selects the vers
 
 ## Find your Pebble version from the Juju version
 
-Each version of Juju uses a specific version of Pebble. To determine which Pebble features are available to you, look up the Pebble version from the Juju version.
+Each version of Juju provides a fixed version of Pebble. To determine which Pebble features are available to you, look up the Pebble version from the Juju version.
 
 | Juju Version | Pebble Version |
 |--------------|----------------|
