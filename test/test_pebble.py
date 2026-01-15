@@ -1803,6 +1803,20 @@ class TestClient:
             ('GET', '/v1/changes/70', None, None),
         ]
 
+    @pytest.mark.parametrize('action', ['start', 'stop'])
+    def test_startstop_checks_nothing_changed(self, client: MockClient, action: str):
+        client.responses.append({
+            'result': {'changed': None},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        result = getattr(client, f'{action}_checks')(['chk1', 'chk2'])
+        assert client.requests == [
+            ('POST', '/v1/checks', None, {'action': action, 'checks': ('chk1', 'chk2')})
+        ]
+        assert result == []
+
     def test_get_change_str(self, client: MockClient):
         client.responses.append({
             'result': build_mock_change_dict(),
