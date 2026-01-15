@@ -206,7 +206,7 @@ multipass shell juju-sandbox-k8s
 cd ~/fastapi-demo
 ```
 
-Now, pack your charm project directory into a `.charm` file, as below. This will produce a `.charm` file.  In our case it was named `fastapi-demo_amd64.charm`; yours should be named similarly, though the name might vary slightly depending on your architecture.
+Now run `charmcraft pack` to create a `.charm` file that can be deployed with Juju. In our case, the file was named `fastapi-demo_amd64.charm`. Yours should be named similarly, though the name might vary slightly depending on your architecture.
 
 ```
 charmcraft pack
