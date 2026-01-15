@@ -32,7 +32,7 @@ jobs:
               path: scanner
               persist-credentials: false
           - name: Install uv
-            uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
+            uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867  # v7.1.6
           - name: Install secscan cli
             run: |
               sudo snap install canonical-secscan-client
@@ -53,7 +53,7 @@ jobs:
             run: |
               cd scanner && ./sbomber download
           - name: Upload reports
-            uses: actions/upload-artifact@v5
+            uses: actions/upload-artifact@v6
             with:
               name: secscan-report-upload-${{ matrix.manifest }}
               path: ./scanner/reports/

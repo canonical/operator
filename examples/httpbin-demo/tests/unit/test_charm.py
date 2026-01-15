@@ -13,20 +13,34 @@
 # limitations under the License.
 
 import ops
+import pytest
 from ops import testing
 
 from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
 
+# A mock Pebble layer - useful for testing the charm's status reporting code. The status reporting
+# code shouldn't care how the service is started, so the layer doesn't need the real command.
+MOCK_LAYER = ops.pebble.Layer(
+    {
+        "services": {
+            SERVICE_NAME: {
+                "override": "replace",
+                "command": "mock-command",
+                "startup": "enabled",
+            },
+        },
+    }
+)
 
-def test_httpbin_pebble_ready():
+
+def test_pebble_ready():
+    """Check that the charm correctly starts the service in the container."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
     state_in = testing.State(containers={container})
-
     # Act:
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     expected_plan = {
@@ -48,72 +62,87 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_config_changed_valid_can_connect():
-    """Test a config-changed event when the config is valid and the container can be reached."""
-    # Arrange:
-    ctx = testing.Context(HttpbinDemoCharm)  # The default config will be read from charmcraft.yaml
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        config={"log-level": "debug"},  # This is the config the charmer passed with `juju config`
+def test_status_service_active():
+    """Check that the charm goes into active status if the service is active.
+
+    This test is useful in addition to ``test_pebble_ready()`` because it checks that the charm
+    consistently sets active status, regardless of which event was handled.
+    """
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(
+        CONTAINER_NAME,
+        layers={"base": MOCK_LAYER},
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.ACTIVE},
+        can_connect=True,
     )
-
-    # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
-    updated_plan = state_out.get_container(container.name).plan
-    gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_config_changed_valid_cannot_connect():
-    """Test a config-changed event when the config is valid but the container cannot be reached.
+def test_status_service_inactive():
+    """Check that the charm goes into maintenance status if the service isn't active."""
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(
+        CONTAINER_NAME,
+        layers={"base": MOCK_LAYER},
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.INACTIVE},
+        can_connect=True,
+    )
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload")
 
-    We expect to end up in MaintenanceStatus waiting for the deferred event to
-    be retried.
-    """
-    # Arrange:
+
+def test_status_no_service():
+    """Check that the charm goes into maintenance status if the service hasn't been defined."""
+    ctx = testing.Context(HttpbinDemoCharm)
+    container = testing.Container(CONTAINER_NAME, can_connect=True)
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
+
+
+def test_status_no_pebble():
+    """Check that the charm goes into maintenance status if the container is down."""
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=False)
-    state_in = testing.State(containers={container}, config={"log-level": "debug"})
-
-    # Act:
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
-    assert isinstance(state_out.unit_status, testing.MaintenanceStatus)
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+    assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
 
-def test_config_changed_valid_uppercase():
-    """Test a config-changed event when the config is valid and uppercase."""
-    # Arrange:
+@pytest.mark.parametrize(
+    "user_log_level, gunicorn_log_level",
+    [
+        ("debug", "debug"),
+        ("DEBUG", "debug"),
+    ],
+)
+def test_config_changed(user_log_level: str, gunicorn_log_level: str):
+    """Test a config-changed event when the config is valid."""
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": "DEBUG"})
-
-    # Act:
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
-    assert gunicorn_args == "--log-level debug"
-    assert isinstance(state_out.unit_status, testing.ActiveStatus)
+    assert gunicorn_args == f"--log-level {gunicorn_log_level}"
+    assert state_out.unit_status == testing.ActiveStatus()
 
 
-def test_config_changed_invalid():
+@pytest.mark.parametrize(
+    "user_log_level",
+    [
+        "",
+        "foobar",
+    ],
+)
+def test_config_changed_invalid(user_log_level: str):
     """Test a config-changed event when the config is invalid."""
-    # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(CONTAINER_NAME, can_connect=True)
-    invalid_level = "foobar"
-    state_in = testing.State(containers={container}, config={"log-level": invalid_level})
-
-    # Act:
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-
-    # Assert:
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
-    assert invalid_level in state_out.unit_status.message
+    assert state_out.unit_status.message.startswith(f"Invalid log level: '{user_log_level}'.")

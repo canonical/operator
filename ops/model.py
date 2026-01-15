@@ -3664,7 +3664,7 @@ class _ModelBackend:
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         with self._wrap_hookcmd('relation-model-get', relation_id=relation_id):
             raw = hookcmds.relation_model_get(relation_id)
-        return dataclasses.asdict(raw)
+        return {'uuid': raw.uuid}
 
     def config_get(self) -> dict[str, bool | int | float | str]:
         with self._wrap_hookcmd('config-get'):
@@ -4074,7 +4074,7 @@ class _ModelBackend:
         """
         with self._wrap_hookcmd('credential-get'):
             raw_spec = hookcmds.credential_get()
-        return CloudSpec.from_dict(dataclasses.asdict(raw_spec))
+        return CloudSpec._from_hookcmds(raw_spec)
 
 
 class _ModelBackendValidator:
@@ -4235,6 +4235,15 @@ class CloudCredential:
             redacted=d.get('redacted') or [],
         )
 
+    @classmethod
+    def _from_hookcmds(cls, o: hookcmds.CloudCredential) -> CloudCredential:
+        """Create a new model.CloudCredential object from a hookcmds.CloudCredential object."""
+        return cls(
+            auth_type=o.auth_type,
+            attributes=o.attributes,
+            redacted=o.redacted,
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class CloudSpec:
@@ -4284,4 +4293,20 @@ class CloudSpec:
             ca_certificates=d.get('cacertificates') or [],
             skip_tls_verify=d.get('skip-tls-verify') or False,
             is_controller_cloud=d.get('is-controller-cloud') or False,
+        )
+
+    @classmethod
+    def _from_hookcmds(cls, o: hookcmds.CloudSpec) -> CloudSpec:
+        """Create a new model.CloudSpec object from a hookcmds.CloudSpec object."""
+        return cls(
+            type=o.type,
+            name=o.name,
+            region=o.region,
+            endpoint=o.endpoint,
+            identity_endpoint=o.identity_endpoint,
+            storage_endpoint=o.storage_endpoint,
+            credential=CloudCredential._from_hookcmds(o.credential) if o.credential else None,
+            ca_certificates=o.ca_certificates,
+            skip_tls_verify=o.skip_tls_verify,
+            is_controller_cloud=o.is_controller_cloud,
         )

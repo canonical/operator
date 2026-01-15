@@ -20,7 +20,7 @@ import tempfile
 from typing import Any, Literal, overload
 
 from ._types import SecretInfo, SecretRotate
-from ._utils import datetime_to_iso, run
+from ._utils import datetime_to_rfc3339, run
 
 
 # The `--file` parameter is not exposed as we expect the content to be held in
@@ -57,7 +57,7 @@ def secret_add(
         if isinstance(expire, str):
             args.extend(['--expire', expire])
         else:
-            args.extend(['--expire', datetime_to_iso(expire)])
+            args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
     args.extend(['--owner', owner])
@@ -291,7 +291,7 @@ def secret_set(
         if isinstance(expire, str):
             args.extend(['--expire', expire])
         else:
-            args.extend(['--expire', datetime_to_iso(expire)])
+            args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
     args.extend(['--owner', owner])
