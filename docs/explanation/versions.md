@@ -7,7 +7,6 @@ Charms should only support deployment on the LTS versions of Juju that are not y
 
 ## Find tool versions by base
 
-Choosing the base or bases that your charm will support in turn selects the versions of Juju, Ops, and Charmcraft that you should use, and the default version of Python available.
 
 | Base | Python | Juju | Ops | Charmcraft |
 |------|----------------|---------------|--------------|-------------------|
