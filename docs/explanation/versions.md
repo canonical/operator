@@ -10,7 +10,7 @@ When you're deciding which version of tools to use within the charming ecosystem
 |------|----------------|---------------|--------------|-------------------|
 | 18.04 (Bionic Beaver) | [3.6](https://docs.python.org/3/whatsnew/3.6.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 1.x | 2.x |
 | 20.04 (Focal Fossa) | [3.8](https://docs.python.org/3/whatsnew/3.8.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/) | 2.x |
-| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/reference/platforms/#base), [4.x](https://documentation.ubuntu.com/charmcraft/stable/release-notes/charmcraft-4.0/) |
+| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.0.1/) |
 | 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.0.1/) |
 
 ## Pebble provided by Juju
@@ -32,7 +32,11 @@ Each version of Juju provides a fixed version of Pebble. To determine which Pebb
 
 Juju releases new minor versions approximately every 3 months, which are supported with bug fixes for four months from their release date and security fixes for another two months. Long Term Support (LTS) releases receive security fixes for 15 years.
 
+> See more: {external+ref:juju}`Juju support timeframes <releasenotes>`
+
 Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version.
+
+> See more: [Ops support timeframes](https://github.com/canonical/operator/blob/main/SECURITY.md)
 
 ### Juju
 
