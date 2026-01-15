@@ -247,11 +247,6 @@ jobs:
           echo "=== Wheel files downloaded ==="
           ls -lh ../operator-wheels/*.whl || echo "No wheel files found"
           echo ""
-          echo "=== Updated requirements files ==="
-          [ -f requirements.txt ] && (echo "requirements.txt:" && tail -n 10 requirements.txt) || echo "No requirements.txt"
-          [ -f test-requirements.txt ] && (echo "test-requirements.txt:" && tail -n 10 test-requirements.txt) || echo "No test-requirements.txt"
-          echo ""
-          echo "=== Installed ops package version (after tox install) will be checked during test run ==="
 
       - name: Install dependencies
         id: deps
@@ -263,13 +258,6 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
         working-directory: ${{ matrix.charm-root }}
         run: tox -vve unit
-
-      - name: Show all installed dependencies in test environment
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
-        working-directory: ${{ matrix.charm-root }}
-        run: |
-          echo "=== All installed packages in unit test environment ==="
-          uv pip freeze || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
 
       - name: Check for tox static environment
         id: has-static

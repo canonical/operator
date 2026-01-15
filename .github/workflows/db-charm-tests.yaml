@@ -62,24 +62,8 @@ jobs:
             poetry lock
           fi
 
-      - name: Show installed ops package versions
-        run: |
-          echo "=== Wheel files downloaded ==="
-          ls -lh operator-wheels/*.whl || echo "No wheel files found"
-          echo ""
-          echo "=== Updated requirements.txt ==="
-          cat requirements.txt | tail -n 10 || echo "No requirements.txt"
-          echo ""
-          echo "=== Installed ops package version (after tox install) will be checked during test run ==="
-
       - name: Install dependencies
         run: pip install tox~=4.2
 
       - name: Run the charm's unit tests
         run: tox -vve unit
-
-      - name: Show all installed dependencies in test environment
-        if: ${{ !cancelled() }}
-        run: |
-          echo "=== All installed packages in unit test environment ==="
-          uv pip freeze || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
