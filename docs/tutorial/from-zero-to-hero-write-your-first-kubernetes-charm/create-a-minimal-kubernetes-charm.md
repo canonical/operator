@@ -104,7 +104,7 @@ if __name__ == "__main__":  # pragma: nocover
     ops.main(FastAPIDemoCharm)
 ```
 
-As you can see, a charm is a pure Python class that inherits from the `CharmBase` class of Ops and which we pass to the `main` function defined in the `ops.main` module. We'll refer to `FastAPIDemoCharm` as the "charm class".
+As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
 
 ### Handle the pebble-ready event
 
