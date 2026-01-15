@@ -108,10 +108,10 @@ As you can see, a charm is a pure Python class that inherits from the [`CharmBas
 
 ### Handle the pebble-ready event
 
-In the `__init__` function of your charm class, use Ops constructs to add an observer for when the Juju controller informs the charm that the Pebble in its workload container is up and running, as below. As you can see, the observer is a function that takes as an argument an event and an event handler. The event name is created automatically by Ops for each container on the template `<container>-pebble-ready`. The event handler is a method in your charm class that will be executed when the event is fired; in this case, you will use it to tell Pebble how to start your application.
+In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
 
 ```python
-framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
+framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
 ```
 
 

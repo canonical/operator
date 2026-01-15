@@ -32,7 +32,7 @@ class FastAPIDemoCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
         self.pebble_service_name = "fastapi-service"
-        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
+        framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         """Define and start a workload using the Pebble API."""
