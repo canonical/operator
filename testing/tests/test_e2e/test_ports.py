@@ -3,20 +3,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
-
 import pytest
-from scenario import Context, State
+from scenario import Context, Port, State, TCPPort, UDPPort
 from scenario.errors import StateValidationError
-from scenario.state import Port, TCPPort, UDPPort
 
 from ops import CharmBase, Framework, StartEvent, StopEvent
 
 
-class MyCharm(CharmBase):
-    META: Mapping[str, Any] = {'name': 'edgar'}
-
+class Charm(CharmBase):
     def __init__(self, framework: Framework):
         super().__init__(framework)
         framework.observe(self.on.start, self._open_port)
@@ -31,11 +25,11 @@ class MyCharm(CharmBase):
 
 
 @pytest.fixture
-def ctx() -> Context[MyCharm]:
-    return Context(MyCharm, meta=dict(MyCharm.META))
+def ctx() -> Context[Charm]:
+    return Context(Charm, meta={'name': 'edgar'})
 
 
-def test_open_port(ctx: Context[MyCharm]):
+def test_open_port(ctx: Context[Charm]):
     out = ctx.run(ctx.on.start(), State())
     ports = tuple(out.opened_ports)
     assert len(ports) == 1
@@ -45,7 +39,7 @@ def test_open_port(ctx: Context[MyCharm]):
     assert port.port == 12
 
 
-def test_close_port(ctx: Context[MyCharm]):
+def test_close_port(ctx: Context[Charm]):
     out = ctx.run(ctx.on.stop(), State(opened_ports={TCPPort(42)}))
     assert not out.opened_ports
 
