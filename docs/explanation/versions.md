@@ -32,7 +32,7 @@ Each version of Juju provides a fixed version of Pebble. To determine which Pebb
 
 Juju releases new minor versions approximately every 3 months, which are supported with bug fixes for four months from their release date and security fixes for another two months. Long Term Support (LTS) releases receive security fixes for 15 years.
 
-> See more: {external+ref:juju}`Juju support timeframes <releasenotes>`
+> See more: {external+juju:ref}`Juju support timeframes <releasenotes>`
 
 Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version.
 
