@@ -52,9 +52,9 @@ Ops releases new minor versions approximately once per month. Major versions are
 
 | Version | Status | Release Date | End of Life |
 |---------|--------|--------------|-------------|
-| [Ops 1.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | ❌ EOL | 2020-10-31 | 2024-04-26 |
-| [Ops 2.x](https://github.com/canonical/operator/blob/2.23-maintenance/SECURITY.md) | 🔔 Upgrade soon | 2023-01-25 | 2026-07-30 |
-| [Ops 3.x](https://github.com/canonical/operator/blob/main/SECURITY.md) | 🟢 Active | 2025-07-02 | 2027-01-01 |
+| Ops 1.5 | ❌ EOL | 2020-10-31 | 2024-04-26 |
+| Ops 2.23 | 🔔 Upgrade soon | 2023-01-25 | 2026-07-30 |
+| Ops 3.5 | 🟢 Active | 2025-12-18 | 2026-12-18 |
 
 **Legend:**
 - 🟢 Active: Currently supported
