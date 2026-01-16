@@ -42,12 +42,6 @@ jobs:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels
 
-      - name: Checkout the operator repository
-        uses: actions/checkout@v6
-        with:
-          path: myops
-          persist-credentials: false
-
       - name: Install patch dependencies
         run: pip install poetry~=2.0
 
@@ -58,8 +52,7 @@ jobs:
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\n${ops_wheel}" >> requirements.txt
           else
-            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock
+            poetry add "${ops_wheel}" --lock
           fi
 
       - name: Install dependencies
