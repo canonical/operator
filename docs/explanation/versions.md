@@ -42,25 +42,25 @@ Ops releases new minor versions approximately once per month. Major versions are
 
 | Version | Status | Release Date | End of Bug Fixes | End of Life |
 |---------|--------|--------------|-------------------|-------------|
-| [Juju 2.9 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 🟢 Active | 2021-04-28 |  | 2035-04-28 |
-| [Juju 3.0](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2022-10-22 | 2023-02-22 | 2023-04-23 |
-| [Juju 3.1](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2023-02-06 | 2023-06-06 | 2023-08-06 |
-| [Juju 3.2](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2023-05-26 | 2023-09-26 | 2023-11-06 |
-| [Juju 3.3](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2023-11-10 | 2024-03-10 | 2024-05-10 |
-| [Juju 3.4](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2024-02-15 | 2024-06-15 | 2024-08-15 |
-| [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | ❌ EOL | 2024-05-07 | 2024-09-07 | 2024-11-07 |
-| [Juju 3.6 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/) | 🟢 Active | 2024-12-11 |  | 2039-04-11 |
-| [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | 🟢 Active | 2025-11-14 | 2026-03-14 | 2026-05-14 |
+| [Juju 2.9 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | <span style="color:green">●</span> Active | 2021-04-28 |  | 2035-04-28 |
+| [Juju 3.0](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2022-10-22 | 2023-02-22 | 2023-04-23 |
+| [Juju 3.1](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2023-02-06 | 2023-06-06 | 2023-08-06 |
+| [Juju 3.2](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2023-05-26 | 2023-09-26 | 2023-11-06 |
+| [Juju 3.3](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2023-11-10 | 2024-03-10 | 2024-05-10 |
+| [Juju 3.4](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2024-02-15 | 2024-06-15 | 2024-08-15 |
+| [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2024-05-07 | 2024-09-07 | 2024-11-07 |
+| [Juju 3.6 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/) | <span style="color:green">●</span> Active | 2024-12-11 |  | 2039-04-11 |
+| [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | <span style="color:green">●</span> Active | 2025-11-14 | 2026-03-14 | 2026-05-14 |
 
 ### Ops
 
 | Version | Status | Release Date | End of Life |
 |---------|--------|--------------|-------------|
-| Ops 1.5 | ❌ EOL | 2020-10-31 | 2024-04-26 |
-| Ops 2.23 | 🔔 Upgrade soon | 2023-01-25 | 2026-07-30 |
-| Ops 3.5 | 🟢 Active | 2025-12-18 | 2026-12-18 |
+| Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
+| Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2026-07-30 |
+| Ops 3.5 | <span style="color:green">●</span> Active | 2025-12-18 | 2026-12-18 |
 
 **Legend:**
-- 🟢 Active: Currently supported
-- 🔔 Upgrade soon: Supported but approaching EOL
-- ❌ EOL: End of life, no longer supported
+- <span style="color:green">●</span> Active: Currently supported
+- <span style="color:orange">⚠</span> Upgrade soon: Supported but approaching EOL
+- <span style="color:red">✗</span> EOL: End of life, no longer supported
