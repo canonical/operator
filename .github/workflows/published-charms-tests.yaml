@@ -241,7 +241,7 @@ jobs:
             exit 1
           fi
 
-      - name: Show installed ops package versions
+      - name: Show downloaded ops package versions
         working-directory: ${{ matrix.charm-root }}
         run: |
           echo "=== Wheel files downloaded ==="
