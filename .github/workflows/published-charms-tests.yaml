@@ -210,8 +210,8 @@ jobs:
         run: |
           set -xueo pipefail
           # Get the absolute paths to the wheels
-          ops_wheel="$(cd .. && ls $(pwd)/operator-wheels/ops-[0-9]*.whl)"
-          ops_scenario_wheel="$(cd .. && ls $(pwd)/operator-wheels/ops_scenario-*.whl)"
+          ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
+          ops_scenario_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops_scenario-*.whl)"
           if [ -e "test-requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" test-requirements.txt
             echo -e "\n${ops_wheel}" >> test-requirements.txt
