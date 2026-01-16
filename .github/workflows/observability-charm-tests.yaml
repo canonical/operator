@@ -68,6 +68,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upgrade pytest-interface-tester for ops-scenario compatibility
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          if [ -e "uv.lock" ]; then
+            # Upgrade only pytest-interface-tester to a version compatible with new ops-scenario
+            uv add "pytest-interface-tester>=3.4" --optional dev --upgrade-package pytest-interface-tester || echo "Could not upgrade pytest-interface-tester"
+          fi
+
       - name: Show installed ops package versions
         if: ${{ !(matrix.disabled) }}
         run: |
