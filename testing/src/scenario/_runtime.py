@@ -41,7 +41,11 @@ def _remove_private_address_from_databag(databag: dict[str, str]) -> None:
     """Remove private-address from a databag in-place.
     
     This is used to simulate Juju 4.0+ behavior where private-address
-    is not included in the default relation databag.
+    is not included in the default relation databag. If the key does not
+    exist, this function does nothing (safe to call on any databag).
+    
+    Args:
+        databag: The databag dictionary to modify in-place.
     """
     databag.pop('private-address', None)
 

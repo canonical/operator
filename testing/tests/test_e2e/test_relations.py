@@ -778,6 +778,33 @@ def test_peer_relation_units_does_not_contain_this_unit():
     assert rel_out.local_unit_data.get('this-unit') == '<ops.model.Unit charm-name/0>'
 
 
+def _is_juju4_or_later(juju_version: str) -> bool:
+    """Helper to check if Juju version is 4.0 or later."""
+    return int(juju_version.split('.')[0]) >= 4
+
+
+def _check_databag_has_private_address(
+    databag: dict[str, str],
+    juju_version: str,
+) -> None:
+    """Helper to assert private-address presence based on Juju version.
+    
+    Args:
+        databag: The databag to check.
+        juju_version: The Juju version string.
+    """
+    if _is_juju4_or_later(juju_version):
+        # For Juju 4.0+, private-address should not be present
+        assert 'private-address' not in databag
+    else:
+        # For Juju 3.x, private-address should be present
+        assert 'private-address' in databag
+    
+    # ingress-address and egress-subnets should always be present
+    assert 'ingress-address' in databag
+    assert 'egress-subnets' in databag
+
+
 @pytest.mark.parametrize('juju_version', ['3.6.4', '4.0.0', '4.1.5'])
 def test_private_address_removed_for_juju4(mycharm, juju_version):
     """Test that private-address is removed from databags for Juju 4.0+."""
@@ -793,19 +820,7 @@ def test_private_address_removed_for_juju4(mycharm, juju_version):
         # Get the remote unit's data
         for unit in relation.units:
             remote_data = relation.data[unit]
-            
-            # Check if private-address is in the databag
-            juju_major = int(juju_version.split('.')[0])
-            if juju_major >= 4:
-                # For Juju 4.0+, private-address should not be present
-                assert 'private-address' not in remote_data
-            else:
-                # For Juju 3.x, private-address should be present
-                assert 'private-address' in remote_data
-            
-            # ingress-address and egress-subnets should always be present
-            assert 'ingress-address' in remote_data
-            assert 'egress-subnets' in remote_data
+            _check_databag_has_private_address(remote_data, juju_version)
     
     mycharm._call = check_databags
     
@@ -842,19 +857,7 @@ def test_private_address_removed_subordinate_relation_juju4(mycharm, juju_versio
         # Get the remote unit's data
         for unit in relation.units:
             remote_data = relation.data[unit]
-            
-            # Check if private-address is in the databag
-            juju_major = int(juju_version.split('.')[0])
-            if juju_major >= 4:
-                # For Juju 4.0+, private-address should not be present
-                assert 'private-address' not in remote_data
-            else:
-                # For Juju 3.x, private-address should be present
-                assert 'private-address' in remote_data
-            
-            # ingress-address and egress-subnets should always be present
-            assert 'ingress-address' in remote_data
-            assert 'egress-subnets' in remote_data
+            _check_databag_has_private_address(remote_data, juju_version)
     
     mycharm._call = check_databags
     
@@ -890,18 +893,7 @@ def test_private_address_removed_peer_relation_juju4(mycharm, juju_version):
         
         # Check local unit data
         local_data = relation.data[charm.unit]
-        
-        juju_major = int(juju_version.split('.')[0])
-        if juju_major >= 4:
-            # For Juju 4.0+, private-address should not be present
-            assert 'private-address' not in local_data
-        else:
-            # For Juju 3.x, private-address should be present
-            assert 'private-address' in local_data
-        
-        # ingress-address and egress-subnets should always be present
-        assert 'ingress-address' in local_data
-        assert 'egress-subnets' in local_data
+        _check_databag_has_private_address(local_data, juju_version)
     
     mycharm._call = check_databags
     
