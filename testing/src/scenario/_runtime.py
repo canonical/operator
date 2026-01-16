@@ -37,6 +37,15 @@ logger = scenario_logger.getChild('runtime')
 RUNTIME_MODULE = Path(__file__).parent
 
 
+def _remove_private_address_from_databag(databag: dict[str, str]) -> None:
+    """Remove private-address from a databag in-place.
+    
+    This is used to simulate Juju 4.0+ behavior where private-address
+    is not included in the default relation databag.
+    """
+    databag.pop('private-address', None)
+
+
 class Runtime:
     """Charm runtime wrapper.
 
@@ -297,6 +306,23 @@ class Runtime:
 
         # we make a copy to avoid mutating the input state
         output_state = copy.deepcopy(state)
+
+        # Remove private-address from relation databags for Juju 4.0+
+        juju_major_version = int(self._juju_version.split('.')[0])
+        if juju_major_version >= 4:
+            for relation in output_state.relations:
+                # Remove from local unit data
+                _remove_private_address_from_databag(relation.local_unit_data)
+                
+                # Remove from remote unit(s) data based on relation type
+                if isinstance(relation, Relation):
+                    for unit_data in relation.remote_units_data.values():
+                        _remove_private_address_from_databag(unit_data)
+                elif isinstance(relation, SubordinateRelation):
+                    _remove_private_address_from_databag(relation.remote_unit_data)
+                elif isinstance(relation, PeerRelation):
+                    for peer_data in relation.peers_data.values():
+                        _remove_private_address_from_databag(peer_data)
 
         logger.info(' - generating virtual charm root')
         with self._virtual_charm_root() as temporary_charm_root:

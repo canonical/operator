@@ -776,3 +776,136 @@ def test_peer_relation_units_does_not_contain_this_unit():
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
     assert rel_out.local_unit_data.get('this-unit') == '<ops.model.Unit charm-name/0>'
+
+
+@pytest.mark.parametrize('juju_version', ['3.6.4', '4.0.0', '4.1.5'])
+def test_private_address_removed_for_juju4(mycharm, juju_version):
+    """Test that private-address is removed from databags for Juju 4.0+."""
+    
+    def check_databags(charm: CharmBase, event: RelationEvent):
+        # Check the relation databag through the charm's perspective
+        relation = event.relation
+        
+        # Get the remote unit's data
+        for unit in relation.units:
+            remote_data = relation.data[unit]
+            
+            # Check if private-address is in the databag
+            juju_major = int(juju_version.split('.')[0])
+            if juju_major >= 4:
+                # For Juju 4.0+, private-address should not be present
+                assert 'private-address' not in remote_data
+            else:
+                # For Juju 3.x, private-address should be present
+                assert 'private-address' in remote_data
+            
+            # ingress-address and egress-subnets should always be present
+            assert 'ingress-address' in remote_data
+            assert 'egress-subnets' in remote_data
+    
+    mycharm._call = check_databags
+    
+    relation = Relation(
+        endpoint='foo',
+        interface='foo',
+        remote_app_name='remote',
+    )
+    
+    ctx = Context(
+        mycharm,
+        meta={
+            'name': 'local',
+            'requires': {'foo': {'interface': 'foo'}},
+        },
+        juju_version=juju_version,
+    )
+    
+    ctx.run(ctx.on.relation_changed(relation), State(relations={relation}))
+
+
+@pytest.mark.parametrize('juju_version', ['3.6.4', '4.0.0', '4.1.5'])
+def test_private_address_removed_subordinate_relation_juju4(mycharm, juju_version):
+    """Test that private-address is removed from subordinate relation databags for Juju 4.0+."""
+    
+    def check_databags(charm: CharmBase, event: RelationEvent):
+        # Check the subordinate relation databag
+        relation = event.relation
+        
+        # Get the remote unit's data
+        for unit in relation.units:
+            remote_data = relation.data[unit]
+            
+            # Check if private-address is in the databag
+            juju_major = int(juju_version.split('.')[0])
+            if juju_major >= 4:
+                # For Juju 4.0+, private-address should not be present
+                assert 'private-address' not in remote_data
+            else:
+                # For Juju 3.x, private-address should be present
+                assert 'private-address' in remote_data
+            
+            # ingress-address and egress-subnets should always be present
+            assert 'ingress-address' in remote_data
+            assert 'egress-subnets' in remote_data
+    
+    mycharm._call = check_databags
+    
+    relation = SubordinateRelation(
+        endpoint='foo',
+        interface='foo',
+        remote_app_name='remote',
+    )
+    
+    ctx = Context(
+        mycharm,
+        meta={
+            'name': 'local',
+            'requires': {'foo': {'interface': 'foo', 'scope': 'container'}},
+        },
+        juju_version=juju_version,
+    )
+    
+    ctx.run(ctx.on.relation_changed(relation), State(relations={relation}))
+
+
+@pytest.mark.parametrize('juju_version', ['3.6.4', '4.0.0', '4.1.5'])
+def test_private_address_removed_peer_relation_juju4(mycharm, juju_version):
+    """Test that private-address is removed from peer relation databags for Juju 4.0+."""
+    
+    def check_databags(charm: CharmBase, event: RelationEvent):
+        # Check the peer relation databag
+        relation = event.relation
+        
+        # Check local unit data
+        local_data = relation.data[charm.unit]
+        
+        juju_major = int(juju_version.split('.')[0])
+        if juju_major >= 4:
+            # For Juju 4.0+, private-address should not be present
+            assert 'private-address' not in local_data
+        else:
+            # For Juju 3.x, private-address should be present
+            assert 'private-address' in local_data
+        
+        # ingress-address and egress-subnets should always be present
+        assert 'ingress-address' in local_data
+        assert 'egress-subnets' in local_data
+    
+    mycharm._call = check_databags
+    
+    # Create peer relation with peers_data to test peer databag cleanup
+    relation = PeerRelation(
+        endpoint='foo',
+        peers_data={1: _DEFAULT_JUJU_DATABAG.copy()},
+    )
+    
+    ctx = Context(
+        mycharm,
+        meta={
+            'name': 'local',
+            'peers': {'foo': {'interface': 'foo'}},
+        },
+        juju_version=juju_version,
+    )
+    
+    ctx.run(ctx.on.relation_changed(relation), State(relations={relation}))
