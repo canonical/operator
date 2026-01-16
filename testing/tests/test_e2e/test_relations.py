@@ -787,7 +787,10 @@ def _check_databag_has_private_address(
     databag: dict[str, str],
     juju_version: str,
 ) -> None:
-    """Helper to assert private-address presence based on Juju version.
+    """Assert that private-address presence matches expected behavior for the given Juju version.
+    
+    Verifies that private-address is present in Juju 3.x but not in Juju 4.0+.
+    Also checks that ingress-address and egress-subnets are always present.
     
     Args:
         databag: The databag to check.
