@@ -76,27 +76,9 @@ jobs:
             uv add "pytest-interface-tester>=3.4" --optional dev --upgrade-package pytest-interface-tester || echo "Could not upgrade pytest-interface-tester"
           fi
 
-      - name: Show installed ops package versions
-        if: ${{ !(matrix.disabled) }}
-        run: |
-          echo "=== Installed ops-related packages ==="
-          uv pip list | grep -E "(ops|scenario|tracing)" || echo "No ops packages found"
-          echo ""
-          echo "=== Wheel files downloaded ==="
-          ls -lh operator-wheels/*.whl || echo "No wheel files found"
-          echo ""
-          echo "=== Package versions from pyproject.toml ==="
-          grep -A 5 "dependencies =" pyproject.toml || echo "No dependencies section found"
-
       - name: Run the charm's unit tests
         if: ${{ !(matrix.disabled) }}
         run: tox -vve unit
-
-      - name: Show all installed dependencies in test environment
-        if: ${{ !(matrix.disabled) && !cancelled() }}
-        run: |
-          echo "=== All installed packages in unit test environment ==="
-          uv pip freeze || .tox/unit/bin/pip list || echo "Could not list packages from test environment"
 
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario
