@@ -59,9 +59,10 @@ jobs:
             ops_scenario_wheel="$(ls operator-wheels/ops_scenario-*.whl)"
             ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
             # Add ops first, then ops-scenario (for testing), then ops-tracing
-            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
-            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit
-            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
+            # Use --upgrade-package to ensure the wheel versions are used, not existing pinned versions
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops
+            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-scenario
+            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-tracing
           else
             echo "Error: no uv.lock file found"
             exit 1
