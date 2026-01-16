@@ -52,6 +52,7 @@ jobs:
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\n${ops_wheel}" >> requirements.txt
           else
+            poetry remove ops --lock
             poetry add "${ops_wheel}" --lock
           fi
 
