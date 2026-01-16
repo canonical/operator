@@ -783,6 +783,10 @@ def test_private_address_removed_for_juju4(mycharm, juju_version):
     """Test that private-address is removed from databags for Juju 4.0+."""
     
     def check_databags(charm: CharmBase, event: RelationEvent):
+        # Only check relation events
+        if not isinstance(event, RelationEvent):
+            return
+            
         # Check the relation databag through the charm's perspective
         relation = event.relation
         
@@ -828,6 +832,10 @@ def test_private_address_removed_subordinate_relation_juju4(mycharm, juju_versio
     """Test that private-address is removed from subordinate relation databags for Juju 4.0+."""
     
     def check_databags(charm: CharmBase, event: RelationEvent):
+        # Only check relation events
+        if not isinstance(event, RelationEvent):
+            return
+            
         # Check the subordinate relation databag
         relation = event.relation
         
@@ -873,6 +881,10 @@ def test_private_address_removed_peer_relation_juju4(mycharm, juju_version):
     """Test that private-address is removed from peer relation databags for Juju 4.0+."""
     
     def check_databags(charm: CharmBase, event: RelationEvent):
+        # Only check relation events
+        if not isinstance(event, RelationEvent):
+            return
+            
         # Check the peer relation databag
         relation = event.relation
         
