@@ -254,8 +254,28 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
-exclude = ["tracing/*"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+exclude = [
+    "tracing/*",
+    "testing/tests/helpers.py",
+    "testing/tests/test_charm_spec_autoload.py",
+    "testing/tests/test_consistency_checker.py",
+    "testing/tests/test_context_on.py",
+    "testing/tests/test_context.py",
+    "testing/tests/test_emitted_events_util.py",
+    "testing/tests/test_plugin.py",
+    "testing/tests/test_runtime.py",
+    "testing/tests/test_e2e/test_secrets.py",
+    "testing/tests/test_e2e/test_relations.py",
+    "testing/tests/test_e2e/test_trace_data.py",
+    "testing/tests/test_e2e/test_juju_log.py",
+    "testing/tests/test_e2e/test_status.py",
+    "testing/tests/test_e2e/test_storage.py",
+    "testing/tests/test_e2e/test_manager.py",
+    "testing/tests/test_e2e/test_ports.py",
+    "testing/tests/test_e2e/test_rubbish_events.py",
+    "testing/tests/test_e2e/test_pebble.py",
+]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
