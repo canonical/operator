@@ -54,6 +54,8 @@ Note that:
 - The only data shared in plain text is the secret ID (a locator URI). The secret ID can be publicly shared. Juju will ensure that only remote apps/units to which the secret has explicitly been granted by the owner will be able to fetch the actual secret payload from that ID.
 - The secret needs to be granted to a remote entity (app or unit), and that always goes via a relation instance. By passing a relation to `grant` (in this case the event's relation), we are explicitly declaring the scope of the secret -- its lifetime will be bound to that of this relation instance.
 
+If the relation is a cross-model relation, Juju only allows the offering application to grant access to secrets.
+
 > See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
