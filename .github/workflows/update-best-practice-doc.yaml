@@ -27,7 +27,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: python .github/update-best-practice-table.py --path-to-charmcraft='${{ github.workspace }}/charmcraft' > docs/reuse/best-practices.txt
-        shell: bash
         working-directory: operator
 
       - run: |
