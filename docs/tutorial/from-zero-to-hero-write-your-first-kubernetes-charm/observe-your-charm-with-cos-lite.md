@@ -230,8 +230,8 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
 ```
 
@@ -284,9 +284,9 @@ Now switch back to the charm model and integrate your charm with the exposed end
 
 ```text
 juju switch testing
-juju integrate demo-api-charm admin/cos-lite.grafana
-juju integrate demo-api-charm admin/cos-lite.loki
-juju integrate demo-api-charm admin/cos-lite.prometheus
+juju integrate fastapi-demo admin/cos-lite.grafana
+juju integrate fastapi-demo admin/cos-lite.loki
+juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
 <a href="#heading--access-your-applications-from-the-host-machine"><h3 id="heading--access-your-applications-from-the-host-machine">Access your applications from the host machine</h3></a>
