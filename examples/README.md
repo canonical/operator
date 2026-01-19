@@ -22,5 +22,5 @@ This directory contains charms that you can pack and deploy locally, to help lea
 
     ```
     charmcraft pack
-    juju deploy ./httpbin-demo_ubuntu-22.04-amd64.charm --resource httpbin-image=kennethreitz/httpbin
+    juju deploy ./httpbin-demo_amd64.charm --resource httpbin-image=kennethreitz/httpbin
     ```
