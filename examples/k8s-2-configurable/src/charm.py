@@ -38,7 +38,7 @@ class FastAPIConfig:
     def __post_init__(self):
         """Validate the configuration."""
         if self.server_port == 22:
-            raise ValueError('Invalid port number, 22 is reserved for SSH')
+            raise ValueError("Invalid port number, 22 is reserved for SSH")
 
 
 class FastAPIDemoCharm(ops.CharmBase):
@@ -47,9 +47,9 @@ class FastAPIDemoCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
         # See 'containers' in charmcraft.yaml.
-        self.container = self.unit.get_container('demo-server')
-        self.pebble_service_name = 'fastapi-service'
-        framework.observe(self.on['demo-server'].pebble_ready, self._on_demo_server_pebble_ready)
+        self.container = self.unit.get_container("demo-server")
+        self.pebble_service_name = "fastapi-service"
+        framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
 
     def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
@@ -71,16 +71,16 @@ class FastAPIDemoCharm(ops.CharmBase):
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+        self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
         try:
             config = self.load_config(FastAPIConfig)
         except ValueError as e:
-            logger.error('Configuration error: %s', e)
+            logger.error("Configuration error: %s", e)
             self.unit.status = ops.BlockedStatus(str(e))
             return
         try:
             self.container.add_layer(
-                'fastapi_demo', self._get_pebble_layer(config.server_port), combine=True
+                "fastapi_demo", self._get_pebble_layer(config.server_port), combine=True
             )
             logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
@@ -91,33 +91,33 @@ class FastAPIDemoCharm(ops.CharmBase):
 
             self.unit.status = ops.ActiveStatus()
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-            logger.info('Unable to connect to Pebble: %s', e)
-            self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+            logger.info("Unable to connect to Pebble: %s", e)
+            self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
 
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""
-        command = ' '.join(
+        command = " ".join(
             [
-                'uvicorn',
-                'api_demo_server.app:app',
-                '--host=0.0.0.0',
-                f'--port={port}',
+                "uvicorn",
+                "api_demo_server.app:app",
+                "--host=0.0.0.0",
+                f"--port={port}",
             ]
         )
         pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
+            "summary": "FastAPI demo service",
+            "description": "pebble config layer for FastAPI demo server",
+            "services": {
                 self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
+                    "override": "replace",
+                    "summary": "fastapi demo",
+                    "command": command,
+                    "startup": "enabled",
                 }
             },
         }
         return ops.pebble.Layer(pebble_layer)
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     ops.main(FastAPIDemoCharm)

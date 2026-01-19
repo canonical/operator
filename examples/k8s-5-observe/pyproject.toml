@@ -11,7 +11,6 @@ log_cli_level = "INFO"
 
 # Linting tools configuration
 [tool.ruff]
-format.quote-style = "single"  # Remove this when switching the tutorial to charmcraft init.
 line-length = 99
 lint.select = ["E", "W", "F", "C", "N", "D", "I001"]
 lint.ignore = [
