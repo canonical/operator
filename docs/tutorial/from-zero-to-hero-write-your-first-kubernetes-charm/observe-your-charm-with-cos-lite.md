@@ -205,22 +205,6 @@ Now, in your `src` directory, create a subdirectory called `grafana_dashboards` 
 
 ```
 
-## Specify binary packages required to build
-
-When packing a charm, Charmcraft builds the charm's dependencies from source.
-
-Charmcraft currently encounters an error when building the `cos-lite` packages from source. As a workaround, add a new `parts` section in your `charmcraft.yaml` file:
-
-```yaml
-# Workaround for a build error.
-parts:
-  charm:
-    charm-binary-python-packages:
-      - cosl
-```
-
-You wouldn't usually need to use this workaround in a charm. We're planning to update this tutorial to modernise the charm and remove the workaround.
-
 ## Validate your charm
 
 Open a shell in your Multipass Ubuntu VM, navigate inside your project directory, and run all of the following.
