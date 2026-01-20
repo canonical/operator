@@ -21,6 +21,7 @@ requires-python = ">=3.10"
 # You should include the dependencies of the code in src/. You should also include the
 # dependencies of any charmlibs that the charm uses (copy the dependencies from PYDEPS).
 dependencies = [
+    "cosl>=0.0.53",
     "ops>=3,<4",
 ]
 
