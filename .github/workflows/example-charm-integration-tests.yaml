@@ -46,6 +46,7 @@ jobs:
         dir:
           - examples/httpbin-demo
           - examples/k8s-1-minimal
+          - examples/k8s-2-configurable
     steps:
       - uses: actions/checkout@v6
         with:
@@ -79,7 +80,6 @@ jobs:
       fail-fast: false
       matrix:
         dir:
-          - examples/k8s-2-configurable
           - examples/k8s-3-postgresql
           - examples/k8s-4-action
           - examples/k8s-5-observe
