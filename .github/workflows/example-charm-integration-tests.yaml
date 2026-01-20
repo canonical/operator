@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '50 15 * * 2'  # 15:50 UTC Tuesdays
+  pull_request:
 
 permissions: {}
 
