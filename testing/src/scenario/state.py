@@ -957,11 +957,7 @@ class CheckInfo:
     ):
         object.__setattr__(self, 'name', name)
         if level is not None:
-            try:
-                level = pebble.CheckLevel(level)
-            except ValueError:
-                # preserve the existing behaviour of not crashing on arbitrary strings
-                logger.error('%s is not a valid Pebble check level.', level)
+            level = pebble.CheckLevel(level)
         object.__setattr__(self, 'level', level)
         object.__setattr__(self, 'startup', startup)
         object.__setattr__(self, 'status', status)
