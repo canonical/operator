@@ -109,12 +109,12 @@ Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider`
 try:
     config = self.load_config(FastAPIConfig)
 except ValueError as e:
-    logger.warning('Unable to add metrics: invalid configuration: %s', e)
+    logger.warning("Unable to add metrics: invalid configuration: %s", e)
 else:
     self._prometheus_scraping = MetricsEndpointProvider(
         self,
-        relation_name='metrics-endpoint',
-        jobs=[{'static_configs': [{'targets': [f'*:{config.server_port}']}]}],
+        relation_name="metrics-endpoint",
+        jobs=[{"static_configs": [{"targets": [f"*:{config.server_port}"]}]}],
         refresh_event=self.on.config_changed,
     )
 ```
@@ -154,7 +154,7 @@ Then, in your charm's `__init__` method, initialise the `LogForwarder` instance 
 
 ```python
 # Enable pushing application logs to Loki.
-self._logging = LogForwarder(self, relation_name='logging')
+self._logging = LogForwarder(self, relation_name="logging")
 ```
 
 Congratulations, your charm can now also integrate with Loki!
@@ -192,7 +192,7 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 ```python
 # Provide grafana dashboards over a relation interface.
 self._grafana_dashboards = GrafanaDashboardProvider(
-    self, relation_name='grafana-dashboard'
+    self, relation_name="grafana-dashboard"
 )
 ```
 

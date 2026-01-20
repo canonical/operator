@@ -54,7 +54,7 @@ class FastAPIConfig:
     def __post_init__(self):
         """Validate the configuration."""
         if self.server_port == 22:
-            raise ValueError('Invalid port number, 22 is reserved for SSH')
+            raise ValueError("Invalid port number, 22 is reserved for SSH")
 ```
 
 Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
@@ -89,7 +89,7 @@ In the `__init__` function, add a new attribute to define a container object for
 
 ```python
 # See 'containers' in charmcraft.yaml.
-self.container = self.unit.get_container('demo-server')
+self.container = self.unit.get_container("demo-server")
 ```
 
 Create a new method, as below. This method will get the current Pebble layer configuration and compare the new and the existing service definitions -- if they differ, it will update the layer and restart the service.
@@ -108,15 +108,17 @@ def _replan_workload(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
     try:
         config = self.load_config(FastAPIConfig)
     except ValueError as e:
-        logger.error('Configuration error: %s', e)
+        logger.error("Configuration error: %s", e)
         self.unit.status = ops.BlockedStatus(str(e))
         return
     try:
-        self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
+        self.container.add_layer(
+            "fastapi_demo", self._get_pebble_layer(config.server_port), combine=True
+        )
         logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
         # Tell Pebble to incorporate the changes, including restarting the
@@ -126,8 +128,8 @@ def _replan_workload(self) -> None:
 
         self.unit.status = ops.ActiveStatus()
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-        logger.info('Unable to connect to Pebble: %s', e)
-        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+        logger.info("Unable to connect to Pebble: %s", e)
+        self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
@@ -137,23 +139,23 @@ Now, crucially, update the `_get_pebble_layer` method to make the layer definiti
 ```python
 def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
+    command = " ".join(
         [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            f"--port={port}",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
-        'summary': 'FastAPI demo service',
-        'description': 'pebble config layer for FastAPI demo server',
-        'services': {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {
             self.pebble_service_name: {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': command,
-                'startup': 'enabled',
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": command,
+                "startup": "enabled",
             }
         },
     }
@@ -237,20 +239,20 @@ First, we'll add a test that sets the port in the input state and asserts that t
 ```python
 def test_config_changed():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={'server-port': 8080},
+        config={"server-port": 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     command = (
         state_out.get_container(container.name)
-        .layers['fastapi_demo']
-        .services['fastapi-service']
+        .layers["fastapi_demo"]
+        .services["fastapi-service"]
         .command
     )
-    assert '--port=8080' in command
+    assert "--port=8080" in command
 ```
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
@@ -258,15 +260,15 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={'server-port': 22},
+        config={"server-port": 22},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        'Invalid port number, 22 is reserved for SSH'
+        "Invalid port number, 22 is reserved for SSH"
     )
 ```
 

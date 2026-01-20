@@ -126,7 +126,7 @@ In the `__init__` method, define a new instance of the 'DatabaseRequires' class.
 ```python
 # The 'relation_name' comes from the 'charmcraft.yaml file'.
 # The 'database_name' is the name of the database that our application requires.
-self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
+self.database = DatabaseRequires(self, relation_name="database", database_name="names_db")
 ```
 
 Next, add event observers for all the database events:
@@ -160,10 +160,10 @@ def get_app_environment(self) -> dict[str, str]:
     if not db_data:
         return {}
     return {
-        'DEMO_SERVER_DB_HOST': db_data['db_host'],
-        'DEMO_SERVER_DB_PORT': db_data['db_port'],
-        'DEMO_SERVER_DB_USER': db_data['db_username'],
-        'DEMO_SERVER_DB_PASSWORD': db_data['db_password'],
+        "DEMO_SERVER_DB_HOST": db_data["db_host"],
+        "DEMO_SERVER_DB_PORT": db_data["db_port"],
+        "DEMO_SERVER_DB_USER": db_data["db_username"],
+        "DEMO_SERVER_DB_PASSWORD": db_data["db_password"],
     }
 ```
 
@@ -173,17 +173,17 @@ This method depends on the following method, which extracts the database authent
 def fetch_database_relation_data(self) -> dict[str, str]:
     """Retrieve relation data from a database."""
     relations = self.database.fetch_relation_data()
-    logger.debug('Got following database data: %s', relations)
+    logger.debug("Got following database data: %s", relations)
     for data in relations.values():
         if not data:
             continue
-        logger.info('New database endpoint is %s', data['endpoints'])
-        host, port = data['endpoints'].split(':')
+        logger.info("New database endpoint is %s", data["endpoints"])
+        host, port = data["endpoints"].split(":")
         db_data = {
-            'db_host': host,
-            'db_port': port,
-            'db_username': data['username'],
-            'db_password': data['password'],
+            "db_host": host,
+            "db_port": port,
+            "db_username": data["username"],
+            "db_password": data["password"],
         }
         return db_data
     return {}
@@ -209,16 +209,16 @@ def _replan_workload(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
     try:
         config = self.load_config(FastAPIConfig)
     except ValueError as e:
-        logger.error('Configuration error: %s', e)
+        logger.error("Configuration error: %s", e)
         return
     env = self.get_app_environment()
     try:
         self.container.add_layer(
-            'fastapi_demo',
+            "fastapi_demo",
             self._get_pebble_layer(config.server_port, env),
             combine=True,
         )
@@ -229,7 +229,7 @@ def _replan_workload(self) -> None:
         self.container.replan()
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-        logger.info('Unable to connect to Pebble: %s', e)
+        logger.info("Unable to connect to Pebble: %s", e)
 ```
 
 We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
@@ -239,24 +239,24 @@ Next, update `_get_pebble_layer()` to put the environment variables in the Pebbl
 ```python
 def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
+    command = " ".join(
         [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            f"--port={port}",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
-        'summary': 'FastAPI demo service',
-        'description': 'pebble config layer for FastAPI demo server',
-        'services': {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {
             self.pebble_service_name: {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': command,
-                'startup': 'enabled',
-                'environment': environment,
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": command,
+                "startup": "enabled",
+                "environment": environment,
             }
         },
     }
@@ -294,19 +294,19 @@ def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         self.load_config(FastAPIConfig)
     except ValueError as e:
         event.add_status(ops.BlockedStatus(str(e)))
-    if not self.model.get_relation('database'):
+    if not self.model.get_relation("database"):
         # We need the user to do 'juju integrate'.
-        event.add_status(ops.BlockedStatus('Waiting for database relation'))
+        event.add_status(ops.BlockedStatus("Waiting for database relation"))
     elif not self.database.fetch_relation_data():
         # We need the charms to finish integrating.
-        event.add_status(ops.WaitingStatus('Waiting for database relation'))
+        event.add_status(ops.WaitingStatus("Waiting for database relation"))
     try:
         status = self.container.get_service(self.pebble_service_name)
     except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-        event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
+        event.add_status(ops.MaintenanceStatus("Waiting for Pebble in workload container"))
     else:
         if not status.is_running():
-            event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
+            event.add_status(ops.MaintenanceStatus("Waiting for the service to start up"))
     # If nothing is wrong, then the status is active.
     event.add_status(ops.ActiveStatus())
 ```
@@ -318,7 +318,7 @@ self.unit.status = ops.ActiveStatus()
 ```
 
 ```python
-self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
 ```
 
 ```python
@@ -417,16 +417,16 @@ Now that our charm uses `fetch_database_relation_data` to extract database authe
 def test_relation_data():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint='database',
-        interface='postgresql_client',
-        remote_app_name='postgresql-k8s',
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
         remote_app_data={
-            'endpoints': 'example.com:5432',
-            'username': 'foo',
-            'password': 'bar',
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
         },
     )
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -435,13 +435,13 @@ def test_relation_data():
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers['fastapi_demo'].services[
-        'fastapi-service'
+    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
+        "fastapi-service"
     ].environment == {
-        'DEMO_SERVER_DB_HOST': 'example.com',
-        'DEMO_SERVER_DB_PORT': '5432',
-        'DEMO_SERVER_DB_USER': 'foo',
-        'DEMO_SERVER_DB_PASSWORD': 'bar',
+        "DEMO_SERVER_DB_HOST": "example.com",
+        "DEMO_SERVER_DB_PORT": "5432",
+        "DEMO_SERVER_DB_USER": "foo",
+        "DEMO_SERVER_DB_PASSWORD": "bar",
     }
 ```
 
@@ -450,7 +450,7 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```python
 def test_no_database_blocked():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -458,14 +458,14 @@ def test_no_database_blocked():
 
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
-    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 ```
 
 Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
 
 ```python
     # Check the unit is blocked:
-    assert state_out.unit_status == testing.BlockedStatus('Waiting for database relation')
+    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 ```
 
 Now run `tox -e unit` to make sure all test cases pass.
@@ -483,21 +483,21 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
-APP_NAME = METADATA['name']
+METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+APP_NAME = METADATA["name"]
 
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Deploy the charm under test.
 
     Assert on the unit status before any relations/configurations take place.
     """
     resources = {
-        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
+        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 ```
 
@@ -511,8 +511,8 @@ def test_database_integration(juju: jubilant.Juju):
 
     Assert that the charm is active if the integration is established.
     """
-    juju.deploy('postgresql-k8s', channel='14/stable', trust=True)
-    juju.integrate(APP_NAME, 'postgresql-k8s')
+    juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
+    juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
 ```
 

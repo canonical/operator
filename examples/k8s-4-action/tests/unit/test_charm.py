@@ -152,3 +152,32 @@ def test_get_db_info_action():
         "db-host": "example.com",
         "db-port": "5432",
     }
+
+
+def test_get_db_info_action_show_password():
+    ctx = testing.Context(FastAPIDemoCharm)
+    relation = testing.Relation(
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
+        remote_app_data={
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
+        },
+    )
+    container = testing.Container(name="demo-server", can_connect=True)
+    state_in = testing.State(
+        containers={container},
+        relations={relation},
+        leader=True,
+    )
+
+    ctx.run(ctx.on.action("get-db-info", params={"show-password": True}), state_in)
+
+    assert ctx.action_results == {
+        "db-host": "example.com",
+        "db-port": "5432",
+        "db-username": "foo",
+        "db-password": "bar",
+    }
