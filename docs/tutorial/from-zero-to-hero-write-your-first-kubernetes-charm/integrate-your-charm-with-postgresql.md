@@ -107,10 +107,10 @@ from lib.charms.data_platform_libs...
 
 The former is not resolvable by default but everything works fine when the charm is deployed. Why? Because the `dispatch` script in the packed charm sets the `PYTHONPATH` environment variable to include the `lib` directory when it executes your `src/charm.py` code. This tells Python it can check the `lib` directory when looking for modules and packages at import time.
 
-If you're experiencing issues with your IDE or just trying to run the `charm.py` file on your own, make sure to set/update `PYTHONPATH` to include `lib` directory as well.
+If you're experiencing issues with your IDE, make sure to set/update `PYTHONPATH` to include the `lib` directory as well.
 
 ```bash
-# from the charm project directory (~/fastapi-demo), set
+# in your project directory (~/k8s-tutorial), set
 export PYTHONPATH=lib
 # or update
 export PYTHONPATH=lib:$PYTHONPATH
