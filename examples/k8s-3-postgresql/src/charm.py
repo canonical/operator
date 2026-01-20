@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
 logger = logging.getLogger(__name__)
 
 
-# Note that this configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm."""

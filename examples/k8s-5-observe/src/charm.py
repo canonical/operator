@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 logger = logging.getLogger(__name__)
 
 
-# Note that this configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm."""
@@ -53,7 +52,6 @@ class FastAPIConfig:
             raise ValueError("Invalid port number, 22 is reserved for SSH")
 
 
-# Note that this action is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class GetDbInfoAction:
     """Fetches database authentication information."""

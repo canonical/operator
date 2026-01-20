@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
 logger = logging.getLogger(__name__)
 
 
-# Note that this configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm."""
@@ -50,7 +49,6 @@ class FastAPIConfig:
             raise ValueError("Invalid port number, 22 is reserved for SSH")
 
 
-# Note that this action is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class GetDbInfoAction:
     """Fetches database authentication information."""
@@ -222,7 +220,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         for data in relations.values():
             if not data:
                 continue
-            logger.info("New PSQL database endpoint is %s", data["endpoints"])
+            logger.info("New database endpoint is %s", data["endpoints"])
             host, port = data["endpoints"].split(":")
             db_data = {
                 "db_host": host,
