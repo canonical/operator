@@ -24,11 +24,11 @@ This can be done by defining a charm configuration in a file called `charmcraft.
 
 In this part of the tutorial you will update your charm to make it possible for a charm user to change the port on which the workload application is available.
 
-## Define the configuration options
+## Define the configuration option
 
-To begin with, let's define the options that will be available for configuration.
+To begin with, let's define the option that will be available for configuration.
 
-In the `charmcraft.yaml` file you created earlier, define a configuration option, as below. The name of your configurable option is going to be `server-port`.  The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
+In `charmcraft.yaml`, replace the `config` block with:
 
 ```yaml
 config:
@@ -38,6 +38,8 @@ config:
       description: Default port on which FastAPI is available
       type: int
 ```
+
+This defines a configuration option called `server-port`. The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
 
 ## Define a configuration class
 
