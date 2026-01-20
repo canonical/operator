@@ -961,7 +961,6 @@ class CheckInfo:
         object.__setattr__(self, 'level', level)
         object.__setattr__(self, 'startup', startup)
         object.__setattr__(self, 'status', status)
-        # FIXME: is it safe to narrow the `successes` attribute type to `int` and convert it here?
         object.__setattr__(self, 'successes', successes)
         object.__setattr__(self, 'failures', failures)
         object.__setattr__(self, 'threshold', threshold if threshold is not None else 3)
