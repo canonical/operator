@@ -510,7 +510,6 @@ nitpick_ignore = [
     ('py:class', 'scenario.state.CharmType'),
     ('py:class', 'scenario.state._EntityStatus'),
     ('py:class', 'scenario.state._Event'),
-    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
