@@ -968,7 +968,7 @@ class CheckInfo:
         # FIXME: is it safe to narrow the `successes` attribute type to `int` and convert it here?
         object.__setattr__(self, 'successes', successes)
         object.__setattr__(self, 'failures', failures)
-        object.__setattr__(self, 'threshold', threshold if threshold is not None else 0)
+        object.__setattr__(self, 'threshold', threshold if threshold is not None else 3)
         if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
                 change_id = ''
