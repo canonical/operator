@@ -18,7 +18,7 @@ cd operator/examples/k8s-2-configurable
 
 A charm often requires or supports relations to other charms. For example, to make our application fully functional we need to connect it to the database. In this chapter of the tutorial we will update our charm so that it can be integrated with the existing [PostgreSQL charm](https://charmhub.io/postgresql-k8s?channel=14/stable).
 
-## Fetch the required database interface charm libraries
+## Fetch the required database interface charm library
 
 In `charmcraft.yaml`, add a `charm-libs` section before the `containers` section:
 
@@ -74,7 +74,7 @@ requires:
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.
 
-Import the database interface libraries and define database event handlers
+Import the database interface library and define database event handlers
 
 We now need to implement the logic that wires our application to a database. When a relation between our application and the data platform is formed, the provider side (that is: the data platform) will create a database for us and it will provide us with all the information we need to connect to it over the relation -- for example, username, password, host, port, and so on. On our side, we nevertheless still need to set the relevant environment variables to point to the database and restart the service.
 
@@ -84,7 +84,7 @@ To do so, we need to update our charm `src/charm.py` to do all of the following:
 * Define the event handlers that will be called during the relation lifecycle.
 * Bind the event handlers to the observed relation events.
 
-### Import the database interface libraries
+### Import the database interface library
 
 At the top of `src/charm.py`, import the database interfaces library:
 
