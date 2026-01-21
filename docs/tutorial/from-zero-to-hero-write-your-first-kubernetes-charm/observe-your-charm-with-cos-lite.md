@@ -51,7 +51,9 @@ Next, run the following command to download the libraries:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-Your charm directory should now include the structure below:
+You might see a warning that Charmcraft cannot get a keyring. You can ignore the warning.
+
+After Charmcraft has downloaded the libraries, you project's `lib` directory contains:
 
 ```text
 lib
