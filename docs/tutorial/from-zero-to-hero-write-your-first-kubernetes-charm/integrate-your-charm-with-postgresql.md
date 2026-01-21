@@ -44,7 +44,7 @@ WARNING: Cannot get a keyring. Every store interaction that requires authenticat
 
 You won't need to authenticate with Charmhub, so you can ignore the warning.
 
-After Charmcraft has downloaded the library, your charm directory has the following structure:
+After Charmcraft has downloaded the library, your project directory contains a `lib` directory:
 
 ```text
 lib
