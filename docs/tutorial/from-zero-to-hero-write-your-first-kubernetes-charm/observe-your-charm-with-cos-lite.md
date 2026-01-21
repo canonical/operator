@@ -73,10 +73,6 @@ lib
             └── prometheus_scrape.py
 ```
 
-```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. To import a library in your code, use `charms.prometheus_k8s.v0.prometheus_scrape`, for example.
-```
-
 ## Integrate with Prometheus
 
 Follow the steps below to make your charm capable of integrating with the existing [Prometheus](https://charmhub.io/prometheus-k8s) charm. This will enable your charm user to collect real-time metrics about your application.
