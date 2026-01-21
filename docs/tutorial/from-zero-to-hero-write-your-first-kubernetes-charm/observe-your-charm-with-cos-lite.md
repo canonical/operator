@@ -75,6 +75,24 @@ lib
             └── prometheus_scrape.py
 ```
 
+## Add dependencies from libraries
+
+When you use libraries from Charmhub, you must check whether the libraries have any dependencies apart from `ops`.
+
+If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other library files, you'll see that some of the libraries depend on the `cosl` package:
+
+- `grafana_dashboard.py` specifies `PYDEPS = ["cosl >= 0.0.50"]`
+- `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
+- `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
+
+This means that you need to add `cosl>=0.0.53` to your charm's dependencies.
+
+To update your charm's dependencies in `pyproject.toml`, run:
+
+```text
+uv add 'cosl>=0.0.53'
+```
+
 ## Integrate with Prometheus
 
 Follow the steps below to make your charm capable of integrating with the existing [Prometheus](https://charmhub.io/prometheus-k8s) charm. This will enable your charm user to collect real-time metrics about your application.
