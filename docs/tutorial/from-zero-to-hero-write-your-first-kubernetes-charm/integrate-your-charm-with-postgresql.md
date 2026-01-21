@@ -36,7 +36,15 @@ Next, run the following command to download the library:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-Your charm directory should now contain the structure below:
+When you run this command, you might see a warning:
+
+```text
+WARNING: Cannot get a keyring. Every store interaction that requires authentication will require you to log in again.
+```
+
+You won't need to authenticate with Charmhub, so you can ignore the warning.
+
+After Charmcraft has downloaded the library, your charm directory has the following structure:
 
 ```text
 lib
