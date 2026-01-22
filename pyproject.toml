@@ -68,7 +68,7 @@ integration = [
 ]
 release = [
     "packaging~=24.0",
-    "pygithub~=2.6",
+    "pygithub~=2.8",
     "rich~=14.1",
 ]
 
