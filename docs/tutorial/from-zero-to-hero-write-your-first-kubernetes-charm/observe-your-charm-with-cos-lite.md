@@ -53,7 +53,7 @@ ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 
 You might see a warning that Charmcraft cannot get a keyring. You can ignore the warning.
 
-After Charmcraft has downloaded the libraries, you project's `lib` directory contains:
+After Charmcraft has downloaded the libraries, your project's `lib` directory contains:
 
 ```text
 lib
