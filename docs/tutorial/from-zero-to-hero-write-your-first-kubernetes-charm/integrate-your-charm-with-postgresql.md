@@ -18,7 +18,7 @@ cd operator/examples/k8s-2-configurable
 
 A charm often requires or supports relations to other charms. For example, to make our application fully functional we need to connect it to the database. In this chapter of the tutorial we will update our charm so that it can be integrated with the existing [PostgreSQL charm](https://charmhub.io/postgresql-k8s?channel=14/stable).
 
-## Fetch the required database interface charm libraries
+## Fetch the required database interface charm library
 
 In `charmcraft.yaml`, add a `charm-libs` section before the `containers` section:
 
@@ -36,7 +36,15 @@ Next, run the following command to download the library:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-Your charm directory should now contain the structure below:
+When you run this command, you might see a warning:
+
+```text
+WARNING: Cannot get a keyring. Every store interaction that requires authentication will require you to log in again.
+```
+
+You won't need to authenticate with Charmhub, so you can ignore the warning.
+
+After Charmcraft has downloaded the library, your project directory contains a `lib` directory:
 
 ```text
 lib
@@ -66,7 +74,7 @@ requires:
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.
 
-Import the database interface libraries and define database event handlers
+Import the database interface library and define database event handlers
 
 We now need to implement the logic that wires our application to a database. When a relation between our application and the data platform is formed, the provider side (that is: the data platform) will create a database for us and it will provide us with all the information we need to connect to it over the relation -- for example, username, password, host, port, and so on. On our side, we nevertheless still need to set the relevant environment variables to point to the database and restart the service.
 
@@ -76,7 +84,7 @@ To do so, we need to update our charm `src/charm.py` to do all of the following:
 * Define the event handlers that will be called during the relation lifecycle.
 * Bind the event handlers to the observed relation events.
 
-### Import the database interface libraries
+### Import the database interface library
 
 At the top of `src/charm.py`, import the database interfaces library:
 
@@ -107,10 +115,10 @@ from lib.charms.data_platform_libs...
 
 The former is not resolvable by default but everything works fine when the charm is deployed. Why? Because the `dispatch` script in the packed charm sets the `PYTHONPATH` environment variable to include the `lib` directory when it executes your `src/charm.py` code. This tells Python it can check the `lib` directory when looking for modules and packages at import time.
 
-If you're experiencing issues with your IDE or just trying to run the `charm.py` file on your own, make sure to set/update `PYTHONPATH` to include `lib` directory as well.
+If you're experiencing issues with your IDE, make sure to set/update `PYTHONPATH` to include the `lib` directory as well.
 
 ```bash
-# from the charm project directory (~/fastapi-demo), set
+# in your project directory (~/k8s-tutorial), set
 export PYTHONPATH=lib
 # or update
 export PYTHONPATH=lib:$PYTHONPATH

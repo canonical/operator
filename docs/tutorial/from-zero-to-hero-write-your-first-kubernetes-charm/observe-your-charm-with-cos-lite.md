@@ -51,7 +51,9 @@ Next, run the following command to download the libraries:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-Your charm directory should now include the structure below:
+You might see a warning that Charmcraft cannot get a keyring. You can ignore the warning.
+
+After Charmcraft has downloaded the libraries, your project's `lib` directory contains:
 
 ```text
 lib
@@ -73,8 +75,22 @@ lib
             └── prometheus_scrape.py
 ```
 
-```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. To import a library in your code, use `charms.prometheus_k8s.v0.prometheus_scrape`, for example.
+## Add dependencies from libraries
+
+When you use libraries from Charmhub, you must check whether the libraries have any dependencies apart from `ops`.
+
+If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other library files, you'll see that some of the libraries depend on the `cosl` package:
+
+- `grafana_dashboard.py` specifies `PYDEPS = ["cosl >= 0.0.50"]`
+- `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
+- `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
+
+This means that you need to add `cosl>=0.0.53` to your charm's dependencies.
+
+To update your charm's dependencies in `pyproject.toml`, run:
+
+```text
+uv add 'cosl>=0.0.53'
 ```
 
 ## Integrate with Prometheus
@@ -204,22 +220,6 @@ Now, in your `src` directory, create a subdirectory called `grafana_dashboards` 
 **How to build a Grafana dashboard is beyond the scope of this tutorial. However, if you'd like to get a quick idea:** The dashboard template file was created by manually building a Grafana dashboard using the Grafana web UI, then exporting it to a JSON file and updating the `datasource` `uid` for Prometheus and Loki from constant values to the dynamic variables `"${prometheusds}"` and `"${lokids}"`, respectively.
 
 ```
-
-## Specify binary packages required to build
-
-When packing a charm, Charmcraft builds the charm's dependencies from source.
-
-Charmcraft currently encounters an error when building the `cos-lite` packages from source. As a workaround, add a new `parts` section in your `charmcraft.yaml` file:
-
-```yaml
-# Workaround for a build error.
-parts:
-  charm:
-    charm-binary-python-packages:
-      - cosl
-```
-
-You wouldn't usually need to use this workaround in a charm. We're planning to update this tutorial to modernise the charm and remove the workaround.
 
 ## Validate your charm
 
