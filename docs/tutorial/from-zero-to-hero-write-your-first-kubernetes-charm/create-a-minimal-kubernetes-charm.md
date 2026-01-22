@@ -42,8 +42,6 @@ Charmcraft created several files, including:
 
 These files currently contain placeholder code and configuration.
 
-Charmcraft also created a module called `src/fastapi_demo.py`. We won't need this module. In general, it's a good place to put functions that interact with the running workload.
-
 ## Write your charm
 
 ### Edit the metadata
