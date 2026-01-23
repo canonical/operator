@@ -111,7 +111,7 @@ charmcraft pack
 juju refresh \
   --path="./fastapi-demo_amd64.charm" \
   fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
 ```
 
 Next, test that the basic action invocation works:
