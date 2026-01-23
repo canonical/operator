@@ -952,7 +952,7 @@ class CheckInfo:
         status: pebble.CheckStatus = pebble.CheckStatus.UP,
         successes: int | None = 0,
         failures: int = 0,
-        threshold: int | None = 3,
+        threshold: int = 3,
         change_id: pebble.ChangeID | None = None,
     ):
         object.__setattr__(self, 'name', name)
@@ -963,8 +963,6 @@ class CheckInfo:
         object.__setattr__(self, 'status', status)
         object.__setattr__(self, 'successes', successes)
         object.__setattr__(self, 'failures', failures)
-        if threshold is None:
-            threshold = 3
         object.__setattr__(self, 'threshold', threshold)
         if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
