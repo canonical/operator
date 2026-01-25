@@ -146,9 +146,9 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-The custom Pebble layer that you just added is defined in the  `self._get_pebble_layer()` method. Update this method to match your application, as follows:
+The custom Pebble layer that you just added is defined in the  `self._get_pebble_layer()` method. We'll now add this method.
 
-In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute :
+In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute:
 
 ```python
 self.pebble_service_name = "fastapi-service"
@@ -197,14 +197,9 @@ logger = logging.getLogger(__name__)
 
 ### Pack your charm
 
-First, ensure that you are inside the Multipass Ubuntu VM, in the `~/fastapi-demo` folder:
+Now go back to the terminal in your virtual machine and make sure that you're in the `~/fastapi-demo` directory.
 
-```
-multipass shell juju-sandbox-k8s
-cd ~/fastapi-demo
-```
-
-Now run `charmcraft pack` to create a `.charm` file that can be deployed with Juju. In our case, the file was named `fastapi-demo_amd64.charm`. Yours should be named similarly, though the name might vary slightly depending on your architecture.
+Then run `charmcraft pack` to create a `.charm` file that can be deployed with Juju. In our case, the file was named `fastapi-demo_amd64.charm`. Yours should be named similarly, though the name might vary slightly depending on your architecture.
 
 ```
 charmcraft pack
