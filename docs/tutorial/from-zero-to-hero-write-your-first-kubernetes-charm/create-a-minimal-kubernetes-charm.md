@@ -208,12 +208,6 @@ charmcraft pack
 
 ```{important}
 
-If packing failed - perhaps you forgot to make `charm.py` executable earlier - you may need to run `charmcraft clean` before re-running `charmcraft pack`. `charmcraft` will generally detect when files have changed, but will miss only file attributes changing.
-
-```
-
-```{important}
-
 **Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents.
 
 ```
