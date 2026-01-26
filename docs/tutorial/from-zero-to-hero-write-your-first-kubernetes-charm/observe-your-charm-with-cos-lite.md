@@ -267,7 +267,7 @@ Validate that the offers have been successfully created by running:
 juju find-offers cos-lite
 ```
 
-You should something similar to the output below:
+You should see something similar to the output below:
 
 ```text
 Store          URL                        Access  Interfaces
