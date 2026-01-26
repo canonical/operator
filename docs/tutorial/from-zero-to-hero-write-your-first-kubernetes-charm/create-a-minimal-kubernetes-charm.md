@@ -197,7 +197,7 @@ logger = logging.getLogger(__name__)
 
 ### Pack your charm
 
-Now go back to the terminal in your virtual machine and make sure that you're in the `~/fastapi-demo` directory.
+Now go back to your virtual machine and make sure that you're in the `~/fastapi-demo` directory.
 
 Then run `charmcraft pack` to create a `.charm` file that can be deployed with Juju. In our case, the file was named `fastapi-demo_amd64.charm`. Yours should be named similarly, though the name might vary slightly depending on your architecture.
 
@@ -239,7 +239,7 @@ When all units are settled down, you should see the output below, where `10.152.
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
-testing  concierge-k8s  k8s           3.6.12   unsupported  13:38:19+01:00
+testing  concierge-k8s  k8s           3.6.13   unsupported  13:38:19+01:00
 
 App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
 fastapi-demo           active      1  fastapi-demo             0  10.152.183.215  no
@@ -376,15 +376,16 @@ collected 1 item
 
 tests/unit/test_charm.py::test_pebble_layer PASSED
 
-============================================= 1 passed in 1.21s ==============================================
+============================================= 1 passed in 0.54s ==============================================
 unit: commands[1]> coverage report
-Name           Stmts   Miss Branch BrPart  Cover   Missing
-----------------------------------------------------------
-src/charm.py      18      0      0      0   100%
-----------------------------------------------------------
-TOTAL             18      0      0      0   100%
-  unit: OK (4.26=setup[0.23]+cmd[3.33,0.70] seconds)
-  congratulations :) (4.30 seconds)
+Name                  Stmts   Miss Branch BrPart  Cover   Missing
+-----------------------------------------------------------------
+src/charm.py             17      0      0      0   100%
+src/fastapi_demo.py       4      4      0      0     0%   9-20
+-----------------------------------------------------------------
+TOTAL                    21      4      0      0    81%
+  unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
+  congratulations :) (1.93 seconds)
 ```
 
 Congratulations, you have written your first unit test!

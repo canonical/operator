@@ -371,7 +371,7 @@ You should see both applications get to the `active` status, and also that the `
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
-testing  concierge-k8s  k8s           3.6.12   unsupported  13:50:39+01:00
+testing  concierge-k8s  k8s           3.6.13   unsupported  13:50:39+01:00
 
 App             Version  Status  Scale  Charm           Channel    Rev  Address         Exposed  Message
 fastapi-demo             active      1  fastapi-demo                 2  10.152.183.233  no
@@ -400,7 +400,7 @@ curl -X 'POST' \
 
 ```{important}
 
-If you changed the `server-port` config value in the previous section, don't forget to change it back to 8000 before doing this!
+If you changed the `server-port` config value in the previous chapter, don't forget to change it back to 8000 before doing this!
 ```
 
 Second, let's try to read something from the database by running:

@@ -16,8 +16,6 @@
 
 """Kubernetes charm for a demo app."""
 
-from __future__ import annotations
-
 import dataclasses
 import logging
 

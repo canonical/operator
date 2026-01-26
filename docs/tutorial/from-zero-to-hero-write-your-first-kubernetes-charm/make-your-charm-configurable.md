@@ -214,7 +214,7 @@ As expected, the application is indeed in the `blocked` state:
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
-testing  concierge-k8s  k8s           3.6.12   unsupported  18:19:24+01:00
+testing  concierge-k8s  k8s           3.6.13   unsupported  18:19:24+01:00
 
 App           Version  Status   Scale  Charm         Channel  Rev  Address         Exposed  Message
 fastapi-demo           blocked      1  fastapi-demo             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH

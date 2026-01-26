@@ -289,7 +289,7 @@ juju integrate fastapi-demo admin/cos-lite.loki
 juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
-<a href="#heading--access-your-applications-from-the-host-machine"><h3 id="heading--access-your-applications-from-the-host-machine">Access your applications from the host machine</h3></a>
+### Access your applications from the host machine
 
 ```{important}
 
@@ -306,15 +306,15 @@ This should result in an output similar to the one below:
 
 ```text
 Model     Controller     Cloud/Region  Version  SLA          Timestamp
-cos-lite  concierge-k8s  k8s           3.6.12   unsupported  18:05:07+01:00
+cos-lite  concierge-k8s  k8s           3.6.13   unsupported  18:05:07+01:00
 
 App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
-alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no
-catalogue              active      1  catalogue-k8s     1/stable        84  10.152.183.19   no
-grafana       9.5.3    active      1  grafana-k8s       1/stable       146  10.152.183.132  no
-loki          2.9.6    active      1  loki-k8s          1/stable       194  10.152.183.207  no
+alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       180  10.152.183.70   no
+catalogue              active      1  catalogue-k8s     1/stable        87  10.152.183.19   no
+grafana       9.5.21   active      1  grafana-k8s       1/stable       160  10.152.183.132  no
+loki          2.9.6    active      1  loki-k8s          1/stable       199  10.152.183.207  no
 prometheus    2.52.0   active      1  prometheus-k8s    1/stable       247  10.152.183.196  no
-traefik       2.11.0   active      1  traefik-k8s       latest/stable  236  10.152.183.83   no       Serving at 10.223.2.63
+traefik       2.11.0   active      1  traefik-k8s       latest/stable  263  10.152.183.83   no       Serving at 10.223.2.63
 ```
 
 From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
@@ -335,14 +335,16 @@ This should result in an output similar to the one below:
 ```text
 Name:           juju-sandbox-k8s
 State:          Running
+Snapshots:      1
 IPv4:           10.112.13.157
                 10.49.132.1
                 10.1.157.64
-Release:        Ubuntu 22.04.1 LTS
-Image hash:     1d24e397489d (Ubuntu 22.04 LTS)
+Release:        Ubuntu 24.04.3 LTS
+Image hash:     2b5f90ffe818 (Ubuntu 24.04 LTS)
+CPU(s):         4
 Load:           0.31 0.25 0.28
-Disk usage:     15.9G out of 19.2G
-Memory usage:   2.1G out of 7.8G
+Disk usage:     19.4GiB out of 48.4GiB
+Memory usage:   3.2GiB out of 7.7GiB
 Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     UID map: 1000:default
                     GID map: 1000:default
