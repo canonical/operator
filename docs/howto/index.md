@@ -51,7 +51,7 @@ Ops enables your charm to output logs to the Juju logs.
 Log from your charm <log-from-your-charm>
 ```
 
-## Running workloads
+## Managing machine workloads
 
 Your charm is responsible for interacting with a workload.
 
@@ -59,12 +59,17 @@ Your charm is responsible for interacting with a workload.
 :maxdepth: 1
 
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
-Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 ```
 
-Kubernetes charms use Pebble to manage containers. Your charm can configure Pebble so that you can access metrics for services and health checks.
+## Managing containers
 
-- {doc}`Manage metrics <manage-metrics>`
+TODO: Write intro
+
+```{toctree}
+:maxdepth: 1
+
+Manage containers <manage-containers/index>
+```
 
 ## Managing features
 
@@ -86,14 +91,6 @@ Manage stored state <manage-stored-state>
 Manage opened ports <manage-opened-ports>
 Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
-```
-
-% TOC only. Nothing shown on the page.
-
-```{toctree}
-:hidden:
-
-Manage metrics <manage-metrics>
 ```
 
 ## Tracing
