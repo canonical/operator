@@ -9,5 +9,6 @@ Kubernetes charms use Pebble to manage containers. Your charm can configure Pebb
 :maxdepth: 1
 
 Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
+Manage Pebble custom notices <manage-pebble-custom-notices>
 Manage Pebble metrics <manage-pebble-metrics>
 ```
