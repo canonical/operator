@@ -1,5 +1,5 @@
 (manage-leadership-changes)=
-# Manage leadership changes
+# How to manage leadership changes
 > See first: {external+juju:ref}`Juju | Leader unit <leader-unit>`
 
 ## Implement response to leadership changes
