@@ -5,7 +5,7 @@
 >
 > **See previous: {ref}`Set up your development environment <set-up-your-development-environment>`**
 
-As you already know from your knowledge of Juju, when you deploy a Kubernetes charm, the following things happen:
+When you deploy a Kubernetes charm, the following things happen:
 
 1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`.
 1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
@@ -205,6 +205,10 @@ Then run `charmcraft pack` to create a `.charm` file that can be deployed with J
 charmcraft pack
 # Packed fastapi-demo_amd64.charm
 ```
+
+The first time you run `charmcraft pack`, Charmcraft takes several minutes to pack your charm. Packing will be faster the next time because Charmcraft has cached the packing environment.
+
+If you run into inexplicable issues when running `charmcraft pack`, this may be because some of the cached information is out of date. Run `charmcraft clean` to fix this.
 
 ```{important}
 
