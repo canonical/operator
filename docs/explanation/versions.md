@@ -25,7 +25,7 @@ Each version of Juju provides a fixed version of Pebble. To determine which Pebb
 | 3.3 | [1.4.2](https://github.com/canonical/pebble/releases/tag/v1.4.2) |
 | 3.4 | [1.7.4](https://github.com/canonical/pebble/releases/tag/v1.7.4) |
 | 3.5 | [1.10.2](https://github.com/canonical/pebble/releases/tag/v1.10.2) |
-| 3.6 | [1.19.2](https://github.com/canonical/pebble/releases/tag/v1.19.2) |
+| 3.6 | [1.26.0](https://github.com/canonical/pebble/releases/tag/v1.26.0) |
 | 4.0 | [1.26.0](https://github.com/canonical/pebble/releases/tag/v1.26.0) |
 
 ## Support dates for Juju and Ops
