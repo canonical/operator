@@ -2,11 +2,10 @@
 
 ## Fixes
 
-* Use parse_rfc3339 for datetime parsing to support Python 3.10 (#2264)
+* Use `parse_rfc3339` for datetime parsing to support Juju 4 (#2264)
 * Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
 * Prevent `KeyError` on `auth-type` when creating `CloudCredential` object (#2268)
-* _checks_action should return empty list when there are no changes (#2270)
-* Replace git reference injection with wheel artifacts in charm test workflows (#2252)
+* `_checks_action` should return empty list when there are no changes (#2270)
 
 ## Documentation
 
@@ -29,6 +28,7 @@
 
 ## CI
 
+* Replace git reference injection with wheel artifacts in charm test workflows (#2252)
 * Explicitly provide the charmcraft repo location in CI (#2277)
 * Remove outdated custom signature generation (#2280)
 
