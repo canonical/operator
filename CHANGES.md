@@ -2,7 +2,7 @@
 
 ## Fixes
 
-* Use `parse_rfc3339` for datetime parsing to support Python 3.10 (#2264)
+* Use `parse_rfc3339` for datetime parsing to support Juju 4 (#2264)
 * Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
 * Prevent `KeyError` on `auth-type` when creating `CloudCredential` object (#2268)
 * `_checks_action` should return empty list when there are no changes (#2270)
