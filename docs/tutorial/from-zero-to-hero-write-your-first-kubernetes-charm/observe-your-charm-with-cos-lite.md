@@ -48,10 +48,12 @@ charm-libs:
 Next, run the following command to download the libraries:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ charmcraft fetch-libs
+ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-Your charm directory should now include the structure below:
+You might see a warning that Charmcraft cannot get a keyring. You can ignore the warning.
+
+After Charmcraft has downloaded the libraries, your project's `lib` directory contains:
 
 ```text
 lib
@@ -73,8 +75,22 @@ lib
             └── prometheus_scrape.py
 ```
 
-```{note}
-When you rebuild your charm with `charmcraft pack`, Charmcraft will copy the contents of the top `lib` directory to the project root. To import a library in your code, use `charms.prometheus_k8s.v0.prometheus_scrape`, for example.
+## Add dependencies from libraries
+
+When you use libraries from Charmhub, you must check whether the libraries have any dependencies apart from `ops`.
+
+If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other library files, you'll see that some of the libraries depend on the `cosl` package:
+
+- `grafana_dashboard.py` specifies `PYDEPS = ["cosl >= 0.0.50"]`
+- `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
+- `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
+
+This means that you need to add `cosl>=0.0.53` to your charm's dependencies.
+
+To update your charm's dependencies in `pyproject.toml`, run:
+
+```text
+uv add 'cosl>=0.0.53'
 ```
 
 ## Integrate with Prometheus
@@ -109,12 +125,12 @@ Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider`
 try:
     config = self.load_config(FastAPIConfig)
 except ValueError as e:
-    logger.warning('Unable to add metrics: invalid configuration: %s', e)
+    logger.warning("Unable to add metrics: invalid configuration: %s", e)
 else:
     self._prometheus_scraping = MetricsEndpointProvider(
         self,
-        relation_name='metrics-endpoint',
-        jobs=[{'static_configs': [{'targets': [f'*:{config.server_port}']}]}],
+        relation_name="metrics-endpoint",
+        jobs=[{"static_configs": [{"targets": [f"*:{config.server_port}"]}]}],
         refresh_event=self.on.config_changed,
     )
 ```
@@ -154,7 +170,7 @@ Then, in your charm's `__init__` method, initialise the `LogForwarder` instance 
 
 ```python
 # Enable pushing application logs to Loki.
-self._logging = LogForwarder(self, relation_name='logging')
+self._logging = LogForwarder(self, relation_name="logging")
 ```
 
 Congratulations, your charm can now also integrate with Loki!
@@ -192,7 +208,7 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 ```python
 # Provide grafana dashboards over a relation interface.
 self._grafana_dashboards = GrafanaDashboardProvider(
-    self, relation_name='grafana-dashboard'
+    self, relation_name="grafana-dashboard"
 )
 ```
 
@@ -205,22 +221,6 @@ Now, in your `src` directory, create a subdirectory called `grafana_dashboards` 
 
 ```
 
-## Specify binary packages required to build
-
-When packing a charm, Charmcraft builds the charm's dependencies from source.
-
-Charmcraft currently encounters an error when building the `cos-lite` packages from source. As a workaround, add a new `parts` section in your `charmcraft.yaml` file:
-
-```yaml
-# Workaround for a build error.
-parts:
-  charm:
-    charm-binary-python-packages:
-      - cosl
-```
-
-You wouldn't usually need to use this workaround in a charm. We're planning to update this tutorial to modernise the charm and remove the workaround.
-
 ## Validate your charm
 
 Open a shell in your Multipass Ubuntu VM, navigate inside your project directory, and run all of the following.
@@ -230,9 +230,9 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
+  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
@@ -267,34 +267,35 @@ Validate that the offers have been successfully created by running:
 juju find-offers cos-lite
 ```
 
-You should something similar to the output below:
+You should see something similar to the output below:
 
 ```text
-Store     URL                        Access  Interfaces
-microk8s  admin/cos-lite.loki        admin   loki_push_api:logging
-microk8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
-microk8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
+Store          URL                        Access  Interfaces
+concierge-k8s  admin/cos-lite.loki        admin   loki_push_api:logging
+concierge-k8s  admin/cos-lite.prometheus  admin   prometheus_scrape:metrics-endpoint
+concierge-k8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dashboard
 ```
 
-As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `welcome-k8s` model.
+As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
 
 ## Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
 ```text
-juju switch welcome-k8s
-juju integrate demo-api-charm admin/cos-lite.grafana
-juju integrate demo-api-charm admin/cos-lite.loki
-juju integrate demo-api-charm admin/cos-lite.prometheus
+juju switch testing
+juju integrate fastapi-demo admin/cos-lite.grafana
+juju integrate fastapi-demo admin/cos-lite.loki
+juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
-<a href="#heading--access-your-applications-from-the-host-machine"><h3 id="heading--access-your-applications-from-the-host-machine">Access your applications from the host machine</h3></a>
+### Access your applications from the host machine
 
 ```{important}
-
-The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes (MicroK8s) network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
+There is currently an issue with this part of the tutorial. If you follow the instructions, you may not be able to access Grafana from your host machine. We're working on improving the instructions. Check back soon for the new instructions!
 ```
+
+The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM.
 
 First, run:
 
@@ -305,16 +306,16 @@ juju status -m cos-lite
 This should result in an output similar to the one below:
 
 ```text
-Model     Controller  Cloud/Region        Version  SLA          Timestamp
-cos-lite  microk8s    microk8s/localhost  3.6.8    unsupported  18:05:07+01:00
+Model     Controller     Cloud/Region  Version  SLA          Timestamp
+cos-lite  concierge-k8s  k8s           3.6.13   unsupported  18:05:07+01:00
 
 App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
-alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       160  10.152.183.70   no
-catalogue              active      1  catalogue-k8s     1/stable        84  10.152.183.19   no
-grafana       9.5.3    active      1  grafana-k8s       1/stable       146  10.152.183.132  no
-loki          2.9.6    active      1  loki-k8s          1/stable       194  10.152.183.207  no
+alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       180  10.152.183.70   no
+catalogue              active      1  catalogue-k8s     1/stable        87  10.152.183.19   no
+grafana       9.5.21   active      1  grafana-k8s       1/stable       160  10.152.183.132  no
+loki          2.9.6    active      1  loki-k8s          1/stable       199  10.152.183.207  no
 prometheus    2.52.0   active      1  prometheus-k8s    1/stable       247  10.152.183.196  no
-traefik       2.11.0   active      1  traefik-k8s       latest/stable  236  10.152.183.83   no       Serving at 10.223.2.63
+traefik       2.11.0   active      1  traefik-k8s       latest/stable  263  10.152.183.83   no       Serving at 10.223.2.63
 ```
 
 From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
@@ -327,23 +328,25 @@ Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps repre
 Now open a terminal on your host machine and run:
 
 ```text
-multipass info charm-dev
+multipass info juju-sandbox-k8s
 ```
 
 This should result in an output similar to the one below:
 
 ```text
-Name:           charm-dev
+Name:           juju-sandbox-k8s
 State:          Running
+Snapshots:      1
 IPv4:           10.112.13.157
                 10.49.132.1
                 10.1.157.64
-Release:        Ubuntu 22.04.1 LTS
-Image hash:     1d24e397489d (Ubuntu 22.04 LTS)
+Release:        Ubuntu 24.04.3 LTS
+Image hash:     2b5f90ffe818 (Ubuntu 24.04 LTS)
+CPU(s):         4
 Load:           0.31 0.25 0.28
-Disk usage:     15.9G out of 19.2G
-Memory usage:   2.1G out of 7.8G
-Mounts:         /home/maksim/fastapi-demo => ~/fastapi-demo
+Disk usage:     19.4GiB out of 48.4GiB
+Memory usage:   3.2GiB out of 7.7GiB
+Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     UID map: 1000:default
                     GID map: 1000:default
 ```
@@ -376,7 +379,7 @@ In your Grafana web page, do all of the following:
 
 Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm.
 
-Next, in the `Juju model` drop down field, select `welcome-k8s`.
+Next, in the `Juju model` drop down field, select `testing`.
 
 Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
 
