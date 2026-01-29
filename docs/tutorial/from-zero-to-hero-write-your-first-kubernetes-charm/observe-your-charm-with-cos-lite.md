@@ -292,9 +292,10 @@ juju integrate fastapi-demo admin/cos-lite.prometheus
 ### Access your applications from the host machine
 
 ```{important}
-
-The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM. You can skip this step if you have decided to follow this tutorial directly on your host machine.
+There is currently an issue with this part of the tutorial. If you follow the instructions, you may not be able to access Grafana from your host machine. We're working on improving the instructions. Check back soon for the new instructions!
 ```
+
+The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM.
 
 First, run:
 
