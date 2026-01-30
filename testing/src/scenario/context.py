@@ -684,9 +684,9 @@ class Context(Generic[CharmType]):
         # Extract config and actions from meta if it contains them (e.g., charmcraft.yaml)
         # and they were not explicitly provided
         if config is None and meta is not None:
-            config = meta.get("config")
+            config = meta.get('config')
         if actions is None and meta is not None:
-            actions = meta.get("actions")
+            actions = meta.get('actions')
 
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
