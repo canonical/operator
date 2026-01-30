@@ -188,3 +188,115 @@ def test_charm_spec_is_deprecated():
     ctx = Context(CharmBase, meta={'name': 'some-name'})
     with pytest.warns(DeprecationWarning):
         _ = ctx.charm_spec  # type: ignore
+
+
+def test_charmcraft_yaml_config_extraction():
+    """Test that config is extracted from a full charmcraft.yaml dict."""
+    charmcraft_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+        'config': {
+            'options': {
+                'param1': {
+                    'type': 'string',
+                    'default': 'value1',
+                }
+            }
+        },
+    }
+    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    assert ctx._charm_spec.config == charmcraft_yaml['config']
+
+
+def test_charmcraft_yaml_actions_extraction():
+    """Test that actions are extracted from a full charmcraft.yaml dict."""
+    charmcraft_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+        'actions': {
+            'do-foo': {
+                'description': 'Do foo',
+            },
+        },
+    }
+    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    assert ctx._charm_spec.actions == charmcraft_yaml['actions']
+
+
+def test_charmcraft_yaml_both_config_and_actions_extraction():
+    """Test that both config and actions are extracted from charmcraft.yaml."""
+    charmcraft_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+        'config': {
+            'options': {
+                'param1': {
+                    'type': 'string',
+                }
+            }
+        },
+        'actions': {
+            'do-foo': {
+                'description': 'Do foo',
+            },
+        },
+    }
+    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    assert ctx._charm_spec.config == charmcraft_yaml['config']
+    assert ctx._charm_spec.actions == charmcraft_yaml['actions']
+
+
+def test_metadata_yaml_without_config_or_actions():
+    """Test backward compatibility with metadata.yaml that has no config/actions."""
+    metadata_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+    }
+    ctx = Context(MyCharm, meta=metadata_yaml)
+    assert ctx._charm_spec.meta == metadata_yaml
+    assert ctx._charm_spec.config is None
+    assert ctx._charm_spec.actions is None
+
+
+def test_explicit_config_overrides_extracted_config():
+    """Test that explicitly provided config parameter overrides extracted config."""
+    charmcraft_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+        'config': {
+            'options': {
+                'original': {'type': 'string'},
+            }
+        },
+    }
+    explicit_config = {
+        'options': {
+            'override': {'type': 'int'},
+        }
+    }
+    ctx = Context(MyCharm, meta=charmcraft_yaml, config=explicit_config)
+    assert ctx._charm_spec.config == explicit_config
+    assert 'override' in ctx._charm_spec.config['options']
+
+
+def test_explicit_actions_overrides_extracted_actions():
+    """Test that explicitly provided actions parameter overrides extracted actions."""
+    charmcraft_yaml = {
+        'name': 'my-charm',
+        'summary': 'A test charm',
+        'description': 'Test charm description',
+        'actions': {
+            'original-action': {},
+        },
+    }
+    explicit_actions = {
+        'override-action': {},
+    }
+    ctx = Context(MyCharm, meta=charmcraft_yaml, actions=explicit_actions)
+    assert ctx._charm_spec.actions == explicit_actions
+    assert 'override-action' in ctx._charm_spec.actions

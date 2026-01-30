@@ -654,11 +654,15 @@ class Context(Generic[CharmType]):
 
         :arg charm_type: the :class:`ops.CharmBase` subclass to handle the event.
         :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a dict).
+            Alternatively, can be a full charmcraft.yaml dict, in which case ``config`` and
+            ``actions`` will be automatically extracted from it (if not explicitly provided).
             If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
-            If none is provided, we will search for a ``actions.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present, otherwise we will
+            search for an ``actions.yaml`` file in the charm root.
         :arg config: charm config to use. Needs to be a valid config.yaml format (as a dict).
-            If none is provided, we will search for a ``config.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present, otherwise we will
+            search for a ``config.yaml`` file in the charm root.
         :arg juju_version: Juju agent version to simulate.
         :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
             defined in the metadata.
@@ -677,6 +681,13 @@ class Context(Generic[CharmType]):
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
+        # Extract config and actions from meta if it contains them (e.g., charmcraft.yaml)
+        # and they were not explicitly provided
+        if config is None and meta is not None:
+            config = meta.get("config")
+        if actions is None and meta is not None:
+            actions = meta.get("actions")
+
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
