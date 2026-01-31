@@ -291,11 +291,108 @@ juju integrate fastapi-demo admin/cos-lite.prometheus
 
 ### Simulate API requests
 
-TODO
+Before we monitor the health of our application, let's simulate a continuous load of API requests. We'll set up the simulation so that a proportion of requests fail because of a server error.
+
+First, create a file called `simulate.py` in your project directory:
+
+```python
+# /// script
+# dependencies = [
+#     "jubilant",
+#     "requests",
+# ]
+# ///
+
+"""Simulate a continuous load of API requests."""
+
+import logging
+import random
+import time
+
+import jubilant
+import requests
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
+)
+logging.getLogger("jubilant").setLevel("WARNING")
+logger = logging.getLogger(__name__)
+
+APP = "fastapi-demo"
+
+
+def main():
+    """Send requests to the server."""
+    juju = jubilant.Juju(model="testing")
+    while True:
+        status = juju.status()
+        if jubilant.all_active(status, APP):
+            unit_address = status.apps[APP].units[f"{APP}/0"].address
+            server_port = juju.config(APP)["server-port"]
+            send_request(f"http://{unit_address}:{server_port}")
+        else:
+            logger.error("No active app: %s", APP)
+        time.sleep(10)
+
+
+def send_request(base_url: str) -> None:
+    """Send a request, with a 25% chance of causing a server error."""
+    if random.random() < 0.75:
+        url = f"{base_url}/names"
+    else:
+        url = f"{base_url}/error"
+    logger.info("Requesting %s", url)
+    try:
+        response = requests.get(url, timeout=5)
+        logger.info("Response code: %d", response.status_code)
+    except requests.exceptions.ConnectionError:
+        logger.error("Unable to connect")
+    except requests.exceptions.Timeout:
+        logger.error("Request timed out")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+This file is not part of your charm code. It's a standalone Python script that repeatedly sends requests to our application's API endpoints:
+
+- `/names` with 75% probability
+- `/error` with 25% probability
+
+Our application's `/error` endpoint deliberately returns HTTP status code 500 (Internal Server Error). When we monitor the health of our application, we'll see a sustained error rate of approximately 25%.
+
+`simulate.py` uses {external+jubilant:doc}`Jubilant <index>` to get the unit IP address and server port from Juju. This is more robust and convenient than hard-coding the server location in the script.
+
+Next, open a new terminal in your virtual machine:
+
+```text
+multipass shell juju-sandbox-k8s
+```
+
+Then run `simulate.py`:
+
+```text
+uv run ~/fastapi-demo/simulate.py
+```
+
+The output should look like:
+
+```text
+16:06:04 - INFO - Requesting http://10.1.157.94:8000/names
+16:06:04 - INFO - Response code: 200
+16:06:15 - INFO - Requesting http://10.1.157.94:8000/names
+16:06:15 - INFO - Response code: 200
+16:06:26 - INFO - Requesting http://10.1.157.94:8000/error
+16:06:26 - INFO - Response code: 500
+...
+```
+
+Leave the script running for the rest of the tutorial. To stop the script later, press <kbd>Ctrl</kbd> + <kbd>C</kbd>.
 
 ### Access Grafana from your host machine
 
-Grafana allows you to visualise metrics on a dashboard. We'll now open Grafana's web UI to inspect the simulated API requests.
+Grafana allows you to visualise metrics on a dashboard. We'll now open Grafana's web UI to monitor the health of our application.
 
 COS Lite exposes Grafana through a load balancer that is provided by the [Traefik](https://charmhub.io/traefik-k8s) ingress integrator. In a production deployment, you'd access Grafana by connecting to the external endpoint that Traefik exposes. We don't have a production deployment, so we'll access Grafana by connecting to the load balancer's Kubernetes service.
 
