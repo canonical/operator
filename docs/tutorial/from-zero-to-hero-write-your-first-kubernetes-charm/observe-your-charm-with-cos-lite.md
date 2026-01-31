@@ -278,7 +278,7 @@ concierge-k8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dash
 
 As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
 
-## Integrate your charm with COS Lite
+### Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
@@ -289,49 +289,63 @@ juju integrate fastapi-demo admin/cos-lite.loki
 juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
-### Access your applications from the host machine
+### Simulate API requests
 
-```{important}
-There is currently an issue with this part of the tutorial. If you follow the instructions, you may not be able to access Grafana from your host machine. We're working on improving the instructions. Check back soon for the new instructions!
-```
+TODO
 
-The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM.
+### Access Grafana from your host machine
 
-First, run:
+Grafana allows you to visualise metrics on a dashboard. We'll now open Grafana's web UI to inspect the simulated API requests.
+
+COS Lite exposes Grafana through a load balancer that is provided by the [Traefik](https://charmhub.io/traefik-k8s) ingress integrator. In a production deployment, you'd access Grafana by connecting to the external endpoint that Traefik exposes. We don't have a production deployment, so we'll access Grafana by connecting to the load balancer's Kubernetes service.
+
+To access Grafana from your host machine, you'll need:
+
+- Grafana's admin password
+- The HTTP port of the load balancer's Kubernetes service
+- Your virtual machine's IP address
+
+To get Grafana's admin password, run the following command in your virtual machine:
 
 ```text
-juju status -m cos-lite
+juju run grafana/0 -m cos-lite get-admin-password --wait 1m
 ```
 
-This should result in an output similar to the one below:
+You should see a response similar to:
 
 ```text
-Model     Controller     Cloud/Region  Version  SLA          Timestamp
-cos-lite  concierge-k8s  k8s           3.6.13   unsupported  18:05:07+01:00
+Running operation 3 with 1 task
+  - task 4 on unit-grafana-0
 
-App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
-alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       180  10.152.183.70   no
-catalogue              active      1  catalogue-k8s     1/stable        87  10.152.183.19   no
-grafana       9.5.21   active      1  grafana-k8s       1/stable       160  10.152.183.132  no
-loki          2.9.6    active      1  loki-k8s          1/stable       199  10.152.183.207  no
-prometheus    2.52.0   active      1  prometheus-k8s    1/stable       247  10.152.183.196  no
-traefik       2.11.0   active      1  traefik-k8s       latest/stable  263  10.152.183.83   no       Serving at 10.223.2.63
+Waiting for task 4...
+admin-password: eEJOix1zkrJ6
+url: http://10.43.45.0/cos-lite-grafana
 ```
 
-From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
+In our example, the admin password is `eEJOix1zkrJ6`.
 
-```{caution}
+Next, to get the HTTP port of the load balancer's Kubernetes service, run the following command in your virtual machine:
 
-Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps represent Kubernetes Services.  Note: The charm should be programmed to support Services.
+```text
+kubectl -n cos-lite get svc traefik-lb
 ```
 
-Now open a terminal on your host machine and run:
+You should see a response similar to:
+
+```text
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+traefik-lb   LoadBalancer   10.152.183.166   10.43.45.0    80:31471/TCP,443:31548/TCP   10m
+```
+
+The port we want is given by `80:<port>/TCP`. In our example, the port is 31471.
+
+Finally, to get your virtual machine's IP address, run the following command on your host machine:
 
 ```text
 multipass info juju-sandbox-k8s
 ```
 
-This should result in an output similar to the one below:
+You should see a response similar to:
 
 ```text
 Name:           juju-sandbox-k8s
@@ -351,27 +365,17 @@ Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     GID map: 1000:default
 ```
 
-From this output, retrieve your Multipass Ubuntu VM's network IP address. In our case it is `10.112.13.157`.
+The IP address we want is the first IPv4 address listed. In our example, the IP address is 10.112.13.157.
 
-Now, also on your host machine, run the code below.  Until the next reboot, this will forward all the traffic for your Kubernetes Service IP range via the network on your VM. This will allow you, for example, to view your Grafana dashboards in a web browser inside your VM, as we do in the next step.
-
-```text
-sudo ip route add 10.152.183.0/24 via 10.112.13.157
-```
-
-## Log in to Grafana
-
-In a terminal inside your VM, do all of the following:
-
-First, run `juju status` again to retrieve the IP address of your Grafana service.  For us it is `http://10.152.183.132:3000` (see the output above).
-
-Now, use `juju run` to retrieve your Grafana password, as shown below.
+We can now combine the IP address and port to obtain the URL of Grafana's web UI:
 
 ```text
-juju run grafana/0 -m cos-lite get-admin-password --wait 1m
+http://10.112.13.157:31471/cos-lite-grafana
 ```
 
-Now, on your host machine, open a web browser, enter the Grafana IP address, and use the username "admin" and your Grafana password to log in.
+Your Grafana URL will be similar.
+
+Open your Grafana URL in your browser, then log in using the username `admin` and the password you got from `juju run`.
 
 ### Inspect the dashboards
 
