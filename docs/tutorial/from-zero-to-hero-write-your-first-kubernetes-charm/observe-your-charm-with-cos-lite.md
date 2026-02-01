@@ -332,7 +332,7 @@ def main():
             send_request(f"http://{unit_address}:{server_port}")
         else:
             logger.error("No active app: %s", APP)
-        time.sleep(10)
+        time.sleep(5)
 
 
 def send_request(base_url: str) -> None:
@@ -343,7 +343,7 @@ def send_request(base_url: str) -> None:
         url = f"{base_url}/error"
     logger.info("Requesting %s", url)
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=1)
         logger.info("Response code: %d", response.status_code)
     except requests.exceptions.ConnectionError:
         logger.error("Unable to connect")
@@ -381,10 +381,10 @@ The output should look like:
 ```text
 16:06:04 - INFO - Requesting http://10.1.157.94:8000/names
 16:06:04 - INFO - Response code: 200
-16:06:15 - INFO - Requesting http://10.1.157.94:8000/names
-16:06:15 - INFO - Response code: 200
-16:06:26 - INFO - Requesting http://10.1.157.94:8000/error
-16:06:26 - INFO - Response code: 500
+16:06:10 - INFO - Requesting http://10.1.157.94:8000/names
+16:06:10 - INFO - Response code: 200
+16:06:16 - INFO - Requesting http://10.1.157.94:8000/error
+16:06:16 - INFO - Response code: 500
 ...
 ```
 
@@ -474,35 +474,21 @@ Your Grafana URL will be similar.
 
 Open your Grafana URL in your browser, then log in using the username `admin` and the password you got from `juju run`.
 
-### Inspect the dashboards
+### Inspect the Grafana dashboard
 
-In your Grafana web page, do all of the following:
+In the Grafana web UI, navigate to the Dashboards page, then click **General > FastAPI Monitoring**. This opens the dashboard that you put in the `grafana_dashboards` directory of your charm.
 
-Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm.
+Next, in the "Juju model" drop down field, select "testing".
 
-Next, in the `Juju model` drop down field, select `testing`.
+You should see the following data on the dashboard:
 
-Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
-
-```text
-curl 10.1.157.94:8000/names
-```
-
-and
-
-```text
-curl 10.1.157.94:8000/error
-```
-
-where `10.1.157.94` is the IP of our application unit (pod).
-
-In a while you should see the following data appearing on the dashboard:
-
-1. HTTP Request Duration Percentiles. This dashboard is based on the data from Prometheus and will allow you to see what fraction of requests takes what amount of time.
-2. Percent of failed requests per 2 minutes time frame. In your case this will be a ratio of all the requests and the requests submitted to the `/error` path (i.e., the ones that cause the Internal Server Error).
-3. Logs from your application that were collected by Loki and forwarded to Grafana. Here you can see some INFO level logs and ERROR logs with traceback from Python when you were calling the `/error` path.
+- **HTTP request duration percentiles** - This graph shows Prometheus data. It tracks the duration below which 60% of requests fall (p60) and the duration below which 90% of requests fall (p90).
+- **Percentage of failed requests** - This graph should hover around 25% because `simulate.py` sends requests to `/error` with 25% probability.
+- **FastAPI logs from the workload container** - These logs were captured from our application by Pebble, sent to Loki, then sent to Grafana. You can see INFO and ERROR messages as FastAPI handles each request to `/names` and `/error`, including exception tracebacks.
 
 ![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png)
+
+### Inspect metrics in Prometheus
 
 ```{important}
 
