@@ -408,7 +408,7 @@ To get Grafana's admin password, run the following command in your virtual machi
 juju run grafana/0 -m cos-lite get-admin-password --wait 1m
 ```
 
-You should see a response similar to:
+The output should look like:
 
 ```text
 Running operation 3 with 1 task
@@ -427,7 +427,7 @@ Next, to get the HTTP port of the load balancer's Kubernetes service, run the fo
 kubectl -n cos-lite get svc traefik-lb
 ```
 
-You should see a response similar to:
+The output should look like:
 
 ```text
 NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
@@ -442,7 +442,7 @@ Finally, to get your virtual machine's IP address, run the following command on 
 multipass info juju-sandbox-k8s
 ```
 
-You should see a response similar to:
+The output should look like:
 
 ```text
 Name:           juju-sandbox-k8s
@@ -486,15 +486,31 @@ You should see the following data on the dashboard:
 - **Percentage of failed requests** - This graph should hover around 25% because `simulate.py` sends requests to `/error` with 25% probability.
 - **FastAPI logs from the workload container** - These logs were captured from our application by Pebble, sent to Loki, then sent to Grafana. You can see INFO and ERROR messages as FastAPI handles each request to `/names` and `/error`, including exception tracebacks.
 
-![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png)
+TODO: Add a new screenshot
 
 ### Inspect metrics in Prometheus
 
-```{important}
+Let's use Prometheus to explore the metrics that our application provides from its `/metrics` endpoint. These metrics are the data source for the graphs on the Grafana dashboard.
 
-If you are interested in the Prometheus metrics produced by your application that were used to build these dashboards you can run following command in your VM: `curl <your app pod IP>:8000/metrics`
-Also, you can reach Prometheus in your web browser (similar to Grafana) at `http://<Prometheus pod IP>:9090/graph` .
+The URL of Prometheus's web UI is:
+
+```text
+http://10.112.13.157:31471/cos-lite-prometheus-0/graph
 ```
+
+Where 10.112.13.157 is your virtual machine's IP address and 31471 is the HTTP port of the load balancer's Kubernetes service, as with Grafana.
+
+Open your Prometheus URL in your browser, then enter a search expression and click **Execute**. For example, use the following expression to see how many requests the `/names` endpoint has received:
+
+```text
+starlette_requests_total{path="/names"}
+```
+
+The search result should look like:
+
+![Application metrics in Prometheus](../../resources/k8s-tutorial-observe-metrics.png)
+
+Which means that `/names`has received 150 requests.
 
 ## Review the final code
 
