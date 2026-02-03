@@ -193,9 +193,7 @@ jobs:
           persist-credentials: false
 
       - name: Install patch dependencies
-        run: |
-          pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
-          poetry self add poetry-plugin-export
+        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
       - name: Bump minimum Python version to align with ops requirements
         working-directory: ${{ matrix.charm-root }}
