@@ -241,8 +241,19 @@ jobs:
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
           elif [ -e "poetry.lock" ]; then
-            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --lock
-            poetry add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --lock
+            # Update ops dependency to use git source in pyproject.toml
+            sed -i -E "s|^ops = .*|ops = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\" }|g" pyproject.toml
+            # Add or update ops-scenario
+            if ! grep -q "ops-scenario" pyproject.toml; then
+              # Add to unit test dependencies if that group exists
+              if grep -q '\[tool\.poetry\.group\.unit\.dependencies\]' pyproject.toml; then
+                sed -i "/\[tool\.poetry\.group\.unit\.dependencies\]/a ops-scenario = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\", subdirectory = \"testing\" }" pyproject.toml
+              fi
+            else
+              sed -i -E "s|^ops-scenario = .*|ops-scenario = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\", subdirectory = \"testing\" }|g" pyproject.toml
+            fi
+            # Update the lock file (only update ops and ops-scenario, not other packages)
+            poetry update ops ops-scenario || poetry lock --no-update
           elif [ -e "uv.lock" ]; then
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
