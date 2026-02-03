@@ -293,76 +293,32 @@ juju integrate fastapi-demo admin/cos-lite.prometheus
 
 Before we monitor the health of our application, let's simulate a continuous load of API requests. We'll set up the simulation so that a proportion of requests fail because of a server error.
 
-First, create a file called `simulate.py` in your project directory:
+First, create a file called `simulate.sh` in your project directory:
 
-```python
-# /// script
-# dependencies = [
-#     "jubilant",
-#     "requests",
-# ]
-# ///
-
-"""Simulate a continuous load of API requests."""
-
-import logging
-import random
-import time
-
-import jubilant
-import requests
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
-)
-logging.getLogger("jubilant").setLevel("WARNING")
-logger = logging.getLogger(__name__)
-
-APP = "fastapi-demo"
-
-
-def main():
-    """Send requests to the server."""
-    juju = jubilant.Juju(model="testing")
-    while True:
-        status = juju.status()
-        if jubilant.all_active(status, APP):
-            unit_address = status.apps[APP].units[f"{APP}/0"].address
-            server_port = juju.config(APP)["server-port"]
-            send_request(f"http://{unit_address}:{server_port}")
-        else:
-            logger.error("No active app: %s", APP)
-        time.sleep(5)
-
-
-def send_request(base_url: str) -> None:
-    """Send a request, with a 25% chance of causing a server error."""
-    if random.random() < 0.75:
-        url = f"{base_url}/names"
-    else:
-        url = f"{base_url}/error"
-    logger.info("Requesting %s", url)
-    try:
-        response = requests.get(url, timeout=1)
-        logger.info("Response code: %d", response.status_code)
-    except requests.exceptions.ConnectionError:
-        logger.error("Unable to connect")
-    except requests.exceptions.Timeout:
-        logger.error("Request timed out")
-
-
-if __name__ == "__main__":
-    main()
+```sh
+while true; do
+    curl http://10.1.157.94:8000/names
+    echo
+    sleep 5
+    curl http://10.1.157.94:8000/names
+    echo
+    sleep 5
+    curl http://10.1.157.94:8000/names
+    echo
+    sleep 5
+    curl http://10.1.157.94:8000/error
+    echo
+    sleep 5
+done
 ```
 
-This file is not part of your charm code. It's a standalone Python script that repeatedly sends requests to our application's API endpoints:
+This script repeatedly sends requests to our application's API endpoints. Our application's `/error` endpoint deliberately returns HTTP status code 500 (Internal Server Error). When we monitor the health of our application, we'll see a sustained error rate of 25%.
 
-- `/names` with 75% probability
-- `/error` with 25% probability
+Replace 10.1.157.94 by the IP address of your `fastapi-demo` unit, which you can get from the output of `juju status`.
 
-Our application's `/error` endpoint deliberately returns HTTP status code 500 (Internal Server Error). When we monitor the health of our application, we'll see a sustained error rate of approximately 25%.
-
-`simulate.py` uses {external+jubilant:doc}`Jubilant <index>` to get the unit IP address and server port from Juju. This is more robust and convenient than hard-coding the server location in the script.
+```{note}
+`simulate.sh` isn't intended to show how to benchmark a real application. Sending requests to a Juju unit is convenient as a one-off local simulation, but for a real application you'd send requests through an ingress intergrator such as [Traefik](https://charmhub.io/traefik-k8s). You'd also use a benchmarking tool such as [ab](https://httpd.apache.org/docs/2.2/programs/ab.html).
+```
 
 Next, open a new terminal in your virtual machine:
 
@@ -370,21 +326,21 @@ Next, open a new terminal in your virtual machine:
 multipass shell juju-sandbox-k8s
 ```
 
-Then run `simulate.py`:
+Then run the script:
 
 ```text
-uv run ~/fastapi-demo/simulate.py
+chmod +x ~/fastapi-demo/simulate.sh
+. ~/fastapi-demo/simulate.sh
 ```
 
 The output should look like:
 
 ```text
-16:06:04 - INFO - Requesting http://10.1.157.94:8000/names
-16:06:04 - INFO - Response code: 200
-16:06:10 - INFO - Requesting http://10.1.157.94:8000/names
-16:06:10 - INFO - Response code: 200
-16:06:16 - INFO - Requesting http://10.1.157.94:8000/error
-16:06:16 - INFO - Response code: 500
+{"names":{}}
+{"names":{}}
+{"names":{}}
+Internal server error
+{"names":{}}
 ...
 ```
 
@@ -483,10 +439,10 @@ Next, in the "Juju model" drop down field, select "testing".
 You should see the following data on the dashboard:
 
 - **HTTP request duration percentiles** - This graph shows Prometheus data. It tracks the duration below which 60% of requests fall (p60) and the duration below which 90% of requests fall (p90).
-- **Percentage of failed requests** - This graph should hover around 25% because `simulate.py` sends requests to `/error` with 25% probability.
-- **FastAPI logs from the workload container** - These logs were captured from our application by Pebble, sent to Loki, then sent to Grafana. You can see INFO and ERROR messages as FastAPI handles each request to `/names` and `/error`, including exception tracebacks.
+- **Percentage of failed requests** - This graph should be flat at 25% because `simulate.sh` sends 25% of requests to `/error`.
+- **FastAPI logs from the workload container** - These logs were captured from our application by Pebble, sent to Loki, then sent to Grafana. You can see info and error messages as FastAPI handles each request to `/names` and `/error`, including exception tracebacks.
 
-TODO: Add a new screenshot
+![Application monitoring dashboard in Grafana](../../resources/k8s-tutorial-observe-dashboard.png)
 
 ### Inspect metrics in Prometheus
 
