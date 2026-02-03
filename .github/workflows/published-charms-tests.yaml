@@ -193,7 +193,9 @@ jobs:
           persist-credentials: false
 
       - name: Install patch dependencies
-        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
+        run: |
+          pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
+          poetry self add poetry-plugin-export
 
       - name: Bump minimum Python version to align with ops requirements
         working-directory: ${{ matrix.charm-root }}
@@ -241,23 +243,18 @@ jobs:
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
           elif [ -e "poetry.lock" ]; then
-            # Update ops dependency to use git source in pyproject.toml
-            sed -i -E "s|^ops = .*|ops = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\" }|g" pyproject.toml
-            # Add or update ops-scenario
-            if ! grep -q "ops-scenario" pyproject.toml; then
-              # Add to unit test dependencies if that group exists
-              if grep -q '\[tool\.poetry\.group\.unit\.dependencies\]' pyproject.toml; then
-                sed -i "/\[tool\.poetry\.group\.unit\.dependencies\]/a ops-scenario = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\", subdirectory = \"testing\" }" pyproject.toml
+            # For Poetry-based charms, install from the existing lock file (with ops 2.x)
+            # then force-reinstall ops 3.x and ops-scenario on top
+            # This bypasses Poetry's version conflict resolution
+            
+            if [ -e "tox.ini" ]; then
+              # Add commands_post to force-reinstall ops after poetry install completes successfully
+              if grep -q "^\[testenv:unit\]" tox.ini; then
+                sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+              elif grep -q "^\[testenv\]" tox.ini; then
+                sed -i "/^\[testenv\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               fi
-            else
-              sed -i -E "s|^ops-scenario = .*|ops-scenario = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\", subdirectory = \"testing\" }|g" pyproject.toml
             fi
-            # Remove the old lock file to force fresh resolution
-            rm -f poetry.lock
-            # Update the lock file with new ops version
-            # If this fails due to version conflicts with transitive dependencies, skip updating the lock
-            # The test will fail later during tox run, which is the expected behavior for incompatible charms
-            poetry lock || echo "Warning: Could not update poetry.lock due to dependency conflicts. Tests may fail."
           elif [ -e "uv.lock" ]; then
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
