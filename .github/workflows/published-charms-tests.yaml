@@ -252,8 +252,12 @@ jobs:
             else
               sed -i -E "s|^ops-scenario = .*|ops-scenario = { git = \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\", rev = \"$GITHUB_SHA\", subdirectory = \"testing\" }|g" pyproject.toml
             fi
-            # Update the lock file (only update ops and ops-scenario, not other packages)
-            poetry update ops ops-scenario || poetry lock --no-update
+            # Remove the old lock file to force fresh resolution
+            rm -f poetry.lock
+            # Update the lock file with new ops version
+            # If this fails due to version conflicts with transitive dependencies, skip updating the lock
+            # The test will fail later during tox run, which is the expected behavior for incompatible charms
+            poetry lock || echo "Warning: Could not update poetry.lock due to dependency conflicts. Tests may fail."
           elif [ -e "uv.lock" ]; then
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
             uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
