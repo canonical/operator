@@ -195,6 +195,30 @@ jobs:
       - name: Install patch dependencies
         run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
+      - name: Bump minimum Python version to align with ops requirements
+        working-directory: ${{ matrix.charm-root }}
+        run: |
+          set -xueo pipefail
+          # Update tox.ini
+          if [ -e "tox.ini" ]; then
+            # Update basepython to use python3.10 if it's set to 3.8 or 3.9
+            sed -i -E "s/^basepython = python3\.[89]$/basepython = python3.10/" tox.ini
+            # Update py3X environment factors to py310 minimum
+            sed -i -E "s/\{py3[89]\}/\{py310\}/g" tox.ini
+            sed -i -E "s/py3[89]/py310/g" tox.ini
+          fi
+          # Update pyproject.toml requires-python
+          if [ -e "pyproject.toml" ]; then
+            # Update requires-python to >=3.10 if it's <3.10
+            sed -i -E "s/requires-python = \">=3\.[89]\"/requires-python = \">=3.10\"/" pyproject.toml
+            sed -i -E "s/requires-python = '>=3\.[89]'/requires-python = '>=3.10'/" pyproject.toml
+          fi
+          # Update .python-version
+          if [ -e ".python-version" ]; then
+            # Replace any 3.8 or 3.9 version with 3.10
+            sed -i -E "s/^3\.[89]\..*/3.10/" .python-version
+          fi
+
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         working-directory: ${{ matrix.charm-root }}
         run: |
@@ -238,6 +262,8 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
         working-directory: ${{ matrix.charm-root }}
         run: tox -vve unit
+        env:
+          PIP_IGNORE_REQUIRES_PYTHON: "1"
 
       - name: Check for tox static environment
         id: has-static
@@ -255,6 +281,8 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static == 'true' }}
         working-directory: ${{ matrix.charm-root }}
         run: tox -vve static
+        env:
+          PIP_IGNORE_REQUIRES_PYTHON: "1"
 
 
   charmcraft-profile-tests:
