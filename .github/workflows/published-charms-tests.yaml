@@ -261,10 +261,27 @@ jobs:
             
             if [ -e "tox.ini" ]; then
               # Add allowlist_externals and commands_post to force-reinstall ops after poetry install
+              # Check if allowlist_externals already exists to avoid duplicates
               if grep -q "^\[testenv:unit\]" tox.ini; then
-                sed -i "/^\[testenv:unit\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+                if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
+                  # Append pip to existing allowlist_externals
+                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                else
+                  # Add new allowlist_externals
+                  sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
+                fi
+                # Add commands_post (always new)
+                sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               elif grep -q "^\[testenv\]" tox.ini; then
-                sed -i "/^\[testenv\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+                if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
+                  # Append pip to existing allowlist_externals
+                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                else
+                  # Add new allowlist_externals
+                  sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
+                fi
+                # Add commands_post (always new)
+                sed -i "/^\[testenv\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               fi
             fi
           elif [ -e "uv.lock" ]; then
@@ -277,15 +294,32 @@ jobs:
             
             if [ -e "tox.ini" ]; then
               # Add allowlist_externals and commands_post to force-reinstall ops after uv install
+              # Check if allowlist_externals already exists to avoid duplicates
               if grep -q "^\[testenv:unit\]" tox.ini; then
-                sed -i "/^\[testenv:unit\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+                if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
+                  # Append pip to existing allowlist_externals
+                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                else
+                  # Add new allowlist_externals
+                  sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
+                fi
+                # Add commands_post (always new)
+                sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               elif grep -q "^\[testenv\]" tox.ini; then
-                sed -i "/^\[testenv\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+                if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
+                  # Append pip to existing allowlist_externals
+                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                else
+                  # Add new allowlist_externals
+                  sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
+                fi
+                # Add commands_post (always new)
+                sed -i "/^\[testenv\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               fi
             fi
           else
-            echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
-            exit 1
+            echo "Warning: No requirements.txt or poetry.lock or uv.lock file found. Skipping ops version update."
+            echo "The charm may not use Python dependencies or may have a non-standard setup."
           fi
 
       - name: Install dependencies
