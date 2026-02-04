@@ -281,7 +281,7 @@ jobs:
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -291,7 +291,7 @@ jobs:
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
@@ -314,7 +314,7 @@ jobs:
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -324,7 +324,7 @@ jobs:
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
