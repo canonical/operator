@@ -195,6 +195,20 @@ jobs:
       - name: Install patch dependencies
         run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
+      - name: Special case for wordpress-k8s (Python 3.12 incompatibility)
+        if: matrix.charm-repo == 'canonical/wordpress-k8s-operator'
+        working-directory: ${{ matrix.charm-root }}
+        run: |
+          set -xueo pipefail
+          # mysql-connector-python doesn't have wheels for Python 3.12, cap at 3.11
+          if [ -e ".python-version" ]; then
+            sed -i -E "s/^3\.12\..*/3.11/" .python-version
+          fi
+          if [ -e "pyproject.toml" ]; then
+            sed -i -E "s/requires-python = \">=3\.10\"/requires-python = \">=3.10,<3.12\"/" pyproject.toml
+            sed -i -E "s/requires-python = '>=3\.10'/requires-python = '>=3.10,<3.12'/" pyproject.toml
+          fi
+
       - name: Bump minimum Python version to align with ops requirements
         working-directory: ${{ matrix.charm-root }}
         run: |
@@ -254,9 +268,18 @@ jobs:
               fi
             fi
           elif [ -e "uv.lock" ]; then
-            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing
-            uv add --frozen --raw-sources git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA
-            uv lock
+            # For uv-based charms, install from the existing lock file (with ops 2.x)
+            # then force-reinstall ops 3.x and ops-scenario on top
+            # This bypasses uv's version conflict resolution
+            
+            if [ -e "tox.ini" ]; then
+              # Add allowlist_externals and commands_post to force-reinstall ops after uv install
+              if grep -q "^\[testenv:unit\]" tox.ini; then
+                sed -i "/^\[testenv:unit\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+              elif grep -q "^\[testenv\]" tox.ini; then
+                sed -i "/^\[testenv\]/a allowlist_externals = pip\ncommands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+              fi
+            fi
           else
             echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
             exit 1
