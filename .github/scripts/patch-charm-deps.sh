@@ -25,6 +25,9 @@ echo "OPS WHEEL: $OPS_WHEEL"
 echo "OPS-SCENARIO WHEEL: $OPS_SCENARIO_WHEEL"
 echo "========================================="
 
+# Track whether we successfully updated any dependencies
+UPDATED=false
+
 # Function to add pip to allowlist_externals and commands_post to a tox.ini section
 # Args: $1 = section name (e.g., "testenv:unit" or "testenv")
 add_tox_pip_commands() {
@@ -70,6 +73,7 @@ if [ -e "test-requirements.txt" ] || [ -e "requirements-charmcraft.txt" ] || [ -
       sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" "$req_file"
       echo -e "\n$OPS_SCENARIO_WHEEL" >> "$req_file"
       echo "    ✓ Updated $req_file with ops 3.x"
+      UPDATED=true
     fi
   done
   
@@ -95,6 +99,7 @@ elif [ -e "poetry.lock" ]; then
   poetry add "$OPS_WHEEL" --lock
   poetry add "$OPS_SCENARIO_WHEEL" --lock
   echo "    ✓ Updated poetry.lock with ops 3.x wheels"
+  UPDATED=true
 
 # 3. Handle uv-based charms
 elif [ -e "uv.lock" ]; then
@@ -105,14 +110,31 @@ elif [ -e "uv.lock" ]; then
   uv add --frozen --raw-sources "$OPS_SCENARIO_WHEEL"
   uv lock
   echo "    ✓ Updated uv.lock with ops 3.x wheels"
+  UPDATED=true
 
 else
-  echo "⚠ Warning: No recognised dependency files found (requirements.txt, poetry.lock, or uv.lock)"
-  echo "  The charm may not use Python dependencies or may have a non-standard setup."
-  echo "  Skipping ops version update."
+  echo "✗ Error: No recognised dependency files found (requirements.txt, poetry.lock, or uv.lock)"
+  echo "  Cannot update ops dependencies without a dependency file."
+  UPDATED=false
 fi
 
 echo ""
+
+# Fail if we didn't successfully update any dependencies
+if [ "$UPDATED" = false ]; then
+  echo "========================================="
+  echo "✗ FAILURE: No dependency files were updated"
+  echo "========================================="
+  echo "ERROR: Unable to patch ops dependencies - no recognised dependency management system found."
+  echo "This charm either:"
+  echo "  1. Does not use Python dependencies"
+  echo "  2. Has a non-standard dependency setup"
+  echo "  3. Is missing dependency files that should be present"
+  echo ""
+  echo "The test cannot proceed without updating ops to 3.x."
+  exit 1
+fi
+
 echo "========================================="
 echo "✓ Dependency patching complete"
 echo "========================================="
