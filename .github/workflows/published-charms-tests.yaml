@@ -22,8 +22,6 @@ jobs:
             charm-root: .
           - charm-repo: canonical/airbyte-k8s-operator
             charm-root: .
-          - charm-repo: canonical/airbyte-ui-k8s-operator
-            charm-root: .
           - charm-repo: canonical/aproxy-operator
             charm-root: .
           - charm-repo: canonical/argo-operators
@@ -41,6 +39,8 @@ jobs:
           - charm-repo: canonical/digest-squid-auth-helper
             charm-root: .
           - charm-repo: canonical/discourse-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/glauth-k8s-operator
             charm-root: .
           - charm-repo: canonical/grafana-agent-k8s-operator
             charm-root: .
@@ -92,6 +92,8 @@ jobs:
             charm-root: charms/kfp-viewer
           - charm-repo: canonical/kfp-operators
             charm-root: charms/kfp-viz
+          - charm-repo: canonical/kratos-external-idp-integrator
+            charm-root: .
           - charm-repo: canonical/kratos-operator
             charm-root: .
           - charm-repo: canonical/kubeflow-profiles-operator
@@ -124,8 +126,6 @@ jobs:
             charm-root: charms/jupyter-controller
           - charm-repo: canonical/notebook-operators
             charm-root: charms/jupyter-ui
-          - charm-repo: canonical/oathkeeper-operator
-            charm-root: .
           - charm-repo: canonical/oauth2-proxy-k8s-operator
             charm-root: .
           - charm-repo: canonical/oidc-gatekeeper-operator
@@ -141,6 +141,8 @@ jobs:
           - charm-repo: canonical/parca-scrape-target-operator
             charm-root: .
           - charm-repo: canonical/pgbouncer-k8s-operator
+            charm-root: .
+          - charm-repo: canonical/pgbouncer-operator
             charm-root: .
           - charm-repo: canonical/ranger-k8s-operator
             charm-root: .
@@ -160,9 +162,7 @@ jobs:
             charm-root: .
           - charm-repo: canonical/superset-k8s-operator
             charm-root: .
-          - charm-repo: canonical/tempo-coordinator-k8s-operator
-            charm-root: .
-          - charm-repo: canonical/tempo-worker-k8s-operator
+          - charm-repo: canonical/tempo-operators
             charm-root: .
           - charm-repo: canonical/temporal-admin-k8s-operator
             charm-root: .
