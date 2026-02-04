@@ -254,7 +254,7 @@ jobs:
             sed -i -E "s/^basepython = python3\.[89]$/basepython = python3.10/" tox.ini
             # Update py3X environment factors to py310 minimum
             sed -i -E "s/\{py3[89]\}/\{py310\}/g" tox.ini
-            sed -i -E "s/py3[89]/py310/g" tox.ini
+            sed -i -E "s/\bpy3[89]\b/py310/g" tox.ini
           fi
           # Update pyproject.toml requires-python
           if [ -e "pyproject.toml" ]; then
