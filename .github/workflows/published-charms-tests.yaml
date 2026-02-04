@@ -201,7 +201,7 @@ jobs:
       - name: Copy helper scripts and cleanup operator checkout
         run: |
           mkdir -p /tmp/operator-scripts
-          cp operator-repo/.github/scripts/* /tmp/operator-scripts/
+          cp operator-repo/.github/*.sh /tmp/operator-scripts/
           rm -rf operator-repo
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
