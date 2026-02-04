@@ -107,7 +107,7 @@ elif [ -e "uv.lock" ]; then
   echo "    ✓ Updated uv.lock with ops 3.x wheels"
 
 else
-  echo "⚠ Warning: No recognized dependency files found (requirements.txt, poetry.lock, or uv.lock)"
+  echo "⚠ Warning: No recognised dependency files found (requirements.txt, poetry.lock, or uv.lock)"
   echo "  The charm may not use Python dependencies or may have a non-standard setup."
   echo "  Skipping ops version update."
 fi
