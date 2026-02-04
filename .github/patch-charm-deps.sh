@@ -45,7 +45,7 @@ add_tox_pip_commands() {
   if grep -A5 "$section_pattern" tox.ini | grep -q "^allowlist_externals"; then
     echo "    Found existing allowlist_externals, appending pip"
     # Append pip to existing allowlist_externals multi-line list
-    sed -i "/$section_pattern/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip" tox.ini
+    sed -i "/$section_pattern/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
   else
     echo "    Creating new allowlist_externals with pip"
     sed -i "/$section_pattern/a allowlist_externals = pip" tox.ini
