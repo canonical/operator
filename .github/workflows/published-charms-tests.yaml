@@ -112,8 +112,10 @@ jobs:
             charm-root: .
           - charm-repo: canonical/mongodb-operator
             charm-root: .
-          - charm-repo: canonical/mysql-router-k8s-operator
-            charm-root: .
+          - charm-repo: canonical/mysql-router-operators
+            charm-root: machines
+          - charm-repo: canonical/mysql-router-operators
+            charm-root: kubernetes
           - charm-repo: canonical/netbox-k8s-operator
             charm-root: .
           - charm-repo: canonical/nginx-ingress-integrator-operator
@@ -263,7 +265,8 @@ jobs:
               # Add commands_post to force-reinstall ops after regular deps
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
-                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                  # Append pip to existing allowlist_externals - add it right after the allowlist_externals line
+                  sed -i "/^\[testenv:unit\]/,/^\[/ s/^\(allowlist_externals.*\)$/\1\n    pip/" tox.ini
                 else
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
                 fi
@@ -280,8 +283,8 @@ jobs:
               # Check if allowlist_externals already exists to avoid duplicates
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
-                  # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
+                  # Append pip to existing allowlist_externals - add it right after the allowlist_externals line
+                  sed -i "/^\[testenv:unit\]/,/^\[/ s/^\(allowlist_externals.*\)$/\1\n    pip/" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -290,8 +293,8 @@ jobs:
                 sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
-                  # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
+                  # Append pip to existing allowlist_externals - add it right after the allowlist_externals line
+                  sed -i "/^\[testenv\]/,/^\[/ s/^\(allowlist_externals.*\)$/\1\n    pip/" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
@@ -313,8 +316,8 @@ jobs:
               # Check if allowlist_externals already exists to avoid duplicates
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
-                  # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
+                  # Append pip to existing allowlist_externals - add it right after the allowlist_externals line
+                  sed -i "/^\[testenv:unit\]/,/^\[/ s/^\(allowlist_externals.*\)$/\1\n    pip/" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -323,8 +326,8 @@ jobs:
                 sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
-                  # Append pip to existing allowlist_externals
-                  sed -i "/^\[testenv\]/,/^\[/ { /^allowlist_externals/a\    pip\n}" tox.ini
+                  # Append pip to existing allowlist_externals - add it right after the allowlist_externals line
+                  sed -i "/^\[testenv\]/,/^\[/ s/^\(allowlist_externals.*\)$/\1\n    pip/" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
