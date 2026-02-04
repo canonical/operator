@@ -201,7 +201,7 @@ jobs:
       - name: Copy helper scripts and cleanup operator checkout
         run: |
           mkdir -p /tmp/operator-scripts
-          cp operator-repo/.github/*.sh /tmp/operator-scripts/
+          cp operator-repo/.github/patch-charm-deps.py /tmp/operator-scripts/
           rm -rf operator-repo
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
@@ -226,48 +226,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cap wordpress-k8s Python requirement at 3.11
-        if: matrix.charm-repo == 'canonical/wordpress-k8s-operator'
-        working-directory: charm-repo/${{ matrix.charm-root }}
-        run: |
-          set -xueo pipefail
-          # Update requires-python to exclude 3.12 (mysql-connector-python compatibility)
-          if [ -e "pyproject.toml" ]; then
-            # For specs with a lower bound >=3.10, adjust or add an upper bound <3.12
-            # Double-quoted form: replace any existing <3.X upper bound with <3.12
-            sed -i -E "s/(requires-python = \">=3\.1[0-9][^\"]*),<3\.[0-9]+\"/\1,<3.12\"/" pyproject.toml
-            # Double-quoted form: if there is no upper bound, append <3.12
-            sed -i -E "s/(requires-python = \">=3\.1[0-9][^\"]*)\"/\1,<3.12\"/" pyproject.toml
-            # Single-quoted form: replace any existing <3.X upper bound with <3.12
-            sed -i -E "s/(requires-python = '>=3\.1[0-9][^']*),<3\.[0-9]+'/\1,<3.12'/" pyproject.toml
-            # Single-quoted form: if there is no upper bound, append <3.12
-            sed -i -E "s/(requires-python = '>=3\.1[0-9][^']*)'/\1,<3.12'/" pyproject.toml
-          fi
-
-      - name: Bump minimum Python version to align with ops requirements
-        working-directory: charm-repo/${{ matrix.charm-root }}
-        run: |
-          set -xueo pipefail
-          # Update tox.ini
-          if [ -e "tox.ini" ]; then
-            # Update basepython to use python3.10 if it's set to 3.8 or 3.9
-            sed -i -E "s/^basepython = python3\.[89]$/basepython = python3.10/" tox.ini
-            # Update py3X environment factors to py310 minimum
-            sed -i -E "s/\{py3[89]\}/\{py310\}/g" tox.ini
-            sed -i -E "s/\bpy3[89]\b/py310/g" tox.ini
-          fi
-          # Update pyproject.toml requires-python
-          if [ -e "pyproject.toml" ]; then
-            # Update requires-python to >=3.10 if it's <3.10 (handles >=3.8, >=3.9, >=3.8.6, etc.)
-            sed -i -E "s/requires-python = \">=3\.[89](\.[0-9]+)?\"/requires-python = \">=3.10\"/" pyproject.toml
-            sed -i -E "s/requires-python = '>=3\.[89](\.[0-9]+)?'/requires-python = '>=3.10'/" pyproject.toml
-          fi
-          # Update .python-version
-          if [ -e ".python-version" ]; then
-            # Replace any 3.8 or 3.9 version with 3.10
-            sed -i -E "s/^3\.[89](\..*)?$/3.10/" .python-version
-          fi
-
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         working-directory: charm-repo/${{ matrix.charm-root }}
         run: |
@@ -275,7 +233,13 @@ jobs:
           # Get the absolute paths to the wheels
           ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
           ops_scenario_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops_scenario-*.whl)"
-          /tmp/operator-scripts/patch-charm-deps.sh "${ops_wheel}" "${ops_scenario_wheel}"
+          
+          # Use --max-python-version for wordpress-k8s to cap at 3.11
+          if [ "${{ matrix.charm-repo }}" = "canonical/wordpress-k8s-operator" ]; then
+            python /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}" --max-python-version=3.12
+          else
+            python /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}"
+          fi
       - name: Install dependencies
         id: deps
         run: pip install tox~=4.2
