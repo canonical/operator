@@ -268,9 +268,12 @@ jobs:
               fi
             fi
           elif [ -e "uv.lock" ]; then
-            # For uv-based charms, install from the existing lock file (with ops 2.x)
-            # then force-reinstall ops 3.x and ops-scenario on top
+            # For uv-based charms, regenerate the lock file to account for Python version changes
+            # then use pip force-reinstall in tox to install ops 3.x and ops-scenario on top
             # This bypasses uv's version conflict resolution
+            
+            # Regenerate lock file with updated Python version from pyproject.toml
+            uv lock
             
             if [ -e "tox.ini" ]; then
               # Add allowlist_externals and commands_post to force-reinstall ops after uv install
