@@ -209,9 +209,9 @@ jobs:
           fi
           # Update pyproject.toml requires-python
           if [ -e "pyproject.toml" ]; then
-            # Update requires-python to >=3.10 if it's <3.10
-            sed -i -E "s/requires-python = \">=3\.[89]\"/requires-python = \">=3.10\"/" pyproject.toml
-            sed -i -E "s/requires-python = '>=3\.[89]'/requires-python = '>=3.10'/" pyproject.toml
+            # Update requires-python to >=3.10 if it's <3.10 (handles >=3.8, >=3.9, >=3.8.6, etc.)
+            sed -i -E "s/requires-python = \">=3\.[89](\.[0-9]+)?\"/requires-python = \">=3.10\"/" pyproject.toml
+            sed -i -E "s/requires-python = '>=3\.[89](\.[0-9]+)?'/requires-python = '>=3.10'/" pyproject.toml
           fi
           # Update .python-version
           if [ -e ".python-version" ]; then
