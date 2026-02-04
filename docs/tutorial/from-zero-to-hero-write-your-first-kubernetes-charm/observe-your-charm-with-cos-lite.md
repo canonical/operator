@@ -317,7 +317,7 @@ This script repeatedly sends requests to our application's API endpoints. Our ap
 Replace 10.1.157.94 by the IP address of your `fastapi-demo` unit, which you can get from the output of `juju status`.
 
 ```{note}
-`simulate.sh` isn't intended to show how to benchmark a real application. Sending requests to a Juju unit is convenient as a one-off local simulation, but for a real application you'd send requests through an ingress intergrator such as [Traefik](https://charmhub.io/traefik-k8s). You'd also use a benchmarking tool such as [ab](https://httpd.apache.org/docs/2.2/programs/ab.html).
+`simulate.sh` isn't intended to show how to benchmark a real application. Sending requests to a Juju unit is convenient as a one-off local simulation, but for a real application you'd send requests through an ingress integrator such as [Traefik](https://charmhub.io/traefik-k8s). You'd also use a benchmarking tool such as [ab](https://httpd.apache.org/docs/2.2/programs/ab.html).
 ```
 
 Next, open a new terminal in your virtual machine:
@@ -466,7 +466,7 @@ The search result should look like:
 
 ![Application metrics in Prometheus](../../resources/k8s-tutorial-observe-metrics.png)
 
-Which means that `/names`has received 150 requests.
+Which means that `/names` has received 150 requests so far.
 
 ## Review the final code
 
