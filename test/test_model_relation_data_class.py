@@ -31,6 +31,11 @@ try:
 except ImportError:
     pydantic = None
 
+try:
+    from pydantic.experimental.missing_sentinel import MISSING
+except ImportError:
+    MISSING = None  # type: ignore
+
 import ops
 from ops import testing
 
@@ -193,6 +198,7 @@ if pydantic:
         bar: int = pydantic.Field(default=0, ge=0)
         baz: list[str] = pydantic.Field(default_factory=list)
         quux: Nested = pydantic.Field(default_factory=Nested)
+        miss: str | MISSING = MISSING  # type: ignore
 
         @pydantic.field_validator('baz')
         @classmethod
