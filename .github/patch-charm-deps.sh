@@ -64,6 +64,20 @@ add_tox_pip_commands() {
   }" tox.ini
 }
 
+# Helper function to patch all testenv sections in tox.ini
+patch_tox_testenv_sections() {
+  if [ -e "tox.ini" ]; then
+    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
+    if [ -n "$testenv_sections" ]; then
+      echo "$testenv_sections" | while IFS= read -r section; do
+        add_tox_pip_commands "$section"
+      done
+      return 0
+    fi
+  fi
+  return 1
+}
+
 # Detect dependency management system and patch accordingly
 echo ""
 echo "Detecting dependency management system..."
@@ -92,52 +106,31 @@ if [ -e "test-requirements.txt" ] || [ -e "requirements-charmcraft.txt" ] || [ -
     sed -i -E "/^[[:space:]]*(ops\[testing\]|ops)[>=<]/d" tox.ini
     sed -i -E "/^[[:space:]]*ops-scenario[>=<]/d" tox.ini
     echo "    ✓ Removed inline ops deps from tox.ini"
-    
-    # Add commands_post to force-reinstall for all testenv sections
-    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
-    if [ -n "$testenv_sections" ]; then
-      echo "$testenv_sections" | while IFS= read -r section; do
-        add_tox_pip_commands "$section"
-      done
-    fi
+    patch_tox_testenv_sections
   fi
   
 # 2. Handle Poetry-based charms
 elif [ -e "poetry.lock" ]; then
   echo "✓ Found Poetry-based charm"
-  echo "  Strategy: Update poetry.lock with wheel files"
+  echo "  Strategy: Force-reinstall wheels via tox after Poetry install"
   
   # Poetry doesn't support adding local wheels directly to the lock file
-  # Instead, we use the same tox.ini patching approach as requirements.txt
-  if [ -e "tox.ini" ]; then
-    # Find all testenv sections and add pip commands to install wheels
-    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
-    if [ -n "$testenv_sections" ]; then
-      echo "$testenv_sections" | while IFS= read -r section; do
-        add_tox_pip_commands "$section"
-      done
-      echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels after Poetry install"
-      UPDATED=true
-    fi
+  # Instead, patch tox.ini to force-reinstall the wheels after Poetry installs its dependencies
+  if patch_tox_testenv_sections; then
+    echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels"
+    UPDATED=true
   fi
 
 # 3. Handle uv-based charms
 elif [ -e "uv.lock" ]; then
   echo "✓ Found uv-based charm"
-  echo "  Strategy: Use tox to force-reinstall ops 3.x wheels after uv install"
+  echo "  Strategy: Force-reinstall wheels via tox after uv install"
   
   # uv doesn't support adding local wheels to the lock file
-  # Instead, we use the same tox.ini patching approach as Poetry
-  if [ -e "tox.ini" ]; then
-    # Find all testenv sections and add pip commands to install wheels
-    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
-    if [ -n "$testenv_sections" ]; then
-      echo "$testenv_sections" | while IFS= read -r section; do
-        add_tox_pip_commands "$section"
-      done
-      echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels after uv install"
-      UPDATED=true
-    fi
+  # Instead, patch tox.ini to force-reinstall the wheels after uv installs its dependencies
+  if patch_tox_testenv_sections; then
+    echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels"
+    UPDATED=true
   else
     echo "    ✗ Error: uv-based charm has no tox.ini to patch"
     UPDATED=false
