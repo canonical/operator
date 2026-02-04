@@ -269,7 +269,7 @@ jobs:
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals multi-line list
-                  sed -i "/^\[testenv:unit\]/,/^\[testenv/ { /^allowlist_externals[[:space:]]*=/a\\    pip\n}" tox.ini
+                  sed -i "/^\[testenv:unit\]/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
                 else
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
                 fi
@@ -288,7 +288,7 @@ jobs:
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals multi-line list
                   # Find the allowlist_externals line and add pip as an indented entry after it
-                  sed -i "/^\[testenv:unit\]/,/^\[testenv/ { /^allowlist_externals[[:space:]]*=/a\\    pip\n}" tox.ini
+                  sed -i "/^\[testenv:unit\]/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -298,7 +298,7 @@ jobs:
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals multi-line list
-                  sed -i "/^\[testenv\]/,/^\[testenv/ { /^allowlist_externals[[:space:]]*=/a\\    pip\n}" tox.ini
+                  sed -i "/^\[testenv\]/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
@@ -321,7 +321,7 @@ jobs:
               if grep -q "^\[testenv:unit\]" tox.ini; then
                 if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals multi-line list
-                  sed -i "/^\[testenv:unit\]/,/^\[testenv/ { /^allowlist_externals[[:space:]]*=/a\\    pip\n}" tox.ini
+                  sed -i "/^\[testenv:unit\]/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
@@ -331,7 +331,7 @@ jobs:
               elif grep -q "^\[testenv\]" tox.ini; then
                 if grep -A5 "^\[testenv\]" tox.ini | grep -q "^allowlist_externals"; then
                   # Append pip to existing allowlist_externals multi-line list
-                  sed -i "/^\[testenv\]/,/^\[testenv/ { /^allowlist_externals[[:space:]]*=/a\\    pip\n}" tox.ini
+                  sed -i "/^\[testenv\]/,/^\[testenv:/ { /^allowlist_externals[[:space:]]*=/a\    pip\n}" tox.ini
                 else
                   # Add new allowlist_externals
                   sed -i "/^\[testenv\]/a allowlist_externals = pip" tox.ini
