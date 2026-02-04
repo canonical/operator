@@ -254,6 +254,22 @@ jobs:
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
             echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+            
+            # For charms with inline deps in tox.ini, also patch those (e.g., indico-operator)
+            if [ -e "tox.ini" ] && grep -q "^[[:space:]]*ops" tox.ini; then
+              # Remove ops and ops-scenario deps from tox.ini deps sections
+              sed -i -E "/^[[:space:]]*(ops\[testing\]|ops)[>=<]/d" tox.ini
+              sed -i -E "/^[[:space:]]*ops-scenario[>=<]/d" tox.ini
+              # Add commands_post to force-reinstall ops after regular deps
+              if grep -q "^\[testenv:unit\]" tox.ini; then
+                if grep -A5 "^\[testenv:unit\]" tox.ini | grep -q "^allowlist_externals"; then
+                  sed -i "/^\[testenv:unit\]/,/^\[/ { /^allowlist_externals/a\    pip" -e "}" tox.ini
+                else
+                  sed -i "/^\[testenv:unit\]/a allowlist_externals = pip" tox.ini
+                fi
+                sed -i "/^\[testenv:unit\]/a commands_post =\n    pip install --force-reinstall --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA\n    pip install --no-deps git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing" tox.ini
+              fi
+            fi
           elif [ -e "poetry.lock" ]; then
             # For Poetry-based charms, install from the existing lock file (with ops 2.x)
             # then force-reinstall ops 3.x and ops-scenario on top
