@@ -55,12 +55,21 @@ add_tox_pip_commands() {
   
   # Add commands_post to force-reinstall ops after regular install
   echo "    Adding commands_post to force-reinstall ops 3.x"
+  
+  # Detect if tox-uv is being used (check for runner = "uv-venv-lock-runner" or package = "uv")
+  if grep -qE "^runner[[:space:]]*=[[:space:]]*['\"]?uv-venv" tox.ini || grep -qE "^package[[:space:]]*=[[:space:]]*['\"]?uv" tox.ini; then
+    echo "    Detected tox-uv, using 'uv pip install'"
+    PIP_CMD="uv pip install"
+  else
+    PIP_CMD="pip install"
+  fi
+  
   sed -i "/$section_pattern/a commands_post =" tox.ini
   sed -i "/$section_pattern/,/^\[testenv:/ {
-    /^commands_post[[:space:]]*=/a\\    pip install --force-reinstall --no-deps $OPS_WHEEL
+    /^commands_post[[:space:]]*=/a\\    $PIP_CMD --force-reinstall --no-deps $OPS_WHEEL
   }" tox.ini
   sed -i "/$section_pattern/,/^\[testenv:/ {
-    /pip install --force-reinstall --no-deps.*ops.*whl/a\\    pip install --no-deps $OPS_SCENARIO_WHEEL
+    /install --force-reinstall --no-deps.*ops.*whl/a\\    $PIP_CMD --no-deps $OPS_SCENARIO_WHEEL
   }" tox.ini
 }
 
