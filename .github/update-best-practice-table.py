@@ -154,7 +154,7 @@ def main():
     parser.add_argument(
         '--path-to-charmcraft',
         type=pathlib.Path,
-        default=pathlib.Path(__file__).parent.parent.parent.parent / 'charmcraft',
+        required=True,
         help='Path to a clone of canonical/charmcraft',
     )
     args = parser.parse_args()

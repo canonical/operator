@@ -83,20 +83,20 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
     """
-    params = event.load_params(GetDbInfoAction, errors='fail')
+    params = event.load_params(GetDbInfoAction, errors="fail")
     db_data = self.fetch_database_relation_data()
     if not db_data:
-        event.fail('No database connected')
+        event.fail("No database connected")
         return
     output = {
-        'db-host': db_data.get('db_host', None),
-        'db-port': db_data.get('db_port', None),
+        "db-host": db_data.get("db_host", None),
+        "db-port": db_data.get("db_port", None),
     }
     if params.show_password:
         output.update(
             {
-                'db-username': db_data.get('db_username', None),
-                'db-password': db_data.get('db_password', None),
+                "db-username": db_data.get("db_username", None),
+                "db-password": db_data.get("db_password", None),
             }
         )
     event.set_results(output)
@@ -109,42 +109,42 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
+  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
 ```
 
 Next, test that the basic action invocation works:
 
 ```text
-juju run demo-api-charm/0 get-db-info
+juju run fastapi-demo/0 get-db-info
 ```
 
 It might take a few seconds, but soon you should see an output similar to the one below, showing the database host and port:
 
 ```text
 Running operation 1 with 1 task
-  - task 2 on unit-demo-api-charm-0
+  - task 2 on unit-fastapi-demo-0
 
 Waiting for task 2...
-db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
+db-host: postgresql-k8s-primary.testing.svc.cluster.local
 db-port: "5432"
 ```
 
 Now, test that the action parameter (`show-password`) works as well by setting it to `True`:
 
 ```text
-juju run demo-api-charm/0 get-db-info show-password=True
+juju run fastapi-demo/0 get-db-info show-password=True
 ```
 
 The output should now include the username and the password:
 
 ```text
 Running operation 3 with 1 task
-  - task 4 on unit-demo-api-charm-0
+  - task 4 on unit-fastapi-demo-0
 
 Waiting for task 4...
-db-host: postgresql-k8s-primary.welcome-k8s.svc.cluster.local
+db-host: postgresql-k8s-primary.testing.svc.cluster.local
 db-password: RGv80aF9WAJJtExn
 db-port: "5432"
 db-username: relation_id_4
@@ -160,27 +160,27 @@ Let's add a test to check the behaviour of the `get_db_info` action that we just
 def test_get_db_info_action():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint='database',
-        interface='postgresql_client',
-        remote_app_name='postgresql-k8s',
+        endpoint="database",
+        interface="postgresql_client",
+        remote_app_name="postgresql-k8s",
         remote_app_data={
-            'endpoints': 'example.com:5432',
-            'username': 'foo',
-            'password': 'bar',
+            "endpoints": "example.com:5432",
+            "username": "foo",
+            "password": "bar",
         },
     )
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
         leader=True,
     )
 
-    ctx.run(ctx.on.action('get-db-info', params={'show-password': False}), state_in)
+    ctx.run(ctx.on.action("get-db-info", params={"show-password": False}), state_in)
 
     assert ctx.action_results == {
-        'db-host': 'example.com',
-        'db-port': '5432',
+        "db-host": "example.com",
+        "db-port": "5432",
     }
 ```
 

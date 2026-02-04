@@ -11,8 +11,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   o11y-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
 
     strategy:
       fail-fast: false
@@ -32,6 +36,12 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Install dependencies
         run: pip install tox~=4.2 uv~=0.6
 
@@ -44,12 +54,26 @@ jobs:
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
             sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=tracing --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            # Get absolute paths to the wheels
+            ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+            ops_scenario_wheel="$(ls operator-wheels/ops_scenario-*.whl)"
+            ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
+            # Add ops first, then ops-scenario (for testing), then ops-tracing
+            # Use --upgrade-package to ensure the wheel versions are used, not existing pinned versions
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops
+            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-scenario
+            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-tracing
           else
             echo "Error: no uv.lock file found"
             exit 1
+          fi
+
+      - name: Upgrade pytest-interface-tester for ops-scenario compatibility
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          if [ -e "uv.lock" ]; then
+            # Upgrade only pytest-interface-tester to a version compatible with new ops-scenario
+            uv add "pytest-interface-tester>=3.4" --optional dev --upgrade-package pytest-interface-tester || echo "Could not upgrade pytest-interface-tester"
           fi
 
       - name: Run the charm's unit tests

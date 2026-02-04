@@ -23,7 +23,7 @@ assigned, and coordinate the release of the fix.
 
 You may also send email to security@ubuntu.com. Email may optionally be
 encrypted to OpenPGP key
-[`4072 60F7 616E CE4D 9D12 4627 98E9 740D C345 39E0`](https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x407260f7616ece4d9d12462798e9740dc34539e0)
+[`75E1 451E 529B 51E1 9006 CD5E 91EC 85F1 DA9A 776D`](https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75e1451e529b51e19006cd5e91ec85f1da9a776d)
 
 If you have a deadline for public disclosure, please let us know.
 Our vulnerability management team intends to respond within 3 working

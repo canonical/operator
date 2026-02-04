@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
 # limitations under the License.
 
 """Kubernetes charm for a demo app."""
-
-from __future__ import annotations
 
 import dataclasses
 import logging
@@ -36,7 +34,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
 logger = logging.getLogger(__name__)
 
 
-# Note that this configuration is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class FastAPIConfig:
     """Configuration for the FastAPI demo charm."""
@@ -47,10 +44,9 @@ class FastAPIConfig:
     def __post_init__(self):
         """Validate the configuration."""
         if self.server_port == 22:
-            raise ValueError('Invalid port number, 22 is reserved for SSH')
+            raise ValueError("Invalid port number, 22 is reserved for SSH")
 
 
-# Note that this action is also defined in charmcraft.yaml
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class GetDbInfoAction:
     """Fetches database authentication information."""
@@ -65,15 +61,15 @@ class FastAPIDemoCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
         # See 'containers' in charmcraft.yaml.
-        self.container = self.unit.get_container('demo-server')
-        self.pebble_service_name = 'fastapi-service'
-        framework.observe(self.on.demo_server_pebble_ready, self._on_demo_server_pebble_ready)
+        self.container = self.unit.get_container("demo-server")
+        self.pebble_service_name = "fastapi-service"
+        framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
         # Report the unit status after each event.
         framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # The 'relation_name' comes from the 'charmcraft.yaml file'.
         # The 'database_name' is the name of the database that our application requires.
-        self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
+        self.database = DatabaseRequires(self, relation_name="database", database_name="names_db")
         # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
         framework.observe(self.database.on.database_created, self._on_database_endpoint)
         framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
@@ -91,19 +87,19 @@ class FastAPIDemoCharm(ops.CharmBase):
             self.load_config(FastAPIConfig)
         except ValueError as e:
             event.add_status(ops.BlockedStatus(str(e)))
-        if not self.model.get_relation('database'):
+        if not self.model.get_relation("database"):
             # We need the user to do 'juju integrate'.
-            event.add_status(ops.BlockedStatus('Waiting for database relation'))
+            event.add_status(ops.BlockedStatus("Waiting for database relation"))
         elif not self.database.fetch_relation_data():
             # We need the charms to finish integrating.
-            event.add_status(ops.WaitingStatus('Waiting for database relation'))
+            event.add_status(ops.WaitingStatus("Waiting for database relation"))
         try:
             status = self.container.get_service(self.pebble_service_name)
         except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-            event.add_status(ops.MaintenanceStatus('Waiting for Pebble in workload container'))
+            event.add_status(ops.MaintenanceStatus("Waiting for Pebble in workload container"))
         else:
             if not status.is_running():
-                event.add_status(ops.MaintenanceStatus('Waiting for the service to start up'))
+                event.add_status(ops.MaintenanceStatus("Waiting for the service to start up"))
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
@@ -125,20 +121,20 @@ class FastAPIDemoCharm(ops.CharmBase):
 
         Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
         """
-        params = event.load_params(GetDbInfoAction, errors='fail')
+        params = event.load_params(GetDbInfoAction, errors="fail")
         db_data = self.fetch_database_relation_data()
         if not db_data:
-            event.fail('No database connected')
+            event.fail("No database connected")
             return
         output = {
-            'db-host': db_data.get('db_host', None),
-            'db-port': db_data.get('db_port', None),
+            "db-host": db_data.get("db_host", None),
+            "db-port": db_data.get("db_port", None),
         }
         if params.show_password:
             output.update(
                 {
-                    'db-username': db_data.get('db_username', None),
-                    'db-password': db_data.get('db_password', None),
+                    "db-username": db_data.get("db_username", None),
+                    "db-password": db_data.get("db_password", None),
                 }
             )
         event.set_results(output)
@@ -156,16 +152,16 @@ class FastAPIDemoCharm(ops.CharmBase):
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
-        self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+        self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
         try:
             config = self.load_config(FastAPIConfig)
         except ValueError as e:
-            logger.error('Configuration error: %s', e)
+            logger.error("Configuration error: %s", e)
             return
         env = self.get_app_environment()
         try:
             self.container.add_layer(
-                'fastapi_demo',
+                "fastapi_demo",
                 self._get_pebble_layer(config.server_port, env),
                 combine=True,
             )
@@ -176,28 +172,28 @@ class FastAPIDemoCharm(ops.CharmBase):
             self.container.replan()
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-            logger.info('Unable to connect to Pebble: %s', e)
+            logger.info("Unable to connect to Pebble: %s", e)
 
     def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""
-        command = ' '.join(
+        command = " ".join(
             [
-                'uvicorn',
-                'api_demo_server.app:app',
-                '--host=0.0.0.0',
-                f'--port={port}',
+                "uvicorn",
+                "api_demo_server.app:app",
+                "--host=0.0.0.0",
+                f"--port={port}",
             ]
         )
         pebble_layer: ops.pebble.LayerDict = {
-            'summary': 'FastAPI demo service',
-            'description': 'pebble config layer for FastAPI demo server',
-            'services': {
+            "summary": "FastAPI demo service",
+            "description": "pebble config layer for FastAPI demo server",
+            "services": {
                 self.pebble_service_name: {
-                    'override': 'replace',
-                    'summary': 'fastapi demo',
-                    'command': command,
-                    'startup': 'enabled',
-                    'environment': environment,
+                    "override": "replace",
+                    "summary": "fastapi demo",
+                    "command": command,
+                    "startup": "enabled",
+                    "environment": environment,
                 }
             },
         }
@@ -209,30 +205,30 @@ class FastAPIDemoCharm(ops.CharmBase):
         if not db_data:
             return {}
         return {
-            'DEMO_SERVER_DB_HOST': db_data['db_host'],
-            'DEMO_SERVER_DB_PORT': db_data['db_port'],
-            'DEMO_SERVER_DB_USER': db_data['db_username'],
-            'DEMO_SERVER_DB_PASSWORD': db_data['db_password'],
+            "DEMO_SERVER_DB_HOST": db_data["db_host"],
+            "DEMO_SERVER_DB_PORT": db_data["db_port"],
+            "DEMO_SERVER_DB_USER": db_data["db_username"],
+            "DEMO_SERVER_DB_PASSWORD": db_data["db_password"],
         }
 
     def fetch_database_relation_data(self) -> dict[str, str]:
         """Retrieve relation data from a database."""
         relations = self.database.fetch_relation_data()
-        logger.debug('Got following database data: %s', relations)
+        logger.debug("Got following database data: %s", relations)
         for data in relations.values():
             if not data:
                 continue
-            logger.info('New PSQL database endpoint is %s', data['endpoints'])
-            host, port = data['endpoints'].split(':')
+            logger.info("New database endpoint is %s", data["endpoints"])
+            host, port = data["endpoints"].split(":")
             db_data = {
-                'db_host': host,
-                'db_port': port,
-                'db_username': data['username'],
-                'db_password': data['password'],
+                "db_host": host,
+                "db_port": port,
+                "db_username": data["username"],
+                "db_password": data["password"],
             }
             return db_data
         return {}
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     ops.main(FastAPIDemoCharm)

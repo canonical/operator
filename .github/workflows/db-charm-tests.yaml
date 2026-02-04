@@ -10,8 +10,12 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   db-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -32,23 +36,24 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
-      - name: Checkout the operator repository
-        uses: actions/checkout@v6
+      - name: Download operator wheels
+        uses: actions/download-artifact@v7
         with:
-          path: myops
-          persist-credentials: false
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
 
       - name: Install patch dependencies
         run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
           else
-            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock
+            poetry remove ops --lock
+            poetry add "${ops_wheel}" --lock
           fi
 
       - name: Install dependencies

@@ -510,12 +510,7 @@ nitpick_ignore = [
     ('py:class', 'scenario.state.CharmType'),
     ('py:class', 'scenario.state._EntityStatus'),
     ('py:class', 'scenario.state._Event'),
-    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
-
-# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
-# of _MaxPositionalArgs.
-_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
@@ -531,24 +526,6 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
           """,
     re.VERBOSE,
 )
-
-
-def _custom_get_signature(self):
-    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
-        signature = inspect.signature(self.object)
-        parameters = []
-        for position, param in enumerate(signature.parameters.values()):
-            if position >= self.object._max_positional_args:
-                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
-            else:
-                parameters.append(param)
-        signature = signature.replace(parameters=parameters)
-        return None, None, signature
-    return _real_get_signature(self)
-
-
-sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature
-
 
 # This is very strongly based on
 # https://github.com/sphinx-doc/sphinx/blob/03b9134ee00e98df4f8b5f6d22f345cdafe31870/sphinx/domains/changeset.py#L46

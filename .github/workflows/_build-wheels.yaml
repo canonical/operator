@@ -1,0 +1,38 @@
+name: Build Operator Wheels
+
+on:
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Name of the artifact containing the wheels"
+        value: ${{ jobs.build-wheels.outputs.artifact-name }}
+
+permissions: {}
+
+jobs:
+  build-wheels:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.artifact-name.outputs.name }}
+    steps:
+      - name: Checkout the operator repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+
+      - name: Build wheels
+        run: uv build --all
+
+      - name: Set artifact name
+        id: artifact-name
+        run: echo "name=operator-wheels-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload wheels as artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: dist/*.whl
+          retention-days: 1

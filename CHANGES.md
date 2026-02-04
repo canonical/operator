@@ -1,3 +1,37 @@
+# 3.5.1 - 28 January 2026
+
+## Fixes
+
+* Use `parse_rfc3339` for datetime parsing to support Juju 4 (#2264)
+* Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
+* Prevent `KeyError` on `auth-type` when creating `CloudCredential` object (#2268)
+* `_checks_action` should return empty list when there are no changes (#2270)
+
+## Documentation
+
+* Provide examples in unit testing how-to, and other small improvements (#2251)
+* Update the action how-to to explain the additionalProperties default flip (#2249)
+* For state-transition tests, clarify about immutability and reusing state (#2153)
+* Fix and clarify holistic example of handling storage (#2098)
+* Remove comments from K8s tutorial and clarify about persisting data (#2253)
+* Clarify handling of postgres relation data in K8s tutorial (#2256)
+* Improve unit tests of httpbin demo charm (#2254)
+* Add version information for tools in the charming ecosystem (#2231)
+* Avoid emojis that render differently across platforms (#2273)
+* Secrets over CMR comment added (#2271)
+* Fix charm name in httpbin deploy command (#2276)
+* Updated security@ubuntu.com PGP key (#2286)
+
+## Tests
+
+* Remove unnecessary test module (#2247)
+
+## CI
+
+* Replace git reference injection with wheel artifacts in charm test workflows (#2252)
+* Explicitly provide the charmcraft repo location in CI (#2277)
+* Remove outdated custom signature generation (#2280)
+
 # 3.5.0 - 18 December 2025
 
 ## Features
