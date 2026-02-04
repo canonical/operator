@@ -124,12 +124,24 @@ elif [ -e "poetry.lock" ]; then
 # 3. Handle uv-based charms
 elif [ -e "uv.lock" ]; then
   echo "✓ Found uv-based charm"
-  echo "  Strategy: Update uv.lock with wheel files"
+  echo "  Strategy: Use tox to force-reinstall ops 3.x wheels after uv install"
   
-  uv add --raw-sources "$OPS_WHEEL"
-  uv add --raw-sources "$OPS_SCENARIO_WHEEL"
-  echo "    ✓ Updated uv.lock with ops 3.x wheels"
-  UPDATED=true
+  # uv doesn't support adding local wheels to the lock file
+  # Instead, we use the same tox.ini patching approach as Poetry
+  if [ -e "tox.ini" ]; then
+    # Find all testenv sections and add pip commands to install wheels
+    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
+    if [ -n "$testenv_sections" ]; then
+      echo "$testenv_sections" | while IFS= read -r section; do
+        add_tox_pip_commands "$section"
+      done
+      echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels after uv install"
+      UPDATED=true
+    fi
+  else
+    echo "    ✗ Error: uv-based charm has no tox.ini to patch"
+    UPDATED=false
+  fi
 
 else
   echo "✗ Error: No recognised dependency files found (requirements.txt, poetry.lock, or uv.lock)"
