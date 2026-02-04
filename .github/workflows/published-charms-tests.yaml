@@ -197,18 +197,24 @@ jobs:
       - name: Install patch dependencies
         run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
+      - name: Set up Python 3.11 for wordpress-k8s (Python 3.12 incompatibility)
+        if: matrix.charm-repo == 'canonical/wordpress-k8s-operator'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Special case for wordpress-k8s (Python 3.12 incompatibility)
         if: matrix.charm-repo == 'canonical/wordpress-k8s-operator'
         working-directory: ${{ matrix.charm-root }}
         run: |
           set -xueo pipefail
           # mysql-connector-python doesn't have wheels for Python 3.12, cap at 3.11
-          if [ -e ".python-version" ]; then
-            sed -i -E "s/^3\.12\..*/3.11/" .python-version
-          fi
           if [ -e "pyproject.toml" ]; then
-            sed -i -E "s/requires-python = \">=3\.10\"/requires-python = \">=3.10,<3.12\"/" pyproject.toml
-            sed -i -E "s/requires-python = '>=3\.10'/requires-python = '>=3.10,<3.12'/" pyproject.toml
+            sed -i -E "s/requires-python = \"[^\"]+\"/requires-python = \">=3.10,<3.12\"/" pyproject.toml
+            sed -i -E "s/requires-python = '[^']+'/requires-python = '>=3.10,<3.12'/" pyproject.toml
+          fi
+          if [ -e ".python-version" ]; then
+            echo "3.11" > .python-version
           fi
 
       - name: Bump minimum Python version to align with ops requirements
