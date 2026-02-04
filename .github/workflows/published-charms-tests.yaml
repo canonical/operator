@@ -258,7 +258,7 @@ jobs:
           # Update .python-version
           if [ -e ".python-version" ]; then
             # Replace any 3.8 or 3.9 version with 3.10
-            sed -i -E "s/^3\.[89]\..*/3.10/" .python-version
+            sed -i -E "s/^3\.[89](\..*)?$/3.10/" .python-version
           fi
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
