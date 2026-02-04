@@ -53,7 +53,9 @@ add_tox_pip_commands() {
   
   # Add commands_post to force-reinstall ops after regular install
   echo "    Adding commands_post to force-reinstall ops 3.x"
-  sed -i "/$section_pattern/a commands_post =\n    pip install --force-reinstall --no-deps $OPS_WHEEL\n    pip install --no-deps $OPS_SCENARIO_WHEEL" tox.ini
+  sed -i "/$section_pattern/a commands_post =" tox.ini
+  sed -i "/$section_pattern/,/^\[testenv:/ { /^commands_post[[:space:]]*=/a\\    pip install --force-reinstall --no-deps $OPS_WHEEL" tox.ini
+  sed -i "/$section_pattern/,/^\[testenv:/ { /pip install --force-reinstall --no-deps.*ops.*whl/a\\    pip install --no-deps $OPS_SCENARIO_WHEEL" tox.ini
 }
 
 # Detect dependency management system and patch accordingly
@@ -69,9 +71,9 @@ if [ -e "test-requirements.txt" ] || [ -e "requirements-charmcraft.txt" ] || [ -
       echo "  Patching $req_file"
       # Remove existing ops and ops-scenario entries
       sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" "$req_file"
-      echo -e "\n$OPS_WHEEL" >> "$req_file"
+      printf '\n%s\n' "$OPS_WHEEL" >> "$req_file"
       sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" "$req_file"
-      echo -e "\n$OPS_SCENARIO_WHEEL" >> "$req_file"
+      printf '\n%s\n' "$OPS_SCENARIO_WHEEL" >> "$req_file"
       echo "    ✓ Updated $req_file with ops 3.x"
       UPDATED=true
     fi
@@ -85,9 +87,12 @@ if [ -e "test-requirements.txt" ] || [ -e "requirements-charmcraft.txt" ] || [ -
     sed -i -E "/^[[:space:]]*ops-scenario[>=<]/d" tox.ini
     echo "    ✓ Removed inline ops deps from tox.ini"
     
-    # Add commands_post to force-reinstall
-    if grep -q "^\[testenv:unit\]" tox.ini; then
-      add_tox_pip_commands "testenv:unit"
+    # Add commands_post to force-reinstall for all testenv sections
+    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
+    if [ -n "$testenv_sections" ]; then
+      echo "$testenv_sections" | while IFS= read -r section; do
+        add_tox_pip_commands "$section"
+      done
     fi
   fi
   
@@ -96,19 +101,27 @@ elif [ -e "poetry.lock" ]; then
   echo "✓ Found Poetry-based charm"
   echo "  Strategy: Update poetry.lock with wheel files"
   
-  poetry add "$OPS_WHEEL" --lock
-  poetry add "$OPS_SCENARIO_WHEEL" --lock
-  echo "    ✓ Updated poetry.lock with ops 3.x wheels"
-  UPDATED=true
+  # Poetry doesn't support adding local wheels directly to the lock file
+  # Instead, we use the same tox.ini patching approach as requirements.txt
+  if [ -e "tox.ini" ]; then
+    # Find all testenv sections and add pip commands to install wheels
+    testenv_sections=$(grep -E "^\[testenv(:[^\]]+)?\]" tox.ini | sed -E 's/^\[([^]]+)\].*$/\1/' | sort -u || true)
+    if [ -n "$testenv_sections" ]; then
+      echo "$testenv_sections" | while IFS= read -r section; do
+        add_tox_pip_commands "$section"
+      done
+      echo "    ✓ Updated tox.ini to force-reinstall ops 3.x wheels after Poetry install"
+      UPDATED=true
+    fi
+  fi
 
 # 3. Handle uv-based charms
 elif [ -e "uv.lock" ]; then
   echo "✓ Found uv-based charm"
   echo "  Strategy: Update uv.lock with wheel files"
   
-  uv add --frozen --raw-sources "$OPS_WHEEL"
-  uv add --frozen --raw-sources "$OPS_SCENARIO_WHEEL"
-  uv lock
+  uv add --raw-sources "$OPS_WHEEL"
+  uv add --raw-sources "$OPS_SCENARIO_WHEEL"
   echo "    ✓ Updated uv.lock with ops 3.x wheels"
   UPDATED=true
 

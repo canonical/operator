@@ -287,6 +287,12 @@ jobs:
         working-directory: charm-repo/${{ matrix.charm-root }}
         run: tox -vve unit
         env:
+          # Required to allow pip to install packages that may have incompatible
+          # requires-python constraints. This is necessary because we're testing
+          # ops 3.x compatibility with charms that may have older Python version
+          # requirements. The actual Python version in use (3.10+) is compatible
+          # with ops 3.x, but some transitive dependencies may declare older
+          # version requirements.
           PIP_IGNORE_REQUIRES_PYTHON: "1"
 
       - name: Check for tox static environment
@@ -306,6 +312,12 @@ jobs:
         working-directory: charm-repo/${{ matrix.charm-root }}
         run: tox -vve static
         env:
+          # Required to allow pip to install packages that may have incompatible
+          # requires-python constraints. This is necessary because we're testing
+          # ops 3.x compatibility with charms that may have older Python version
+          # requirements. The actual Python version in use (3.10+) is compatible
+          # with ops 3.x, but some transitive dependencies may declare older
+          # version requirements.
           PIP_IGNORE_REQUIRES_PYTHON: "1"
 
 
