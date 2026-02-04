@@ -337,8 +337,8 @@ jobs:
               fi
             fi
           else
-            echo "Warning: No requirements.txt or poetry.lock or uv.lock file found. Skipping ops version update."
-            echo "The charm may not use Python dependencies or may have a non-standard setup."
+            echo "Error: No requirements.txt or poetry.lock or uv.lock file found"
+            exit 1
           fi
 
       - name: Install dependencies
