@@ -304,6 +304,7 @@ jobs:
 
   charmcraft-profile-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -319,22 +320,31 @@ jobs:
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech
 
+      - name: Download operator wheels
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
+
       - name: Install dependencies
         run: pip install tox~=4.2 uv~=0.9 tox-uv~=1.29
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         run: |
           set -xueo pipefail
+          # Get the absolute paths to the wheels
+          ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+          ops_scenario_wheel="$(ls operator-wheels/ops_scenario-*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             sed -i -e "/^ops-scenario[ ><=]/d" -e "/^ops\[testing\][ ><=]/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops-scenario&subdirectory=testing" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
+            echo -e "\n${ops_scenario_wheel}" >> requirements.txt
           elif [ -e "uv.lock" ]; then
             uv remove ops[testing] --group unit --frozen
             uv remove ops --frozen
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --group unit --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit
+            uv add "${ops_scenario_wheel}" --group unit --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no uv.lock file found"
             exit 1
