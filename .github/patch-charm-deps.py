@@ -8,8 +8,10 @@ Usage: patch-charm-deps.py <ops-wheel> <ops-scenario-wheel>
 """
 
 import argparse
+import configparser
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -25,59 +27,101 @@ def update_python_version_requirements(charm_root: Path, max_version: str | None
     # Update tox.ini
     tox_ini = charm_root / "tox.ini"
     if tox_ini.exists():
-        content = tox_ini.read_text()
-        original = content
+        config = configparser.ConfigParser()
+        config.read(tox_ini)
+        modified = False
         
-        # Update basepython to use python3.10 if it's set to 3.8 or 3.9
-        content = re.sub(r'^basepython = python3\.[89]$', 'basepython = python3.10', content, flags=re.MULTILINE)
+        for section in config.sections():
+            # Update basepython to use python3.10 if it's set to 3.8 or 3.9
+            if config.has_option(section, 'basepython'):
+                basepython = config.get(section, 'basepython')
+                if basepython in ('python3.8', 'python3.9'):
+                    config.set(section, 'basepython', 'python3.10')
+                    modified = True
+            
+            # Update envlist to replace py38/py39 with py310
+            if config.has_option(section, 'envlist'):
+                envlist = config.get(section, 'envlist')
+                new_envlist = envlist.replace('py38', 'py310').replace('py39', 'py310')
+                new_envlist = new_envlist.replace('{py38}', '{py310}').replace('{py39}', '{py310}')
+                if new_envlist != envlist:
+                    config.set(section, 'envlist', new_envlist)
+                    modified = True
         
-        # Update py3X environment factors to py310 minimum
-        content = re.sub(r'\{py3[89]\}', '{py310}', content)
-        content = re.sub(r'py3[89]', 'py310', content)
-        
-        if content != original:
-            tox_ini.write_text(content)
+        if modified:
+            with open(tox_ini, 'w') as f:
+                config.write(f)
             print(f"  ✓ Updated {tox_ini.relative_to(charm_root)}")
     
     # Update pyproject.toml requires-python
     pyproject = charm_root / "pyproject.toml"
     if pyproject.exists():
         content = pyproject.read_text()
-        original = content
         
-        if max_version:
-            # Cap at max_version
-            version_constraint = f'">=3.10,<{max_version}"'
-            content = re.sub(
-                r'requires-python = ["\'][^"\']+["\']',
-                f'requires-python = {version_constraint}',
-                content
-            )
-        else:
-            # Update requires-python to >=3.10 if it's <3.10 (handles >=3.8, >=3.9, >=3.8.6, etc.)
-            content = re.sub(
-                r'requires-python = ["\']>=3\.[89](\.[0-9]+)?["\']',
-                'requires-python = ">=3.10"',
-                content
-            )
+        # Parse TOML
+        try:
+            data = tomllib.loads(content)
+        except tomllib.TOMLDecodeError:
+            # Fall back to regex if TOML parsing fails
+            print(f"  ⚠ Warning: Could not parse {pyproject.name} as TOML, using regex fallback")
+            original = content
+            if max_version:
+                version_constraint = f'">=3.10,<{max_version}"'
+                content = re.sub(
+                    r'requires-python = ["\'][^"\']+["\']',
+                    f'requires-python = {version_constraint}',
+                    content
+                )
+            else:
+                content = re.sub(
+                    r'requires-python = ["\']>=3\.[89](\.[0-9]+)?["\']',
+                    'requires-python = ">=3.10"',
+                    content
+                )
+            if content != original:
+                pyproject.write_text(content)
+                print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
+            return
         
-        if content != original:
+        # Update requires-python if it exists
+        modified = False
+        if 'project' in data and 'requires-python' in data['project']:
+            requires_python = data['project']['requires-python']
+            
+            if max_version:
+                # Cap at max_version
+                new_requires = f">=3.10,<{max_version}"
+            elif re.match(r'>=3\.[89]', requires_python):
+                # Update to >=3.10 if currently <3.10
+                new_requires = ">=3.10"
+            else:
+                new_requires = None
+            
+            if new_requires:
+                # Use regex to preserve the exact format (quotes, whitespace)
+                content = re.sub(
+                    r'(requires-python\s*=\s*)["\'][^"\']+["\']',
+                    f'\\1"{new_requires}"',
+                    content
+                )
+                modified = True
+        
+        if modified:
             pyproject.write_text(content)
             print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
     
     # Update .python-version
     python_version = charm_root / ".python-version"
     if python_version.exists():
-        content = python_version.read_text()
+        content = python_version.read_text().strip()
         # Replace any 3.8 or 3.9 version with 3.10 (or 3.11 if max_version is 3.12)
-        if max_version == "3.12":
-            new_version = "3.11\n"
-        else:
-            new_version = "3.10\n"
-        
-        if re.match(r'^3\.[89]\.', content):
-            python_version.write_text(new_version)
-            print(f"  ✓ Updated {python_version.relative_to(charm_root)} to {new_version.strip()}")
+        if re.match(r'^3\.[89]', content):
+            if max_version == "3.12":
+                new_version = "3.11"
+            else:
+                new_version = "3.10"
+            python_version.write_text(new_version + "\n")
+            print(f"  ✓ Updated {python_version.relative_to(charm_root)} to {new_version}")
 
 
 def add_tox_pip_commands(tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool) -> None:
@@ -90,55 +134,38 @@ def add_tox_pip_commands(tox_ini_path: Path, section: str, ops_wheel: str, ops_s
         ops_scenario_wheel: Path to ops-scenario wheel file
         use_uv_pip: Whether to use 'uv pip install' instead of 'pip install'
     """
-    content = tox_ini_path.read_text()
-    lines = content.split('\n')
+    config = configparser.ConfigParser()
+    config.read(tox_ini_path)
     
-    section_pattern = f'[{section}]'
-    section_idx = None
-    
-    # Find the section
-    for i, line in enumerate(lines):
-        if line.strip() == section_pattern:
-            section_idx = i
-            break
-    
-    if section_idx is None:
+    if not config.has_section(section):
         print(f"  Section [{section}] not found in tox.ini, skipping")
         return
     
     print(f"  Adding pip to allowlist_externals and commands_post in [{section}]")
     
-    # Find the next section or end of file
-    next_section_idx = len(lines)
-    for i in range(section_idx + 1, len(lines)):
-        if lines[i].startswith('[testenv'):
-            next_section_idx = i
-            break
-    
-    # Check if allowlist_externals already exists in this section
-    allowlist_idx = None
-    for i in range(section_idx, next_section_idx):
-        if re.match(r'^allowlist_externals\s*=', lines[i]):
-            allowlist_idx = i
-            break
-    
     pip_cmd = "uv pip install" if use_uv_pip else "pip install"
     
-    if allowlist_idx is not None:
-        print("    Found existing allowlist_externals, appending pip")
-        # Insert pip as an indented entry after allowlist_externals
-        lines.insert(allowlist_idx + 1, "    pip")
+    # Add pip to allowlist_externals
+    if config.has_option(section, 'allowlist_externals'):
+        allowlist = config.get(section, 'allowlist_externals')
+        if 'pip' not in allowlist.split():
+            print("    Found existing allowlist_externals, appending pip")
+            # Preserve multi-line format if it exists
+            if '\n' in allowlist:
+                config.set(section, 'allowlist_externals', allowlist + '\n    pip')
+            else:
+                config.set(section, 'allowlist_externals', allowlist + '\n    pip')
     else:
         print("    Creating new allowlist_externals with pip")
-        lines.insert(section_idx + 1, "allowlist_externals = pip")
+        config.set(section, 'allowlist_externals', 'pip')
     
     # Add commands_post
     print(f"    Adding commands_post to force-reinstall ops 3.x (using '{pip_cmd}')")
-    lines.insert(section_idx + 1, "commands_post =")
-    lines.insert(section_idx + 2, f"    {pip_cmd} --force-reinstall --no-deps {ops_wheel}")
-    lines.insert(section_idx + 3, f"    {pip_cmd} --no-deps {ops_scenario_wheel}")
+    commands_post = f"\n    {pip_cmd} --force-reinstall --no-deps {ops_wheel}\n    {pip_cmd} --no-deps {ops_scenario_wheel}"
+    config.set(section, 'commands_post', commands_post)
     
-    tox_ini_path.write_text('\n'.join(lines))
+    with open(tox_ini_path, 'w') as f:
+        config.write(f)
 
 
 def patch_tox_testenv_sections(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
@@ -151,24 +178,33 @@ def patch_tox_testenv_sections(charm_root: Path, ops_wheel: str, ops_scenario_wh
     if not tox_ini.exists():
         return False
     
-    content = tox_ini.read_text()
+    config = configparser.ConfigParser()
+    config.read(tox_ini)
     
     # Detect if tox-uv is being used
-    use_uv_pip = (
-        re.search(r'^runner\s*=\s*["\']?uv-venv', content, re.MULTILINE) is not None or
-        re.search(r'^package\s*=\s*["\']?uv', content, re.MULTILINE) is not None
-    )
+    use_uv_pip = False
+    for section in config.sections():
+        if config.has_option(section, 'runner'):
+            runner = config.get(section, 'runner')
+            if 'uv-venv' in runner:
+                use_uv_pip = True
+                break
+        if config.has_option(section, 'package'):
+            package = config.get(section, 'package')
+            if 'uv' in package:
+                use_uv_pip = True
+                break
     
     if use_uv_pip:
         print("  Detected tox-uv, will use 'uv pip install'")
     
     # Find all testenv sections
-    sections = set(re.findall(r'^\[(testenv(?::[^\]]+)?)\]', content, re.MULTILINE))
+    testenv_sections = [s for s in config.sections() if s.startswith('testenv')]
     
-    if not sections:
+    if not testenv_sections:
         return False
     
-    for section in sorted(sections):
+    for section in sorted(testenv_sections):
         add_tox_pip_commands(tox_ini, section, ops_wheel, ops_scenario_wheel, use_uv_pip)
     
     return True
@@ -215,13 +251,31 @@ def patch_requirements_txt(charm_root: Path, ops_wheel: str, ops_scenario_wheel:
     # Also patch inline deps in tox.ini if present
     tox_ini = charm_root / "tox.ini"
     if tox_ini.exists():
-        content = tox_ini.read_text()
-        if re.search(r'^\s+ops', content, re.MULTILINE):
-            print("  Found inline ops deps in tox.ini, patching...")
-            # Remove ops and ops-scenario deps from tox.ini deps sections
-            content = re.sub(r'^\s+(ops\[testing\]|ops)[>=<].*\n', '', content, flags=re.MULTILINE)
-            content = re.sub(r'^\s+ops-scenario[>=<].*\n', '', content, flags=re.MULTILINE)
-            tox_ini.write_text(content)
+        config = configparser.ConfigParser()
+        config.read(tox_ini)
+        
+        modified = False
+        for section in config.sections():
+            if config.has_option(section, 'deps'):
+                deps = config.get(section, 'deps')
+                # Remove ops and ops-scenario deps
+                new_deps_lines = []
+                for line in deps.split('\n'):
+                    line = line.strip()
+                    if line and not (
+                        re.match(r'^ops(\[testing\])?[>=<]', line) or
+                        re.match(r'^ops-scenario[>=<]', line)
+                    ):
+                        new_deps_lines.append(line)
+                
+                if len(new_deps_lines) != len([l for l in deps.split('\n') if l.strip()]):
+                    print("  Found inline ops deps in tox.ini, patching...")
+                    config.set(section, 'deps', '\n    ' + '\n    '.join(new_deps_lines) if new_deps_lines else '')
+                    modified = True
+        
+        if modified:
+            with open(tox_ini, 'w') as f:
+                config.write(f)
             print("    ✓ Removed inline ops deps from tox.ini")
             patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel)
     
