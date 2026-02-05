@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
@@ -32,7 +34,7 @@ import ops
         ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
-def test_event_type(evt, expected_type):
+def test_event_type(evt: str, expected_type: _EventType):
     event = _Event(evt)
     assert event._path.type is expected_type
 
@@ -45,7 +47,7 @@ def test_event_type(evt, expected_type):
     class MyCharm(ops.CharmBase):
         pass
 
-    spec = _CharmSpec(
+    spec = _CharmSpec[MyCharm](
         MyCharm,
         meta={
             'requires': {
@@ -76,6 +78,8 @@ def test_emitted_framework():
 
 def test_emitted_deferred():
     class MyCharm(ops.CharmBase):
+        META: ClassVar[dict[str, Any]] = {'name': 'joop'}
+
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)

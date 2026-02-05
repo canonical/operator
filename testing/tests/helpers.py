@@ -60,7 +60,7 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self, other: State):
+def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
@@ -79,5 +79,8 @@ def jsonpatch_delta(self, other: State):
     return sort_patch(patch)
 
 
-def sort_patch(patch: list[dict], key=lambda obj: obj['path'] + obj['op']):
+def sort_patch(
+    patch: list[dict[str, Any]],
+    key: Callable[[dict[str, Any]], str] = lambda obj: obj['path'] + obj['op'],
+) -> list[dict[str, Any]]:
     return sorted(patch, key=key)
