@@ -298,7 +298,7 @@ First, create a file called `simulate.sh` in your project directory:
 ```sh
 #!/bin/sh
 
-unit_location="10.1.0.145:8000"  # Get the IP address from 'juju status'
+unit_location="10.1.157.94:8000"  # Get the IP address from 'juju status'
 
 while true; do
     for i in {1..3}; do
