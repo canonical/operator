@@ -278,7 +278,7 @@ concierge-k8s  admin/cos-lite.grafana     admin   grafana_dashboard:grafana-dash
 
 As you might notice from your knowledge of Juju, this is essentially preparing these endpoints, which exist in the `cos-lite` model, for a cross-model relation with your charm, which you've deployed to the `testing` model.
 
-## Integrate your charm with COS Lite
+### Integrate your charm with COS Lite
 
 Now switch back to the charm model and integrate your charm with the exposed endpoints, as below. This effectively integrates your application with Prometheus, Loki, and Grafana.
 
@@ -289,49 +289,117 @@ juju integrate fastapi-demo admin/cos-lite.loki
 juju integrate fastapi-demo admin/cos-lite.prometheus
 ```
 
-### Access your applications from the host machine
+### Simulate API requests
 
-```{important}
-There is currently an issue with this part of the tutorial. If you follow the instructions, you may not be able to access Grafana from your host machine. We're working on improving the instructions. Check back soon for the new instructions!
+Before we monitor the health of our application, let's simulate a continuous load of API requests. We'll set up the simulation so that a proportion of requests fail because of a server error.
+
+First, create a file called `simulate.sh` in your project directory:
+
+```sh
+#!/bin/sh
+
+unit_location="10.1.157.94:8000"  # Get the IP address from 'juju status'
+
+while true; do
+    for i in {1..3}; do
+        curl "http://$unit_location/names"
+        echo
+        sleep 5
+    done
+
+    curl "http://$unit_location/error"
+    echo
+    sleep 5
+done
 ```
 
-The power of Grafana lies in the way it allows you to visualise metrics on a dashboard. Thus, in the general case you will want to open the Grafana Web UI in a web browser. However, you are now working in a headless VM that does not have any user interface. This means that you will need to open Grafana in a web browser on your host machine. To do this, you will need to add IP routes to the Kubernetes network inside of our VM.
+This script repeatedly sends requests to our application's API endpoints. Our application's `/error` endpoint deliberately returns HTTP status code 500 (Internal Server Error). When we monitor the health of our application, we'll see a sustained error rate of 25%.
 
-First, run:
+Replace 10.1.157.94 by the IP address of your `fastapi-demo` unit, which you can get from the output of `juju status`.
+
+```{note}
+`simulate.sh` isn't intended to show how to benchmark a real application. Sending requests to a Juju unit is convenient as a one-off local simulation, but for a real application you'd send requests through an ingress integrator such as [Traefik](https://charmhub.io/traefik-k8s). You'd also use a benchmarking tool such as [ab](https://httpd.apache.org/docs/2.2/programs/ab.html).
+```
+
+Next, open a new terminal in your virtual machine:
 
 ```text
-juju status -m cos-lite
+multipass shell juju-sandbox-k8s
 ```
 
-This should result in an output similar to the one below:
+Then run the script:
 
 ```text
-Model     Controller     Cloud/Region  Version  SLA          Timestamp
-cos-lite  concierge-k8s  k8s           3.6.13   unsupported  18:05:07+01:00
-
-App           Version  Status  Scale  Charm             Channel        Rev  Address         Exposed  Message
-alertmanager  0.27.0   active      1  alertmanager-k8s  1/stable       180  10.152.183.70   no
-catalogue              active      1  catalogue-k8s     1/stable        87  10.152.183.19   no
-grafana       9.5.21   active      1  grafana-k8s       1/stable       160  10.152.183.132  no
-loki          2.9.6    active      1  loki-k8s          1/stable       199  10.152.183.207  no
-prometheus    2.52.0   active      1  prometheus-k8s    1/stable       247  10.152.183.196  no
-traefik       2.11.0   active      1  traefik-k8s       latest/stable  263  10.152.183.83   no       Serving at 10.223.2.63
+chmod +x ~/fastapi-demo/simulate.sh
+. ~/fastapi-demo/simulate.sh
 ```
 
-From this output, from the `Address` column, retrieve the IP address for each app to obtain the  Kubernetes service IP address range. Make a note of each as well as the range. (In our output we got the `10.152.183.0-10.152.183.255` range.)
+The output should look like:
 
-```{caution}
-
-Do not mix up Apps and Units -- Units represent Kubernetes pods while Apps represent Kubernetes Services.  Note: The charm should be programmed to support Services.
+```text
+{"names":{}}
+{"names":{}}
+{"names":{}}
+Internal server error
+{"names":{}}
+...
 ```
 
-Now open a terminal on your host machine and run:
+Leave the script running for the rest of the tutorial. To stop the script later, press <kbd>Ctrl</kbd> + <kbd>C</kbd>.
+
+### Access Grafana from your host machine
+
+Grafana allows you to visualise metrics on a dashboard. We'll now open Grafana's web UI to monitor the health of our application.
+
+COS Lite exposes Grafana through a load balancer that is provided by the [Traefik](https://charmhub.io/traefik-k8s) ingress integrator. In a production deployment, you'd access Grafana by connecting to the external endpoint that Traefik exposes. We don't have a production deployment, so we'll access Grafana by connecting to the load balancer's Kubernetes service.
+
+To access Grafana from your host machine, you'll need:
+
+- Grafana's admin password
+- The HTTP port of the load balancer's Kubernetes service
+- Your virtual machine's IP address
+
+To get Grafana's admin password, run the following command in your virtual machine:
+
+```text
+juju run grafana/0 -m cos-lite get-admin-password --wait 1m
+```
+
+The output should look like:
+
+```text
+Running operation 3 with 1 task
+  - task 4 on unit-grafana-0
+
+Waiting for task 4...
+admin-password: eEJOix1zkrJ6
+url: http://10.43.45.0/cos-lite-grafana
+```
+
+In our example, the admin password is `eEJOix1zkrJ6`.
+
+Next, to get the HTTP port of the load balancer's Kubernetes service, run the following command in your virtual machine:
+
+```text
+kubectl -n cos-lite get svc traefik-lb
+```
+
+The output should look like:
+
+```text
+NAME         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+traefik-lb   LoadBalancer   10.152.183.166   10.43.45.0    80:31471/TCP,443:31548/TCP   10m
+```
+
+The port we want is given by `80:<port>/TCP`. In our example, the port is 31471.
+
+Finally, to get your virtual machine's IP address, run the following command on your host machine:
 
 ```text
 multipass info juju-sandbox-k8s
 ```
 
-This should result in an output similar to the one below:
+The output should look like:
 
 ```text
 Name:           juju-sandbox-k8s
@@ -351,63 +419,55 @@ Mounts:         /home/me/k8s-tutorial => ~/fastapi-demo
                     GID map: 1000:default
 ```
 
-From this output, retrieve your Multipass Ubuntu VM's network IP address. In our case it is `10.112.13.157`.
+The IP address we want is the first IPv4 address listed. In our example, the IP address is 10.112.13.157.
 
-Now, also on your host machine, run the code below.  Until the next reboot, this will forward all the traffic for your Kubernetes Service IP range via the network on your VM. This will allow you, for example, to view your Grafana dashboards in a web browser inside your VM, as we do in the next step.
-
-```text
-sudo ip route add 10.152.183.0/24 via 10.112.13.157
-```
-
-## Log in to Grafana
-
-In a terminal inside your VM, do all of the following:
-
-First, run `juju status` again to retrieve the IP address of your Grafana service.  For us it is `http://10.152.183.132:3000` (see the output above).
-
-Now, use `juju run` to retrieve your Grafana password, as shown below.
+We can now combine the IP address and port to obtain the URL of Grafana's web UI:
 
 ```text
-juju run grafana/0 -m cos-lite get-admin-password --wait 1m
+http://10.112.13.157:31471/cos-lite-grafana
 ```
 
-Now, on your host machine, open a web browser, enter the Grafana IP address, and use the username "admin" and your Grafana password to log in.
+Your Grafana URL will be similar.
 
-### Inspect the dashboards
+Open your Grafana URL in your browser, then log in using the username `admin` and the password you got from `juju run`.
 
-In your Grafana web page, do all of the following:
+### Inspect the Grafana dashboard
 
-Click `FastAPI Monitoring`. You should see the Grafana Dashboard that we uploaded to the `grafana_dashboards` directory of your charm.
+In the Grafana web UI, navigate to the Dashboards page, then click **General > FastAPI Monitoring**. This opens the dashboard that you put in the `grafana_dashboards` directory of your charm.
 
-Next, in the `Juju model` drop down field, select `testing`.
+Next, in the "Juju model" drop down field, select "testing".
 
-Now, call a couple of API points on the application, as below. To produce some successful requests and some requests with code 500 (internal server error), call several times, in any order.
+You should see the following data on the dashboard:
+
+- **HTTP request duration percentiles** - This graph shows Prometheus data. It tracks the duration below which 60% of requests fall (p60) and the duration below which 90% of requests fall (p90).
+- **Percentage of failed requests** - This graph should be flat at 25% because `simulate.sh` sends 25% of requests to `/error`.
+- **FastAPI logs from the workload container** - These logs were captured from our application by Pebble, sent to Loki, then sent to Grafana. You can see info and error messages as FastAPI handles each request to `/names` and `/error`, including exception tracebacks.
+
+![Application monitoring dashboard in Grafana](../../resources/k8s-tutorial-observe-dashboard.png)
+
+### Inspect metrics in Prometheus
+
+Let's use Prometheus to explore the metrics that our application provides from its `/metrics` endpoint. These metrics are the data source for the graphs on the Grafana dashboard.
+
+The URL of Prometheus's web UI is:
 
 ```text
-curl 10.1.157.94:8000/names
+http://10.112.13.157:31471/cos-lite-prometheus-0/graph
 ```
 
-and
+Where 10.112.13.157 is your virtual machine's IP address and 31471 is the HTTP port of the load balancer's Kubernetes service, as with Grafana.
+
+Open your Prometheus URL in your browser, then enter a search expression and click **Execute**. For example, use the following expression to see how many requests the `/names` endpoint has received:
 
 ```text
-curl 10.1.157.94:8000/error
+starlette_requests_total{path="/names"}
 ```
 
-where `10.1.157.94` is the IP of our application unit (pod).
+The search result should look like:
 
-In a while you should see the following data appearing on the dashboard:
+![Application metrics in Prometheus](../../resources/k8s-tutorial-observe-metrics.png)
 
-1. HTTP Request Duration Percentiles. This dashboard is based on the data from Prometheus and will allow you to see what fraction of requests takes what amount of time.
-2. Percent of failed requests per 2 minutes time frame. In your case this will be a ratio of all the requests and the requests submitted to the `/error` path (i.e., the ones that cause the Internal Server Error).
-3. Logs from your application that were collected by Loki and forwarded to Grafana. Here you can see some INFO level logs and ERROR logs with traceback from Python when you were calling the `/error` path.
-
-![Observe your charm with COS Lite](../../resources/observe_your_charm_with_cos_lite.png)
-
-```{important}
-
-If you are interested in the Prometheus metrics produced by your application that were used to build these dashboards you can run following command in your VM: `curl <your app pod IP>:8000/metrics`
-Also, you can reach Prometheus in your web browser (similar to Grafana) at `http://<Prometheus pod IP>:9090/graph` .
-```
+Which means that `/names` has received 150 requests so far.
 
 ## Review the final code
 
