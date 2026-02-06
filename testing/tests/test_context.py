@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Mapping
-
 import os
+from collections.abc import Mapping
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -228,11 +228,11 @@ def test_init_with_actions_only():
 
 def test_init_with_no_meta():
     with pytest.raises(ContextSetupError):
-        ctx = Context(MyCharm)
+        _ = Context(MyCharm)
 
 
 def test_init_with_bad_meta():
-    ctx = Context(MyCharm, meta={'a truth universally acknowledged': 'it'})  # type: ignore
+    ctx = Context(MyCharm, meta={'a truth universally acknowledged': 'it'})
     with pytest.raises((UncaughtCharmError, KeyError)):
         ctx.run(ctx.on.update_status(), State())
 
