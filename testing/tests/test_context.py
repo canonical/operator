@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from scenario import Context, State
-from scenario.errors import UncaughtCharmError
+from scenario.errors import ContextSetupError, UncaughtCharmError
 from scenario.state import _Event, _next_action_id
 
 from ops import CharmBase
@@ -205,6 +205,7 @@ def test_init_with_meta_only():
     assert spec.meta is meta
     assert spec.config is None
     assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_config_only():
@@ -213,6 +214,7 @@ def test_init_with_config_only():
     assert spec.meta == {'name': 'MyCharm'}
     assert spec.config is CONFIG
     assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_actions_only():
@@ -221,6 +223,18 @@ def test_init_with_actions_only():
     assert spec.meta == {'name': 'MyCharm'}
     assert spec.config is None
     assert spec.actions is ACTIONS
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_no_meta():
+    with pytest.raises(ContextSetupError):
+        ctx = Context(MyCharm)
+
+
+def test_init_with_bad_meta():
+    ctx = Context(MyCharm, meta={'a truth universally acknowledged': 'it'})  # type: ignore
+    with pytest.raises((UncaughtCharmError, KeyError)):
+        ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_charmcraft_yaml_as_meta_w_actions():
@@ -230,6 +244,7 @@ def test_init_with_charmcraft_yaml_as_meta_w_actions():
     assert spec.meta is charmcraft_yaml
     assert spec.config is None
     assert spec.actions is charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_charmcraft_yaml_as_meta_w_config():
@@ -239,6 +254,7 @@ def test_init_with_charmcraft_yaml_as_meta_w_config():
     assert spec.meta is charmcraft_yaml
     assert spec.config is charmcraft_yaml['config']
     assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
@@ -248,6 +264,8 @@ def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
     assert spec.meta is charmcraft_yaml
     assert spec.config is charmcraft_yaml['config']
     assert spec.actions is charmcraft_yaml['actions']
+    with pytest.raises((UncaughtCharmError, KeyError)):
+        ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_full_charmcraft_yaml_as_meta():
@@ -257,6 +275,7 @@ def test_init_with_full_charmcraft_yaml_as_meta():
     assert spec.meta is charmcraft_yaml
     assert spec.config is charmcraft_yaml['config']
     assert spec.actions is charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
@@ -268,6 +287,7 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     assert spec.config is config
     assert spec.config is not charmcraft_yaml['config']
     assert spec.actions is charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
 
 
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
@@ -279,3 +299,4 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     assert spec.config is charmcraft_yaml['config']
     assert spec.actions is actions
     assert spec.actions is not charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
