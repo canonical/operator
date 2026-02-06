@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Mapping
+
 import os
 from unittest.mock import patch
 
@@ -190,113 +192,90 @@ def test_charm_spec_is_deprecated():
         _ = ctx.charm_spec  # type: ignore
 
 
-def test_charmcraft_yaml_config_extraction():
-    """Test that config is extracted from a full charmcraft.yaml dict."""
-    charmcraft_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-        'config': {
-            'options': {
-                'param1': {
-                    'type': 'string',
-                    'default': 'value1',
-                }
-            }
-        },
-    }
+CONFIG: Mapping[str, Any] = {
+    'options': {'perambulator-abbreviation': {'type': 'string', 'default': 'pram'}}
+}
+ACTIONS: Mapping[str, Any] = {'do-foo': {'description': 'Who do? Foo do.'}}
+
+
+def test_init_with_meta_only():
+    meta = {'name': 'jane'}
+    ctx = Context(MyCharm, meta=meta)
+    spec = ctx._charm_spec
+    assert spec.meta is meta
+    assert spec.config is None
+    assert spec.actions is None
+
+
+def test_init_with_config_only():
+    ctx = Context(MyCharm, config=CONFIG)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'MyCharm'}
+    assert spec.config is CONFIG
+    assert spec.actions is None
+
+
+def test_init_with_actions_only():
+    ctx = Context(MyCharm, actions=ACTIONS)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'MyCharm'}
+    assert spec.config is None
+    assert spec.actions is ACTIONS
+
+
+def test_init_with_charmcraft_yaml_as_meta_w_actions():
+    charmcraft_yaml = {'name': 'mary', 'actions': ACTIONS}
     ctx = Context(MyCharm, meta=charmcraft_yaml)
-    assert ctx._charm_spec.config == charmcraft_yaml['config']
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is None
+    assert spec.actions is charmcraft_yaml['actions']
 
 
-def test_charmcraft_yaml_actions_extraction():
-    """Test that actions are extracted from a full charmcraft.yaml dict."""
-    charmcraft_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-        'actions': {
-            'do-foo': {
-                'description': 'Do foo',
-            },
-        },
-    }
+def test_init_with_charmcraft_yaml_as_meta_w_config():
+    charmcraft_yaml = {'name': 'mary', 'config': CONFIG}
     ctx = Context(MyCharm, meta=charmcraft_yaml)
-    assert ctx._charm_spec.actions == charmcraft_yaml['actions']
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is charmcraft_yaml['config']
+    assert spec.actions is None
 
 
-def test_charmcraft_yaml_both_config_and_actions_extraction():
-    """Test that both config and actions are extracted from charmcraft.yaml."""
-    charmcraft_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-        'config': {
-            'options': {
-                'param1': {
-                    'type': 'string',
-                }
-            }
-        },
-        'actions': {
-            'do-foo': {
-                'description': 'Do foo',
-            },
-        },
-    }
+def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
+    charmcraft_yaml = {'config': CONFIG, 'actions': ACTIONS}
     ctx = Context(MyCharm, meta=charmcraft_yaml)
-    assert ctx._charm_spec.config == charmcraft_yaml['config']
-    assert ctx._charm_spec.actions == charmcraft_yaml['actions']
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is charmcraft_yaml['config']
+    assert spec.actions is charmcraft_yaml['actions']
 
 
-def test_metadata_yaml_without_config_or_actions():
-    """Test backward compatibility with metadata.yaml that has no config/actions."""
-    metadata_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-    }
-    ctx = Context(MyCharm, meta=metadata_yaml)
-    assert ctx._charm_spec.meta == metadata_yaml
-    assert ctx._charm_spec.config is None
-    assert ctx._charm_spec.actions is None
+def test_init_with_full_charmcraft_yaml_as_meta():
+    charmcraft_yaml = {'name': 'mary', 'config': CONFIG, 'actions': ACTIONS}
+    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is charmcraft_yaml['config']
+    assert spec.actions is charmcraft_yaml['actions']
 
 
-def test_explicit_config_overrides_extracted_config():
-    """Test that explicitly provided config parameter overrides extracted config."""
-    charmcraft_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-        'config': {
-            'options': {
-                'original': {'type': 'string'},
-            }
-        },
-    }
-    explicit_config = {
-        'options': {
-            'override': {'type': 'int'},
-        }
-    }
-    ctx = Context(MyCharm, meta=charmcraft_yaml, config=explicit_config)
-    assert ctx._charm_spec.config == explicit_config
-    assert 'override' in ctx._charm_spec.config['options']
+def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
+    charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    ctx = Context(MyCharm, meta=charmcraft_yaml, config=config)
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is config
+    assert spec.config is not charmcraft_yaml['config']
+    assert spec.actions is charmcraft_yaml['actions']
 
 
-def test_explicit_actions_overrides_extracted_actions():
-    """Test that explicitly provided actions parameter overrides extracted actions."""
-    charmcraft_yaml = {
-        'name': 'my-charm',
-        'summary': 'A test charm',
-        'description': 'Test charm description',
-        'actions': {
-            'original-action': {},
-        },
-    }
-    explicit_actions = {
-        'override-action': {},
-    }
-    ctx = Context(MyCharm, meta=charmcraft_yaml, actions=explicit_actions)
-    assert ctx._charm_spec.actions == explicit_actions
-    assert 'override-action' in ctx._charm_spec.actions
+def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
+    charmcraft_yaml = {'name': 'catherine', 'config': CONFIG, 'actions': ACTIONS}
+    actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
+    ctx = Context(MyCharm, meta=charmcraft_yaml, actions=actions)
+    spec = ctx._charm_spec
+    assert spec.meta is charmcraft_yaml
+    assert spec.config is charmcraft_yaml['config']
+    assert spec.actions is actions
+    assert spec.actions is not charmcraft_yaml['actions']
