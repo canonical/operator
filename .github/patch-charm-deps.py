@@ -251,11 +251,11 @@ def add_tox_pip_commands_toml(tox_toml_path: Path, section: str, ops_wheel: str,
     """
     content = tox_toml_path.read_text()
     
-    # Parse to check if section exists
+    # Parse to check if section exists and what keys are already present
     try:
         data = tomllib.loads(content)
-    except tomllib.TOMLDecodeError:
-        print(f"  ⚠ Warning: Could not parse tox.toml")
+    except tomllib.TOMLDecodeError as e:
+        print(f"  ⚠ Warning: Could not parse tox.toml: {e}")
         return
     
     # Convert section name format: testenv:unit -> env.unit, testenv -> env_run_base
@@ -277,48 +277,61 @@ def add_tox_pip_commands_toml(tox_toml_path: Path, section: str, ops_wheel: str,
             return
         current = current[part]
     
+    # Check what already exists in this section
+    has_allowlist = 'allowlist_externals' in current
+    has_commands_post = 'commands_post' in current
+    
     print(f"  Adding pip to allowlist_externals and commands_post in [{toml_section}]")
     
     pip_cmd = "uv pip install" if use_uv_pip else "pip install"
     
-    # Use regex to add allowlist_externals and commands_post
-    # Find the section in the TOML file
-    section_pattern = re.escape(f'[{toml_section}]')
+    # Find the section in the TOML file using regex
+    section_header = f'[{toml_section}]'
     
-    # Check if allowlist_externals exists
-    if not re.search(rf'{section_pattern}[^\[]*allowlist_externals\s*=', content, re.DOTALL):
+    if not has_allowlist:
         print("    Creating new allowlist_externals with pip")
-        # Add after section header
+        # Add after section header - find the line after the section header
         content = re.sub(
-            rf'({section_pattern}\n)',
+            rf'(\[{re.escape(toml_section)}\]\s*\n)',
             rf'\1allowlist_externals = ["pip"]\n',
             content
         )
     else:
         print("    Found existing allowlist_externals, appending pip")
-        # This is tricky with TOML - need to update the array
-        # For now, use a simple approach: if it's an array, add to it
-        content = re.sub(
-            rf'(allowlist_externals\s*=\s*\[)([^\]]*)\]',
-            rf'\1\2, "pip"]',
-            content
-        )
+        # Check if "pip" is already in the array
+        if isinstance(current['allowlist_externals'], list) and 'pip' not in current['allowlist_externals']:
+            # Add pip to the existing array
+            content = re.sub(
+                rf'(allowlist_externals\s*=\s*\[)([^\]]*?)(\])',
+                lambda m: f'{m.group(1)}{m.group(2)}, "pip"{m.group(3)}' if m.group(2).strip() else f'{m.group(1)}"pip"{m.group(3)}',
+                content,
+                count=1
+            )
+        else:
+            print("      pip already in allowlist_externals, skipping")
     
-    # Add commands_post
-    print(f"    Adding commands_post to force-reinstall ops 3.x (using '{pip_cmd}')")
-    commands_post_lines = [
-        f'    "{pip_cmd} --force-reinstall --no-deps {ops_wheel}",',
-        f'    "{pip_cmd} --no-deps {ops_scenario_wheel}"',
-    ]
-    commands_post_str = '\n'.join(commands_post_lines)
-    
-    # Add commands_post after allowlist_externals
-    if not re.search(rf'{section_pattern}[^\[]*commands_post\s*=', content, re.DOTALL):
-        content = re.sub(
-            rf'(allowlist_externals\s*=\s*[^\n]+\n)',
-            rf'\1commands_post = [\n{commands_post_str}\n]\n',
-            content
-        )
+    if not has_commands_post:
+        print(f"    Adding commands_post to force-reinstall ops 3.x (using '{pip_cmd}')")
+        commands_post_str = f'commands_post = [\n    "{pip_cmd} --force-reinstall --no-deps {ops_wheel}",\n    "{pip_cmd} --no-deps {ops_scenario_wheel}",\n]'
+        
+        # Add after allowlist_externals if it exists, otherwise after section header
+        if 'allowlist_externals' in content:
+            # Add after the allowlist_externals line(s)
+            content = re.sub(
+                rf'(allowlist_externals\s*=\s*\[[^\]]*\]\s*\n)',
+                rf'\1{commands_post_str}\n',
+                content,
+                count=1
+            )
+        else:
+            # Add after section header
+            content = re.sub(
+                rf'(\[{re.escape(toml_section)}\]\s*\n)',
+                rf'\1{commands_post_str}\n',
+                content
+            )
+    else:
+        print("    commands_post already exists, skipping")
     
     tox_toml_path.write_text(content)
 
