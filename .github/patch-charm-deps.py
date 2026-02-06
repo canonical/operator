@@ -33,18 +33,14 @@ def get_tox_config_path(charm_root: Path) -> Path | None:
     return None
 
 
-def update_python_version_requirements(charm_root: Path, max_version: str | None = None) -> None:
-    """Update Python version requirements to >=3.10 (and optionally cap at max_version).
+def update_tox_python_version(tox_config: Path, charm_root: Path) -> None:
+    """Update Python version in tox configuration (tox.ini or tox.toml).
     
     Args:
-        charm_root: Root directory of the charm
-        max_version: Optional maximum Python version (e.g., "3.12")
+        tox_config: Path to tox configuration file
+        charm_root: Root directory of charm (for relative path display)
     """
-    print("\nUpdating Python version requirements...")
-    
-    # Update tox.ini or tox.toml
-    tox_config = get_tox_config_path(charm_root)
-    if tox_config and tox_config.suffix == ".ini":
+    if tox_config.suffix == ".ini":
         config = configparser.ConfigParser()
         config.read(tox_config)
         modified = False
@@ -71,7 +67,7 @@ def update_python_version_requirements(charm_root: Path, max_version: str | None
                 config.write(f)
             print(f"  ✓ Updated {tox_config.relative_to(charm_root)}")
     
-    elif tox_config and tox_config.suffix == ".toml":
+    elif tox_config.suffix == ".toml":
         # Handle tox.toml using regex (no standard library for writing TOML)
         content = tox_config.read_text()
         original = content
@@ -90,76 +86,113 @@ def update_python_version_requirements(charm_root: Path, max_version: str | None
         if content != original:
             tox_config.write_text(content)
             print(f"  ✓ Updated {tox_config.relative_to(charm_root)}")
+
+
+def update_pyproject_python_version(pyproject: Path, charm_root: Path, max_version: str | None = None) -> None:
+    """Update requires-python in pyproject.toml.
+    
+    Args:
+        pyproject: Path to pyproject.toml
+        charm_root: Root directory of charm (for relative path display)
+        max_version: Optional maximum Python version (e.g., "3.12")
+    """
+    content = pyproject.read_text()
+    
+    # Parse TOML
+    try:
+        data = tomllib.loads(content)
+    except tomllib.TOMLDecodeError:
+        # Fall back to regex if TOML parsing fails
+        print(f"  ⚠ Warning: Could not parse {pyproject.name} as TOML, using regex fallback")
+        original = content
+        if max_version:
+            version_constraint = f'">=3.10,<{max_version}"'
+            content = re.sub(
+                r'requires-python = ["\'][^"\']+["\']',
+                f'requires-python = {version_constraint}',
+                content
+            )
+        else:
+            content = re.sub(
+                r'requires-python = ["\']>=3\.[89](\.[0-9]+)?["\']',
+                'requires-python = ">=3.10"',
+                content
+            )
+        if content != original:
+            pyproject.write_text(content)
+            print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
+        return
+    
+    # Update requires-python if it exists
+    modified = False
+    if 'project' in data and 'requires-python' in data['project']:
+        requires_python = data['project']['requires-python']
+        
+        if max_version:
+            # Cap at max_version
+            new_requires = f">=3.10,<{max_version}"
+        elif re.match(r'>=3\.[89]', requires_python):
+            # Update to >=3.10 if currently <3.10
+            new_requires = ">=3.10"
+        else:
+            new_requires = None
+        
+        if new_requires:
+            # Use regex to preserve the exact format (quotes, whitespace)
+            content = re.sub(
+                r'(requires-python\s*=\s*)["\'][^"\']+["\']',
+                f'\\1"{new_requires}"',
+                content
+            )
+            modified = True
+    
+    if modified:
+        pyproject.write_text(content)
+        print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
+
+
+def update_python_version_file(python_version_file: Path, charm_root: Path, max_version: str | None = None) -> None:
+    """Update .python-version file.
+    
+    Args:
+        python_version_file: Path to .python-version
+        charm_root: Root directory of charm (for relative path display)
+        max_version: Optional maximum Python version (e.g., "3.12")
+    """
+    content = python_version_file.read_text().strip()
+    # Replace any 3.8 or 3.9 version with 3.10 (or 3.11 if max_version is 3.12)
+    if re.match(r'^3\.[89]', content):
+        if max_version == "3.12":
+            new_version = "3.11"
+        else:
+            new_version = "3.10"
+        python_version_file.write_text(new_version + "\n")
+        print(f"  ✓ Updated {python_version_file.relative_to(charm_root)} to {new_version}")
+
+
+def update_python_version_requirements(charm_root: Path, max_version: str | None = None) -> None:
+    """Update Python version requirements to >=3.10 (and optionally cap at max_version).
+    
+    Args:
+        charm_root: Root directory of the charm
+        max_version: Optional maximum Python version (e.g., "3.12")
+    """
+    print("\nUpdating Python version requirements...")
+    
+    # Update tox.ini or tox.toml
+    tox_config = get_tox_config_path(charm_root)
+    if tox_config:
+        update_tox_python_version(tox_config, charm_root)
     
     # Update pyproject.toml requires-python
     pyproject = charm_root / "pyproject.toml"
     if pyproject.exists():
-        content = pyproject.read_text()
-        
-        # Parse TOML
-        try:
-            data = tomllib.loads(content)
-        except tomllib.TOMLDecodeError:
-            # Fall back to regex if TOML parsing fails
-            print(f"  ⚠ Warning: Could not parse {pyproject.name} as TOML, using regex fallback")
-            original = content
-            if max_version:
-                version_constraint = f'">=3.10,<{max_version}"'
-                content = re.sub(
-                    r'requires-python = ["\'][^"\']+["\']',
-                    f'requires-python = {version_constraint}',
-                    content
-                )
-            else:
-                content = re.sub(
-                    r'requires-python = ["\']>=3\.[89](\.[0-9]+)?["\']',
-                    'requires-python = ">=3.10"',
-                    content
-                )
-            if content != original:
-                pyproject.write_text(content)
-                print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
-            return
-        
-        # Update requires-python if it exists
-        modified = False
-        if 'project' in data and 'requires-python' in data['project']:
-            requires_python = data['project']['requires-python']
-            
-            if max_version:
-                # Cap at max_version
-                new_requires = f">=3.10,<{max_version}"
-            elif re.match(r'>=3\.[89]', requires_python):
-                # Update to >=3.10 if currently <3.10
-                new_requires = ">=3.10"
-            else:
-                new_requires = None
-            
-            if new_requires:
-                # Use regex to preserve the exact format (quotes, whitespace)
-                content = re.sub(
-                    r'(requires-python\s*=\s*)["\'][^"\']+["\']',
-                    f'\\1"{new_requires}"',
-                    content
-                )
-                modified = True
-        
-        if modified:
-            pyproject.write_text(content)
-            print(f"  ✓ Updated {pyproject.relative_to(charm_root)}")
+        update_pyproject_python_version(pyproject, charm_root, max_version)
     
     # Update .python-version
-    python_version = charm_root / ".python-version"
-    if python_version.exists():
-        content = python_version.read_text().strip()
-        # Replace any 3.8 or 3.9 version with 3.10 (or 3.11 if max_version is 3.12)
-        if re.match(r'^3\.[89]', content):
-            if max_version == "3.12":
-                new_version = "3.11"
-            else:
-                new_version = "3.10"
-            python_version.write_text(new_version + "\n")
-            print(f"  ✓ Updated {python_version.relative_to(charm_root)} to {new_version}")
+    python_version_file = charm_root / ".python-version"
+    if python_version_file.exists():
+        update_python_version_file(python_version_file, charm_root, max_version)
 
 
 def add_tox_pip_commands_ini(tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool) -> None:
