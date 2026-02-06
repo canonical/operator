@@ -9,6 +9,7 @@ specific `State` exists in, and the events that can be executed on that `State`.
 
 from __future__ import annotations
 
+import copy
 import functools
 import pathlib
 import tempfile
@@ -681,12 +682,18 @@ class Context(Generic[CharmType]):
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
+        meta = copy.deepcopy(meta)
+        config = copy.deepcopy(config)
+        actions = copy.deepcopy(actions)
         # Extract config and actions from meta if it contains them (e.g., charmcraft.yaml)
         # and they were not explicitly provided
-        if config is None and meta is not None:
-            config = meta.get('config')
-        if actions is None and meta is not None:
-            actions = meta.get('actions')
+        if meta is not None:
+            meta_config = meta.pop('config', None)
+            if config is None:
+                config = meta_config
+            meta_actions = meta.pop('actions', None)
+            if actions is None:
+                actions = meta_actions
 
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
