@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-scenario"
 
-version = "8.2.0.dev0"
+version = "8.6.0.dev0"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -21,8 +21,9 @@ license = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops==3.2.0.dev0",
+    "ops==3.6.0.dev0",
     "PyYAML>=6.0.1",
+    "typing_extensions>=4.9.0",  # for `deprecated` decorator, replace with stdlib `warnings.deprecated` when we're Python 3.13+
 ]
 readme = "README.md"
 requires-python = ">=3.10"

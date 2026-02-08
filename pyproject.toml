@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.2.0.dev0",
+    "ops-scenario==8.6.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.2.0.dev0",
+    "ops-tracing==3.6.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -71,13 +71,15 @@ benchmark = [
 integration = [
     "ops[testing,tracing]",
     "pytest~=8.4",
-    "jubilant~=1.2",
+    "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
 ]
 release = [
+    "packaging~=24.0",
     "pygithub~=2.6",
+    "rich~=14.1",
 ]
 
 [project.urls]
@@ -127,8 +129,7 @@ aggressive = 3
 [tool.ruff]
 line-length = 99
 exclude = ["examples"]
-# FIXME
-target-version = "py38"
+target-version = "py310"
 extend-exclude = ["docs/conf.py", "docs/.sphinx/"]
 
 # Ruff formatter configuration
@@ -202,6 +203,8 @@ ignore = [
     # Missing docstring in `__init__`
     "D107",
 
+    # Manual list comprehension.
+    "PERF401",
     # Manual dict comprehension.
     "PERF403",
 
@@ -231,50 +234,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # "Useless" expression.
     "B018"
 ]
-"testing/*" = [
-    # TODO: the below ignores should be fixed
-    "A001",  # Variable is shadowing a Python builtin
-    "B033",  # Sets should not contain duplicate item
-    "B904",  # Use raise from within except
-    "D101",  # Missing docstring in public class
-    "D102",  # Missing docstring in public method
-    "D202",  # No blank lines allowed after function docstring
-    "D205",  # 1 blank line required between summary line and description
-    "D212",  # Multi-line docstring summary should start at the first line
-    "D403",  # First word of the docstring should be capitalized
-    "D415",  # First line should end with a period, question mark, or exclamation point
-    "E501",  # Line too long
-    "I001",  # isort
-    "N818",  # Exception name should end with Error
-    "S105",  # Possible hardcoded password
-    "S311",  # Standard pseudo-random generators are not suitable for cryptographic purposes
-    "RUF009",  # Do not perform function call in dataclass defaults
-    "RUF052",  # Local dummy variable is accessed
-    "RUF100",  # Unused `noqa` directive
-    "SIM102",  # Use single if instead of nested if
-    "SIM108",  # Use ternary operator instead if if-else block
-    "PERF102",  # Use dict.values()
-    "PERF203",  # try-except in loop body
-    "PERF401",  # Use list.extend
-]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
-    # TODO: the below ignores should be fixed
-    "CPY",  # flake8-copyright
-    "I001",  # isort
-    "B017",  # Do not assert blind exception
-    "B018",  # Useless attribute access
-    "E501",  # Line too long
-    "N999",  # Invalid module name
-    "N813",  # CamelCase imported as lowercase
-    "S105",  # Possible hardcoded password
-    "S108",  # Probably insecure usage of /tmp
-    "W291",  # Trailing whitespace
-    "UP037",  # Remove quotes from type annotation
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
-    "RUF015",  # Prefer `next` over single element slice
-    "SIM115",  # Use a context manager for opening files
 ]
 "tools/tests_tools/*" = [
     # All documentation linting.

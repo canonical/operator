@@ -15,7 +15,7 @@ In order to prevent two separate charms from rolling their own relation with the
 
 If you have a charm that provides a service, you should search `charm-relation-interfaces` (or directly charmhub in the future) and see if it exists already, or perhaps a similar one exists that lacks the semantics you need and can be extended to support it.
 
-Conversely, if the charm you are developing needs some service (a database, an ingress url, an authentication endpoint...)  you should search `charm-relation-interfaces` to see if there is an interface you can use, and to find existing charms that provide it. 
+Conversely, if the charm you are developing needs some service (a database, an ingress URL, an authentication endpoint...)  you should search `charm-relation-interfaces` to see if there is an interface you can use, and to find existing charms that provide it.
 
 There are three actors in play:
 
@@ -38,6 +38,3 @@ For each interface, the charm-relation-interfaces repository hosts:
 
 ## Charm relation interfaces in Charmhub
 Charmhub will, for all charms using the interface, verify that they implement it correctly (regardless of whether they use the 'official' implementation or they roll their own) in order to give the charm a happy checkmark on `charmhub.io`. In order to do that it will need to fetch the specification (from `charm-relation-interfaces`) *and* the charm repo, because we can't know what implementation they are using: we need the source code.
-
-
-

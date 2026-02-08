@@ -9,7 +9,7 @@ Instrument generously, so that more context is captured than is immediately need
 
 **Field engineers** can inspect the trace data from live deployments, ideally avoiding the need to reproduce failures in staging.
 
-**SREs** may want to set latency and error rate alerts on specific elements of trace data preemptively. They can also get more insights to help root-cause analysis across services.
+**Site Reliability Engineers** may want to set latency and error rate alerts on specific elements of trace data preemptively. They can also get more insights to help root-cause analysis across services.
 
 **QA teams** can incorporate trace assertions into integration tests to simplify interoperability testing.
 
@@ -49,7 +49,7 @@ For the `receive-ca-cert` relation, the supported `certificate_transfer` interfa
 **Ops** contains its own instrumentation, as well as unit and integration tests for it:
 
 - Ops creates the root span and a separate span when calling each observer, which provide context for your instrumentation and can be used to scope trace data assertions in your unit tests.
-- Ops creates spans for every Juju hook tool invocation and every Pebble operation, so you typically don't have to.
+- Ops creates spans for every Juju hook command invocation and every Pebble operation, so you typically don't have to.
 - The [ops.tracing.Tracing](ops_tracing.Tracing) first-party charm library validates its arguments during object construction, and would trip on misconfiguration in a unit or integration test.
 - Buffering and export logic is already tested as part of Ops, and charms need not write integration
 tests to cover these.

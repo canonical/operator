@@ -32,7 +32,7 @@ import pytest
 
 import ops
 from ops.framework import _BREAKPOINT_WELCOME_MESSAGE, _event_regex
-from ops.jujucontext import _JujuContext
+from ops.jujucontext import JujuContext
 from ops.model import _ModelBackend
 from ops.storage import JujuStorage, NoSnapshotError, SQLiteStorage
 from test.test_helpers import FakeScript
@@ -75,7 +75,7 @@ def create_framework(
         charm_dir,
         meta=model._cache._meta if model else ops.CharmMeta(),
         model=model,  # type: ignore
-        juju_debug_at=_JujuContext.from_dict(os.environ).debug_at,
+        juju_debug_at=JujuContext._from_dict(os.environ).debug_at,
     )
     request.addfinalizer(framework.close)
     request.addfinalizer(patcher.stop)
@@ -1215,7 +1215,7 @@ class TestFramework:
             framework.observe(charm.on.start, charm._on_event)
 
 
-MutableTypesTestCase = typing.Tuple[
+MutableTypesTestCase = tuple[
     typing.Callable[[], typing.Any],  # Called to get operand A.
     typing.Any,  # Operand B.
     typing.Any,  # Expected result.
@@ -1223,7 +1223,7 @@ MutableTypesTestCase = typing.Tuple[
     typing.Callable[[typing.Any, typing.Any], typing.Any],  # Validation to perform.
 ]
 
-ComparisonOperationsTestCase = typing.Tuple[
+ComparisonOperationsTestCase = tuple[
     typing.Any,  # Operand A.
     typing.Any,  # Operand B.
     typing.Callable[[typing.Any, typing.Any], bool],  # Operation to test.
@@ -1231,12 +1231,12 @@ ComparisonOperationsTestCase = typing.Tuple[
     bool,  # Result of op(B, A).
 ]
 
-SetOperationsTestCase = typing.Tuple[
-    typing.Set[str],  # A set to test an operation against (other_set).
+SetOperationsTestCase = tuple[
+    set[str],  # A set to test an operation against (other_set).
     # An operation to test.
-    typing.Callable[[typing.Set[str], typing.Set[str]], typing.Set[str]],
-    typing.Set[str],  # The expected result of operation(obj._stored.set, other_set).
-    typing.Set[str],  # The expected result of operation(other_set, obj._stored.set).
+    typing.Callable[[set[str], set[str]], set[str]],
+    set[str],  # The expected result of operation(obj._stored.set, other_set).
+    set[str],  # The expected result of operation(other_set, obj._stored.set).
 ]
 
 
@@ -1632,14 +1632,14 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast('typing.Set[str]', set()),
+                lambda: typing.cast('set[str]', set()),
                 None,
                 set(),
                 lambda a, b: None,
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast('typing.Set[str]', set()),
+                lambda: typing.cast('set[str]', set()),
                 'a',
                 {'a'},
                 lambda a, b: a.add(b),
@@ -1653,7 +1653,7 @@ class TestStoredState:
                 lambda res, expected_res: _assert_equal(res, expected_res),
             ),
             (
-                lambda: typing.cast('typing.Set[str]', set()),
+                lambda: typing.cast('set[str]', set()),
                 {'a'},
                 set(),
                 # Nested sets are not allowed as sets themselves are not hashable.
@@ -1864,7 +1864,6 @@ class TestBreakpoint:
 
         with patch('pdb.Pdb.set_trace') as mock:
             # We want to verify that there are *no* logs at warning level.
-            # However, assertNoLogs is Python 3.10+.
 
             framework.breakpoint()
             warning_logs = [
@@ -2132,7 +2131,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
 
@@ -2281,7 +2279,6 @@ class TestDebugHook:
         framework.observe(publisher.install, observer.callback_method)
 
         with patch('sys.stderr', new_callable=io.StringIO) as fake_stderr:
-            fake_stderr = typing.cast('io.StringIO', fake_stderr)
             with patch('pdb.runcall') as mock:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE

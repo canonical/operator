@@ -20,7 +20,8 @@ import functools
 import ipaddress
 import json
 import urllib.parse
-from typing import Any, Callable, Iterable, Protocol, cast
+from collections.abc import Callable, Iterable
+from typing import Any, Protocol, cast
 
 import pytest
 
@@ -122,8 +123,8 @@ nested_decode = functools.partial(json.loads, object_hook=json_nested_hook)
 
 
 class MyCharm(BaseTestCharm):
-    encoder = nested_encode
-    decoder = nested_decode
+    encoder = staticmethod(nested_encode)
+    decoder = staticmethod(nested_decode)
 
     @property
     def databag_class(self) -> type[DatabagProtocol]:
@@ -323,11 +324,6 @@ if pydantic is not None:
 def test_relation_load_custom_naming_pattern(
     relation_data: dict[str, str], relation_data_class: type[_AliasProtocol]
 ):
-    # The latest version of Pydantic available for Python 3.8 does not support
-    # the `alias` metadata, so we need to skip the test for that case.
-    if pydantic is not None and relation_data_class is _PydanticDataclassesAlias:
-        pytest.skip('Pydantic does not support dataclasses alias metadata in this version.')
-
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -747,8 +743,8 @@ class _CommonTypesDataclass:
 
 
 class CommonTypesDataclasses(BaseTestCharmCommonTypes):
-    encoder = json_ip_and_country_encode
-    decoder = json_ip_decode
+    encoder = staticmethod(json_ip_and_country_encode)
+    decoder = staticmethod(json_ip_decode)
 
     @property
     def databag_class(self):
@@ -767,7 +763,7 @@ if pydantic:
         origin: Country
 
     class CommonTypesPydanticDataclass(BaseTestCharmCommonTypes):
-        encoder = json_ip_and_country_encode
+        encoder = staticmethod(json_ip_and_country_encode)
 
         @property
         def databag_class(self):

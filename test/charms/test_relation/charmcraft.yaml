@@ -12,8 +12,9 @@ platforms:
 
 parts:
     test-relation:
-        plugin: charm
         source: .
+        plugin: uv
+        build-snaps: [astral-uv]
 
 requires:
     db:

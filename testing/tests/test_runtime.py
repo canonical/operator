@@ -1,16 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import os
 from tempfile import TemporaryDirectory
 
 import pytest
+from scenario import ActiveStatus, Context
+from scenario._runtime import Runtime, UncaughtCharmError
+from scenario.state import Relation, State, _CharmSpec, _Event
 
 import ops
 from ops._main import _Abort
-
-from scenario import Context, ActiveStatus
-from scenario.state import Relation, State, _CharmSpec, _Event
-from scenario._runtime import Runtime, UncaughtCharmError
 
 
 def charm_type():
@@ -93,7 +95,8 @@ def test_unit_name(app_name, unit_id):
         assert manager.charm.unit.name == f'{app_name}/{unit_id}'
 
 
-def test_env_clean_on_charm_error():
+def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     meta = {'name': 'frank', 'requires': {'box': {'interface': 'triangle'}}}
 
     my_charm_type = charm_type()
@@ -141,7 +144,7 @@ def test_juju_version_is_set_in_environ():
 
 
 @pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
-def test_ops_raises_abort(exit_code: int):
+def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -153,6 +156,7 @@ def test_ops_raises_abort(exit_code: int):
             # simpler than causing the framework to raise it.
             raise _Abort(exit_code)
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     ctx = Context(MyCharm, meta={'name': 'foo'})
     if exit_code == 0:
         state_out = ctx.run(ctx.on.start(), State())
@@ -163,3 +167,51 @@ def test_ops_raises_abort(exit_code: int):
             ctx.run(ctx.on.start(), State())
         assert isinstance(exc.value.__cause__, _Abort)
         assert exc.value.__cause__.exit_code == exit_code
+
+
+class ValueErrorCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.update_status, self._on_update_status)
+
+    def _on_update_status(self, event: ops.EventBase):
+        raise ValueError()
+
+
+@pytest.mark.parametrize(
+    ('expected_error', 'bare_charm_errors'),
+    (
+        # any non-zero string that `isdigit`
+        (ValueError, '1'),
+        (ValueError, '007'),
+        # 'true' (case-insensitive)
+        (ValueError, 'true'),
+        (ValueError, 'True'),
+        (ValueError, 'tRuE'),
+        # falsey digits
+        (UncaughtCharmError, '0'),
+        (UncaughtCharmError, '00'),
+        # any other value
+        (UncaughtCharmError, '-1'),
+        (UncaughtCharmError, 'false'),
+        (UncaughtCharmError, 'yes'),
+        (UncaughtCharmError, '✩ anything ✨ else ✧'),
+        # the actually unset case is tested separately
+        # the empty string is treated as 'any other value'
+        (UncaughtCharmError, ''),
+    ),
+)
+def test_bare_charm_errors_set(
+    monkeypatch: pytest.Monkeypatch, expected_error: type[Exception], bare_charm_errors: str | None
+):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
+    ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
+    with pytest.raises(expected_error):
+        ctx.run(ctx.on.update_status(), State())
+
+
+def test_bare_charm_errors_not_set(monkeypatch: pytest.Monkeypatch):
+    monkeypatch.delenv('SCENARIO_BARE_CHARM_ERRORS', raising=False)
+    ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
+    with pytest.raises(UncaughtCharmError):
+        ctx.run(ctx.on.update_status(), State())

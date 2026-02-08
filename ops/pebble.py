@@ -44,6 +44,7 @@ import io
 import json
 import logging
 import os
+import pathlib
 import select
 import shutil
 import signal
@@ -57,26 +58,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from typing import (
     IO,
     TYPE_CHECKING,
     Any,
     AnyStr,
     BinaryIO,
-    Callable,
-    Dict,
-    Generator,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Optional,
     Protocol,
-    Sequence,
     TextIO,
     TypedDict,
-    Union,
 )
 
 import websocket
@@ -95,24 +88,24 @@ ServiceDict = typing.TypedDict(
         'after': Sequence[str],
         'before': Sequence[str],
         'requires': Sequence[str],
-        'environment': Dict[str, str],
+        'environment': dict[str, str],
         'user': str,
-        'user-id': Optional[int],
+        'user-id': int | None,
         'group': str,
-        'group-id': Optional[int],
+        'group-id': int | None,
         'working-dir': str,
         'on-success': str,
         'on-failure': str,
-        'on-check-failure': Dict[str, Any],
+        'on-check-failure': dict[str, Any],
         'backoff-delay': str,
-        'backoff-factor': Optional[int],
+        'backoff-factor': int | None,
         'backoff-limit': str,
-        'kill-delay': Optional[str],
+        'kill-delay': str | None,
     },
     total=False,
 )
 
-HttpDict = typing.TypedDict('HttpDict', {'url': str, 'headers': Dict[str, str]}, total=False)
+HttpDict = typing.TypedDict('HttpDict', {'url': str, 'headers': dict[str, str]}, total=False)
 TcpDict = typing.TypedDict('TcpDict', {'port': int, 'host': str}, total=False)
 ExecDict = typing.TypedDict(
     'ExecDict',
@@ -120,10 +113,10 @@ ExecDict = typing.TypedDict(
         'command': str,
         # see JujuVersion.supports_exec_service_context
         'service-context': str,
-        'environment': Dict[str, str],
-        'user-id': Optional[int],
+        'environment': dict[str, str],
+        'user-id': int | None,
         'user': str,
-        'group-id': Optional[int],
+        'group-id': int | None,
         'group': str,
         'working-dir': str,
     },
@@ -134,14 +127,14 @@ CheckDict = typing.TypedDict(
     'CheckDict',
     {
         'override': str,
-        'level': Union['CheckLevel', str],
+        'level': 'CheckLevel | str',
         'startup': Literal['', 'enabled', 'disabled'],
-        'period': Optional[str],
-        'timeout': Optional[str],
-        'http': Optional[HttpDict],
-        'tcp': Optional[TcpDict],
-        'exec': Optional[ExecDict],
-        'threshold': Optional[int],
+        'period': str | None,
+        'timeout': str | None,
+        'http': HttpDict | None,
+        'tcp': TcpDict | None,
+        'exec': ExecDict | None,
+        'threshold': int | None,
     },
     total=False,
 )
@@ -150,11 +143,11 @@ CheckDict = typing.TypedDict(
 LogTargetDict = typing.TypedDict(
     'LogTargetDict',
     {
-        'override': Union[Literal['merge'], Literal['replace']],
-        'type': Literal['loki'],
+        'override': Literal['merge'] | Literal['replace'],
+        'type': Literal['loki', 'opentelemetry'],
         'location': str,
-        'services': List[str],
-        'labels': Dict[str, str],
+        'services': list[str],
+        'labels': dict[str, str],
     },
     total=False,
 )
@@ -164,9 +157,9 @@ LayerDict = typing.TypedDict(
     {
         'summary': str,
         'description': str,
-        'services': Dict[str, ServiceDict],
-        'checks': Dict[str, CheckDict],
-        'log-targets': Dict[str, LogTargetDict],
+        'services': dict[str, ServiceDict],
+        'checks': dict[str, CheckDict],
+        'log-targets': dict[str, LogTargetDict],
     },
     total=False,
 )
@@ -174,9 +167,9 @@ LayerDict = typing.TypedDict(
 PlanDict = typing.TypedDict(
     'PlanDict',
     {
-        'services': Dict[str, ServiceDict],
-        'checks': Dict[str, CheckDict],
-        'log-targets': Dict[str, LogTargetDict],
+        'services': dict[str, ServiceDict],
+        'checks': dict[str, CheckDict],
+        'log-targets': dict[str, LogTargetDict],
     },
     total=False,
 )
@@ -197,14 +190,14 @@ IdentityDict = typing.TypedDict(
 _AuthDict = TypedDict(
     '_AuthDict',
     {
-        'permissions': Optional[str],
-        'user-id': Optional[int],
-        'user': Optional[str],
-        'group-id': Optional[int],
-        'group': Optional[str],
-        'path': Optional[str],
-        'make-dirs': Optional[bool],
-        'make-parents': Optional[bool],
+        'permissions': str | None,
+        'user-id': int | None,
+        'user': str | None,
+        'group-id': int | None,
+        'group': str | None,
+        'path': str | None,
+        'make-dirs': bool | None,
+        'make-parents': bool | None,
     },
     total=False,
 )
@@ -243,9 +236,9 @@ class _FileLikeIO(Protocol[typing.AnyStr]):  # That also covers TextIO and Bytes
     def __enter__(self) -> typing.IO[typing.AnyStr]: ...
 
 
-_AnyStrFileLikeIO = Union[_FileLikeIO[bytes], _FileLikeIO[str]]
-_TextOrBinaryIO = Union[TextIO, BinaryIO]
-_IOSource = Union[str, bytes, _AnyStrFileLikeIO]
+_AnyStrFileLikeIO = _FileLikeIO[bytes] | _FileLikeIO[str]
+_TextOrBinaryIO = TextIO | BinaryIO
+_IOSource = str | bytes | _AnyStrFileLikeIO
 
 _SystemInfoDict = TypedDict('_SystemInfoDict', {'version': str})
 
@@ -270,13 +263,13 @@ if TYPE_CHECKING:
         {
             'path': str,
             'name': str,
-            'size': NotRequired[Optional[int]],
+            'size': NotRequired[int | None],
             'permissions': str,
             'last-modified': str,
-            'user-id': NotRequired[Optional[int]],
-            'user': NotRequired[Optional[str]],
-            'group-id': NotRequired[Optional[int]],
-            'group': NotRequired[Optional[str]],
+            'user-id': NotRequired[int | None],
+            'user': NotRequired[str | None],
+            'group-id': NotRequired[int | None],
+            'group': NotRequired[str | None],
             'type': str,
         },
     )
@@ -289,11 +282,11 @@ if TYPE_CHECKING:
             'kind': str,
             'summary': str,
             'status': str,
-            'log': NotRequired[Optional[List[str]]],
+            'log': NotRequired[list[str] | None],
             'progress': _ProgressDict,
             'spawn-time': str,
-            'ready-time': NotRequired[Optional[str]],
-            'data': NotRequired[Optional[Dict[str, Any]]],
+            'ready-time': NotRequired[str | None],
+            'data': NotRequired[dict[str, Any] | None],
         },
     )
     _ChangeDict = TypedDict(
@@ -305,16 +298,16 @@ if TYPE_CHECKING:
             'status': str,
             'ready': bool,
             'spawn-time': str,
-            'tasks': NotRequired[Optional[List[_TaskDict]]],
-            'err': NotRequired[Optional[str]],
-            'ready-time': NotRequired[Optional[str]],
-            'data': NotRequired[Optional[Dict[str, Any]]],
+            'tasks': NotRequired[list[_TaskDict] | None],
+            'err': NotRequired[str | None],
+            'ready-time': NotRequired[str | None],
+            'data': NotRequired[dict[str, Any] | None],
         },
     )
 
     _Error = TypedDict('_Error', {'kind': str, 'message': str})
     _Item = TypedDict('_Item', {'path': str, 'error': NotRequired[_Error]})
-    _FilesResponse = TypedDict('_FilesResponse', {'result': List[_Item]})
+    _FilesResponse = TypedDict('_FilesResponse', {'result': list[_Item]})
 
     _WarningDict = TypedDict(
         '_WarningDict',
@@ -322,7 +315,7 @@ if TYPE_CHECKING:
             'message': str,
             'first-added': str,
             'last-added': str,
-            'last-shown': NotRequired[Optional[str]],
+            'last-shown': NotRequired[str | None],
             'expire-after': str,
             'repeat-after': str,
         },
@@ -332,14 +325,14 @@ if TYPE_CHECKING:
         '_NoticeDict',
         {
             'id': str,
-            'user-id': NotRequired[Optional[int]],
+            'user-id': NotRequired[int | None],
             'type': str,
             'key': str,
             'first-occurred': str,
             'last-occurred': str,
             'last-repeated': str,
             'occurrences': int,
-            'last-data': NotRequired[Optional[Dict[str, str]]],
+            'last-data': NotRequired[dict[str, str] | None],
             'repeat-after': NotRequired[str],
             'expire-after': NotRequired[str],
         },
@@ -2483,9 +2476,7 @@ class Client:
 
             try:
                 return self._wait_change(change_id, this_timeout)
-            except (socket.timeout, builtins.TimeoutError):
-                # NOTE: in Python 3.10 socket.timeout is an alias of TimeoutError,
-                # but we still need to support Python 3.8, so catch both.
+            except builtins.TimeoutError:
                 # Catch timeout from wait endpoint and loop to check deadline.
                 pass
 
@@ -2540,7 +2531,10 @@ class Client:
             span.set_attribute('checks', checks)
             body = {'action': action, 'checks': checks}
             resp = self._request('POST', '/v1/checks', body=body)
-            return resp['result']['changed']
+            # Pebble may return `changed: null` if nothing has been stopped or started.
+            # Remove this crutch when Jujus that include affected Pebble have reached EOL.
+            # https://github.com/canonical/pebble/issues/788
+            return resp['result']['changed'] or []
 
     def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -2598,12 +2592,14 @@ class Client:
             return [ServiceInfo.from_dict(info) for info in resp['result']]
 
     @typing.overload
-    def pull(self, path: str, *, encoding: None) -> BinaryIO: ...
+    def pull(self, path: str | pathlib.PurePath, *, encoding: None) -> BinaryIO: ...
 
     @typing.overload
-    def pull(self, path: str, *, encoding: str = 'utf-8') -> TextIO: ...
+    def pull(self, path: str | pathlib.PurePath, *, encoding: str = 'utf-8') -> TextIO: ...
 
-    def pull(self, path: str, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
+    def pull(
+        self, path: str | pathlib.PurePath, *, encoding: str | None = 'utf-8'
+    ) -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
         Args:
@@ -2620,6 +2616,7 @@ class Client:
             PathError: If there was an error reading the file at path, for
                 example, if the file doesn't exist or is a directory.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble pull') as span:
             query = {
                 'action': 'read',
@@ -2635,32 +2632,30 @@ class Client:
                 raise ProtocolError(f'invalid boundary {boundary!r}')
 
             parser = _FilesParser(boundary)
+            try:
+                while True:
+                    chunk = response.read(self._chunk_size)
+                    if not chunk:
+                        break
+                    parser.feed(chunk)
 
-            while True:
-                chunk = response.read(self._chunk_size)
-                if not chunk:
-                    break
-                parser.feed(chunk)
+                resp = parser.get_response()
+                if resp is None:
+                    raise ProtocolError('no "response" field in multipart body')
+                self._raise_on_path_error(resp, path)
 
-            resp = parser.get_response()
-            if resp is None:
-                raise ProtocolError('no "response" field in multipart body')
-            self._raise_on_path_error(resp, path)
+                filenames = parser.filenames()
+                if not filenames:
+                    raise ProtocolError('no file content in multipart response')
+                elif len(filenames) > 1:
+                    raise ProtocolError('single file request resulted in a multi-file response')
 
-            filenames = parser.filenames()
-            if not filenames:
-                raise ProtocolError('no file content in multipart response')
-            elif len(filenames) > 1:
-                raise ProtocolError('single file request resulted in a multi-file response')
-
-            filename = filenames[0]
-            if filename != path:
-                raise ProtocolError(f'path not expected: {filename!r}')
-
-            f = parser.get_file(path, encoding)
-
-            parser.remove_files()
-            return f
+                filename = filenames[0]
+                if filename != path:
+                    raise ProtocolError(f'path not expected: {filename!r}')
+                return parser.get_file(path, encoding)
+            finally:
+                parser.remove_files()
 
     @staticmethod
     def _raise_on_path_error(resp: _FilesResponse, path: str):
@@ -2674,7 +2669,7 @@ class Client:
 
     def push(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         source: _IOSource,
         *,
         encoding: str = 'utf-8',
@@ -2710,6 +2705,7 @@ class Client:
             PathError: If there was an error writing the file to the path; for example, if the
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2806,7 +2802,7 @@ class Client:
         return generator(), content_type
 
     def list_files(
-        self, path: str, *, pattern: str | None = None, itself: bool = False
+        self, path: str | pathlib.PurePath, *, pattern: str | None = None, itself: bool = False
     ) -> list[FileInfo]:
         """Return list of directory entries from given path on remote system.
 
@@ -2825,6 +2821,7 @@ class Client:
             PathError: if there was an error listing the directory; for example, if the directory
                 does not exist.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble list_files') as span:
             query = {'path': path}
             if pattern:
@@ -2839,7 +2836,7 @@ class Client:
 
     def make_dir(
         self,
-        path: str,
+        path: str | pathlib.PurePath,
         *,
         make_parents: bool = False,
         permissions: int | None = None,
@@ -2869,6 +2866,7 @@ class Client:
             PathError: if there was an error making the directory; for example, if the parent path
                 does not exist, and ``make_parents`` is not used.
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble make_dir') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
@@ -2882,7 +2880,7 @@ class Client:
             resp = self._request('POST', '/v1/files', None, body)
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
-    def remove_path(self, path: str, *, recursive: bool = False):
+    def remove_path(self, path: str | pathlib.PurePath, *, recursive: bool = False):
         """Remove a file or directory on the remote system.
 
         Args:
@@ -2896,6 +2894,7 @@ class Client:
             pebble.PathError: If a relative path is provided, or if `recursive` is False
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
+        path = str(path)
         with tracer.start_as_current_span('pebble remove_path') as span:
             info: dict[str, Any] = {'path': path}
             if recursive:
@@ -2916,7 +2915,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -2937,7 +2936,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -2956,7 +2955,7 @@ class Client:
         *,
         service_context: str | None = None,
         environment: dict[str, str] | None = None,
-        working_dir: str | None = None,
+        working_dir: str | pathlib.PurePath | None = None,
         timeout: float | None = None,
         user_id: int | None = None,
         user: str | None = None,
@@ -3122,7 +3121,7 @@ class Client:
                 'command': command,
                 'service-context': service_context,
                 'environment': environment or {},
-                'working-dir': working_dir,
+                'working-dir': str(working_dir) if working_dir is not None else None,
                 'timeout': _format_timeout(timeout) if timeout is not None else None,
                 'user-id': user_id,
                 'user': user,
@@ -3556,8 +3555,9 @@ class _FilesParser:
         """Return a list of filenames from the "files" parts of the response."""
         return list(self._files.keys())
 
-    def get_file(self, path: str, encoding: str | None) -> _TextOrBinaryIO:
+    def get_file(self, path: str | pathlib.PurePath, encoding: str | None) -> _TextOrBinaryIO:
         """Return an open file object containing the data."""
+        path = str(path)
         mode = 'r' if encoding else 'rb'
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.

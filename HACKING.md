@@ -50,7 +50,10 @@ tox -e unit -- test/test_charm.py
 tox -e format
 
 # Generate a local copy of the Sphinx docs in docs/_build
-tox -e docs
+make -C docs html
+
+# Check spelling in the doc source files
+make -C docs spelling
 
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
@@ -231,7 +234,63 @@ dependencies can be found in the relevant `tox.ini` environment `deps` field.
 The build backend is [setuptools](https://pypi.org/project/setuptools/), and
 the build frontend is [build](https://pypi.org/project/build/).
 
-# Publishing a Release
+# Releases
+
+## Release documentation
+
+As part of the release process, you'll write a summary of the release.
+The summary appears in the GitHub release notes and in Discourse and Matrix.
+
+In the summary, outline the key improvements from all areas of Ops,
+including testing, tracing, and the docs.
+The point here is to encourage people to check out the full notes and to upgrade
+promptly, so ensure that you entice them with the best that the new versions
+have to offer.
+
+Avoid using the word "Scenario", preferring "unit testing API" or "state
+transition testing".
+
+### CHANGES.md
+
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
+kept up-to-date by the PR that's created when you run `tox -e draft-release`
+during the release process. You only need to manually edit the changelog if a
+commit message needs adjusting (we try to avoid doing this).
+
+There's also a changelog for `ops-scenario`:
+[testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
+We've kept it for historical reference, but we no longer maintain it.
+
+### GitHub release notes
+
+The GitHub release notes include the summary of the release and
+the list of changes found in the changelog. A draft release is created when
+you run `tox -e draft-release` duing the release process. You might need to
+edit the draft release after a review.
+
+### Discourse and Matrix
+
+After completing the release process, post to
+[the 'framework' category in Discourse](https://discourse.charmhub.io/c/framework/42) and
+[Charm Development in Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
+The Discourse post title should be:
+
+```
+Ops x.y.z released
+```
+
+And the post should resemble this:
+
+```
+The main improvements in this release are ...
+
+Read more in the [full release notes on GitHub](link to the GitHub release).
+```
+
+The Matrix post should be similar.
+
+## Publishing a release
 
 Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
 
@@ -252,10 +311,10 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     > `tox -e draft-release -- --branch 2.23-maintenance`
 
 2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
-3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
-4. Go to the GitHub releases page, edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
-    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+
+4. Go to the GitHub releases page, then edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
 
     > Pushing the tags will trigger automatic builds for the Python packages and
     > publish them to PyPI ([ops](https://pypi.org/project/ops/)
@@ -266,11 +325,17 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
-    > You can troubleshoot errors on the [Actions Tab](https://github.com/canonical/operator/actions).
+    > You can troubleshoot errors at [Actions > Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml).
+    >
+    > The Publish workflow includes a job that runs the "SBOM and secscan" workflow.
 
-5. In the [SBOM and secscan workflow in the Actions Tab](https://github.com/canonical/operator/actions/workflows/sbom-secscan.yaml), verify that there is a run for the new release. In the workflow run, there will be two artifacts produced, `secscan-report-upload-sdist` and `secscan-report-upload-wheel`. Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+5. On the summary page of the most recent Publish run, locate the secscan artifacts. There will be two artifacts: `secscan-report-upload-sdist` and `secscan-report-upload-wheel`.
+
+    Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
+
 6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
 [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+
 7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
 
     > This assumes the same defaults as mentioned in step 1.
@@ -281,136 +346,49 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 
 If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
 
-## Release Documentation
-
-We produce several pieces of documentation for `ops` and `ops-scenario`
-releases, each serving a separate purpose and covering a different level.
-
-Avoid using the word "Scenario", preferring "unit testing API" or "state
-transition testing". Users should install `ops-scenario` with
-`pip install ops[testing]` rather than using the `ops-scenario` package name
-directly.
-
-### `git log`
-
-`git log` is used to see every change since a previous release. Obviously, no
-special work needs to be done so that this is available. A link to the GitHub
-view of the log will be included at the end of the GitHub release notes when
-the "Generate Release Notes" button is used, in the form:
-
-```
-**Full Changelog**: https://github.com/canonical/operator/compare/3.0.0...3.1.0
-```
-
-These changes include both `ops` and `ops-scenario`. If someone needs to see
-changes only for one of the packages, then the `/testing/` folder can be
-filtered in/out.
-
-### CHANGES.md
-
-A changelog is kept in version control that simply lists the changes in each
-release, other than chores. The changelog for `ops`
-is at the top level, in [CHANGES.md](CHANGES.md), and the changelog for
-`ops-scenario` is in the `/testing` folder, [CHANGES.md](testing/CHANGES.md).
-There will be overlap between the two files, as many PRs will include changes to
-common infrastructure, or will adjust both `ops` and also the testing API in
-`ops-scenario`.
-
-Adding the changes is done in preparation for a release. Use the "Generate
-Release Notes" button in the GitHub releases page, and copy the text to the
-CHANGES.md files.
-
-* Group the changes by the commit type (feat, fix, and so on) and use full names
-  ("Features", not "feat", "Fixes", not "fix") for group headings.
-* Remove any chores.
-* Remove any bullets that do not apply to the package. For instance, if a bullet
-  only affects `ops[testing]`, don't include it in [CHANGES.md](CHANGES.md) when
-  doing an `ops` release. The bullet should go in [testing/CHANGES.md](testing/CHANGES.md)
-  instead. If `ops[testing]` is not being released yet, put the bullet in a placeholder
-  section at top of [testing/CHANGES.md](testing/CHANGES.md).
-* Strip the commit type prefix from the bullet point, and capitalise the first
-  word.
-* Strip the username (who did each commit) if the author is a member of the
-  Charm Tech team.
-* Replace the link to the pull request with the PR number in parentheses.
-* Where appropriate, collapse multiple tightly related bullet points into a
-  single point that refers to multiple commits.
-* Where appropriate, add backticks for code formatting.
-* Do not include the "New Contributors" section and the "Full Changelog" link
-  (created by "Generate Release Notes").
-
-For example: the PR
-
-```
-* docs: clarify where StoredState is stored by @benhoyt in https://github.com/canonical/operator/pull/2006
-```
-
-is added to the "Documentation" section as:
-
-```
-* Clarify where StoredState is stored (#2006)
-```
-
-### GitHub Release Notes
-
-The GitHub release notes include the list of changes found in the changelogs,
-but:
-
-* If both `ops` and `ops-scenario` packages are being released, include all the
-  changes in the same set of release notes. If only one package is being
-  released, remove any bullets that apply only to the other package.
-* The links to the PRs are left in full.
-* Add a section above the list of changes that briefly outlines any key changes
-  in the release.
-
-### Discourse Release Announcement
-
-Post to the [framework category](https://discourse.charmhub.io/c/framework/42)
-with a subject matching the GitHub release title.
-
-The post should resemble this:
-
-```
-The Charm Tech team has just released version x.y.z of ops!
-
-It’s available from PyPI by using `pip install ops`, and `pip install ops[testing]`,
-which will pick up the latest version. Upgrade by running `pip install --upgrade ops`.
-
-The main improvements in this release are ...
-
-Read more in the [full release notes on GitHub](link to the GitHub release).
-```
-
-In the post, outline the key improvements both in `ops` and `ops-scenario`.
-The point here is to encourage people to check out the full notes and to upgrade
-promptly, so ensure that you entice them with the best that the new versions
-have to offer.
-
 ## Updating the Ops versions in the Charmcraft profiles
 
 The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
 
-First, fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
+1. Fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
 
-> See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
+    See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
 
-Next, do the following for the `kubernetes` profile:
+2. In your Charmcraft development branch, modify the Ops version specifier in:
 
-1. In `charmcraft/templates/init-kubernetes/pyproject.toml.j2`, modify the Ops version specifier.
-2. At the repo root, create a directory called `generated-temp`.
-3. Inside `generated-temp`, run:
+    - `charmcraft/templates/init-kubernetes/pyproject.toml.j2`
+    - `charmcraft/templates/init-machine/pyproject.toml.j2`
+
+2. Clone [charmcraft-profile-tools](https://github.com/canonical/charmcraft-profile-tools) locally.
+
+3. In your clone of charmcraft-profile-tools, run:
+
     ```text
-    CHARMCRAFT_DEVELOPER=1 python -m charmcraft init --profile=kubernetes
+    CHARMCRAFT_DIR=/path/to/charmcraft just init
     ```
-4. Inside `generated-temp`, run `uv lock`.
-5. Copy `generated-temp/uv.lock` to `charmcraft/templates/init-kubernetes/uv.lock.j2`, overwriting the existing file.
-6. In `charmcraft/templates/init-kubernetes/uv.lock.j2`, replace `generated-temp` by `{{ name }}`.
-7. Delete the `generated-temp` directory.
 
-For the `machine` profile, modify the Ops version specifier in `charmcraft/templates/init-machine/pyproject.toml.j2`. Then run a diff between `.../init-machine/pyproject.toml.j2` and `.../init-kubernetes/pyproject.toml.j2`. If the files match, copy `uv.lock.j2` from the `kubernetes` profile to the `machine` profile. Otherwise, repeat the full process for the `machine` profile.
+    This initialises a Kubernetes charm and a machine charm based on your Charmcraft development branch.
 
-Commit your changes. You should have changed these files:
-* charmcraft/templates/init-kubernetes/pyproject.toml.j2
-* charmcraft/templates/init-kubernetes/uv.lock.j2
-* charmcraft/templates/init-machine/pyproject.toml.j2
-* charmcraft/templates/init-machine/uv.lock.j2
+    If you don't have [just](https://just.systems/man/en/) installed, use `uvx --from rust-just just` instead.
+
+4. Lock the dependencies of the charms and generate `uv.lock.j2` files:
+
+    ```text
+    just lock
+    ```
+
+5. Copy the `uv.lock.j2` files to your Charmcraft development branch:
+
+    ```text
+    cp .templates/init-kubernetes/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-kubernetes
+    cp .templates/init-machine/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-machine
+    ```
+
+6. In your Charmcraft development branch, commit your changes.
+
+    You should have changed these files:
+
+    * charmcraft/templates/init-kubernetes/pyproject.toml.j2
+    * charmcraft/templates/init-kubernetes/uv.lock.j2
+    * charmcraft/templates/init-machine/pyproject.toml.j2
+    * charmcraft/templates/init-machine/uv.lock.j2

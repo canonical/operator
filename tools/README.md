@@ -10,10 +10,18 @@ The package provides tooling to generate the appropriate `charmcraft.yaml` secti
 
 ### Usage
 
+By default, the generated YAML is printed to stdout. Use `--update` to modify `charmcraft.yaml` in place.
+
 For example, if your charm contains a single config class in `src/charm.py` called `Config` and three actions, which all end with 'Action' (and no other classes have that name):
 
 ```bash
 update-charmcraft-schema --config-class Config --action-class '.+Action'
+```
+
+To update the file in place:
+
+```bash
+update-charmcraft-schema --config-class Config --action-class '.+Action' --update
 ```
 
 If you have a config class in `src/workload.py` called `WorkloadConfig` and one in `src/charm.py` called `AdditionalConfig`:

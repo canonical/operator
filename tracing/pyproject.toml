@@ -1,6 +1,6 @@
 [project]
 name = "ops-tracing"
-version = "3.2.0.dev0"
+version = "3.6.0.dev0"
 description = "The tracing facility for the Ops library."
 requires-python = ">=3.10"
 readme = "README.md"
@@ -31,7 +31,7 @@ classifiers = [
 dependencies = [
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.30",
-    "ops==3.2.0.dev0",
+    "ops==3.6.0.dev0",
     "pydantic",
 ]
 
@@ -112,8 +112,6 @@ ignore = [
     "D",
     # asserts are OK in tests
     "S101",
-    # type[xxx] require Python 3.9
-    "UP006",
 ]
 
 [tool.pyright]

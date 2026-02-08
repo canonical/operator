@@ -41,6 +41,8 @@ that:
 - the charm does not raise uncaught exceptions while handling the event
 - the output state (or the diff with the input state) is as expected.
 
+When the testing framework runs the event, the input state isn't modified. Instead, the output state is a new `State` object. `State` objects are generally immutable - but be careful when working with `dict` attributes, as they don't enforce immutability.
+
 ## Core concepts
 
 The tests are about running assertions on atomic state transitions, treating the
@@ -62,7 +64,7 @@ Comparing these tests with `Harness` tests:
   time. This ensures that the execution environment is as clean as possible
   (for a unit test).
 - Harness maintains a model of the Juju Model, which is a maintenance burden and
-  adds complexity. These tests mock at the level of hook tools and store all
+  adds complexity. These tests mock at the level of hook commands and store all
   mocking data in a monolithic data structure (the `State`), which makes it more
   lightweight and portable.
 
@@ -71,7 +73,7 @@ Comparing these tests with `Harness` tests:
 A test consists of three broad steps:
 
 - **Arrange**:
-    - declare the context 
+    - declare the context
     - declare the input state
     - select an event to fire
 - **Act**:
@@ -165,7 +167,7 @@ been emitted, what statuses it went through, etc... Before we get there, we have
 Consider the following tests. Suppose we want to verify that while handling a given top-level Juju event:
 
 - a specific chain of (custom) events was emitted on the charm
-- the charm `juju-log`ged these specific strings
+- the charm logged these specific strings
 - the charm went through this sequence of app/unit statuses (e.g. `maintenance`, then `waiting`, then `active`)
 
 These types of test have a place in Scenario, but that is not State: the contents of the Juju log or
@@ -192,13 +194,12 @@ emit multiple events in a single charm execution.
 
 ## The virtual charm root
 
-Before executing the charm, the framework copies the charm's `/src`, any libs,
-and the metadata, config, and actions YAML to a temporary directory. The charm
-will see that temporary directory as its 'root'. This allows us to keep things
-simple when dealing with metadata that can be either inferred from the charm
-type being passed to `Context` or be passed to it as an argument, thereby
-overriding the inferred one. This also allows you to test charms defined on the
-fly, as in:
+Before executing the charm, the framework writes the metadata, config, and actions
+YAML files to a temporary directory. The charm will see that temporary directory as its
+'root'. This allows us to keep things simple when dealing with metadata that can be
+either inferred from the charm type being passed to `Context` or be passed to it
+as an argument, thereby overriding the inferred one. This also allows you to test
+charms defined on the fly, as in:
 
 ```python
 class MyCharmType(ops.CharmBase):

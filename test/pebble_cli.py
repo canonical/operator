@@ -203,7 +203,7 @@ def main():
             result = client.get_checks(level=pebble.CheckLevel(args.level), names=args.name)
         elif args.command == 'exec':
             environment = {}
-            for env in typing.cast('typing.List[str]', args.env) or []:
+            for env in typing.cast('list[str]', args.env) or []:
                 key, _, value = env.partition('=')
                 environment[key] = value
 

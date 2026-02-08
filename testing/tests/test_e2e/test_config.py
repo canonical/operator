@@ -1,14 +1,17 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
-import pytest
-
-import ops
 import ops_tools
-
+import pytest
 from scenario.context import Context
 from scenario.state import State
+
+import ops
+
 from ..helpers import trigger
 
 

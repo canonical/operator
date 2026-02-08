@@ -19,17 +19,16 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
+import os
 import pathlib
 import warnings
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    List,
     Literal,
-    Mapping,
     NoReturn,
-    Optional,
     TextIO,
     TypedDict,
     TypeVar,
@@ -47,6 +46,7 @@ from .framework import (
     Object,
     ObjectEvents,
 )
+from .jujuversion import JujuVersion
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -308,6 +308,8 @@ class InstallEvent(HookEvent):
     lifecycle. Any associated callback method should be used to
     perform one-time setup operations, such as installing prerequisite
     software.
+
+    See also: `Juju | Hook | install <https://documentation.ubuntu.com/juju/3.6/reference/hook/#install>`_.
     """
 
 
@@ -319,6 +321,8 @@ class StartEvent(HookEvent):
     used to ensure that the charm's software is in a running state. Note that
     the charm's software should be configured so as to persist in this state
     through reboots without further intervention on Juju's part.
+
+    See also: `Juju | Hook | start <https://documentation.ubuntu.com/juju/3.6/reference/hook/#start>`_.
     """
 
 
@@ -330,6 +334,8 @@ class StopEvent(HookEvent):
     unit's destruction sequence. Callback methods bound to this event
     should be used to ensure that the charm's software is not running,
     and that it will not start again on reboot.
+
+    See also: `Juju | Hook | stop <https://documentation.ubuntu.com/juju/3.6/reference/hook/#stop>`_.
     """
 
     def defer(self) -> NoReturn:
@@ -348,6 +354,8 @@ class RemoveEvent(HookEvent):
     """Event triggered when a unit is about to be terminated.
 
     This event fires prior to Juju removing the charm and terminating its unit.
+
+    See also: `Juju | Hook | remove <https://documentation.ubuntu.com/juju/3.6/reference/hook/#remove>`_.
     """
 
     def defer(self) -> NoReturn:
@@ -374,7 +382,7 @@ class ConfigChangedEvent(HookEvent):
     - Right after the unit starts up for the first time.
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`~ops.InstallEvent`
-      and a :class:~`ops.StartEvent` during the startup sequence
+      and a :class:`~ops.StartEvent` during the startup sequence
       (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
@@ -386,6 +394,8 @@ class ConfigChangedEvent(HookEvent):
     software has already been started; it should not start stopped
     software, but should (if appropriate) restart running software to
     take configuration changes into account.
+
+    See also: `Juju | Hook | config-changed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#config-changed>`_.
     """
 
 
@@ -401,6 +411,8 @@ class UpdateStatusEvent(HookEvent):
     The interval between :class:`~ops.UpdateStatusEvent` events can
     be configured model-wide, e.g.  ``juju model-config
     update-status-hook-interval=1m``.
+
+    See also: `Juju | Hook | update-status <https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status>`_.
     """
 
 
@@ -414,6 +426,8 @@ class UpgradeCharmEvent(HookEvent):
     provided there is no existing error state. The callback method should be
     used to reconcile current state written by an older version of the charm
     into whatever form that is needed by the current charm version.
+
+    See also: `Juju | Hook | upgrade-charm <https://documentation.ubuntu.com/juju/3.6/reference/hook/#upgrade-charm>`_.
     """
 
 
@@ -431,6 +445,8 @@ class PreSeriesUpgradeEvent(HookEvent):
     callback method associated with this event, the administrator will initiate
     steps to actually upgrade the series.  After the upgrade has been completed,
     the :class:`~ops.PostSeriesUpgradeEvent` will fire.
+
+    See also: `Juju | Hook | pre-series-upgrade <https://documentation.ubuntu.com/juju/3.6/reference/hook/#pre-series-upgrade>`_.
 
     .. jujuremoved:: 4.0
     """
@@ -456,6 +472,8 @@ class PostSeriesUpgradeEvent(HookEvent):
     the series has actually changed or whether it was rolled back to the
     original series.
 
+    See also: `Juju | Hook | post-series-upgrade <https://documentation.ubuntu.com/juju/3.6/reference/hook/#post-series-upgrade>`_.
+
     .. jujuremoved:: 4.0
     """
 
@@ -478,11 +496,15 @@ class LeaderElectedEvent(HookEvent):
     unit. Callback methods bound to this event may take any action
     required for the elected unit to assert leadership. Note that only
     the elected leader unit will receive this event.
+
+    See also: `Juju | Hook | leader-elected <https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-elected>`_.
     """
 
 
 class LeaderSettingsChangedEvent(HookEvent):
     """Event triggered when leader changes any settings.
+
+    See also: `Juju | Hook | leader-settings-changed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-settings-changed>`_.
 
     .. deprecated:: 2.4.0
         This event has been deprecated in favor of using a Peer relation,
@@ -501,12 +523,12 @@ class CollectMetricsEvent(HookEvent):
     Note that associated callback methods are currently sandboxed in
     how they can interact with Juju.
 
-    .. jujuremoved:: 4.0
+    .. jujuremoved:: 3.6.11
     """
 
     def __init__(self, handle: Handle):
         warnings.warn(
-            'collect-metrics events will not be emitted from Juju 4.0 onwards - '
+            'collect-metrics events are not be emitted from Juju 3.6.11 onwards - '
             'consider using the Canonical Observability Stack',
             DeprecationWarning,
             stacklevel=3,
@@ -634,6 +656,8 @@ class RelationCreatedEvent(RelationEvent):
     can occur before units for those applications have started. All existing
     relations will trigger `RelationCreatedEvent` before :class:`~ops.StartEvent` is
     emitted.
+
+    See also: `Juju | Hook | <endpoint>-relation-created <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-created>`_.
     """
 
     unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -650,6 +674,8 @@ class RelationJoinedEvent(RelationEvent):
     determined using no more than the name of the joining unit and the
     remote ``private-address`` setting, which is always available when
     the relation is created and is by convention not deleted.
+
+    See also: `Juju | Hook | <endpoint>-relation-joined <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-joined>`_.
     """
 
     unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -673,6 +699,8 @@ class RelationChangedEvent(RelationEvent):
 
     The data that may be queried, or set, are determined by the relation's
     interface.
+
+    See also: `Juju | Hook | <endpoint>-relation-changed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-changed>`_.
     """
 
 
@@ -693,6 +721,8 @@ class RelationDepartedEvent(RelationEvent):
 
     Once all callback methods bound to this event have been run for such a
     relation, the unit agent will fire the :class:`~ops.RelationBrokenEvent`.
+
+    See also: `Juju | Hook | <endpoint>-relation-departed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-departed>`_.
     """
 
     unit: model.Unit  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -755,6 +785,8 @@ class RelationBrokenEvent(RelationEvent):
     :class:`~ops.RelationDepartedEvent` has been run. If a callback method
     bound to this event is being executed, it is guaranteed that no remote units
     are currently known locally.
+
+    See also: `Juju | Hook | <endpoint>-relation-broken <https://documentation.ubuntu.com/juju/3.6/reference/hook/#endpoint-relation-broken>`_.
     """
 
     unit: None  # pyright: ignore[reportIncompatibleVariableOverride]
@@ -829,6 +861,8 @@ class StorageAttachedEvent(StorageEvent):
     :class:`~ops.InstallEvent` fires, so that the installation routine may
     use the storage. The name prefix of this hook will depend on the
     storage key defined in the ``metadata.yaml`` file.
+
+    See also: `Juju | Hook | <storage>-storage-attached <https://documentation.ubuntu.com/juju/3.6/reference/hook/#storage-storage-attached>`_.
     """
 
 
@@ -845,6 +879,8 @@ class StorageDetachingEvent(StorageEvent):
     removed and before the unit terminates. The name prefix of the
     hook will depend on the storage key defined in the ``metadata.yaml``
     file.
+
+    See also: `Juju | Hook | <storage>-storage-detaching <https://documentation.ubuntu.com/juju/3.6/reference/hook/#storage-storage-detaching>`_.
     """
 
 
@@ -903,6 +939,8 @@ class PebbleReadyEvent(WorkloadEvent):
     a workload has started its Pebble instance and is ready to receive instructions
     regarding what services should be started. The name prefix of the hook
     will depend on the container key defined in the ``metadata.yaml`` file.
+
+    See also: `Juju | Hook | <container>-pebble-ready <https://documentation.ubuntu.com/juju/3.6/reference/hook/#container-pebble-ready>`_.
     """
 
 
@@ -951,6 +989,8 @@ class PebbleNoticeEvent(WorkloadEvent):
 class PebbleCustomNoticeEvent(PebbleNoticeEvent):
     """Event triggered when a Pebble notice of type "custom" is created or repeats.
 
+    See also: `Juju | Hook | <container>-pebble-notice-custom <https://documentation.ubuntu.com/juju/3.6/reference/hook/#container-pebble-custom-notice>`_.
+
     .. jujuadded:: 3.4
     """
 
@@ -998,6 +1038,8 @@ class PebbleCheckFailedEvent(PebbleCheckEvent):
     if the check is currently failing, check the current status with
     ``event.info.status == ops.pebble.CheckStatus.DOWN``.
 
+    See also: `Juju | Hook | <container>-pebble-check-failed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#container-pebble-check-failed>`_.
+
     .. jujuadded:: 3.6
     """
 
@@ -1008,6 +1050,8 @@ class PebbleCheckRecoveredEvent(PebbleCheckEvent):
     This event is only triggered when the check has previously reached a failure
     state (not simply failed, but failed at least as many times as the
     configured threshold).
+
+    See also: `Juju | Hook | <container>-pebble-check-recovered <https://documentation.ubuntu.com/juju/3.6/reference/hook/#container-pebble-check-recovered>`_.
 
     .. jujuadded:: 3.6
     """
@@ -1033,7 +1077,6 @@ class SecretEvent(HookEvent):
             backend=backend,
             id=self._id,
             label=self._label,
-            _secret_set_cache=self.framework.model._cache._secret_set_cache,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -1049,7 +1092,7 @@ class SecretEvent(HookEvent):
         Not meant to be called by charm code.
         """
         self._id = cast('str', snapshot['id'])
-        self._label = cast('Optional[str]', snapshot['label'])
+        self._label = cast('str | None', snapshot['label'])
 
 
 class SecretChangedEvent(SecretEvent):
@@ -1063,6 +1106,8 @@ class SecretChangedEvent(SecretEvent):
     :meth:`event.secret.get_content() <ops.Secret.get_content>` with ``refresh=True``
     to tell Juju to start tracking the new revision.
 
+    See also: `Juju | Hook | secret-changed <https://documentation.ubuntu.com/juju/3.6/reference/hook/#secret-changed>`_.
+
     .. jujuadded:: 3.0
         Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
     """
@@ -1074,6 +1119,8 @@ class SecretRotateEvent(SecretEvent):
     This event is fired on the secret owner to inform it that the secret must
     be rotated. The event will keep firing until the owner creates a new
     revision by calling :meth:`event.secret.set_content() <ops.Secret.set_content>`.
+
+    See also: `Juju | Hook | secret-rotate <https://documentation.ubuntu.com/juju/3.6/reference/hook/#secret-rotate>`_.
 
     .. jujuadded:: 3.0
     """
@@ -1101,6 +1148,8 @@ class SecretRemoveEvent(SecretEvent):
     :meth:`event.remove_revision() <ops.SecretRemoveEvent.remove_revision>` to
     remove the now-unused revision. If the charm does not, then the event will
     be emitted again, when further revisions are ready for removal.
+
+    See also: `Juju | Hook | secret-remove <https://documentation.ubuntu.com/juju/3.6/reference/hook/#secret-remove>`_.
 
     .. jujuadded:: 3.0
     """
@@ -1147,6 +1196,8 @@ class SecretExpiredEvent(SecretEvent):
     must be removed. The event will keep firing until the owner removes the
     revision by calling :meth:`event.remove_revision()
     <ops.SecretExpiredEvent.remove_revision>`.
+
+    See also: `Juju | Hook | secret-expired <https://documentation.ubuntu.com/juju/3.6/reference/hook/#secret-expired>`_.
 
     .. jujuadded:: 3.0
     """
@@ -1349,7 +1400,7 @@ class CharmEvents(ObjectEvents):
     collect_metrics = EventSource(CollectMetricsEvent)
     """Triggered by Juju to collect metrics (see :class:`~ops.CollectMetricsEvent`).
 
-    .. jujuremoved:: 4.0
+    .. jujuremoved:: 3.6.11
     """
 
     secret_changed = EventSource(SecretChangedEvent)
@@ -1524,6 +1575,10 @@ class CharmBase(Object):
                 data = self.load_config(Config, errors='blocked')
                 # `data.workload_class` has the value of the Juju option `class`
 
+        Pydantic classes that have fields that are not simple or
+        Pydantic types, such as :class:`ops.Secret`, require setting
+        ``arbitrary_types_allowed`` in the Pydantic model config.
+
         Any additional positional or keyword arguments to this method will be
         passed through to the config class ``__init__``.
 
@@ -1568,7 +1623,6 @@ class CharmBase(Object):
                 value = model.Secret(
                     backend=self.model._backend,
                     id=value,
-                    _secret_set_cache=self.model._cache._secret_set_cache,
                 )
             config[attr] = value
         try:
@@ -2025,7 +2079,7 @@ class StorageMeta:
     multiple_range: tuple[int, int | None] | None
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = List[str]
+    properties = list[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: _StorageMetaDict):
@@ -2119,7 +2173,7 @@ class JujuAssumesCondition(enum.Enum):
 class JujuAssumes:
     """Juju model features that are required by the charm.
 
-    See the `Charmcraft docs <https://canonical-charmcraft.readthedocs-hosted.com/en/stable/reference/files/charmcraft-yaml-file/#assumes>`_
+    See the `Charmcraft docs <https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/#assumes>`_
     for a list of available features.
     """
 
@@ -2157,7 +2211,9 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        self.additional_properties = raw.get('additionalProperties', True)
+        # The default in Juju 4 is False. The default in earlier Juju versions is True.
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+        self.additional_properties = raw.get('additionalProperties', juju_version < '4.0.0')
 
 
 @dataclasses.dataclass(frozen=True)

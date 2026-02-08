@@ -1,11 +1,8 @@
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+base: ubuntu@24.04
+platforms:
+  amd64:
+  arm64:
 
 name: httpbin-demo
 title: |
@@ -18,6 +15,13 @@ summary: |
 assumes:
   - juju >= 3.1
   - k8s-api
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
 
 config:
   options:

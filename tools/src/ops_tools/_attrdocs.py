@@ -91,7 +91,8 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
         # description fields, so we fall through to collect any docstrings from
         # the code as well.
 
-    for schema_class in reversed(cls.mro()):
+    # Iterate child-first so that child docstrings take priority over parent ones.
+    for schema_class in cls.mro():
         if schema_class is object:
             continue
         try:
@@ -106,5 +107,6 @@ def get_attr_docstrings(cls: type[object]) -> dict[str, str]:
             continue
         extractor = AttributeDocstringExtractor()
         extractor.visit(tree)
-        docs.update(extractor.attribute_docs)
+        for attr, doc in extractor.attribute_docs.items():
+            docs.setdefault(attr, doc)
     return docs

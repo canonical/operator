@@ -16,9 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.12", "3.14"]
         dir:
           - examples/httpbin-demo
+          - examples/machine-tinyproxy
           - examples/k8s-1-minimal
           - examples/k8s-2-configurable
           - examples/k8s-3-postgresql
@@ -26,13 +27,17 @@ jobs:
           - examples/k8s-5-observe
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Set up Python 3
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '${{ matrix.python-version }}'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
@@ -41,8 +46,6 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
-      - name: Install tox
-        run: pip install tox~=4.2
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}

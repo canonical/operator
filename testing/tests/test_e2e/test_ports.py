@@ -1,14 +1,20 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import pytest
-from ops import CharmBase, Framework, StartEvent, StopEvent
+from collections.abc import Mapping
+from typing import Any
 
+import pytest
 from scenario import Context, State
 from scenario.state import Port, StateValidationError, TCPPort, UDPPort
 
+from ops import CharmBase, Framework, StartEvent, StopEvent
+
 
 class MyCharm(CharmBase):
-    META = {'name': 'edgar'}
+    META: Mapping[str, Any] = {'name': 'edgar'}
 
     def __init__(self, framework: Framework):
         super().__init__(framework)
@@ -31,7 +37,7 @@ def ctx():
 def test_open_port(ctx):
     out = ctx.run(ctx.on.start(), State())
     assert len(out.opened_ports) == 1
-    port = tuple(out.opened_ports)[0]
+    port = next(iter(out.opened_ports))
 
     assert port.protocol == 'tcp'
     assert port.port == 12

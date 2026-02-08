@@ -1,0 +1,13 @@
+[project]
+name = "test-tracing"
+version = "0.0.0.dev0"
+description = "A simple charm for integration tests."
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+    "ops-tracing",
+]
+
+[tool.uv.sources]
+ops = { path = "ops.tar.gz" }
+ops-tracing = { path = "ops_tracing.tar.gz" }

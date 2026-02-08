@@ -1,17 +1,26 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import pytest
-from ops import CharmBase, ModelError
+from collections.abc import Mapping
+from typing import Any
 
+import pytest
 from scenario import Context, State, Storage
+
+from ops import CharmBase, ModelError
 
 
 class MyCharmWithStorage(CharmBase):
-    META = {'name': 'charlene', 'storage': {'foo': {'type': 'filesystem'}}}
+    META: Mapping[str, Any] = {
+        'name': 'charlene',
+        'storage': {'foo': {'type': 'filesystem'}},
+    }
 
 
 class MyCharmWithoutStorage(CharmBase):
-    META = {'name': 'patrick'}
+    META: Mapping[str, Any] = {'name': 'patrick'}
 
 
 @pytest.fixture

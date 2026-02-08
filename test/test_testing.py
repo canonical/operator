@@ -5005,7 +5005,7 @@ class TestTestingPebbleClient:
             )
 
 
-PebbleClientType = typing.Union[_TestingPebbleClient, pebble.Client]
+PebbleClientType = _TestingPebbleClient | pebble.Client
 
 
 # For testing file-ops of the pebble client.  This is refactored into a
@@ -5057,11 +5057,11 @@ class PebbleStorageAPIsTestMixin:
 
         # We also support file-like objects as input, so let's test that case as well.
         if encoding is None:
-            stream_class = typing.cast('typing.Type[io.BytesIO]', stream_class)
+            stream_class = typing.cast('type[io.BytesIO]', stream_class)
             small_file = stream_class(typing.cast('bytes', original_data))
             client.push(f'{pebble_dir}/test', small_file)
         else:
-            stream_class = typing.cast('typing.Type[io.StringIO]', stream_class)
+            stream_class = typing.cast('type[io.StringIO]', stream_class)
             small_file = stream_class(typing.cast('str', original_data))
             client.push(f'{pebble_dir}/test', small_file, encoding=encoding)
         with client.pull(f'{pebble_dir}/test', encoding=encoding) as infile:
@@ -7136,7 +7136,10 @@ class TestChecks:
 
     def test_stop_checks(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
-        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        # This generates a warning because there's a security event
+        # logged, but we haven't set up logging for Harness in these tests.
+        with pytest.warns(RuntimeWarning):
+            changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
 
     def test_stop_then_start(self, request: pytest.FixtureRequest):
@@ -7320,15 +7323,6 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.labels == {'foo': 'bar'}
     assert log_target.override == 'merge'
     assert log_target.location == 'https://loki2.example.com'
-
-
-@pytest.mark.skipif(
-    not hasattr(ops.testing, 'Context'), reason='requires optional ops[testing] install'
-)
-def test_scenario_available():
-    ctx = ops.testing.Context(ops.CharmBase, meta={'name': 'foo'})
-    state = ctx.run(ctx.on.start(), ops.testing.State())
-    assert isinstance(state.unit_status, ops.testing.UnknownStatus)
 
 
 @pytest.mark.parametrize('test_context', ['init', 'event'])

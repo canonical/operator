@@ -1,5 +1,9 @@
 This directory contains charms that you can pack and deploy locally, to help learn how to use Ops.
 
+### Charm from the machine charm tutorial
+
+- **[machine-tinyproxy](machine-tinyproxy)** - From [Write your first machine charm](https://documentation.ubuntu.com/ops/latest/tutorial/write-your-first-machine-charm/). This charm demonstrates how to run a reverse proxy with a configurable URL path.
+
 ### Charms from the Kubernetes charm tutorial
 
 - **[k8s-1-minimal](k8s-1-minimal)** - From [Create a minimal Kubernetes charm](https://documentation.ubuntu.com/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm/). This charm is a minimal Kubernetes charm for a demo web server.
@@ -18,5 +22,5 @@ This directory contains charms that you can pack and deploy locally, to help lea
 
     ```
     charmcraft pack
-    juju deploy ./httpbin-demo_ubuntu-22.04-amd64.charm --resource httpbin-image=kennethreitz/httpbin
+    juju deploy ./httpbin-demo_amd64.charm --resource httpbin-image=kennethreitz/httpbin
     ```

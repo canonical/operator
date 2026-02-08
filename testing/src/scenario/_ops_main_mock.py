@@ -10,21 +10,15 @@ import marshal
 import re
 import sys
 import warnings
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Sequence,
-    cast,
-)
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 import ops
-import ops.jujucontext
 import ops.storage
-
-from ops.framework import _event_regex
 from ops._main import _Dispatcher, _Manager
 from ops._main import logger as ops_logger
+from ops.framework import _event_regex
+from ops.log import JujuLogHandler, _get_juju_log_and_app_id
 
 from .context import Context
 from .errors import BadOwnerPath, NoObserverError
@@ -124,7 +118,7 @@ class Ops(_Manager, Generic[CharmType]):
         event: _Event,
         context: Context[CharmType],
         charm_spec: _CharmSpec[CharmType],
-        juju_context: ops.jujucontext._JujuContext,
+        juju_context: ops.JujuContext,
     ):
         self.state = state
         self.event = event
@@ -156,15 +150,9 @@ class Ops(_Manager, Generic[CharmType]):
     def _load_charm_meta(self):
         metadata = (self._charm_root / 'metadata.yaml').read_text()
         actions_meta = self._charm_root / 'actions.yaml'
-        if actions_meta.exists():
-            actions_metadata = actions_meta.read_text()
-        else:
-            actions_metadata = None
+        actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
         config_meta = self._charm_root / 'config.yaml'
-        if config_meta.exists():
-            config_metadata = config_meta.read_text()
-        else:
-            config_metadata = None
+        config_metadata = config_meta.read_text() if config_meta.exists() else None
 
         return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
 
@@ -220,7 +208,7 @@ class Ops(_Manager, Generic[CharmType]):
             ops_logger.debug('Event %s not defined for %s.', event_name, self.charm)
             raise NoObserverError(
                 f'Cannot fire {event_name!r} on {owner}: invalid event (not on charm.on).',
-            )
+            ) from None
         return event_to_emit
 
     def _object_to_ops_object(self, obj: Any) -> Any:
@@ -257,13 +245,13 @@ class Ops(_Manager, Generic[CharmType]):
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
         """Walk path on root to an ObjectEvents instance."""
         obj = root
-        for step in path:
-            try:
+        try:
+            for step in path:
                 obj = getattr(obj, step)
-            except AttributeError:
-                raise BadOwnerPath(
-                    f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
-                )
+        except AttributeError:
+            raise BadOwnerPath(
+                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
+            ) from None
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
                 f'event_owner_path {path!r} invalid: does not lead to an ObjectEvents instance.',
@@ -285,6 +273,14 @@ class Ops(_Manager, Generic[CharmType]):
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()
             self._tracing_mock.__exit__(None, None, None)
+
+        # Clean up logging handlers to avoid test pollution.
+        logger = logging.getLogger()
+        for handler in logger.handlers[:]:
+            if isinstance(handler, JujuLogHandler):
+                logger.removeHandler(handler)
+        # Clear app ID cached when logging security events.
+        _get_juju_log_and_app_id.cache_clear()
 
 
 class CapturingFramework(ops.Framework):

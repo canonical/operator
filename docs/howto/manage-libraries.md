@@ -1,5 +1,5 @@
 (manage-libraries)=
-# Manage libraries
+# How to manage libraries
 
 > See first: {external+charmcraft:ref}`Charmcraft | Manage libraries <manage-libraries>`
 

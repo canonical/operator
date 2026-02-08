@@ -23,7 +23,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import opentelemetry.trace
 
@@ -32,7 +32,7 @@ from . import framework as _framework
 from . import model as _model
 from . import storage as _storage
 from ._private import tracer
-from .jujucontext import _JujuContext
+from .jujucontext import JujuContext
 from .log import setup_root_logging
 from .version import version
 
@@ -55,7 +55,7 @@ def _exe_path(path: Path) -> Path | None:
 def _get_event_args(
     charm: _charm.CharmBase,
     bound_event: _framework.BoundEvent,
-    juju_context: _JujuContext,
+    juju_context: JujuContext,
 ) -> tuple[list[Any], dict[str, Any]]:
     event_type = bound_event.event_type
     model = charm.framework.model
@@ -89,15 +89,18 @@ def _get_event_args(
         storage_name = juju_context.storage_name or '-'.join(
             bound_event.event_kind.split('_')[:-2]
         )
+        storage_index = juju_context.storage_index
 
         storages = model.storages[storage_name]
-        index, storage_location = model._backend._storage_event_details()
+        storage_location = model._backend.storage_get(
+            f'{storage_name}/{storage_index}', 'location'
+        )
         if len(storages) == 1:
             storage = storages[0]
         else:
             # If there's more than one value, pick the right one. We'll realize the key on lookup
-            storage = next((s for s in storages if s.index == index), None)
-        storage = cast('Union[_storage.JujuStorage, _storage.SQLiteStorage]', storage)
+            storage = next((s for s in storages if s.index == storage_index), None)
+        storage = cast('_storage.JujuStorage | _storage.SQLiteStorage', storage)
         storage.location = storage_location  # type: ignore
         return [storage], {}
     elif issubclass(event_type, _charm.ActionEvent):
@@ -152,7 +155,7 @@ class _Dispatcher:
 
     event_name: str
 
-    def __init__(self, charm_dir: Path, juju_context: _JujuContext):
+    def __init__(self, charm_dir: Path, juju_context: JujuContext):
         self._juju_context = juju_context
         self._charm_dir = charm_dir
         self._exec_path = Path(self._juju_context.dispatch_path or sys.argv[0])
@@ -219,7 +222,7 @@ class _Dispatcher:
 
 
 def _should_use_controller_storage(
-    db_path: Path, meta: _charm.CharmMeta, juju_context: _JujuContext
+    db_path: Path, meta: _charm.CharmMeta, juju_context: JujuContext
 ) -> bool:
     """Figure out whether we want to use controller storage or not."""
     # if local state has been used previously, carry on using that
@@ -254,7 +257,7 @@ class _Manager:
 
     Running _Manager consists of three main steps:
     - setup: initialise the following from JUJU_* environment variables:
-      - the Framework (hook tool wrappers)
+      - the Framework (hook command wrappers)
       - the storage backend
       - the event that Juju is emitting on us
       - the charm instance (user-facing)
@@ -276,12 +279,12 @@ class _Manager:
         model_backend: _model._ModelBackend | None = None,
         use_juju_for_storage: bool | None = None,
         charm_state_path: str = CHARM_STATE_FILE,
-        juju_context: _JujuContext | None = None,
+        juju_context: JujuContext | None = None,
     ):
         from . import tracing  # break circular import
 
         if juju_context is None:
-            juju_context = _JujuContext.from_dict(os.environ)
+            juju_context = JujuContext._from_dict(os.environ)
 
         try:
             name = charm_class.__name__
@@ -414,7 +417,7 @@ class _Manager:
         #       EventBase.defer().
         #
         # Skip reemission of deferred events for collect-metrics events because
-        # they do not have the full access to all hook tools.
+        # they do not have the full access to all hook commands.
         if not self.dispatcher.is_restricted_context():
             # Re-emit any deferred events from the previous run.
             self.framework.reemit()
@@ -447,7 +450,7 @@ class _Manager:
         Args:
             charm: A charm instance to emit an event from.
             event_name: A Juju event name to emit on a charm.
-            juju_context: An instance of the _JujuContext class.
+            juju_context: An instance of the JujuContext class.
         """
         event_to_emit = self._get_event_to_emit(event_name)
 

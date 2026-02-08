@@ -42,12 +42,7 @@ parts:
 
 
 def pack(charm_dir: pathlib.Path):
-    """Pack the charm.
-
-    The pytest-operator plugin has a pack method, but it doesn't work out of the
-    box in GitHub actions, and there isn't really any reason that it should be
-    part of the plugin, so we just have a simple subprocess here.
-    """
+    """Pack the charm."""
     cmd = ['charmcraft', 'pack', '--verbose']
     # We need to use `sudo` in the GitHub actions environment, just as in
     # the pack test. `sg lxd -c` should work, but does not - perhaps because of

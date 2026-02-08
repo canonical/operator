@@ -1,7 +1,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""
+"""Check that the state is consistent with the context.
+
 The :meth:`check_consistency` function is the primary entry point for the
 consistency checks. Calling it ensures that the :class:`State` and the event,
 in combination with the ``Context``, is viable in Juju. For example, Juju can't
@@ -23,18 +24,12 @@ import marshal
 import os
 import re
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Iterable,
-    NamedTuple,
-)
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-from .errors import InconsistentScenarioError
 from ._runtime import logger as scenario_logger
+from .errors import InconsistentScenarioError
 from .state import (
     CharmType,
     PeerRelation,
@@ -137,7 +132,7 @@ def check_resource_consistency(
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
-    """Check the internal consistency of the resources from metadata and in :class:`scenario.State`."""
+    """Check the internal consistency of the resources from metadata and in `State`."""
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -178,8 +173,8 @@ def check_event_consistency(
         # consistency possible?
         warnings.append(
             'this is a custom event; if its name makes it look like a builtin one '
-            '(for example, a relation event, or a workload event), you might get some false-negative '
-            'consistency checks.',
+            '(for example, a relation event, or a workload event), you might get '
+            'some false-negative consistency checks.',
         )
         return Results(errors, warnings)
 
@@ -251,7 +246,7 @@ def _check_workload_event(
                     'you **can** fire fire pebble-ready while the container cannot connect, '
                     "but that's most likely not what you want.",
                 )
-        names = Counter(exec.command_prefix for exec in event.container.execs)
+        names = Counter(exe.command_prefix for exe in event.container.execs)
         if dupes := [n for n in names if names[n] > 1]:
             errors.append(
                 f'container {event.container.name} has duplicate command prefixes: {dupes}',
@@ -338,7 +333,7 @@ def _check_action_param_types(
         'object': dict,
     }
     expected_param_type: dict[str, Any] = {}
-    for par_name, par_spec in actions[action.name].get('params', {}).items():
+    for par_name, par_spec in (actions[action.name] or {}).get('params', {}).items():
         value = par_spec.get('type')
         if not value:
             errors.append(
@@ -376,7 +371,7 @@ def check_storages_consistency(
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
-    """Check the consistency of the :class:`scenario.State` storages with the charm_spec metadata."""
+    """Check the consistency of the `State` storages with the charm_spec metadata."""
     state_storage = state.storages
     meta_storage = (charm_spec.meta or {}).get('storage', {})
     errors: list[str] = []
@@ -543,6 +538,7 @@ def check_relation_consistency(
 ) -> Results:
     """Check the consistency of any relations in the :class:`scenario.State`."""
     errors: list[str] = []
+    warnings: list[str] = []
 
     peer_relations_meta = charm_spec.meta.get('peers', {}).items()
     all_relations_meta = charm_spec.get_all_relations()
@@ -613,7 +609,35 @@ def check_relation_consistency(
                 f'`peers_data={{other_unit: y}}, local_unit_data=x`.',
             )
 
-    return Results(errors, [])
+    # relation-joined, relation-changed, and relation-departed must all provide
+    # a remote unit, either explicitly or by having at least one remote unit
+    # with data.
+    if (
+        event.name.endswith(('_relation_joined', '_relation_changed', '_relation_departed'))
+        and not event.relation_remote_unit_id
+        and event.relation is not None  # Another check will have complained if it is None.
+    ):
+        try:
+            relation = state.get_relation(event.relation.id)
+        except KeyError:
+            # Another check will already have complained about this.
+            pass
+        else:
+            remote_units = relation._remote_unit_ids
+            if len(remote_units) == 0:
+                errors.append(f'{event.name!r} must provide a remote unit. Pass in `remote_unit`.')
+            elif len(remote_units) == 1:
+                warnings.append(
+                    f'{event.name!r} is implicitly using {remote_units[0]} as the remote unit. '
+                    f'Consider passing `remote_unit` explicitly.'
+                )
+            else:
+                warnings.append(
+                    f'{event.name!r} is implicitly using one unit from {remote_units} as the '
+                    f'remote unit. Consider passing `remote_unit` explicitly.'
+                )
+
+    return Results(errors, warnings)
 
 
 def check_containers_consistency(
@@ -624,7 +648,6 @@ def check_containers_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :class:`scenario.State` containers with the charm_spec metadata."""
-
     # event names will be normalized; need to compare against normalized container names.
     meta = charm_spec.meta
     meta_containers = list(map(_normalise_name, meta.get('containers', {})))
@@ -704,7 +727,6 @@ def check_cloudspec_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check that Kubernetes models don't have :attr:`scenario.State.cloud_spec` set."""
-
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -722,7 +744,7 @@ def check_storedstate_consistency(
     state: State,
     **_kwargs: Any,
 ) -> Results:
-    """Check the internal consistency of any :class:`scenario.StoredState` in the :class:`scenario.State`."""
+    """Check the internal consistency of any `StoredState` in the `State`."""
     errors: list[str] = []
 
     # Attribute names must be unique on each object.
@@ -741,8 +763,9 @@ def check_storedstate_consistency(
         # This is the same "only simple types" check that ops does.
         try:
             marshal.dumps(ss.content)
-        except ValueError:
+        except ValueError:  # noqa: PERF203
             errors.append(
-                f'The StoredState object {ss.owner_path}.{ss.name} should contain only simple types.',
+                f'The StoredState object {ss.owner_path}.{ss.name} '
+                f'should contain only simple types.',
             )
     return Results(errors, [])

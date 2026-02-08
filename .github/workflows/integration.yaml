@@ -15,7 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         preset: ['k8s', 'microk8s']
-        test: ['test_direct_connection', 'test_with_tls', 'test_relation_units']
+        test:
+          # https://github.com/canonical/observability-stack/issues/110
+          # - test_direct_connection
+          # - test_with_tls
+          - test_relation_units
 
     steps:
       - run: |
@@ -29,9 +33,41 @@ jobs:
           --juju-channel=3/stable
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
+
+  secrets:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        juju-channel:
+          - 3.6/stable
+          - 4.0/stable
+
+    continue-on-error: ${{ matrix.juju-channel == '4.0/stable' }}
+
+    steps:
+      - run: |
+           # Work around https://github.com/jnsgruk/concierge/issues/30
+           sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+           sudo rm -rf /run/containerd
+        if: matrix.preset == 'k8s'
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
+          -p microk8s
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+      - run: uv tool install tox --with tox-uv
+      - run: tox -e integration -- --log-cli-level=INFO -s test/integration/test_secrets.py
+        timeout-minutes: 20  # Juju 4 gets stuck while destroying the model

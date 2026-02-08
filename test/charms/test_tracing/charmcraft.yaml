@@ -12,10 +12,9 @@ platforms:
 
 parts:
     test-tracing:
-        plugin: charm
         source: .
-        build-packages:
-            - cargo
+        plugin: uv
+        build-snaps: [astral-uv]
 
 requires:
     charm-tracing:
@@ -28,15 +27,15 @@ requires:
         optional: true
 
 actions:
-  one:
-    params:
-      arg:
-        type: string
-  two:
-    params:
-      arg:
-        type: string
-  three:
-    params:
-      arg:
-        type: string
+    one:
+        params:
+            arg:
+                type: string
+    two:
+        params:
+            arg:
+                type: string
+    three:
+        params:
+            arg:
+                type: string

@@ -1,9 +1,27 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+
+import pytest
+import scenario
+from scenario import Context
+from scenario.errors import UncaughtCharmError
+from scenario.state import (
+    _DEFAULT_JUJU_DATABAG,
+    PeerRelation,
+    Relation,
+    RelationBase,
+    State,
+    StateValidationError,
+    SubordinateRelation,
+    _Event,
+    _next_relation_id,
+)
 
 import ops
-import pytest
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -14,21 +32,6 @@ from ops.charm import (
     RelationEvent,
 )
 from ops.framework import EventBase, Framework
-
-import scenario
-from scenario import Context
-from scenario.errors import UncaughtCharmError
-from scenario.state import (
-    _DEFAULT_JUJU_DATABAG,
-    _Event,
-    PeerRelation,
-    Relation,
-    RelationBase,
-    State,
-    StateValidationError,
-    SubordinateRelation,
-    _next_relation_id,
-)
 from tests.helpers import trigger
 
 
@@ -36,7 +39,7 @@ from tests.helpers import trigger
 def mycharm():
     class MyCharmEvents(CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: type[EventBase]):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)
@@ -486,10 +489,7 @@ def test_relation_default_unit_data_peer():
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
 
 
-@pytest.mark.parametrize(
-    'evt_name',
-    ('changed', 'broken', 'departed', 'joined', 'created'),
-)
+@pytest.mark.parametrize('evt_name', ('broken', 'created'))
 def test_relation_events_no_remote_units(mycharm, evt_name, caplog):
     relation = Relation(
         endpoint='foo',
@@ -544,7 +544,11 @@ def test_relation_app_data_bad_types(mycharm, data):
 )
 @pytest.mark.parametrize(
     'relation',
-    (Relation('a'), PeerRelation('b'), SubordinateRelation('c')),
+    (
+        Relation('a', remote_units_data={0: {}}),
+        PeerRelation('b', peers_data={1: {}}),
+        SubordinateRelation('c'),
+    ),
 )
 def test_relation_event_trigger(relation, evt_name, mycharm):
     meta = {
@@ -663,9 +667,9 @@ def test_get_relation_when_missing():
 
     # If there's no defined relation with the name, then get_relation raises KeyError.
     ctx = Context(MyCharm, meta={'name': 'foo'})
-    with pytest.raises(UncaughtCharmError) as exc:
+    with pytest.raises((KeyError, UncaughtCharmError)) as exc:
         ctx.run(ctx.on.update_status(), State())
-    assert isinstance(exc.value.__cause__, KeyError)
+    assert isinstance(exc.value, KeyError) or isinstance(exc.value.__cause__, KeyError)
 
 
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))

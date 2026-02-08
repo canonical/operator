@@ -16,7 +16,7 @@ Ops communicates with Juju by reading environment variables and running processe
 
 > See also:
 > - {external+juju:ref}`Juju | Hook <hook>`
-> - {external+juju:ref}`Juju |Hook command <list-of-hook-commands>`
+> - {external+juju:ref}`Juju | Hook command <list-of-hook-commands>`
 
 ## Hardening
 
@@ -51,7 +51,7 @@ When testing an event with [](ops.testing.Context), the mocked unit state databa
 
 ## Security updates
 
-We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your dev dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
+We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your `dev` dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
 
 Your charm repository should have tooling configured so that any dependencies with security updates are detected automatically (such as [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/)), prompting to you re-lock so that the charm will be built with the latest version.
 
@@ -76,6 +76,7 @@ Otherwise, Ops doesn't introduce any new security risks. Ops does expand the imp
 * Use {external+juju:ref}`Juju secrets <secret>` for storing and sharing sensitive data.
 * Juju users that integrate a charm with a tracing receiver should also integrate with a certificate authority provider, to ensure all traces are sent via HTTPS.
 * Charms should follow best practices for writing secure Python code.
+* Machine charms are responsible for setting appropriate ownership and permissions on the files and directories they create, for example using {py:func}`os.umask`.
 * Charms should have workflows that statically check for security issues (such as [ruff](https://docs.astral.sh/ruff/linter/) and [zizmor](https://docs.zizmor.sh/)).
 * Charm authors should exercise caution when considering adding dependencies to their charms.
 * Write the exact dependencies of the charm into a lock file (using `uv lock`, `poetry lock`, or similar tool) and commit that lock file to source control.

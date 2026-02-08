@@ -1,0 +1,24 @@
+name: Docs links
+
+on:
+  # The docs have a lot of external links, so the link checker takes a long time to run.
+  # As of Oct 2025, the link checker fails on many Read the Docs links because RTD's
+  # servers respond with 429 (Too Many Requests) without allowing retry after delay.
+  # Given this, it's best to run the workflow manually and inspect the results.
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  docs-linkcheck:
+    name: Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+      - name: Check links
+        run: make -C docs linkcheck

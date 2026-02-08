@@ -1,22 +1,19 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import copy
 import tempfile
+from collections.abc import Callable, Generator, Iterable
 from dataclasses import asdict, replace
-from typing import Any, Callable, Iterable, Generator
+from typing import Any
 
-import yaml
-
-import ops
 import pytest
-from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
-from ops.framework import EventBase, Framework
-from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
-
+import yaml
+from scenario.context import Context
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
-    _Event,
-    _next_storage_index,
     Address,
     BindAddress,
     CheckInfo,
@@ -36,9 +33,15 @@ from scenario.state import (
     StoredState,
     SubordinateRelation,
     TCPPort,
+    _Event,
+    _next_storage_index,
     layer_from_rockcraft,
 )
-from scenario.context import Context
+
+import ops
+from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
+from ops.framework import EventBase, Framework
+from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
 from tests.helpers import jsonpatch_delta, sort_patch, trigger
 
 CUSTOM_EVT_SUFFIXES = {
@@ -59,7 +62,7 @@ CUSTOM_EVT_SUFFIXES = {
 def mycharm():
     class MyCharmEvents(CharmEvents):
         @classmethod
-        def define_event(cls, event_kind: str, event_type: 'type[EventBase]'):
+        def define_event(cls, event_kind: str, event_type: type[EventBase]):
             if getattr(cls, event_kind, None):
                 delattr(cls, event_kind)
             return super().define_event(event_kind, event_type)
@@ -215,9 +218,9 @@ def test_relation_set(mycharm):
 
         # this will NOT raise an exception because we're not in an event context!
         # we're right before the event context is entered in fact.
-        with pytest.raises(Exception):
+        with pytest.raises(ops.RelationDataAccessError):
             rel.data[rel.app]['a'] = 'b'
-        with pytest.raises(Exception):
+        with pytest.raises(ops.RelationDataAccessError):
             rel.data[charm.model.get_unit('remote/1')]['c'] = 'd'
 
         assert charm.unit.is_leader()
@@ -503,14 +506,14 @@ def test_state_immutable(obj_in, attribute: str, get_method: str, key_attr: str,
     elif attribute == 'opened_ports':
         # There's no State.get_opened_ports, because in a charm tests you just
         # want to assert the port is/is not in the set.
-        obj_out = [p for p in state_out.opened_ports if p == obj_in][0]
+        obj_out = next(p for p in state_out.opened_ports if p == obj_in)
     elif attribute == 'secrets':
         # State.get_secret only takes keyword arguments, while the others take
         # only positional arguments.
         obj_out = state_out.get_secret(id=obj_in.id)
     elif attribute == 'resources':
         # Charms can't change resources, so there's no State.get_resource.
-        obj_out = [r for r in state_out.resources if r == obj_in][0]
+        obj_out = next(r for r in state_out.resources if r == obj_in)
     else:
         obj_out = getattr(state_out, get_method)(getattr(obj_in, key_attr))
     assert obj_in is not obj_out
@@ -829,7 +832,7 @@ def test_state_from_context():
     assert state.get_relations('sub')[0].interface == 'below'
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert tuple(state.storages)[0].name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
@@ -880,7 +883,7 @@ def test_state_from_context_extend():
     assert state.get_relation(relation.id).remote_app_data == {'a': 'b'}
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert tuple(state.storages)[0].name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'

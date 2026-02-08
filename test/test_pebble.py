@@ -21,7 +21,6 @@ import email.parser
 import io
 import json
 import signal
-import socket
 import tempfile
 import typing
 import unittest
@@ -1804,6 +1803,20 @@ class TestClient:
             ('GET', '/v1/changes/70', None, None),
         ]
 
+    @pytest.mark.parametrize('action', ['start', 'stop'])
+    def test_startstop_checks_nothing_changed(self, client: MockClient, action: str):
+        client.responses.append({
+            'result': {'changed': None},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        result = getattr(client, f'{action}_checks')(['chk1', 'chk2'])
+        assert client.requests == [
+            ('POST', '/v1/checks', None, {'action': action, 'checks': ('chk1', 'chk2')})
+        ]
+        assert result == []
+
     def test_get_change_str(self, client: MockClient):
         client.responses.append({
             'result': build_mock_change_dict(),
@@ -2132,7 +2145,7 @@ class TestClient:
     def test_wait_change_socket_timeout(self, client: MockClient, time: MockTime):
         def timeout_response(n: float):
             time.sleep(n)
-            raise socket.timeout('socket.timeout: timed out')
+            raise TimeoutError('socket.timeout: timed out')
 
         client.responses.append(lambda: timeout_response(3))
 

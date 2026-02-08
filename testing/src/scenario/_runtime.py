@@ -12,14 +12,11 @@ import tempfile
 import typing
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Type,
-)
+from typing import TYPE_CHECKING
 
 import yaml
-from ops import pebble
-from ops.jujucontext import _JujuContext
+
+from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
 
@@ -53,7 +50,9 @@ class Runtime:
         charm_root: str | Path | None = None,
         juju_version: str = '3.0.0',
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
+        availability_zone: str | None = None,
+        principal_unit: str | None = None,
     ):
         self._charm_spec = charm_spec
         self._juju_version = juju_version
@@ -62,6 +61,8 @@ class Runtime:
         self._app_name = app_name
         self._unit_id = unit_id
         self._machine_id = machine_id
+        self._availability_zone = availability_zone
+        self._principal_unit = principal_unit
 
     def _get_event_env(self, state: State, event: _Event, charm_root: Path):
         """Build the simulated environment the operator framework expects."""
@@ -69,14 +70,21 @@ class Runtime:
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event.name}',
+            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
+            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
         }
 
-        if self._machine_id is not None:  # could be 0
-            env['JUJU_MACHINE_ID'] = str(self._machine_id)
+        if self._machine_id is not None:
+            env['JUJU_MACHINE_ID'] = self._machine_id
+
+        if self._availability_zone is not None:
+            env['JUJU_AVAILABILITY_ZONE'] = self._availability_zone
+
+        if self._principal_unit is not None:
+            env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
         if event._is_action_event and (action := event.action):
             env.update(
@@ -194,7 +202,7 @@ class Runtime:
         WrappedCharm.__name__ = charm_type.__name__
         WrappedCharm.__qualname__ = charm_type.__qualname__
         WrappedCharm.__module__ = charm_type.__module__
-        return typing.cast('Type[CharmType]', WrappedCharm)
+        return typing.cast('type[CharmType]', WrappedCharm)
 
     @contextmanager
     def _virtual_charm_root(self):
@@ -298,7 +306,7 @@ class Runtime:
                 event=event,
                 charm_root=temporary_charm_root,
             )
-            juju_context = _JujuContext.from_dict(env)
+            juju_context = JujuContext.from_environ(env)
             # We need to set JUJU_VERSION in os.environ, because charms may use
             # `JujuVersion.from_environ()` to get the (simulated) Juju version.
             # For consistency, we put all the other ones there too, although we'd
@@ -307,7 +315,7 @@ class Runtime:
             os.environ.update(env)
 
             logger.info(' - entering ops.main (mocked)')
-            from ._ops_main_mock import Ops  # noqa: F811
+            from ._ops_main_mock import Ops
 
             ops = None
 
@@ -334,9 +342,12 @@ class Runtime:
             except (NoObserverError, ActionFailed):
                 raise  # propagate along
             except Exception as e:
+                bare = os.getenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+                if bare.lower() == 'true' or (bare.isdigit() and int(bare)):
+                    raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip  # noqa: E501
 
             finally:
                 if ops:

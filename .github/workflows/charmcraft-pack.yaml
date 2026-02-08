@@ -13,24 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+
       - name: Update 'ops' dependency in test charm to latest
         run: |
-          cd examples/httpbin-demo
-          sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
           if [ -z "$CLONE_SHA" ]
           then
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            ops_source="ops @ git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops"
           else
             # If on a PR, we need to reference the PR branch's repo and commit (not the GITHUB_SHA
             # temporary merge commit), because charmcraft pack does a git checkout which
             # can't see the temporary merge commit.
-            echo -e "\ngit+$CLONE_URL@$CLONE_SHA#egg=ops" >> requirements.txt
+            ops_source="ops @ git+$CLONE_URL@$CLONE_SHA#egg=ops"
           fi
-          cat requirements.txt
+          cd examples/httpbin-demo
+          uv add "$ops_source"
+          cat pyproject.toml
         env:
           CLONE_URL: ${{ github.event.pull_request.head.repo.clone_url }}
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
@@ -41,15 +44,15 @@ jobs:
       - name: Add 'git' as a build package
         run: |
           cd examples/httpbin-demo
-          if yq --exit-status 'has("parts")' charmcraft.yaml; then
-            echo "'parts' already exists in charmcraft.yaml"
+          if yq --exit-status '.parts.charm | has("build-packages")' charmcraft.yaml; then
+            echo "'parts.charm.build-packages' already exists in charmcraft.yaml"
             exit 1
           fi
           yq --inplace '.parts.charm.build-packages = ["git"]' charmcraft.yaml
           cat charmcraft.yaml
 
       - name: Set up LXD
-        uses: canonical/setup-lxd@a3c85fc6fb7fff43fcfeae87659e41a8f635b7dd
+        uses: canonical/setup-lxd@8c6a87bfb56aa48f3fb9b830baa18562d8bfd4ee
         with:
           channel: 5.0/stable
 
@@ -63,7 +66,7 @@ jobs:
 
       - name: Archive charmcraft logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: charmcraft-logs
           path: /root/.local/state/charmcraft/log/*.log

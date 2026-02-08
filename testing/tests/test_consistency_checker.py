@@ -1,10 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
 import pytest
-import ops
-
 from scenario._consistency_checker import check_consistency
 from scenario.context import Context
 from scenario.errors import InconsistentScenarioError
@@ -29,15 +30,17 @@ from scenario.state import (
     _Event,
 )
 
+import ops
+
 
 class MyCharm(ops.CharmBase):
     pass
 
 
 def assert_inconsistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
@@ -46,9 +49,9 @@ def assert_inconsistent(
 
 
 def assert_consistent(
-    state: 'State',
-    event: '_Event',
-    charm_spec: '_CharmSpec',
+    state: State,
+    event: _Event,
+    charm_spec: _CharmSpec,
     juju_version='3.0',
     unit_id=0,
 ):
@@ -498,6 +501,12 @@ def test_action_meta_type_inconsistent():
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}}),
     )
 
+    assert_inconsistent(
+        State(),
+        ctx.on.action('foo', params={'bar': 'baz'}),
+        _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+    )
+
 
 def test_action_name():
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
@@ -507,6 +516,13 @@ def test_action_name():
         ctx.on.action('foo', params={'bar': 'baz'}),
         _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'string'}}}}),
     )
+
+    assert_consistent(
+        State(),
+        ctx.on.action('foo', params={}),
+        _CharmSpec(MyCharm, meta={}, actions={'foo': None}),
+    )
+
     assert_inconsistent(
         State(),
         _Event('box_action', action=ctx.on.action('foo', params={'bar': 'baz'})),

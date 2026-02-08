@@ -14,9 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        juju-channel: ['2.9/stable', '3/stable', '4/beta']
+        juju-channel: ['2.9/stable', '3/stable', '4/stable']
         preset: ['machine', 'microk8s']
-    continue-on-error: ${{ matrix.juju-channel == '4/beta' && matrix.preset == 'microk8s' }}
+    continue-on-error: ${{ matrix.juju-channel == '4/stable' && matrix.preset == 'microk8s' }}
 
     steps:
       - run: sudo snap install --classic concierge
@@ -26,14 +26,21 @@ jobs:
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - name: Checkout the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
 
       - run: uv tool install tox --with tox-uv
 
       - name: Run smoke tests
         run: tox -e smoke
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the test model
+
+      - name: Archive charmcraft logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: charmcraft-logs
+          path: /home/runner/.local/state/charmcraft/log/*.log

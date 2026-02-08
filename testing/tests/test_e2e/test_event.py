@@ -1,11 +1,13 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
 import pytest
-from ops import CharmBase
-
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType
+
+import ops
 
 
 @pytest.mark.parametrize(
@@ -40,7 +42,7 @@ def test_event_type(evt, expected_type):
     assert event._is_secret_event is (expected_type is _EventType.SECRET)
     assert event._is_action_event is (expected_type is _EventType.ACTION)
 
-    class MyCharm(CharmBase):
+    class MyCharm(ops.CharmBase):
         pass
 
     spec = _CharmSpec(
@@ -61,10 +63,7 @@ def test_event_type(evt, expected_type):
 
 
 def test_emitted_framework():
-    class MyCharm(CharmBase):
-        META = {'name': 'joop'}
-
-    ctx = Context(MyCharm, meta=MyCharm.META, capture_framework_events=True)
+    ctx = Context(ops.CharmBase, meta={'name': 'joop'}, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())
     assert len(ctx.emitted_events) == 4
     assert list(map(type, ctx.emitted_events)) == [
@@ -76,9 +75,7 @@ def test_emitted_framework():
 
 
 def test_emitted_deferred():
-    class MyCharm(CharmBase):
-        META = {'name': 'joop'}
-
+    class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
@@ -88,7 +85,7 @@ def test_emitted_deferred():
 
     ctx = Context(
         MyCharm,
-        meta=MyCharm.META,
+        meta={'name': 'joop'},
         capture_deferred_events=True,
         capture_framework_events=True,
     )

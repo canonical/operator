@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Juju and Pebble mocking
+"""Juju and Pebble mocking.
 
 This module contains mocks for the Juju and Pebble APIs that are used by ops
 to interact with the Juju controller and the Pebble service manager.
@@ -13,12 +13,12 @@ import datetime
 import io
 import shutil
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    Mapping,
     NoReturn,
     TextIO,
     cast,
@@ -26,16 +26,16 @@ from typing import (
 )
 
 from ops import (
+    JujuContext,
     JujuVersion,
-    pebble,
+    ModelError,
+    RelationNotFoundError,
     SecretInfo,
     SecretNotFoundError,
-    RelationNotFoundError,
     SecretRotate,
-    ModelError,
+    pebble,
 )
 from ops._private.harness import ExecArgs, _TestingPebbleClient
-from ops.jujucontext import _JujuContext
 from ops.model import CloudSpec as CloudSpec_Ops
 from ops.model import Port as Port_Ops
 from ops.model import Secret as Secret_Ops  # lol
@@ -137,7 +137,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
         context: Context,
-        juju_context: _JujuContext,
+        juju_context: JujuContext,
     ):
         super().__init__(juju_context=juju_context)
         self._state = state
@@ -167,10 +167,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
     ):
-        _port = _port_cls_by_protocol[protocol](port=port)  # type: ignore
+        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
-        if _port in ports:
-            ports.remove(_port)
+        if port_ in ports:
+            ports.remove(port_)
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
@@ -253,6 +253,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         self._check_app_data_access(is_app)
+        data = self._relation_get(relation_id, member_name=member_name, is_app=is_app)
+        return data.copy()
+
+    def _relation_get(self, relation_id: int, member_name: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
         if is_app and member_name == self.app_name:
             return relation.local_app_data
@@ -266,7 +270,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             return relation.local_unit_data
 
         unit_id = int(member_name.split('/')[-1])
-        return relation._get_databag_for_remote(unit_id)  # noqa
+        return relation._get_databag_for_remote(unit_id)
 
     def relation_model_get(self, relation_id: int) -> dict[str, Any]:
         if JujuVersion(self._context.juju_version) < '3.6.2':
@@ -405,7 +409,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         else:
             tgt = relation.local_unit_data
         for key, value in data.items():
-            tgt[key] = value
+            if value == '':
+                # Match the behavior of Juju, which is that setting the value to an
+                # empty string will remove the key entirely from the relation data.
+                tgt.pop(key, None)
+            else:
+                tgt[key] = value
 
     def secret_add(
         self,
@@ -415,7 +424,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-        owner: Literal['unit', 'app'] | None = None,
+        owner: Literal['unit', 'application'] | None = None,
     ) -> str:
         from .state import Secret
 
@@ -425,7 +434,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             description=description,
             expire=expire,
             rotate=rotate,
-            owner=owner,
+            # It's called 'application' in Ops, but 'app' in Scenario.
+            owner='app' if owner == 'application' else owner,
         )
         secrets = set(self._state.secrets)
         secrets.add(secret)
@@ -461,12 +471,11 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if id is not None and label is not None:
             secret._set_label(label)
         juju_version = JujuVersion(self._context.juju_version)
-        if not (juju_version == '3.1.7' or juju_version >= '3.3.1'):
-            # In this medieval Juju chapter,
-            # secret owners always used to track the latest revision.
-            # ref: https://bugs.launchpad.net/juju/+bug/2037120
-            if secret.owner is not None:
-                refresh = True
+        # In this medieval Juju chapter,
+        # secret owners always used to track the latest revision.
+        # ref: https://bugs.launchpad.net/juju/+bug/2037120
+        if not (juju_version == '3.1.7' or juju_version >= '3.3.1') and secret.owner is not None:
+            refresh = True
 
         if peek or refresh:
             if refresh:
@@ -493,6 +502,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         return SecretInfo(
             id=secret.id,
             label=secret.label,
+            description=secret.description,
             revision=secret._latest_revision,
             expires=secret.expire,
             rotation=secret.rotate,
@@ -717,8 +727,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         labels: Mapping[str, str] | None = None,
     ) -> NoReturn:
         raise NotImplementedError(
-            'add-metrics is not implemented in Scenario (and probably never will be: '
-            "it's deprecated API)",
+            'add-metrics is not implemented in Scenario '
+            '(and never will be: it was removed in Juju 3.6.11)'
         )
 
     def resource_get(self, resource_name: str) -> str:
@@ -773,7 +783,7 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # initialize simulated filesystem
         container_root.mkdir(parents=True)
-        for _, mount in mounts.items():
+        for mount in mounts.values():
             path = Path(mount.location).parts
             mounting_dir = container_root.joinpath(*path[1:])
             mounting_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -830,10 +840,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         """Copy any new or changed check infos into the state."""
         infos: set[CheckInfo] = set()
         for info in self._check_infos.values():
-            if isinstance(info.level, str):
-                level = pebble.CheckLevel(info.level)
-            else:
-                level = info.level
+            level = pebble.CheckLevel(info.level) if isinstance(info.level, str) else info.level
             if isinstance(info.status, str):
                 status = pebble.CheckStatus(info.status)
             else:
@@ -887,7 +894,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                 f'container with name={container_name!r} not found. '
                 f'Did you forget a Container, or is the socket path '
                 f'{self.socket_path!r} wrong?',
-            )
+            ) from None
 
     @property
     def _layers(self) -> dict[str, pebble.Layer]:
@@ -899,7 +906,7 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     # Based on a method of the same name from Harness.
     def _find_exec_handler(self, command: list[str]) -> Exec | None:
-        handlers = {exec.command_prefix: exec for exec in self._container.execs}
+        handlers = {exe.command_prefix: exe for exe in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
         # This includes matching against the empty list, which will match any

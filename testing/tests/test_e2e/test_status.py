@@ -1,11 +1,11 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
-import ops
 import pytest
-from ops.charm import CharmBase
-from ops.framework import Framework
-
 from scenario import Context
+from scenario.errors import UncaughtCharmError
 from scenario.state import (
     ActiveStatus,
     BlockedStatus,
@@ -15,7 +15,11 @@ from scenario.state import (
     UnknownStatus,
     WaitingStatus,
 )
-from scenario.errors import UncaughtCharmError
+
+import ops
+from ops.charm import CharmBase
+from ops.framework import Framework
+
 from ..helpers import trigger
 
 
@@ -203,7 +207,7 @@ def test_status_success(status: ops.StatusBase):
         UnknownStatus(),
     ),
 )
-def test_status_error(status: ops.StatusBase):
+def test_status_error(status: ops.StatusBase, monkeypatch: pytest.MonkeyPatch):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -212,6 +216,7 @@ def test_status_error(status: ops.StatusBase):
         def _on_update_status(self, _):
             self.unit.status = status
 
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
     ctx = Context(MyCharm, meta={'name': 'foo'})
     with pytest.raises(UncaughtCharmError) as excinfo:
         ctx.run(ctx.on.update_status(), State())

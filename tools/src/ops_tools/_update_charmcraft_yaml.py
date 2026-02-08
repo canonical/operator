@@ -27,7 +27,9 @@ from __future__ import annotations
 import argparse
 import importlib
 import re
-from typing import Any, Generator
+import sys
+from collections.abc import Generator
+from typing import Any
 
 import yaml
 
@@ -103,7 +105,7 @@ def main():
         '--config',
         action='append',
         help='Python class with optional module path (can be specified multiple times). '
-        'For example, "src.config:Config". The module defaults to "src.charm".'
+        'For example, "src.config:Config". The module defaults to "src.charm". '
         'The class may be a regular expression.',
         default=[],
     )
@@ -111,9 +113,15 @@ def main():
         '--action',
         action='append',
         help='Python class with optional module path (can be specified multiple times). '
-        'For example, "src.backup:BackupAction". The module defaults to "src.charm".'
+        'For example, "src.backup:BackupAction". The module defaults to "src.charm". '
         'The class may be a regular expression.',
         default=[],
+    )
+    parser.add_argument(
+        '--update',
+        action='store_true',
+        help='Update the charmcraft.yaml file in place. Without this flag, '
+        'the generated YAML is printed to stdout.',
     )
     args = parser.parse_args()
 
@@ -134,8 +142,11 @@ def main():
     if actions:
         raw_yaml = _insert_into_charmcraft_yaml(raw_yaml, 'actions', {'actions': actions})
 
-    with open(args.path, 'w') as raw:
-        raw.write(raw_yaml)
+    if args.update:
+        with open(args.path, 'w') as raw:
+            raw.write(raw_yaml)
+    else:
+        sys.stdout.write(raw_yaml)
 
 
 if __name__ == '__main__':

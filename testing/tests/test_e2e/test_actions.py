@@ -1,16 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import dataclasses
 
 import ops_tools
 import pytest
-from ops import __version__ as ops_version
-from ops.charm import ActionEvent, CharmBase
-from ops.framework import Framework
-from ops._private.harness import ActionFailed
-
 from scenario import Context
 from scenario.state import State, _Action, _next_action_id
+
+from ops._private.harness import ActionFailed
+from ops.charm import ActionEvent, CharmBase
+from ops.framework import Framework
 
 
 @pytest.fixture(scope='function')
@@ -112,6 +114,35 @@ def test_action_event_outputs(mycharm, res_value):
     assert ctx.action_logs == ['log1', 'log2']
 
 
+def test_action_event_fail(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        ctx.run(ctx.on.action('foo'), State())
+    assert exc_info.value.message == 'action failed!'
+
+
+def test_action_event_fail_context_manager(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        with ctx(ctx.on.action('foo'), State()):
+            assert False, 'ActionFailed should be raised in the context manager.'
+    assert exc_info.value.message == 'action failed!'
+
+
 def test_action_continues_after_fail():
     class MyCharm(CharmBase):
         def __init__(self, framework):
@@ -132,16 +163,6 @@ def test_action_continues_after_fail():
     assert ctx.action_results == {'initial': 'result', 'final': 'result'}
 
 
-def _ops_less_than(wanted_major, wanted_minor):
-    major, minor = (int(v) for v in ops_version.split('.')[:2])
-    if major < wanted_major:
-        return True
-    if major == wanted_major and minor < wanted_minor:
-        return True
-    return False
-
-
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
 def test_action_event_has_id(mycharm):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
@@ -154,7 +175,6 @@ def test_action_event_has_id(mycharm):
     ctx.run(ctx.on.action('foo'), State())
 
 
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
 def test_action_event_has_override_id(mycharm):
     uuid = '0ddba11-cafe-ba1d-5a1e-dec0debad'
 

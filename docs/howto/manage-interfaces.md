@@ -5,7 +5,7 @@
 ## Register an interface
 
 
-Suppose you have determined that you need to create a new relation interface called `my_fancy_database`. 
+Suppose you have determined that you need to create a new relation interface called `my_fancy_database`.
 
 Suppose that your interface specification has the following data model:
 - the requirer app is supposed to forward a list of tables that it wants to be provisioned by the database provider
@@ -36,7 +36,7 @@ At this point you should see this directory structure:
     ├── README.md
     ├── interface.yaml
     ├── interface_tests
-    └── schema.py                                     
+    └── schema.py
 2 directories, 3 files
 ```
 
@@ -47,7 +47,7 @@ Add to `interface.yaml` the charm that owns the reference implementation of the 
 
 ```yaml
 # interface.yaml
-providers:                                                  
+providers:
   - name: my-fancy-database-operator  # same as metadata.yaml's .name
     url: https://github.com/your-github-slug/my-fancy-database-operator
 ```
@@ -197,7 +197,7 @@ units_data : {
 
 > See more: {ref}`write-tests-for-an-interface`
 
-### 7. Open a PR to [the `charm-relation-interfaces` repo](https://github.com/canonical/charm-relation-interfaces) 
+### 7. Open a PR to [the `charm-relation-interfaces` repo](https://github.com/canonical/charm-relation-interfaces)
 
 Finally, open a pull request to the `charm-relation-interfaces` repo and drive it to completion, addressing any feedback or concerns that the maintainers may have.
 
@@ -218,15 +218,15 @@ Suppose you have an interface specification in [`charm-relation-interfaces`](#ch
 We will continue from the running example from {ref}`register-an-interface`. Your starting setup should look like this:
 
 ```text
-$ tree ./interfaces/my_fancy_database     
-./interfaces/my_fancy_database            
-└── v0                                    
-    ├── interface.yaml                       
-    ├── interface_tests                   
-    ├── README.md                         
-    └── schema.py                         
-                                          
-2 directories, 3 files                    
+$ tree ./interfaces/my_fancy_database
+./interfaces/my_fancy_database
+└── v0
+    ├── interface.yaml
+    ├── interface_tests
+    ├── README.md
+    └── schema.py
+
+2 directories, 3 files
 ```
 
 
@@ -300,7 +300,7 @@ def test_contract_happy_path():
     t.assert_schema_valid()
 ```
 
-This test verifies that the databags of the 'my-fancy-database' relation are valid according to the pydantic schema you have specified in `schema.py`. 
+This test verifies that the databags of the 'my-fancy-database' relation are valid according to the pydantic schema you have specified in `schema.py`.
 
 To check that things work as they should, you can run `interface_tester discover --include my_fancy_database` from the `charm-relation-interfaces` root.
 
@@ -337,10 +337,10 @@ You are ready to merge this files in the charm-relation-interfaces repository. O
 
 #### Prepare the charm
 
-In order to be testable by charm-relation-interfaces, the charm needs to expose and configure a fixture. 
+In order to be testable by charm-relation-interfaces, the charm needs to expose and configure a fixture.
 
 ```{note}
- 
+
 This is because the `fancy-database` interface specification is only supported if the charm is well-configured and has leadership, since it will need to publish data to the application databag.
 Also, interface tests are Scenario tests and as such they are mock-based: there is no cloud substrate running, no Juju, no real charm unit in the background. So you need to patch out all calls that cannot be mocked by Scenario, as well as provide enough mocks through State so that the charm is 'ready' to support the interface you are testing.
 
@@ -448,8 +448,6 @@ INFO:root:Running tests for role: provider
 }
 ```
 
-For reference, [here](https://github.com/IronCore864/my-fancy-database-operator) is an example of a bare minimum `my-fancy-database-operator` charm to make the test pass. In the charm, application relation data and unit relation data are set according to our definition (see the beginning part of the previous how-to guide "How to register an interface".
-
 ### Troubleshooting and debugging the tests
 
 #### Your charm is missing some configuration or mocks
@@ -457,7 +455,7 @@ For reference, [here](https://github.com/IronCore864/my-fancy-database-operator)
 Solution to this is to add the missing mocks/patches to the `interface_tester` fixture in `conftest.py`.
 Essentially, you need to make it so that the charm runtime 'thinks' that everything is normal and ready to process and accept the interface you are testing.
 This may mean mocking the presence and connectivity of a container, system calls, substrate API calls, and more.
-If you have scenario or unittests in your codebase, you most likely already have all the necessary patches scattered around and it's a matter of collecting them.
+If you have unit tests in your codebase, you most likely already have all the necessary patches scattered around and it's a matter of collecting them.
 
 Remember that if you run your tests using `run_matrix.py` locally, in your troubleshooting you need to point `interface.yaml` to the branch where you committed your changes as `run_matrix` fetches the charm repositories in order to run the charms:
 
@@ -470,10 +468,6 @@ requirers:
 Remember, however, to merge the changes first in the operator repository before merging the pull request to `charm-relation-interfaces`.
 
 > See more:
-> 
-> [Here](https://github.com/IronCore864/my-fancy-database-operator) is a minimum charm that both provides and requires the `my_fancy_database` interface from this how-to guide and [this](https://github.com/IronCore864/my-fancy-database-operator/blob/main/tests/interface/conftest.py) is an example of the bare minimum of `conftest.py`. See the content of `test_provider.py` [here in a forked repo](https://github.com/IronCore864/charm-relation-interfaces/blob/my-fancy-database/interfaces/my_fancy_database/v0/interface_tests/test_provider.py) and `test_requirer.py` [here](https://github.com/IronCore864/charm-relation-interfaces/blob/my-fancy-database/interfaces/my_fancy_database/v0/interface_tests/test_requirer.py).
 >
-> For a more realistic reference, refer to the [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the ingress interface defined in the `charm-relation-interfaces` repository, and check out the [`traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) for its content of the [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) file.
-
-
-
+> - [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the `ingress` interface defined in `charm-relation-interfaces`.
+> - [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) for the [`traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator) charm.

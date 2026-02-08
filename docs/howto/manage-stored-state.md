@@ -88,8 +88,8 @@ an integration test: just trigger multiple Juju events.
 
 Add `StoredState` objects to the `State` with any content that you want to mock
 having persisted from a previous event. For example, in your
-`tests/unit/test_charm.py` file provide a `_stored` attribute that has a
-'expensive_value' key:
+`tests/unit/test_charm.py` file provide a `_stored` attribute that has an
+`expensive_value` key:
 
 ```python
 def test_charm_sets_stored_state():

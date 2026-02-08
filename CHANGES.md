@@ -1,3 +1,228 @@
+# 3.5.1 - 28 January 2026
+
+## Fixes
+
+* Use `parse_rfc3339` for datetime parsing to support Juju 4 (#2264)
+* Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
+* Prevent `KeyError` on `auth-type` when creating `CloudCredential` object (#2268)
+* `_checks_action` should return empty list when there are no changes (#2270)
+
+## Documentation
+
+* Provide examples in unit testing how-to, and other small improvements (#2251)
+* Update the action how-to to explain the additionalProperties default flip (#2249)
+* For state-transition tests, clarify about immutability and reusing state (#2153)
+* Fix and clarify holistic example of handling storage (#2098)
+* Remove comments from K8s tutorial and clarify about persisting data (#2253)
+* Clarify handling of postgres relation data in K8s tutorial (#2256)
+* Improve unit tests of httpbin demo charm (#2254)
+* Add version information for tools in the charming ecosystem (#2231)
+* Avoid emojis that render differently across platforms (#2273)
+* Secrets over CMR comment added (#2271)
+* Fix charm name in httpbin deploy command (#2276)
+* Updated security@ubuntu.com PGP key (#2286)
+
+## Tests
+
+* Remove unnecessary test module (#2247)
+
+## CI
+
+* Replace git reference injection with wheel artifacts in charm test workflows (#2252)
+* Explicitly provide the charmcraft repo location in CI (#2277)
+* Remove outdated custom signature generation (#2280)
+
+# 3.5.0 - 18 December 2025
+
+## Features
+
+* Env var to control exception wrapping in tests (#2142)
+* Deprecate testing.Context.charm_spec (#2219)
+
+## Documentation
+
+* Fix charmcraft init command (#2210)
+* Update CI examples to use uv and tox-uv (#2213)
+* Update and clarify info about environment prep (#2217)
+* Match Charmcraft profiles in tox.ini example for integration testing (#2221)
+* Use base 24.04 for httpbin-demo charm (#2222)
+* Clarify parts of the machine charm tutorial (#2223)
+* Match Charmcraft profiles in "Write and structure charm code" (#2220)
+* Use cosl binary in K8s tutorial charm to work around error (#2232)
+* Fix URL issues by updating doc starter pack (#2238)
+
+## Tests
+
+* Don't skip tests if ops[testing] isn't installed (#2215)
+* Switch the integration test charms to use the uv plugin (#2218)
+
+## CI
+
+* Avoid jitter in the best practice doc PRs (#2193)
+* Ignore PERF401 (manual list comprehension) across the repo (#2201)
+* The git commands need to be run in the operator directory as well (#2197)
+* Have cycle in the sbomber manifests use the default value (#2209)
+* Add pytest.warns to note an expected warning (#2092)
+* Update release script to handle non-final versions (#2199)
+* Add ops-tracing as a dependency for the observability tests (#2239)
+* Add scheduled workflow for packing and integration testing example charms (#2233)
+
+# 3.4.0 - 27 November 2025
+
+## Breaking Changes
+
+* Fix: Change JujuContext.machine_id from int to str (#2108)
+* Fix: Ensure that the testing context manager is exited when an exception occurs (#2117)
+
+## Features
+
+* Add a low-level API for the Juju hook commands (#2019)
+* Make PebbleClient file methods also accept pathlib.PurePath (#2097)
+* Log the total number of deferred events (#2161)
+* Allow setting the Juju availability zone and principal unit in the testing Context (#2187)
+
+## Fixes
+
+* Allow actions without params or descriptions in ops[testing] (#2090)
+* Ensure `ops.Pebble.pull` cleans up temporary files if it errors (#2087)
+* Make secret info description visible to the charm in ops[testing] (#2115)
+* Raise ActionFailed when using Context as a context manager (#2121)
+* Detect categories with an exclamation mark indicating breaking changes (#2132)
+* Normalise Secret.owner to 'app' for ops[testing] output state (#2127)
+* Don't cache secret metadata in Ops (#2143)
+* Secret-info-get cannot be provided with both an ID and a label (#2170)
+* Minor hookcmds fixes (#2175)
+
+## Documentation
+
+* Update referenced examples for managing interfaces (#2068)
+* Tidy up spelling and formatting in several places (#2060)
+* Add missing assignment to state_out in unit tests how-to (#2075)
+* Update the holistic/delta explanation with the reconciler pattern (#2029)
+* Fix broken setup/teardown links in README (#2094)
+* Update info about release docs, mark testing changelog as not maintained (#2074)
+* Switch to makefile for building the docs (#2073)
+* Document how to extract the charm instance from the testing context (#2084)
+* Add a how-to guide for migrating away from Harness (#2062)
+* Rename hook tools to hook commands (#2114)
+* Remove legacy how-to guide for Harness (#2122)
+* Update the Juju release the metrics functionality is removed from 4.0 to 3.6.11 (#2126)
+* Clarify that Context is the testing context not only the Juju context (#2123)
+* Explain the Charmhub public listing process and add a reference list of best practices (#1989)
+* Expand next steps for K8s tutorial (#2034)
+* Remove mention of the `simple` Charmcraft profile (#2138)
+* Expand landing pages with summaries of pages (#2140)
+* Update environment setup for integration tests and K8s tutorial (#2124)
+* Replace machine charm tutorial by an improved tutorial (#2119)
+* Change HACKING.md instructions for maintaining Charmcraft profiles (#2151)
+* In integration tests, use consistent approach to logging and packing (#2150)
+* In integration testing how-to, clarify that Juju model is destroyed after all tests in the model complete (#2154)
+* Remove Charmcraft channel specifier from machine charm tutorial (#2148)
+* Add AI contribution note and style guideline for type annotation of return values (#2168)
+* Add ops[testing] to the ops.testing docstring (#2171)
+* Add links to the Juju hook from each event class (#2176)
+* Add a short umask note (#2184)
+
+## Tests
+
+* Re-enable testing consistency checks after disabling them (#2141)
+* Expand secrets integration and state transition tests (#2130)
+
+## Refactoring
+
+* Use ops.hookcmds in _ModelBackend (#2116)
+* Don't get the storage details from --help (#2172)
+* Drop 3.8 and 3.9 compatibility code (#2173)
+* Use json.dumps to produce the YAML in relation-set and state-set (#2174)
+* Rely on type annotations instead of casts in hookcmds (#2179)
+
+## CI
+
+* Add integration and state transition tests for the secrets API (#2078)
+* Temporarily disable tracing integration tests (#2102)
+* Add secrets tests follow-up (#2105)
+* Support monorepos in ops charm compatibility testing (#2100)
+* Test both Charmcraft 3 and Charmcraft 4 profiles (#2103)
+* Add automated doc checks (and related starter pack updates) (#2099)
+* Clean up accidental workflow trigger (#2144)
+* Test if package versions match dependency versions before publishing (#2139)
+* Update spelling (#2167)
+* Test against 4.0/stable (#2186)
+* Store charmcraft logs if smoke tests fail (#2192)
+* Use Juju channel 4/stable in Ops smoke tests (#2190)
+
+# 3.3.0 - 29 September 2025
+
+## Features
+
+* Expose the Juju hook context in ops.JujuContext (#1996)
+
+## Fixes
+
+* In testing, separate relation data cache from mock Juju backend (#2052)
+
+## Documentation
+
+* Use uv for testing and packing the httpbin charm (#2011)
+* Improve intro to ops.testing reference (#2023)
+* In httpbin charm integration tests, add env var for charm file to deploy (#2018)
+* Update get_cloud_spec doc now that credential-get works on K8s (#2031)
+* Note that arbitrary_types_allowed is required when ops.Secret is used in a Pydantic class (#2038)
+* Clean up Resources.fetch docstring, add ModelError exception (#2039)
+* Note that the peer databag isn't usable during the install event (#2051)
+* Fix testing code in actions how-to guide (#2054)
+
+## CI
+
+* Nicer logging output in the release script using rich (#2017)
+* Clean up PYTHONPATH in tox.ini (#2058)
+
+# 3.2.0 - 28 August 2025
+
+## Features
+
+* Add security event logging (#1905)
+* Surface JUJU_MACHINE_ID envvar in testing env (#1961)
+* Add a new log target type opentelemetry (#1937)
+
+## Documentation
+
+* Update links and config for switch to documentation.ubuntu.com/ops (#1940)
+* Update the required Python version and note the 2.x documentation site (#1946)
+* Be consistent with recommending self.config (#1947)
+* Use latest styles from starter pack and remove .html extensions (#1951)
+* Remove .html extensions from hardcoded links (#1955)
+* Fix broken URLs in sitemap (#1956)
+* Add related doc links to homepage (#1959)
+* Use classes from ops instead of ops.<submodule> (#1968)
+* Fix unstyled error pages (#1969)
+* Add Google Analyics integration and cookie consent banner (#1971)
+* Refresh docs homepage with more context about Ops (#1964)
+* Update link to Charmlibs docs (#1985)
+* Remove unnecessary pages from sitemap (#1979)
+* Update the httpbin example charm to Jubilant (#1987)
+* Update the Zero to Hero tutorial to Jubilant (#1988)
+* Add model-config best practice note (#1990)
+* Change some best practices to tips (#2001)
+* Add integration test for invalid config in httpbin charm (#2002)
+* Make a `Layer` instead of a `LayerDict` in the httpbin charm (#2003)
+* Update how-to to feature Jubilant (#2000, #2004)
+* Use Charmcraft-style format and lint for example charms, not Ops-style (#2008)
+* Update broken link to HookVars source code (#2006)
+
+## CI
+
+* Fixes for the SBOM and security scan workflow, and trigger it on publishing (#1916)
+* Store the charmcraft logs if packing fails (#1936)
+* Install release dependencies for the TIOBE analysis (#1930)
+* Add Juju 4/beta to the smoke test matrix (#1963)
+* Adjust permissions block in publish workflow (#1984)
+* Update actions/checkout to v5 (#1993)
+* Enable doctests (#1991)
+* Ignore juju/4 timeouts (#1998)
+* Remove the token for SBOM and security scan workflow (#2009)
+* Speed up integration test (#1978)
+
 # 3.1.0 - 30 July 2025
 
 ## Features
@@ -511,7 +736,7 @@ The minimum version of Python for Ops 3.x is 3.10.
 
 ## Features
 
-* Added `Model.get_cloud_spec` which uses the `credential-get` hook tool to get details of the cloud where the model is deployed (#1152)
+* Added `Model.get_cloud_spec` which uses the `credential-get` hook command to get details of the cloud where the model is deployed (#1152)
 
 ## Fixes
 

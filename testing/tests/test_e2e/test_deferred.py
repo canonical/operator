@@ -1,13 +1,18 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import typing
+from collections.abc import Mapping
 
-import ops
 import pytest
-from ops.framework import LifecycleEvent
-
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
+
+import ops
+from ops.framework import LifecycleEvent
+
 from ..helpers import trigger
 
 CHARM_CALLED = 0
@@ -16,13 +21,13 @@ CHARM_CALLED = 0
 @pytest.fixture(scope='function')
 def mycharm():
     class MyCharm(ops.CharmBase):
-        META: dict[str, typing.Any] = {
+        META: Mapping[str, typing.Any] = {
             'name': 'mycharm',
             'requires': {'foo': {'interface': 'bar'}},
             'containers': {'foo': {'type': 'oci-image'}},
         }
         defer_next = 0
-        captured: list[ops.EventBase] = []
+        captured: typing.ClassVar[list[ops.EventBase]] = []
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)

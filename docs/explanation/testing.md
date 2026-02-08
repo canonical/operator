@@ -112,7 +112,7 @@ When writing an integration test, it is not sufficient to simply check that Juju
 ### Tools
 
 - [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator)
+- [Jubilant](https://documentation.ubuntu.com/jubilant/)
 
 Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
@@ -121,28 +121,9 @@ Integration tests and unit tests should run using the minor version of Python th
 basepython = python3.10
 ```
 
-(pytest-operator)=
-#### `pytest-operator`
-
-`pytest-operator` is a Python library that provides Juju plugins for the generic Python library `pytest` to facilitate the {ref}`integration testing <integration-testing>` of charms.
-
-> See more: [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator)
-
-It builds a fixture called `ops_test` that helps you interact with Juju through constructs that wrap around [`python-libjuju` ](https://pypi.org/project/juju/).
-
-> See more:
-> - [`pytest-operator` > `ops_test`](https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md#ops_test)
-> - [`pytest` > Fixtures](https://docs.pytest.org/en/6.2.x/fixture.html)
-
-It also provides convenient markers and command line parameters (e.g., the `@pytest.mark.skip_if_deployed` marker in combination with the `--no-deploy` configuration helps you skip, e.g., a deployment test in the case where you already have a deployment).
-
-> See more:
-> - [`pytest-operator` > Markers](https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md#markers)
-> - [`pytest-operator` > Command line parameters](https://github.com/charmed-kubernetes/pytest-operator/blob/main/docs/reference.md#command-line-parameters)
-
 ### Examples
 
-- [Prometheus K8s integration tests](https://github.com/canonical/prometheus-k8s-operator/blob/main/tests/integration/test_charm.py)
+- [Tempo worker integration tests](https://github.com/canonical/tempo-operators/blob/main/worker/tests/integration/test_deploy.py)
 
 ## Continuous integration
 
@@ -163,9 +144,11 @@ on:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install dependencies
-        run: python -m pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```
@@ -181,7 +164,7 @@ Integration tests are a bit more complex, because these tests require a Juju con
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:

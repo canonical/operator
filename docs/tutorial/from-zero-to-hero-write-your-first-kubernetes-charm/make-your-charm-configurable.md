@@ -24,11 +24,11 @@ This can be done by defining a charm configuration in a file called `charmcraft.
 
 In this part of the tutorial you will update your charm to make it possible for a charm user to change the port on which the workload application is available.
 
-## Define the configuration options
+## Define the configuration option
 
-To begin with, let's define the options that will be available for configuration.
+To begin with, let's define the option that will be available for configuration.
 
-In the `charmcraft.yaml` file you created earlier, define a configuration option, as below. The name of your configurable option is going to be `server-port`.  The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
+In `charmcraft.yaml`, replace the `config` block with:
 
 ```yaml
 config:
@@ -38,6 +38,8 @@ config:
       description: Default port on which FastAPI is available
       type: int
 ```
+
+This defines a configuration option called `server-port`. The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
 
 ## Define a configuration class
 
@@ -54,7 +56,7 @@ class FastAPIConfig:
     def __post_init__(self):
         """Validate the configuration."""
         if self.server_port == 22:
-            raise ValueError('Invalid port number, 22 is reserved for SSH')
+            raise ValueError("Invalid port number, 22 is reserved for SSH")
 ```
 
 Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
@@ -75,10 +77,10 @@ Now, define the handler, as below. Since configuring something like a port affec
 
 ```python
 def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
-    self._update_layer_and_restart()
+    self._replan_workload()
 ```
 
-We'll define `_update_layer_and_restart` shortly.
+We'll define `_replan_workload` shortly.
 
 ```{caution}
 
@@ -89,13 +91,13 @@ In the `__init__` function, add a new attribute to define a container object for
 
 ```python
 # See 'containers' in charmcraft.yaml.
-self.container = self.unit.get_container('demo-server')
+self.container = self.unit.get_container("demo-server")
 ```
 
 Create a new method, as below. This method will get the current Pebble layer configuration and compare the new and the existing service definitions -- if they differ, it will update the layer and restart the service.
 
 ```python
-def _update_layer_and_restart(self) -> None:
+def _replan_workload(self) -> None:
     """Define and start a workload using the Pebble API.
 
     You'll need to specify the right entrypoint and environment
@@ -108,15 +110,17 @@ def _update_layer_and_restart(self) -> None:
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus('Assembling Pebble layers')
+    self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
     try:
         config = self.load_config(FastAPIConfig)
     except ValueError as e:
-        logger.error('Configuration error: %s', e)
+        logger.error("Configuration error: %s", e)
         self.unit.status = ops.BlockedStatus(str(e))
         return
     try:
-        self.container.add_layer('fastapi_demo', self._get_pebble_layer(config.server_port), combine=True)
+        self.container.add_layer(
+            "fastapi_demo", self._get_pebble_layer(config.server_port), combine=True
+        )
         logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
 
         # Tell Pebble to incorporate the changes, including restarting the
@@ -126,45 +130,45 @@ def _update_layer_and_restart(self) -> None:
 
         self.unit.status = ops.ActiveStatus()
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-        logger.info('Unable to connect to Pebble: %s', e)
-        self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+        logger.info("Unable to connect to Pebble: %s", e)
+        self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
 ```
 
-When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_update_layer_and_restart` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
 
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
 ```python
 def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = ' '.join(
+    command = " ".join(
         [
-            'uvicorn',
-            'api_demo_server.app:app',
-            '--host=0.0.0.0',
-            f'--port={port}',
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            f"--port={port}",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
-        'summary': 'FastAPI demo service',
-        'description': 'pebble config layer for FastAPI demo server',
-        'services': {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {
             self.pebble_service_name: {
-                'override': 'replace',
-                'summary': 'fastapi demo',
-                'command': command,
-                'startup': 'enabled',
+                "override": "replace",
+                "summary": "fastapi demo",
+                "command": command,
+                "startup": "enabled",
             }
         },
     }
     return ops.pebble.Layer(pebble_layer)
 ```
 
-As you may have noticed, the new `_update_layer_and_restart` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_update_layer_and_restart` like this:
+As you may have noticed, the new `_replan_workload` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_replan_workload` like this:
 
 ```python
 def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
-    self._update_layer_and_restart()
+    self._replan_workload()
 ```
 
 ## Validate your charm
@@ -174,21 +178,21 @@ First, repack and refresh your charm:
 ```text
 charmcraft pack
 juju refresh \
-  --path="./demo-api-charm_ubuntu-22.04-amd64.charm" \
-  demo-api-charm --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+  --path="./fastapi-demo_amd64.charm" \
+  fastapi-demo --force-units --resource \
+  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
 ```
 
 Now, check the available configuration options:
 
 ```text
-juju config demo-api-charm
+juju config fastapi-demo
 ```
 
 Our newly defined `server-port` option is there. Let's try to configure it to something else, e.g., `5000`:
 
 ```text
-juju config demo-api-charm server-port=5000
+juju config fastapi-demo server-port=5000
 ```
 
 Now, let's validate that the app is actually running and reachable on the new port by sending the HTTP  request below, where `10.1.157.74` is the IP of our pod and `5000` is the new application port:
@@ -197,26 +201,26 @@ Now, let's validate that the app is actually running and reachable on the new po
 curl 10.1.157.74:5000/version
 ```
 
-You should see JSON string with the version of the application: `{"version":"1.0.0"}`
+You should see JSON string with the version of the application: `{"version":"1.0.2"}`
 
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
 
 ```text
-juju config demo-api-charm server-port=22
+juju config fastapi-demo server-port=22
 juju status
 ```
 
 As expected, the application is indeed in the `blocked` state:
 
 ```text
-Model        Controller  Cloud/Region        Version  SLA          Timestamp
-welcome-k8s  microk8s    microk8s/localhost  3.6.8    unsupported  18:19:24+01:00
+Model    Controller     Cloud/Region  Version  SLA          Timestamp
+testing  concierge-k8s  k8s           3.6.13   unsupported  18:19:24+01:00
 
-App             Version  Status   Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           blocked      1  demo-api-charm             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
+App           Version  Status   Scale  Charm         Channel  Rev  Address         Exposed  Message
+fastapi-demo           blocked      1  fastapi-demo             1  10.152.183.215  no       Invalid port number, 22 is reserved for SSH
 
-Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
+Unit             Workload  Agent  Address      Ports  Message
+fastapi-demo/0*  blocked   idle   10.1.157.74         Invalid port number, 22 is reserved for SSH
 ```
 
 Congratulations, you now know how to make your charm configurable!
@@ -224,7 +228,7 @@ Congratulations, you now know how to make your charm configurable!
 Before continuing, reset the port to `8000` and check that the application is in `active` status:
 
 ```text
-juju config demo-api-charm server-port=8000
+juju config fastapi-demo server-port=8000
 juju status
 ```
 
@@ -237,20 +241,20 @@ First, we'll add a test that sets the port in the input state and asserts that t
 ```python
 def test_config_changed():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={'server-port': 8080},
+        config={"server-port": 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     command = (
         state_out.get_container(container.name)
-        .layers['fastapi_demo']
-        .services['fastapi-service']
+        .layers["fastapi_demo"]
+        .services["fastapi-service"]
         .command
     )
-    assert '--port=8080' in command
+    assert "--port=8080" in command
 ```
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
@@ -258,15 +262,15 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name='demo-server', can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
-        config={'server-port': 22},
+        config={"server-port": 22},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert state_out.unit_status == testing.BlockedStatus(
-        'Invalid port number, 22 is reserved for SSH'
+        "Invalid port number, 22 is reserved for SSH"
     )
 ```
 

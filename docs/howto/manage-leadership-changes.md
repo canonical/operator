@@ -1,5 +1,5 @@
 (manage-leadership-changes)=
-# Manage leadership changes
+# How to manage leadership changes
 > See first: {external+juju:ref}`Juju | Leader unit <leader-unit>`
 
 ## Implement response to leadership changes
@@ -85,19 +85,14 @@ More commonly, an integration test might want to verify that leader and non-lead
 as expected. For example:
 
 ```python
-async def get_leader_unit(ops_test, app, model=None):
-    """Utility method to get the current leader unit."""
-    leader_unit = None
-    if model is None:
-        model = ops_test.model
-    for unit in model.applications[app].units:
-        if await unit.is_leader_from_status():
-            leader_unit = unit
-            break
-
-    return leader_unit
+def get_leader_unit(juju: jubilant.Juju) -> str | None:
+    """Utility method to get the name of the current leader."""
+    for unit_name, unit in juju.status().apps["your-app"].units.items():
+        if unit.leader:
+            return unit_name
+    # It's possible that no leader has been elected,
+    # for example if the application has just been deployed.
+    return None
 ```
 
-> Examples: [Zookeeper testing upgrades](https://github.com/canonical/zookeeper-operator/blob/106f9c2cd9408a172b0e93f741d8c9f860c4c38e/tests/integration/test_upgrade.py#L22), [postgresql testing password rotation action](https://github.com/canonical/postgresql-k8s-operator/blob/62645caa89fd499c8de9ac3e5e9598b2ed22d619/tests/integration/test_password_rotation.py#L38)
-
-> See more: [`juju.unit.Unit.is_leader_from_status`](https://pythonlibjuju.readthedocs.io/en/latest/api/juju.unit.html#juju.unit.Unit.is_leader_from_status)
+> See more: [](jubilant.Juju.status)

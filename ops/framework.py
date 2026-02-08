@@ -29,23 +29,9 @@ import sys
 import types
 import typing
 import weakref
+from collections.abc import Callable, Hashable, Iterable
 from contextlib import contextmanager
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Hashable,
-    Iterable,
-    List,
-    Literal,
-    NoReturn,
-    Optional,
-    Protocol,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, Protocol, TypeVar
 
 import opentelemetry.trace
 
@@ -64,22 +50,22 @@ class Serializable(typing.Protocol):
     def handle(self) -> 'Handle': ...  # noqa
     @handle.setter
     def handle(self, val: Handle): ...
-    def snapshot(self) -> Dict[str, Any]: ...  # noqa
-    def restore(self, snapshot: Dict[str, Any]) -> None: ...  # noqa
+    def snapshot(self) -> dict[str, Any]: ...  # noqa
+    def restore(self, snapshot: dict[str, Any]) -> None: ...  # noqa
 
 
 class _StoredObject(Protocol):
     _under: Any = None
 
 
-StoredObject = Union['StoredList', 'StoredSet', 'StoredDict']
+StoredObject = 'StoredList | StoredSet | StoredDict'
 
 _Path = _Kind = _MethodName = _EventKey = str
 # used to type Framework Attributes
-_ObserverPath = List[Tuple[_Path, _MethodName, _Path, _EventKey]]
-_ObjectPath = Tuple[Optional[_Path], _Kind]
-_PathToObjectMapping = Dict[_Path, 'Object']
-_PathToSerializableMapping = Dict[_Path, Serializable]
+_ObserverPath = list[tuple[_Path, _MethodName, _Path, _EventKey]]
+_ObjectPath = tuple[_Path | None, _Kind]
+_PathToObjectMapping = dict[_Path, 'Object']
+_PathToSerializableMapping = dict[_Path, Serializable]
 
 _T = TypeVar('_T')
 _EventType = TypeVar('_EventType', bound='EventBase')
@@ -595,7 +581,7 @@ class Framework(Object):
     """The charm's metadata."""
 
     charm_dir: pathlib.Path = None  # type: ignore
-    """The charm project root directory."""
+    """The directory where the charm is running."""
 
     _stored: StoredStateData = None  # type: ignore
 
@@ -972,7 +958,8 @@ class Framework(Object):
     def _reemit(self, single_event_path: str | None = None):
         last_event_path = None
         deferred = True
-        for event_path, observer_path, method_name in self._storage.notices(single_event_path):
+        notices = tuple(self._storage.notices(single_event_path))
+        for i, (event_path, observer_path, method_name) in enumerate(notices):
             event_handle = Handle.from_path(event_path)
 
             if last_event_path != event_path:
@@ -993,7 +980,12 @@ class Framework(Object):
 
             if observer:
                 if single_event_path is None:
-                    logger.debug('Re-emitting deferred event %s.', event)
+                    logger.debug(
+                        'Re-emitting deferred event %s (%d of %d in queue).',
+                        event,
+                        i + 1,
+                        len(notices),
+                    )
                 elif isinstance(event, LifecycleEvent):
                     # Ignore Lifecycle events: they are "private" and not interesting.
                     pass

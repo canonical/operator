@@ -1,14 +1,16 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from __future__ import annotations
 
 import copy
 import datetime
 import typing
 
-import ops
 import pytest
-
 import scenario
 
+import ops
 
 META = {
     'name': 'context-charm',
@@ -333,7 +335,7 @@ def test_relation_departed_event():
     relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
     # These look like:
-    #   ctx.run(ctx.on.baz_relation_departed(unit=unit_ordinal, departing_unit=unit_ordinal), state)
+    #   ctx.run(ctx.on.baz_relation_departed(unit=unit_num, departing_unit=unit_num), state)
     with ctx(ctx.on.relation_departed(relation, remote_unit=2, departing_unit=1), state_in) as mgr:
         mgr.run()
         relation_event, collect_status = mgr.charm.observed

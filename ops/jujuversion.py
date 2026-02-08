@@ -133,7 +133,7 @@ class JujuVersion:
         """Report whether this Juju version supports the "secrets" feature."""
         # Juju version 3.0.0 had an initial version of secrets, but:
         # * In 3.0.2, secret-get "--update" was renamed to "--refresh", and
-        #   secret-get-info was separated into its own hook tool
+        #   secret-get-info was separated into its own hook command
         # * In 3.0.3, a bug with observer labels was fixed (juju/juju#14916)
         return (self.major, self.minor, self.patch) >= (3, 0, 3)
 

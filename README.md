@@ -14,7 +14,7 @@ Let's use `ops` to build a Kubernetes charm:
 
 ### Set up
 
-> See [Juju | Set things up](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/manage-your-deployment-environment/#set-things-up). <br> Choose the automatic track and MicroK8s.
+> See [Juju | Set things up](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-juju-deployment/set-up-your-juju-deployment/). <br> Choose the automatic track and MicroK8s.
 
 
 ### Write your charm
@@ -146,7 +146,7 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ### Clean up
 
-> See [Juju | Tear things down](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-deployment/manage-your-deployment-environment/#tear-things-down). <br> Choose the automatic track.
+> See [Juju | Tear things down](https://documentation.ubuntu.com/juju/3.6/howto/manage-your-juju-deployment/tear-down-your-juju-deployment-local-testing-and-development/). <br> Choose the automatic track.
 
 ## Next steps
 

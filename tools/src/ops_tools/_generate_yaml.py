@@ -20,11 +20,10 @@ import dataclasses
 import enum
 import logging
 import re
+from collections.abc import Generator, Mapping
 from typing import (
     Any,
     Final,
-    Generator,
-    Mapping,
     TypedDict,
     get_args,
     get_origin,
@@ -69,8 +68,8 @@ JUJU_TYPES: Final[Mapping[type, str]] = {
 }
 
 # We currently only handle the basic types that we expect to see in real charms.
-# Arrays and objects (lists, tuples, and dicts) are handled without using this
-# mapping.
+# Arrays, objects, and dicts (lists, tuples, and dicts) are handled without
+# using this mapping.
 JSON_TYPES: Final[Mapping[type, str]] = {
     bool: 'boolean',
     int: 'integer',
@@ -83,10 +82,9 @@ def attr_to_default(cls: type[object], name: str) -> object:
     """Get the default value for the attribute."""
     if not dataclasses.is_dataclass(cls):
         return getattr(cls, name, None)
-    for field in dataclasses.fields(cls):
-        if field.name == name:
-            break
-    else:
+    fields_by_name = {f.name: f for f in dataclasses.fields(cls)}
+    field = fields_by_name.get(name)
+    if field is None:
         return None
 
     # This might be a Pydantic dataclass using a Pydantic.Field object.
@@ -131,7 +129,9 @@ def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]
     # If there are multiple types -- for example, the type annotation is
     # `int | str` -- then we can't determine the type.
     # Likewise if there are no hints somehow (generic used without args?).
-    return yaml_types.get(hints.pop(), fallback) if len(hints) == 1 else fallback
+    if len(hints) != 1:
+        return fallback
+    return yaml_types.get(hints.pop(), fallback)
 
 
 def attr_to_juju_type(cls: type[object], name: str) -> str:
@@ -187,7 +187,12 @@ def juju_schema_from_model_fields(cls: type[object]) -> dict[str, OptionDict]:
 
 
 def juju_names(cls: type[object]) -> Generator[str]:
-    """Iterates over all the names to include in the config or action YAML."""
+    """Iterates over all the names to include in the config or action YAML.
+
+    This is similar to ``ops.charm._juju_fields`` but is intentionally separate:
+    ``_juju_fields`` is strict and raises ``ValueError`` on unsupported types,
+    whereas this function is permissive and falls back to ``get_type_hints``.
+    """
     # Note that this should match the behaviour of ops.Relation.save().
     if dataclasses.is_dataclass(cls):
         for field in dataclasses.fields(cls):

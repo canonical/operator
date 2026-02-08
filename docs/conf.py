@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import os
 import pathlib
 import sys
@@ -13,6 +14,15 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
+# Check that the ops package is installed in the Sphinx venv.
+if importlib.util.find_spec("ops") is None:
+    print(
+        "Error: The ops package is not available. "
+        "Check whether the $(VENVDIR) target in our Makefile has been changed or reverted."
+    )
+    sys.exit(1)
+
+# Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 # Configuration for the Sphinx documentation builder.
@@ -97,7 +107,7 @@ ogp_site_name = project
 #
 # TODO: To customise the preview image, update as needed.
 
-ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg"
+ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
@@ -188,18 +198,13 @@ slug = 'ops'
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
 #######################
 
-# Base URL of RTD hosted project
+# Use RTD canonical URL to ensure duplicate pages have a specific canonical URL
 
-html_baseurl = 'https://documentation.ubuntu.com/ops/'
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
 
-# URL scheme. Add language and version scheme elements.
-# When configured with RTD variables, check for RTD environment so manual runs succeed:
+# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
 
-if 'READTHEDOCS_VERSION' in os.environ:
-    version = os.environ["READTHEDOCS_VERSION"]
-    sitemap_url_scheme = '{version}{link}'
-else:
-    sitemap_url_scheme = 'MANUAL/{link}'
+sitemap_url_scheme = '{link}'
 
 # Include `lastmod` dates in the sitemap:
 
@@ -243,12 +248,14 @@ redirects = {}
 # Link checker exceptions #
 ###########################
 
-# A regex list of URLs that are ignored by 'make linkcheck'
-#
-# TODO: Remove or adjust the ACME entry after you update the contributing guide
+# During linkcheck, if a target URL matches any of these regexes (using re.match)
+# then the URL is skipped.
 
 linkcheck_ignore = [
-    "http://127.0.0.1:8000"
+    # Excluded because the pages don't contain elements with an ID matching the URL fragment.
+    r"https://matrix\.to/#/",
+    r"https://documentation\.ubuntu\.com/pebble/reference/api/#/",
+    r"https://documentation\.ubuntu\.com/juju/3\.6/reference/hook-command/list-of-hook-commands/#list-of-hook-commands",
 ]
 
 
@@ -293,14 +300,28 @@ linkcheck_retries = 3
 
 extensions = [
     "canonical_sphinx",
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_reredirects",
+    "sphinx_tabs.tabs",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    "sphinx_config_options",
+    "sphinx_contributor_listing",
+    "sphinx_filtered_toctree",
+    "sphinx_related_links",
+    "sphinx_roles",
+    "sphinx_terminal",
+    "sphinx_ubuntu_images",
+    "sphinx_youtube_links",
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
+    "sphinx.ext.intersphinx",
+    "sphinx_sitemap",
     'sphinx.ext.autodoc',
-    'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    "sphinx_sitemap",
 ]
 
 # Excludes files or directories from processing
@@ -423,7 +444,9 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'jubilant': ('https://documentation.ubuntu.com/jubilant', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
-    'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
+    'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest', None),
+    'charmlibs': ('https://documentation.ubuntu.com/charmlibs/', None),
+    'multipass': ('https://documentation.ubuntu.com/multipass/latest', None),
     'pebble': ('https://documentation.ubuntu.com/pebble', None),
     'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
 }
@@ -440,16 +463,16 @@ nitpicky = True
 # ('envvar', 'LD_LIBRARY_PATH').
 nitpick_ignore = [
     # Please keep this list sorted alphabetically.
+    ('py:class', '_AddressDict'),
     ('py:class', '_ChangeDict'),
     ('py:class', '_CheckInfoDict'),
     ('py:class', '_EntityStatus'),
     ('py:class', '_Event'),
     ('py:class', '_FileInfoDict'),
-    ('py:class', '_JujuContext'),
+    ('py:class', '_NetworkDict'),
     ('py:class', '_NoticeDict'),
     ('py:class', '_ProgressDict'),
     ('py:class', '_RawPortProtocolLiteral'),
-    ('py:class', '_Readable'),
     ('py:class', '_RelationMetaDict'),
     ('py:class', '_ResourceMetaDict'),
     ('py:class', '_StateKwargs'),
@@ -457,7 +480,6 @@ nitpick_ignore = [
     ('py:class', '_TaskDict'),
     ('py:class', '_TextOrBinaryIO'),
     ('py:class', '_WarningDict'),
-    ('py:class', '_Writeable'),
     ('py:class', 'AnyJson'),
     ('py:class', 'BasicIdentityDict'),
     ('py:class', 'CharmType'),
@@ -474,7 +496,6 @@ nitpick_ignore = [
     ('py:class', 'ops.model._ModelCache'),
     ('py:class', 'ops.model._NetworkDict'),
     ('py:class', 'ops.model._T'),
-    ('py:class', 'ops.model._SupportsKeysAndGetItem'),
     ('py:class', 'ops.pebble._FileLikeIO'),
     ('py:class', 'ops.pebble._IOSource'),
     ('py:class', 'ops.pebble._ServiceInfoDict'),
@@ -489,12 +510,7 @@ nitpick_ignore = [
     ('py:class', 'scenario.state.CharmType'),
     ('py:class', 'scenario.state._EntityStatus'),
     ('py:class', 'scenario.state._Event'),
-    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
 ]
-
-# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
-# of _MaxPositionalArgs.
-_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
@@ -510,24 +526,6 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
           """,
     re.VERBOSE,
 )
-
-
-def _custom_get_signature(self):
-    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
-        signature = inspect.signature(self.object)
-        parameters = []
-        for position, param in enumerate(signature.parameters.values()):
-            if position >= self.object._max_positional_args:
-                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
-            else:
-                parameters.append(param)
-        signature = signature.replace(parameters=parameters)
-        return None, None, signature
-    return _real_get_signature(self)
-
-
-sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature
-
 
 # This is very strongly based on
 # https://github.com/sphinx-doc/sphinx/blob/03b9134ee00e98df4f8b5f6d22f345cdafe31870/sphinx/domains/changeset.py#L46

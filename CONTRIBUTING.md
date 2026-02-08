@@ -4,6 +4,12 @@ Before working on changes, please consider [opening an issue](https://github.com
 
 For detailed technical information about the development of Ops, see [HACKING.md](./HACKING.md).
 
+# AI
+
+You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. If you are not capable of reviewing the PR (for example, if you are not fluent in Python, or are not familiar with Ops), please do not submit the PR (maybe you'd like to open an issue instead). PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
+
+Please do not use tools (such as GitHub Copilot) to provide PR reviews. The Charm Tech team also has access to these tools, and will use them when appropriate.
+
 # Pull requests
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
@@ -76,18 +82,27 @@ Recommended tone:
 
 ## How to build the documentation locally
 
-To build the docs and open them in your browser:
+Before you start, make sure that you've [installed uv](https://docs.astral.sh/uv/getting-started/installation/). On Ubuntu, you can run:
 
 ```sh
-tox -e docs
-open docs/_build/html/index.html
+sudo snap install astral-uv --classic
 ```
 
-Alternatively, to serve the docs locally and automatically refresh them whenever you edit a file:
+To build the docs:
 
 ```sh
-tox -e docs-live
+make -C docs html
 ```
+
+This generates HTML docs in the `docs/_build` directory.
+
+To view the docs, you'll need to serve the docs locally. The easiest way is to run the following command instead of `make -C docs html`:
+
+```sh
+make -C docs run
+```
+
+This serves the docs locally and automatically refreshes them whenever you edit a file.
 
 ## How to document version dependencies
 
@@ -100,8 +115,8 @@ We do note when features behave differently when using different versions of Juj
 In docstrings:
 
 - Use `.. jujuadded:: x.y` to indicate that the feature is only available when using version x.y (or higher) of Juju.
-- Use `.. jujuchanged:: x.y` when the feature's behaviour _in Ops_ changes.
-- Use `.. jujuremoved:: x.y` when the feature will be available in Ops but not in that version (or later) of Juju.
+- Use `.. jujuchanged:: x.y` when the feature's behaviour changed in version x.y of Juju.
+- Use `.. jujuremoved:: x.y` when the feature's behaviour changed in version x.y of Juju.
 
 Similar directives also work in MyST Markdown. For example:
 

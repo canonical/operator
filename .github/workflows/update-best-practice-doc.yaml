@@ -1,0 +1,58 @@
+name: Update Best Practices Doc
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 1 * * 1' # 01:25 Mondays
+
+permissions: {}
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+          path: operator
+          persist-credentials: true
+
+      - uses: actions/checkout@v6
+        with:
+          repository: canonical/charmcraft
+          path: charmcraft
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python .github/update-best-practice-table.py --path-to-charmcraft='${{ github.workspace }}/charmcraft' > docs/reuse/best-practices.txt
+        working-directory: operator
+
+      - run: |
+          echo "New changes in best practices"
+          git --no-pager diff
+          git config --global user.name "Prints Charming [bot]"
+          git config --global user.email "ben.hoyt+prints-charming-bot@canonical.com"
+          git switch -C auto-update-best-practice-docs
+          git commit --allow-empty -am "docs: update best practices documentation"
+          echo "Total changes in best practices"
+          git --no-pager diff main HEAD
+          git push -f --set-upstream origin auto-update-best-practice-docs
+        working-directory: operator
+      - run: |
+          # Ensure a PR if there are changes, no PR otherwise
+          PR=$(gh pr list --state open --head auto-update-best-practice-docs --json number -q '.[0].number')
+          CHANGES=$(git --no-pager diff --stat main HEAD)
+          echo "Existing PR? $PR"
+          echo "Changes? $CHANGES"
+          if [[ -n "$PR" && -z "$CHANGES" ]]; then
+          echo "Closing #$PR as stale"
+          gh pr close -c stale "$PR";
+          elif [[ -z "$PR" && -n "$CHANGES" ]]; then
+          echo "Opening new PR"
+          gh pr create --base main --head auto-update-best-practice-docs --title "chore: update best practices" --body "This is an automated PR to update the best practices documentation.";
+          fi
+        working-directory: operator
+        env:
+            GITHUB_TOKEN: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}

@@ -11,26 +11,36 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   o11y-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
 
     strategy:
       fail-fast: false
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: 9a9deb24ee65d66d5225fa97cb8b82a21847e054  # rev176 2025-07-28T08:13:27Z
+            commit: b3e432d665bbd50e2e786d1f999047abe911e897  # rev196 2025-12-06T16:01:09Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 75efc8c8bd91d63be90318e8999a210e6d23f0cf  # rev255 2025-07-28T08:16:54Z
+            commit: 74bd4a8b98ee750ab401a652a3cf9bb2317ded15  # rev281 2025-12-12T14:20:39Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 1ee19d9d5a782cf9f68e911aa02041bd7ee5e538  # 2025-07-28T15:06:48Z
+            commit: 2a0b282c0edcffdf46f84bb808529b5c0a705061  # rev175 2025-12-05T18:18:09Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
+
+      - name: Download operator wheels
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
 
       - name: Install dependencies
         run: pip install tox~=4.2 uv~=0.6
@@ -43,11 +53,27 @@ jobs:
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
             sed -i 's/requires-python = "~=3.8"/requires-python = "~=3.10"/g' pyproject.toml
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
-            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
+            sed -i 's/pythonVersion = "3\.[89]"/pythonVersion = "3.10"/g' pyproject.toml
+            # Get absolute paths to the wheels
+            ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+            ops_scenario_wheel="$(ls operator-wheels/ops_scenario-*.whl)"
+            ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
+            # Add ops first, then ops-scenario (for testing), then ops-tracing
+            # Use --upgrade-package to ensure the wheel versions are used, not existing pinned versions
+            uv add "${ops_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops
+            uv add "${ops_scenario_wheel}" --optional dev --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-scenario
+            uv add "${ops_tracing_wheel}" --raw-sources --prerelease=if-necessary-or-explicit --upgrade-package ops-tracing
           else
             echo "Error: no uv.lock file found"
             exit 1
+          fi
+
+      - name: Upgrade pytest-interface-tester for ops-scenario compatibility
+        if: ${{ !(matrix.disabled) }}
+        run: |
+          if [ -e "uv.lock" ]; then
+            # Upgrade only pytest-interface-tester to a version compatible with new ops-scenario
+            uv add "pytest-interface-tester>=3.4" --optional dev --upgrade-package pytest-interface-tester || echo "Could not upgrade pytest-interface-tester"
           fi
 
       - name: Run the charm's unit tests

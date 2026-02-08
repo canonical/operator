@@ -52,7 +52,7 @@ At this point, Ops will trace:
 - The `ops.main()` call
 - Observer invocations for the Juju event
 - Observer invocations for custom and life-cycle events
-- Ops calls that inspect and update Juju (also called "hook tools")
+- Ops calls that inspect and update Juju (also called "hook commands")
 - Pebble API access
 
 This provides coarse-grained tracing, focused on the boundaries between the
@@ -147,8 +147,8 @@ to create custom spans and events using the OpenTelemetry API where that makes s
 If you've added custom instrumentation, it is because something important is recorded.
 Let's validate that in a unit test.
 
-The [trace\_data](ops.testing.Context.trace_data) attribute
-of the [](ops.testing.Context) class of the testing framework 
+The [`trace_data`](ops.testing.Context.trace_data) attribute
+of the [](ops.testing.Context) class of the testing framework
 contains the list of finished spans.
 
 The following example demonstrates how to get the root span, created by Ops itself.
@@ -180,7 +180,7 @@ def ancestors(span: ReadableSpan) -> Generator[ReadableSpan]:
 assert span_a in list(ancestors(span_c))
 ```
 
-You can disambiguate spans using their [instrumentation_scope](opentelemetry.sdk.util.instrumentation.InstrumentationScope) property.
+You can disambiguate spans using their [`instrumentation_scope`](opentelemetry.sdk.util.instrumentation.InstrumentationScope) property.
 
 ```py
 # Spans from Ops

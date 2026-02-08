@@ -13,24 +13,17 @@ import pathlib
 import random
 import re
 import string
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
-    Dict,
-    Final,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     NoReturn,
-    Sequence,
     TypeVar,
-    Union,
     cast,
 )
 from uuid import uuid4
@@ -38,7 +31,7 @@ from uuid import uuid4
 import yaml
 
 import ops
-from ops import pebble, CharmBase, CharmEvents, SecretRotate, StatusBase
+from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
@@ -47,7 +40,9 @@ from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import TypedDict
+
     from typing_extensions import Unpack
+
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
@@ -69,8 +64,8 @@ if TYPE_CHECKING:  # pragma: no cover
         workload_version: str
 
 
-AnyJson = Union[str, bool, Dict[str, 'AnyJson'], int, float, List['AnyJson']]
-RawSecretRevisionContents = RawDataBagContents = Dict[str, str]
+AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
+RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -88,9 +83,6 @@ _BUILTIN_EVENTS = {
     'start',
     'stop',
     'install',
-    'install',
-    'start',
-    'stop',
     'remove',
     'update_status',
     'config_changed',
@@ -144,84 +136,6 @@ def _deepcopy_mutable_fields(obj: object):
             object.__setattr__(obj, attr, copy.deepcopy(value))
 
 
-# This can be replaced with the KW_ONLY dataclasses functionality in Python 3.10+.
-def _max_posargs(n: int):
-    class _MaxPositionalArgs:
-        """Raises TypeError when instantiating objects if arguments are not passed as keywords.
-
-        Looks for a `_max_positional_args` class attribute, which should be an int
-        indicating the maximum number of positional arguments that can be passed to
-        `__init__` (excluding `self`).
-        """
-
-        _max_positional_args = n
-
-        @classmethod
-        def _annotate_class(cls):
-            """Record information about which parameters are positional vs. keyword-only."""
-            if hasattr(cls, '_init_parameters'):
-                # We don't support dynamically changing the signature of a
-                # class, so we assume here it's the same as previously.
-                # In addition, the class and the function that provides it
-                # are private, so we generally don't expect anyone to be
-                # doing anything radical with these.
-                return
-            # inspect.signature guarantees the order of parameters is as
-            # declared, which aligns with dataclasses. Simpler ways of
-            # getting the arguments (like __annotations__) do not have that
-            # guarantee, although in practice it is the case.
-            cls._init_parameters = parameters = inspect.signature(cls.__init__).parameters
-            cls._init_kw_only = {
-                name
-                for name in tuple(parameters)[cls._max_positional_args :]
-                if not name.startswith('_')
-            }
-            cls._init_required_args = [
-                name
-                for name in tuple(parameters)
-                if name != 'self' and parameters[name].default is inspect.Parameter.empty
-            ]
-
-        def __new__(cls, *args: Any, **kwargs: Any):
-            cls._annotate_class()
-            required_args = [name for name in cls._init_required_args if name not in kwargs]
-            n_posargs = len(args)
-            max_n_posargs = cls._max_positional_args
-            kw_only = cls._init_kw_only
-            if n_posargs > max_n_posargs:
-                raise TypeError(
-                    f'{cls.__name__} takes {max_n_posargs} positional '
-                    f'argument{"" if max_n_posargs == 1 else "s"} but '
-                    f'{n_posargs} {"was" if n_posargs == 1 else "were"} '
-                    f'given. The following arguments are keyword-only: '
-                    f'{", ".join(kw_only)}',
-                ) from None
-            # Also check if there are just not enough arguments at all, because
-            # the default TypeError message will incorrectly describe some of
-            # the arguments as positional.
-            if n_posargs < len(required_args):
-                required_pos = [
-                    f"'{arg}'" for arg in required_args[n_posargs:] if arg not in kw_only
-                ]
-                required_kw = {f"'{arg}'" for arg in required_args[n_posargs:] if arg in kw_only}
-                if required_pos and required_kw:
-                    details = f'positional: {", ".join(required_pos)} and keyword: {", ".join(required_kw)} arguments'
-                elif required_pos:
-                    details = f'positional argument{"" if len(required_pos) == 1 else "s"}: {", ".join(required_pos)}'
-                else:
-                    details = f'keyword argument{"" if len(required_kw) == 1 else "s"}: {", ".join(required_kw)}'
-                raise TypeError(f'{cls.__name__} missing required {details}') from None
-            return super().__new__(cls)
-
-        def __reduce__(self):
-            # The default __reduce__ doesn't understand that some arguments have
-            # to be passed as keywords, so using the copy module fails.
-            attrs = cast('Dict[str, Any]', super().__reduce__()[2])
-            return (lambda: self.__class__(**attrs), ())
-
-    return _MaxPositionalArgs
-
-
 # A lot of JujuLogLine objects are created, so we want them to be fast and light.
 # Dataclasses define __slots__, so are small, and a namedtuple is actually
 # slower to create than a dataclass. A plain dictionary (or TypedDict) would be
@@ -236,8 +150,8 @@ class JujuLogLine:
     """The log message."""
 
 
-@dataclasses.dataclass(frozen=True)
-class CloudCredential(_max_posargs(0)):
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class CloudCredential:  # noqa: D101
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
@@ -266,11 +180,13 @@ class CloudCredential(_max_posargs(0)):
 
 
 @dataclasses.dataclass(frozen=True)
-class CloudSpec(_max_posargs(1)):
+class CloudSpec:  # noqa: D101
     __doc__ = ops.CloudSpec.__doc__
 
     type: str
     """Type of the cloud."""
+
+    _: dataclasses.KW_ONLY
 
     name: str = 'localhost'
     """Juju cloud name."""
@@ -320,12 +236,12 @@ class CloudSpec(_max_posargs(1)):
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))
+    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # noqa: S311
     return f'secret:{secret_id}'
 
 
 @dataclasses.dataclass(frozen=True)
-class Secret(_max_posargs(1)):
+class Secret:
     """A Juju secret.
 
     This class is used for both user and charm secrets.
@@ -336,6 +252,9 @@ class Secret(_max_posargs(1)):
 
     This is the content the charm will receive with a
     :meth:`ops.Secret.get_content` call."""
+
+    _: dataclasses.KW_ONLY
+
     latest_content: RawSecretRevisionContents | None = None
     """The content of the latest revision of the secret.
 
@@ -428,11 +347,14 @@ def _normalise_name(s: str):
 
 
 @dataclasses.dataclass(frozen=True)
-class Address(_max_posargs(1)):
+class Address:
     """An address in a Juju network space."""
 
     value: str
     """The IP address in the space."""
+
+    _: dataclasses.KW_ONLY
+
     hostname: str = ''
     """A host name that maps to the address in :attr:`value`."""
     cidr: str = ''
@@ -449,11 +371,16 @@ class Address(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-class BindAddress(_max_posargs(1)):
+class BindAddress:
     """An address bound to a network interface in a Juju space."""
 
-    addresses: Sequence[Address]
+    # This has the 'ops.testing.' prefix so that Sphinx knows which
+    # 'Address' class it is (it's not the one from 'hookcmds').
+    addresses: Sequence[ops.testing.Address]
     """The addresses in the space."""
+
+    _: dataclasses.KW_ONLY
+
     interface_name: str = ''
     """The name of the network interface."""
     mac_address: str | None = None
@@ -463,7 +390,7 @@ class BindAddress(_max_posargs(1)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        """Dumps itself to dict in the same format the hook tool would."""
+        """Dumps itself to dict in the same format the hook command would."""
         dct = {
             'interface-name': self.interface_name,
             'addresses': [dataclasses.asdict(addr) for addr in self.addresses],
@@ -474,7 +401,7 @@ class BindAddress(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-class Network(_max_posargs(2)):
+class Network:
     """A Juju network space.
 
     Simplifying the Juju "spaces" model, each relation endpoint of the charm is
@@ -500,6 +427,9 @@ class Network(_max_posargs(2)):
         default_factory=lambda: [BindAddress([Address('192.0.2.0')])],
     )
     """Addresses that the charm's application should bind to."""
+
+    _: dataclasses.KW_ONLY
+
     ingress_addresses: Sequence[str] = dataclasses.field(
         default_factory=lambda: ['192.0.2.0'],
     )
@@ -516,7 +446,7 @@ class Network(_max_posargs(2)):
         _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
-        # dumps itself to dict in the same format the hook tool would
+        # dumps itself to dict in the same format the hook command would
         return {
             'bind-addresses': [ba._hook_tool_output_fmt() for ba in self.bind_addresses],
             'egress-subnets': self.egress_subnets,
@@ -541,7 +471,7 @@ def _next_relation_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-class RelationBase(_max_posargs(2)):
+class RelationBase:
     """Base class for the various types of relation.
 
     The only mandatory argument to `Relation` (and other relation types) is
@@ -559,6 +489,8 @@ class RelationBase(_max_posargs(2)):
     interface: str | None = None
     """Interface name. Must match the interface name attached to this endpoint in the metadata.
     If left empty, it will be automatically derived from the metadata."""
+
+    _: dataclasses.KW_ONLY
 
     id: int = dataclasses.field(default_factory=_next_relation_id)
     """Juju relation ID. Every new Relation instance gets a unique one,
@@ -633,7 +565,7 @@ _DEFAULT_JUJU_DATABAG = {
 }
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class Relation(RelationBase):
     """A relation between the charm and another application."""
 
@@ -680,7 +612,7 @@ class Relation(RelationBase):
         yield from self.remote_units_data.values()
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class SubordinateRelation(RelationBase):
     """A relation to share data between a subordinate and a principal charm."""
 
@@ -727,7 +659,7 @@ class SubordinateRelation(RelationBase):
         return f'{self.remote_app_name}/{self.remote_unit_id}'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
@@ -762,11 +694,11 @@ class PeerRelation(RelationBase):
 
 def _random_model_name():
     space = string.ascii_letters + string.digits
-    return ''.join(random.choice(space) for _ in range(20))
+    return ''.join(random.choice(space) for _ in range(20))  # noqa: S311
 
 
 @dataclasses.dataclass(frozen=True)
-class Model(_max_posargs(1)):
+class Model:
     """The Juju model in which the charm is deployed.
 
     Charms don't usually need to be aware of the model in which they are
@@ -780,6 +712,9 @@ class Model(_max_posargs(1)):
 
     name: str = dataclasses.field(default_factory=_random_model_name)
     """The name of the model."""
+
+    _: dataclasses.KW_ONLY
+
     uuid: str = dataclasses.field(default_factory=lambda: str(uuid4()))
     """A unique identifier for the model, typically generated by Juju."""
 
@@ -827,10 +762,13 @@ def _generate_new_change_id():
 
 
 @dataclasses.dataclass(frozen=True)
-class Exec(_max_posargs(1)):
+class Exec:
     """Mock data for simulated :meth:`ops.Container.exec` calls."""
 
     command_prefix: Sequence[str]
+
+    _: dataclasses.KW_ONLY
+
     return_code: int = 0
     """The return code of the process.
 
@@ -863,8 +801,8 @@ class Exec(_max_posargs(1)):
         return self._change_id
 
 
-@dataclasses.dataclass(frozen=True)
-class Mount(_max_posargs(0)):
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class Mount:
     """Maps a local path to a :class:`Container` filesystem."""
 
     location: str | pathlib.PurePosixPath
@@ -894,7 +832,7 @@ def _next_notice_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-class Notice(_max_posargs(1)):
+class Notice:
     """A Pebble notice."""
 
     key: str
@@ -903,6 +841,8 @@ class Notice(_max_posargs(1)):
     This is in the format ``domain/path``; for example:
     ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
+
+    _: dataclasses.KW_ONLY
 
     id: str = dataclasses.field(default_factory=_next_notice_id)
     """Unique ID for this notice."""
@@ -957,20 +897,20 @@ class Notice(_max_posargs(1)):
         )
 
 
-@dataclasses.dataclass(frozen=True)
-class CheckInfo(_max_posargs(1)):
+@dataclasses.dataclass(frozen=True, init=False)
+class CheckInfo:
     """A health check for a Pebble workload container."""
 
     name: str
     """Name of the check."""
 
-    level: pebble.CheckLevel | None = None
+    level: pebble.CheckLevel | None
     """Level of the check."""
 
-    startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED
+    startup: pebble.CheckStartup
     """Startup mode of the check."""
 
-    status: pebble.CheckStatus = pebble.CheckStatus.UP
+    status: pebble.CheckStatus
     """Status of the check.
 
     :attr:`ops.pebble.CheckStatus.UP` means the check is healthy (the number of
@@ -980,36 +920,56 @@ class CheckInfo(_max_posargs(1)):
     been stopped, so is not currently running.
     """
 
-    successes: int | None = 0
+    successes: int | None
     """Number of times this check has succeeded.
 
     Set this to None to simulate an older version of Pebble which doesn't have
     the ``successes`` field (introduced in Pebble v1.23.0).
     """
 
-    failures: int = 0
+    failures: int
     """Number of failures since the check last succeeded."""
 
-    threshold: int = 3
+    threshold: int
     """Failure threshold.
 
     This is how many consecutive failures for the check to be considered 'down'.
     """
 
-    change_id: pebble.ChangeID | None = None
+    change_id: pebble.ChangeID | None
     """The ID of the Pebble Change associated with this check.
 
     Passing ``None`` will automatically assign a new Change ID if the status is
     :attr:`ops.pebble.CheckStatus.UP` or :attr:`ops.pebble.CheckStatus.DOWN`.
     """
 
-    def __post_init__(self):
-        if self.change_id is None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        level: pebble.CheckLevel | str | None = None,
+        startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED,
+        status: pebble.CheckStatus = pebble.CheckStatus.UP,
+        successes: int | None = 0,
+        failures: int = 0,
+        threshold: int = 3,
+        change_id: pebble.ChangeID | None = None,
+    ):
+        object.__setattr__(self, 'name', name)
+        if level is not None:
+            level = pebble.CheckLevel(level)
+        object.__setattr__(self, 'level', level)
+        object.__setattr__(self, 'startup', startup)
+        object.__setattr__(self, 'status', status)
+        object.__setattr__(self, 'successes', successes)
+        object.__setattr__(self, 'failures', failures)
+        object.__setattr__(self, 'threshold', threshold)
+        if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
                 change_id = ''
             else:
                 change_id = pebble.ChangeID(_generate_new_change_id())
-            object.__setattr__(self, 'change_id', change_id)
+        object.__setattr__(self, 'change_id', change_id)
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -1028,11 +988,13 @@ class CheckInfo(_max_posargs(1)):
 
 
 @dataclasses.dataclass(frozen=True)
-class Container(_max_posargs(1)):
+class Container:
     """A Kubernetes container where a charm's workload runs."""
 
     name: str
     """Name of the container, as found in the charm metadata."""
+
+    _: dataclasses.KW_ONLY
 
     can_connect: bool = False
     """When False, all Pebble operations will fail."""
@@ -1077,8 +1039,9 @@ class Container(_max_posargs(1)):
     When your charm runs, the simulated container filesystem will have symlinks to
     ``/path/to/local/foo.py`` and ``/path/to/local/bin`` at the specified locations.
 
-    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files to the
-    container filesystem, make sure to specify source files/directories that can be safely modified.
+    If you're testing charm code that uses :meth:`ops.pebble.Client.push` to write files
+    to the container filesystem, make sure to specify source files/directories that can
+    be safely modified.
     """
 
     execs: Iterable[Exec] = frozenset()
@@ -1155,7 +1118,6 @@ class Container(_max_posargs(1)):
         You should run your assertions on this plan, not so much on the layers,
         as those are input data.
         """
-
         # copied over from ops.testing._TestingPebbleClient.get_plan().
         plan = pebble.Plan(yaml.safe_dump(self._base_plan))
         services = self._render_services()
@@ -1195,7 +1157,7 @@ class Container(_max_posargs(1)):
             infos[name] = info
         return infos
 
-    def get_filesystem(self, ctx: Context) -> pathlib.Path:
+    def get_filesystem(self, ctx: Context[Any]) -> pathlib.Path:
         """Simulated Pebble filesystem in this context.
 
         Returns:
@@ -1233,9 +1195,13 @@ def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
         raise ValueError(f'rockcraft.yaml file not found at {path}')
     with path.open('r') as f:
         rockcraft = yaml.safe_load(f)
+    description = (
+        f'{rockcraft.get("description", "(no description)")} '
+        f'(built from the rockcraft.yaml at {path})'
+    )
     layer_dict: pebble.LayerDict = {
         'summary': rockcraft['summary'],
-        'description': f'{rockcraft.get("description", "(no description)")} (built from the rockcraft.yaml at {path})',
+        'description': description,
         'services': rockcraft.get('services', {}),
         'checks': rockcraft.get('checks', {}),
     }
@@ -1297,7 +1263,7 @@ class _EntityStatus:
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class UnknownStatus(_EntityStatus, ops.UnknownStatus):
+class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
     __doc__ = ops.UnknownStatus.__doc__
 
     name: Literal['unknown'] = 'unknown'
@@ -1307,7 +1273,7 @@ class UnknownStatus(_EntityStatus, ops.UnknownStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ErrorStatus(_EntityStatus, ops.ErrorStatus):
+class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
     __doc__ = ops.ErrorStatus.__doc__
 
     name: Literal['error'] = 'error'
@@ -1317,7 +1283,7 @@ class ErrorStatus(_EntityStatus, ops.ErrorStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ActiveStatus(_EntityStatus, ops.ActiveStatus):
+class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
     __doc__ = ops.ActiveStatus.__doc__
 
     name: Literal['active'] = 'active'
@@ -1327,7 +1293,7 @@ class ActiveStatus(_EntityStatus, ops.ActiveStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class BlockedStatus(_EntityStatus, ops.BlockedStatus):
+class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
     __doc__ = ops.BlockedStatus.__doc__
 
     name: Literal['blocked'] = 'blocked'
@@ -1337,7 +1303,7 @@ class BlockedStatus(_EntityStatus, ops.BlockedStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
+class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
     __doc__ = ops.MaintenanceStatus.__doc__
 
     name: Literal['maintenance'] = 'maintenance'
@@ -1347,7 +1313,7 @@ class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class WaitingStatus(_EntityStatus, ops.WaitingStatus):
+class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # noqa: D101
     __doc__ = ops.WaitingStatus.__doc__
 
     name: Literal['waiting'] = 'waiting'
@@ -1367,7 +1333,7 @@ _EntityStatus._entity_statuses.update(
 
 
 @dataclasses.dataclass(frozen=True)
-class StoredState(_max_posargs(1)):
+class StoredState:
     """Represents unit-local state that persists across events."""
 
     name: str = '_stored'
@@ -1379,6 +1345,8 @@ class StoredState(_max_posargs(1)):
             _stored = ops.StoredState()
 
     """
+
+    _: dataclasses.KW_ONLY
 
     owner_path: str | None = None
     """The path to the owner of this StoredState instance.
@@ -1411,7 +1379,7 @@ _RawPortProtocolLiteral = Literal['tcp', 'udp', 'icmp']
 
 
 @dataclasses.dataclass(frozen=True)
-class Port(_max_posargs(1)):
+class Port:
     """Represents a port on the charm host.
 
     Port objects should not be instantiated directly: use :class:`TCPPort`,
@@ -1420,6 +1388,8 @@ class Port(_max_posargs(1)):
 
     port: int | None = None
     """The port to open. Required for TCP and UDP; not allowed for ICMP."""
+
+    _: dataclasses.KW_ONLY
 
     protocol: _RawPortProtocolLiteral = 'tcp'
     """The protocol that data transferred over the port will use."""
@@ -1479,7 +1449,7 @@ class UDPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class ICMPPort(Port):
     """Represents an ICMP port on the charm host."""
 
@@ -1488,8 +1458,6 @@ class ICMPPort(Port):
 
     :meta private:
     """
-
-    _max_positional_args: Final = 0
 
     def __post_init__(self):
         super().__post_init__()
@@ -1521,11 +1489,13 @@ def _next_storage_index(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-class Storage(_max_posargs(1)):
+class Storage:
     """Represents an (attached) storage made available to the charm container."""
 
     name: str
     """The name of the storage, as found in the charm metadata."""
+
+    _: dataclasses.KW_ONLY
 
     index: int = dataclasses.field(default_factory=_next_storage_index)
     """The index of this storage instance.
@@ -1538,13 +1508,13 @@ class Storage(_max_posargs(1)):
             return (self.name, self.index) == (other.name, other.index)
         return False
 
-    def get_filesystem(self, ctx: Context) -> pathlib.Path:
+    def get_filesystem(self, ctx: Context[Any]) -> pathlib.Path:
         """Simulated filesystem root in this context."""
         return ctx._get_storage_root(self.name, self.index)
 
 
-@dataclasses.dataclass(frozen=True)
-class Resource(_max_posargs(0)):
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class Resource:
     """Represents a resource made available to the charm.
 
     From the perspective of a 'real' deployed charm, if your charm _has_
@@ -1561,8 +1531,8 @@ class Resource(_max_posargs(0)):
     """A local path that will be provided to the charm as the content of the resource."""
 
 
-@dataclasses.dataclass(frozen=True)
-class State(_max_posargs(0)):
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class State:
     """Represents the Juju-owned portion of a unit's state.
 
     Roughly speaking, it wraps all hook-tool- and pebble-mediated data a charm can access in its
@@ -1598,7 +1568,7 @@ class State(_max_posargs(0)):
     """Ports opened by Juju on this charm."""
     leader: bool = False
     """Whether this charm has leadership."""
-    model: Model = Model()
+    model: Model = dataclasses.field(default_factory=Model)
     """The model this charm lives in."""
     secrets: Iterable[Secret] = dataclasses.field(default_factory=frozenset)
     """The secrets this charm has access to (as an owner, or as a grantee).
@@ -1624,9 +1594,9 @@ class State(_max_posargs(0)):
     """Contents of a charm's stored state."""
 
     # the current statuses.
-    app_status: _EntityStatus = UnknownStatus()
+    app_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
     """Status of the application."""
-    unit_status: _EntityStatus = UnknownStatus()
+    unit_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
     """Status of the unit."""
     workload_version: str = ''
     """Workload version."""
@@ -1656,7 +1626,8 @@ class State(_max_posargs(0)):
         if self.storages != normalised_storage:
             object.__setattr__(self, 'storages', normalised_storage)
 
-        # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by charmers.
+        # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by
+        # charmers.
         # ops.Network does not have the relation name, so cannot be converted.
         # ops.Resources does not contain the source of the resource, so cannot be converted.
         # ops.StoredState is not convenient to initialise with data, so not useful here.
@@ -1678,32 +1649,6 @@ class State(_max_posargs(0)):
             # a frozenset as the actual attribute.
             if not isinstance(val, frozenset):
                 object.__setattr__(self, name, frozenset(val))
-
-    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> State:
-        # We use copy.deepcopy() to create the initial output state (that is
-        # then typically modified by the charm execution). This would normally
-        # 'just work', but we have a custom `__reduce__` method to handle the
-        # odd way we are setting keyword-only arguments. It's cleaner to have
-        # this custom `__deepcopy__` than to try to handle this case in the
-        # reduce method as well.
-        # TODO: When we require Python 3.10+ this method should be removed.
-        new_state = copy.copy(self)
-        object.__setattr__(new_state, 'config', self.config.copy())
-        for attr in (
-            'relations',
-            'networks',
-            'containers',
-            'storages',
-            'opened_ports',
-            'secrets',
-            'resources',
-            'stored_states',
-        ):
-            value = getattr(self, attr)
-            new_value = frozenset(copy.deepcopy(v, memo) for v in value)
-            object.__setattr__(new_state, attr, new_value)
-        object.__setattr__(new_state, 'deferred', self.deferred[:])
-        return new_state
 
     def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
@@ -1803,7 +1748,6 @@ class State(_max_posargs(0)):
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
-
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
         # requires:
         #   foo-bar: ...
@@ -1854,8 +1798,8 @@ class State(_max_posargs(0)):
         Items that are found in the metadata and are also in the passed
         arguments will be merged, with the passed values taking precedence.
         """
-        meta = ctx.charm_spec.meta
-        spec_config = ctx.charm_spec.config
+        meta = ctx._charm_spec.meta
+        spec_config = ctx._charm_spec.config
         config = {} if config is None else config
         if spec_config:
             options = spec_config.get('options', {})
@@ -1885,10 +1829,10 @@ class State(_max_posargs(0)):
                 continue
             storages.add(Storage(name=storage_name))
         stored_states = set(stored_states or ())
-        for attr in dir(ctx.charm_spec.charm_type):
-            value = getattr(ctx.charm_spec.charm_type, attr)
+        for attr in dir(ctx._charm_spec.charm_type):
+            value = getattr(ctx._charm_spec.charm_type, attr)
             if isinstance(value, ops.StoredState):
-                owner_path = ctx.charm_spec.charm_type.handle_kind
+                owner_path = ctx._charm_spec.charm_type.handle_kind
                 if any(ss.name == attr and ss.owner_path == owner_path for ss in stored_states):
                     continue
                 stored_states.add(StoredState(attr, owner_path=owner_path))
@@ -2038,7 +1982,7 @@ class _EventType(str, Enum):
     BUILTIN = 'builtin'
     RELATION = 'relation'
     ACTION = 'action'
-    SECRET = 'secret'
+    SECRET = 'secret'  # noqa: S105  # This is not an actual secret.
     STORAGE = 'storage'
     WORKLOAD = 'workload'
     CUSTOM = 'custom'
@@ -2060,17 +2004,10 @@ class _EventPath(str):
         instance.name = name = string.split('.')[-1]
         instance.owner_path = string.split('.')[:-1] or ['on']
 
-        instance.suffix, instance.type = suffix, _ = _EventPath._get_suffix_and_type(
-            name,
-        )
-        # TODO: when we drop Python 3.8, we can change the whole if-else below to
-        # instance.prefix = string.removesuffix(suffix)
-        if suffix:
-            instance.prefix, _ = string.rsplit(suffix, maxsplit=1)
-        else:
-            instance.prefix = string
+        instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
+        instance.prefix = string.removesuffix(instance.suffix)
+        instance._is_custom = instance.suffix == ''
 
-        instance.is_custom = suffix == ''
         return instance
 
     @staticmethod
@@ -2166,6 +2103,8 @@ class _Event:  # type: ignore
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
+        # This is the event name as Juju provides it, with dashes not underscores.
+        object.__setattr__(self, '_juju_name', f'{path.prefix}{path.suffix.replace("_", "-")}')
 
     @property
     def _path(self) -> _EventPath:
@@ -2390,7 +2329,7 @@ def _next_action_id(*, update: bool = True):
 
 
 @dataclasses.dataclass(frozen=True)
-class _Action(_max_posargs(1)):
+class _Action:
     """A ``juju run`` command.
 
     Used to simulate ``juju run``, passing in any parameters. For example::
@@ -2406,6 +2345,8 @@ class _Action(_max_posargs(1)):
 
     name: str
     """Juju action name, as found in the charm metadata."""
+
+    _: dataclasses.KW_ONLY
 
     params: Mapping[str, AnyJson] = dataclasses.field(default_factory=dict)
     """Parameter values passed to the action."""

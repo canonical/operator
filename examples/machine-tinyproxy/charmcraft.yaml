@@ -1,0 +1,36 @@
+# This file configures Charmcraft.
+# See https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/
+type: charm
+name: tinyproxy
+title: Reverse Proxy Demo
+summary: A demo charm that configures tinyproxy as a reverse proxy.
+description: |
+  This charm demonstrates how to write a machine charm with Ops.
+
+# Documentation:
+# https://documentation.ubuntu.com/charmcraft/stable/howto/build-guides/select-platforms/
+base: ubuntu@22.04
+platforms:
+  amd64:
+  arm64:
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+# (Optional) Configuration options for the charm
+# This config section defines charm config options, and populates the Configure
+# tab on Charmhub.
+# More information on this section at:
+# https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/#config
+# General configuration documentation:
+# https://documentation.ubuntu.com/juju/3.6/reference/configuration/#application-configuration
+config:
+  options:
+    slug:
+      description: "Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"
+      default: example
+      type: string

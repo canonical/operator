@@ -1,523 +1,986 @@
-(write-your-first-machine-charm)=
+(machine-charm-tutorial)=
 # Write your first machine charm
 
-In this tutorial you will write a {external+juju:ref}`machine charm <machine-charm>` for Juju using {external+charmcraft:doc}`Charmcraft <index>` and Ops.
+In this tutorial, you'll write a machine charm for Juju using Ops and other charm development tools.
 
-**What you'll need:**
+If you're new to charm development, you might find it helpful to read [Charms architecture](https://canonical.com/juju/charms-architecture) and {external+juju:ref}`Machine charm <machine-charm>` before starting the tutorial. Or jump straight in!
 
-- A workstation. For example, a laptop with an amd64 architecture. You'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
+It will take about 2 hours for you to complete the tutorial.
+
+What you'll need:
+
+- A workstation. For example, a laptop with an amd64 architecture. To deploy and test your charm in a virtual machine, you'll need sufficient resources to launch a virtual machine with 4 CPUs, 8 GB RAM, and 50 GB disk space.
 - Familiarity with Linux.
-- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers.
+- Familiarity with the Python programming language, including Object-Oriented Programming and event handlers. It will be helpful if you're familiar with [pytest](https://docs.pytest.org/en/) too.
 
-It will also help if you're familiar with Juju, but don't worry if you're new to Juju. This tutorial will guide you through each step.
+What you'll do:
 
-**What you'll do:**
+- Use {external+charmcraft:doc}`Charmcraft <index>` to create a machine charm from a template.
+- Add functionality to your charm, so that it can install and manage a workload on its machine.
+- Test your charm, using the Ops testing framework for unit tests and {external+jubilant:doc}`Jubilant <index>` for integration tests.
 
-Study your application. Use Charmcraft and Ops to build a basic charm and test-deploy it with Juju and a localhost LXD-based cloud. Repeat the steps to evolve the charm so it can become increasingly more sophisticated.
+If you need help, don't hesitate to get in touch at [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix.
 
-
-
-```{note}
-
-Should you get stuck at any point: Don't hesitate to get in touch on [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
-
+```{tip}
+As you work through the tutorial, you'll write your charm piece by piece. You can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) at any time.
 ```
 
 ## Study your application
 
-In this tutorial we will be writing a charm for Microsample (`microsample`) -- a small educational application that delivers a Flask microservice.
-
-The application has been packaged and published as a snap ([https://snapcraft.io/microsample](https://snapcraft.io/microsample)). We will write our charm such that `juju deploy` will install it from this snap. This will make workload installation straightforward and upgrades automatic (as they will happen automatically through `snapd`).
-
-The application snap has been released into multiple channels -- `edge`, `beta`, `candidate`, and `stable`. We will write our charm such that a user can choose the channel they prefer by running `juju deploy microsample channel=<value>`.
-
-The application has other features that we can exploit, but for now this is enough to get us started with a simple charm.
-
-
-## Set up your development environment
-
-See {external+juju:ref}`Juju | Manage your deployment environment > Set things up <set-things-up>` for instructions on how to set up your development environment so that it's ready for you to test-deploy your charm.
-
-At the charm directory step, call it `microsample-vm`. At the cloud step, choose LXD.
-
-```{important}
-
--  Going forward:
-    - Use your host machine (on Linux, `cd ~/microsample-vm`) to create and edit your charm files. This will allow you to use your favorite local editor.
-    - Use the Multipass VM shell (on Linux, `ubuntu@charm-dev:~$ cd ~/microsample-vm`) to run Charmcraft and Juju commands.
-
-
-- At any point:
-    - To exit the shell, press `mod key + C` or type `exit`.
-    - To stop the VM after exiting the VM shell, run `multipass stop charm-dev`.
-    - To restart the VM and re-open a shell into it, type `multipass shell charm-dev`.
-
-```
-
-
-## Enable `juju deploy microsample-vm`
-
-
-Let's charm our `microsample` application into a `microsample-vm` charm such that a user can successfully install it on any machine cloud simply by running `juju deploy microsample-vm`!
-
-In your Multipass VM shell, enter your charm directory, run `charmcraft init --profile machine` to initialise the file tree structure for your machine charm, and inspect the result. Sample session:
+You'll write a charm that uses [tinyproxy](https://tinyproxy.github.io/) to run a reverse proxy. When your charm is deployed and tinyproxy is running, you'll be able to fetch [example.com](http://example.com) by running:
 
 ```text
-# Enter your charm directory:
-ubuntu@charm-dev:~$ cd microsample-vm/
-
-# Initialise the charm tree structure:
-ubuntu@charm-dev:~/microsample-vm$ charmcraft init --profile machine
-Charmed operator package file and directory tree initialised.
-
-Now edit the following package files to provide fundamental charm metadata
-and other information:
-
-charmcraft.yaml
-src/charm.py
-README.md
-
-# Inspect the result:
-ubuntu@charm-dev:~/microsample-vm$ ls -R
-.:
-CONTRIBUTING.md  README.md        pyproject.toml    src    tox.ini
-LICENSE          charmcraft.yaml  requirements.txt  tests
-
-./src:
-charm.py
-
-./tests:
-integration  unit
-
-./tests/integration:
-test_charm.py
-
-./tests/unit:
-test_charm.py
-
+curl <address>:8000/example/
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`, {external+charmcraft:ref}`Charmcraft | Files <files>`
+Where `<address>` is the IP address of the machine that tinyproxy is running on. You'll be able to use the `juju config` command to change `/example/` to a custom path.
 
-In your local editor, open the `charmcraft.yaml` file and customise its contents as below (you only have to edit the `title`, `summary`, and `description`):
+This application isn't especially realistic in isolation. But it's a good way to illustrate typical interactions between Juju, a charm, a machine, and a workload.
+
+(machine-charm-tutorial-environment)=
+## Set up your environment
+
+### Create a virtual machine
+
+You'll deploy and test your charm inside an Ubuntu virtual machine that's running on your computer. Your virtual machine will provide an isolated environment that's safe for you to experiment in, without affecting your host machine. This is especially helpful for the charm's integration tests, which require a local Juju controller and LXD cloud.
+
+First, install Multipass for managing virtual machines. See the [installation instructions](https://canonical.com/multipass/install).
+
+Next, open a terminal, then run:
+
+```text
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+```
+
+This creates a virtual machine called `juju-sandbox`.
+
+Multipass allocates some of your computer's memory and disk space to your virtual machine. The options we've chosen for `multipass launch` ensure that your virtual machine will be powerful enough to run Juju and deploy medium-sized charms.
+
+This step should take less than 10 minutes, but the time depends on your computer and network. When your virtual machine has been created, you'll see the message:
+
+```text
+Launched: juju-sandbox
+```
+
+Now run:
+
+```text
+multipass shell juju-sandbox
+```
+
+This switches the terminal so that you're working inside your virtual machine.
+
+You'll see a message with information about your virtual machine. You'll also see a new prompt:
+
+```text
+ubuntu@juju-sandbox:~$
+```
+
+### Install Juju and charm development tools
+
+Now that you have a virtual machine, you need to install the following tools on your virtual machine:
+
+- **Charmcraft, Juju, and LXD** - You'll use {external+charmcraft:doc}`Charmcraft <index>` to create the initial version of your charm and prepare your charm for deployment. When you deploy your charm, Juju will use LXD to manage the machine where your charm runs.
+- **uv** - Your charm will be a Python project. You'll use [uv](https://docs.astral.sh/uv/) to manage your charm's runtime and development dependencies.
+- **tox** - You'll use [tox](https://tox.wiki/en/) to run your charm's checks and tests.
+
+Instead of manually installing and configuring each tool, we recommend using [Concierge](https://github.com/canonical/concierge), Canonical's tool for setting up charm development environments.
+
+In your virtual machine, run:
+
+```text
+sudo snap install --classic concierge
+sudo concierge prepare -p machine --extra-snaps astral-uv
+```
+
+This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p machine` tells Concierge that we want tools for developing machine charms.
+
+This step should take less than 15 minutes, but the time depends on your computer and network. When the tools have been installed, you'll see a message that ends with:
+
+```text
+msg="Bootstrapped Juju" provider=lxd
+```
+
+To install tox, run:
+
+```text
+uv tool install tox --with tox-uv
+```
+
+When tox has been installed, you'll see a confirmation and a warning:
+
+```text
+Installed 1 executable: tox
+warning: `/home/ubuntu/.local/bin` is not on your PATH. To use installed tools,
+run `export PATH="/home/ubuntu/.local/bin:$PATH"` or `uv tool update-shell`.
+```
+
+Instead of following the warning, exit your virtual machine:
+
+```text
+exit
+```
+
+The terminal switches back to your host machine. Your virtual machine is still running.
+
+Next, stop your virtual machine:
+
+```text
+multipass stop juju-sandbox
+```
+
+Then use the Multipass {external+multipass:ref}`snapshot <reference-command-line-interface-snapshot>` command to take a snapshot of your virtual machine:
+
+```text
+multipass snapshot juju-sandbox
+```
+
+If you have any problems with your virtual machine during or after completing the tutorial, use the Multipass {external+multipass:ref}`restore <reference-command-line-interface-restore>` command to restore your virtual machine to this point.
+
+### Create a project directory
+
+Although you'll deploy and test your charm inside your virtual machine, you'll probably find it more convenient to write your charm using your usual text editor or IDE.
+
+Outside your virtual machine, create a project directory:
+
+```text
+mkdir ~/tinyproxy-tutorial
+```
+
+You'll write your charm in this directory.
+
+Next, use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make the directory available inside your virtual machine:
+
+```text
+multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:~/tinyproxy
+```
+
+Finally, start your virtual machine and switch to your virtual machine:
+
+```text
+multipass shell juju-sandbox
+```
+
+## Create a charm project
+
+In your virtual machine, go into your project directory and create the initial version of your charm:
+
+```text
+cd ~/tinyproxy
+charmcraft init --profile machine
+```
+
+Charmcraft created several files, including:
+
+- `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
+- `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
+- `src/charm.py` - The Python file that will contain the main logic of your charm.
+- `src/tinyproxy.py` - A helper module that will contain functions for interacting with tinyproxy.
+
+These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
+
+## Write your charm
+
+### Edit the metadata
+
+Open `~/tinyproxy-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
 
 ```yaml
-# (Required)
-name: microsample-vm
-
-# (Required)
-type: charm
-
-# (Recommended)
-title: Microsample VM Charm
-
-# (Required)
-summary: A charm that deploys the microsample snap and allows for a configuration of the snap channel via juju config.
-
-# (Required)
+title: Reverse Proxy Demo
+summary: A demo charm that configures tinyproxy as a reverse proxy.
 description: |
-  A machine charm for the Microsample application, built on top of the `microsample` snap.
-
-  The charm allows you to deploy the application via `juju deploy`.
-  It also defines a channel config that allows you to choose which snap channel to install from during deployment.
-
-  This charm makes it easy to deploy the Microsample application on any machine cloud.
-
-  The primary value of this charm is educational -- beginner machine charms can study it to learn how to build a machine charm.
-
-# (Required for 'charm' type)
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
-
+  This charm demonstrates how to write a machine charm with Ops.
 ```
-> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml <charmcraft-yaml-file>`
 
-Now open the `src/charm.py` file and update it as below (you'll have to add an import statement for `os` and an observer and handler for the `install` event -- in the definition of which you'll be using `os` and `ops`).
+### Write a helper module
+
+Your charm will interact with tinyproxy, so it's a good idea to write a helper module that wraps tinyproxy.
+Charmcraft created `src/tinyproxy.py` as a placeholder helper module.
+
+The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. However, the helper module won't be a general-purpose wrapper for tinyproxy. The helper module will contain opinionated functions for managing tinyproxy on Ubuntu.
+
+The helper module will depend on some libraries that are useful when writing charms.
+
+To add the libraries to your charm's dependencies, run:
+
+```text
+uv add charmlibs-apt charmlibs-pathops
+```
+
+This adds the following Python packages to the `dependencies` list in `pyproject.toml`:
+
+- {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>` - A library for using APT to manage system packages. This is how your charm will install tinyproxy.
+- {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>` - A file operations library, similar to `pathlib` from the standard library.
+
+Next, replace the contents of `src/tinyproxy.py` with:
 
 ```python
-#!/usr/bin/env python3
-import os
+"""Functions for interacting with tinyproxy."""
+
 import logging
-import ops
+import os
+import shutil
+import signal
+import subprocess
+
+from charmlibs import apt, pathops
 
 logger = logging.getLogger(__name__)
 
-class MicrosampleVmCharm(ops.CharmBase):
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.install, self._on_install)
-
-    def _on_start(self, event: ops.StartEvent):
-        """Handle start event."""
-        self.unit.status = ops.ActiveStatus()
-
-    def _on_install(self, event: ops.InstallEvent):
-        """Handle install event."""
-        self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
-        os.system(f"snap install microsample --channel edge")
-        self.unit.status = ops.ActiveStatus("Ready")
+CONFIG_FILE = pathops.LocalPath("/etc/tinyproxy/tinyproxy.conf")
+PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
 
 
-if __name__ == "__main__":  # pragma: nocover
-    ops.main(MicrosampleVmCharm)  # type: ignore
+def ensure_config(port: int, slug: str) -> bool:
+    """Ensure that tinyproxy is configured. Return True if any changes were made."""
+    # For the config file format, see https://manpages.ubuntu.com/manpages/jammy/en/man5/tinyproxy.conf.5.html
+    config = f"""\
+PidFile "{PID_FILE}"
+Port {port}
+Timeout 600
+ReverseOnly Yes
+ReversePath "/{slug}/" "http://www.example.com/"
+"""
+    return pathops.ensure_contents(CONFIG_FILE, config)
+
+
+def get_version() -> str:
+    """Get the version of tinyproxy that is installed."""
+    result = subprocess.run(["tinyproxy", "-v"], check=True, capture_output=True, text=True)
+    return result.stdout.removeprefix("tinyproxy").strip()
+
+
+def install() -> None:
+    """Use APT to install the tinyproxy executable."""
+    apt.update()
+    # Install a specific package from ubuntu@22.04
+    # See https://packages.ubuntu.com/jammy/tinyproxy-bin
+    # In general, it's good practice for charms to pin workload versions.
+    apt.add_package("tinyproxy-bin", "1.11.0-1")
+    # If this call fails, the charm will go into error status. The Juju logs will show the error:
+    # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
+
+
+def is_installed() -> bool:
+    """Return whether the tinyproxy executable is available."""
+    return shutil.which("tinyproxy") is not None
+
+
+def is_running() -> bool:
+    """Return whether tinyproxy is running."""
+    return bool(_get_pid())
+
+
+def reload_config() -> None:
+    """Ask tinyproxy to reload config."""
+    pid = _get_pid()
+    if not pid:
+        raise RuntimeError("tinyproxy is not running")
+    # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
+    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+    os.kill(pid, signal.SIGUSR1)
+
+
+def start() -> None:
+    """Start tinyproxy."""
+    subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
+
+
+def stop() -> None:
+    """Stop tinyproxy."""
+    pid = _get_pid()
+    if pid:
+        os.kill(pid, signal.SIGTERM)
+
+
+def uninstall() -> None:
+    """Uninstall the tinyproxy executable and remove files."""
+    apt.remove_package("tinyproxy-bin")
+    PID_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.unlink(missing_ok=True)
+    CONFIG_FILE.parent.rmdir()
+
+
+def _get_pid() -> int | None:
+    """Return the PID of the tinyproxy process, or None if the process can't be found."""
+    if not PID_FILE.exists():
+        return None
+    pid = int(PID_FILE.read_text())
+    try:
+        # Sending signal 0 doesn't terminate the process. It just checks whether the PID exists.
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return None
+    return pid
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | File src/charm.py <src-charm-py-file>`,  {ref}`run-workloads-with-a-charm-machines`
+Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
 
-Next, in your Multipass VM shell, inside your project directory, run `charmcraft pack` to pack the charm. It may take a few minutes the first time around but, when it's done, your charm project should contain a `.charm` file. Sample session:
+1. Receive an event from Juju.
+2. Use the functions in the helper module to manage tinyproxy and check its status.
+3. Report the status back to Juju.
 
+```{tip}
+After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks. You can run these commands from anywhere in the `~/tinyproxy` directory in your virtual machine.
 
-```text
-# Pack the charm into a '.charm' file:
-ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
-Charms packed:
-    microsample-vm_ubuntu-22.04-amd64.charm
-
-# Inspect the results -- your charm's root directory should contain a .charm file:
-ubuntu@charm-dev:~/microsample-vm$ ls
-CONTRIBUTING.md  charmcraft.yaml                          requirements.txt  tox.ini
-LICENSE          microsample-vm_ubuntu-22.04-amd64.charm  src
-README.md        pyproject.toml                           tests
+You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are available on your host machine. However, be careful when running the same tox command inside and outside your virtual machine. If tox fails with an error related to the `.tox` directory, use `-re` instead of `-e` in the commands. This recreates the tox environment.
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | Manage charms > Pack <pack-a-charm>`
+### Handle the install event
 
-Now, open a new shell into your Multipass VM and use it to configure the Juju log verbosity levels and to start a live debug session:
+We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic, containing a class called `TinyproxyCharm`. We'll refer to `TinyproxyCharm` as the "charm class".
 
-```text
-# Set your logging verbosity level to `DEBUG`:
-ubuntu@charm-dev:~$  juju model-config logging-config="<root>=WARNING;unit=DEBUG"
+In `src/charm.py`, replace the `_on_install` method of the charm class with:
 
-# Start a live debug session:
-ubuntu@charm-dev:~$  juju debug-log
+```python
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Install tinyproxy on the machine."""
+        if not tinyproxy.is_installed():
+            tinyproxy.install()
+            version = tinyproxy.get_version()
+            self.unit.set_workload_version(version)
 ```
 
-In your old VM shell, use Juju to deploy your charm. If all has gone well, you should see your App and Unit -- Workload status show as `active`:
+When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
-```text
-# Deploy the Microsample VM charm as the 'microsample' application:
-ubuntu@charm-dev:~/microsample-vm$ juju deploy ./microsample-vm_ubuntu-22.04-amd64.charm microsample
-Located local charm "microsample-vm", revision 0
-Deploying "microsample" from local charm "microsample-vm", revision 0 on ubuntu@22.04/stable
+As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
 
-# Check the deployment status
-# (use --watch 1s to update it automatically at 1s intervals):
-ubuntu@charm-dev:~/microsample-vm$ juju status
-Model        Controller  Cloud/Region         Version  SLA          Timestamp
-welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  12:49:26+01:00
-
-App          Version  Status  Scale  Charm           Channel  Rev  Exposed  Message
-microsample           active      1  microsample-vm             0  no
-
-Unit            Workload  Agent  Machine  Public address  Ports  Message
-microsample/0*  active    idle   1        10.122.219.101
-
-Machine  State    Address         Inst id        Base          AZ  Message
-1        started  10.122.219.101  juju-f25b73-1  ubuntu@22.04      Running
-
-
+```{important}
+Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
 ```
 
-Finally, use `curl` to test that the service works. Get the address of the running machine from the Juju status
-(10.122.219.101 in this example), then run `curl`:
+### Define a configuration option
 
-```text
-ubuntu@charm-dev:~/microsample-vm$  curl http://10.122.219.101:8080
-Online
-```
+After deploying your charm, you'll use the `juju config` command to change the path of the reverse proxy, so we need to define a configuration option called `slug`. We'll do this in two places:
 
-```{note}
+- In `charmcraft.yaml`, to tell Juju and Ops about the configuration option.
+- In the charm code, to additionally tell Ops how to validate values of the configuration option.
 
-If the Juju status doesn't look right, for example if you see an "error" status instead of "active",
-there might be an issue with the charm code. You can use a debug session (`juju debug-log`) to get
-more detailed information about the issue. After you've identified the issue:
-
-1. Fix the code in `src/charm.py`.
-2. Rebuild the charm: `charmcraft pack`.
-3. Refresh the application from the repacked charm: `juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm --force-units`.
-4. Let the model know that you've fixed the issue: `juju resolved microsample/0`.
-
-```
-
-```{note}
-
-The template content from `charmcraft init` was sufficient for the charm to pack and deploy successfully.  However, our goal here was to make it run successfully, that is, to actually install the `microsample` application on our LXD cloud. With the edits above, this goal has been achieved.
-
-```
-
-
-## Enable `juju deploy microsample-vm --config channel=<channel>`
-
-Let's now evolve our charm so that a user can successfully choose which version of `microsample` they want installed by running `juju config microsample-vm channel=<their preferred channel>`!
-
-In your local editor, in your `charmcraft.yaml` file, define the configuration option as below:
+In `charmcraft.yaml`, replace the `config` block with:
 
 ```yaml
 config:
   options:
-    channel:
-      description: |
-        Channel for the microsample snap.
-      default: "edge"
+    slug:
+      description: "Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"
+      default: example
       type: string
 ```
 
-
-> See more: {external+charmcraft:ref}`Charmcraft | File charmcraft.yaml | Key config <charmcraft-yaml-key-config>`
-
-Then, in the `src/charm.py` file, update the `_on_install` function to make use of the new configuration option, as below:
+Then add the following class to `src/charm.py`:
 
 ```python
-def _on_install(self, event: ops.InstallEvent):
-    """Handle install event."""
-    self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
-    channel = self.config.get('channel')
-    if channel in ('beta', 'edge', 'candidate', 'stable'):
-        os.system(f"snap install microsample --{channel}")
-        self.unit.status = ops.ActiveStatus("Ready")
-    else:
-        self.unit.status = ops.BlockedStatus("Invalid channel configured.")
+class TinyproxyConfig(pydantic.BaseModel):
+    """Schema for the charm's config options."""
+
+    slug: str = pydantic.Field(
+        "example",
+        pattern=r"^[a-z0-9-]+$",
+        description="Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+",
+    )
 ```
 
-Now, in your Multipass VM shell, inside your project directory, pack the charm, refresh it in the Juju model, and inspect the results:
-
-```text
-
-# Pack the charm:
-ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
-Charms packed:
-    microsample-vm_ubuntu-22.04-amd64.charm
-
-# Refresh the application from the repacked charm:
-ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm
-Added local charm "microsample-vm", revision 1, to the model
-
-# Verify that the new configuration option is available:
-ubuntu@charm-dev:~/microsample-vm$ juju config microsample
-application: microsample
-application-config:
-  trust:
-    default: false
-    description: Does this application have access to trusted credentials
-    source: default
-    type: bool
-    value: false
-charm: microsample-vm
-settings:
-  channel:
-    default: edge
-    description: |
-      Channel for the microsample snap.
-    source: default
-    type: string
-    value: edge
-
-```
-
-Back to the `src/charm.py` file, in the `__init__` function of your charm, observe the `config-changed` event and pair it with an event handler:
-
-```text
-self.framework.observe(self.on.config_changed, self._on_config_changed)
-```
-
-
-Next, in the body of the charm definition, define the event handler, as below:
+Also add the following line at the beginning of `src/charm.py`:
 
 ```python
-def _on_config_changed(self, event: ops.ConfigChangedEvent):
-    channel = self.config.get('channel')
-    if channel in ('beta', 'edge', 'candidate', 'stable'):
-        os.system(f"snap refresh microsample --{channel}")
-        self.unit.status = ops.ActiveStatus("Ready at '%s'" % channel)
-    else:
-        self.unit.status = ops.BlockedStatus("Invalid channel configured.")
+import pydantic
 ```
 
-Now, in your Multipass VM shell, inside your project directory, pack the charm, refresh it in the Juju model, and inspect the results:
+The `TinyproxyConfig` class uses [Pydantic](https://docs.pydantic.dev) to specify how to validate values of `slug`. The class doesn't actually load the configured value of `slug`; we'll do that elsewhere in the charm code.
+
+To add Pydantic to your charm's dependencies, run:
 
 ```text
-# Pack the charm:
-ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
-Charms packed:
-    microsample-vm_ubuntu-22.04-amd64.charm
-
-# Refresh the application:
-ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm
-Added local charm "microsample-vm", revision 2, to the model
-
-# Change the 'channel' config to 'beta':
-ubuntu@charm-dev:~/microsample-vm$ juju config microsample channel=beta
-
-# Inspect the Message column
-# ('Ready at beta' is what we expect to see if the snap channel has been changed to 'beta'):
-ubuntu@charm-dev:~/microsample-vm$ juju status
-Model        Controller  Cloud/Region         Version  SLA          Timestamp
-welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  13:54:53+01:00
-
-App          Version  Status  Scale  Charm           Channel  Rev  Exposed  Message
-microsample           active      1  microsample-vm             2  no       Ready at 'beta'
-
-Unit            Workload  Agent  Machine  Public address  Ports  Message
-microsample/0*  active    idle   1        10.122.219.101         Ready at 'beta'
-
-Machine  State    Address         Inst id        Base          AZ  Message
-1        started  10.122.219.101  juju-f25b73-1  ubuntu@22.04      Running
+uv add pydantic
 ```
 
-Congratulations, your charm users can now deploy the application from a specific channel!
+### Start tinyproxy and handle configuration changes
 
-> See more: {ref}`manage-configuration`
+Your charm now needs a way to load the value of the `slug` configuration option, write a configuration file on the machine, then start tinyproxy:
 
+1. To load the value of `slug`, we'll use the `load_config` method that Ops provides. This method also validates the value of `slug` using the `TinyproxyConfig` class that we just defined.
+2. To write a configuration file, we'll use the `ensure_config` function from the helper module.
+3. To start tinyproxy, we'll use the `start` function from the helper module.
 
-## Enable `juju status` with `App Version`
-
-Let's evolve our charm so that a user can see which version of the application has been installed simply by running `juju status`!
-
-In your local editor, update the `requirements.txt` file as below (you'll have to add the `requests` and `requests-unixsocket` lines):
-
-```text
-ops ~= 2.5
-requests==2.28.1
-requests-unixsocket==0.3.0
-```
-
-<!--
-> See more: [Charmcraft | File `requirements.txt` <file-requirementstxt>`](), [PyPI > Library `requests`](https://pypi.org/project/requests/), [PyPI > Library `requests-unixsocket`](https://pypi.org/project/requests-unixsocket/)
--->
-
-Then, in your `src/charm.py` file, import the `requests_unixsocket` package, update the `_on_config_changed` function to set the workload version to the output of a function `_getWorkloadVersion`, and define the function to retrieve the Microsample workload version from the `snapd` API via a Unix socket, as below:
+In `src/charm.py`, add the following methods to the charm class:
 
 ```python
-#!/usr/bin/env python3
-# Copyright 2023 Ubuntu
-# See LICENSE file for licensing details.
+    def configure_and_run(self) -> None:
+        """Ensure that tinyproxy is running with the correct config."""
+        try:
+            config = self.load_config(TinyproxyConfig)
+        except pydantic.ValidationError:
+            # The collect-status handler will run next and will set status for the user to see.
+            return
+        if not tinyproxy.is_installed():
+            return
+        changed = tinyproxy.ensure_config(PORT, config.slug)
+        if not tinyproxy.is_running():
+            tinyproxy.start()
+            self.wait_for_running()
+        elif changed:
+            logger.info("Config changed while tinyproxy is running. Updating tinyproxy config")
+            tinyproxy.reload_config()
 
-"""Charm the application."""
+    def wait_for_running(self) -> None:
+        """Wait for tinyproxy to be running."""
+        for _ in range(3):
+            if tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was not running within the expected time")
+        # Raising a runtime error will put the charm into error status.
+        # The Juju logs will show the error message, to help you debug the error.
+```
 
-import os
-import logging
-import ops
-import requests_unixsocket
+Then add the following lines at the beginning of `src/charm.py`:
 
-logger = logging.getLogger(__name__)
+```python
+import time
 
+PORT = 8000
+```
 
-class MicrosampleVmCharm(ops.CharmBase):
-    """Charm the application."""
+The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+Replace the `_on_start` method of the charm class with:
 
-    def _on_start(self, event: ops.StartEvent):
+```python
+    def _on_start(self, event: ops.StartEvent) -> None:
         """Handle start event."""
-        self.unit.status = ops.ActiveStatus()
-
-    def _on_install(self, event: ops.InstallEvent):
-        """Handle install event."""
-        self.unit.status = ops.MaintenanceStatus("Installing microsample snap")
-        channel = self.config.get('channel')
-        if channel in ('beta', 'edge', 'candidate', 'stable'):
-            os.system(f"snap install microsample --{channel}")
-            self.unit.status = ops.ActiveStatus("Ready")
-        else:
-            self.unit.status = ops.BlockedStatus("Invalid channel configured.")
-
-    def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        channel = self.config.get('channel')
-        if channel in ('beta', 'edge', 'candidate', 'stable'):
-            os.system(f"snap refresh microsample --{channel}")
-            workload_version = self._getWorkloadVersion()
-            self.unit.set_workload_version(workload_version)
-            self.unit.status = ops.ActiveStatus("Ready at '%s'" % channel)
-        else:
-            self.unit.status = ops.BlockedStatus("Invalid channel configured.")
-
-    def _getWorkloadVersion(self):
-        """Get the microsample workload version from the snapd API via unix-socket"""
-        snap_name = "microsample"
-        snapd_url = f"http+unix://%2Frun%2Fsnapd.socket/v2/snaps/{snap_name}"
-        session = requests_unixsocket.Session()
-        # Use the requests library to send a GET request over the Unix domain socket
-        response = session.get(snapd_url)
-        # Check if the request was successful
-        if response.status_code == 200:
-            data = response.json()
-            workload_version = data["result"]["version"]
-        else:
-            workload_version = "unknown"
-            print(f"Failed to retrieve Snap apps. Status code: {response.status_code}")
-
-        # Return the workload version
-        return workload_version
-
-if __name__ == "__main__":  # pragma: nocover
-    ops.main(MicrosampleVmCharm)  # type: ignore
+        self.configure_and_run()
 ```
 
-<!--NOT SURE IF WE NEED TO LINK TO THESE AGAIN
-> See more: [File `src/charm.py` <file-srccharmpy>`, {ref}`Ops <ops-ops>`,  {ref}`Event `config-changed` <event-config-changed>`
--->
+Next, add the following line to the `__init__` method of the charm class:
 
-Finally, in your Multipass VM shell, pack the charm, refresh it in Juju, and check the Juju status -- it should now show the version of your workload.
+```python
+        framework.observe(self.on.config_changed, self._on_config_changed)
+```
+
+Then add the following method to the charm class:
+
+```python
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config-changed event."""
+        self.configure_and_run()
+```
+
+### Report status to Juju
+
+Your charm should report the machine's status to Juju after handling each event. This enables you to use Juju's status output to see whether tinyproxy is running and correctly configured.
+
+One option would be to modify each method in the charm class to report an appropriate status. However, this tends to be awkward in practice, because the logic to decide which status is most appropriate can become complex. Instead, we'll handle a special "collect-unit-status" event that is produced by Ops.
+
+Add the following line to the `__init__` method of the charm class:
+
+```python
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
+```
+
+Then add the following method to the charm class:
+
+```python
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
+        """Report the status of tinyproxy (runs after each event)."""
+        try:
+            self.load_config(TinyproxyConfig)
+        except pydantic.ValidationError as e:
+            (slug_error,) = e.errors()  # 'slug' is the first and only option validated.
+            slug_value = slug_error["input"]
+            message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
+            event.add_status(ops.BlockedStatus(message))
+        if not tinyproxy.is_installed():
+            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
+        if not tinyproxy.is_running():
+            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to start"))
+        event.add_status(ops.ActiveStatus())
+```
+
+Ops runs this method after each Juju event, regardless of whether the charm code handles the event. After running the method, Ops decides which status to report to Juju, choosing the highest priority status that was proposed with `event.add_status`.
+
+For example, if the value of the `slug` configuration option is invalid, `load_config` raises an error and the charm code proposes a "blocked" status. This status means that your charm needs intervention from a human, so Ops gives it the highest priority and reports it to Juju.
+
+### Stop and uninstall tinyproxy
+
+If Juju wants to remove a unit of the application, your charm (on that unit) receives the "stop" event followed by the "remove" event.
+
+To handle these events, add the following lines to the `__init__` method of the charm class:
+
+```python
+        framework.observe(self.on.stop, self._on_stop)
+        framework.observe(self.on.remove, self._on_remove)
+```
+
+Then add the following methods to the charm class:
+
+```python
+    def _on_stop(self, event: ops.StopEvent) -> None:
+        """Handle stop event."""
+        tinyproxy.stop()
+        self.wait_for_not_running()
+
+    def _on_remove(self, event: ops.RemoveEvent) -> None:
+        """Handle remove event."""
+        tinyproxy.uninstall()
+
+    def wait_for_not_running(self) -> None:
+        """Wait for tinyproxy to not be running."""
+        for _ in range(3):
+            if not tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was still running after the expected time")
+```
+
+That's all the charm code! If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
+
+## Try your charm
+
+### Pack your charm
+
+Before you can try your charm, you need to "pack" it. Packing combines the charm code and metadata into a single file that can be deployed to Juju.
+
+In your virtual machine, make sure that the working directory is `~/tinyproxy`. Then run:
 
 ```text
-# Pack the charm:
-ubuntu@charm-dev:~/microsample-vm$ charmcraft pack
-Created 'microsample-vm_ubuntu-22.04-amd64.charm'.
-Charms packed:
-    microsample-vm_ubuntu-22.04-amd64.charm
-
-# Refresh the application:
-ubuntu@charm-dev:~/microsample-vm$ juju refresh microsample --path=./microsample-vm_ubuntu-22.04-amd64.charm
-Added local charm "microsample-vm", revision 3, to the model
-
-# Verify that the App Version now shows the version:
-ubuntu@charm-dev:~/microsample-vm$ juju status
-Model        Controller  Cloud/Region         Version  SLA          Timestamp
-welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  14:04:39+01:00
-
-App          Version        Status  Scale  Charm           Channel  Rev  Exposed  Message
-microsample  0+git.49ff7aa  active      1  microsample-vm             3  no       Ready at 'beta'
-
-Unit            Workload  Agent  Machine  Public address  Ports  Message
-microsample/0*  active    idle   1        10.122.219.101         Ready at 'beta'
-
-Machine  State    Address         Inst id        Base          AZ  Message
-1        started  10.122.219.101  juju-f25b73-1  ubuntu@22.04      Running
+charmcraft pack
 ```
 
-Congratulations, your charm user can view the version of the workload deployed from your charm!
+Charmcraft will take up to 20 minutes to pack your charm, depending on your computer and network. If you modify the charm code after completing the tutorial, packing will be faster the second time because Charmcraft has cached the packing environment.
+
+When Charmcraft has packed your charm, you'll see a message similar to:
+
+```text
+Packed tinyproxy_amd64.charm
+```
+
+The name of the `.charm` file depends on your computer's architecture. For example, if your computer has an ARM-based architecture, the file is called `tinyproxy_arm64.charm`.
+
+### Deploy your charm
+
+As you deploy your charm to Juju, it will be helpful to watch Juju status in real time.
+
+Open another terminal, then run:
+
+```text
+multipass shell juju-sandbox
+```
+
+Next, in the same terminal, run:
+
+```text
+juju status --watch 2s
+```
+
+You should now have two terminals:
+
+- A terminal with working directory `~/tinyproxy`, from earlier.
+
+- A terminal that shows Juju status in real time:
+
+    ```text
+    Model    Controller     Cloud/Region         Version  SLA          Timestamp
+    testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:00:00+08:00
+    ```
+
+You're now ready to deploy your charm.
+
+In the `~/tinyproxy` directory, run `juju deploy ./<charm-file>`, where `<charm-file`> is the name of the file created by `charmcraft pack`. For example:
+
+```text
+juju deploy ./tinyproxy_amd64.charm
+```
+
+Juju creates an "application" from your charm. For each unit in the application, Juju starts a LXD virtual machine and installs your charm on the machine. We didn't tell Juju how many units we want, so Juju assumes one unit and starts one machine. After Juju has installed your charm on the machine, Juju starts sending events to your charm so that your charm can install and start tinyproxy.
+
+When your charm has started tinyproxy, the application will go into "active" status:
+
+```text
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:01:38+08:00
+
+App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
+tinyproxy  1.11.0   active      1  tinyproxy             0  no
+
+Unit          Workload  Agent  Machine  Public address  Ports  Message
+tinyproxy/0*  active    idle   0        10.71.67.208
+
+Machine  State    Address       Inst id        Base          AZ            Message
+0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04  juju-sandbox  Running
+```
+
+```{tip}
+For the rest of the tutorial, we'll assume that you're still watching Juju status. To stop watching, press <kbd>Ctrl</kbd> + <kbd>C</kbd>.
+```
+
+### Try the reverse proxy
+
+Now that tinyproxy is running, we can check that it proxies [example.com](http://example.com) on the machine's network.
+
+In your virtual machine, run:
+
+```text
+curl <address>:8000/example/
+```
+
+Where `<address>` is the IP address of machine 0 from Juju status. In our example of Juju status, the IP address is 10.71.67.208.
+
+The output of curl should be similar to:
+
+```text
+<!doctype html><html lang="en"><head><title>Example Domain</title>...
+```
+
+Then run `curl http://example.com` and check that you get the same output.
+
+### Change the configuration
+
+Let's see what happens to the reverse proxy if we change the `slug` configuration option. Run:
+
+```text
+juju config tinyproxy slug=foo
+```
+
+You might see the message "(config-changed)" briefly appear in Juju status as your charm handles the config-changed event.
+
+Then run:
+
+```text
+curl <address>:8000/foo/
+```
+
+The output should be the same as when you ran `curl <address>:8000/example/`. Now run:
+
+```text
+curl <address>:8000/example/
+```
+
+The output should contain "400 Bad Request". These outputs confirm that your charm successfully reconfigured tinyproxy to use `/foo/` instead of `/example/` for the path of the reverse proxy.
+
+Next, let's try an invalid value of `slug`:
+
+```
+juju config tinyproxy slug=foo/bar
+```
+
+Juju status should now show "blocked" and a message about the invalid value.
+
+To unblock your charm, reset `slug` to `example`:
+
+```
+juju config tinyproxy --reset slug
+```
+
+## Write unit tests
+
+### Write tests for the helper module
+
+When writing a charm, it's good practice to write unit tests for the charm code that interacts with the workload (tinyproxy). Typically, you'd mock external calls, such as file operations. To illustrate the approach, we'll write a test for the `get_version` function in the helper module.
+
+Create a file `tests/unit/test_tinyproxy.py` containing:
+
+```python
+import pytest
+
+from charm import tinyproxy
 
 
+class MockVersionProcess:
+    """Mock object that represents the result of calling 'tinyproxy -v'."""
+
+    def __init__(self, version: str):
+        self.stdout = f"tinyproxy {version}"
+
+
+def test_version(monkeypatch: pytest.MonkeyPatch):
+    """Test that the helper module correctly returns the version of tinyproxy."""
+    version_process = MockVersionProcess("1.0.0")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
+    assert tinyproxy.get_version() == "1.0.0"
+```
+
+We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
+
+```text
+tox -e unit -- tests/unit/test_tinyproxy.py
+```
+
+### Write state-transition tests
+
+We should write unit tests for the charm code that handles events. Each test will be structured as a "state-transition" test, using the testing framework that comes with Ops.
+
+State-transition tests are isolated tests of event handlers. They don't require Juju to be available. Instead, they test how your charm responds to simulated events from Juju.
+
+It's helpful to think of each test this way:
+
+1. Ops mocks the input to a particular event handler, based on details that you provide. You mock the interaction between the event handler and the workload. For tinyproxy, we'll define a mock object that represents the state of tinyproxy and we'll patch the helper module to act on this mock object.
+2. Ops runs the event handler with the mocked input, which simulates your charm receiving the event.
+3. You assert that the event handler acted correctly.
+
+Replace the contents of `tests/unit/test_charm.py` with:
+
+```python
+import pytest
+from ops import testing
+
+from charm import PORT, TinyproxyCharm
+
+
+class MockTinyproxy:
+    """Mock object that represents tinyproxy."""
+
+    def __init__(
+        self,
+        config: None | tuple[int, str] = None,
+        installed: bool = False,
+        reloaded_config: bool = False,
+        running: bool = False,
+    ):
+        self.config = config
+        self.installed = installed
+        self.reloaded_config = reloaded_config
+        self.running = running
+
+    def ensure_config(self, port: int, slug: str) -> bool:
+        old_config = self.config
+        self.config = (port, slug)
+        return self.config != old_config
+
+    def get_version(self) -> str:
+        return "1.0.0"
+
+    def install(self) -> None:
+        self.installed = True
+
+    def is_installed(self) -> bool:
+        return self.installed
+
+    def is_running(self) -> bool:
+        return self.running
+
+    def start(self) -> None:
+        self.running = True
+
+    def stop(self) -> None:
+        self.running = False
+
+    def reload_config(self) -> None:
+        self.reloaded_config = True
+
+    def uninstall(self) -> None:
+        self.installed = False
+
+
+def test_install(monkeypatch: pytest.MonkeyPatch):
+    """Test that the charm correctly handles the install event."""
+    # A state-transition test has three broad steps:
+    # Step 1. Arrange the input state.
+    tinyproxy = MockTinyproxy()
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
+    ctx = testing.Context(TinyproxyCharm)
+    state_in = testing.State()
+    # Step 2. Simulate an event, in this case an install event.
+    state_out = ctx.run(ctx.on.install(), state_in)
+    # Step 3. Check the output state.
+    assert state_out.workload_version is not None
+    assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
+    assert tinyproxy.is_installed()
+
+
+# For convenience, define a reusable fixture that provides a MockTinyproxy object
+# and patches the helper module in the charm.
+@pytest.fixture
+def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
+    tinyproxy = MockTinyproxy(installed=True)
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
+    return tinyproxy
+
+
+def test_start(tinyproxy_installed: MockTinyproxy):
+    """Test that the charm correctly handles the start event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_out = ctx.run(ctx.on.start(), testing.State())
+    assert state_out.unit_status == testing.ActiveStatus()
+    assert tinyproxy_installed.is_running()
+    assert tinyproxy_installed.config == (PORT, "example")
+
+
+# Define another fixture, this time representing an installed, configured, and running tinyproxy.
+@pytest.fixture
+def tinyproxy_configured(monkeypatch: pytest.MonkeyPatch):
+    tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
+    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
+    return tinyproxy
+
+
+def test_config_changed(tinyproxy_configured: MockTinyproxy):
+    """Test that the charm correctly handles the config-changed event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_in = testing.State(config={"slug": "foo"})
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert state_out.unit_status == testing.ActiveStatus()
+    assert tinyproxy_configured.is_running()
+    assert tinyproxy_configured.config == (PORT, "foo")
+    assert tinyproxy_configured.reloaded_config
+
+
+@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
+def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: str):
+    """Test that the charm fails to start if the config is invalid."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_in = testing.State(config={"slug": invalid_slug})
+    state_out = ctx.run(ctx.on.start(), state_in)
+    assert state_out.unit_status == testing.BlockedStatus(
+        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
+    )
+    assert not tinyproxy_installed.is_running()
+    assert tinyproxy_installed.config is None
+
+
+@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
+def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, invalid_slug: str):
+    """Test that the charm fails to change config if the config is invalid."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_in = testing.State(config={"slug": invalid_slug})
+    state_out = ctx.run(ctx.on.config_changed(), state_in)
+    assert state_out.unit_status == testing.BlockedStatus(
+        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
+    )
+    assert tinyproxy_configured.is_running()  # tinyproxy should still be running...
+    assert tinyproxy_configured.config == (PORT, "example")  # ...with the original config.
+    assert not tinyproxy_configured.reloaded_config
+
+
+def test_stop(tinyproxy_configured: MockTinyproxy):
+    """Test that the charm correctly handles the stop event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_out = ctx.run(ctx.on.stop(), testing.State())
+    assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
+    assert not tinyproxy_configured.is_running()
+
+
+def test_remove(tinyproxy_installed: MockTinyproxy):
+    """Test that the charm correctly handles the remove event."""
+    ctx = testing.Context(TinyproxyCharm)
+    state_out = ctx.run(ctx.on.remove(), testing.State())
+    assert state_out.unit_status == testing.MaintenanceStatus(
+        "Waiting for tinyproxy to be installed"
+    )
+    assert not tinyproxy_installed.is_installed()
+```
+
+### Run the tests
+
+Run the following command from anywhere in the `~/tinyproxy` directory:
+
+```text
+tox -e unit
+```
+
+The output should be similar to:
+
+```text
+...
+
+============================================ 12 passed in 0.43s =============================================
+unit: commands[1]> coverage report
+Name               Stmts   Miss Branch BrPart  Cover   Missing
+--------------------------------------------------------------
+src/charm.py          71      5     20      7    87%   71->exit, 101, 106->exit, 115-116, 125-126
+src/tinyproxy.py      47     26      6      0    40%   34-41, 52-56, 63, 68, 73-78, 83, 88-90, 95-98, 103-111
+--------------------------------------------------------------
+TOTAL                118     31     26      7    69%
+  unit: OK (1.21=setup[0.05]+cmd[1.03,0.13] seconds)
+  congratulations :) (1.30 seconds)
+```
+
+## Write integration tests
+
+Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
+
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. We'll expand the tests to cover more of your charm's functionality.
+
+In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
+
+```python
+    juju.wait(jubilant.all_active, timeout=600)
+```
+
+This extends the duration that Jubilant waits for your charm to deploy, in case the integration tests run slowly in your virtual machine. The default duration would be sufficient if the integration tests were running in a continuous integration environment.
+
+Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
+
+```python
+    assert version == "1.11.0"  # The version installed by tinyproxy.install.
+```
+
+You should now have the following tests:
+
+- `test_deploy` - Deploys your charm and checks that it goes into active status.
+- `test_workload_version_is_set` - Checks that your charm reports the correct version of tinyproxy to Juju.
+
+Before running the tests, let's add a test to check that an invalid value of `slug` blocks the charm.
+
+Add the following function at the end of `tests/integration/test_charm.py`:
+
+```python
+def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
+    """Check that the charm goes into blocked status if slug is invalid."""
+    juju.config("tinyproxy", {"slug": "foo/bar"})
+    juju.wait(jubilant.all_blocked)
+    juju.config("tinyproxy", reset="slug")
+```
+
+Each test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+
+- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available.
+- `juju` - A Jubilant object for interacting with a temporary Juju model.
+
+The `juju` fixture is module-scoped. In other words, each test in `test_charm.py` affects the state of the same Juju model. This means that the order of the tests is significant. This also explains why we reset `slug` at the end of `test_block_on_invalid_config` - to ensure that any subsequent test could assume an unblocked charm.
+
+If you wanted isolated tests, you could change `juju` to be function-scoped (pytest's default scope) and deploy the `.charm` file at the beginning of each test. However, this would slow down the tests.
+
+Now run the tests:
+
+```text
+tox -e integration
+```
+
+It will take a few minutes to run the tests. The output should be similar to:
+
+```text
+...
+
+======================= 3 passed in 277.23s (0:04:37) =======================
+  integration: OK (277.76=setup[0.06]+cmd[277.70] seconds)
+  congratulations :) (277.89 seconds)
+```
+
+```{tip}
+`tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
+```
 
 ## Tear things down
 
-See {external+juju:ref}`Juju | Manage your deployment environment > Tear things down <tear-things-down>`.
+Congratulations on reaching the end of the tutorial!
 
+You can keep things running, to explore further, or you can remove what you created:
 
+- To remove your charm from Juju, run `juju remove-application tinyproxy`. You don't need to do this if you plan to remove your virtual machine.
+- If you're still watching Juju status, press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop watching.
+- To exit your virtual machine, run `exit`. The terminal switches back to your host machine.
+- To stop your virtual machine, run `multipass stop juju-sandbox`.
+- To remove your virtual machine, run `multipass delete juju-sandbox`.
+- To uninstall Multipass, see {external+multipass:ref}`how-to-guides-install-multipass` > Uninstall.
 
-(tutorial-machines-next-steps)=
 ## Next steps
 
-By the end of this tutorial you will have built a machine charm and evolved it in a number of typical ways. But there is a lot more to explore:
+If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
 
-| If you are wondering... | visit...             |
-|-------------------------|----------------------|
-| "How do I...?"          | {ref}`how-to-guides` |
-| "What is...?"           | {ref}`reference`     |
-| "Why...?", "So what?"   | {ref}`explanation`   |
+For more information about topics covered in the tutorial, see:
 
+- [](#write-and-structure-charm-code)
+- [](#manage-configuration)
+- [](#testing)
 
+You might also want to inspect a real machine charm: [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator)

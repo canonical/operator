@@ -17,14 +17,18 @@ jobs:
       contents: read
     environment: publish-pypi
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc  # v6.4.3
+      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
         with:
           enable-cache: false
       - run: uv build --all
-      - uses: actions/attest-build-provenance@v2
+      - name: Test if built package versions and dependency versions match
+        run: |
+          set -xueo pipefail
+          uvx --with "$(echo -n dist/ops-*.whl)[testing,tracing]" --with dist/ops_scenario-*.whl --with dist/ops_tracing-*.whl python -c 'import ops, scenario, ops_tracing; print("OK")'
+      - uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'dist/*'
       - uses: pypa/gh-action-pypi-publish@release/v1

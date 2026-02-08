@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Test Context
+"""Test Context.
 
 The test `Context` object provides the context of the wider Juju system that the
 specific `State` exists in, and the events that can be executed on that `State`.
@@ -12,18 +12,16 @@ from __future__ import annotations
 import functools
 import pathlib
 import tempfile
+from collections.abc import Callable, Mapping
 from contextlib import contextmanager
-from typing import (
-    Generic,
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Mapping,
-)
+from typing import TYPE_CHECKING, Any, Generic
+
+from typing_extensions import deprecated
 
 import ops
 from ops._private.harness import ActionFailed
 
+from ._runtime import Runtime
 from .errors import (
     AlreadyEmittedError,
     ContextSetupError,
@@ -41,10 +39,12 @@ from .state import (
     _CharmSpec,
     _Event,
 )
-from ._runtime import Runtime
 
 if TYPE_CHECKING:  # pragma: no cover
+    from opentelemetry.sdk.trace import ReadableSpan
+
     from ops._private.harness import ExecArgs
+
     from ._ops_main_mock import Ops
     from .state import (
         AnyJson,
@@ -53,7 +53,6 @@ if TYPE_CHECKING:  # pragma: no cover
         State,
         _EntityStatus,
     )
-    from opentelemetry.sdk.trace import ReadableSpan
 
 logger = scenario_logger.getChild('runtime')
 
@@ -100,7 +99,7 @@ class Manager(Generic[CharmType]):
 
     @property
     def _runner(self):
-        return self._ctx._run  # noqa
+        return self._ctx._run
 
     def __enter__(self):
         self._wrapped_ctx = wrapped_ctx = self._runner(self._arg, self._state_in)
@@ -134,9 +133,8 @@ class Manager(Generic[CharmType]):
                 'Doing so implicitly upon exit...',
             )
             self.run()
-        # guaranteed to be set: run was either called before, or right above
-        assert self.ops
-        self.ops.destroy()
+        if exc_type is not None:
+            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -170,57 +168,57 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.InstallEvent)
-    def install():
+    def install():  # noqa: D102
         return _Event('install')
 
     @staticmethod
     @_copy_doc(ops.StartEvent)
-    def start():
+    def start():  # noqa: D102
         return _Event('start')
 
     @staticmethod
     @_copy_doc(ops.StopEvent)
-    def stop():
+    def stop():  # noqa: D102
         return _Event('stop')
 
     @staticmethod
     @_copy_doc(ops.RemoveEvent)
-    def remove():
+    def remove():  # noqa: D102
         return _Event('remove')
 
     @staticmethod
     @_copy_doc(ops.UpdateStatusEvent)
-    def update_status():
+    def update_status():  # noqa: D102
         return _Event('update_status')
 
     @staticmethod
     @_copy_doc(ops.ConfigChangedEvent)
-    def config_changed():
+    def config_changed():  # noqa: D102
         return _Event('config_changed')
 
     @staticmethod
     @_copy_doc(ops.UpgradeCharmEvent)
-    def upgrade_charm():
+    def upgrade_charm():  # noqa: D102
         return _Event('upgrade_charm')
 
     @staticmethod
     @_copy_doc(ops.PreSeriesUpgradeEvent)
-    def pre_series_upgrade():
+    def pre_series_upgrade():  # noqa: D102
         return _Event('pre_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.PostSeriesUpgradeEvent)
-    def post_series_upgrade():
+    def post_series_upgrade():  # noqa: D102
         return _Event('post_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.LeaderElectedEvent)
-    def leader_elected():
+    def leader_elected():  # noqa: D102
         return _Event('leader_elected')
 
     @staticmethod
     @_copy_doc(ops.SecretChangedEvent)
-    def secret_changed(secret: Secret):
+    def secret_changed(secret: Secret):  # noqa: D102
         if secret.owner:
             raise ValueError(
                 'This unit will never receive secret-changed for a secret it owns.',
@@ -229,7 +227,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretExpiredEvent)
-    def secret_expired(secret: Secret, *, revision: int):
+    def secret_expired(secret: Secret, *, revision: int):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-expire for a secret it does not own.',
@@ -238,7 +236,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRotateEvent)
-    def secret_rotate(secret: Secret):
+    def secret_rotate(secret: Secret):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-rotate for a secret it does not own.',
@@ -247,7 +245,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRemoveEvent)
-    def secret_remove(secret: Secret, *, revision: int):
+    def secret_remove(secret: Secret, *, revision: int):  # noqa: D102
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-removed for a secret it does not own.',
@@ -256,22 +254,22 @@ class CharmEvents:
 
     @staticmethod
     def collect_app_status():
-        """Event triggered at the end of every hook to collect app statuses for evaluation"""
+        """Event triggered at the end of every hook to collect app statuses for evaluation."""
         return _Event('collect_app_status')
 
     @staticmethod
     def collect_unit_status():
-        """Event triggered at the end of every hook to collect unit statuses for evaluation"""
+        """Event triggered at the end of every hook to collect unit statuses for evaluation."""
         return _Event('collect_unit_status')
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
-    def relation_created(relation: RelationBase):
+    def relation_created(relation: RelationBase):  # noqa: D102
         return _Event(f'{relation.endpoint}_relation_created', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
-    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):
+    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):  # noqa: D102
         return _Event(
             f'{relation.endpoint}_relation_joined',
             relation=relation,
@@ -280,7 +278,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationChangedEvent)
-    def relation_changed(
+    def relation_changed(  # noqa: D102
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -293,7 +291,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationDepartedEvent)
-    def relation_departed(
+    def relation_departed(  # noqa: D102
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -308,27 +306,27 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
-    def relation_broken(relation: RelationBase):
+    def relation_broken(relation: RelationBase):  # noqa: D102
         return _Event(f'{relation.endpoint}_relation_broken', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.StorageAttachedEvent)
-    def storage_attached(storage: Storage):
+    def storage_attached(storage: Storage):  # noqa: D102
         return _Event(f'{storage.name}_storage_attached', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.StorageDetachingEvent)
-    def storage_detaching(storage: Storage):
+    def storage_detaching(storage: Storage):  # noqa: D102
         return _Event(f'{storage.name}_storage_detaching', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.PebbleReadyEvent)
-    def pebble_ready(container: Container):
+    def pebble_ready(container: Container):  # noqa: D102
         return _Event(f'{container.name}_pebble_ready', container=container)
 
     @staticmethod
     @_copy_doc(ops.PebbleCustomNoticeEvent)
-    def pebble_custom_notice(container: Container, notice: Notice):
+    def pebble_custom_notice(container: Container, notice: Notice):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_custom_notice',
             container=container,
@@ -337,7 +335,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckFailedEvent)
-    def pebble_check_failed(container: Container, info: CheckInfo):
+    def pebble_check_failed(container: Container, info: CheckInfo):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_check_failed',
             container=container,
@@ -346,7 +344,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckRecoveredEvent)
-    def pebble_check_recovered(container: Container, info: CheckInfo):
+    def pebble_check_recovered(container: Container, info: CheckInfo):  # noqa: D102
         return _Event(
             f'{container.name}_pebble_check_recovered',
             container=container,
@@ -355,7 +353,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.ActionEvent)
-    def action(
+    def action(  # noqa: D102
         name: str,
         params: Mapping[str, AnyJson] | None = None,
         id: str | None = None,
@@ -414,14 +412,15 @@ class CharmEvents:
 
 
 class Context(Generic[CharmType]):
-    """Represents a simulated charm's execution context.
+    """Testing context in which events are emitted.
 
-    The main entry point to running a test. It contains:
+    The ``Context`` represents a charm's execution context, simulated for the
+    test execution. It is the main entry point to running a test, and contains:
 
     - the charm source code being executed
     - the metadata files associated with it
     - a charm project repository root
-    - the Juju version to be simulated
+    - metadata about the Juju environment being simulated (version, unit name, and so on)
 
     After you have instantiated ``Context``, typically you will call :meth:`run()` to execute the
     charm once, write any assertions you like on the output state returned by the call, write any
@@ -430,8 +429,8 @@ class Context(Generic[CharmType]):
     Each ``Context`` instance is in principle designed to be single-use:
     ``Context`` is not cleaned up automatically between charm runs.
 
-    Any side effects generated by executing the charm, that are not rightful part of the
-    ``State``, are in fact stored in the ``Context``:
+    Any side effects generated by executing the charm, that are not part of the mocked Juju
+    ``State``, are also stored in the ``Context``:
 
     - :attr:`juju_log`
     - :attr:`app_status_history`
@@ -467,10 +466,10 @@ class Context(Generic[CharmType]):
 
         def test_foo():
             ctx = Context(MyCharm)
-            with ctx(ctx.on.start(), State()) as manager:
-                manager.charm._some_private_setup()
-                manager.run()
-                assert manager.charm._some_private_attribute == "bar"
+            with ctx(ctx.on.start(), State()) as mgr:
+                mgr.charm._some_private_setup()
+                mgr.run()
+                assert mgr.charm._some_private_attribute == "bar"
 
     Note that you can't call ``run()`` multiple times. The context 'pauses' ops
     right before emitting the event, but otherwise this is a regular test; you
@@ -483,8 +482,18 @@ class Context(Generic[CharmType]):
     unit_id: int
     """The unit ID that this charm is deployed to."""
 
+    juju_version: str
+    """The Juju model version being simulated."""
+
     juju_log: list[JujuLogLine]
     """A record of what the charm has sent to juju-log"""
+
+    app_trusted: bool
+    """Whether the charm has Juju trust.
+
+    Juju trust means deployed with ``--trust`` or added with ``juju trust``.
+    """
+
     app_status_history: list[_EntityStatus]
     """A record of the app statuses the charm has set.
 
@@ -501,6 +510,7 @@ class Context(Generic[CharmType]):
 
     Note that the *current* status is **not** in the app status history.
     """
+
     unit_status_history: list[_EntityStatus]
     """A record of the unit statuses the charm has set.
 
@@ -521,6 +531,10 @@ class Context(Generic[CharmType]):
     Also note that, unless you initialise the State with a preexisting status,
     the first status in the history will always be ``unknown``.
     """
+
+    exec_history: dict[str, list[ExecArgs]]
+    """A record of the exec calls made by the charm."""
+
     workload_version_history: list[str]
     """A record of the workload versions the charm has set.
 
@@ -533,8 +547,10 @@ class Context(Generic[CharmType]):
 
     Note that the *current* version is **not** in the version history.
     """
+
     removed_secret_revisions: list[int]
     """A record of the secret revisions the charm has removed"""
+
     emitted_events: list[ops.EventBase]
     """A record of the events (including custom) that the charm has processed.
 
@@ -564,31 +580,36 @@ class Context(Generic[CharmType]):
                 'commit',
             ]
     """
+
     requested_storages: dict[str, int]
     """A record of the storages the charm has requested"""
+
     trace_data: list[ReadableSpan]
     """Trace data generated during the last run.
 
-    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not rely on the
-    order of this list. Rather, tests could validate parent/child relationships or containment by
-    start and end timestamps.
+    Each entry is a :py:class:`opentelemetry.sdk.trace.ReadableSpan`. Tests should not
+    rely on the order of this list. Rather, tests could validate parent/child relationships
+    or containment by start and end timestamps.
     """
 
     action_logs: list[str]
-    """The logs associated with the action output, set by the charm with :meth:`ops.ActionEvent.log`
+    """The logs associated with the action output.
 
-    This will be empty when handling a non-action event.
+    These are set by the charm with :meth:`ops.ActionEvent.log` and will be empty
+    when handling a non-action event.
     """
+
     action_results: dict[str, Any] | None
     """A key-value mapping assigned by the charm as a result of the action.
 
     This will be ``None`` if the charm never calls :meth:`ops.ActionEvent.set_results`
     """
+
     charm_root: str | pathlib.Path | None
     """The charm root directory to use when executing the charm.
 
-    Before running the event, the charm's ``/src``, any libs, and the metadata, config, and action
-    YAML is copied to the charm root. If ``charm_root`` is None, then a temporary directory is
+    Before running the event, the charm's metadata, config, and action YAML files are
+    copied to the charm root. If ``charm_root`` is None, then a temporary directory is
     created and used. To set up the charm root directory with other files, pass in the location of
     the directory to use. If a ``charm_root`` is provided, the tests are also able to inspect the
     content of the directory after the event has run, unlike the temporary directory, which is
@@ -614,7 +635,9 @@ class Context(Generic[CharmType]):
         capture_framework_events: bool = False,
         app_name: str | None = None,
         unit_id: int | None = 0,
-        machine_id: int | None = None,
+        machine_id: str | None = None,
+        availability_zone: str | None = None,
+        principal_unit: str | None = None,
         app_trusted: bool = False,
     ):
         """Represents a simulated charm's execution context.
@@ -644,11 +667,16 @@ class Context(Generic[CharmType]):
         :arg machine_id: Juju Machine ID that this charm is deployed onto,
             surfaced to the charm as the JUJU_MACHINE_ID envvar.
             Only applicable to machine charms. Unset by default.
+        :arg availability_zone: Juju availability zone that this charm is deployed to,
+            surfaced to the charm as the JUJU_AVAILABILITY_ZONE envvar.
+            Unset by default.
+        :arg principal_unit: Juju principal unit name for subordinate charms,
+            surfaced to the charm as the JUJU_PRINCIPAL_UNIT envvar.
+            Only applicable to subordinate charms. Unset by default.
         :arg app_trusted: whether the charm has Juju trust (deployed with ``--trust`` or added with
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
-
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
@@ -669,7 +697,7 @@ class Context(Generic[CharmType]):
                 config=config,
             )
 
-        self.charm_spec = spec
+        self._charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
         if juju_version.split('.')[0] == '2':
@@ -677,9 +705,11 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self.charm_spec.meta.get('name')
+        self.app_name = app_name or self._charm_spec.meta.get('name')
         self.unit_id = unit_id
         self._machine_id = machine_id
+        self._availability_zone = availability_zone
+        self._principal_unit = principal_unit
         self.app_trusted = app_trusted
         self._tmp = tempfile.TemporaryDirectory()
 
@@ -707,6 +737,19 @@ class Context(Generic[CharmType]):
         self._action_failure_message: str | None = None
 
         self.on = CharmEvents()
+
+    @property
+    @deprecated('Use State.from_context to generate a State from charm metadata.', stacklevel=2)
+    def charm_spec(self):
+        """Deprecated property for accessing the Context's charm specification.
+
+        The ``_CharmSpec`` class is private and intended for internal use only.
+        ``Context.charm_spec`` will be removed in a future major version.
+
+        Consider accessing the charm class or metadata directly, or using
+        :meth:`State.from_context` to generate a ``State`` from your charm's metadata.
+        """
+        return self._charm_spec
 
     def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
@@ -765,8 +808,8 @@ class Context(Generic[CharmType]):
 
         :arg event: the event that the charm will respond to. Use the :attr:`on` attribute to
             specify the event; for example: ``ctx.on.start()``.
-        :arg state: the :class:`State` instance to use as data source for the hook tool calls that
-            the charm will invoke when handling the event.
+        :arg state: the :class:`State` instance to use as data source for the hook command
+            calls that the charm will invoke when handling the event.
         """
         # Help people transition from Scenario 6:
         if isinstance(event, str):
@@ -814,6 +857,25 @@ class Context(Generic[CharmType]):
                 'You should call the event method. Did you forget to add parentheses?',
             )
 
+        with self._run(event=event, state=state) as ops:
+            ops.run()
+        # We know that the output state will have been set by this point,
+        # so let the type checkers know that too.
+        assert self._output_state is not None
+        return self._output_state
+
+    @contextmanager
+    def _run(self, event: _Event, state: State):
+        runtime = Runtime(
+            app_name=self.app_name,
+            charm_spec=self._charm_spec,
+            juju_version=self.juju_version,
+            charm_root=self.charm_root,
+            unit_id=self.unit_id,
+            machine_id=self._machine_id,
+            availability_zone=self._availability_zone,
+            principal_unit=self._principal_unit,
+        )
         if event.action:
             # Reset the logs, failure status, and results, in case the context
             # is reused.
@@ -821,32 +883,16 @@ class Context(Generic[CharmType]):
             if self.action_results is not None:
                 self.action_results.clear()
             self._action_failure_message = None
-        with self._run(event=event, state=state) as ops:
-            ops.run()
-        # We know that the output state will have been set by this point,
-        # so let the type checkers know that too.
-        assert self._output_state is not None
-        if event.action:
-            if self._action_failure_message is not None:
-                raise ActionFailed(
-                    self._action_failure_message,
-                    state=self._output_state,  # type: ignore
-                )
-        return self._output_state
 
-    @contextmanager
-    def _run(self, event: _Event, state: State):
-        runtime = Runtime(
-            app_name=self.app_name,
-            charm_spec=self.charm_spec,
-            juju_version=self.juju_version,
-            charm_root=self.charm_root,
-            unit_id=self.unit_id,
-            machine_id=self._machine_id,
-        )
         with runtime.exec(
             state=state,
             event=event,
-            context=self,  # type: ignore
+            context=self,
         ) as ops:
             yield ops
+
+        if event.action and self._action_failure_message is not None:
+            raise ActionFailed(
+                self._action_failure_message,
+                state=self._output_state,  # type: ignore
+            )

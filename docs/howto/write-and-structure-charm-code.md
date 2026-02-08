@@ -21,17 +21,14 @@ In your new repository, run `charmcraft init` to generate the recommended
 structure for building a charm.
 
 ```{note}
-In most cases, you'll want to use `--profile=machine` or `profile=kubernetes`.
+In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
 If you are charming an application built with a popular framework, check if
 charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-
-Avoid the default (`--profile=simple`), which provides a demo charm, rather than
-a base for building a charm of your own.
 ```
 
 If your repository will hold multiple charms, or a charm and source for other
 artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft --init` in each charm
+for each charm inside of that one, and run `charmcraft init` in each charm
 folder. You'll end up with a structure similar to:
 
 ```
@@ -41,12 +38,13 @@ my-charm-set-operators/
 │   │   ├── charmcraft.yaml
 │   │   ├── pyproject.toml
 │   │   ├── README.md
-│   │   ├── requirements.txt
 │   │   ├── src
-│   │   │   └── charm.py
+│   │   │   ├── charm.py
+│   │   │   └── core.py
 │   │   ├── tests
 |   |   |   └── ...
-│   │   └── tox.ini
+│   │   ├── tox.ini
+│   │   └── uv.lock
 │   ├── my-charm-dashboard
 |   |   └── ...
 │   └── my-charm-helper
@@ -66,7 +64,7 @@ my-charm-set-operators/
 Charms run using the Python version provided by the base Ubuntu version. Write
 charm code that will run with the Python version of the oldest base you support.
 
-> See also: {external+juju:ref}`Juju | Roadmap and releases <juju-roadmap-and-releases>`
+> See also: {external+juju:ref}`Juju | Roadmap and releases <releasenotes>`
 
 ```{admonition} Best practice
 :class: hint
@@ -76,31 +74,38 @@ version in your `pyproject.toml` so that tooling will detect any use of Python
 features not available in the versions you support.
 ```
 
-### Add Python dependencies to pyproject.toml and generate a lock file
+### Add Python dependencies to pyproject.toml and update the lock file
 
 Specify all the direct dependencies of your charm in your `pyproject.toml`
 file in the top-level charm folder. For example:
 
 ```toml
-# Required group: these are all dependencies required to run the charm.
+# All dependencies required to run the charm
 dependencies = [
-    "ops~=2.19",
+    "ops>=3,<4",
 ]
 
-# Required group: these are all dependencies required to run all the charm's tests.
 [dependency-groups]
-test = [
+# Dependencies of linting and static type checks
+lint = [
+    "ruff",
+    "codespell",
+    "pyright",
+]
+# Dependencies of unit tests
+unit = [
+    "coverage[toml]",
     "ops[testing]",
     "pytest",
-    "coverage[toml]",
-    "jubilant",
 ]
-# Optional additional groups:
+# Dependencies of integration tests
+integration = [
+    "jubilant",
+    "pytest",
+]
+# Additional groups
 docs = [
-    "canonical-sphinx-extensions",
-    "furo",
-    "sphinx ~= 8.0.0",
-    "sphinxext-opengraph",
+    "Sphinx",
 ]
 ```
 
@@ -108,27 +113,12 @@ docs = [
 Including an external dependency is a significant choice. It can help with
 reducing the complexity and development cost. However, it also increases the
 complexity of understanding the entire system, and adds a maintenance burden of
-keeping track of upstream versions, particularly around security issues.
-
-> See more: [Our Software Dependency Problem](https://research.swtch.com/deps)
+keeping track of upstream versions, particularly around security issues. See [Our Software Dependency Problem](https://research.swtch.com/deps).
 ```
 
-Use the `pyproject.toml` dependencies to specify *all* dependencies (including
-indirect or transitive dependencies) in a lock file.
+If you initialised your charm using the `machine` or `kubernetes` profile of `charmcraft init`, your charm uses Charmcraft's {external+charmcraft:ref}`uv plugin <craft_parts_uv_plugin>` and has a lock file called `uv.lock`. After specifying dependencies in `pyproject.toml`, run `uv lock` to update `uv.lock`.
 
-````{admonition} Best practice
-:class: hint
-
-When using the `charm` plugin with charmcraft, ensure that you set strict
-dependencies to true. For example:
-
-```yaml
-parts:
-  my-charm:
-    plugin: charm
-    charm-strict-dependencies: true
-```
-````
+We recommend that you use `uv add` and `uv remove` instead of editing dependencies in `pyproject.toml`. These commands automatically update `pyproject.toml` and `uv.lock`. For more information, see [Managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) in the uv documentation.
 
 ```{admonition} Best practice
 :class: hint
@@ -137,21 +127,17 @@ Ensure that tooling is configured to automatically detect new versions,
 particularly security releases, for all your dependencies.
 ```
 
-The default lock file is a plain `requirements.txt` file (you can use a tool
-such as [pip-compile](https://pip-tools.readthedocs.io/en/latest/) to produce
-it from `pyproject.toml`).
-
-```{tip}
-Charmcraft provides plugins for {external+charmcraft:ref}`uv <craft_parts_uv_plugin>`
-and {external+charmcraft:ref}`poetry <craft_parts_poetry_plugin>`. Use one of
-these tools to simplify the generation of your lock file.
-```
-
 ```{admonition} Best practice
 :class: hint
 
 Ensure that the `pyproject.toml` *and* the lock file are committed to version
 control, so that exact versions of charms can be reproduced.
+```
+
+```{admonition} Best practice
+:class: hint
+
+Avoid using Charmcraft's `charm` plugin if possible. Instead, {external+charmcraft:ref}`migrate to the uv plugin <howto-migrate-to-uv>` or the {external+charmcraft:ref}`poetry plugin <howto-migrate-to-poetry>`.
 ```
 
 (design-your-python-modules)=
@@ -374,6 +360,14 @@ By default, Juju will retry hooks that fail, but users can disable this
 behaviour, so charms should not rely on it.
 ```
 
+(follow-best-practices)=
+## Follow best practices
+
+Notes on best practices for charm development and maintenance can be found across the charming ecosystem documentation. While we usually encourage you to read them in their original context, we collect them here as well, for your convenience.
+
+```{include} ../reuse/best-practices.txt
+```
+
 (validate-your-charm-with-every-change)=
 ## Validate your charm with every change
 
@@ -403,11 +397,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run linters
         run: tox -e lint
 ```
@@ -420,17 +414,17 @@ Other `tox` environments can be run similarly; for example unit tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```
 
 Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
-a cloud in which to deploy it, is required. This example uses a `concierge` in order to set up
+a cloud in which to deploy it, is required. This example uses [Concierge](https://github.com/canonical/concierge) to set up
 `k8s` and Juju:
 
 ```
@@ -446,11 +440,11 @@ a cloud in which to deploy it, is required. This example uses a `concierge` in o
       - name: Install Juju and tools
         run: sudo concierge prepare -p k8s
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-      - name: Install dependencies
-        run: pip install tox
+        uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@7
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
         run: tox -e integration -- --model testing

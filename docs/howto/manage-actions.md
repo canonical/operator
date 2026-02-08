@@ -39,6 +39,8 @@ actions:
     additionalProperties: false
 ```
 
+You should **always** include the `additionalProperties` field, which controls whether users can provide properties that are not in the definition. The default value of the field changed from `true` in Juju 3 to `false` in Juju 4. If you don't explicitly include the field, the charm behaviour will differ depending on which Juju version the charm is deployed to.
+
 In the `src/charm.py` file of the charm, add a class that mirrors the
 configuration from `charmcraft.yaml`. This lets your static type checker and
 IDE know what Python type the parameters should be, and provides a place to do
@@ -144,9 +146,9 @@ success checks in every test where the action is successful.
 def test_backup_action_failed():
     ctx = testing.Context(MyCharm)
 
-    with pytest.raises(ops.ActionFailed) as exc_info:
+    with pytest.raises(testing.ActionFailed) as exc_info:
         ctx.run(ctx.on.action('do_backup'), State())
-    assert exc_info.value.message == 'sorry, couldn't do the backup'
+    assert exc_info.value.message == "sorry, couldn't do the backup"
     # The state is also available if that's required:
     assert exc_info.value.state.get_container(...)
 
@@ -161,14 +163,11 @@ def test_backup_action_failed():
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that an action works correctly against a real Juju instance, write an integration test with `pytest_operator`. For example:
+To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
-async def test_logger(ops_test):
-    app = ops_test.model.applications[APP_NAME]
-    unit = app.units[0]  # Run the action against the first unit.
-    action = await unit.run_action('snapshot', filename='db-snapshot.tar.gz')
-    action = await action.wait()
-    assert action.status == 'completed'
-    assert action.results['snapshot-size'].isdigit()
+def test_logger(juju: jubilant.Juju):
+    action = juju.run("your-app/0", "snapshot", {"filename": "db-snapshot.tar.gz"})
+    assert action.status == "completed"
+    assert action.results["snapshot-size"].isdigit()
 ```

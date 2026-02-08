@@ -19,7 +19,7 @@ This guide will refer to a local LXD cloud and a machine charm, but you can easi
 ## Analyse the charm
 
 
-We start by looking at the charm we intend to translate; as an example, we will take [microsample](https://github.com/erik78se/charm-microsample), an educational charm, because it is simple and includes a number of hooks, while implementing little-to-no business logic (the charm does very little).
+We start by looking at the charm we intend to translate; as an example, we will take [`microsample`](https://github.com/erik78se/charm-microsample), an educational charm, because it is simple and includes a number of hooks, while implementing little-to-no business logic (the charm does very little).
 
 From the charm root directory we see:
 
@@ -254,7 +254,7 @@ Similarly all that string parsing we were doing to get a hold of the snap versio
         return microsample_snap.channel
 ```
 
-Also, we can interact with the microsample service via the `operator_libs_linux.v0` charm library, which wraps `systemd` and allows us to write simply:
+Also, we can interact with the `microsample` service via the `operator_libs_linux.v0` charm library, which wraps `systemd` and allows us to write simply:
 
 ```python
     def _on_start(self, _event):  # noqa

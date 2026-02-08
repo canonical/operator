@@ -13,18 +13,18 @@
 # limitations under the License.
 
 import logging
-from pathlib import Path
+import pathlib
 
 import jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
-def test_deploy(charm: Path, juju: jubilant.Juju):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -32,11 +32,11 @@ def test_deploy(charm: Path, juju: jubilant.Juju):
     resources = {"httpbin-image": METADATA["resources"]["httpbin-image"]["upstream-source"]}
 
     # Deploy the charm and wait for active/idle status
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
 
 
-def test_block_on_invalid_config(charm: Path, juju: jubilant.Juju):
+def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
     """Check that the charm goes into blocked status if log-level is invalid."""
     # The value of log-level should be one of info, debug, and so on.
     juju.config(APP_NAME, {"log-level": "foo"})

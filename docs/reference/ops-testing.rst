@@ -6,10 +6,22 @@
 Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
 
-State-transition tests, previously known as 'Scenario', expect you to define the
+To learn how to test a particular feature, such as relations, see the relevant how-to guide.
+For example, How to manage relations > :ref:`manage-relations-test-the-feature`.
+
+See also:
+
+- :doc:`/howto/write-unit-tests-for-a-charm`
+- :doc:`/explanation/testing` - A summary of types of charm tests
+
+State-transition tests expect you to define the
 Juju state all at once, define the Juju context against which to test the charm,
 and fire a single event on the charm to execute its logic. The tests can then
 assert that the Juju state has changed as expected.
+
+Unlike integration tests, state-transition tests do not deploy your charm with a real Juju
+controller and model. Instead, your charm code is run using the 'Scenario' testing framework.
+These are the primary form of unit tests that you should write for a charm.
 
 A very simple test, where the charm has no config, no relations, the unit
 is the leader, and has a `start` handler that sets the status to active might
@@ -30,18 +42,16 @@ how the state changes in reaction to events. They are not
 necessarily tests of individual methods or functions;
 they are testing the 'contract' of the charm: given
 a certain state, when a certain event happens, the charm should transition to
-another state. Unlike integration tests, they do not test using a real Juju
-controller and model, and focus on a single Juju unit.
-For simplicity, we refer to them as 'unit' tests.
+another state.
 
 Writing these tests should nudge you into thinking of a charm as a black-box
 'input to output' function. The inputs are:
 
-- Event: why am I, the charm, being executed
-- State: am I the leader? what is my relation data? what is my config?
-- Context: what relations can I have? what containers can I have?
+- Event (:class:`CharmEvents <ops.testing.CharmEvents>`): why am I, the charm, being executed?
+- :class:`State <ops.testing.State>`: am I the leader? what is my relation data? what is my config?
+- :class:`Context <ops.testing.Context>`: what relations can I have? what containers can I have?
 
-The output is another `State`: the state after
+The output is another ``State``: the state after
 the charm has interacted with the mocked Juju model.
 The output state is the same type of data structure as the input state.
 
@@ -53,20 +63,20 @@ Writing unit tests for a charm, then, means verifying that:
 - the output state (as compared with the input state) is as expected
 - the charm does not raise uncaught exceptions while handling the event
 
+When the testing framework runs the event, the input state isn't modified. Instead, the output state is a new :class:`State <ops.testing.State>` object. ``State`` objects are generally immutable - but be careful when working with ``dict`` attributes, as they don't enforce immutability.
+
 A test consists of three broad steps:
 
 - **Arrange**:
     - declare the context
     - declare the input state
 - **Act**:
-    - run an event (ie. obtain the output state, given the input state and the event)
+    - run an event (obtain the output state, given the input state and the event)
 - **Assert**:
     - verify that the output state is what you expect it to be
     - verify that the charm has seen a certain sequence of statuses, events, and `juju-log` calls
 
-.. note::
-    Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see :doc:`/explanation/testing`.
+This API for testing was previously called 'Scenario'.
 
 
 ..

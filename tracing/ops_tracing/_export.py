@@ -56,7 +56,7 @@ class BufferingSpanExporter(SpanExporter):
 
     cache: dict[str | None, ssl.SSLContext]
 
-    def __init__(self, buffer_path: pathlib.Path | str):
+    def __init__(self, buffer_path: pathlib.Path):
         self.buffer = Buffer(buffer_path)
         self.lock = threading.Lock()
         self.cache = {}

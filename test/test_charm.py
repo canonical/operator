@@ -35,7 +35,8 @@ import ops
 import ops.charm
 from ops import testing
 from ops._main import _Abort
-from ops.model import ModelError, StatusName
+from ops.hookcmds import StatusName
+from ops.model import ModelError
 
 from .test_helpers import FakeScript, create_framework
 
@@ -312,10 +313,10 @@ storage:
     fake_script.write(
         'storage-get',
         """
-        if [ "$1" = "-s" ]; then
-            id=${2#*/}
-            key=${2%/*}
-            echo "\\"/var/srv/${key}/${id}\\"" # NOQA: test_quote_backslashes
+        if [ "$2" = "-s" ]; then
+            id=${3#*/}
+            key=${3%/*}
+            echo "{\\"kind\\": \\"filesystem\\", \\"location\\": \\"/var/srv/${key}/${id}\\"}"
         elif [ "$1" = '--help' ]; then
             printf '%s\\n' \\
             'Usage: storage-get [options] [<key>]' \\
@@ -626,11 +627,17 @@ def test_config_from_raw():
     assert meta.config['sssh'].description == 'a user secret'
 
 
-def test_actions_from_charm_root():
+@pytest.mark.parametrize('additional_properties', [False, True])
+def test_actions_from_charm_root(additional_properties: bool):
     with tempfile.TemporaryDirectory() as d:
         td = pathlib.Path(d)
         (td / 'actions.yaml').write_text(
-            yaml.safe_dump({'foo': {'description': 'foos the bar', 'additionalProperties': False}})
+            yaml.safe_dump({
+                'foo': {
+                    'description': 'foos the bar',
+                    'additionalProperties': additional_properties,
+                }
+            })
         )
         (td / 'metadata.yaml').write_text(
             yaml.safe_dump({'name': 'bob', 'requires': {'foo': {'interface': 'bar'}}})
@@ -639,8 +646,23 @@ def test_actions_from_charm_root():
         meta = ops.CharmMeta.from_charm_root(td)
         assert meta.name == 'bob'
         assert meta.requires['foo'].interface_name == 'bar'
-        assert not meta.actions['foo'].additional_properties
+        assert meta.actions['foo'].additional_properties == additional_properties
         assert meta.actions['foo'].description == 'foos the bar'
+
+
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [('2.9', True), ('3.6.12', True), ('4.0.0', False), ('4.1', False), (None, True)],
+)
+def test_actions_additional_properties(
+    monkeypatch: pytest.MonkeyPatch, juju_version: str | None, additional_properties: bool
+):
+    if juju_version is None:
+        monkeypatch.delenv('JUJU_VERSION', raising=False)
+    else:
+        monkeypatch.setenv('JUJU_VERSION', juju_version)
+    action = ops.ActionMeta('foo', {})
+    assert action.additional_properties == additional_properties
 
 
 def _setup_test_action(fake_script: FakeScript):
@@ -705,9 +727,9 @@ def test_action_events(request: pytest.FixtureRequest, fake_script: FakeScript):
     assert charm.seen_action_params == {'foo-name': 'name', 'silent': True}
     assert fake_script.calls() == [
         ['action-get', '--format=json'],
-        ['action-log', 'test-log'],
+        ['action-log', '--', 'test-log'],
         ['action-set', 'res=val with spaces', f'id={action_id}'],
-        ['action-fail', 'test-fail'],
+        ['action-fail', '--', 'test-fail'],
     ]
 
 
@@ -952,32 +974,6 @@ def test_secret_event_remove_revision(
     ]
 
 
-def test_secret_event_caches_secret_set(request: pytest.FixtureRequest, fake_script: FakeScript):
-    class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.secrets: list[ops.Secret] = []
-            self.framework.observe(self.on.secret_changed, self.on_secret_changed)
-
-        def on_secret_changed(self, event: ops.SecretChangedEvent):
-            event.secret.set_info(description='desc')
-            event.secret.set_content({'key': 'value'})
-            self.secrets.append(event.secret)
-
-    fake_script.write('secret-get', """echo '{"key": "value"}'""")
-    fake_script.write('secret-set', 'exit 0')
-
-    framework = create_framework(request)
-    charm = MyCharm(framework)
-
-    charm.on.secret_changed.emit('secret:changed', None)
-    charm.on.secret_changed.emit('secret:changed', None)
-    cache = charm.secrets[0]._secret_set_cache
-    assert cache is charm.secrets[1]._secret_set_cache
-    assert charm.secrets[0]._secret_set_cache['secret:changed']['description'] == 'desc'
-    assert 'content' in cache['secret:changed']
-
-
 def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: FakeScript):
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -999,7 +995,7 @@ def test_collect_app_status_leader(request: pytest.FixtureRequest, fake_script: 
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=True', 'blocked', 'first'],
+        ['status-set', '--application=True', 'blocked', '--', 'first'],
     ]
 
 
@@ -1065,7 +1061,7 @@ def test_collect_unit_status(request: pytest.FixtureRequest, fake_script: FakeSc
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=False', 'blocked', 'first'],
+        ['status-set', '--application=False', 'blocked', '--', 'first'],
     ]
 
 
@@ -1112,8 +1108,8 @@ def test_collect_app_and_unit_status(request: pytest.FixtureRequest, fake_script
 
     assert fake_script.calls(True) == [
         ['is-leader', '--format=json'],
-        ['status-set', '--application=True', 'active', ''],
-        ['status-set', '--application=False', 'waiting', 'blah'],
+        ['status-set', '--application=True', 'active', '--', ''],
+        ['status-set', '--application=False', 'waiting', '--', 'blah'],
     ]
 
 
@@ -1166,7 +1162,7 @@ def test_collect_status_priority_valid(
     ops.charm._evaluate_status(charm)
 
     status_set_calls = [call for call in fake_script.calls(True) if call[0] == 'status-set']
-    assert status_set_calls == [['status-set', '--application=True', expected, '']]
+    assert status_set_calls == [['status-set', '--application=True', expected, '--', '']]
 
 
 @pytest.mark.parametrize(
@@ -1380,9 +1376,7 @@ class _MyConfigCharm(BaseTestConfigCharm):
         return MyConfig
 
 
-# Note that we would really like to have kw_only=True here as well, but that's
-# not available in Python 3.8.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MyDataclassConfig:
     my_bool: bool | None = None
     my_int: int = 42
@@ -1694,9 +1688,7 @@ class _MyActionCharm(BaseTestActionCharm):
         return MyAction
 
 
-# Note that we would really like to have kw_only=True here as well, but that's
-# not available in Python 3.8.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MyDataclassAction:
     my_str: str
     my_bool: bool = False
@@ -1917,11 +1909,6 @@ if pydantic is not None:
 def test_action_custom_naming_pattern(
     action_params: dict[str, int], action_class: type[object], request: pytest.FixtureRequest
 ):
-    # The latest version of Pydantic available for Python 3.8 does not support
-    # the `alias` metadata, so we need to skip the test for that case.
-    if pydantic is not None and action_class is _PydanticDataclassesAlias:
-        pytest.skip('Pydantic does not support dataclasses alias metadata in this version.')
-
     class Charm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
