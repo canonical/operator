@@ -8,7 +8,7 @@ Kubernetes charms use Pebble to manage containers. Your charm can configure Pebb
 ```{toctree}
 :maxdepth: 1
 
-Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
+Manage the workload container <manage-the-workload-container>
 Manage files in the workload container <manage-files-in-the-workload-container>
 Manage Pebble health checks <manage-pebble-health-checks>
 Manage Pebble custom notices <manage-pebble-custom-notices>

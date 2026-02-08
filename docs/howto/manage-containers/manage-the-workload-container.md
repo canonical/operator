@@ -1,5 +1,5 @@
-(run-workloads-with-a-charm-kubernetes)=
-# How to run workloads with a Kubernetes charm
+(manage-the-workload-container)=
+# How to manage the workload container
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
 
@@ -232,41 +232,6 @@ class MyCharm(ops.CharmBase):
             logger.info('Service: %s', service)
         ...
 ```
-
-## Test container changes
-
-When testing a Kubernetes charm, you can mock container interactions. By default, a `State` has no
-containers, so if the charm were to execute `self.unit.containers`, it would get back an empty dict.
-
-To give the charm access to some containers, you need to pass them to the input state, like so:
-
-```python
-state = testing.State(containers={
-    testing.Container(name='foo', can_connect=True),
-    testing.Container(name='bar', can_connect=False),
-})
-```
-
-In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
-would give `False`.
-
-A [](testing.Container) contains a list of [](ops.pebble.Layer)s, just like an [](ops.Container).
-You might start the test with some existing layers -- from a `rockcraft.yaml` file, for example, and
-assert that the charm adds an additional layer.
-
-```python
-def test_add_layer():
-    ctx = testing.Context(MyCharm)
-    layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
-    container_in = testing.Container('workload', layers=[layer])
-    state_in = testing.State(containers={container})
-    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    assert len(state_out.get_container(container.name).layers) == 2
-    new_plan = state_out.get_container(container.name).plan
-    assert ...  # Verify that the plan contains changes made in pebble-ready.
-```
-
-> See more: [](testing.layer_from_rockcraft)
 
 ## Control and monitor services in the workload container
 
@@ -646,3 +611,38 @@ against the command used in the ops `container.exec()` call. For example if the 
  3. an `Exec` with the command prefix `()`
 
 If none of these are found an `ExecError` will be raised.
+
+## Write unit tests
+
+When testing a Kubernetes charm, you can mock container interactions. By default, a `State` has no
+containers, so if the charm were to execute `self.unit.containers`, it would get back an empty dict.
+
+To give the charm access to some containers, you need to pass them to the input state, like so:
+
+```python
+state = testing.State(containers={
+    testing.Container(name='foo', can_connect=True),
+    testing.Container(name='bar', can_connect=False),
+})
+```
+
+In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
+would give `False`.
+
+A [](testing.Container) contains a list of [](ops.pebble.Layer)s, just like an [](ops.Container).
+You might start the test with some existing layers -- from a `rockcraft.yaml` file, for example, and
+assert that the charm adds an additional layer.
+
+```python
+def test_add_layer():
+    ctx = testing.Context(MyCharm)
+    layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
+    container_in = testing.Container('workload', layers=[layer])
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
+    assert len(state_out.get_container(container.name).layers) == 2
+    new_plan = state_out.get_container(container.name).plan
+    assert ...  # Verify that the plan contains changes made in pebble-ready.
+```
+
+> See more: [](testing.layer_from_rockcraft)

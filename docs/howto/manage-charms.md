@@ -65,7 +65,7 @@ and the charm workflow.
 
 > See more:
 >
-> - {ref}`run-workloads-with-a-charm-kubernetes`
+> - {ref}`manage-containers`
 > - {ref}`run-workloads-with-a-charm-machines`
 > - {ref}`write-and-structure-charm-code`
 > - {ref}`write-unit-tests-for-a-charm`

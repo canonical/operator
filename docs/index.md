@@ -34,7 +34,7 @@ Ops promotes consistent and maintainable charm code. Its APIs help you separate 
 **Step-by-step guides** covering key operations and common tasks
 - [Manage charms](howto/manage-charms)
 - [Manage relations](howto/manage-relations)
-- [Run workloads with a Kubernetes charm](howto/manage-containers/run-workloads-with-a-charm-kubernetes)
+- [Manage containers](howto/manage-containers/index)
 ```
 
 ````
