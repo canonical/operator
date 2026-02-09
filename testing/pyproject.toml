@@ -1,44 +1,39 @@
-[build-system]
-requires = [
-    "setuptools >= 35.0.2",
-]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "ops-scenario"
-
 version = "8.6.0.dev0"
-
+description = "Python library providing a state-transition testing API for Operator Framework charms."
+requires-python = ">=3.10"
+readme = "README.md"
+license = "Apache-2.0"
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
 ]
 maintainers = [
     { name = "The Charm Tech team at Canonical Ltd." }
 ]
-description = "Python library providing a state-transition testing API for Operator Framework charms."
-license = "Apache-2.0"
 keywords = ["juju", "test"]
-
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    'Framework :: Pytest',
+    'Intended Audience :: Developers',
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    'Topic :: Software Development :: Quality Assurance',
+    'Topic :: Software Development :: Testing',
+    'Topic :: Utilities',
+]
 dependencies = [
     "ops==3.6.0.dev0",
     "PyYAML>=6.0.1",
     "typing_extensions>=4.9.0",  # for `deprecated` decorator, replace with stdlib `warnings.deprecated` when we're Python 3.13+
 ]
-readme = "README.md"
-requires-python = ">=3.10"
-
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    'Framework :: Pytest',
-    'Intended Audience :: Developers',
-    'Topic :: Software Development :: Quality Assurance',
-    'Topic :: Software Development :: Testing',
-    'Topic :: Utilities',
-]
 
 [project.urls]
-"Homepage" = "https://github.com/canonical/operator"
-"Bug Tracker" = "https://github.com/canonical/operator/issues"
+"Repository" = "https://github.com/canonical/operator"
+"Issues" = "https://github.com/canonical/operator/issues"
+"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
+"Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
-[bdist_wheel]
-universal = 1
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
