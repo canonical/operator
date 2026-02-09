@@ -1,4 +1,4 @@
-(manage-pebble-custom-notices)=
+(pebble-custom-notices)=
 # How to manage Pebble custom notices
 
 ## Record a notice

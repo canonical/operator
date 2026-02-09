@@ -1,4 +1,4 @@
-(manage-the-workload-container)=
+(workload-containers)=
 # How to manage the workload container
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
@@ -7,7 +7,7 @@ Pebble is a lightweight, API-driven process supervisor designed for use with cha
 
 When the workload container starts up, Juju fires a [`PebbleReadyEvent`](ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](ops.Container) instance.
 
-The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
+The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, run commands, and [read and write files](#files-in-containers). These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 
 The rest of this document provides details of how a charm interacts with the workload container via Pebble, using `ops` [`Container`](ops.Container) methods.
 

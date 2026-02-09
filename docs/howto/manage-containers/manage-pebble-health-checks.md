@@ -1,4 +1,4 @@
-(manage-pebble-health-checks)=
+(pebble-health-checks)=
 # How to manage Pebble health checks
 
 Pebble supports adding custom health checks: first, to allow Pebble itself to restart services when certain checks fail, and second, to allow Kubernetes to restart containers when specified checks fail.
