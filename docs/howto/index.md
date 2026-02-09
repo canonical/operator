@@ -63,13 +63,28 @@ Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 
 ## Managing containers
 
-TODO: Write intro
-
 ```{toctree}
-:maxdepth: 1
+:hidden:
 
 Manage containers <manage-containers/index>
 ```
+
+In a Kubernetes charm, your charm manages the workload by defining the Pebble service configuration. Your charm can also use Pebble to run commands and read and write files in the workload container.
+
+- {doc}`Manage the workload container <manage-containers/manage-the-workload-container>`
+- {doc}`Manage files in the workload container <manage-containers/manage-files-in-the-workload-container>`
+
+Pebble can regularly check that the workload is healthy and report back to your charm.
+
+- {doc}`Manage Pebble health checks <manage-containers/manage-pebble-health-checks>`
+
+Custom notices enable the workload to tell your charm that something has happened.
+
+- {doc}`Manage Pebble custom notices <manage-containers/manage-pebble-custom-notices>`
+
+Your charm can configure Pebble so that you can access metrics for services and health checks.
+
+- {doc}`Manage Pebble metrics <manage-containers/manage-pebble-metrics>`
 
 ## Managing features
 
