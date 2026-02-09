@@ -151,7 +151,7 @@ This means you should not usually have a `level=alive` check for a service in a 
 
 > Added in ops 2.17
 
-To test charms that use Pebble check events, use the `CheckInfo` class and the emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
+To test charms that use Pebble check events, use the `CheckInfo` class and then emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
 
 ```python
 import ops
