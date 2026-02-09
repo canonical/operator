@@ -38,7 +38,7 @@ jobs:
           ref: ${{ matrix.commit }}
 
       - name: Download operator wheels
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels

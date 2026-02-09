@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867  # v7.1.6
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
@@ -45,39 +45,6 @@ jobs:
       matrix:
         dir:
           - examples/httpbin-demo
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867  # v7.1.6
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p microk8s
-      - name: Pack charm
-        run: |
-          cd ${{ matrix.dir }}
-          charmcraft pack
-      - name: Run integration tests
-        run: |
-          cd ${{ matrix.dir }}
-          tox -e integration
-
-  # Pack & run integration tests for legacy K8s charms.
-  # These charms don't use the profiles from Charmcraft 4, meaning:
-  #   - They don't use tox-uv
-  #   - They don't use Charmcraft's uv plugin
-  #   - Their integration tests include a packing step
-  # TODO: Move these to k8s-examples-integration after modernising the charms.
-  legacy-k8s-examples-integration:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        dir:
           - examples/k8s-1-minimal
           - examples/k8s-2-configurable
           - examples/k8s-3-postgresql
@@ -87,8 +54,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Set up tox
-        run: pip install tox
+      - name: Set up uv
+        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
       - name: Install Concierge
         run: sudo snap install --classic concierge
       - name: Prepare for deploying K8s charms
@@ -99,6 +68,10 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Pack charm
+        run: |
+          cd ${{ matrix.dir }}
+          charmcraft pack
       - name: Run integration tests
         run: |
           cd ${{ matrix.dir }}

@@ -25,7 +25,7 @@ Each version of Juju provides a fixed version of Pebble. To determine which Pebb
 | 3.3 | [1.4.2](https://github.com/canonical/pebble/releases/tag/v1.4.2) |
 | 3.4 | [1.7.4](https://github.com/canonical/pebble/releases/tag/v1.7.4) |
 | 3.5 | [1.10.2](https://github.com/canonical/pebble/releases/tag/v1.10.2) |
-| 3.6 | [1.19.2](https://github.com/canonical/pebble/releases/tag/v1.19.2) |
+| 3.6 | [1.26.0](https://github.com/canonical/pebble/releases/tag/v1.26.0) |
 | 4.0 | [1.26.0](https://github.com/canonical/pebble/releases/tag/v1.26.0) |
 
 ## Support dates for Juju and Ops
@@ -58,7 +58,7 @@ Ops releases new minor versions approximately once per month. Major versions are
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
 | Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2026-07-30 |
-| Ops 3.5 | <span style="color:green">●</span> Active | 2025-12-18 | 2026-12-18 |
+| Ops 3.5 | <span style="color:green">●</span> Active | 2026-01-28 | 2027-01-28 |
 
 **Legend:**
 - <span style="color:green">●</span> Active: Currently supported
