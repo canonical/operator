@@ -44,5 +44,5 @@ tox -e lint          # Type checking and linting
 - `test/` - Unit tests mirroring source structure
 - `test/conftest.py` - Pytest configuration
 - `test/charms/` - Test charm implementations
-- `testing/src/scenario/` - Testing framework source
+- `testing/src/ops_scenario/` - Testing framework source
 - `tox.ini` - Test environment configuration
