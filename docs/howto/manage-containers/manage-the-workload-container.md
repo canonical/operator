@@ -638,10 +638,11 @@ def test_add_layer():
     ctx = testing.Context(MyCharm)
     layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
     container_in = testing.Container('workload', layers=[layer])
-    state_in = testing.State(containers={container})
-    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    assert len(state_out.get_container(container.name).layers) == 2
-    new_plan = state_out.get_container(container.name).plan
+    state_in = testing.State(containers={container_in})
+    state_out = ctx.run(ctx.on.pebble_ready(container_in), state_in)
+    container_out = state_out.get_container(container_in.name)
+    assert len(container_out.layers) == 2
+    new_plan = container_out.plan
     assert ...  # Verify that the plan contains changes made in pebble-ready.
 ```
 
