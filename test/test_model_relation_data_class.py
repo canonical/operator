@@ -242,6 +242,7 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_load_fail(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
@@ -257,8 +258,11 @@ def test_relation_load_fail(charm_class: type[BaseTestCharm], monkeypatch: pytes
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
+def test_relation_load_fail_multi_field_validation(
+    charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
@@ -420,8 +424,11 @@ def test_relation_save_simple(charm_class: type[BaseTestCharm]):
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_save_no_access(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
+def test_relation_save_no_access(
+    charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
@@ -468,6 +475,7 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_invalid(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             def encoder(_: Any) -> int:
