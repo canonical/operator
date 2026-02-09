@@ -6,7 +6,7 @@
 - Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python) version in your `pyproject.toml` so that tooling will detect any use of Python features not available in the versions you support. See [Use the Python provided by the base](#define-the-required-dependencies).
 - The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. See [Validate your charm with every change](#validate-your-charm-with-every-change).
 
-**[Manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)**
+**[How to manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)**
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. See [Write a library](#manage-libraries-write-a-library).
 
 **[How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)**
@@ -17,7 +17,7 @@
 - Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 - Never log credentials or other sensitive information.
 
-**[Manage configuration](https://documentation.ubuntu.com/ops/latest/howto/manage-configuration/)**
+**[How to manage configuration](https://documentation.ubuntu.com/ops/latest/howto/manage-configuration/)**
 - Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`. See [Define a configuration option](#define-a-configuration-option).
 
 **[Manage resources](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-resources/)**
@@ -28,6 +28,7 @@
 
 **[``charmcraft.yaml`` file](https://documentation.ubuntu.com/charmcraft/latest/reference/files/charmcraft-yaml-file/)**
 - Include the ``optional`` key in all endpoint definitions, rather than relying on the default value to indicate that the relation is required. Although this field is not enforced by Juju, including it makes it clear to users (and other tools) whether the relation is required. See {external+charmcraft:ref}`<endpoint role> <charmcraft-yaml-key-requires>`.
+- Always explicitly include the ``additionalProperties`` key. The default value is different in Juju 3 (``true``) and Juju 4 (``false``), so explicitly including it in the actions definition ensures consistent behaviour between versions. See {external+charmcraft:ref}`actions <charmcraft-yaml-key-actions>`.
 - Prefer lowercase alphanumeric action names, and use hyphens (-) to separate words. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some action names be dashed and some be underscored. See {external+charmcraft:ref}`actions <charmcraft-yaml-key-actions>`.
 - For very complex applications, consider providing configuration profiles, which can group values for large configs together. For example, a ``profile: large`` that tweaks multiple options under the hood to optimize for larger deployments, or a ``profile: ci`` for limited resource usage during testing. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
 - Just like Juju, a charm is an opinionated tool. Configure the application with the best defaults (ideally the application is deployable without providing any configuration at deploy time), and only expose application configuration options when necessary. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
