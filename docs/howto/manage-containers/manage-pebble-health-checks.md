@@ -147,7 +147,7 @@ When a K8s liveness probe (a `level=alive` check) succeeds, you should consider 
 
 This means you should not usually have a `level=alive` check for a service in a charm. This is especially important for workloads that take a long or indefinite period of time to start. Instead, use a Pebble check without a level and specify `on-check-failure: restart` for the service. That way Pebble itself has control over restarting the service.
 
-## Testing with checks
+## Write unit tests
 
 > Added in ops 2.17
 

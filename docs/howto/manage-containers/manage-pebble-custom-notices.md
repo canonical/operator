@@ -47,7 +47,7 @@ A charm can also query for notices using the following two `Container` methods:
 * [`get_notice`](ops.Container.get_notice), which gets a single notice by unique ID (the value of `notice.id`).
 * [`get_notices`](ops.Container.get_notices), which returns all notices by default, and allows filtering notices by specific attributes such as `key`.
 
-## Test notices
+## Write unit tests
 
 To test charms that use Pebble Notices, use the [`pebble_custom_notice`](ops.testing.CharmEvents.pebble_custom_notice) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, as well as two other notices in the queue, the
 charm tests could do the following:
