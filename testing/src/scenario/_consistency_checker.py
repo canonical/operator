@@ -724,16 +724,18 @@ def check_cloudspec_consistency(
     state: State,
     event: _Event,
     charm_spec: _CharmSpec[CharmType],
+    juju_version: tuple[int, ...],
     **_kwargs: Any,
 ) -> Results:
-    """Check that Kubernetes models don't have :attr:`scenario.State.cloud_spec` set."""
+    """Check the consistency of :attr:`scenario.State.cloud_spec` with the model type."""
     errors: list[str] = []
     warnings: list[str] = []
 
-    if state.model.type == 'kubernetes' and state.model.cloud_spec:
+    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < (3, 6, 10):
         errors.append(
-            'CloudSpec is only available for machine charms, not Kubernetes charms. '
-            "Simulate a machine substrate with: `State(..., model=Model(type='lxd'))`.",
+            'CloudSpec is not available for Kubernetes charms with Juju < 3.6.10. '
+            'Set the juju_version to 3.6.10+ or '
+            "simulate a machine substrate with: `State(..., model=Model(type='lxd'))`.",
         )
 
     return Results(errors, warnings)
