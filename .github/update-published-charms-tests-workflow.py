@@ -90,6 +90,7 @@ CHARM_ROOTS = {
     ],
     'mysql-router-operators': ['machines', 'kubernetes'],
     'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
+    'tempo-operators': ['coordinator', 'worker'],
     'vault-k8s-operator': ['k8s', 'machine'],
 }
 

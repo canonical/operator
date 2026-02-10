@@ -31,7 +31,7 @@ jobs:
           - charm-repo: canonical/argo-operators
             charm-root: charms/argo-controller
           - charm-repo: canonical/catalogue-k8s-operator
-            charm-root: .
+            charm-root: charm
           - charm-repo: canonical/charm-ubuntu
             charm-root: .
           - charm-repo: canonical/conserver-charm
@@ -167,7 +167,9 @@ jobs:
           - charm-repo: canonical/superset-k8s-operator
             charm-root: .
           - charm-repo: canonical/tempo-operators
-            charm-root: .
+            charm-root: coordinator
+          - charm-repo: canonical/tempo-operators
+            charm-root: worker
           - charm-repo: canonical/temporal-admin-k8s-operator
             charm-root: .
           - charm-repo: canonical/temporal-k8s-operator
