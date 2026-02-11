@@ -1,3 +1,12 @@
+# 2.23.2 - 11 February 2026
+
+## Documentation
+
+* For 2.23, update links and config for switch to documentation.ubuntu.com/ops (#1942)
+* For 2.x, fix site title and unstyled error pages (#1945)
+* For 2.x, remove .html extensions (#1954)
+* For 2.x, fix unstyled error pages (#1973)
+
 # 2.23.1 - 30 July 2025
 
 ## Fixes
