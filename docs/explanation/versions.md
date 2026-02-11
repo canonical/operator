@@ -57,8 +57,8 @@ Ops releases new minor versions approximately once per month. Major versions are
 | Version | Status | Release Date | End of Life |
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
-| Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2026-07-30 |
-| Ops 3.5 | <span style="color:green">●</span> Active | 2026-01-28 | 2027-01-28 |
+| Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2027-02-11 |
+| Ops 3.5 | <span style="color:green">●</span> Active | 2026-02-11 | 2027-02-11 |
 
 **Legend:**
 - <span style="color:green">●</span> Active: Currently supported

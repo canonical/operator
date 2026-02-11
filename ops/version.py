@@ -19,4 +19,4 @@ This module is NOT to be used when developing charms using ops.
 
 from __future__ import annotations
 
-version: str = '3.6.0.dev0'
+version: str = '3.5.2'
