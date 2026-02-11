@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - '2.*'
+  workflow_dispatch:
 
 permissions: {}
 
@@ -27,6 +28,6 @@ jobs:
       # is updated in the PYPI settings.
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: ./tracing/dist/
+          packages-dir: ./dist/
           skip-existing: true
           verbose: true
