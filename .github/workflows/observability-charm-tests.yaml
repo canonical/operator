@@ -19,11 +19,11 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: cc7bd1db35589fd63e44fb0e8813cd3b4362943e  # rev171 2025-06-22T16:01:16Z
+            commit: b3e432d665bbd50e2e786d1f999047abe911e897  # rev196 2025-12-06T16:01:09Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: ca0a31dab4497eac1bcdc3ca3eb47bbbc7365dc9  # rev253 2025-06-23T08:45:58Z
+            commit: 74bd4a8b98ee750ab401a652a3cf9bb2317ded15  # rev281 2025-12-12T14:20:39Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: a2770608526f2c82ddc3d225870f1a48eaa87179  # 2025-06-12T17:55:14Z
+            commit: 2a0b282c0edcffdf46f84bb808529b5c0a705061  # rev175 2025-12-05T18:18:09Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v4
@@ -47,6 +47,7 @@ jobs:
             uv remove ops-scenario --optional dev --frozen || echo "maybe ops-scenario is not a dev dependency"
             uv remove ops --frozen
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=testing --optional dev --raw-sources --prerelease=if-necessary-or-explicit
+            uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#subdirectory=tracing --raw-sources --prerelease=if-necessary-or-explicit
             uv add git+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA --raw-sources --prerelease=if-necessary-or-explicit
           else
             echo "Error: no requirements.txt or uv.lock file found"
