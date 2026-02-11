@@ -1,3 +1,17 @@
+# 3.5.2 - 11 February 2026
+
+## Fixes
+
+* Make testing.CheckInfo level arg type match pebble.CheckInfo.level (#2274)
+* Credential-get is available on k8s in newer Juju (#2307)
+
+## Documentation
+
+* Update Pebble version in Juju 3.6 (#2295)
+* Refresh K8s tutorial to use Concierge and uv-based Charmcraft profile (#2285)
+* Add missing "How to" in page titles (#2289)
+* Fix and improve observability part of K8s tutorial (#2305)
+
 # 3.5.1 - 28 January 2026
 
 ## Fixes
