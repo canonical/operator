@@ -445,9 +445,7 @@ def _patch_tox_testenv_sections_toml(
 
     # Patch env_run_base (equivalent to [testenv])
     if 'env_run_base' in data:
-        add_tox_pip_commands_toml(
-            tox_config, 'testenv', ops_wheel, ops_scenario_wheel, use_uv_pip
-        )
+        add_tox_pip_commands_toml(tox_config, 'testenv', ops_wheel, ops_scenario_wheel, use_uv_pip)
 
     # Patch specific envs
     if 'env' in data:
@@ -485,9 +483,7 @@ def _patch_tox_testenv_sections_ini(
         return False
 
     for section in sorted(testenv_sections):
-        add_tox_pip_commands_ini(
-            tox_config, section, ops_wheel, ops_scenario_wheel, use_uv_pip
-        )
+        add_tox_pip_commands_ini(tox_config, section, ops_wheel, ops_scenario_wheel, use_uv_pip)
 
     return True
 
