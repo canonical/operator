@@ -3,7 +3,7 @@
 ## Fixes
 
 * Make testing.CheckInfo level arg type match pebble.CheckInfo.level (#2274)
-* Credential-get is available on k8s in newer Juju (#2307)
+* Make testing consistency check aware that `credential-get` is available on k8s in newer Juju (#2307)
 * Drop unused `setuptools_scm` build dependency (#2310)
 
 ## Documentation
