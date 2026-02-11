@@ -1,5 +1,9 @@
 # 2.23.2 - 11 February 2026
 
+## Fixes
+
+* Drop unused `setuptools_scm` build dependency (#2318)
+
 ## Documentation
 
 * For 2.23, update links and config for switch to documentation.ubuntu.com/ops (#1942)
