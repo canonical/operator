@@ -406,6 +406,9 @@ def update_versions_doc(version: str):
     eol_date_str = eol_date.strftime('%Y-%m-%d')
 
     versions_doc_path = VERSION_FILES['versions_doc']
+    if not versions_doc_path.exists():
+        logger.info('Skipping version doc update: doc does not exist')
+        return
     content = versions_doc_path.read_text()
 
     # Find and replace the Ops major version row
@@ -567,7 +570,10 @@ def draft_release(
 
     new_branch = f'release-prep-{tag}'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    changed_files = ['CHANGES.md', *[str(path) for path in VERSION_FILES.values()]]
+    changed_files = [
+        'CHANGES.md',
+        *[str(path) for path in VERSION_FILES.values() if path.exists()],
+    ]
     subprocess.run(['/usr/bin/git', 'add', *changed_files], check=True)
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
     subprocess.run(['/usr/bin/git', 'push', fork_remote, new_branch], check=True)
@@ -612,7 +618,7 @@ def post_release(
     update_versions_for_post_release(base_branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    files = [str(path) for path in VERSION_FILES.values()]
+    files = [str(path) for path in VERSION_FILES.values() if path.exists()]
     subprocess.run(['/usr/bin/git', 'add', *files], check=True)
     subprocess.run(
         ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True
