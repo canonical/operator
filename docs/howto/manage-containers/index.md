@@ -1,7 +1,7 @@
 (manage-containers)=
 # How to manage containers
 
-Kubernetes charms use Pebble to manage containers. These guides walk you through the Ops API for interacting with Pebble.
+Kubernetes charms use {external+pebble:doc}`Pebble <index>` to manage containers. These guides walk you through the Ops API for interacting with Pebble.
 
 ## Managing a Kubernetes workload
 

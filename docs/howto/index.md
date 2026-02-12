@@ -69,7 +69,7 @@ Run workloads with a machine charm <run-workloads-with-a-charm-machines>
 Manage containers <manage-containers/index>
 ```
 
-In a Kubernetes charm, your charm manages the workload by defining the Pebble service configuration. Your charm can also use Pebble to run commands and read and write files in the workload container.
+In a Kubernetes charm, your charm manages the workload by defining the {external+pebble:doc}`Pebble <index>` service configuration. Your charm can also use Pebble to run commands and read and write files in the workload container.
 
 - {doc}`Manage the workload container <manage-containers/manage-the-workload-container>`
 - {doc}`Manage files in the workload container <manage-containers/manage-files-in-the-workload-container>`
