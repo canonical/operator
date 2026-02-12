@@ -1,5 +1,5 @@
-(run-workloads-with-a-charm-kubernetes)=
-# How to run workloads with a Kubernetes charm
+(workload-containers)=
+# How to manage the workload container
 
 The recommended way to create charms for Kubernetes is using the sidecar pattern with the workload container running Pebble.
 
@@ -7,7 +7,7 @@ Pebble is a lightweight, API-driven process supervisor designed for use with cha
 
 When the workload container starts up, Juju fires a [`PebbleReadyEvent`](ops.PebbleReadyEvent), which can be handled using [`Framework.observe`](ops.Framework.observe). This gives the charm author access to `event.workload`, a [`Container`](ops.Container) instance.
 
-The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, read and write files, and run commands. These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
+The `Container` class has methods to modify the Pebble configuration "plan", start and stop services, run commands, and [read and write files](#files-in-containers). These methods use the Pebble API, which communicates from the charm container to the workload container using HTTP over a Unix domain socket.
 
 The rest of this document provides details of how a charm interacts with the workload container via Pebble, using `ops` [`Container`](ops.Container) methods.
 
@@ -233,134 +233,6 @@ class MyCharm(ops.CharmBase):
         ...
 ```
 
-## Test container changes
-
-When testing a Kubernetes charm, you can mock container interactions. By default, a `State` has no
-containers, so if the charm were to execute `self.unit.containers`, it would get back an empty dict.
-
-To give the charm access to some containers, you need to pass them to the input state, like so:
-
-```python
-state = testing.State(containers={
-    testing.Container(name='foo', can_connect=True),
-    testing.Container(name='bar', can_connect=False),
-})
-```
-
-In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
-would give `False`.
-
-A [](testing.Container) contains a list of [](ops.pebble.Layer)s, just like an [](ops.Container).
-You might start the test with some existing layers -- from a `rockcraft.yaml` file, for example, and
-assert that the charm adds an additional layer.
-
-```python
-def test_add_layer():
-    ctx = testing.Context(MyCharm)
-    layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
-    container_in = testing.Container('workload', layers=[layer])
-    state_in = testing.State(containers={container})
-    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    assert len(state_out.get_container(container.name).layers) == 2
-    new_plan = state_out.get_container(container.name).plan
-    assert ...  # Verify that the plan contains changes made in pebble-ready.
-```
-
-> See more: [](testing.layer_from_rockcraft)
-
-### Mount files in the container
-
-You can configure a container to have some files in it:
-
-```python
-import pathlib
-
-local_file = pathlib.Path('/path/to/local/real/file.txt')
-
-container = testing.Container(
-    name='foo',
-    can_connect=True,
-    mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file)},
-    )
-state = testing.State(containers={container})
-```
-
-In this case, if the charm were to:
-
-```python
-def _on_start(self, _):
-    foo = self.unit.get_container('foo')
-    content = foo.pull('/local/share/config.yaml').read()
-```
-
-then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempfile` for
-nicely wrapping data and passing it to the charm via the container.
-
-### Check files written in the container
-
-`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
-
-```python
-import tempfile
-
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-def test_pebble_push():
-    with tempfile.NamedTemporaryFile() as local_file:
-        container = testing.Container(
-            name='foo',
-            can_connect=True,
-            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)}
-        )
-        state_in = testing.State(containers={container})
-        ctx = testing.Context(
-            MyCharm,
-            meta={'name': 'foo', 'containers': {'foo': {}}}
-        )
-        ctx.run(
-            ctx.on.pebble_ready(container),
-            state_in,
-        )
-        assert local_file.read().decode() == 'TEST'
-```
-
-If the charm writes files to a container (to a location you didn't mount as a temporary folder you
-have access to), you will be able to inspect them using `get_filesystem`.
-
-```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-
-def test_pebble_push():
-    container = testing.Container(name='foo', can_connect=True)
-    state_in = testing.State(containers={container})
-    ctx = testing.Context(
-        MyCharm,
-        meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
-
-    state_out = ctx.run(ctx.on.start(), state_in)
-
-    # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
-    container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
-    cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
-    assert cfg_file.read_text() == 'TEST'
-```
-
 ## Control and monitor services in the workload container
 
 The main purpose of Pebble is to control and monitor services, which are usually long-running processes like web servers and databases.
@@ -509,299 +381,6 @@ The backoff delay between restarts is calculated using an exponential backoff: `
 The `backoff-factor` must be greater than or equal to 1.0. If the factor is set to 1.0, `next` will equal `current`, so the delay will remain constant.
 
 Just before delaying, a small random time jitter of 0-10% of the delay is added (the current delay is not updated). For example, if the current delay value is 2 seconds, the actual delay will be between 2.0 and 2.2 seconds.
-
-## Perform health checks on the workload container
-
-Pebble supports adding custom health checks: first, to allow Pebble itself to restart services when certain checks fail, and second, to allow Kubernetes to restart containers when specified checks fail.
-
-Each check can be one of three types. The types and their success criteria are:
-
-* `http`: an HTTP `GET` request to the URL specified must return an HTTP 2xx status code.
-* `tcp`: opening the given TCP port must be successful.
-* `exec`: executing the specified command must yield a zero exit code.
-
-### Check configuration
-
-Checks are configured in the layer configuration using the top-level field `checks`. Here's an example showing the three different types of checks:
-
-```yaml
-checks:
-    up:
-        override: replace
-        level: alive  # optional, but required for liveness/readiness probes
-        period: 10s   # this is the default
-        timeout: 3s   # this is the default
-        threshold: 3  # this is the default
-        exec:
-            command: service nginx status
-
-    online:
-        override: replace
-        level: ready
-        tcp:
-            port: 8080
-
-    http-test:
-        override: replace
-        http:
-            url: http://localhost:8080/test
-```
-
-Each check is performed with the specified `period` (the default is 10 seconds apart), and is considered an error if a `timeout` happens before the check responds -- for example, before the HTTP request is complete or before the command finishes executing.
-
-A check is considered healthy until it's had `threshold` errors in a row (the default is 3). At that point, the `on-check-failure` action will be triggered, and the health endpoint will return an error response (both are discussed below). When the check succeeds again, the failure count is reset.
-
-See the {external+pebble:ref}`layer specification <layer-specification>` for more details about the fields and options for different types of checks.
-
-### Respond to a check failing or recovering
-
-> Added in `ops 2.15` and `juju 3.6`
-
-To have the charm respond to a check reaching the failure threshold, or passing again afterwards, observe the `pebble_check_failed` and `pebble_check_recovered` events and switch on the info's `name`:
-
-```python
-class PostgresCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_check_failed, self._on_pebble_check_failed)
-        framework.observe(self.on["db"].pebble_check_recovered, self._on_pebble_check_recovered)
-
-    def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
-        if event.info.name == "http-test":
-            logger.warning("The http-test has started failing!")
-            self.unit.status = ops.ActiveStatus("Degraded functionality ...")
-
-        elif event.info == "online":
-            logger.error("The service is no longer online!")
-
-    def _on_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
-        if event.info.name == "http-test":
-            logger.warning("The http-test has stopped failing!")
-            self.unit.status = ops.ActiveStatus()
-
-        elif event.info == "online":
-            logger.error("The service is online again!")
-```
-
-All check events have an `info` property with the details of the check's current status. Note that, by the time that the charm receives the event, the status of the check may have changed (for example, passed again after failing). If the response to the check failing is light (such as changing the status), then it's fine to rely on the status of the check at the time the event was triggered — there will be a subsequent check-recovered event, and the status will quickly flick back to the correct one. If the response is heavier (such as restarting a service with an adjusted configuration), then the two events should share a common handler and check the current status via the `info` property; for example:
-
-```python
-class PostgresCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_check_failed, self._on_pebble_check_failed)
-        framework.observe(self.on["db"].pebble_check_recovered, self._on_pebble_check_recovered)
-
-    def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
-        if event.info.name != "up":
-            # For now, we ignore the other tests.
-            return
-        if event.info.status == ops.pebble.CheckStatus.DOWN:
-            self.activate_alternative_configuration()
-        else:
-            self.activate_main_configuration()
-```
-
-### Fetch check status
-
-You can use the [`get_check`](ops.Container.get_check) and [`get_checks`](ops.Container.get_checks) methods to fetch the current status of one check or multiple checks, respectively. The returned [`CheckInfo`](ops.pebble.CheckInfo) objects provide various attributes, most importantly a `status` attribute which will be either `UP` or `DOWN`.
-
-Here is a code example that checks whether the `uptime` check is healthy, and writes an error log if not:
-
-```python
-container = self.unit.get_container('main')
-check = container.get_check('uptime')
-if check.status != ops.pebble.CheckStatus.UP:
-    logger.error('Uh oh, uptime check unhealthy: %s', check)
-```
-
-### Check auto-restart
-
-To enable Pebble auto-restart behavior based on a check, use the `on-check-failure` map in the service configuration. For example, to restart the "server" service when the "http-test" check fails, use the following configuration:
-
-```yaml
-services:
-    server:
-        override: merge
-        on-check-failure:
-            http-test: restart   # can also be "shutdown" or "ignore" (the default)
-```
-
-### Check health endpoint and probes
-
-Pebble includes an HTTP `/v1/health` endpoint that allows a user to query the health of configured checks, optionally filtered by check level with the query string `?level=<level>` This endpoint returns an HTTP 200 status if the checks are healthy, HTTP 502 otherwise.
-
-Each check can optionally specify a `level` of "alive" or "ready". These have semantic meaning: "alive" means the check or the service it's connected to is up and running; "ready" means it's properly accepting network traffic. These correspond to Kubernetes ["liveness" and "readiness" probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/).
-
-When Juju creates a sidecar charm container, it initialises the Kubernetes liveness and readiness probes to hit the `/v1/health` endpoint with `?level=alive` and `?level=ready` filters, respectively.
-
-Ready implies alive, and not alive implies not ready. If you've configured an "alive" check but no "ready" check, and the "alive" check is unhealthy, `/v1/health?level=ready` will report unhealthy as well, and the Kubernetes readiness probe will act on that.
-
-If there are no checks configured, Pebble returns HTTP 200 so the liveness and readiness probes are successful by default. To use this feature, you must explicitly create checks with `level: alive` or `level: ready` in the layer configuration.
-
-Consider the K8s liveness success (`level=alive` check) to mean "Pebble is alive" rather than "the application is fully alive" (and failure to mean "this container needs to die"). For charms that take a long time to start, you should not have a `level=alive` check (if Pebble's running, it will report alive to K8s), and instead use an ordinary Pebble check (without a `level`) in conjunction with `on-check-failure: restart`. That way Pebble itself has full control over restarting the service in question.
-
-When checks exceed the configured failure threshold, or start succeeding again after, Juju will emit a
-`pebble-check-failed` or `pebble-check-recovered` event. Note that the status of the check when the
-event is received may not be the same - for example, by the time the charm receives a failed event
-the check may have started passing again. If your charm needs to act based on the current state
-rather than the fact that the check state changed, then the charm code must get the current check
-state (and you would use the same handler for both failed and recovered events).
-
-> See more: [](ops.PebbleCheckRecoveredEvent), [](ops.PebbleCheckFailedEvent)
-
-### Services with long startup time
-
-When a K8s liveness probe (a `level=alive` check) succeeds, you should consider it to mean "Pebble is alive" rather than "the workload is alive". Similarly, a liveness probe failure means "this container needs to be restarted" rather than an issue with the workload.
-
-This means you should not usually have a `level=alive` check for a service in a charm. This is especially important for workloads that take a long or indefinite period of time to start. Instead, use a Pebble check without a level and specify `on-check-failure: restart` for the service. That way Pebble itself has control over restarting the service.
-
-### Testing with checks
-
-> Added in ops 2.17
-
-To test charms that use Pebble check events, use the `CheckInfo` class and the emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
-
-```python
-import ops
-from ops import testing
-
-def test_http_check_failing():
-    ctx = testing.Context(PostgresCharm)
-    check_info = testing.CheckInfo(
-        'http-test',
-        failures=3,
-        status=ops.pebble.CheckStatus.DOWN,
-        level=layer.checks['http-test'].level,
-        startup=layer.checks['http-test'].startup,
-        threshold=layer.checks['http-test'].threshold,
-    )
-    layer = ops.pebble.Layer({
-        'checks': {'http-test': {'override': 'replace', 'startup': 'enabled', 'failures': 3}},
-    })
-    container = testing.Container('db', check_infos={check_info}, layers={'layer1': layer})
-    state_in = testing.State(containers={container})
-
-    state_out = ctx.run(ctx.on.pebble_check_failed(container, info=check_info), state_in)
-
-    assert state_out...
-```
-
-## Manage files in the workload container
-
-Pebble's files API allows charm authors to read and write files on the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
-
-### Push
-
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
-
-```python
-config = """
-port = 7777
-max_connections = 1000
-"""
-container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
-```
-
-The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
-
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](ops.Container.push) for details.
-
-### Pull
-
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
-
-The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
-
-```python
-# Update port to 8888 and restart service
-config = container.pull('/etc/pg/postgresql.conf').read()
-if 'port =' not in config:
-    config += '\nport = 8888\n'
-container.push('/etc/pg/postgresql.conf', config)
-container.restart('postgresql')
-```
-
-If you specify the keyword argument `encoding=None` on the `pull()` call, reads from the returned file-like object will return `bytes`. The default is `encoding='utf-8'`, which will decode the file's bytes from UTF-8 so that reads return a Python `str`.
-
-### Push recursive
-
-To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
-
-```python
-# copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.push_path('/source/dir', '/destination')
-
-# copy "/source/dir/[files]" into "/destination/[files]"
-container.push_path('/source/dir/*', '/destination')
-```
-
-A trailing "/*" on the source directory is the only supported globbing/matching.
-
-### Pull recursive
-
-To copy several files to the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
-
-```python
-# copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.pull_path('/source/dir', '/destination')
-
-# copy "/source/dir/[files]" into "/destination/[files]"
-container.pull_path('/source/dir/*', '/destination')
-```
-
-A trailing "/*" on the source directory is the only supported globbing/matching.
-
-### List files
-
-To list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). It returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
-
-```python
-infos = container.list_files('/etc', pattern='*.conf')
-total_size = sum(f.size for f in infos)
-logger.info('total size of config files: %d', total_size)
-names = set(f.name for f in infos)
-if 'host.conf' not in names:
-    raise Exception('This charm requires /etc/host.conf!')
-```
-
-If you want information about the directory itself (instead of its contents), call `list_files(path, itself=True)`.
-
-### Create directory
-
-To create a directory, use [`Container.make_dir`](ops.Container.make_dir). It takes an optional `make_parents=True` argument (like `mkdir -p`), as well as optional permissions and user/group arguments. Some examples:
-
-```python
-container.make_dir('/etc/pg', user='postgres', group='postgres')
-container.make_dir('/some/other/nested/dir', make_parents=True)
-```
-
-### Remove path
-
-To delete a file or directory, use [`Container.remove_path`](ops.Container.remove_path). If a directory is specified, it must be empty unless `recursive=True` is specified, in which case the entire directory tree is deleted, recursively (like `rm -r`). For example:
-
-```python
-# Delete Apache access log
-container.remove_path('/var/log/apache/access.log')
-# Blow away /tmp/mysubdir and all files under it
-container.remove_path('/tmp/mysubdir', recursive=True)
-```
-
-### Check file and directory existence
-
-To check if a paths exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
-
-```python
-# if /tmp/myfile exists
-container.exists('/tmp/myfile') # True
-container.isdir('/tmp/myfile') # False
-
-# if /tmp/mydir exists
-container.exists('/tmp/mydir') # True
-container.isdir('/tmp/mydir') # True
-```
 
 ## Run commands on the workload container
 
@@ -1033,110 +612,38 @@ against the command used in the ops `container.exec()` call. For example if the 
 
 If none of these are found an `ExecError` will be raised.
 
-(use-custom-notices-from-the-workload-container)=
-## Use custom notices from the workload container
+## Write unit tests
 
-### Record a notice
+When testing a Kubernetes charm, you can mock container interactions. By default, a `State` has no
+containers, so if the charm were to execute `self.unit.containers`, it would get back an empty dict.
 
-To record a custom notice, use the `pebble notify` CLI command. For example, the workload might have a script to back up the database and then record a notice:
-
-```sh
-pg_dump mydb >/tmp/mydb.sql
-/charm/bin/pebble notify canonical.com/postgresql/backup-done path=/tmp/mydb.sql
-```
-
-The first argument to `pebble notify` is the key, which must be in the format `<domain>/<path>`. The caller can optionally provide map data arguments in `<name>=<value>` format; this example shows a single data argument named `path`.
-
-The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occurs frequently.
-
-> See more: [Pebble | `pebble notify`](inv:pebble:std:label#reference_pebble_notify_command)
-
-### Respond to a notice
-
-To have the charm respond to a notice, observe the `pebble_custom_notice` event and switch on the notice's `key`:
+To give the charm access to some containers, you need to pass them to the input state, like so:
 
 ```python
-class PostgresCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_custom_notice, self._on_pebble_custom_notice)
-
-    def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent) -> None:
-        if event.notice.key == "canonical.com/postgresql/backup-done":
-            path = event.notice.last_data["path"]
-            logger.info("Backup finished, copying %s to the cloud", path)
-            f = event.workload.pull(path, encoding=None)
-            s3_bucket.upload_fileobj(f, "db-backup.sql")
-
-        elif event.notice.key == "canonical.com/postgresql/other-thing":
-            logger.info("Handling other thing")
+state = testing.State(containers={
+    testing.Container(name='foo', can_connect=True),
+    testing.Container(name='bar', can_connect=False),
+})
 ```
 
-All notice events have a [`notice`](ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
+In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it
+would give `False`.
 
-### Fetch notices
-
-A charm can also query for notices using the following two `Container` methods:
-
-* [`get_notice`](ops.Container.get_notice), which gets a single notice by unique ID (the value of `notice.id`).
-* [`get_notices`](ops.Container.get_notices), which returns all notices by default, and allows filtering notices by specific attributes such as `key`.
-
-### Test notices
-
-To test charms that use Pebble Notices, use the [`pebble_custom_notice`](ops.testing.CharmEvents.pebble_custom_notice) method to simulate recording a notice with the given details. For example, to simulate the "backup-done" notice handled above, as well as two other notices in the queue, the
-charm tests could do the following:
+A [](testing.Container) contains a list of [](ops.pebble.Layer)s, just like an [](ops.Container).
+You might start the test with some existing layers -- from a `rockcraft.yaml` file, for example, and
+assert that the charm adds an additional layer.
 
 ```python
-from ops import testing
-
-@patch('charm.s3_bucket.upload_fileobj')
-def test_backup_done(upload_fileobj):
-    # Arrange:
-    ctx = testing.Context(PostgresCharm)
-
-    notice = testing.Notice(
-        'canonical.com/postgresql/backup-done',
-        last_data={'path': '/tmp/mydb.sql'},
-    )
-    container = testing.Container('db', can_connect=True, notices=[
-        testing.Notice(key='example.com/a', occurrences=10),
-        testing.Notice(key='example.com/b'),
-        notice,
-    ])
-    root = container.get_filesystem()
-    (root / "tmp").mkdir()
-    (root / "tmp" / "mydb.sql").write_text("BACKUP")
-    state_in = testing.State(containers={container})
-
-    # Act:
-    state_out = ctx.run(ctx.on.pebble_custom_notice(container, notice), state_in)
-
-    # Assert:
-    upload_fileobj.assert_called_once()
-    upload_f, upload_key = upload_fileobj.call_args.args
-    self.assertEqual(upload_f.read(), b"BACKUP")
-    self.assertEqual(upload_key, "db-backup.sql")
+def test_add_layer():
+    ctx = testing.Context(MyCharm)
+    layer = testing.layer_from_rockcraft('../rock/rockcraft.yaml')
+    container_in = testing.Container('workload', layers=[layer])
+    state_in = testing.State(containers={container_in})
+    state_out = ctx.run(ctx.on.pebble_ready(container_in), state_in)
+    container_out = state_out.get_container(container_in.name)
+    assert len(container_out.layers) == 2
+    new_plan = container_out.plan
+    assert ...  # Verify that the plan contains changes made in pebble-ready.
 ```
 
-<!--
- <a href="#heading--access-the-pebble-client-directly"><h2 id="heading--access-the-pebble-client-directly">Access the Pebble client directly</h2></a>
-
-Occasionally charm code may want to access the lower-level Pebble API directly: the [`Container.pebble`](ops.Container.pebble) property returns the [`pebble.Client`](ops.pebble.Client) instance for the given container.
-
-Below is a (contrived) example of an action that uses the Pebble client directly to call [`pebble.Client.get_changes`](ops.pebble.Client.get_changes):
-
-```python
-import ops
-
-class MyCharm(ops.CharmBase):
-    ...
-
-    def show_pebble_changes(self):
-        container = self.unit.get_container('main')
-        client = container.pebble
-        changes = client.get_changes(select=ops.pebble.ChangeState.ALL)
-        for change in changes:
-            logger.info('Pebble change %d: %s', change.id, change.summary)
-```
--->
+> See more: [](testing.layer_from_rockcraft)
