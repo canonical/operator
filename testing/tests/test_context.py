@@ -228,7 +228,7 @@ def test_init_with_actions_only():
 
 def test_init_with_no_meta():
     with pytest.raises(ContextSetupError):
-        _ = Context(MyCharm)
+        Context(MyCharm)
 
 
 def test_init_with_bad_meta():
