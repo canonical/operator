@@ -1775,7 +1775,7 @@ class State:
         rel = self.get_relation(relation)
         if not isinstance(rel, kind):
             raise TypeError(
-                f"Relation {relation} is not a {kind.__name__}, it's {rel.__class__.__name__}"
+                f"Relation {relation} is not a {kind.__name__}, it's a {rel.__class__.__name__}"
             )
         return rel
 
@@ -1824,7 +1824,7 @@ class State:
             if not isinstance(rel, kind):
                 raise TypeError(
                     f'Relation on endpoint {endpoint} is not a {kind.__name__}'
-                    f", it's {rel.__class__.__name__}"
+                    f", it's a {rel.__class__.__name__}"
                 )
         return rels
 
