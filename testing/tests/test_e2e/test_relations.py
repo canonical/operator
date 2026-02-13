@@ -672,6 +672,20 @@ def test_get_relation_when_missing():
     assert isinstance(exc.value, KeyError) or isinstance(exc.value.__cause__, KeyError)
 
 
+def test_get_regular_relation():
+    rel = Relation('foo')
+    state = State(relations={rel})
+    rel_out = state.get_regular_relation(rel.id)
+    assert rel_out == rel
+
+
+def test_get_regular_relation_type_error():
+    rel = PeerRelation('foo')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_regular_relation(rel.id)
+
+
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))
 def test_relation_positional_arguments(klass):
     with pytest.raises(TypeError):
