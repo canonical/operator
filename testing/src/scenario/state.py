@@ -1818,7 +1818,9 @@ class State:
         """
         return self._get_typed_relations(endpoint, kind=SubordinateRelation)
 
-    def _get_typed_relations(self, endpoint: str, kind: type[_RelationType]) -> tuple[_RelationType, ...]:
+    def _get_typed_relations(
+        self, endpoint: str, kind: type[_RelationType]
+    ) -> tuple[_RelationType, ...]:
         rels = self.get_relations(endpoint)
         for rel in rels:
             if not isinstance(rel, kind):
