@@ -69,6 +69,7 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
+RelationType = TypeVar('RelationType', bound='RelationBase')
 
 logger = scenario_logger.getChild('state')
 
@@ -1746,6 +1747,35 @@ class State:
                 return state_relation
         raise KeyError(f'relation: id={relation} not found in the State')
 
+    def get_regular_relation(self, relation: int, /) -> Relation:
+        """Get a regular relation from this State by relation id.
+
+        Raises a ``TypeError`` if this relation is not a regular ``Relation``.
+        """
+        return self._get_typed_relation(relation, kind=Relation)
+
+    def get_peer_relation(self, relation: int, /) -> PeerRelation:
+        """Get a peer relation from this State by relation id.
+
+        Raises a ``TypeError`` if this relation is not a ``PeerRelation``.
+        """
+        return self._get_typed_relation(relation, kind=PeerRelation)
+
+    def get_subordinate_relation(self, relation: int, /) -> SubordinateRelation:
+        """Get a subordinate relation from this State by relation id.
+
+        Raises a ``TypeError`` if this relation is not a ``SubordinateRelation``.
+        """
+        return self._get_typed_relation(relation, kind=SubordinateRelation)
+
+    def _get_typed_relation(self, relation: int, kind: type[RelationType]) -> RelationType:
+        rel = self.get_relation(relation)
+        if not isinstance(rel, kind):
+            raise TypeError(
+                f"Relation {relation} is not a {kind.__name__}, it's {rel.__class__.__name__}"
+            )
+        return rel
+
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
@@ -1757,6 +1787,37 @@ class State:
         return tuple(
             r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
         )
+
+    def get_regular_relations(self, endpoint: str) -> tuple[Relation, ...]:
+        """Get regular relations on this endpoint from the current state.
+
+        Raises a ``TypeError`` if the relations on this endpoint aren't regular ``Relation``s.
+        """
+        return self._get_typed_relations(endpoint, kind=Relation)
+
+    def get_peer_relations(self, endpoint: str) -> tuple[PeerRelation, ...]:
+        """Get peer relations on this endpoint from the current state.
+
+        Raises a ``TypeError`` if the relations on this endpoint aren't ``PeerRelation``s.
+        """
+        return self._get_typed_relations(endpoint, kind=PeerRelation)
+
+    def get_subordinate_relations(self, endpoint: str) -> tuple[SubordinateRelation, ...]:
+        """Get subordinate relations on this endpoint from the current state.
+
+        Raises a ``TypeError`` if the relations on this endpoint aren't ``SubordinateRelation``s.
+        """
+        return self._get_typed_relations(endpoint, kind=SubordinateRelation)
+
+    def _get_typed_relations(self, endpoint: str, kind: type[RelationType]) -> RelationType:
+        rels = self.get_relations(endpoint)
+        for rel in rels:
+            if not isinstance(rel, kind):
+                raise TypeError(
+                    f'Relation on endpoint {endpoint} is not a {kind.__name__}'
+                    f", it's {rel.__class__.__name__}"
+                )
+        return rels
 
     @classmethod
     def from_context(
