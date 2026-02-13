@@ -1750,21 +1750,24 @@ class State:
     def get_regular_relation(self, relation: int, /) -> Relation:
         """Get a regular relation from this State by relation id.
 
-        Raises a ``TypeError`` if this relation is not a regular ``Relation``.
+        Raises:
+            TypeError: If this relation is not a ``Relation``.
         """
         return self._get_typed_relation(relation, kind=Relation)
 
     def get_peer_relation(self, relation: int, /) -> PeerRelation:
         """Get a peer relation from this State by relation id.
 
-        Raises a ``TypeError`` if this relation is not a ``PeerRelation``.
+        Raises:
+            TypeError: If this relation is not a ``PeerRelation``.
         """
         return self._get_typed_relation(relation, kind=PeerRelation)
 
     def get_subordinate_relation(self, relation: int, /) -> SubordinateRelation:
         """Get a subordinate relation from this State by relation id.
 
-        Raises a ``TypeError`` if this relation is not a ``SubordinateRelation``.
+        Raises:
+            TypeError: If this relation is not a ``SubordinateRelation``.
         """
         return self._get_typed_relation(relation, kind=SubordinateRelation)
 
@@ -1791,24 +1794,27 @@ class State:
     def get_regular_relations(self, endpoint: str) -> tuple[Relation, ...]:
         """Get regular relations on this endpoint from the current state.
 
-        Raises a ``TypeError`` if any of the relations on this endpoint
-        is not a ``Relation``.
+        Raises:
+            TypeError: If any of the relations on this endpoint is not
+                a ``Relation``.
         """
         return self._get_typed_relations(endpoint, kind=Relation)
 
     def get_peer_relations(self, endpoint: str) -> tuple[PeerRelation, ...]:
         """Get peer relations on this endpoint from the current state.
 
-        Raises a ``TypeError`` if any of the relations on this endpoint
-        is not a ``PeerRelation``.
+        Raises:
+            TypeError: If any of the relations on this endpoint is not
+                a ``PeerRelation``.
         """
         return self._get_typed_relations(endpoint, kind=PeerRelation)
 
     def get_subordinate_relations(self, endpoint: str) -> tuple[SubordinateRelation, ...]:
         """Get subordinate relations on this endpoint from the current state.
 
-        Raises a ``TypeError`` if any of the relations on this endpoint
-        is not a ``SubordinateRelation``.
+        Raises:
+            TypeError: If any of the relations on this endpoint is not
+                a ``SubordinateRelation``.
         """
         return self._get_typed_relations(endpoint, kind=SubordinateRelation)
 
