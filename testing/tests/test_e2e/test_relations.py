@@ -686,6 +686,103 @@ def test_get_regular_relation_type_error():
         state.get_regular_relation(rel.id)
 
 
+def test_get_peer_relation():
+    rel = PeerRelation('peers')
+    state = State(relations={rel})
+    rel_out = state.get_peer_relation(rel.id)
+    assert rel_out == rel
+
+
+def test_get_peer_relation_type_error():
+    rel = Relation('foo')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_peer_relation(rel.id)
+
+
+def test_get_subordinate_relation():
+    rel = SubordinateRelation('logging')
+    state = State(relations={rel})
+    rel_out = state.get_subordinate_relation(rel.id)
+    assert rel_out == rel
+
+
+def test_get_subordinate_relation_type_error():
+    rel = PeerRelation('peers')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_subordinate_relation(rel.id)
+
+
+def test_get_regular_relations():
+    rel1 = Relation('foo')
+    rel2 = Relation('foo')
+    state = State(relations={rel1, rel2})
+    rels_out = state.get_regular_relations('foo')
+    assert len(rels_out) == 2
+    assert rel1 in rels_out
+    assert rel2 in rels_out
+
+
+def test_get_regular_relations_type_error():
+    rel = PeerRelation('peers')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_regular_relations('peers')
+
+
+def test_get_peer_relations():
+    rel1 = PeerRelation('peers')
+    rel2 = PeerRelation('peers')
+    state = State(relations={rel1, rel2})
+    rels_out = state.get_peer_relations('peers')
+    assert len(rels_out) == 2
+    assert rel1 in rels_out
+    assert rel2 in rels_out
+
+
+def test_get_peer_relations_type_error():
+    rel = SubordinateRelation('logging')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_peer_relations('logging')
+
+
+def test_get_subordinate_relations():
+    rel1 = SubordinateRelation('logging')
+    rel2 = SubordinateRelation('logging')
+    state = State(relations={rel1, rel2})
+    rels_out = state.get_subordinate_relations('logging')
+    assert len(rels_out) == 2
+    assert rel1 in rels_out
+    assert rel2 in rels_out
+
+
+def test_get_subordinate_relations_type_error():
+    rel = Relation('foo')
+    state = State(relations={rel})
+    with pytest.raises(TypeError):
+        state.get_subordinate_relations('foo')
+
+
+def test_get_regular_relations_empty():
+    state = State()
+    rels_out = state.get_regular_relations('foo')
+    assert len(rels_out) == 0
+
+
+def test_get_peer_relations_empty():
+    state = State()
+    rels_out = state.get_peer_relations('peers')
+    assert len(rels_out) == 0
+
+
+def test_get_subordinate_relations_empty():
+    state = State()
+    rels_out = state.get_subordinate_relations('logging')
+    assert len(rels_out) == 0
+
+
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))
 def test_relation_positional_arguments(klass):
     with pytest.raises(TypeError):
