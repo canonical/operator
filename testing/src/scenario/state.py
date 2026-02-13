@@ -69,7 +69,7 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
-RelationType = TypeVar('RelationType', bound='RelationBase')
+_RelationType = TypeVar('_RelationType', bound='RelationBase')
 
 logger = scenario_logger.getChild('state')
 
@@ -1771,7 +1771,7 @@ class State:
         """
         return self._get_typed_relation(relation, kind=SubordinateRelation)
 
-    def _get_typed_relation(self, relation: int, kind: type[RelationType]) -> RelationType:
+    def _get_typed_relation(self, relation: int, kind: type[_RelationType]) -> _RelationType:
         rel = self.get_relation(relation)
         if not isinstance(rel, kind):
             raise TypeError(
@@ -1818,7 +1818,7 @@ class State:
         """
         return self._get_typed_relations(endpoint, kind=SubordinateRelation)
 
-    def _get_typed_relations(self, endpoint: str, kind: type[RelationType]) -> RelationType:
+    def _get_typed_relations(self, endpoint: str, kind: type[_RelationType]) -> tuple[_RelationType, ...]:
         rels = self.get_relations(endpoint)
         for rel in rels:
             if not isinstance(rel, kind):
