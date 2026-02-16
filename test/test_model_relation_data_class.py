@@ -219,6 +219,7 @@ if pydantic:
 
 
 if pydantic and MISSING is not None:
+
     class MissingPydanticDatabag(pydantic.BaseModel):
         foo: str
         bar: int = pydantic.Field(default=0, ge=0)
