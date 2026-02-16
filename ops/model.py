@@ -1915,7 +1915,10 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
-        data = {field: encoder(values[attr]) if attr in values else '' for attr, field in sorted(fields.items())}
+        data = {
+            field: encoder(values[attr]) if attr in values else ''
+            for attr, field in sorted(fields.items())
+        }
         self.data[dst].update(data)
 
 
