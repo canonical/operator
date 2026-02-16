@@ -259,7 +259,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key: str | Relation) -> Binding | None:
+    def get_binding(self, binding_key: str | Relation) -> Binding:
         """Get a network space binding.
 
         Args:
