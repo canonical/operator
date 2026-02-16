@@ -16,7 +16,7 @@ ops
 
 ## Pebble
 
-An API for interacting with Pebble. You usually shouldn't use this API directly. Instead, use `ops.Container` for interacting with containers. See [](#run-workloads-with-a-charm-kubernetes).
+An API for interacting with Pebble. You usually shouldn't use this API directly. Instead, use `ops.Container` for interacting with containers. See [](#manage-containers).
 
 ```{toctree}
 :maxdepth: 1

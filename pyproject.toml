@@ -94,7 +94,7 @@ ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
 
 [tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.lib"]
+include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
