@@ -1,4 +1,5 @@
-# How to manage metrics
+(pebble-metrics)=
+# How to manage Pebble metrics
 
 Pebble provides [metrics](https://documentation.ubuntu.com/pebble/reference/api/#/metrics/get_v1_metrics) for services and health checks in OpenMetrics format. Access to the Pebble metrics endpoint requires HTTP basic authentication with a username and password.
 

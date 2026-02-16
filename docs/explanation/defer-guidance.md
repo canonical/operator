@@ -9,7 +9,7 @@ If the charm encounters a temporary failure (such as working with a container or
 
 Note that it’s important to consider that when the deferred handler is run again, the Juju context may not be exactly the same as it was when the event was first emitted, so the charm code needs to be aware of this.
 
-If the temporary failure is because the workload is busy, and the charm is deployed to a Kubernetes sidecar controller, you might be able to avoid the defer using a [Pebble custom notice](#use-custom-notices-from-the-workload-container). For example, if the code can’t continue because the workload is currently restarting, if you can have a post-completion hook for the restart that executes `pebble notify`, then you can ensure that the charm is ‘woken up’ at the right time to handle the work.
+If the temporary failure is because the workload is busy, and the charm is deployed to a Kubernetes sidecar controller, you might be able to avoid the defer using a [Pebble custom notice](#pebble-custom-notices). For example, if the code can’t continue because the workload is currently restarting, if you can have a post-completion hook for the restart that executes `pebble notify`, then you can ensure that the charm is ‘woken up’ at the right time to handle the work.
 
 In the future, we hope to see a Juju ‘request re-emit event’ feature that will let the charm tell Juju when it expects the problem to be resolved.
 
@@ -33,7 +33,7 @@ In some situations, the charm is waiting for a system to be ready, but it’s no
 
 Deferring the work here is ok, but it’s important to consider the delay between deferring the event and its eventual re-emitting - it’s not safe to assume that this will be a small period of time, unless you know that another event can be expected.
 
-For a Kubernetes charm, if the charm is waiting on the workload and it’s possible to have the workload execute a command when it’s ready, then using a [Pebble custom notice](#use-custom-notices-from-the-workload-container) is much better than deferring. This then becomes another example of “waiting for a collection of events”, described above.
+For a Kubernetes charm, if the charm is waiting on the workload and it’s possible to have the workload execute a command when it’s ready, then using a [Pebble custom notice](#pebble-custom-notices) is much better than deferring. This then becomes another example of “waiting for a collection of events”, described above.
 
 ## Not possible: actions, shutting down, framework generated events, secrets
 

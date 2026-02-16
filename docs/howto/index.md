@@ -51,7 +51,7 @@ Ops enables your charm to output logs to the Juju logs.
 Log from your charm <log-from-your-charm>
 ```
 
-## Running workloads
+## Managing machine workloads
 
 Your charm is responsible for interacting with a workload.
 
@@ -59,12 +59,32 @@ Your charm is responsible for interacting with a workload.
 :maxdepth: 1
 
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
-Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 ```
 
-Kubernetes charms use Pebble to manage containers. Your charm can configure Pebble so that you can access metrics for services and health checks.
+## Managing containers
 
-- {doc}`Manage metrics <manage-metrics>`
+```{toctree}
+:hidden:
+
+Manage containers <manage-containers/index>
+```
+
+In a Kubernetes charm, your charm manages the workload by defining the {external+pebble:doc}`Pebble <index>` service configuration. Your charm can also use Pebble to run commands and read and write files in the workload container.
+
+- {doc}`Manage the workload container <manage-containers/manage-the-workload-container>`
+- {doc}`Manage files in the workload container <manage-containers/manage-files-in-the-workload-container>`
+
+Pebble can regularly check that the workload is healthy and report back to your charm.
+
+- {doc}`Manage Pebble health checks <manage-containers/manage-pebble-health-checks>`
+
+Custom notices enable the workload to tell your charm that something has happened.
+
+- {doc}`Manage Pebble custom notices <manage-containers/manage-pebble-custom-notices>`
+
+Your charm can configure Pebble so that you can access metrics for services and health checks.
+
+- {doc}`Manage Pebble metrics <manage-containers/manage-pebble-metrics>`
 
 ## Managing features
 
@@ -86,14 +106,6 @@ Manage stored state <manage-stored-state>
 Manage opened ports <manage-opened-ports>
 Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
-```
-
-% TOC only. Nothing shown on the page.
-
-```{toctree}
-:hidden:
-
-Manage metrics <manage-metrics>
 ```
 
 ## Tracing
