@@ -178,6 +178,7 @@ class CloudCredential:  # noqa: D101
         object.__setattr__(self, 'auth_type', auth_type)
         object.__setattr__(self, 'attributes', dict(attributes) if attributes else {})
         object.__setattr__(self, 'redacted', list(redacted) if redacted else [])
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
@@ -247,6 +248,7 @@ class CloudSpec:  # noqa: D101
         )
         object.__setattr__(self, 'skip_tls_verify', skip_tls_verify)
         object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> CloudSpec_Ops:
         return CloudSpec_Ops(
@@ -511,6 +513,7 @@ class Network:
             'egress_subnets',
             list(egress_subnets) if egress_subnets is not None else ['192.0.2.0/24'],
         )
+        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
@@ -986,6 +989,7 @@ class Notice:
         object.__setattr__(self, 'last_data', dict(last_data) if last_data else {})
         object.__setattr__(self, 'repeat_after', repeat_after)
         object.__setattr__(self, 'expire_after', expire_after)
+        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
