@@ -2601,7 +2601,8 @@ class _TestingModelBackend:
     def _storage_attach(self, storage_id: str):
         """Mark the named storage_id as attached.
 
-        Return ``True`` if it was previously detached.
+        Returns:
+            ``True`` if it was previously detached.
         """
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # re-attachment of a storage unit.  This is not present in
