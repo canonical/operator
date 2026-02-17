@@ -154,7 +154,7 @@ class CloudSpec:
     """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
+    """If this is the cloud used by the controller, defaults to `False`."""
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CloudSpec:

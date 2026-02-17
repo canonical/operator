@@ -540,9 +540,9 @@ class ExecError(Error, Generic[AnyStr]):
     """Standard error from the process.
 
     If :meth:`ExecProcess.wait_output` was being called and ``combine_stderr``
-    was False, this is the captured stderr as a str (or bytes if encoding was
+    was `False`, this is the captured stderr as a str (or bytes if encoding was
     None). If :meth:`ExecProcess.wait` was being called or ``combine_stderr``
-    was True, this is None.
+    was `True`, this is None.
     """
 
     def __init__(
@@ -1069,7 +1069,7 @@ class ServiceInfo:
         self.current = current
 
     def is_running(self) -> bool:
-        """Return True if this service is running (in the active state)."""
+        """Return `True` if this service is running (in the active state)."""
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
@@ -1723,9 +1723,9 @@ class ExecProcess(Generic[AnyStr]):
     """Standard error from the process.
 
     If the stderr argument was not passed to :meth:`Client.exec` and
-    ``combine_stderr`` was False, this is a readable file-like object the
+    ``combine_stderr`` was `False`, this is a readable file-like object the
     caller can use to stream error output from the process. It is None if
-    stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was True.
+    stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was `True`.
     """
 
     def __init__(
@@ -1820,7 +1820,7 @@ class ExecProcess(Generic[AnyStr]):
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
-        at most that duration. If combine_stderr was True, stdout will include
+        at most that duration. If combine_stderr was `True`, stdout will include
         the process's standard error, and stderr will be None.
 
         Raises:
@@ -1878,7 +1878,7 @@ class ExecProcess(Generic[AnyStr]):
 
 
 def _has_fileno(f: Any) -> bool:
-    """Return True if the file-like object has a valid fileno() method."""
+    """Return `True` if the file-like object has a valid fileno() method."""
     try:
         f.fileno()
         return True
