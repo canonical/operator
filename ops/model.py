@@ -3164,7 +3164,7 @@ class Container:
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is `False`
+            pebble.PathError: If a relative path is provided, or if ``recursive`` is ``False``
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         self._pebble.remove_path(path, recursive=recursive)
@@ -4277,7 +4277,7 @@ class CloudSpec:
     """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to `False`."""
+    """If this is the cloud used by the controller, defaults to ``False``."""
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudSpec:

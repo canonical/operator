@@ -212,7 +212,7 @@ class _Dispatcher:
         self.event_name = name
 
     def is_restricted_context(self):
-        """Return `True` if we are running in a restricted Juju context.
+        """Return ``True`` if we are running in a restricted Juju context.
 
         When in a restricted context, most commands (relation-get, config-get,
         state-get) are not available. As such, we change how we interact with

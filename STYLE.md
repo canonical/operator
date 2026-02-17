@@ -266,7 +266,7 @@ Choice of words: For example, if the whole document uses "mandatory", you probab
 When describing boolean parameters in docstrings:
 
 - Use lowercase "true"/"false" (no backticks) for truth-y/falsy concepts: "if true, create parent directories".
-- Use backtick-quoted `` `True` ``/`` `False` `` when referring to the Python objects themselves: "pass `True` to enable".
+- Use double-backtick-quoted `` ``True`` ``/`` ``False`` `` when referring to the Python objects themselves: "pass ``True`` to enable".
 - Do not use bare "True"/"False" (capitalised without backticks).
 
 ### Be precise

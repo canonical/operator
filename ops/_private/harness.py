@@ -450,7 +450,7 @@ class Harness(Generic[CharmType]):
         should be active when the charm starts, and then call this method. This method will
         automatically create and add peer relations that are specified in metadata.yaml.
 
-        If the charm metadata specifies containers, this sets can_connect to `True` for all
+        If the charm metadata specifies containers, this sets can_connect to ``True`` for all
         containers (in addition to triggering pebble-ready for each).
 
         Example::
@@ -2601,7 +2601,7 @@ class _TestingModelBackend:
     def _storage_attach(self, storage_id: str):
         """Mark the named storage_id as attached.
 
-        Return `True` if it was previously detached.
+        Return ``True`` if it was previously detached.
         """
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # re-attachment of a storage unit.  This is not present in

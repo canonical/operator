@@ -1231,7 +1231,7 @@ class StoredState:
     Data is stored alongside the charm (in the charm container for Kubernetes
     sidecar charms, and on the machine for machine charms). The exceptions are
     two deprecated cases: Kubernetes podspec charms, and charms explicitly
-    passing `True` for `use_juju_for_storage` when running :meth:`ops.main`.
+    passing ``True`` for ``use_juju_for_storage`` when running :meth:`ops.main`.
 
     For machine charms, charms are upgraded in-place on the machine, so the data
     is preserved. For Kubernetes sidecar charms, when the charm is upgraded, the
