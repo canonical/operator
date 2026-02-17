@@ -385,7 +385,6 @@ def test_replace_state():
         (Container, 'layers', {'name': 'foo'}),
         (Container, 'service_statuses', {'name': 'foo'}),
         (Container, 'mounts', {'name': 'foo'}),
-        (Container, 'notices', {'name': 'foo'}),
         (StoredState, 'content', {}),
     ],
 )
@@ -415,6 +414,7 @@ def test_immutable_content_dict(
         (Network, 'bind_addresses', {'binding_name': 'foo'}),
         (Network, 'ingress_addresses', {'binding_name': 'foo'}),
         (Network, 'egress_subnets', {'binding_name': 'foo'}),
+        (Container, 'notices', {'name': 'foo'}),
     ],
 )
 def test_immutable_content_list(
