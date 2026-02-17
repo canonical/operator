@@ -261,6 +261,14 @@ However, it's okay to use acronyms that are very well known in our domain, like 
 
 Choice of words: For example, if the whole document uses "mandatory", you probably shouldn't use "required" in a newly added paragraph. For another example, if the whole document uses "list foo" when adding new content, don't use "get a list of bar".
 
+### Use "true"/"false" consistently in docstrings
+
+When describing boolean parameters in docstrings:
+
+- Use lowercase "true"/"false" (no backticks) for truth-y/falsy concepts: "if true, create parent directories".
+- Use backtick-quoted `` `True` ``/`` `False` `` when referring to the Python objects themselves: "pass `True` to enable".
+- Do not use bare "True"/"False" (capitalised without backticks).
+
 ### Be precise
 
 Be precise in names and verbs. Use precise verbs to describe the behaviour. For example, the appropriate description of `/v1/services` is "list services", while "get a service" is probably a better fit for `/v1/services/{name}`.

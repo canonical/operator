@@ -2643,9 +2643,9 @@ class Container:
                 combining).
             layer: A YAML string, configuration layer dict, or pebble.Layer
                 object containing the Pebble layer to add.
-            combine: If combine is False (the default), append the new layer
+            combine: If combine is false (the default), append the new layer
                 as the top layer with the given label (must be unique). If
-                combine is True and the label already exists, the two layers
+                combine is true and the label already exists, the two layers
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
         """
@@ -2798,7 +2798,7 @@ class Container:
             encoding: Encoding to use for encoding source str to bytes, or
                 strings read from source if it is a TextIO type. Ignored if
                 source is bytes or BinaryIO.
-            make_dirs: If True, create parent directories if they don't exist.
+            make_dirs: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
             user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
@@ -3130,7 +3130,7 @@ class Container:
 
         Args:
             path: Path of the directory to create on the remote system.
-            make_parents: If True, create parent directories if they don't exist.
+            make_parents: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
             user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
@@ -3158,13 +3158,13 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory, recursively delete it and
+            recursive: If true, and path is a directory, recursively delete it and
                        everything under it. If path is a file, delete the file. In
                        either case, do nothing if the file or directory does not
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is False
+            pebble.PathError: If a relative path is provided, or if `recursive` is `False`
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         self._pebble.remove_path(path, recursive=recursive)

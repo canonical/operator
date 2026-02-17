@@ -2539,8 +2539,8 @@ class Client:
     def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
-        If combine is False (the default), append the new layer as the top
-        layer with the given label. If combine is True and the label already
+        If combine is false (the default), append the new layer as the top
+        layer with the given label. If combine is true and the label already
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
@@ -2689,7 +2689,7 @@ class Client:
             encoding: Encoding to use for encoding source str to bytes, or
                 strings read from source if it is a TextIO type. Ignored if
                 source is bytes or BinaryIO.
-            make_dirs: If True, create parent directories if they don't exist.
+            make_dirs: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
             user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
@@ -2849,7 +2849,7 @@ class Client:
 
         Args:
             path: Path of the directory to create on the remote system.
-            make_parents: If True, create parent directories if they don't exist.
+            make_parents: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
             user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
@@ -2885,13 +2885,13 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory, recursively delete it and
+            recursive: If true, and path is a directory, recursively delete it and
                        everything under it. If path is a file, delete the file. In
                        either case, do nothing if the file or directory does not
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is False
+            pebble.PathError: If a relative path is provided, or if `recursive` is `False`
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         path = str(path)
@@ -3074,13 +3074,13 @@ class Client:
                 :meth:`ExecProcess.wait_output` to capture error output as a
                 string, or read from :meth:`ExecProcess.stderr` to stream
                 error output from the process. Must be None if combine_stderr
-                is True.
+                is `True`.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
                 is used to encode them to bytes. If encoding is None, the
                 types read or written are raw bytes.
-            combine_stderr: If True, process's stderr output is combined into
-                its stdout (the stderr argument must be None). If False,
+            combine_stderr: If true, process's stderr output is combined into
+                its stdout (the stderr argument must be None). If false,
                 separate streams are used for stdout and stderr.
 
         Returns:

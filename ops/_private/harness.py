@@ -1646,7 +1646,7 @@ class Harness(Generic[CharmType]):
         do/don't trigger extra calls.
 
         Args:
-            reset: If True, reset the calls list back to empty, if false, the call list is
+            reset: If true, reset the calls list back to empty, if false, the call list is
                 preserved.
 
         Return:
