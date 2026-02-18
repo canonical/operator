@@ -240,7 +240,9 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail(charm_class: type[BaseTestCharm]):
+def test_relation_load_fail(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
@@ -250,13 +252,16 @@ def test_relation_load_fail(charm_class: type[BaseTestCharm]):
     data = {'foo': json.dumps('value'), 'bar': json.dumps('bar'), 'baz': json.dumps(['a', 'b'])}
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    with pytest.raises(ValueError):
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    assert isinstance(exc_info.value.__cause__, ValueError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCharm]):
+def test_relation_load_fail_multi_field_validation(
+    charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
@@ -270,9 +275,8 @@ def test_relation_load_fail_multi_field_validation(charm_class: type[BaseTestCha
     }
     rel = testing.Relation('db', remote_app_data=data)
     state_in = testing.State(leader=True, relations={rel})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    with pytest.raises(ValueError):
         ctx.run(ctx.on.relation_changed(rel), state_in)
-    assert isinstance(exc_info.value.__cause__, ValueError)
 
 
 class _AliasProtocol(Protocol):
@@ -418,7 +422,11 @@ def test_relation_save_simple(charm_class: type[BaseTestCharm]):
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
+def test_relation_save_no_access(
+    charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
@@ -427,9 +435,8 @@ def test_relation_save_no_access(charm_class: type[BaseTestCharm]):
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    with pytest.raises(ops.RelationDataAccessError):
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    assert isinstance(exc_info.value.__cause__, ops.RelationDataAccessError)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
@@ -463,7 +470,9 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
-def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
+def test_relation_save_invalid(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
     class Charm(charm_class):
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             def encoder(_: Any) -> int:
@@ -476,9 +485,8 @@ def test_relation_save_invalid(charm_class: type[BaseTestCharm]):
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel_in = testing.Relation('db')
     state_in = testing.State(leader=True, relations={rel_in})
-    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+    with pytest.raises(ops.RelationDataTypeError):
         ctx.run(ctx.on.relation_changed(rel_in), state_in)
-    assert isinstance(exc_info.value.__cause__, ops.RelationDataTypeError)
 
 
 class _OneStringProtocol(Protocol):
