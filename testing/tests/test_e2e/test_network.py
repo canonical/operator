@@ -14,24 +14,22 @@ from scenario.state import (
     SubordinateRelation,
 )
 
-from ops import RelationNotFoundError
-from ops.charm import CharmBase
-from ops.framework import Framework
+import ops
 
 
 @pytest.fixture(scope='function')
-def mycharm():
-    class MyCharm(CharmBase):
+def mycharm() -> type[ops.CharmBase]:
+    class MyCharm(ops.CharmBase):
         _call = None
         called = False
 
-        def __init__(self, framework: Framework):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
 
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             if MyCharm._call:
                 MyCharm.called = True
                 MyCharm._call(self, event)
@@ -39,8 +37,8 @@ def mycharm():
     return MyCharm
 
 
-def test_ip_get(mycharm):
-    ctx = Context(
+def test_ip_get(mycharm: type[ops.CharmBase]):
+    ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={
             'name': 'foo',
@@ -68,17 +66,30 @@ def test_ip_get(mycharm):
     ) as mgr:
         # we have a network for the relation
         rel = mgr.charm.model.get_relation('metrics-endpoint')
-        assert str(mgr.charm.model.get_binding(rel).network.bind_address) == '192.0.2.0'
+        assert rel is not None
+        binding = mgr.charm.model.get_binding(rel)
+        assert binding is not None
+        network = binding.network
+        assert network is not None
+        assert str(network.bind_address) == '192.0.2.0'
 
         # we have a network for a binding without relations on it
-        assert str(mgr.charm.model.get_binding('deadnodead').network.bind_address) == '192.0.2.0'
+        binding = mgr.charm.model.get_binding('deadnodead')
+        assert binding is not None
+        network = binding.network
+        assert network is not None
+        assert str(network.bind_address) == '192.0.2.0'
 
         # and an extra binding
-        assert str(mgr.charm.model.get_binding('foo').network.bind_address) == '4.4.4.4'
+        binding = mgr.charm.model.get_binding('foo')
+        assert binding is not None
+        network = binding.network
+        assert network is not None
+        assert str(network.bind_address) == '4.4.4.4'
 
 
-def test_no_sub_binding(mycharm):
-    ctx = Context(
+def test_no_sub_binding(mycharm: type[ops.CharmBase]):
+    ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={
             'name': 'foo',
@@ -94,15 +105,15 @@ def test_no_sub_binding(mycharm):
             ]
         ),
     ) as mgr:
-        with pytest.raises(RelationNotFoundError):
+        with pytest.raises(ops.RelationNotFoundError):
             # sub relations have no network
-            mgr.charm.model.get_binding('bar').network  # noqa: B018  # Used to trigger the error.
+            mgr.charm.model.get_binding('bar').network  # type: ignore # noqa: B018  # Used to trigger the error.
 
 
-def test_no_relation_error(mycharm):
+def test_no_relation_error(mycharm: type[ops.CharmBase]):
     """Attempting to call get_binding on a non-existing relation -> RelationNotFoundError"""
 
-    ctx = Context(
+    ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={
             'name': 'foo',
@@ -125,12 +136,12 @@ def test_no_relation_error(mycharm):
             networks={Network('bar')},
         ),
     ) as mgr:
-        with pytest.raises(RelationNotFoundError):
-            mgr.charm.model.get_binding('foo').network  # noqa: B018  # Used to trigger the error.
+        with pytest.raises(ops.RelationNotFoundError):
+            mgr.charm.model.get_binding('foo').network  # type: ignore # noqa: B018  # Used to trigger the error.
 
 
-def test_juju_info_network_default(mycharm):
-    ctx = Context(
+def test_juju_info_network_default(mycharm: type[ops.CharmBase]):
+    ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={'name': 'foo'},
     )
@@ -140,11 +151,15 @@ def test_juju_info_network_default(mycharm):
         State(),
     ) as mgr:
         # we have a network for the relation
-        assert str(mgr.charm.model.get_binding('juju-info').network.bind_address) == '192.0.2.0'
+        binding = mgr.charm.model.get_binding('juju-info')
+        assert binding is not None
+        network = binding.network
+        assert network is not None
+        assert str(network.bind_address) == '192.0.2.0'
 
 
-def test_explicit_juju_info_network_override(mycharm):
-    ctx = Context(
+def test_explicit_juju_info_network_override(mycharm: type[ops.CharmBase]):
+    ctx: Context[ops.CharmBase] = Context(
         mycharm,
         meta={
             'name': 'foo',
@@ -157,4 +172,8 @@ def test_explicit_juju_info_network_override(mycharm):
         ctx.on.update_status(),
         State(),
     ) as mgr:
-        assert mgr.charm.model.get_binding('juju-info').network.bind_address
+        binding = mgr.charm.model.get_binding('juju-info')
+        assert binding is not None
+        network = binding.network
+        assert network is not None
+        assert network.bind_address

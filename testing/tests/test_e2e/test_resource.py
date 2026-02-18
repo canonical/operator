@@ -12,7 +12,7 @@ import ops
 
 
 class ResourceCharm(ops.CharmBase):
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
 
 

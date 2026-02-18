@@ -10,18 +10,17 @@ import pytest
 from scenario.state import State, StoredState
 
 import ops
-from ops.framework import StoredState as OpsStoredstate
 from tests.helpers import trigger
 
 
 @pytest.fixture(scope='function')
-def mycharm():
+def mycharm() -> type[ops.CharmBase]:
     class MyCharm(ops.CharmBase):
         META: Mapping[str, Any] = {'name': 'mycharm'}
 
         _read: ClassVar[dict[str, Any]] = {}
-        _stored = OpsStoredstate()
-        _stored2 = OpsStoredstate()
+        _stored = ops.StoredState()
+        _stored2 = ops.StoredState()
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -37,8 +36,8 @@ def mycharm():
     return MyCharm
 
 
-def test_stored_state_default(mycharm):
-    out = trigger(State(), 'start', mycharm, meta=mycharm.META)
+def test_stored_state_default(mycharm: type[ops.CharmBase]):
+    out = trigger(State(), 'start', mycharm, meta=mycharm.META)  # type: ignore
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'bar',
         'baz': {12: 142},
@@ -49,7 +48,7 @@ def test_stored_state_default(mycharm):
     }
 
 
-def test_stored_state_initialized(mycharm):
+def test_stored_state_initialized(mycharm: type[ops.CharmBase]):
     out = trigger(
         State(
             stored_states={
@@ -58,7 +57,7 @@ def test_stored_state_initialized(mycharm):
         ),
         'start',
         mycharm,
-        meta=mycharm.META,
+        meta=mycharm.META,  # type: ignore
     )
     assert out.get_stored_state('_stored', owner_path='MyCharm').content == {
         'foo': 'FOOX',
@@ -72,7 +71,7 @@ def test_stored_state_initialized(mycharm):
 
 def test_positional_arguments():
     with pytest.raises(TypeError):
-        StoredState('_stored', '')
+        StoredState('_stored', '')  # type: ignore
 
 
 def test_default_arguments():
