@@ -78,7 +78,7 @@ class Handle:
     """Handle defines a name for an object in the form of a hierarchical path.
 
     The provided parent is the object (or that object's handle) that this handle
-    sits under, or None if the object identified by this handle stands by itself
+    sits under, or ``None`` if the object identified by this handle stands by itself
     as the root of its own hierarchy.
 
     The handle kind is a string that defines a namespace so objects with the

@@ -1425,7 +1425,7 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
     """
 
     startup: CheckStartup
@@ -1453,7 +1453,7 @@ class CheckInfo:
     :meth:`Client.start_checks`. It is reset to one when the check
     succeeds after the check's failure threshold was reached.
 
-    This will be None if the version of Pebble being queried doesn't return
+    This will be ``None`` if the version of Pebble being queried doesn't return
     the ``successes`` field (introduced in Pebble v1.23.0).
     """
 
@@ -1472,7 +1472,7 @@ class CheckInfo:
     change_id: ChangeID | None
     """Change ID of ``perform-check`` or ``recover-check`` change driving this check.
 
-    This will be None on older versions of Pebble, which did not use changes
+    This will be ``None`` on older versions of Pebble, which did not use changes
     to drive health checks.
     """
 
@@ -1708,7 +1708,7 @@ class ExecProcess(Generic[AnyStr]):
 
     If the stdin argument was not passed to :meth:`Client.exec`, this is a
     writable file-like object the caller can use to stream input to the
-    process. It is None if stdin was passed to :meth:`Client.exec`.
+    process. It is ``None`` if stdin was passed to :meth:`Client.exec`.
     """
 
     stdout: IO[AnyStr] | None
@@ -1716,7 +1716,7 @@ class ExecProcess(Generic[AnyStr]):
 
     If the stdout argument was not passed to :meth:`Client.exec`, this is a
     readable file-like object the caller can use to stream output from the
-    process. It is None if stdout was passed to :meth:`Client.exec`.
+    process. It is ``None`` if stdout was passed to :meth:`Client.exec`.
     """
 
     stderr: IO[AnyStr] | None
@@ -1724,7 +1724,7 @@ class ExecProcess(Generic[AnyStr]):
 
     If the stderr argument was not passed to :meth:`Client.exec` and
     ``combine_stderr`` was ``False``, this is a readable file-like object the
-    caller can use to stream error output from the process. It is None if
+    caller can use to stream error output from the process. It is ``None`` if
     stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was ``True``.
     """
 
@@ -1821,7 +1821,7 @@ class ExecProcess(Generic[AnyStr]):
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
         at most that duration. If combine_stderr was ``True``, stdout will include
-        the process's standard error, and stderr will be None.
+        the process's standard error, and stderr will be ``None``.
 
         Raises:
             ChangeError: if there was an error starting or running the process.
@@ -2443,7 +2443,7 @@ class Client:
         Args:
             change_id: Change ID of change to wait for.
             timeout: Maximum time in seconds to wait for the change to be
-                ready. It may be None, in which case wait_change never times out.
+                ready. It may be ``None``, in which case wait_change never times out.
             delay: If polling, this is the delay in seconds between attempts.
 
         Returns:
@@ -2605,12 +2605,12 @@ class Client:
         Args:
             path: Path of the file to read from the remote system.
             encoding: Encoding to use for decoding the file's bytes to str,
-                or None to specify no decoding.
+                or ``None`` to specify no decoding.
 
         Returns:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
-            encoding is None.
+            encoding is ``None``.
 
         Raises:
             PathError: If there was an error reading the file at path, for

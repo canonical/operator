@@ -184,7 +184,7 @@ class ActionFailed(Exception):  # noqa: N818 (name doesn't end with "Error")
     state: State | None
     """The Juju state after the action has been run.
 
-    When using Harness.run_action, this will be None.
+    When using Harness.run_action, this will be ``None``.
     """
 
     def __init__(
@@ -1859,7 +1859,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret associated with the event.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)
@@ -1880,7 +1880,7 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret associated with the event.
             revision: Revision number to provide to the event. This should be
                 an item from the list returned by :meth:`get_secret_revisions`.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)
@@ -1901,7 +1901,7 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret associated with the event.
             revision: Revision number to provide to the event. This should be
                 an item from the list returned by :meth:`get_secret_revisions`.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)

@@ -1382,7 +1382,7 @@ class Secret:
         identifier for identifying one secret in a set of secrets of arbitrary
         size, use :attr:`unique_identifier` -- this should be rare.)
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
@@ -1401,7 +1401,7 @@ class Secret:
         cases where the charm has a set of secrets of arbitrary size, for
         example, a group of 10 or 20 TLS certificates.
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         if self._id is None:
@@ -1445,7 +1445,7 @@ class Secret:
         Juju will ensure that the entity (the owner or observer) only has one
         secret with this label at once.
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with an ID but no label.
         """
         return self._label
