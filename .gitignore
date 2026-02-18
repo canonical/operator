@@ -13,6 +13,7 @@ coverage.xml
 .coverage.data
 /.tox
 .*.swp
+.ruff_cache
 .claude/settings.local.json
 
 # Tokens and settings for `act` to run GHA locally
@@ -28,6 +29,9 @@ coverage.xml
 ops_scenario.egg-info
 /testing/build/
 /testing/dist/
+ops_tools.egg-info
+/tools/build/
+/tools/dist/
 
 # Smoke test artifacts
 *.tar.gz

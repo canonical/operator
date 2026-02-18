@@ -43,6 +43,7 @@ An API for tracing charm code and sending data to sources such as the [Canonical
 :maxdepth: 1
 
 ops-tracing
+ops-tools
 ```
 
 ## Hook commands
