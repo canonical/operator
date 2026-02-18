@@ -57,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
         secrets: Iterable[Secret]
         resources: Iterable[Resource]
         planned_units: int
-        deferred: Sequence[DeferredEvent]
+        deferred: Iterable[DeferredEvent]
         stored_states: Iterable[StoredState]
         app_status: _EntityStatus
         unit_status: _EntityStatus
@@ -172,13 +172,12 @@ class CloudCredential:  # noqa: D101
         self,
         *,
         auth_type: str,
-        attributes: Mapping[str, str] | None = None,
-        redacted: Sequence[str] | None = None,
+        attributes: Mapping[str, str] = {},
+        redacted: Iterable[str] = (),
     ):
         object.__setattr__(self, 'auth_type', auth_type)
-        object.__setattr__(self, 'attributes', dict(attributes) if attributes else {})
-        object.__setattr__(self, 'redacted', list(redacted) if redacted else [])
-        _deepcopy_mutable_fields(self)
+        object.__setattr__(self, 'attributes', dict(attributes))
+        object.__setattr__(self, 'redacted', list(redacted))
 
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
@@ -232,7 +231,7 @@ class CloudSpec:  # noqa: D101
         identity_endpoint: str | None = None,
         storage_endpoint: str | None = None,
         credential: CloudCredential | None = None,
-        ca_certificates: Sequence[str] | None = None,
+        ca_certificates: Iterable[str] = (),
         skip_tls_verify: bool = False,
         is_controller_cloud: bool = False,
     ):
@@ -243,12 +242,9 @@ class CloudSpec:  # noqa: D101
         object.__setattr__(self, 'identity_endpoint', identity_endpoint)
         object.__setattr__(self, 'storage_endpoint', storage_endpoint)
         object.__setattr__(self, 'credential', credential)
-        object.__setattr__(
-            self, 'ca_certificates', list(ca_certificates) if ca_certificates else []
-        )
+        object.__setattr__(self, 'ca_certificates', list(ca_certificates))
         object.__setattr__(self, 'skip_tls_verify', skip_tls_verify)
         object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
-        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> CloudSpec_Ops:
         return CloudSpec_Ops(
@@ -285,7 +281,7 @@ class Secret:
     This is the content the charm will receive with a
     :meth:`ops.Secret.get_content` call."""
 
-    latest_content: RawSecretRevisionContents | None
+    latest_content: RawSecretRevisionContents
     """The content of the latest revision of the secret.
 
     This is the content the charm will receive with a
@@ -297,7 +293,7 @@ class Secret:
     This is automatically assigned and should not usually need to be explicitly set.
     """
 
-    owner: Literal['unit', 'app', None]
+    owner: Literal['unit', 'app'] | None
     """Indicates if the secret is owned by *this* unit, *this* application, or
     another application/unit.
 
@@ -322,10 +318,10 @@ class Secret:
     """The rotation policy for the secret."""
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
-    _tracked_revision: int
+    _tracked_revision = 1
 
     # what revision is the latest for this secret.
-    _latest_revision: int
+    _latest_revision = 1
 
     def __init__(
         self,
@@ -333,14 +329,12 @@ class Secret:
         *,
         latest_content: RawSecretRevisionContents | None = None,
         id: str | None = None,
-        owner: Literal['unit', 'app', None] = None,
-        remote_grants: Mapping[int, set[str]] | None = None,
+        owner: Literal['unit', 'app'] | None = None,
+        remote_grants: Mapping[int, set[str]] = {},
         label: str | None = None,
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-        _tracked_revision: int = 1,
-        _latest_revision: int = 1,
     ):
         object.__setattr__(self, 'tracked_content', tracked_content)
         object.__setattr__(
@@ -350,13 +344,13 @@ class Secret:
         )
         object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
         object.__setattr__(self, 'owner', owner)
-        object.__setattr__(self, 'remote_grants', dict(remote_grants) if remote_grants else {})
+        object.__setattr__(self, 'remote_grants', dict(remote_grants))
         object.__setattr__(self, 'label', label)
         object.__setattr__(self, 'description', description)
         object.__setattr__(self, 'expire', expire)
         object.__setattr__(self, 'rotate', rotate)
-        object.__setattr__(self, '_tracked_revision', _tracked_revision)
-        object.__setattr__(self, '_latest_revision', _latest_revision)
+        object.__setattr__(self, '_tracked_revision', 1)
+        object.__setattr__(self, '_latest_revision', 1)
         _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
@@ -490,10 +484,10 @@ class Network:
     def __init__(
         self,
         binding_name: str,
-        bind_addresses: Sequence[BindAddress] | None = None,
+        bind_addresses: Iterable[BindAddress] | None = None,
         *,
-        ingress_addresses: Sequence[str] | None = None,
-        egress_subnets: Sequence[str] | None = None,
+        ingress_addresses: Iterable[str] | None = None,
+        egress_subnets: Iterable[str] | None = None,
     ):
         object.__setattr__(self, 'binding_name', binding_name)
         object.__setattr__(
@@ -513,7 +507,6 @@ class Network:
             'egress_subnets',
             list(egress_subnets) if egress_subnets is not None else ['192.0.2.0/24'],
         )
-        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
@@ -968,7 +961,7 @@ class Notice:
         last_occurred: datetime.datetime | None = None,
         last_repeated: datetime.datetime | None = None,
         occurrences: int = 1,
-        last_data: Mapping[str, str] | None = None,
+        last_data: Mapping[str, str] = {},
         repeat_after: datetime.timedelta | None = None,
         expire_after: datetime.timedelta | None = None,
     ):
@@ -986,10 +979,9 @@ class Notice:
             self, 'last_repeated', last_repeated if last_repeated is not None else _now_utc()
         )
         object.__setattr__(self, 'occurrences', occurrences)
-        object.__setattr__(self, 'last_data', dict(last_data) if last_data else {})
+        object.__setattr__(self, 'last_data', dict(last_data))
         object.__setattr__(self, 'repeat_after', repeat_after)
         object.__setattr__(self, 'expire_after', expire_after)
-        _deepcopy_mutable_fields(self)
 
     def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
@@ -1182,27 +1174,23 @@ class Container:
         name: str,
         *,
         can_connect: bool = False,
-        _base_plan: Mapping[str, Any] | None = None,
-        layers: Mapping[str, pebble.Layer] | None = None,
-        service_statuses: Mapping[str, pebble.ServiceStatus] | None = None,
-        mounts: Mapping[str, Mount] | None = None,
-        execs: Iterable[Exec] | None = None,
-        notices: Sequence[Notice] | None = None,
-        check_infos: Iterable[CheckInfo] | None = None,
+        _base_plan: Mapping[str, Any] = {},
+        layers: Mapping[str, pebble.Layer] = {},
+        service_statuses: Mapping[str, pebble.ServiceStatus] = {},
+        mounts: Mapping[str, Mount] = {},
+        execs: Iterable[Exec] = (),
+        notices: Iterable[Notice] = (),
+        check_infos: Iterable[CheckInfo] = (),
     ):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'can_connect', can_connect)
-        object.__setattr__(self, '_base_plan', dict(_base_plan) if _base_plan else {})
-        object.__setattr__(self, 'layers', dict(layers) if layers else {})
-        object.__setattr__(
-            self, 'service_statuses', dict(service_statuses) if service_statuses else {}
-        )
-        object.__setattr__(self, 'mounts', dict(mounts) if mounts else {})
-        object.__setattr__(self, 'execs', frozenset(execs) if execs is not None else frozenset())
-        object.__setattr__(self, 'notices', list(notices) if notices else [])
-        object.__setattr__(
-            self, 'check_infos', frozenset(check_infos) if check_infos is not None else frozenset()
-        )
+        object.__setattr__(self, '_base_plan', dict(_base_plan))
+        object.__setattr__(self, 'layers', dict(layers))
+        object.__setattr__(self, 'service_statuses', dict(service_statuses))
+        object.__setattr__(self, 'mounts', dict(mounts))
+        object.__setattr__(self, 'execs', frozenset(execs))
+        object.__setattr__(self, 'notices', list(notices))
+        object.__setattr__(self, 'check_infos', frozenset(check_infos))
         _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
@@ -1495,12 +1483,12 @@ class StoredState:
         name: str = '_stored',
         *,
         owner_path: str | None = None,
-        content: Mapping[str, Any] | None = None,
+        content: Mapping[str, Any] = {},
         _data_type_name: str = 'StoredStateData',
     ):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'owner_path', owner_path)
-        object.__setattr__(self, 'content', dict(content) if content else {})
+        object.__setattr__(self, 'content', dict(content))
         object.__setattr__(self, '_data_type_name', _data_type_name)
         _deepcopy_mutable_fields(self)
 
@@ -1738,18 +1726,18 @@ class State:
         self,
         *,
         config: dict[str, str | int | float | bool] | None = None,
-        relations: Iterable[RelationBase] | None = None,
-        networks: Iterable[Network] | None = None,
-        containers: Iterable[Container] | None = None,
-        storages: Iterable[Storage] | None = None,
-        opened_ports: Iterable[Port] | None = None,
+        relations: Iterable[RelationBase] = (),
+        networks: Iterable[Network] = (),
+        containers: Iterable[Container] = (),
+        storages: Iterable[Storage] = (),
+        opened_ports: Iterable[Port] = (),
         leader: bool = False,
         model: Model | None = None,
-        secrets: Iterable[Secret] | None = None,
-        resources: Iterable[Resource] | None = None,
+        secrets: Iterable[Secret] = (),
+        resources: Iterable[Resource] = (),
         planned_units: int = 1,
-        deferred: Sequence[DeferredEvent] | None = None,
-        stored_states: Iterable[StoredState] | None = None,
+        deferred: Iterable[DeferredEvent] = (),
+        stored_states: Iterable[StoredState] = (),
         app_status: _EntityStatus | StatusBase | None = None,
         unit_status: _EntityStatus | StatusBase | None = None,
         workload_version: str = '',
@@ -1758,7 +1746,7 @@ class State:
         object.__setattr__(self, 'leader', leader)
         object.__setattr__(self, 'model', model if model is not None else Model())
         object.__setattr__(self, 'planned_units', planned_units)
-        object.__setattr__(self, 'deferred', list(deferred) if deferred else [])
+        object.__setattr__(self, 'deferred', list(deferred))
         object.__setattr__(self, 'workload_version', workload_version)
 
         # Handle status conversion from ops types.
@@ -1775,7 +1763,7 @@ class State:
         # Normalise ops.Port to scenario Port.
         normalised_ports = frozenset(
             Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
-            for port in (opened_ports or ())
+            for port in opened_ports
         )
         object.__setattr__(self, 'opened_ports', normalised_ports)
 
@@ -1784,7 +1772,7 @@ class State:
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)
             else storage
-            for storage in (storages or ())
+            for storage in storages
         )
         object.__setattr__(self, 'storages', normalised_storage)
 
@@ -1794,26 +1782,12 @@ class State:
         # ops.Resources does not contain the source of the resource, so cannot be converted.
         # ops.StoredState is not convenient to initialise with data, so not useful here.
 
-        object.__setattr__(
-            self, 'relations', frozenset(relations) if relations is not None else frozenset()
-        )
-        object.__setattr__(
-            self, 'networks', frozenset(networks) if networks is not None else frozenset()
-        )
-        object.__setattr__(
-            self, 'containers', frozenset(containers) if containers is not None else frozenset()
-        )
-        object.__setattr__(
-            self, 'secrets', frozenset(secrets) if secrets is not None else frozenset()
-        )
-        object.__setattr__(
-            self, 'resources', frozenset(resources) if resources is not None else frozenset()
-        )
-        object.__setattr__(
-            self,
-            'stored_states',
-            frozenset(stored_states) if stored_states is not None else frozenset(),
-        )
+        object.__setattr__(self, 'relations', frozenset(relations))
+        object.__setattr__(self, 'networks', frozenset(networks))
+        object.__setattr__(self, 'containers', frozenset(containers))
+        object.__setattr__(self, 'secrets', frozenset(secrets))
+        object.__setattr__(self, 'resources', frozenset(resources))
+        object.__setattr__(self, 'stored_states', frozenset(stored_states))
 
     def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
