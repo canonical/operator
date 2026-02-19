@@ -540,9 +540,9 @@ class ExecError(Error, Generic[AnyStr]):
     """Standard error from the process.
 
     If :meth:`ExecProcess.wait_output` was being called and ``combine_stderr``
-    was False, this is the captured stderr as a str (or bytes if encoding was
+    was ``False``, this is the captured stderr as a str (or bytes if encoding was
     None). If :meth:`ExecProcess.wait` was being called or ``combine_stderr``
-    was True, this is None.
+    was ``True``, this is None.
     """
 
     def __init__(
@@ -1069,7 +1069,7 @@ class ServiceInfo:
         self.current = current
 
     def is_running(self) -> bool:
-        """Return True if this service is running (in the active state)."""
+        """Return ``True`` if this service is running (in the active state)."""
         return self.current == ServiceStatus.ACTIVE
 
     @classmethod
@@ -1425,7 +1425,7 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or None (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
     """
 
     startup: CheckStartup
@@ -1453,7 +1453,7 @@ class CheckInfo:
     :meth:`Client.start_checks`. It is reset to one when the check
     succeeds after the check's failure threshold was reached.
 
-    This will be None if the version of Pebble being queried doesn't return
+    This will be ``None`` if the version of Pebble being queried doesn't return
     the ``successes`` field (introduced in Pebble v1.23.0).
     """
 
@@ -1472,7 +1472,7 @@ class CheckInfo:
     change_id: ChangeID | None
     """Change ID of ``perform-check`` or ``recover-check`` change driving this check.
 
-    This will be None on older versions of Pebble, which did not use changes
+    This will be ``None`` on older versions of Pebble, which did not use changes
     to drive health checks.
     """
 
@@ -1708,7 +1708,7 @@ class ExecProcess(Generic[AnyStr]):
 
     If the stdin argument was not passed to :meth:`Client.exec`, this is a
     writable file-like object the caller can use to stream input to the
-    process. It is None if stdin was passed to :meth:`Client.exec`.
+    process. It is ``None`` if stdin was passed to :meth:`Client.exec`.
     """
 
     stdout: IO[AnyStr] | None
@@ -1716,16 +1716,16 @@ class ExecProcess(Generic[AnyStr]):
 
     If the stdout argument was not passed to :meth:`Client.exec`, this is a
     readable file-like object the caller can use to stream output from the
-    process. It is None if stdout was passed to :meth:`Client.exec`.
+    process. It is ``None`` if stdout was passed to :meth:`Client.exec`.
     """
 
     stderr: IO[AnyStr] | None
     """Standard error from the process.
 
     If the stderr argument was not passed to :meth:`Client.exec` and
-    ``combine_stderr`` was False, this is a readable file-like object the
-    caller can use to stream error output from the process. It is None if
-    stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was True.
+    ``combine_stderr`` was ``False``, this is a readable file-like object the
+    caller can use to stream error output from the process. It is ``None`` if
+    stderr was passed to :meth:`Client.exec` or ``combine_stderr`` was ``True``.
     """
 
     def __init__(
@@ -1820,8 +1820,8 @@ class ExecProcess(Generic[AnyStr]):
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
         If a timeout was specified to the :meth:`Client.exec` call, this waits
-        at most that duration. If combine_stderr was True, stdout will include
-        the process's standard error, and stderr will be None.
+        at most that duration. If combine_stderr was ``True``, stdout will include
+        the process's standard error, and stderr will be ``None``.
 
         Raises:
             ChangeError: if there was an error starting or running the process.
@@ -1878,7 +1878,7 @@ class ExecProcess(Generic[AnyStr]):
 
 
 def _has_fileno(f: Any) -> bool:
-    """Return True if the file-like object has a valid fileno() method."""
+    """Return ``True`` if the file-like object has a valid fileno() method."""
     try:
         f.fileno()
         return True
@@ -2443,7 +2443,7 @@ class Client:
         Args:
             change_id: Change ID of change to wait for.
             timeout: Maximum time in seconds to wait for the change to be
-                ready. It may be None, in which case wait_change never times out.
+                ready. It may be ``None``, in which case wait_change never times out.
             delay: If polling, this is the delay in seconds between attempts.
 
         Returns:
@@ -2539,8 +2539,8 @@ class Client:
     def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
 
-        If combine is False (the default), append the new layer as the top
-        layer with the given label. If combine is True and the label already
+        If combine is false (the default), append the new layer as the top
+        layer with the given label. If combine is true and the label already
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
@@ -2605,12 +2605,12 @@ class Client:
         Args:
             path: Path of the file to read from the remote system.
             encoding: Encoding to use for decoding the file's bytes to str,
-                or None to specify no decoding.
+                or ``None`` to specify no decoding.
 
         Returns:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
-            encoding is None.
+            encoding is ``None``.
 
         Raises:
             PathError: If there was an error reading the file at path, for
@@ -2689,7 +2689,7 @@ class Client:
             encoding: Encoding to use for encoding source str to bytes, or
                 strings read from source if it is a TextIO type. Ignored if
                 source is bytes or BinaryIO.
-            make_dirs: If True, create parent directories if they don't exist.
+            make_dirs: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
             user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
@@ -2849,7 +2849,7 @@ class Client:
 
         Args:
             path: Path of the directory to create on the remote system.
-            make_parents: If True, create parent directories if they don't exist.
+            make_parents: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
             user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
@@ -2885,13 +2885,13 @@ class Client:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory, recursively delete it and
+            recursive: If true, and path is a directory, recursively delete it and
                        everything under it. If path is a file, delete the file. In
                        either case, do nothing if the file or directory does not
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is False
+            pebble.PathError: If a relative path is provided, or if ``recursive`` is ``False``
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         path = str(path)
@@ -3074,13 +3074,13 @@ class Client:
                 :meth:`ExecProcess.wait_output` to capture error output as a
                 string, or read from :meth:`ExecProcess.stderr` to stream
                 error output from the process. Must be None if combine_stderr
-                is True.
+                is ``True``.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
                 is used to encode them to bytes. If encoding is None, the
                 types read or written are raw bytes.
-            combine_stderr: If True, process's stderr output is combined into
-                its stdout (the stderr argument must be None). If False,
+            combine_stderr: If true, process's stderr output is combined into
+                its stdout (the stderr argument must be None). If false,
                 separate streams are used for stdout and stderr.
 
         Returns:

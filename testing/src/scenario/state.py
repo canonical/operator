@@ -271,7 +271,7 @@ class Secret:
     """Indicates if the secret is owned by *this* unit, *this* application, or
     another application/unit.
 
-    If None, the implication is that read access to the secret has been granted
+    If ``None``, the implication is that read access to the secret has been granted
     to this unit.
     """
 
@@ -1351,7 +1351,7 @@ class StoredState:
     owner_path: str | None = None
     """The path to the owner of this StoredState instance.
 
-    If None, the owner is the Framework. Otherwise, /-separated object names,
+    If ``None``, the owner is the Framework. Otherwise, /-separated object names,
     for example MyCharm/MyCharmLib.
     """
 

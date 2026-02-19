@@ -2019,7 +2019,7 @@ class RelationMeta:
     """
 
     optional: bool
-    """If True, the relation is considered optional.
+    """If true, the relation is considered optional.
 
     This value is informational only and is not used by Juju itself (all
     relations are optional from Juju's perspective), but it may be set in

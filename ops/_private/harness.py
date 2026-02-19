@@ -184,7 +184,7 @@ class ActionFailed(Exception):  # noqa: N818 (name doesn't end with "Error")
     state: State | None
     """The Juju state after the action has been run.
 
-    When using Harness.run_action, this will be None.
+    When using Harness.run_action, this will be ``None``.
     """
 
     def __init__(
@@ -450,7 +450,7 @@ class Harness(Generic[CharmType]):
         should be active when the charm starts, and then call this method. This method will
         automatically create and add peer relations that are specified in metadata.yaml.
 
-        If the charm metadata specifies containers, this sets can_connect to True for all
+        If the charm metadata specifies containers, this sets can_connect to ``True`` for all
         containers (in addition to triggering pebble-ready for each).
 
         Example::
@@ -801,8 +801,8 @@ class Harness(Generic[CharmType]):
         Args:
             storage_name: The storage backend name on the Charm
             count: Number of disks being added
-            attach: True to also attach the storage mount; if :meth:`begin`
-                has been called a True value will also emit storage-attached
+            attach: If true, also attach the storage mount; if :meth:`begin`
+                has been called a true value will also emit storage-attached
 
         Return:
             A list of storage IDs, e.g. ["my-storage/1", "my-storage/2"].
@@ -1646,7 +1646,7 @@ class Harness(Generic[CharmType]):
         do/don't trigger extra calls.
 
         Args:
-            reset: If True, reset the calls list back to empty, if false, the call list is
+            reset: If true, reset the calls list back to empty, if false, the call list is
                 preserved.
 
         Return:
@@ -1859,7 +1859,7 @@ class Harness(Generic[CharmType]):
 
         Args:
             secret_id: The ID of the secret associated with the event.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)
@@ -1880,7 +1880,7 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret associated with the event.
             revision: Revision number to provide to the event. This should be
                 an item from the list returned by :meth:`get_secret_revisions`.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)
@@ -1901,7 +1901,7 @@ class Harness(Generic[CharmType]):
             secret_id: The ID of the secret associated with the event.
             revision: Revision number to provide to the event. This should be
                 an item from the list returned by :meth:`get_secret_revisions`.
-            label: Label value to send to the event. If None, the secret's
+            label: Label value to send to the event. If ``None``, the secret's
                 label is used.
         """
         secret = self._ensure_secret(secret_id)
@@ -2545,7 +2545,7 @@ class _TestingModelBackend:
 
         Args:
             name: name (i.e. from metadata.yaml).
-            include_detached: True to include unattached storage mounts as well.
+            include_detached: If true, include unattached storage mounts as well.
         """
         return [
             index
@@ -2599,7 +2599,11 @@ class _TestingModelBackend:
             self._storage_attached[name].remove(index)
 
     def _storage_attach(self, storage_id: str):
-        """Mark the named storage_id as attached and return True if it was previously detached."""
+        """Mark the named storage_id as attached.
+
+        Returns:
+            ``True`` if it was previously detached.
+        """
         # NOTE: This is an extra function for _TestingModelBackend to simulate
         # re-attachment of a storage unit.  This is not present in
         # ops.model._ModelBackend.
