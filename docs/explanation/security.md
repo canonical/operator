@@ -73,6 +73,7 @@ Otherwise, Ops doesn't introduce any new security risks. Ops does expand the imp
 * Never include any sensitive data in logs.
 * Never include any sensitive data in traces.
 * Never include any sensitive data in exceptions.
+* Never include any sensitive data in command line arguments (which often end up in logs, traces, or exceptions).
 * Use {external+juju:ref}`Juju secrets <secret>` for storing and sharing sensitive data.
 * Juju users that integrate a charm with a tracing receiver should also integrate with a certificate authority provider, to ensure all traces are sent via HTTPS.
 * Charms should follow best practices for writing secure Python code.
