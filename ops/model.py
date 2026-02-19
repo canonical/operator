@@ -1853,8 +1853,9 @@ class Relation:
         fields will be saved through to the relation data. Pydantic fields that
         have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``,
         will have the object's value saved to the Juju relation data with the
-        alias as the key. For other classes, all of the object's attributes that
-        have a class type annotation and value set on the object will be saved
+        alias as the key. Fields without a value (e.g. Pydantic's ``MISSING``
+        sentinel) will be erased. For other classes, all of the object's attributes
+        that have a class type annotation and value set on the object will be saved
         through to the relation data.
 
         For example::
@@ -1915,6 +1916,7 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
+        # Missing values are erased from the databag via an empty string.
         data = {
             field: encoder(values[attr]) if attr in values else ''
             for attr, field in sorted(fields.items())
