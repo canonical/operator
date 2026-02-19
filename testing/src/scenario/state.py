@@ -295,7 +295,7 @@ class Secret:
     # what revision is the latest for this secret.
     _latest_revision = 1
 
-     def __init__(
+    def __init__(
         self,
         tracked_content: RawSecretRevisionContents,
         *,
