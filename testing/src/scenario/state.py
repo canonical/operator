@@ -46,7 +46,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
-        config: dict[str, str | int | float | bool]
+        config: Mapping[str, str | int | float | bool]
         relations: Iterable[RelationBase]
         networks: Iterable[Network]
         containers: Iterable[Container]
@@ -65,7 +65,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
-RawSecretRevisionContents = RawDataBagContents = dict[str, str]
+RawSecretRevisionContents = RawDataBagContents = Mapping[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -240,7 +240,7 @@ def _generate_secret_id():
     return f'secret:{secret_id}'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Secret:
     """A Juju secret.
 
@@ -253,21 +253,19 @@ class Secret:
     This is the content the charm will receive with a
     :meth:`ops.Secret.get_content` call."""
 
-    _: dataclasses.KW_ONLY
-
-    latest_content: RawSecretRevisionContents | None = None
+    latest_content: RawSecretRevisionContents
     """The content of the latest revision of the secret.
 
     This is the content the charm will receive with a
     :meth:`ops.Secret.peek_content` call."""
 
-    id: str = dataclasses.field(default_factory=_generate_secret_id)
+    id: str
     """The Juju ID of the secret.
 
     This is automatically assigned and should not usually need to be explicitly set.
     """
 
-    owner: Literal['unit', 'app', None] = None
+    owner: Literal['unit', 'app'] | None
     """Indicates if the secret is owned by *this* unit, *this* application, or
     another application/unit.
 
@@ -275,36 +273,61 @@ class Secret:
     to this unit.
     """
 
-    remote_grants: Mapping[int, set[str]] = dataclasses.field(default_factory=dict)
+    remote_grants: Mapping[int, frozenset[str]]
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
-    label: str | None = None
+    label: str | None
     """A human-readable label the charm can use to retrieve the secret.
 
     If this is set, it implies that the charm has previously set the label.
     """
-    description: str | None = None
+    description: str | None
     """A human-readable description of the secret."""
-    expire: datetime.datetime | None = None
+    expire: datetime.datetime | None
     """The time at which the secret will expire."""
-    rotate: SecretRotate | None = None
+    rotate: SecretRotate | None
     """The rotation policy for the secret."""
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
-    _tracked_revision: int = 1
+    _tracked_revision = 1
 
     # what revision is the latest for this secret.
-    _latest_revision: int = 1
+    _latest_revision = 1
+
+     def __init__(
+        self,
+        tracked_content: RawSecretRevisionContents,
+        *,
+        latest_content: RawSecretRevisionContents | None = None,
+        id: str | None = None,
+        owner: Literal['unit', 'app'] | None = None,
+        remote_grants: Mapping[int, set[str]] = {},
+        label: str | None = None,
+        description: str | None = None,
+        expire: datetime.datetime | None = None,
+        rotate: SecretRotate | None = None,
+    ):
+        object.__setattr__(self, 'tracked_content', tracked_content)
+        object.__setattr__(
+            self,
+            'latest_content',
+            latest_content if latest_content is not None else tracked_content,
+        )
+        object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
+        object.__setattr__(self, 'owner', owner)
+        remote_grants = {k: frozenset(v) for k, v in remote_grants.items()}
+        object.__setattr__(self, 'remote_grants', remote_grants)
+        object.__setattr__(self, 'label', label)
+        object.__setattr__(self, 'description', description)
+        object.__setattr__(self, 'expire', expire)
+        object.__setattr__(self, 'rotate', rotate)
+        object.__setattr__(self, '_tracked_revision', 1)
+        object.__setattr__(self, '_latest_revision', 1)
+        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.id)
-
-    def __post_init__(self):
-        if self.latest_content is None:
-            # bypass frozen dataclass
-            object.__setattr__(self, 'latest_content', self.tracked_content)
-        _deepcopy_mutable_fields(self)
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
@@ -578,7 +601,7 @@ class Relation(RelationBase):
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""
-    remote_units_data: dict[UnitID, RawDataBagContents] = dataclasses.field(
+    remote_units_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
         default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
     """The current content of the databag for each unit in the relation."""
@@ -663,7 +686,7 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
+    peers_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
     """Current contents of the peer databags.
 
     Note that this does not include data for the unit being tested. Data for
@@ -1540,7 +1563,7 @@ class State:
     return data from `State.leader`, and so on.
     """
 
-    config: dict[str, str | int | float | bool] = dataclasses.field(
+    config: Mapping[str, str | int | float | bool] = dataclasses.field(
         default_factory=dict,
     )
     """The present configuration of this charm."""
@@ -1764,7 +1787,7 @@ class State:
         ctx: Context[CharmType],
         *,
         # If provided, these merge with or replace the generated versions.
-        config: dict[str, str | int | float | bool] | None = None,
+        config: Mapping[str, str | int | float | bool] | None = None,
         relations: Iterable[RelationBase] | None = None,
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
