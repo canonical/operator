@@ -1853,9 +1853,8 @@ class Relation:
         fields will be saved through to the relation data. Pydantic fields that
         have an ``alias``, or dataclasses that have a ``metadata{'alias'=}``,
         will have the object's value saved to the Juju relation data with the
-        alias as the key. Fields without a value (e.g. Pydantic's ``MISSING``
-        sentinel) will be erased. For other classes, all of the object's attributes
-        that have a class type annotation and value set on the object will be saved
+        alias as the key. For other classes, all of the object's attributes that
+        have a class type annotation and value set on the object will be saved
         through to the relation data.
 
         For example::
@@ -1873,6 +1872,10 @@ class Relation:
                 # data.source will be stored under the Juju relation key 'from'
                 # data.destination will be stored under the Juju relation key 'to'
                 relation.save(data, self.unit)
+
+        If a class declares a field, but the object does not have a value for it,
+        the field will be erased from the relation data.
+        This is possible when using Pydantic's ``MISSING`` sentinel.
 
         Args:
             obj: an object with attributes to save to the relation data, typically
