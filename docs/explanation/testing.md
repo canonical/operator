@@ -148,7 +148,7 @@ on:
       - name: Set up uv
         uses: astral-sh/setup-uv@7
       - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
+        run: uv tool install tox --python 3.12 --with tox-uv
       - name: Run tests
         run: tox -e unit
 ```

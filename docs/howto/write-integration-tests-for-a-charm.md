@@ -41,7 +41,7 @@ Where `<preset>` is `machine`, `kubernetes`, or another of Concierge's presets. 
 Next, use uv to install tox:
 
 ```text
-uv tool install tox --with tox-uv
+uv tool install tox --python 3.12 --with tox-uv
 ```
 
 Your virtual machine is now ready. Before using your virtual machine, we recommend that you do a couple more setup steps.

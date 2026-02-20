@@ -9,7 +9,7 @@ You'll need the following tools:
 
 - **Charmcraft** - For initialising and packing your charm. See {external+charmcraft:ref}`Charmcraft | Manage Charmcraft <manage-charmcraft>`.
 - **uv** - For managing your charm's dependencies, including Ops. See [Installing uv](https://docs.astral.sh/uv/getting-started/installation/).
-- **tox** - For running checks and tests. To install tox: `uv tool install tox --with tox-uv`.
+- **tox** - For running checks and tests. To install tox: `uv tool install tox --python 3.12 --with tox-uv`.
 
 To deploy your charm locally and to run integration tests, you'll also need a Juju controller.
 
