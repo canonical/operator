@@ -104,7 +104,7 @@ msg="Bootstrapped Juju" provider=lxd
 To install tox, run:
 
 ```text
-uv tool install tox --with tox-uv
+uv tool install tox --python 3.12 --with tox-uv
 ```
 
 When tox has been installed, you'll see a confirmation and a warning:
