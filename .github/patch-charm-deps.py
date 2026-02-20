@@ -449,7 +449,7 @@ def _patch_tox_testenv_sections_toml(
 
     # Patch specific envs
     if 'env' in data:
-        for env_name in sorted(data['env'].keys()):
+        for env_name in data['env']:
             add_tox_pip_commands_toml(
                 tox_config, f'testenv:{env_name}', ops_wheel, ops_scenario_wheel, use_uv_pip
             )
