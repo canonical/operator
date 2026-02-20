@@ -482,7 +482,7 @@ def _patch_tox_testenv_sections_ini(
     if not testenv_sections:
         return False
 
-    for section in sorted(testenv_sections):
+    for section in testenv_sections:
         add_tox_pip_commands_ini(tox_config, section, ops_wheel, ops_scenario_wheel, use_uv_pip)
 
     return True
