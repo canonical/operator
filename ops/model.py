@@ -1873,6 +1873,10 @@ class Relation:
                 # data.destination will be stored under the Juju relation key 'to'
                 relation.save(data, self.unit)
 
+        If a class declares a field, but the object does not have a value for it,
+        the field will be erased from the relation data.
+        This is possible when using Pydantic's ``MISSING`` sentinel.
+
         Args:
             obj: an object with attributes to save to the relation data, typically
                 a Pydantic ``BaseModel`` subclass or dataclass.
@@ -1915,7 +1919,11 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
-        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
+        # Missing values are erased from the databag via an empty string.
+        data = {
+            field: encoder(values[attr]) if attr in values else ''
+            for attr, field in sorted(fields.items())
+        }
         self.data[dst].update(data)
 
 

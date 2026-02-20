@@ -31,6 +31,11 @@ try:
 except ImportError:
     pydantic = None
 
+try:
+    from pydantic.experimental.missing_sentinel import MISSING
+except ImportError:
+    MISSING = None  # type: ignore
+
 import ops
 from ops import testing
 
@@ -211,6 +216,34 @@ if pydantic:
             return MyPydanticDatabag
 
     _test_classes.extend((MyPydanticDataclassCharm, MyPydanticBaseModelCharm))
+
+
+if pydantic and MISSING is not None:
+
+    class MissingPydanticDatabag(pydantic.BaseModel):
+        foo: str
+        bar: int = pydantic.Field(default=0, ge=0)
+        baz: list[str] = pydantic.Field(default_factory=list)
+        quux: Nested = pydantic.Field(default_factory=Nested)
+        miss: str | MISSING = MISSING  # type: ignore
+
+        @pydantic.field_validator('baz')
+        @classmethod
+        def check_foo_not_in_baz(cls, baz: list[str], values: Any):
+            data = cast('dict[str, Any]', values.data)
+            foo = data.get('foo')
+            if foo in baz:
+                raise ValueError('foo cannot be in baz')
+            return baz
+
+        model_config = pydantic.ConfigDict(validate_assignment=True)
+
+    class MissingPydanticBaseModelCharm(BaseTestCharm):
+        @property
+        def databag_class(self) -> type[DatabagProtocol]:
+            return MissingPydanticDatabag
+
+    _test_classes.append(MissingPydanticBaseModelCharm)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
