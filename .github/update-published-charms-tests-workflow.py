@@ -69,9 +69,12 @@ SKIP = {
     'cos-lite-bundle',
     # Source is not public.
     'charm-weebl',
+    # Read-only partial mirror of mysql-router-operators.
+    'mysql-router-k8s-operator',
 }
 CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
+    'catalogue-k8s-operator': ['charm'],
     'jimm': ['charms/jimm'],
     'k8s-operator': ['charms/worker', 'charms/worker/k8s'],
     'katib-operators': ['charms/katib-controller', 'charms/katib-db-manager', 'charms/katib-ui'],
@@ -85,7 +88,9 @@ CHARM_ROOTS = {
         'charms/kfp-viewer',
         'charms/kfp-viz',
     ],
+    'mysql-router-operators': ['machines', 'kubernetes'],
     'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
+    'tempo-operators': ['coordinator', 'worker'],
     'vault-k8s-operator': ['k8s', 'machine'],
 }
 
