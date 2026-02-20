@@ -558,7 +558,7 @@ class ExecError(Error, Generic[AnyStr]):
         self.stderr = stderr
 
     def __str__(self):
-        message = f'non-zero exit code {self.exit_code} executing {self.command!r}'
+        message = f'non-zero exit code {self.exit_code} executing {self.command[0]!r}'
 
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
             if out is None:
