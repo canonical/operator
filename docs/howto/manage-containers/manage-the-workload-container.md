@@ -554,7 +554,7 @@ Note that because sleep will exit via a signal, `wait()` will raise an `ExecErro
 ```
 Traceback (most recent call last):
   ...
-ops.pebble.ExecError: non-zero exit code 143 executing ['sleep', '10']
+ops.pebble.ExecError: non-zero exit code 143 executing 'sleep'
 ```
 
 ### Test command execution
