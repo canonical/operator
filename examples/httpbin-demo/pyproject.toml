@@ -29,7 +29,9 @@ dependencies = [
 lint = [
     "ruff",
     "codespell",
+    "mypy",
     "pyright",
+    "types-PyYAML",
 ]
 # Dependencies of unit tests
 unit = [
@@ -82,6 +84,12 @@ max-complexity = 10
 
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+
+[tool.mypy]
+explicit_package_bases = true
+files = ["src", "tests"]
+follow_imports = "silent"
+mypy_path = ["src", "../.."]  # for running in ops tree with local tool.uv.sources
 
 [tool.pyright]
 include = ["src", "tests"]
