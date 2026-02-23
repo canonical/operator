@@ -148,7 +148,7 @@ unit = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ops", specifier = ">=2.23,<4" }]
+requires-dist = [{ name = "ops", editable = "../../" }]
 
 [package.metadata.requires-dev]
 integration = [
@@ -163,7 +163,7 @@ lint = [
 ]
 unit = [
     { name = "coverage", extras = ["toml"] },
-    { name = "ops", extras = ["testing"] },
+    { name = "ops", extras = ["testing"], editable = "../../" },
     { name = "pytest" },
 ]
 
@@ -224,17 +224,11 @@ wheels = [
 
 [[package]]
 name = "ops"
-version = "3.1.0"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../../" }
 dependencies = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api" },
     { name = "pyyaml" },
     { name = "websocket-client" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/fb/7ec08c56511b108cedd92b2eb978419d982b0b87776d8e860cd981e10b9e/ops-3.1.0.tar.gz", hash = "sha256:49bc8ce4f24815dae57aec752d7d0c9cd34e7942c29966f29a9f9774d1b97512", size = 531550, upload-time = "2025-07-30T02:26:49.875Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/c4/db1450da4cb5ac49da1a814bf6b6ffcff873dfd15abd39520370d85848ab/ops-3.1.0-py3-none-any.whl", hash = "sha256:4553052c881c9e2ba76209dc01be48915330e4d05287fca0fc5ae05ae0d20f0a", size = 188440, upload-time = "2025-07-30T02:26:44.945Z" },
 ]
 
 [package.optional-dependencies]
@@ -242,17 +236,62 @@ testing = [
     { name = "ops-scenario" },
 ]
 
+[package.metadata]
+requires-dist = [
+    { name = "opentelemetry-api", specifier = "~=1.0" },
+    { name = "ops-scenario", marker = "extra == 'testing'", editable = "../../testing" },
+    { name = "ops-tracing", marker = "extra == 'tracing'", editable = "../../tracing" },
+    { name = "pyyaml", specifier = "==6.*" },
+    { name = "websocket-client", specifier = "==1.*" },
+]
+provides-extras = ["testing", "tracing", "harness"]
+
+[package.metadata.requires-dev]
+benchmark = [{ name = "pytest-benchmark", specifier = "~=5.0" }]
+coverage = [{ name = "coverage", extras = ["toml"], specifier = "~=7.0" }]
+integration = [
+    { name = "httpx", specifier = "~=0.28" },
+    { name = "jubilant", specifier = "~=1.5" },
+    { name = "jubilant-backports" },
+    { name = "minio", specifier = "~=7.2" },
+    { name = "ops", extras = ["testing", "tracing"], editable = "../../" },
+    { name = "pytest", specifier = "~=8.4" },
+]
+lint = [
+    { name = "codespell", specifier = "==2.4.1" },
+    { name = "ops", extras = ["testing", "tracing"], editable = "../../" },
+    { name = "pyright", specifier = "~=1.1" },
+    { name = "ruff", specifier = "==0.11.2" },
+    { name = "typing-extensions", specifier = "~=4.2" },
+]
+release = [
+    { name = "packaging", specifier = "~=24.0" },
+    { name = "pygithub", specifier = "~=2.6" },
+    { name = "rich", specifier = "~=14.1" },
+]
+unit = [
+    { name = "jsonpatch", specifier = "~=1.33" },
+    { name = "ops", extras = ["testing", "tracing"], editable = "../../" },
+    { name = "pydantic", specifier = "~=2.10" },
+    { name = "pytest", specifier = "~=8.4" },
+]
+xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
+
 [[package]]
 name = "ops-scenario"
-version = "8.1.0"
-source = { registry = "https://pypi.org/simple" }
+version = "8.6.0.dev0"
+source = { editable = "../../testing" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/c9/260d8c7a62894e80ba1e16857d7e4ab539b7559fc5d28f0636909570652e/ops_scenario-8.1.0.tar.gz", hash = "sha256:6b199d882710f3950348a885ff3b1d371806cb678f58e2c077b33029c6db9857", size = 109375, upload-time = "2025-07-30T02:26:51.599Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/7b/7dd20a749e4c5d2317344a803c5c815af48a0d39b05ea5b2af1c81bbbf3f/ops_scenario-8.1.0-py3-none-any.whl", hash = "sha256:740df042474bdfed6836be184c9f9cc1f92af7a3a9d2ab234276e4291aa8312c", size = 63745, upload-time = "2025-07-30T02:26:46.383Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "ops", editable = "../../" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "typing-extensions", specifier = ">=4.9.0" },
 ]
 
 [[package]]

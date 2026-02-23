@@ -85,3 +85,8 @@ skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
 include = ["src", "tests"]
+extraPaths = ["src", "../.."]  # for running in ops tree with local tool.uv.sources
+
+[tool.uv.sources]
+ops = { path = "../../", editable = true }
+ops-scenario = { path = "../../testing", editable = true }
