@@ -689,10 +689,7 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            if meta:
-                meta = copy.deepcopy(meta)
-            else:
-                meta = {'name': str(charm_type.__name__)}
+            meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
             spec = _CharmSpec(
                 charm_type=charm_type,
                 meta=meta,
