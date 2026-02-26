@@ -1,4 +1,4 @@
-# 3.7.0 - 26 February 2026
+# 3.6.0 - 26 February 2026
 
 ## Features
 
