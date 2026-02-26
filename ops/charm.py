@@ -2079,7 +2079,7 @@ class StorageMeta:
     multiple_range: tuple[int, int | None] | None
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = list[str]
+    properties: list[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: _StorageMetaDict):
