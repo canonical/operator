@@ -69,7 +69,7 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
-RelationType = TypeVar('RelationType', bound='RelationBase')
+_RelationType = TypeVar('_RelationType', bound='RelationBase')
 
 
 logger = scenario_logger.getChild('state')
@@ -1742,8 +1742,8 @@ class State:
         )
 
     def get_relation(
-        self, relation: int, /, *, kind: type[RelationType] = RelationBase
-    ) -> RelationType:
+        self, relation: int, /, *, kind: type[_RelationType] = RelationBase
+    ) -> _RelationType:
         """Get relation from this State, based on the relation's id.
 
         If the relation is not an instance of ``kind``, a ``TypeError`` is raised.
@@ -1766,8 +1766,8 @@ class State:
         return rel
 
     def get_relations(
-        self, endpoint: str, *, kind: type[RelationType] = RelationBase
-    ) -> tuple[RelationType, ...]:
+        self, endpoint: str, *, kind: type[_RelationType] = RelationBase
+    ) -> tuple[_RelationType, ...]:
         """Get all relations on this endpoint from the current state.
 
         If any relation on this endpoint is not an instance of ``kind``, a ``TypeError`` is raised.
