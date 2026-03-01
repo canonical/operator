@@ -69,6 +69,8 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
+RelationType = TypeVar('RelationType', bound='RelationBase')
+
 
 logger = scenario_logger.getChild('state')
 
@@ -1739,24 +1741,58 @@ class State:
             f'storage: name={storage}, index={index} not found in the State',
         )
 
-    def get_relation(self, relation: int, /) -> RelationBase:
-        """Get relation from this State, based on the relation's id."""
+    def get_relation(
+        self, relation: int, /, *, kind: type[RelationType] = RelationBase
+    ) -> RelationType:
+        """Get relation from this State, based on the relation's id.
+
+        If the relation is not an instance of ``kind``, a ``TypeError`` is raised.
+        This allows type checkers to know the return type more precisely, for example::
+
+            rel = state.get_relation(my_id, kind=testing.PeerRelation)
+            reveal_type(rel)  # testing.PeerRelation
+        """
         for state_relation in self.relations:
             if state_relation.id == relation:
-                return state_relation
-        raise KeyError(f'relation: id={relation} not found in the State')
+                rel = state_relation
+                break
+        else:  # no break
+            raise KeyError(f'relation: id={relation} not found in the State')
+        if not isinstance(rel, kind):
+            raise TypeError(
+                f'relation id={relation} is not a {kind.__name__}'
+                f", it's a {type(rel).__name__}: {rel}"
+            )
+        return rel
 
-    def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
-        """Get all relations on this endpoint from the current state."""
+    def get_relations(
+        self, endpoint: str, *, kind: type[RelationType] = RelationBase
+    ) -> tuple[RelationType, ...]:
+        """Get all relations on this endpoint from the current state.
+
+        If any relation on this endpoint is not an instance of ``kind``, a ``TypeError`` is raised.
+        This allows type checkers to know the return type more precisely, for example::
+
+            rels = state.get_relations(my_endpoint, kind=testing.SubordinateRelation)
+            for rel in rels:
+                reveal_type(rels)  # testing.PeerRelation
+        """
         # we rather normalize the endpoint than worry about cursed metadata situations such as:
         # requires:
         #   foo-bar: ...
         #   foo_bar: ...
 
         normalized_endpoint = _normalise_name(endpoint)
-        return tuple(
+        rels = tuple(
             r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
         )
+        for rel in rels:
+            if not isinstance(rel, kind):
+                raise TypeError(
+                    f'relation on endpoint {endpoint!r} is not a {kind.__name__}'
+                    f", it's a {type(rel).__name__}: {rel}"
+                )
+        return rels
 
     @classmethod
     def from_context(
