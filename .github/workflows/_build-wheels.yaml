@@ -31,7 +31,7 @@ jobs:
         run: echo "name=operator-wheels-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload wheels as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact-name.outputs.name }}
           path: dist/*.whl
