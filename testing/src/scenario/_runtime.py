@@ -205,16 +205,10 @@ class Runtime:
     @contextmanager
     def _virtual_charm_root(self):
         if self._charm_root:
-            tmp_dir = None
-            virtual_charm_root = Path(self._charm_root)
-        else:
-            tmp_dir = tempfile.TemporaryDirectory()
-            virtual_charm_root = Path(tmp_dir.name)
-
-        yield virtual_charm_root
-
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
+            yield Path(self._charm_root)
+            return
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            yield Path(tmp_dir.name)
 
     @contextmanager
     def exec(
