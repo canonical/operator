@@ -2350,8 +2350,13 @@ class _Action:
     the rare cases where a specific ID is required."""
 
 
-@functools.lru_cache
+_CACHE = {}
 def _load_yaml(path: pathlib.Path) -> Any | None:
     if path.exists():
-        return yaml.safe_load(path.read_text())
+        loaded = yaml.safe_load(path.read_text())
+        if path in _CACHE:
+            assert loaded == _CACHE[path]
+        else:
+            _CACHE[path] = loaded
+        return loaded
     return None
