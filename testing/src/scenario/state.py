@@ -1879,6 +1879,7 @@ class _CharmSpec(Generic[CharmType]):
         """Load metadata from charm projects created with Charmcraft < 2.5."""
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
+        charm_root = charm_root.absolute()
         meta: dict[str, Any] =  _load_yaml(charm_root / 'metadata.yaml') or {}
         config =  _load_yaml(charm_root / 'config.yaml')
         actions =  _load_yaml(charm_root / 'actions.yaml')
@@ -1887,7 +1888,7 @@ class _CharmSpec(Generic[CharmType]):
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
-        meta: dict[str, Any] =  _load_yaml(charm_root / 'charmcraft.yaml') or {}
+        meta: dict[str, Any] =  _load_yaml(charm_root.absolute() / 'charmcraft.yaml') or {}
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
         config = meta.pop('config', None)
