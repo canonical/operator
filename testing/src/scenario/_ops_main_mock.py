@@ -148,13 +148,11 @@ class Ops(_Manager, Generic[CharmType]):
         super().__init__(self.charm_spec.charm_type, model_backend, juju_context=juju_context)
 
     def _load_charm_meta(self):
-        metadata = (self._charm_root / 'metadata.yaml').read_text()
-        actions_meta = self._charm_root / 'actions.yaml'
-        actions_metadata = actions_meta.read_text() if actions_meta.exists() else None
-        config_meta = self._charm_root / 'config.yaml'
-        config_metadata = config_meta.read_text() if config_meta.exists() else None
-
-        return ops.CharmMeta.from_yaml(metadata, actions_metadata, config_metadata)
+        return ops.CharmMeta(
+            self.charm_spec.meta,
+            self.charm_spec.actions or {},
+            self.charm_spec.config or {},
+        )
 
     @property
     def _framework_class(self):
