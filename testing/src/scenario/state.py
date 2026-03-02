@@ -1895,6 +1895,9 @@ class _CharmSpec(Generic[CharmType]):
             meta = {**meta}
             config = meta.pop('config', None)
             actions = meta.pop('actions', None)
+        else:
+            config = None
+            actions = None
         return meta, config, actions
 
     @staticmethod
