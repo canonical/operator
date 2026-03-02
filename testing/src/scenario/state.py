@@ -1891,8 +1891,10 @@ class _CharmSpec(Generic[CharmType]):
         meta: dict[str, Any] =  _load_yaml(charm_root.absolute() / 'charmcraft.yaml') or {}
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
-        config = meta.pop('config', None)
-        actions = meta.pop('actions', None)
+        if 'config' in meta or 'actions' in meta:
+            meta = {**meta}
+            config = meta.pop('config', None)
+            actions = meta.pop('actions', None)
         return meta, config, actions
 
     @staticmethod
