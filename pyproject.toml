@@ -43,8 +43,18 @@ lint = [
     "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
+docs = [
+    "ops[testing,tracing]",
+    "ops-tools",
+    "canonical-sphinx[full]",
+    "packaging",
+    "sphinxcontrib-svg2pdfconverter[CairoSVG]",
+    "sphinx-last-updated-by-git",
+    "sphinx-sitemap~=2.8",
+]
 unit = [
     "ops[testing,tracing]",
+    "ops-tools",
     "pytest~=8.4",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
@@ -86,12 +96,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.uv.workspace]
-members = ["tracing", "testing"]
+members = ["tracing", "testing", "tools"]
 
 [tool.uv.sources]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
+ops-tools = { workspace = true }
 
 [tool.setuptools.packages.find]
 include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
@@ -227,6 +238,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 ]
+"tools/tests_tools/*" = [
+    # All documentation linting.
+    "D",
+]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
@@ -254,9 +269,9 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "tools/src/*.py", "tools/tests_tools/*.py"]
 exclude = ["tracing/*"]
-extraPaths = ["testing", "tracing"]
+extraPaths = ["testing", "tracing", "tools"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

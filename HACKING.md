@@ -318,8 +318,9 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 
     > Pushing the tags will trigger automatic builds for the Python packages and
     > publish them to PyPI ([ops](https://pypi.org/project/ops/)
-    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and
-    > [ops-tracing](https://pypi.org/project/ops-tracing/)).
+    > ,[ops-scenario](https://pypi.org/project/ops-scenario),
+    > [ops-tracing](https://pypi.org/project/ops-tracing/)), and
+    > [ops-tools](https://pypi.org/project/ops-tools/)).
     > Note that it sometimes take a bit of time for the new releases to show up.
     >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
