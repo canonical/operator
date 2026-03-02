@@ -118,7 +118,6 @@ try:
         layer_from_rockcraft,
     )
 except ImportError:
-    # mypy requires the type: ignore, pyright complains about the type: ignore
     from .model import Container
 else:
     # The Scenario unit testing framework.
