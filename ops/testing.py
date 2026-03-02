@@ -119,7 +119,7 @@ try:
     )
 except ImportError:
     # mypy requires the type: ignore, pyright complains about the type: ignore
-    from .model import Container  # type: ignore[assignment]
+    from .model import Container
 else:
     # The Scenario unit testing framework.
     __all__.extend([
