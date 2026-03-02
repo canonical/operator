@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# pyright: reportUnnecessaryTypeIgnoreComment=false
 """Framework for unit testing charms in a simulated Juju environment.
 
 The module includes:
