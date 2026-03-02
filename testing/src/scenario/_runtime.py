@@ -207,8 +207,9 @@ class Runtime:
         if self._charm_root:
             yield Path(self._charm_root)
             return
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            yield Path(tmp_dir.name)
+        tmp_dir = tempfile.TemporaryDirectory()
+        yield Path(tmp_dir.name)
+        tmp_dir.cleanup()
 
     @contextmanager
     def exec(
