@@ -221,6 +221,13 @@ class Runtime:
             virtual_charm_root = Path(charm_virtual_root.name)
             charm_virtual_root_is_custom = False
 
+        yield virtual_charm_root
+
+        if not charm_virtual_root_is_custom:
+            # charm_virtual_root is a tempdir
+            typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
+        return
+
         metadata_yaml = virtual_charm_root / 'metadata.yaml'
         config_yaml = virtual_charm_root / 'config.yaml'
         actions_yaml = virtual_charm_root / 'actions.yaml'
