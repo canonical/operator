@@ -54,7 +54,7 @@ from ._private.harness import (
     YAMLStringOrFile,
 )
 from .charm import CharmBase, CharmMeta, RelationRole
-from .model import RelationNotFoundError
+from .model import Container, RelationNotFoundError
 from .pebble import ExecProcess
 
 # The Harness unit testing framework.
@@ -169,6 +169,7 @@ else:
 _compatibility_names = [
     'CharmBase',
     'CharmMeta',
+    'Container',  # If Scenario has been installed, then this will be scenario.Container.
     'ExecProcess',
     'RelationNotFoundError',
     'RelationRole',
