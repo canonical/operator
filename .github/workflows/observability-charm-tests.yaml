@@ -78,7 +78,7 @@ jobs:
 
       - name: Run the charm's unit tests
         if: ${{ !(matrix.disabled) }}
-        run: tox -vve unit
+        run: tox -vve unit -- -vv
 
       - name: Check if 'scenario' tox environment exists
         id: check-tox-env-scenario
