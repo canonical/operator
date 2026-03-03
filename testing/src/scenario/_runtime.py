@@ -75,6 +75,7 @@ class Runtime:
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
+            'JUJU_DEBUG_AT': "all",  # run with breakpoints enabled in charm code
         }
 
         if self._machine_id is not None:
