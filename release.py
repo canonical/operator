@@ -54,6 +54,9 @@ VERSION_FILES = {
     'uvlock': pathlib.Path('uv.lock'),
     'versions_doc': pathlib.Path('docs/explanation/versions.md'),
 }
+COUPLED_EXAMPLES = (  # our example charms that use tool.uv.sources to depend on local ops
+    pathlib.Path('examples/httpbin-demo'),
+)
 CHANGE_LINE_REGEX = (
     r'^\* (?P<category>\w+)(?P<breaking>!?): (?P<summary>.*) by [^ ]+ in (?P<pr>.*)'
 )
@@ -432,9 +435,11 @@ def update_versions_doc(version: str):
     )
 
 
-def update_uv_lock():
+def update_uv_locks():
     """Update the uv.lock file with the new versions."""
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
+    for example in COUPLED_EXAMPLES:
+        subprocess.run(['uv', 'lock'], cwd=example, check=True)  # noqa: S607
 
 
 def get_scenario_version() -> packaging.version.Version:
@@ -467,7 +472,7 @@ def update_versions_for_release(tag: str):
     update_testing_version(tag, scenario_version)
     update_tracing_version(tag)
     update_versions_doc(tag)
-    update_uv_lock()
+    update_uv_locks()
 
 
 def get_new_version_post_release(branch_name: str) -> str:
@@ -506,7 +511,7 @@ def update_versions_for_post_release(branch_name: str):
     update_ops_version(ops_version, scenario_version)
     update_testing_version(ops_version, scenario_version)
     update_tracing_version(ops_version)
-    update_uv_lock()
+    update_uv_locks()
 
 
 def check_update_charm_pins_prs(repo: github.Repository.Repository):
@@ -618,7 +623,8 @@ def post_release(
     update_versions_for_post_release(base_branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    files = [str(path) for path in VERSION_FILES.values() if path.exists()]
+    files = [path for path in VERSION_FILES.values() if path.exists()]
+    files.extend([example / 'uv.lock' for example in COUPLED_EXAMPLES])
     subprocess.run(['/usr/bin/git', 'add', *files], check=True)
     subprocess.run(
         ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True
