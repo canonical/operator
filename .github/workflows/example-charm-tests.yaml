@@ -57,7 +57,7 @@ jobs:
       - name: Run mypy
         working-directory: ${{ matrix.dir }}
         env:
-          MYPYPATH: 'src:../..'
+          MYPYPATH: 'src:lib:../..'
         run: |
           uv run \
             --with 'mypy~=1.19.0' \
