@@ -14,8 +14,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
-
 from ops import JujuContext, pebble
 from ops._main import _Abort
 from ops._private.harness import ActionFailed
@@ -206,72 +204,12 @@ class Runtime:
 
     @contextmanager
     def _virtual_charm_root(self):
-        # If we are using runtime on a real charm, we can make some assumptions about the
-        # directory structure we are going to find.
-        # If we're, say, dynamically defining charm types and doing tests on them, we'll have to
-        # generate the metadata files ourselves. To be sure, we ALWAYS use a tempdir. Ground truth
-        # is what the user passed via the CharmSpec
-        spec = self._charm_spec
-
-        if charm_virtual_root := self._charm_root:
-            charm_virtual_root_is_custom = True
-            virtual_charm_root = Path(charm_virtual_root)
-        else:
-            charm_virtual_root = tempfile.TemporaryDirectory()
-            virtual_charm_root = Path(charm_virtual_root.name)
-            charm_virtual_root_is_custom = False
-
-        metadata_yaml = virtual_charm_root / 'metadata.yaml'
-        config_yaml = virtual_charm_root / 'config.yaml'
-        actions_yaml = virtual_charm_root / 'actions.yaml'
-
-        metadata_files_present: dict[Path, str | None] = {
-            file: file.read_text() if charm_virtual_root_is_custom and file.exists() else None
-            for file in (metadata_yaml, config_yaml, actions_yaml)
-        }
-
-        any_metadata_files_present_in_charm_virtual_root = any(
-            v is not None for v in metadata_files_present.values()
-        )
-
-        if spec.is_autoloaded and charm_virtual_root_is_custom:
-            # since the spec is autoloaded, in theory the metadata contents won't differ, so we can
-            # overwrite away even if the custom vroot is the real charm root (the local repo).
-            # Still, log it for clarity.
-            if any_metadata_files_present_in_charm_virtual_root:
-                logger.debug(
-                    f'metadata files found in custom charm_root {charm_virtual_root}. '
-                    f'The spec was autoloaded so the contents should be identical. '
-                    f'Proceeding...',
-                )
-
-        elif not spec.is_autoloaded and any_metadata_files_present_in_charm_virtual_root:
-            logger.warning(
-                f'Some metadata files found in custom user-provided charm_root '
-                f'{charm_virtual_root} while you have passed meta, config or actions to '
-                f'Context.run(). '
-                'Single source of truth are the arguments passed to Context.run(). '
-                'charm_root metadata files will be overwritten for the '
-                'duration of this test, and restored afterwards. '
-                'To avoid this, clean any metadata files from the charm_root before calling run.',
-            )
-
-        metadata_yaml.write_text(yaml.safe_dump(spec.meta))
-        config_yaml.write_text(yaml.safe_dump(spec.config or {}))
-        actions_yaml.write_text(yaml.safe_dump(spec.actions or {}))
-
-        yield virtual_charm_root
-
-        if charm_virtual_root_is_custom:
-            for file, previous_content in metadata_files_present.items():
-                if previous_content is None:  # None == file did not exist before
-                    file.unlink()
-                else:
-                    file.write_text(previous_content)
-
-        else:
-            # charm_virtual_root is a tempdir
-            typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
+        if self._charm_root:
+            yield Path(self._charm_root)
+            return
+        tmp_dir = tempfile.TemporaryDirectory()
+        yield Path(tmp_dir.name)
+        tmp_dir.cleanup()
 
     @contextmanager
     def exec(

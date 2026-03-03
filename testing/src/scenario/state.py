@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import datetime
+import functools
 import inspect
 import pathlib
 import random
@@ -1878,29 +1879,25 @@ class _CharmSpec(Generic[CharmType]):
         """Load metadata from charm projects created with Charmcraft < 2.5."""
         # back in the days, we used to have separate metadata.yaml, config.yaml and actions.yaml
         # files for charm metadata.
-        metadata_path = charm_root / 'metadata.yaml'
-        meta: dict[str, Any] = (
-            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
-        )
-
-        config_path = charm_root / 'config.yaml'
-        config = yaml.safe_load(config_path.open()) if config_path.exists() else None
-
-        actions_path = charm_root / 'actions.yaml'
-        actions = yaml.safe_load(actions_path.open()) if actions_path.exists() else None
+        charm_root = charm_root.absolute()
+        meta: dict[str, Any] = _load_yaml(charm_root / 'metadata.yaml') or {}
+        config = _load_yaml(charm_root / 'config.yaml')
+        actions = _load_yaml(charm_root / 'actions.yaml')
         return meta, config, actions
 
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
         """Load metadata from charm projects created with Charmcraft >= 2.5."""
-        metadata_path = charm_root / 'charmcraft.yaml'
-        meta: dict[str, Any] = (
-            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
-        )
+        meta: dict[str, Any] = _load_yaml(charm_root.absolute() / 'charmcraft.yaml') or {}
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
-        config = meta.pop('config', None)
-        actions = meta.pop('actions', None)
+        if 'config' in meta or 'actions' in meta:
+            meta = {**meta}
+            config = meta.pop('config', None)
+            actions = meta.pop('actions', None)
+        else:
+            config = None
+            actions = None
         return meta, config, actions
 
     @staticmethod
@@ -2356,3 +2353,10 @@ class _Action:
 
     Every action invocation is automatically assigned a new one. Override in
     the rare cases where a specific ID is required."""
+
+
+@functools.lru_cache
+def _load_yaml(path: pathlib.Path) -> Any | None:
+    if path.exists():
+        return yaml.safe_load(path.read_text())
+    return None
