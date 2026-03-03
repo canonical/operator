@@ -25,6 +25,7 @@ from typing import (
     NoReturn,
     TypeVar,
     cast,
+    overload,
 )
 from uuid import uuid4
 
@@ -69,6 +70,7 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
+_RelationType = TypeVar('_RelationType', bound='RelationBase')
 
 logger = scenario_logger.getChild('state')
 
@@ -1739,12 +1741,44 @@ class State:
             f'storage: name={storage}, index={index} not found in the State',
         )
 
-    def get_relation(self, relation: int, /) -> RelationBase:
-        """Get relation from this State, based on the relation's id."""
+    @overload
+    def get_relation(self, relation: int, /) -> RelationBase: ...
+    @overload
+    def get_relation(self, relation: _RelationType, /) -> _RelationType: ...
+    def get_relation(self, relation: int | RelationBase, /) -> RelationBase:
+        """Get relation from this State, based on the relation's id.
+
+        Args:
+            relation: A relation ID, or a relation object from a previous state.
+                If a relation object is passed, its ID is used to find the relation, and the
+                type, endpoint and interface of the found relation are validated against it.
+
+        Raises:
+            KeyError: If no relation matching the id is found.
+            ValueError: If a relation object is passed but the found relation
+                has a mismatched type, endpoint, or interface.
+        """
+        rel_id = relation if isinstance(relation, int) else relation.id
         for state_relation in self.relations:
-            if state_relation.id == relation:
+            if state_relation.id == rel_id:
+                if not isinstance(relation, int):
+                    if type(state_relation) is not type(relation):
+                        raise ValueError(
+                            f'relation with id={rel_id} has type {type(state_relation).__name__!r}'
+                            f', but get_relation was called with {relation!r}'
+                        )
+                    if state_relation.endpoint != relation.endpoint:
+                        raise ValueError(
+                            f'relation with id={rel_id} has endpoint {state_relation.endpoint!r}'
+                            f', but get_relation was called with {relation!r}'
+                        )
+                    if state_relation.interface != relation.interface:
+                        raise ValueError(
+                            f'relation with id={rel_id} has interface {state_relation.interface!r}'
+                            f', but get_relation was called with {relation!r}'
+                        )
                 return state_relation
-        raise KeyError(f'relation: id={relation} not found in the State')
+        raise KeyError(f'relation: id={rel_id} not found in the State')
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
