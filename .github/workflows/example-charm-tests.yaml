@@ -54,3 +54,17 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
+      - name: Run mypy
+        working-directory: ${{ matrix.dir }}
+        env:
+          MYPYPATH: 'src:lib:../..'
+        run: |
+          uv run \
+            --with 'mypy~=1.19.0' \
+            --with=types-PyYAML \
+            --with=../.. \
+            --with=../../testing \
+            --group=lint \
+            --group=unit \
+            --group=integration \
+            mypy --explicit-package-bases --follow-imports=silent src tests
