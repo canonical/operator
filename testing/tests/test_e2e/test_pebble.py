@@ -910,3 +910,24 @@ def test_warning_on_non_empty_container(caplog: pytest.LogCaptureFixture):
         'mycontainer' in record.message and 'non-empty' in record.message
         for record in caplog.records
     )
+
+
+def test_no_warning_on_empty_container(caplog: pytest.LogCaptureFixture):
+    ctx = Context(
+        CharmBase,
+        meta={'name': 'foo', 'containers': {'mycontainer': {}}},
+    )
+    container = Container(name='mycontainer', can_connect=True)
+    state = State(containers={container})
+
+    # First run creates the container root.
+    ctx.run(ctx.on.start(), state)
+
+    # Second run should not warn since the container root is empty.
+    with caplog.at_level(logging.WARNING, logger='ops-scenario.mocking'):
+        ctx.run(ctx.on.start(), state)
+
+    assert not any(
+        'mycontainer' in record.message and 'non-empty' in record.message
+        for record in caplog.records
+    )
