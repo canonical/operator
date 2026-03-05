@@ -249,7 +249,7 @@ class Network:
 class Port:
     """A port that Juju has opened for the charm."""
 
-    protocol: Literal['tcp', 'udp', 'icmp'] | None = 'tcp'
+    protocol: Literal['tcp', 'udp', 'icmp'] = 'tcp'
     """The IP protocol."""
 
     port: int | None = None
