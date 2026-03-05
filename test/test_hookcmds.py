@@ -449,12 +449,21 @@ def test_opened_ports(run: Run):
 def test_opened_ports_endpoints(run: Run):
     run.handle(
         ['opened-ports', '--endpoints', '--format=json'],
-        stdout='["8080/tcp (ep1,ep2)"]',
+        stdout='["8080/tcp (ep1,ep2)", "1234/ftp (ep1)", "1000-2000/udp ()"]',
     )
     result = hookcmds.opened_ports(endpoints=True)
-    assert result[0].port == 8080
     assert result[0].protocol == 'tcp'
-    assert result[0].endpoints == ['ep1', 'ep2']
+    assert result[0].port == 8080
+    assert result[0].to_port is None
+    assert result[0].endpoints == ('ep1', 'ep2')
+    assert result[1].protocol == 'ftp'
+    assert result[1].port == 1234
+    assert result[1].to_port is None
+    assert result[1].endpoints == ('ep1',)
+    assert result[2].protocol == 'udp'
+    assert result[2].port == 1000
+    assert result[2].to_port == 2000
+    assert result[2].endpoints == ()
 
 
 @pytest.mark.parametrize('id', [None, 123])

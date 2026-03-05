@@ -4319,7 +4319,7 @@ class TestPorts:
         ]
 
     def test_opened_ports(self, fake_script: FakeScript, unit: ops.Unit):
-        fake_script.write('opened-ports', """echo '["8080/tcp", "icmp"]'""")
+        fake_script.write('opened-ports', """echo '["8080-8081/tcp (ep1,ep2)", "icmp ()"]'""")
 
         ports_set = unit.opened_ports()
         assert isinstance(ports_set, set)
@@ -4328,24 +4328,30 @@ class TestPorts:
         assert isinstance(ports[0], ops.Port)
         assert ports[0].protocol == 'icmp'
         assert ports[0].port is None
+        assert ports[0].to_port is None
+        assert ports[0].endpoints == ()
         assert isinstance(ports[1], ops.Port)
         assert ports[1].protocol == 'tcp'
         assert ports[1].port == 8080
+        assert ports[1].to_port == 8081
+        assert ports[1].endpoints == ('ep1', 'ep2')
 
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', '--format=json'],
+            ['opened-ports', '--endpoints', '--format=json'],
         ]
 
     def test_opened_ports_warnings(
         self, caplog: pytest.LogCaptureFixture, fake_script: FakeScript, unit: ops.Unit
     ):
-        fake_script.write('opened-ports', """echo '["8080/tcp", "1234/ftp", "1000-2000/udp"]'""")
+        fake_script.write(
+            'opened-ports',
+            """echo '["8080/tcp ()", "1234/ftp (ep1)", "1000-2000/udp (ep1,ep2)"]'""",
+        )
 
         with caplog.at_level(level='WARNING', logger='ops.model'):
             ports_set = unit.opened_ports()
-        assert len(caplog.records) == 2
+        assert len(caplog.records) == 1
         assert re.search(r'.*protocol.*', caplog.records[0].message)
-        assert re.search(r'.*range.*', caplog.records[1].message)
 
         assert isinstance(ports_set, set)
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
@@ -4353,12 +4359,16 @@ class TestPorts:
         assert isinstance(ports[0], ops.Port)
         assert ports[0].protocol == 'tcp'
         assert ports[0].port == 8080
+        assert ports[0].to_port is None
+        assert ports[0].endpoints == ()
         assert isinstance(ports[1], ops.Port)
         assert ports[1].protocol == 'udp'
         assert ports[1].port == 1000
+        assert ports[1].to_port == 2000
+        assert ports[1].endpoints == ('ep1', 'ep2')
 
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', '--format=json'],
+            ['opened-ports', '--endpoints', '--format=json'],
         ]
 
     def test_set_ports_all_open(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4367,7 +4377,7 @@ class TestPorts:
         fake_script.write('opened-ports', 'echo []')
         unit.set_ports(8000, 8025)
         calls = fake_script.calls(clear=True)
-        assert calls.pop(0) == ['opened-ports', '--format=json']
+        assert calls.pop(0) == ['opened-ports', '--endpoints', '--format=json']
         calls.sort()  # We make no guarantee on the order the ports are opened.
         assert calls == [
             ['open-port', '8000/tcp'],
@@ -4378,25 +4388,25 @@ class TestPorts:
         # Two open ports, leave one alone and open another one.
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', """echo '["8025/tcp", "8028/tcp"]'""")
+        fake_script.write('opened-ports', """echo '["8025/tcp (ep1,ep2)", "8028/tcp ()"]'""")
         unit.set_ports(ops.Port('udp', 8022), 8028)
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', '--format=json'],
-            ['close-port', '8025/tcp'],
+            ['opened-ports', '--endpoints', '--format=json'],
+            ['close-port', '--endpoints', 'ep1,ep2', '8025/tcp'],
             ['open-port', '8022/udp'],
         ]
 
     def test_set_ports_replace(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', """echo '["8025/tcp", "8028/tcp"]'""")
+        fake_script.write('opened-ports', """echo '["8025/tcp ()", "8028/tcp (ep)"]'""")
         unit.set_ports(8001, 8002)
         calls = fake_script.calls(clear=True)
-        assert calls.pop(0) == ['opened-ports', '--format=json']
+        assert calls.pop(0) == ['opened-ports', '--endpoints', '--format=json']
         calls.sort()
         assert calls == [
+            ['close-port', '--endpoints', 'ep', '8028/tcp'],
             ['close-port', '8025/tcp'],
-            ['close-port', '8028/tcp'],
             ['open-port', '8001/tcp'],
             ['open-port', '8002/tcp'],
         ]
@@ -4404,20 +4414,20 @@ class TestPorts:
     def test_set_ports_close_all(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', """echo '["8022/udp"]'""")
+        fake_script.write('opened-ports', """echo '["8022/udp (ep1,ep2,ep3)"]'""")
         unit.set_ports()
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', '--format=json'],
-            ['close-port', '8022/udp'],
+            ['opened-ports', '--endpoints', '--format=json'],
+            ['close-port', '--endpoints', 'ep1,ep2,ep3', '8022/udp'],
         ]
 
     def test_set_ports_noop(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
-        fake_script.write('opened-ports', """echo '["8000/tcp"]'""")
+        fake_script.write('opened-ports', """echo '["8000/tcp ()"]'""")
         unit.set_ports(ops.Port('tcp', 8000))
         assert fake_script.calls(clear=True) == [
-            ['opened-ports', '--format=json'],
+            ['opened-ports', '--endpoints', '--format=json'],
         ]
 
 

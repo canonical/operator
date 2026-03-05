@@ -150,7 +150,9 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     for port in result:
         if endpoints:
             port, port_endpoints = port.rsplit(' ', 1)
-            port_endpoints = [e.strip() for e in port_endpoints.strip('()').split(',')]
+            port_endpoints = [
+                endpoint for e in port_endpoints.strip('()').split(',') if (endpoint := e.strip())
+            ]
         else:
             port_endpoints = None
         if '/' in port:

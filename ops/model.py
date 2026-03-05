@@ -801,15 +801,23 @@ class Unit:
                 is ``None``.
         """
         # Normalise to get easier comparisons.
-        existing = {(port.protocol, port.port) for port in self._backend.opened_ports()}
+        existing = {dataclasses.astuple(p) for p in self._backend.opened_ports()}
         desired = {
-            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
-            for port in ports
+            ('tcp', p, None, ())
+            if isinstance(p, int)
+            # If a user specifies a Port with endpoints=None (default) we normalise to endpoints=()
+            # but maybe this is too simple -- if the user didn't specify endpoints then do we
+            # actually want to take action if the port is already open but with some endpoints?
+            # In terms of backwards compatibility, probably not, since previously the endpoints
+            # would have been ignored ...
+            # FIXME: we might need to drop this nice set logic and do an explicit loop instead
+            else (p.protocol, p.port, p.to_port, p.endpoints or ())
+            for p in ports
         }
-        for protocol, port in existing - desired:
-            self._backend.close_port(protocol, port)
-        for protocol, port in desired - existing:
-            self._backend.open_port(protocol, port)
+        for protocol, p, to_port, endpoints in existing - desired:
+            self._backend.close_port(protocol, p, to_port=to_port, endpoints=endpoints)
+        for protocol, p, to_port, endpoints in desired - existing:
+            self._backend.open_port(protocol, p, to_port=to_port, endpoints=endpoints)
 
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
@@ -836,17 +844,7 @@ class Unit:
         self._backend.reboot(now)
 
 
-@dataclasses.dataclass(frozen=True)
-class Port:
-    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
-
-    protocol: typing.Literal['tcp', 'udp', 'icmp']
-    """The IP protocol."""
-
-    port: int | None
-    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
-
-
+Port = hookcmds.Port
 OpenedPort = Port
 """Alias to Port for backwards compatibility.
 
@@ -4037,25 +4035,40 @@ class _ModelBackend:
         with self._wrap_hookcmd('secret-remove', id=id, revision=revision):
             hookcmds.secret_remove(id, revision=revision)
 
-    def open_port(self, protocol: str, port: int | None = None):
-        with self._wrap_hookcmd('open-port', protocol=protocol, port=port):
-            hookcmds.open_port(protocol, port)
+    def open_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: str | Iterable[str] | None = None,
+    ):
+        with self._wrap_hookcmd(
+            'open-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
+        ):
+            hookcmds.open_port(protocol, port, to_port=to_port, endpoints=endpoints)
 
-    def close_port(self, protocol: str, port: int | None = None):
-        with self._wrap_hookcmd('close-port', protocol=protocol, port=port):
-            hookcmds.close_port(protocol, port)
+    def close_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: str | Iterable[str] | None = None,
+    ):
+        with self._wrap_hookcmd(
+            'close-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
+        ):
+            hookcmds.close_port(protocol, port, to_port=to_port, endpoints=endpoints)
 
     def opened_ports(self) -> set[Port]:
-        with self._wrap_hookcmd('opened-ports'):
-            results = hookcmds.opened_ports()
+        with self._wrap_hookcmd('opened-ports', endpoints=True):
+            result = hookcmds.opened_ports(endpoints=True)
         ports: set[Port] = set()
-        for raw_port in results:
-            if raw_port.protocol not in ('tcp', 'udp', 'icmp'):
-                logger.warning('Unexpected opened-ports protocol: %s', raw_port.protocol)
+        for port in result:
+            if port.protocol not in ('tcp', 'udp', 'icmp'):
+                logger.warning('Unexpected opened-ports protocol: %s', port.protocol)
                 continue
-            if raw_port.to_port is not None:
-                logger.warning('Ignoring opened-ports port range: %s', raw_port)
-            port = Port(raw_port.protocol or 'tcp', raw_port.port)
             ports.add(port)
         return ports
 

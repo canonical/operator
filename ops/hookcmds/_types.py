@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import pathlib
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -242,14 +242,11 @@ class Network:
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 
-# Note that we intend to merge this with model.py's `Port` in the future, and
-# that does not have `kw_only=True`. That means that we should not use it here,
-# either, so that merging can be backwards compatible.
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Port:
     """A port that Juju has opened for the charm."""
 
-    protocol: Literal['tcp', 'udp', 'icmp'] | None = 'tcp'
+    protocol: Literal['tcp', 'udp', 'icmp'] = 'tcp'
     """The IP protocol."""
 
     port: int | None = None
@@ -258,8 +255,20 @@ class Port:
     to_port: int | None = None
     """The final port number if this is a range of ports."""
 
-    endpoints: list[str] | None = None
+    endpoints: tuple[str, ...] | None = None
     """The endpoints this port applies to, ``['*']`` if all endpoints, or ``None`` if unknown."""
+
+    def __init__(
+        self,
+        protocol: str,
+        port: int | None = None,
+        to_port: int | None = None,
+        endpoints: Iterable[str] | None = None,
+    ):
+        object.__setattr__(self, 'protocol', protocol)
+        object.__setattr__(self, 'port', port)
+        object.__setattr__(self, 'to_port', to_port)
+        object.__setattr__(self, 'endpoints', tuple(endpoints) if endpoints is not None else None)
 
 
 class RelationModelDict(TypedDict):
