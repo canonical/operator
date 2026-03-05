@@ -38,6 +38,8 @@ from ops import testing
 
 ## Write a test
 
+> See first: [](/howto/manage-relations#manage-relations-generate-tests-from-a-deployed-model)
+
 To write a test function, use a `Context` object to encapsulate the charm type (`MyCharm`) and any necessary metadata. The test should then define the initial `State` and call `Context.run` with an `event` and initial `State`.
 
 This follows the typical test structure:
@@ -122,15 +124,18 @@ def test_peer_changed():
 
 > See more: [](ops.testing.State.from_context)
 
-## Mock beyond the State
-
-If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
+## Generate tests from a deployed model
 
 If your test needs realistic relation inputs from a deployed model, you can use
 `jhack scenario snapshot` to capture state, then adapt the generated data to
 `ops.testing.State` and `ops.testing.Context`.
 
-> See more: [](/howto/manage-relations)
+For a workflow focused on relation debugging, see
+[](/howto/manage-relations#manage-relations-generate-tests-from-a-deployed-model).
+
+## Mock beyond the State
+
+If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
 
 For example, suppose that the charm we're testing uses the [lightkube client](https://github.com/gtsystem/lightkube) to talk to Kubernetes. To mock that object, modify the test file to contain:
 

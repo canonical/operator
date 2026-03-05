@@ -63,28 +63,6 @@ Other than this, implement a subordinate relation in the same way as any other r
 
 ### Add code to use a relation
 
-### Capture live relation state for testing
-
-When a relation bug only reproduces in a live deployment, you can snapshot the
-live relation state and turn it into a local state-transition test.
-
-A practical workflow is:
-
-1. Reproduce the issue in a deployed model.
-2. Use `jhack scenario snapshot` to export representative relation state.
-3. Convert the generated test scaffolding to `ops.testing` (`Context`, `State`,
-    and `ctx.on.relation_*` events).
-4. Keep one failing test that captures the bug, then fix charm code until the
-    test passes.
-
-This is especially useful when relation databags, relation IDs, or unit/app
-combinations are difficult to reconstruct by hand.
-
-For command syntax and tool updates, see the
-[jhack repository](https://github.com/canonical/jhack).
-
-> See also: [](/howto/write-unit-tests-for-a-charm)
-
 #### Using a charm library
 
 For most relations, you will now want to progress with using the charm library recommended by the charm that you are integrating with. Read the documentation for the other charm on Charmhub and follow the instructions, which will typically involve adding a requirer object in your charm’s `__init__` and then observing custom events.
@@ -383,3 +361,24 @@ def test_active_with_another_app(juju: jubilant.Juju):
 
     juju.wait(jubilant.all_active)
 ```
+
+(manage-relations-generate-tests-from-a-deployed-model)=
+### Generate tests from a deployed model
+
+When a relation bug is only reproducible in a live deployment, you can snapshot
+the live relation state and turn it into a state-transition test.
+
+A practical workflow is:
+
+1. Reproduce the issue in a deployed model.
+2. Use `jhack scenario snapshot` to export representative relation state.
+3. Adapt the generated test scaffolding to your `ops.testing` setup (`Context`,
+    `State`, and `ctx.on.relation_*` events).
+4. Keep one failing test that captures the bug, then fix charm code until the
+    test passes.
+
+This is especially useful when relation databags, relation IDs, or unit/app
+combinations are difficult to reconstruct by hand.
+
+For command syntax and tool updates, see the
+[jhack repository](https://github.com/canonical/jhack).
