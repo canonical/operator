@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import io
+import logging
 from pathlib import Path
 
 import pytest
@@ -880,3 +881,32 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert log_target.labels == {'foo': 'bar'}
     assert log_target.override == 'merge'
     assert log_target.location == 'https://loki2.example.com'
+
+
+def test_warning_on_non_empty_container(caplog: pytest.LogCaptureFixture):
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: object):
+            self.unit.get_container('mycontainer').push('/foo.txt', 'hello')
+
+    ctx = Context(
+        MyCharm,
+        meta={'name': 'foo', 'containers': {'mycontainer': {}}},
+    )
+    container = Container(name='mycontainer', can_connect=True)
+    state = State(containers={container})
+
+    # First run populates the container root with a file.
+    ctx.run(ctx.on.start(), state)
+
+    # Second run should warn that the container root is non-empty.
+    with caplog.at_level(logging.WARNING, logger='ops-scenario.mocking'):
+        ctx.run(ctx.on.start(), state)
+
+    assert any(
+        'mycontainer' in record.message and 'non-empty' in record.message
+        for record in caplog.records
+    )

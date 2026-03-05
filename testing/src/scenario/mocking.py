@@ -778,6 +778,14 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # wipe just in case
         if container_root.exists():
+            if any(container_root.iterdir()):
+                logger.warning(
+                    'Container %r has a non-empty filesystem that will be wiped before this run.'
+                    ' If you are trying to mock filesystem contents, use Mounts instead.'
+                    ' If you are reusing a Context instance across multiple ctx.run() calls,'
+                    ' note that the filesystem is cleared between runs.',
+                    container_name,
+                )
             # Path.rmdir will fail if root is nonempty
             shutil.rmtree(container_root)
 
