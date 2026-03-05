@@ -9,6 +9,7 @@ specific `State` exists in, and the events that can be executed on that `State`.
 
 from __future__ import annotations
 
+import copy
 import functools
 import pathlib
 import tempfile
@@ -654,11 +655,18 @@ class Context(Generic[CharmType]):
 
         :arg charm_type: the :class:`ops.CharmBase` subclass to handle the event.
         :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a dict).
-            If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
+            Alternatively, can be a full ``charmcraft.yaml`` dict, in which case ``config`` and
+            ``actions`` will be automatically extracted from it (if not explicitly provided).
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
-            If none is provided, we will search for a ``actions.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present.
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``actions.yaml``).
         :arg config: charm config to use. Needs to be a valid config.yaml format (as a dict).
-            If none is provided, we will search for a ``config.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``config.yaml``).
         :arg juju_version: Juju agent version to simulate.
         :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
             defined in the metadata.
@@ -677,6 +685,19 @@ class Context(Generic[CharmType]):
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
+        meta = copy.deepcopy(meta)
+        config = copy.deepcopy(config)
+        actions = copy.deepcopy(actions)
+        # Extract config and actions from meta if it contains them (e.g., charmcraft.yaml)
+        # and they were not explicitly provided
+        if meta is not None:
+            meta_config = meta.pop('config', None)
+            if config is None:
+                config = meta_config
+            meta_actions = meta.pop('actions', None)
+            if actions is None:
+                actions = meta_actions
+
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
