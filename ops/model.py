@@ -805,6 +805,12 @@ class Unit:
         desired = {
             ('tcp', p, None, ())
             if isinstance(p, int)
+            # If a user specifies a Port with endpoints=None (default) we normalise to endpoints=()
+            # but maybe this is too simple -- if the user didn't specify endpoints then do we
+            # actually want to take action if the port is already open but with some endpoints?
+            # In terms of backwards compatibility, probably not, since previously the endpoints
+            # would have been ignored ...
+            # FIXME: we might need to drop this nice set logic and do an explicit loop instead
             else (p.protocol, p.port, p.to_port, p.endpoints or ())
             for p in ports
         }
