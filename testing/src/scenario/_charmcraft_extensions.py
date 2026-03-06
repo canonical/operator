@@ -1,4 +1,4 @@
-# Copyright 2024 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Charmcraft extension metadata, config, and actions.
 
@@ -24,6 +24,22 @@ METADATA: dict[str, dict] = {
         },
         'resources': {
             'django-app-image': {'description': 'django application image.', 'type': 'oci-image'}
+        },
+    },
+    'expressjs-framework': {
+        'assumes': ['k8s-api'],
+        'containers': {'app': {'resource': 'app-image'}},
+        'peers': {'secret-storage': {'interface': 'secret-storage'}},
+        'provides': {
+            'grafana-dashboard': {'interface': 'grafana_dashboard'},
+            'metrics-endpoint': {'interface': 'prometheus_scrape'},
+        },
+        'requires': {
+            'ingress': {'interface': 'ingress', 'limit': 1},
+            'logging': {'interface': 'loki_push_api'},
+        },
+        'resources': {
+            'app-image': {'description': 'expressjs application image.', 'type': 'oci-image'}
         },
     },
     'fastapi-framework': {
@@ -138,6 +154,37 @@ CONFIG: dict[str, dict] = {
         },
         'webserver-workers': {
             'description': 'The number of webserver worker processes for handling requests.',
+            'type': 'int',
+        },
+    },
+    'expressjs-framework': {
+        'app-port': {
+            'default': 8080,
+            'description': 'Default port where the application will listen on.',
+            'type': 'int',
+        },
+        'app-secret-key': {
+            'description': 'Long secret you can use for sessions, csrf or any other thing where you need a '
+            'random secret shared by all units',
+            'type': 'string',
+        },
+        'app-secret-key-id': {
+            'description': 'This configuration is similar to `app-secret-key`, but instead accepts a Juju '
+            'user secret ID. The secret should contain a single key, "value", which maps to '
+            'the actual application secret key. To create the secret, run the following '
+            'command: `juju add-secret my-app-secret-key value=<secret-string> && juju '
+            'grant-secret my-app-secret-key my-app`, and use the output secret ID to configure '
+            'this option.',
+            'type': 'secret',
+        },
+        'metrics-path': {
+            'default': '/metrics',
+            'description': 'Path where the prometheus metrics will be scraped.',
+            'type': 'string',
+        },
+        'metrics-port': {
+            'default': 8080,
+            'description': 'Port where the prometheus metrics will be scraped.',
             'type': 'int',
         },
     },
@@ -330,6 +377,12 @@ ACTIONS: dict[str, dict] = {
             'params': {'email': {'type': 'string'}, 'username': {'type': 'string'}},
             'required': ['username', 'email'],
         },
+        'rotate-secret-key': {
+            'description': 'Rotate the secret key. Users will be forced to log in again. This might be useful '
+            'if a security breach occurs.'
+        },
+    },
+    'expressjs-framework': {
         'rotate-secret-key': {
             'description': 'Rotate the secret key. Users will be forced to log in again. This might be useful '
             'if a security breach occurs.'

@@ -28,14 +28,6 @@ import tempfile
 
 import yaml
 
-PROFILES = [
-    'django-framework',
-    'fastapi-framework',
-    'flask-framework',
-    'go-framework',
-    'spring-boot-framework',
-]
-
 # Keys from the expanded YAML that belong to "metadata" (the charm's metadata.yaml equivalent).
 METADATA_KEYS = {
     'assumes',
@@ -67,6 +59,24 @@ OUTPUT_FILE = (
     / 'scenario'
     / '_charmcraft_extensions.py'
 )
+
+
+def get_extensions() -> list[str]:
+    """Get the list of available charmcraft extensions via ``charmcraft list-extensions``."""
+    result = subprocess.run(
+        ['charmcraft', 'list-extensions'],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    extensions = []
+    for line in result.stdout.splitlines():
+        # Skip header and separator lines.
+        if not line or line.startswith('Extension') or line.startswith('---'):
+            continue
+        name = line.split()[0]
+        extensions.append(name)
+    return sorted(extensions)
 
 
 def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict:
@@ -165,9 +175,12 @@ def generate_module(all_data: dict[str, tuple[dict, dict, dict]]) -> str:
 
 
 def main() -> int:  # noqa: D103
+    extensions = get_extensions()
+    print(f'Found extensions: {", ".join(extensions)}')
+
     all_data: dict[str, tuple[dict, dict, dict]] = {}
 
-    for profile in PROFILES:
+    for profile in extensions:
         print(f'Processing {profile}...')
         with tempfile.TemporaryDirectory() as tmpdir:
             expanded = run_charmcraft(profile, pathlib.Path(tmpdir))
