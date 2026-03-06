@@ -1860,6 +1860,65 @@ def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     return True
 
 
+def _apply_extensions(
+    meta: dict[str, Any],
+    extensions: list[str],
+) -> dict[str, Any]:
+    """Merge charmcraft extension defaults into the charm metadata.
+
+    Extension defaults are applied first, then the local charmcraft.yaml
+    values are merged on top, simulating what ``charmcraft expand-extensions``
+    does.
+    """
+    from . import _charmcraft_extensions
+
+    for ext_name in extensions:
+        ext_meta = _charmcraft_extensions.METADATA.get(ext_name, {})
+        ext_config = _charmcraft_extensions.CONFIG.get(ext_name, {})
+        ext_actions = _charmcraft_extensions.ACTIONS.get(ext_name, {})
+
+        if not ext_meta and not ext_config and not ext_actions:
+            logger.warning(
+                f'Unknown charmcraft extension {ext_name!r}; '
+                f'ignoring. You may need to regenerate '
+                f'_charmcraft_extensions.py.',
+            )
+            continue
+
+        # Merge metadata: for dicts, extension provides defaults that
+        # the local yaml overrides. For lists, combine them.
+        for key, ext_value in ext_meta.items():
+            if key not in meta:
+                meta[key] = copy.deepcopy(ext_value)
+            elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
+                merged = copy.deepcopy(ext_value)
+                merged.update(meta[key])
+                meta[key] = merged
+            elif isinstance(ext_value, list) and isinstance(meta[key], list):
+                merged = copy.deepcopy(ext_value)
+                for item in meta[key]:
+                    if item not in merged:
+                        merged.append(item)
+                meta[key] = merged
+
+        # Merge config options.
+        if ext_config:
+            local_config = meta.get('config', {})
+            local_options = local_config.get('options', {})
+            merged_options = copy.deepcopy(ext_config)
+            merged_options.update(local_options)
+            meta['config'] = {'options': merged_options}
+
+        # Merge actions.
+        if ext_actions:
+            local_actions = meta.get('actions', {})
+            merged_actions = copy.deepcopy(ext_actions)
+            merged_actions.update(local_actions)
+            meta['actions'] = merged_actions
+
+    return meta
+
+
 @dataclasses.dataclass(frozen=True)
 class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
@@ -1899,6 +1958,12 @@ class _CharmSpec(Generic[CharmType]):
         )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
+
+        # Apply charmcraft extensions before extracting config/actions.
+        extensions = meta.pop('extensions', None)
+        if extensions:
+            meta = _apply_extensions(meta, extensions)
+
         config = meta.pop('config', None)
         actions = meta.pop('actions', None)
         return meta, config, actions
