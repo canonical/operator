@@ -228,7 +228,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "D",
 ]
 "testing/src/scenario/_charmcraft_extensions.py" = [
-    "CPY001",  # Auto-generated file.
     "E501",  # Auto-generated file; long description strings are unavoidable.
 ]
 ".github/generate_charmcraft_extensions.py" = [
