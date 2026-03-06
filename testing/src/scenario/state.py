@@ -35,6 +35,7 @@ from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
+from . import _charmcraft_extensions
 from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
@@ -1870,8 +1871,6 @@ def _apply_extensions(
     values are merged on top, simulating what ``charmcraft expand-extensions``
     does.
     """
-    from . import _charmcraft_extensions
-
     for ext_name in extensions:
         ext_meta = _charmcraft_extensions.METADATA.get(ext_name, {})
         ext_config = _charmcraft_extensions.CONFIG.get(ext_name, {})
