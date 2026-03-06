@@ -240,12 +240,12 @@ class TestExtensions:
             },
         ) as charm:
             spec = _CharmSpec.autoload(charm)
-            # local override wins
+            # Local override wins.
             assert spec.meta['requires']['ingress'] == {
                 'interface': 'custom-ingress',
                 'limit': 5,
             }
-            # extension-only entries still present
+            # Extension-only entries are still present.
             assert 'logging' in spec.meta['requires']
 
     def test_local_config_overrides_extension(self, tmp_path):
@@ -268,11 +268,11 @@ class TestExtensions:
         ) as charm:
             spec = _CharmSpec.autoload(charm)
             options = spec.config['options']
-            # local override wins
+            # Local override wins.
             assert options['flask-debug'] == {'type': 'boolean', 'default': True}
-            # local-only option present
+            # Local-only option is present.
             assert 'my-custom-option' in options
-            # extension-only options still present
+            # Extension-only options are still present.
             assert 'webserver-workers' in options
 
     def test_local_actions_override_extension(self, tmp_path):
@@ -292,11 +292,11 @@ class TestExtensions:
             },
         ) as charm:
             spec = _CharmSpec.autoload(charm)
-            # local override wins
+            # Local override wins.
             assert spec.actions['rotate-secret-key'] == {
                 'description': 'custom rotate',
             }
-            # local-only action present
+            # Local-only action is present.
             assert 'my-action' in spec.actions
 
     def test_local_assumes_merged_with_extension(self, tmp_path):
@@ -333,8 +333,8 @@ class TestExtensions:
             assert 'create-superuser' in spec.actions
             assert 'rotate-secret-key' in spec.actions
 
-    def test_unknown_extension_warns(self, tmp_path, caplog):
-        """An unknown extension name logs a warning and is skipped."""
+    def test_unknown_extension_warns(self, tmp_path):
+        """An unknown extension name emits a warning and is skipped."""
         with create_tempcharm(
             tmp_path,
             meta={
@@ -345,9 +345,9 @@ class TestExtensions:
                 'extensions': ['nonexistent-extension'],
             },
         ) as charm:
-            spec = _CharmSpec.autoload(charm)
-            assert 'Unknown charmcraft extension' in caplog.text
-            # no extension data merged, but charm still loads
+            with pytest.warns(UserWarning, match='Unknown charmcraft extension'):
+                spec = _CharmSpec.autoload(charm)
+            # No extension data merged, but the charm still loads.
             assert spec.meta['name'] == 'my-app'
 
     def test_extension_stripped_from_meta(self, tmp_path):

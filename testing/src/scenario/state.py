@@ -13,6 +13,7 @@ import pathlib
 import random
 import re
 import string
+import warnings
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
@@ -1877,9 +1878,10 @@ def _apply_extensions(
         ext_actions = _charmcraft_extensions.ACTIONS.get(ext_name, {})
 
         if not ext_meta and not ext_config and not ext_actions:
-            logger.warning(
+            warnings.warn(
                 f'Unknown charmcraft extension {ext_name!r}; '
-                f'ignoring. You may need to update to a newer ops.'
+                f'ignoring. You may need to update to a newer ops.',
+                stacklevel=2,
             )
             continue
 
