@@ -231,6 +231,31 @@ ctx = testing.Context(
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 
+## Charmcraft extensions
+
+If your `charmcraft.yaml` uses a charmcraft extension such as `flask-framework`
+or `django-framework`, the testing framework will automatically expand it when
+autoloading metadata. The extension's metadata (containers, relations, resources,
+etc.), config options, and actions are merged into the charm spec, simulating what
+`charmcraft expand-extensions` does at pack time.
+
+This means you can write tests against a charm that uses extensions without having
+to manually specify all the metadata the extension adds:
+
+```python
+# Given a charmcraft.yaml with:
+#   extensions:
+#     - flask-framework
+
+ctx = testing.Context(MyFlaskCharm)
+# The 'ingress' relation is provided by the flask-framework extension.
+state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingress')}))
+```
+
+Local values in `charmcraft.yaml` take precedence over extension defaults. For
+example, if you define a custom `ingress` relation in your `charmcraft.yaml`, it
+will override the one provided by the extension.
+
 ## Immutability
 
 All of the data structures in the state, (`State`, `Relation`, `Container`, and

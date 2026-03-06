@@ -1951,7 +1951,13 @@ class _CharmSpec(Generic[CharmType]):
 
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
-        """Load metadata from charm projects created with Charmcraft >= 2.5."""
+        """Load metadata from charm projects created with Charmcraft >= 2.5.
+
+        If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+        ``extensions: [flask-framework]``), the extension's metadata, config,
+        and actions are merged in before the values are returned, simulating
+        what ``charmcraft expand-extensions`` does at pack time.
+        """
         metadata_path = charm_root / 'charmcraft.yaml'
         meta: dict[str, Any] = (
             yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
