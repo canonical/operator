@@ -1879,8 +1879,7 @@ def _apply_extensions(
         if not ext_meta and not ext_config and not ext_actions:
             logger.warning(
                 f'Unknown charmcraft extension {ext_name!r}; '
-                f'ignoring. You may need to regenerate '
-                f'_charmcraft_extensions.py.',
+                f'ignoring. You may need to updste to a newer ops.'
             )
             continue
 
