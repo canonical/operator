@@ -13,6 +13,7 @@ import pathlib
 import random
 import re
 import string
+import warnings
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
@@ -35,6 +36,7 @@ from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
+from . import _charmcraft_extensions
 from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
@@ -1860,6 +1862,63 @@ def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     return True
 
 
+def _apply_extensions(
+    meta: dict[str, Any],
+    extensions: list[str],
+) -> dict[str, Any]:
+    """Merge charmcraft extension defaults into the charm metadata.
+
+    Extension defaults are applied first, then the local charmcraft.yaml
+    values are merged on top, simulating what ``charmcraft expand-extensions``
+    does.
+    """
+    for ext_name in extensions:
+        ext_meta = _charmcraft_extensions.METADATA.get(ext_name, {})
+        ext_config = _charmcraft_extensions.CONFIG.get(ext_name, {})
+        ext_actions = _charmcraft_extensions.ACTIONS.get(ext_name, {})
+
+        if not ext_meta and not ext_config and not ext_actions:
+            warnings.warn(
+                f'Unknown charmcraft extension {ext_name!r}; '
+                f'ignoring. You may need to update to a newer ops.',
+                stacklevel=2,
+            )
+            continue
+
+        # Merge metadata: for dicts, extension provides defaults that
+        # the local yaml overrides. For lists, combine them.
+        for key, ext_value in ext_meta.items():
+            if key not in meta:
+                meta[key] = copy.deepcopy(ext_value)
+            elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
+                merged = copy.deepcopy(ext_value)
+                merged.update(meta[key])
+                meta[key] = merged
+            elif isinstance(ext_value, list) and isinstance(meta[key], list):
+                merged = copy.deepcopy(ext_value)
+                for item in meta[key]:
+                    if item not in merged:
+                        merged.append(item)
+                meta[key] = merged
+
+        # Merge config options.
+        if ext_config:
+            local_config = meta.get('config', {})
+            local_options = local_config.get('options', {})
+            merged_options = copy.deepcopy(ext_config)
+            merged_options.update(local_options)
+            meta['config'] = {'options': merged_options}
+
+        # Merge actions.
+        if ext_actions:
+            local_actions = meta.get('actions', {})
+            merged_actions = copy.deepcopy(ext_actions)
+            merged_actions.update(local_actions)
+            meta['actions'] = merged_actions
+
+    return meta
+
+
 @dataclasses.dataclass(frozen=True)
 class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
@@ -1892,13 +1951,25 @@ class _CharmSpec(Generic[CharmType]):
 
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
-        """Load metadata from charm projects created with Charmcraft >= 2.5."""
+        """Load metadata from charm projects created with Charmcraft >= 2.5.
+
+        If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+        ``extensions: [flask-framework]``), the extension's metadata, config,
+        and actions are merged in before the values are returned, simulating
+        what ``charmcraft expand-extensions`` does at pack time.
+        """
         metadata_path = charm_root / 'charmcraft.yaml'
         meta: dict[str, Any] = (
             yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
         )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
+
+        # Apply charmcraft extensions before extracting config/actions.
+        extensions = meta.pop('extensions', None)
+        if extensions:
+            meta = _apply_extensions(meta, extensions)
+
         config = meta.pop('config', None)
         actions = meta.pop('actions', None)
         return meta, config, actions

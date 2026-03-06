@@ -165,3 +165,220 @@ def test_config_defaults(tmp_path, legacy):
         with ctx(ctx.on.start(), State()) as mgr:
             mgr.run()
             assert mgr.charm.config['foo'] is True
+
+
+class TestExtensions:
+    """Tests for charmcraft extension autoloading."""
+
+    def test_extension_adds_metadata(self, tmp_path):
+        """An extension injects its metadata (containers, requires, etc.)."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assert 'flask-app' in spec.meta.get('containers', {})
+            assert 'ingress' in spec.meta.get('requires', {})
+            assert 'secret-storage' in spec.meta.get('peers', {})
+            assert 'metrics-endpoint' in spec.meta.get('provides', {})
+            assert 'flask-app-image' in spec.meta.get('resources', {})
+            assert 'k8s-api' in spec.meta.get('assumes', [])
+
+    def test_extension_adds_config(self, tmp_path):
+        """An extension injects its config options."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assert spec.config is not None
+            options = spec.config.get('options', {})
+            assert 'flask-debug' in options
+            assert 'webserver-workers' in options
+
+    def test_extension_adds_actions(self, tmp_path):
+        """An extension injects its actions."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assert spec.actions is not None
+            assert 'rotate-secret-key' in spec.actions
+
+    def test_local_meta_overrides_extension(self, tmp_path):
+        """Local charmcraft.yaml values take precedence over extension defaults."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+                'requires': {
+                    'ingress': {'interface': 'custom-ingress', 'limit': 5},
+                },
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            # Local override wins.
+            assert spec.meta['requires']['ingress'] == {
+                'interface': 'custom-ingress',
+                'limit': 5,
+            }
+            # Extension-only entries are still present.
+            assert 'logging' in spec.meta['requires']
+
+    def test_local_config_overrides_extension(self, tmp_path):
+        """Local config options override extension config defaults."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+            config={
+                'options': {
+                    'flask-debug': {'type': 'boolean', 'default': True},
+                    'my-custom-option': {'type': 'string'},
+                },
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            options = spec.config['options']
+            # Local override wins.
+            assert options['flask-debug'] == {'type': 'boolean', 'default': True}
+            # Local-only option is present.
+            assert 'my-custom-option' in options
+            # Extension-only options are still present.
+            assert 'webserver-workers' in options
+
+    def test_local_actions_override_extension(self, tmp_path):
+        """Local actions override extension action defaults."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+            actions={
+                'rotate-secret-key': {'description': 'custom rotate'},
+                'my-action': {'description': 'custom action'},
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            # Local override wins.
+            assert spec.actions['rotate-secret-key'] == {
+                'description': 'custom rotate',
+            }
+            # Local-only action is present.
+            assert 'my-action' in spec.actions
+
+    def test_local_assumes_merged_with_extension(self, tmp_path):
+        """Local assumes list is merged with extension assumes."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+                'assumes': ['juju >= 3.1'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assumes = spec.meta['assumes']
+            assert 'k8s-api' in assumes
+            assert 'juju >= 3.1' in assumes
+
+    def test_django_extension_has_create_superuser(self, tmp_path):
+        """Django extension adds the create-superuser action."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-django',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['django-framework'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assert 'create-superuser' in spec.actions
+            assert 'rotate-secret-key' in spec.actions
+
+    def test_unknown_extension_warns(self, tmp_path):
+        """An unknown extension name emits a warning and is skipped."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-app',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['nonexistent-extension'],
+            },
+        ) as charm:
+            with pytest.warns(UserWarning, match='Unknown charmcraft extension'):
+                spec = _CharmSpec.autoload(charm)
+            # No extension data merged, but the charm still loads.
+            assert spec.meta['name'] == 'my-app'
+
+    def test_extension_stripped_from_meta(self, tmp_path):
+        """The 'extensions' key should not remain in the loaded meta."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+        ) as charm:
+            spec = _CharmSpec.autoload(charm)
+            assert 'extensions' not in spec.meta
+
+    def test_extension_with_relations_in_context(self, tmp_path):
+        """Relations from an extension can be used in a Context run."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+        ) as charm:
+            ctx = Context(charm)
+            ctx.run(
+                ctx.on.start(),
+                State(relations={Relation('ingress')}),
+            )

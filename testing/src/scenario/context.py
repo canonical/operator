@@ -655,6 +655,9 @@ class Context(Generic[CharmType]):
         :arg charm_type: the :class:`ops.CharmBase` subclass to handle the event.
         :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a dict).
             If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
+            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            ``extensions: [flask-framework]``), the extension's metadata,
+            config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
             If none is provided, we will search for a ``actions.yaml`` file in the charm root.
         :arg config: charm config to use. Needs to be a valid config.yaml format (as a dict).
