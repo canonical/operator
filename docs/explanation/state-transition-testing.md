@@ -235,8 +235,8 @@ state = ctx.run(ctx.on.start(), testing.State())
 
 If your `charmcraft.yaml` uses a charmcraft extension such as `flask-framework`
 or `django-framework`, the testing framework will automatically expand it when
-autoloading metadata. The extension's metadata (containers, relations, resources,
-etc.), config options, and actions are merged into the charm spec, simulating what
+automatically loading metadata. The extension's metadata (containers, relations, resources,
+and so on), config options, and actions are merged into the charm spec, simulating what
 `charmcraft expand-extensions` does at pack time.
 
 This means you can write tests against a charm that uses extensions without having
