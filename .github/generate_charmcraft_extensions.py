@@ -25,6 +25,7 @@ import pathlib
 import pprint
 import subprocess
 import tempfile
+from typing import Any
 
 import yaml
 
@@ -79,7 +80,7 @@ def get_extensions() -> list[str]:
     return sorted(extensions)
 
 
-def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict:
+def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict[str, Any]:
     """Run charmcraft init + expand-extensions and return the expanded YAML as a dict."""
     subprocess.run(
         ['charmcraft', 'init', '--profile', profile, '--name', 'test-charm'],
@@ -98,23 +99,25 @@ def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict:
     return yaml.safe_load(result.stdout)
 
 
-def extract_extension_data(expanded: dict) -> tuple[dict, dict, dict]:
+def extract_extension_data(
+    expanded: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Extract metadata, config options, and actions from expanded charmcraft YAML."""
-    metadata = {}
+    metadata: dict[str, Any] = {}
     for key in METADATA_KEYS:
         if key in expanded:
             metadata[key] = expanded[key]
 
-    config = {}
+    config: dict[str, Any] = {}
     if 'config' in expanded and 'options' in expanded['config']:
         config = expanded['config']['options']
 
-    actions = expanded.get('actions', {})
+    actions: dict[str, Any] = expanded.get('actions', {})
 
     return metadata, config, actions
 
 
-def format_dict(d: dict, indent: int = 4) -> str:
+def format_dict(d: dict[str, Any], indent: int = 4) -> str:
     """Format a dict as a Python literal string."""
     formatted = pprint.pformat(d, width=100, sort_dicts=True)
     if '\n' in formatted:
@@ -126,7 +129,9 @@ def format_dict(d: dict, indent: int = 4) -> str:
     return formatted
 
 
-def generate_module(all_data: dict[str, tuple[dict, dict, dict]]) -> str:
+def generate_module(
+    all_data: dict[str, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]],
+) -> str:
     """Generate the Python module source code."""
     lines = [
         '# Copyright 2026 Canonical Ltd.',
@@ -139,12 +144,14 @@ def generate_module(all_data: dict[str, tuple[dict, dict, dict]]) -> str:
         '',
         'from __future__ import annotations',
         '',
+        'from typing import Any',
+        '',
     ]
 
     # Build the three top-level dicts.
-    metadata_entries = {}
-    config_entries = {}
-    action_entries = {}
+    metadata_entries: dict[str, dict[str, Any]] = {}
+    config_entries: dict[str, dict[str, Any]] = {}
+    action_entries: dict[str, dict[str, Any]] = {}
     for profile, (metadata, config, actions) in sorted(all_data.items()):
         metadata_entries[profile] = metadata
         config_entries[profile] = config
@@ -160,7 +167,7 @@ def generate_module(all_data: dict[str, tuple[dict, dict, dict]]) -> str:
         ('ACTIONS', action_entries, 'Actions added by each charmcraft extension.'),
     ]:
         lines.append(f'# {docstring}')
-        lines.append(f'{var_name}: dict[str, dict] = {{')
+        lines.append(f'{var_name}: dict[str, dict[str, Any]] = {{')
         for profile in sorted(data):
             lines.append(f'    {profile!r}: {{')
             for key in sorted(data[profile]):
@@ -178,7 +185,7 @@ def main() -> int:  # noqa: D103
     extensions = get_extensions()
     print(f'Found extensions: {", ".join(extensions)}')
 
-    all_data: dict[str, tuple[dict, dict, dict]] = {}
+    all_data: dict[str, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = {}
 
     for profile in extensions:
         print(f'Processing {profile}...')

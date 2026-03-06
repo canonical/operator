@@ -8,8 +8,10 @@ Do not edit manually.
 
 from __future__ import annotations
 
+from typing import Any
+
 # Metadata added by each charmcraft extension.
-METADATA: dict[str, dict] = {
+METADATA: dict[str, dict[str, Any]] = {
     'django-framework': {
         'assumes': ['k8s-api'],
         'containers': {'django-app': {'resource': 'django-app-image'}},
@@ -107,7 +109,7 @@ METADATA: dict[str, dict] = {
 }
 
 # Config options added by each charmcraft extension.
-CONFIG: dict[str, dict] = {
+CONFIG: dict[str, dict[str, Any]] = {
     'django-framework': {
         'django-allowed-hosts': {
             'description': 'A comma-separated list of host/domain names that this Django site can serve. This '
@@ -370,7 +372,7 @@ CONFIG: dict[str, dict] = {
 }
 
 # Actions added by each charmcraft extension.
-ACTIONS: dict[str, dict] = {
+ACTIONS: dict[str, dict[str, Any]] = {
     'django-framework': {
         'create-superuser': {
             'description': 'Create a new Django superuser account.',
