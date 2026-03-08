@@ -4283,6 +4283,19 @@ class TestPorts:
             ['open-port', 'icmp'],
         ]
 
+    def test_open_port_range(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+
+        unit.open_port('tcp', (8080, 8090))
+        unit.open_port('UDP', (4000, 5000))  # type: ignore
+        unit.open_port('tcp', (8080, None))
+
+        assert fake_script.calls(clear=True) == [
+            ['open-port', '8080-8090/tcp'],
+            ['open-port', '4000-5000/udp'],
+            ['open-port', '8080/tcp'],
+        ]
+
     def test_open_port_error(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
@@ -4305,6 +4318,19 @@ class TestPorts:
             ['close-port', '8080/tcp'],
             ['close-port', '4000/udp'],
             ['close-port', 'icmp'],
+        ]
+
+    def test_close_port_range(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('close-port', 'exit 0')
+
+        unit.close_port('tcp', (8080, 8090))
+        unit.close_port('UDP', (4000, 5000))  # type: ignore
+        unit.close_port('tcp', (8080, None))
+
+        assert fake_script.calls(clear=True) == [
+            ['close-port', '8080-8090/tcp'],
+            ['close-port', '4000-5000/udp'],
+            ['close-port', '8080/tcp'],
         ]
 
     def test_close_port_error(self, fake_script: FakeScript, unit: ops.Unit):
