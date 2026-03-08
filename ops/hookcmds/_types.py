@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import pathlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -242,11 +242,11 @@ class Network:
         return cls(bind_addresses=bind, egress_subnets=egress, ingress_addresses=ingress)
 
 
-@dataclasses.dataclass(frozen=True, init=False)
+@dataclasses.dataclass(frozen=True)
 class Port:
     """A port that Juju has opened for the charm."""
 
-    protocol: Literal['tcp', 'udp', 'icmp'] = 'tcp'
+    protocol: Literal['tcp', 'udp', 'icmp'] | None = 'tcp'
     """The IP protocol."""
 
     port: int | None = None
@@ -255,20 +255,8 @@ class Port:
     to_port: int | None = None
     """The final port number if this is a range of ports."""
 
-    endpoints: tuple[str, ...] | None = None
+    endpoints: list[str] | None = None
     """The endpoints this port applies to, ``['*']`` if all endpoints, or ``None`` if unknown."""
-
-    def __init__(
-        self,
-        protocol: str,
-        port: int | None = None,
-        to_port: int | None = None,
-        endpoints: Iterable[str] | None = None,
-    ):
-        object.__setattr__(self, 'protocol', protocol)
-        object.__setattr__(self, 'port', port)
-        object.__setattr__(self, 'to_port', to_port)
-        object.__setattr__(self, 'endpoints', tuple(endpoints) if endpoints is not None else None)
 
 
 class RelationModelDict(TypedDict):

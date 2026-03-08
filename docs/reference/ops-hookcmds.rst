@@ -4,4 +4,3 @@
 ==============
 
 .. automodule:: ops.hookcmds
-   :exclude-members: Port

@@ -801,23 +801,14 @@ class Unit:
                 is ``None``.
         """
         # Normalise to get easier comparisons.
-        existing = {dataclasses.astuple(p) for p in self._backend.opened_ports()}
-        desired = {
-            ('tcp', p, None, ())
-            if isinstance(p, int)
-            # If a user specifies a Port with endpoints=None (default) we normalise to endpoints=()
-            # but maybe this is too simple -- if the user didn't specify endpoints then do we
-            # actually want to take action if the port is already open but with some endpoints?
-            # In terms of backwards compatibility, probably not, since previously the endpoints
-            # would have been ignored ...
-            # FIXME: we might need to drop this nice set logic and do an explicit loop instead
-            else (p.protocol, p.port, p.to_port, p.endpoints or ())
-            for p in ports
-        }
-        for protocol, p, to_port, endpoints in existing - desired:
-            self._backend.close_port(protocol, p, to_port=to_port, endpoints=endpoints)
-        for protocol, p, to_port, endpoints in desired - existing:
-            self._backend.open_port(protocol, p, to_port=to_port, endpoints=endpoints)
+        existing = self._backend.opened_ports()
+        # FIXME: we might need to drop this nice set logic and do an explicit loop instead
+        # depending how how Juju handles overlapping open/close with port ranges
+        desired = {Port('tcp', port) if isinstance(port, int) else port for port in ports}
+        for p in existing - desired:
+            self._backend.close_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
+        for p in desired - existing:
+            self._backend.open_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
 
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
@@ -844,7 +835,30 @@ class Unit:
         self._backend.reboot(now)
 
 
-Port = hookcmds.Port
+@dataclasses.dataclass(frozen=True)
+class Port:
+    """Represents a port opened by :meth:`Unit.open_port` or :meth:`Unit.set_ports`."""
+
+    protocol: typing.Literal['tcp', 'udp', 'icmp']
+    """The IP protocol."""
+
+    port: int | None
+    """The port number. Will be ``None`` if protocol is ``'icmp'``."""
+
+    to_port: int | None = None
+    """The end of the port range, if a range was specified.
+
+    Will be ``None`` if a single port was specified (or if protocol is ``'icmp'``).
+    """
+
+    endpoints: tuple[str, ...] | Literal['*'] = '*'
+    """The endpoints for which the port is open.
+
+    Will be ``"*"`` if open for all endpoints,
+    or a tuple of endpoint names if specified for particular endpoints.
+    """
+
+
 OpenedPort = Port
 """Alias to Port for backwards compatibility.
 
@@ -4069,7 +4083,21 @@ class _ModelBackend:
             if port.protocol not in ('tcp', 'udp', 'icmp'):
                 logger.warning('Unexpected opened-ports protocol: %s', port.protocol)
                 continue
-            ports.add(port)
+            if not port.endpoints:
+                logger.warning('opened-ports result with no endpoints: %s', port)
+                continue
+            model_endpoints = (
+                '*'
+                if len(port.endpoints) == 1 and port.endpoints[0] == '*'
+                else tuple(port.endpoints)
+            )
+            model_port = Port(
+                port.protocol,
+                port.port,
+                to_port=port.to_port,
+                endpoints=model_endpoints,
+            )
+            ports.add(model_port)
         return ports
 
     def reboot(self, now: bool = False):
