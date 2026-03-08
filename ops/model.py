@@ -4086,11 +4086,11 @@ class _ModelBackend:
             if not port.endpoints:
                 logger.warning('opened-ports result with no endpoints: %s', port)
                 continue
-            model_endpoints = (
-                '*'
-                if len(port.endpoints) == 1 and port.endpoints[0] == '*'
-                else tuple(port.endpoints)
-            )
+            match port.endpoints:
+                case ['*']:
+                    model_endpoints = '*'
+                case _:
+                    model_endpoints = tuple(port.endpoints)
             model_port = Port(
                 port.protocol,
                 port.port,
