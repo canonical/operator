@@ -3000,15 +3000,15 @@ class _TestingModelBackend:
         else:
             self._secrets = [s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)]
 
-    def open_port(self, protocol: str, port: int | None = None):
+    def open_port(self, protocol: str, port: int | None = None, *, to_port: int | None = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
-        self._opened_ports.add(model.Port(protocol_lit, port))
+        self._opened_ports.add(model.Port(protocol_lit, port, to_port=to_port))
 
-    def close_port(self, protocol: str, port: int | None = None):
+    def close_port(self, protocol: str, port: int | None = None, *, to_port: int | None = None):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
-        self._opened_ports.discard(model.Port(protocol_lit, port))
+        self._opened_ports.discard(model.Port(protocol_lit, port, to_port=to_port))
 
     def opened_ports(self) -> set[model.Port]:
         return set(self._opened_ports)

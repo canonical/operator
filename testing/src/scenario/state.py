@@ -1394,6 +1394,8 @@ class Port:
     protocol: _RawPortProtocolLiteral = 'tcp'
     """The protocol that data transferred over the port will use."""
 
+    to_port: int | None = None
+
     def __post_init__(self):
         if type(self) is Port:
             raise RuntimeError(
@@ -1420,6 +1422,7 @@ class TCPPort(Port):
 
     :meta private:
     """
+    to_port: int | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -1440,6 +1443,7 @@ class UDPPort(Port):
 
     :meta private:
     """
+    to_port: int | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -1461,7 +1465,7 @@ class ICMPPort(Port):
 
     def __post_init__(self):
         super().__post_init__()
-        if self.port is not None:
+        if self.port is not None or self.to_port is not None:
             raise StateValidationError('`port` cannot be set for `ICMPPort`')
 
 

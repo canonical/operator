@@ -154,8 +154,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
+        *,
+        to_port: int | None = None,
     ):
-        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
+        port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ not in ports:
             ports.add(port_)
@@ -166,11 +168,19 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
+        *,
+        to_port: int | None = None,
     ):
-        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
+        if port is None and to_port is not None:
+            raise ValueError('to_port cannot be set if port is not set')
+        port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ in ports:
             ports.remove(port_)
+        # TODO: How does Juju handle closing port ranges?
+        # if port is not None and to_port is not None:
+        #     port_range = range(port, to_port + 1)
+        #     to_remove = [p for p in ports if p.protocol == protocol and ]
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
