@@ -719,7 +719,9 @@ class Unit:
         )
 
     def open_port(
-        self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
+        self,
+        protocol: typing.Literal['tcp', 'udp', 'icmp'],
+        port: int | tuple[int, int | None] | None = None,
     ) -> None:
         """Open a port with the given protocol for this unit.
 
@@ -736,18 +738,23 @@ class Unit:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
                 uppercase is also supported).
-            port: The port to open. Required for TCP and UDP; not allowed
-                for ICMP.
+            port: The port to open. Required for TCP and UDP; not allowed for ICMP.
+                May be a tuple of two integers to specify a port range.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
-                or ``port`` is not provided when ``protocol`` is 'tcp' or
-                'udp'.
+                or ``port`` is not provided when ``protocol`` is 'tcp' or 'udp'.
         """
-        self._backend.open_port(protocol.lower(), port)
+        if isinstance(port, tuple):
+            port, to_port = port
+        else:
+            port, to_port = port, None
+        self._backend.open_port(protocol.lower(), port, to_port=to_port)
 
     def close_port(
-        self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
+        self,
+        protocol: typing.Literal['tcp', 'udp', 'icmp'],
+        port: int | tuple[int, int | None] | None = None,
     ) -> None:
         """Close a port with the given protocol for this unit.
 
@@ -765,15 +772,18 @@ class Unit:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
                 uppercase is also supported).
-            port: The port to open. Required for TCP and UDP; not allowed
-                for ICMP.
+            port: The port to open. Required for TCP and UDP; not allowed for ICMP.
+                May be a tuple of two integers to specify a port range.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
-                or ``port`` is not provided when ``protocol`` is 'tcp' or
-                'udp'.
+                or ``port`` is not provided when ``protocol`` is 'tcp' or 'udp'.
         """
-        self._backend.close_port(protocol.lower(), port)
+        if isinstance(port, tuple):
+            port, to_port = port
+        else:
+            port, to_port = port, None
+        self._backend.close_port(protocol.lower(), port, to_port=to_port)
 
     def opened_ports(self) -> set[Port]:
         """Return a list of opened ports for this unit."""
