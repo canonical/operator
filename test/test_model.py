@@ -4296,6 +4296,12 @@ class TestPorts:
             ['open-port', '8080/tcp'],
         ]
 
+    def test_open_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+
+        with pytest.raises(TypeError):
+            unit.open_port('tcp', (None, 8090))  # type: ignore
+
     def test_open_port_error(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', "echo 'ERROR bad protocol' >&2; exit 1")
 
@@ -4332,6 +4338,12 @@ class TestPorts:
             ['close-port', '4000-5000/udp'],
             ['close-port', '8080/tcp'],
         ]
+
+    def test_close_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('close-port', 'exit 0')
+
+        with pytest.raises(TypeError):
+            unit.close_port('tcp', (None, 8090))  # type: ignore
 
     def test_close_port_error(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('close-port', "echo 'ERROR bad protocol' >&2; exit 1")
