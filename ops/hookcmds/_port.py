@@ -146,13 +146,12 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     # '8000-8999/tcp' or '8000-8999/udp' (where the two numbers can be any ports)
     # '8000-8999' (where these could be any port number)
     # If ``--endpoints`` is used, then each port will be followed by a
-    # (possibly empty) tuple of endpoints.
+    # (non-empty) tuple of endpoints, e.g. '8000-8999/tcp (ep1,ep2)' or '80/tcp (*)'.
+    # (*) indicates that the port applies to all endpoints.
     for port in result:
         if endpoints:
             port, port_endpoints = port.rsplit(' ', 1)
-            port_endpoints = [
-                endpoint for e in port_endpoints.strip('()').split(',') if (endpoint := e.strip())
-            ]
+            port_endpoints = [e.strip() for e in port_endpoints.strip('()').split(',')]
         else:
             port_endpoints = None
         if '/' in port:
