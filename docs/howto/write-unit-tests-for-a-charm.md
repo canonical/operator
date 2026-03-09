@@ -11,18 +11,12 @@ First of all, install the Ops testing framework. To do this in a virtual environ
 pip install ops[testing]
 ```
 
-When we want to run repeatable unit tests, we'll normally pin `ops[testing]` to the latest minor version in the dependency group for our unit tests. For example, in a `test-requirements.txt` file:
-
-```text
-ops[testing] ~= 2.19
-```
-
-Or in `pyproject.toml`:
+Or using `pyproject.toml`:
 
 ```toml
 [dependency-groups]
 test = [
-  "ops[testing] ~= 2.19",
+  "ops[testing]",
 ]
 ```
 

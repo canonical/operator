@@ -1,5 +1,6 @@
 # Leave a blank line at the end of this file to support concatenation
 backoff
+balancer's
 Canonical's
 databag
 databags
@@ -27,6 +28,7 @@ systemd
 subprocess
 tinyproxy
 traceback
+tracebacks
 untyped
 unpatched
 uv

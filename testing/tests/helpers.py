@@ -7,16 +7,14 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
-import jsonpatch
+import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State
-
-    _CT = TypeVar('_CT', bound=type[CharmType])
 
 logger = logging.getLogger()
 

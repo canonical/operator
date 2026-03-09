@@ -52,6 +52,7 @@ VERSION_FILES = {
     'testing': pathlib.Path('testing/pyproject.toml'),
     'tracing': pathlib.Path('tracing/pyproject.toml'),
     'uvlock': pathlib.Path('uv.lock'),
+    'versions_doc': pathlib.Path('docs/explanation/versions.md'),
 }
 CHANGE_LINE_REGEX = (
     r'^\* (?P<category>\w+)(?P<breaking>!?): (?P<summary>.*) by [^ ]+ in (?P<pr>.*)'
@@ -168,7 +169,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
         A tuple containing:
         - A dict with conventional commit types as keys and lists of tuples (description, PR link)
           as values.
-        - The full changelog line if present, or None if not found.
+        - The full changelog line if present, or ``None`` if not found.
     """
     release_notes = re.sub(
         r'(## New Contributors.*?)(\n|$)', r'\2', release_notes, flags=re.DOTALL
@@ -379,6 +380,58 @@ def update_tracing_version(ops_version: str):
     update_pyproject_versions(VERSION_FILES['tracing'], ops_version, deps={'ops': ops_version})
 
 
+def update_versions_doc(version: str):
+    """Update the Ops version table in docs/explanation/versions.md.
+
+    Updates the row for the current major version with:
+    - The new major.minor version
+    - Today's date as the release date
+    - One year from today as the end of life date
+    """
+    parsed_version = packaging.version.Version(version)
+    major, minor, _ = parsed_version.release
+    major_minor = f'{major}.{minor}'
+
+    today = datetime.date.today()
+    release_date = today.strftime('%Y-%m-%d')
+
+    # Calculate end of life (one year from today)
+    # Handle Feb 29 -> Mar 1 for non-leap years
+    try:
+        eol_date = today.replace(year=today.year + 1)
+    except ValueError:
+        # Feb 29 in a leap year -> Mar 1 in non-leap year
+        eol_date = datetime.date(today.year + 1, 3, 1)
+
+    eol_date_str = eol_date.strftime('%Y-%m-%d')
+
+    versions_doc_path = VERSION_FILES['versions_doc']
+    if not versions_doc_path.exists():
+        logger.info('Skipping version doc update: doc does not exist')
+        return
+    content = versions_doc_path.read_text()
+
+    # Find and replace the Ops major version row
+    # Pattern matches: | Ops X.Y | status | date | date |
+    pattern = rf'(\| Ops {major})\.\d+ (\| [^|]+ \|) [^|]+ \| [^|]+ \|'
+    replacement = rf'\1.{minor} \2 {release_date} | {eol_date_str} |'
+
+    updated = re.sub(pattern, replacement, content)
+
+    if content == updated:
+        logger.error('No changes made to %s. Check the Ops version row.', versions_doc_path)
+        exit(1)
+
+    versions_doc_path.write_text(updated)
+    logger.info(
+        'Updated %s: Ops %s with release date %s and EOL %s',
+        versions_doc_path,
+        major_minor,
+        release_date,
+        eol_date_str,
+    )
+
+
 def update_uv_lock():
     """Update the uv.lock file with the new versions."""
     subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
@@ -413,6 +466,7 @@ def update_versions_for_release(tag: str):
     update_ops_version(tag, scenario_version)
     update_testing_version(tag, scenario_version)
     update_tracing_version(tag)
+    update_versions_doc(tag)
     update_uv_lock()
 
 
@@ -516,7 +570,10 @@ def draft_release(
 
     new_branch = f'release-prep-{tag}'
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    changed_files = ['CHANGES.md', *[str(path) for path in VERSION_FILES.values()]]
+    changed_files = [
+        'CHANGES.md',
+        *[str(path) for path in VERSION_FILES.values() if path.exists()],
+    ]
     subprocess.run(['/usr/bin/git', 'add', *changed_files], check=True)
     subprocess.run(['/usr/bin/git', 'commit', '-m', f'chore: prepare release {tag}'], check=True)
     subprocess.run(['/usr/bin/git', 'push', fork_remote, new_branch], check=True)
@@ -561,7 +618,7 @@ def post_release(
     update_versions_for_post_release(base_branch)
 
     subprocess.run(['/usr/bin/git', 'checkout', '-b', new_branch], check=True)
-    files = [str(path) for path in VERSION_FILES.values()]
+    files = [str(path) for path in VERSION_FILES.values() if path.exists()]
     subprocess.run(['/usr/bin/git', 'add', *files], check=True)
     subprocess.run(
         ['/usr/bin/git', 'commit', '-m', 'chore: update versions after release'], check=True

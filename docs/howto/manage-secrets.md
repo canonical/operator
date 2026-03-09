@@ -54,6 +54,8 @@ Note that:
 - The only data shared in plain text is the secret ID (a locator URI). The secret ID can be publicly shared. Juju will ensure that only remote apps/units to which the secret has explicitly been granted by the owner will be able to fetch the actual secret payload from that ID.
 - The secret needs to be granted to a remote entity (app or unit), and that always goes via a relation instance. By passing a relation to `grant` (in this case the event's relation), we are explicitly declaring the scope of the secret -- its lifetime will be bound to that of this relation instance.
 
+If the relation is a cross-model relation, Juju only allows the offering application to grant access to secrets.
+
 > See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
@@ -251,7 +253,7 @@ Note that:
 ### Label the secrets you're observing
 
 Sometimes a charm will observe multiple secrets. In the `secret-changed` event handler above, you might ask yourself: How do I know which secret has changed?
-The answer lies with **secret labels**: a label is a charm-local name that you can assign to a secret. Let's go through the following code:
+The answer lies with **secret labels**: you can assign a charm-local label to a secret. Let's go through the following code:
 
 ```python
 class MyWebserverCharm(ops.CharmBase):
@@ -311,7 +313,7 @@ So, having labelled the secret on creation, the database charm could add a new r
 
 #### When to use labels
 
-When should you use labels? A label is basically the secret's *name* (local to the charm), so whenever a charm has, or is observing, multiple secrets you should label them. This allows you to distinguish between secrets, for example, in the `SecretChangedEvent` shown above.
+When should you use labels? Juju lets you attach a label (local to the charm) to a secret, so whenever a charm owns, or is observing, multiple secrets you should label them. This allows you to distinguish between secrets, for example, in the `SecretChangedEvent` shown above.
 
 Most charms that use secrets have a fixed number of secrets each with a specific meaning, so the charm author should give them meaningful labels like `database-credential`, `tls-cert`, and so on. Think of these as "pets" with names.
 
