@@ -4278,9 +4278,9 @@ class TestPorts:
         unit.open_port('icmp')
 
         assert fake_script.calls(clear=True) == [
-            ['open-port', '8080/tcp'],
-            ['open-port', '4000/udp'],
-            ['open-port', 'icmp'],
+            ['open-port', '--endpoints', '*', '8080/tcp'],
+            ['open-port', '--endpoints', '*', '4000/udp'],
+            ['open-port', '--endpoints', '*', 'icmp'],
         ]
 
     def test_open_port_range(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4291,9 +4291,9 @@ class TestPorts:
         unit.open_port('tcp', (8080, None))
 
         assert fake_script.calls(clear=True) == [
-            ['open-port', '8080-8090/tcp'],
-            ['open-port', '4000-5000/udp'],
-            ['open-port', '8080/tcp'],
+            ['open-port', '--endpoints', '*', '8080-8090/tcp'],
+            ['open-port', '--endpoints', '*', '4000-5000/udp'],
+            ['open-port', '--endpoints', '*', '8080/tcp'],
         ]
 
     def test_open_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4310,7 +4310,7 @@ class TestPorts:
         assert str(excinfo.value) == 'ERROR bad protocol\n'
 
         assert fake_script.calls(clear=True) == [
-            ['open-port', '8080/ftp'],
+            ['open-port', '--endpoints', '*', '8080/ftp'],
         ]
 
     def test_close_port(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4321,9 +4321,9 @@ class TestPorts:
         unit.close_port('icmp')
 
         assert fake_script.calls(clear=True) == [
-            ['close-port', '8080/tcp'],
-            ['close-port', '4000/udp'],
-            ['close-port', 'icmp'],
+            ['close-port', '--endpoints', '*', '8080/tcp'],
+            ['close-port', '--endpoints', '*', '4000/udp'],
+            ['close-port', '--endpoints', '*', 'icmp'],
         ]
 
     def test_close_port_range(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4334,9 +4334,9 @@ class TestPorts:
         unit.close_port('tcp', (8080, None))
 
         assert fake_script.calls(clear=True) == [
-            ['close-port', '8080-8090/tcp'],
-            ['close-port', '4000-5000/udp'],
-            ['close-port', '8080/tcp'],
+            ['close-port', '--endpoints', '*', '8080-8090/tcp'],
+            ['close-port', '--endpoints', '*', '4000-5000/udp'],
+            ['close-port', '--endpoints', '*', '8080/tcp'],
         ]
 
     def test_close_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4353,7 +4353,7 @@ class TestPorts:
         assert str(excinfo.value) == 'ERROR bad protocol\n'
 
         assert fake_script.calls(clear=True) == [
-            ['close-port', '8080/ftp'],
+            ['close-port', '--endpoints', '*', '8080/ftp'],
         ]
 
     def test_opened_ports(self, fake_script: FakeScript, unit: ops.Unit):
