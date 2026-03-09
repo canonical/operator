@@ -39,7 +39,7 @@ from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
-    from typing import TypedDict
+    from typing import TypeAlias, TypedDict
 
     from typing_extensions import Unpack
 
@@ -1396,6 +1396,8 @@ class Port:
 
     to_port: int | None = None
 
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
+
     def __post_init__(self):
         if type(self) is Port:
             raise RuntimeError(
@@ -1409,8 +1411,9 @@ class Port:
                 self.protocol == other.protocol
                 and self.port == other.port
                 and self.to_port == other.to_port
+                and self.endpoints == other.endpoints
             )
-        return False
+        return NotImplemented
 
     def _to_ops(self) -> ops.Port:
         return ops.Port(protocol=self.protocol, port=self.port, to_port=self.to_port)
@@ -1427,21 +1430,36 @@ class Port:
                     f'`{port_attr}` outside bounds [1:65535], got {port_value}',
                 )
 
-    def _overlaps(self, other: Port) -> bool:
+    def _overlaps(self, other: Port | ops.Port) -> bool:
+        # Overlapping port ranges are allowed if the protocols are different.
         if self.protocol != other.protocol:
             return False
+        # Only and ICMP port has port=None, and since ICMP ports don't have port ranges,
+        # they can't overlap with each other.
         if self.port is None or other.port is None:
-            return False  # two ICMP ports aren't considered overlapping
-        a = range(self.port, self.port + 1 if self.to_port is None else self.to_port)
-        b = range(other.port, other.port + 1 if other.to_port is None else other.to_port)
+            return False
+        # If the ports are identical aside from the endpoints, they aren't considered overlapping.
+        # It's valid to open/close the same port for different endpoints.
+        if (
+            self.protocol == other.protocol
+            and self.port == other.port
+            and self.to_port == other.to_port
+        ):
+            return False
+        # Same protocol, non-identical ports -- Juju will error if the ranges overlap.
+        # Note that if to_port is None, the range will just include the single port.
+        # (Port values are already validated to be in the range [1:65535].)
+        a = range(self.port, self.to_port or self.port + 1)
+        b = range(other.port, other.to_port or other.port + 1)
         return a.start in b or b.start in a
 
-    def _juju_str(self) -> str:
-        if self.port is None:
-            return self.protocol
-        if self.to_port is None:
-            return f'{self.port}/{self.protocol}'
-        return f'{self.port}-{self.to_port}/{self.protocol}'
+
+def _juju_str(port: Port | ops.Port) -> str:
+    if port.port is None:
+        return port.protocol
+    if port.to_port is None:
+        return f'{port.port}/{port.protocol}'
+    return f'{port.port}-{port.to_port}/{port.protocol}'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1457,6 +1475,8 @@ class TCPPort(Port):
     """
     to_port: int | None = None
 
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
+
 
 @dataclasses.dataclass(frozen=True)
 class UDPPort(Port):
@@ -1471,6 +1491,8 @@ class UDPPort(Port):
     """
     to_port: int | None = None
 
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class ICMPPort(Port):
@@ -1481,6 +1503,8 @@ class ICMPPort(Port):
 
     :meta private:
     """
+
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
 
     def __post_init__(self):
         super().__post_init__()
@@ -1493,6 +1517,59 @@ _port_cls_by_protocol = {
     'udp': UDPPort,
     'icmp': ICMPPort,
 }
+
+
+_PortMap: TypeAlias = dict[tuple[_RawPortProtocolLiteral, int | None, int | None], set[str]]
+
+
+def _port_map(ports: Iterable[Port]) -> _PortMap:
+    return {(port.protocol, port.port, port.to_port): set(port.endpoints) for port in ports}
+
+
+def _open_port(port_map: _PortMap, port: Port) -> None:
+    key = (port.protocol, port.port, port.to_port)
+    port_map.setdefault(key, set()).update(port.endpoints)
+
+
+def _close_port(port_map: _PortMap, port: Port, all_endpoints: Sequence[str]) -> None:
+    key = (port.protocol, port.port, port.to_port)
+    if (endpoints := port_map.get(key)) is None:
+        return
+    if port.endpoints == '*':
+        del port_map[key]
+    elif '*' in endpoints:
+        endpoints.clear()
+        endpoints.update(all_endpoints)
+        endpoints.difference_update(port.endpoints)
+    else:
+        endpoints.difference_update(port.endpoints)
+
+
+def _ports_from_map(port_map: _PortMap) -> frozenset[Port]:
+    return frozenset(
+        _port_cls_by_protocol[protocol](
+            protocol=protocol,
+            port=port,  # type: ignore
+            to_port=to_port,
+            endpoints='*' if '*' in endpoints else tuple(sorted(endpoints)),  # type: ignore
+        )
+        for (protocol, port, to_port), endpoints in port_map.items()
+    )
+
+
+def _get_overlapping(port_map: _PortMap, port: Port) -> Port | None:
+    for (protocol, from_port, to_port), endpoints in port_map.items():
+        endpoints = '*' if '*' in endpoints else tuple(sorted(endpoints))
+        assert endpoints
+        this_port = ops.Port(
+            protocol=protocol,
+            port=from_port,
+            to_port=to_port,
+            endpoints=endpoints,
+        )
+        if port._overlaps(this_port):
+            return port
+    return None
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1634,12 +1711,30 @@ class State:
                 object.__setattr__(self, name, _EntityStatus.from_ops(val))
             else:
                 raise TypeError(f'Invalid status.{name}: {val!r}')
+
+        # ports
         normalised_ports = [
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
+            _port_cls_by_protocol[port.protocol](
+                protocol=port.protocol,
+                port=port.port,  # type: ignore
+                to_port=port.to_port,
+                endpoints=port.endpoints,
+            )
+            if isinstance(port, ops.Port)
+            else port
             for port in self.opened_ports
         ]
+        port_map = _port_map([])
+        for port in normalised_ports:
+            if (p := _get_overlapping(port_map, port)) is not None:
+                e = f'cannot open {_juju_str(port)}: port range conflicts with {_juju_str(p)}'
+                raise StateValidationError(e)
+            _open_port(port_map, port)
+        normalised_ports = _ports_from_map(port_map)
         if self.opened_ports != normalised_ports:
             object.__setattr__(self, 'opened_ports', normalised_ports)
+
+        # storage
         normalised_storage = [
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)

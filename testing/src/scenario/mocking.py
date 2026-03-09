@@ -13,7 +13,7 @@ import datetime
 import io
 import shutil
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -59,8 +59,14 @@ from .state import (
     RelationBase,
     Storage,
     SubordinateRelation,
+    _close_port,
     _EntityStatus,
+    _get_overlapping,
+    _juju_str,
+    _open_port,
     _port_cls_by_protocol,
+    _port_map,
+    _ports_from_map,
     _RawPortProtocolLiteral,
 )
 
@@ -157,15 +163,22 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         port: int | None = None,
         *,
         to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
     ):
-        port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
-        ports = set(self._state.opened_ports)
-        for p in ports:
-            if port_ != p and port_._overlaps(p):
-                e = f'cannot open {port_._juju_str()}: port range conflicts with {p._juju_str()}'
-                raise ModelError(e)
-        if port_ not in ports:
-            ports.add(port_)
+        if port is None and to_port is not None:
+            raise TypeError('to_port cannot be specified if port is not specified')
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        port_ = _port_cls_by_protocol[protocol](
+            port=port,  # type: ignore
+            to_port=to_port,
+            endpoints=endpoints,  # type: ignore
+        )
+        port_map = _port_map(self._state.opened_ports)
+        if (p := _get_overlapping(port_map, port_)) is not None:
+            e = f'cannot open {_juju_str(port_)}: port range conflicts with {_juju_str(p)}'
+            raise ModelError(e)
+        _open_port(port_map, port_)
+        ports = _ports_from_map(port_map)
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
@@ -175,17 +188,23 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         port: int | None = None,
         *,
         to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
     ):
         if port is None and to_port is not None:
-            raise ValueError('to_port cannot be set if port is not set')
-        port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
-        ports = set(self._state.opened_ports)
-        for p in ports:
-            if port_ != p and port_._overlaps(p):
-                e = f'cannot close {port_._juju_str()}: port range conflicts with {p._juju_str()}'
-                raise ModelError(e)
-        if port_ in ports:
-            ports.remove(port_)
+            raise TypeError('to_port cannot be specified if port is not specified')
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        port_ = _port_cls_by_protocol[protocol](
+            port=port,  # type: ignore
+            to_port=to_port,
+            endpoints=endpoints,  # type: ignore
+        )
+        port_map = _port_map(self._state.opened_ports)
+        if (p := _get_overlapping(port_map, port_)) is not None:
+            e = f'cannot open {port_._juju_str()}: port range conflicts with {p._juju_str()}'
+            raise ModelError(e)
+        all_endpoints = [e for e, _ in self._charm_spec.get_all_relations()]
+        _close_port(port_map, port_, all_endpoints=all_endpoints)
+        ports = _ports_from_map(port_map)
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
