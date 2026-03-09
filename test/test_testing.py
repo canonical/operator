@@ -6334,6 +6334,42 @@ class TestPorts:
         ports_set = unit.opened_ports()
         assert ports_set == set()
 
+    def test_endpoints(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
+        request.addfinalizer(harness.cleanup)
+        unit = harness.model.unit
+
+        unit.open_port('tcp', 8080, endpoints=['endpoint-a', 'endpoint-b'])
+        unit.open_port('udp', 4000, endpoints=['endpoint-c'])
+
+        ports_set = unit.opened_ports()
+        assert isinstance(ports_set, set)
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
+        assert len(ports) == 2
+        assert isinstance(ports[0], ops.Port)
+        assert ports[0].protocol == 'tcp'
+        assert ports[0].port == 8080
+        assert ports[0].endpoints == ('endpoint-a', 'endpoint-b')
+        assert isinstance(ports[1], ops.Port)
+        assert ports[1].protocol == 'udp'
+        assert ports[1].port == 4000
+        assert ports[1].endpoints == ('endpoint-c',)
+
+        unit.close_port('tcp', 8080, endpoints=['endpoint-a', 'endpoint-b'])
+        unit.close_port('tcp', 8080, endpoints=['endpoint-a', 'endpoint-b'])  # closing same port again has no effect
+
+        ports_set = unit.opened_ports()
+        ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
+        assert len(ports) == 1
+        assert ports[0].protocol == 'udp'
+        assert ports[0].port == 4000
+        assert ports[0].endpoints == ('endpoint-c',)
+
+        unit.close_port('udp', 4000, endpoints=['endpoint-c'])
+
+        ports_set = unit.opened_ports()
+        assert ports_set == set()
+
     def test_errors(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(ops.CharmBase, meta='name: webapp')
         request.addfinalizer(harness.cleanup)
