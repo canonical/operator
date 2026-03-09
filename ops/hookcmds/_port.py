@@ -29,7 +29,7 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 @overload
 def close_port(
     protocol: str | None,
@@ -37,14 +37,14 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 def close_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> str | None:
     """Register a request to close a port or port range.
 
     For more details, see:
@@ -66,7 +66,8 @@ def close_port(
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run('close-port', *args)
+    result = run('close-port', *args).strip()
+    return result or None
 
 
 @overload
@@ -76,7 +77,7 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 @overload
 def open_port(
     protocol: str | None,
@@ -84,14 +85,14 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 def open_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> str | None:
     """Register a request to open a port or port range.
 
     For more details, see:
@@ -123,7 +124,8 @@ def open_port(
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run('open-port', *args)
+    result = run('open-port', *args).strip()
+    return result or None
 
 
 def opened_ports(*, endpoints: bool = False) -> list[Port]:

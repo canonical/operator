@@ -4070,7 +4070,9 @@ class _ModelBackend:
         with self._wrap_hookcmd(
             'open-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
         ):
-            hookcmds.open_port(protocol, port, to_port=to_port, endpoints=endpoints)
+            result = hookcmds.open_port(protocol, port, to_port=to_port, endpoints=endpoints)
+        if result is not None:
+            raise ModelError(result)
 
     def close_port(
         self,
@@ -4083,7 +4085,9 @@ class _ModelBackend:
         with self._wrap_hookcmd(
             'close-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
         ):
-            hookcmds.close_port(protocol, port, to_port=to_port, endpoints=endpoints)
+            result = hookcmds.close_port(protocol, port, to_port=to_port, endpoints=endpoints)
+        if result is not None:
+            raise ModelError(result)
 
     def opened_ports(self) -> set[Port]:
         with self._wrap_hookcmd('opened-ports', endpoints=True):
