@@ -803,7 +803,7 @@ class Unit:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
-    def set_ports(self, *ports: int | Port) -> None:
+    def set_ports(self, *ports: int | tuple[int, int | None] | Port) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
         Some behaviour, such as whether the port is opened or closed externally without
@@ -825,7 +825,14 @@ class Unit:
                 is ``None``.
         """
         existing = self._backend.opened_ports()
-        desired = {Port('tcp', port) if isinstance(port, int) else port for port in ports}
+        desired = {
+            Port('tcp', port)
+            if isinstance(port, int)
+            else Port('tcp', port[0], to_port=port[1])
+            if isinstance(port, tuple)
+            else port
+            for port in ports
+        }
         for p in existing - desired:
             self._backend.close_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
         for p in desired - existing:
