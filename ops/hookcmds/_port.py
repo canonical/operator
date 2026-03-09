@@ -117,7 +117,7 @@ def open_port(
         if protocol is None:
             raise TypeError('You must provide a port or protocol.')
         if to_port is not None:
-            raise TypeError('to_port cannot be specified if port is not specified')
+            raise TypeError('to_port can only be specified if port is also specified')
         args.append(protocol)
     else:
         port_arg = f'{port}-{to_port}' if to_port is not None else str(port)
