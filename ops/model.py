@@ -37,7 +37,7 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping
+from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping, Sequence
 from pathlib import Path, PurePath
 from typing import (
     Any,
@@ -722,6 +722,8 @@ class Unit:
         self,
         protocol: typing.Literal['tcp', 'udp', 'icmp'],
         port: int | tuple[int, int | None] | None = None,
+        *,
+        endpoints: Sequence[str] = '*',
     ) -> None:
         """Open a port with the given protocol for this unit.
 
@@ -750,12 +752,16 @@ class Unit:
             port, to_port = port
         else:
             port, to_port = port, None
-        self._backend.open_port(protocol.lower(), port, to_port=to_port)
+        if not endpoints:
+            raise TypeError('endpoints must be a non-empty string or sequence of strings')
+        self._backend.open_port(protocol.lower(), port, to_port=to_port, endpoints=endpoints)
 
     def close_port(
         self,
         protocol: typing.Literal['tcp', 'udp', 'icmp'],
         port: int | tuple[int, int | None] | None = None,
+        *,
+        endpoints: Sequence[str] = '*',
     ) -> None:
         """Close a port with the given protocol for this unit.
 
@@ -785,7 +791,9 @@ class Unit:
             port, to_port = port
         else:
             port, to_port = port, None
-        self._backend.close_port(protocol.lower(), port, to_port=to_port)
+        if not endpoints:
+            raise TypeError('endpoints must be a non-empty string or sequence of strings')
+        self._backend.close_port(protocol.lower(), port, to_port=to_port, endpoints=endpoints)
 
     def opened_ports(self) -> set[Port]:
         """Return a list of opened ports for this unit."""
@@ -4064,7 +4072,7 @@ class _ModelBackend:
         port: int | None = None,
         *,
         to_port: int | None = None,
-        endpoints: str | Iterable[str] | None = None,
+        endpoints: Sequence[str] = '*',
     ):
         with self._wrap_hookcmd(
             'open-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
@@ -4079,7 +4087,7 @@ class _ModelBackend:
         port: int | None = None,
         *,
         to_port: int | None = None,
-        endpoints: str | Iterable[str] | None = None,
+        endpoints: Sequence[str] = '*',
     ):
         with self._wrap_hookcmd(
             'close-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
