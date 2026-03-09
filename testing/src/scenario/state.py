@@ -1404,11 +1404,43 @@ class Port:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
-            return (self.protocol, self.port) == (other.protocol, other.port)
+            return (
+                self.protocol == other.protocol
+                and self.port == other.port
+                and self.to_port == other.to_port
+            )
         return False
 
     def _to_ops(self) -> ops.Port:
-        return ops.Port(port=self.port, protocol=self.protocol)
+        return ops.Port(protocol=self.protocol, port=self.port, to_port=self.to_port)
+
+    def _validate_ports(self):
+        if self.port is None and self.to_port is not None:
+            # Raise TypeError following ops.hookcmds.open/close_port behaviour.
+            raise TypeError('to_port can only be specified if port is also specified')
+        for port_attr, port_value in (('port', self.port), ('to_port', self.to_port)):
+            if port_value is None:
+                continue
+            if port_value not in range(1, 65535 + 1):
+                raise StateValidationError(
+                    f'`{port_attr}` outside bounds [1:65535], got {port_value}',
+                )
+
+    def _overlaps(self, other: Port) -> bool:
+        if self.protocol != other.protocol:
+            return False
+        if self.port is None or other.port is None:
+            return False  # two ICMP ports aren't considered overlapping
+        a = range(self.port, self.port + 1 if self.to_port is None else self.to_port)
+        b = range(other.port, other.port + 1 if other.to_port is None else other.to_port)
+        return a.start in b or b.start in a
+
+    def _juju_str(self) -> str:
+        if self.port is None:
+            return self.protocol
+        if self.to_port is None:
+            return f'{self.port}/{self.protocol}'
+        return f'{self.port}-{self.to_port}/{self.protocol}'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1424,13 +1456,6 @@ class TCPPort(Port):
     """
     to_port: int | None = None
 
-    def __post_init__(self):
-        super().__post_init__()
-        if not (1 <= self.port <= 65535):
-            raise StateValidationError(
-                f'`port` outside bounds [1:65535], got {self.port}',
-            )
-
 
 @dataclasses.dataclass(frozen=True)
 class UDPPort(Port):
@@ -1445,13 +1470,6 @@ class UDPPort(Port):
     """
     to_port: int | None = None
 
-    def __post_init__(self):
-        super().__post_init__()
-        if not (1 <= self.port <= 65535):
-            raise StateValidationError(
-                f'`port` outside bounds [1:65535], got {self.port}',
-            )
-
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class ICMPPort(Port):
@@ -1465,7 +1483,7 @@ class ICMPPort(Port):
 
     def __post_init__(self):
         super().__post_init__()
-        if self.port is not None or self.to_port is not None:
+        if (self.port, self.to_port) != (None, None):
             raise StateValidationError('`port` cannot be set for `ICMPPort`')
 
 

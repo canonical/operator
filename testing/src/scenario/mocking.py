@@ -147,7 +147,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def opened_ports(self) -> set[Port_Ops]:
         return {
-            Port_Ops(protocol=port.protocol, port=port.port) for port in self._state.opened_ports
+            Port_Ops(protocol=port.protocol, port=port.port, to_port=port.to_port)
+            for port in self._state.opened_ports
         }
 
     def open_port(
@@ -159,6 +160,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     ):
         port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
+        for p in ports:
+            if port_._overlaps(p):
+                e = f'cannot open {port_._juju_str()}: port range conflicts with {p._juju_str()}'
+                raise ModelError(e)
         if port_ not in ports:
             ports.add(port_)
         if ports != self._state.opened_ports:
@@ -175,12 +180,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ValueError('to_port cannot be set if port is not set')
         port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
+        for p in ports:
+            if port_._overlaps(p):
+                e = f'cannot close {port_._juju_str()}: port range conflicts with {p._juju_str()}'
+                raise ModelError(e)
         if port_ in ports:
             ports.remove(port_)
-        # TODO: How does Juju handle closing port ranges?
-        # if port is not None and to_port is not None:
-        #     port_range = range(port, to_port + 1)
-        #     to_remove = [p for p in ports if p.protocol == protocol and ]
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
