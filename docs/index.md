@@ -76,6 +76,15 @@ Supports Django, FastAPI, Go, and more!
 
 ````
 
+## How this documentation is organised
+
+This documentation uses the [Diátaxis documentation structure](https://diataxis.fr/).
+
+- [Tutorials](tutorial/index)
+- [How-to guides](howto/index)
+- [Reference](reference/index), including [ops](reference/ops), [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing), and [ops.pebble](reference/pebble)
+- [Explanation](explanation/index)
+
 ## Releases
 
 [Read the release notes](https://github.com/canonical/operator/releases)
