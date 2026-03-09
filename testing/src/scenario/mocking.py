@@ -59,14 +59,10 @@ from .state import (
     RelationBase,
     Storage,
     SubordinateRelation,
-    _close_port,
     _EntityStatus,
-    _get_overlapping,
-    _open_port,
     _port_cls_by_protocol,
-    _port_map,
     _port_str,
-    _ports_from_map,
+    _PortMap,
     _RawPortProtocolLiteral,
 )
 
@@ -173,12 +169,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             to_port=to_port,
             endpoints=endpoints,  # type: ignore
         )
-        port_map = _port_map(self._state.opened_ports)
-        if (p := _get_overlapping(port_map, port_)) is not None:
+        port_map = _PortMap(self._state.opened_ports)
+        if (p := port_map.get_first_overlap(port_)) is not None:
             e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
             raise ModelError(e)
-        _open_port(port_map, port_)
-        ports = _ports_from_map(port_map)
+        port_map.open_port(port_)
+        ports = port_map.get_ports()
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
@@ -198,13 +194,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             to_port=to_port,
             endpoints=endpoints,  # type: ignore
         )
-        port_map = _port_map(self._state.opened_ports)
-        if (p := _get_overlapping(port_map, port_)) is not None:
+        port_map = _PortMap(self._state.opened_ports)
+        if (p := port_map.get_first_overlap(port_)) is not None:
             e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
             raise ModelError(e)
         all_endpoints = [e for e, _ in self._charm_spec.get_all_relations()]
-        _close_port(port_map, port_, all_endpoints=all_endpoints)
-        ports = _ports_from_map(port_map)
+        port_map.close_port(port_, all_endpoints)
+        ports = port_map.get_ports()
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 

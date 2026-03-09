@@ -39,7 +39,7 @@ from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
 if TYPE_CHECKING:  # pragma: no cover
-    from typing import TypeAlias, TypedDict
+    from typing import TypedDict
 
     from typing_extensions import Unpack
 
@@ -1504,14 +1504,6 @@ class ICMPPort(Port):
             raise StateValidationError('`port` cannot be set for `ICMPPort`')
 
 
-def _port_str(port: Port | ops.Port) -> str:
-    if port.port is None:
-        return port.protocol
-    if port.to_port is None:
-        return f'{port.port}/{port.protocol}'
-    return f'{port.port}-{port.to_port}/{port.protocol}'
-
-
 _port_cls_by_protocol = {
     'tcp': TCPPort,
     'udp': UDPPort,
@@ -1519,57 +1511,66 @@ _port_cls_by_protocol = {
 }
 
 
-_PortMap: TypeAlias = dict[tuple[_RawPortProtocolLiteral, int | None, int | None], set[str]]
+class _PortMap:
+    def __init__(self, ports: Iterable[Port] | None = None):
+        self._map = {} if ports is None else self._make_map(ports)
 
+    @staticmethod
+    def _make_map(
+        ports: Iterable[Port],
+    ) -> dict[tuple[_RawPortProtocolLiteral, int | None, int | None], set[str]]:
+        return {(port.protocol, port.port, port.to_port): set(port.endpoints) for port in ports}
 
-def _port_map(ports: Iterable[Port]) -> _PortMap:
-    return {(port.protocol, port.port, port.to_port): set(port.endpoints) for port in ports}
+    def open_port(self, port: Port) -> None:
+        key = (port.protocol, port.port, port.to_port)
+        self._map.setdefault(key, set()).update(port.endpoints)
 
+    def close_port(self, port: Port, all_endpoints: Sequence[str]) -> None:
+        key = (port.protocol, port.port, port.to_port)
+        if (endpoints := self._map.get(key)) is None:
+            return
+        if port.endpoints == '*':
+            del self._map[key]
+        elif '*' in endpoints:
+            endpoints.clear()
+            endpoints.update(all_endpoints)
+            endpoints.difference_update(port.endpoints)
+        else:
+            endpoints.difference_update(port.endpoints)
 
-def _open_port(port_map: _PortMap, port: Port) -> None:
-    key = (port.protocol, port.port, port.to_port)
-    port_map.setdefault(key, set()).update(port.endpoints)
-
-
-def _close_port(port_map: _PortMap, port: Port, all_endpoints: Sequence[str]) -> None:
-    key = (port.protocol, port.port, port.to_port)
-    if (endpoints := port_map.get(key)) is None:
-        return
-    if port.endpoints == '*':
-        del port_map[key]
-    elif '*' in endpoints:
-        endpoints.clear()
-        endpoints.update(all_endpoints)
-        endpoints.difference_update(port.endpoints)
-    else:
-        endpoints.difference_update(port.endpoints)
-
-
-def _ports_from_map(port_map: _PortMap) -> frozenset[Port]:
-    return frozenset(
-        _port_cls_by_protocol[protocol](
-            protocol=protocol,
-            port=port,  # type: ignore
-            to_port=to_port,
-            endpoints='*' if '*' in endpoints else tuple(sorted(endpoints)),  # type: ignore
+    def get_ports(self) -> frozenset[Port]:
+        return frozenset(
+            _port_cls_by_protocol[protocol](
+                protocol=protocol,
+                port=port,  # type: ignore
+                to_port=to_port,
+                endpoints='*' if '*' in endpoints else tuple(sorted(endpoints)),  # type: ignore
+            )
+            for (protocol, port, to_port), endpoints in self._map.items()
         )
-        for (protocol, port, to_port), endpoints in port_map.items()
-    )
+
+    def get_first_overlap(self, port: Port) -> Port | None:
+        for (protocol, from_port, to_port), endpoints in self._map.items():
+            endpoints = '*' if '*' in endpoints else tuple(sorted(endpoints))
+            assert endpoints
+            this_port = ops.Port(
+                protocol=protocol,
+                port=from_port,
+                to_port=to_port,
+                endpoints=endpoints,
+            )
+            if port._overlaps(this_port):
+                return port
+        return None
 
 
-def _get_overlapping(port_map: _PortMap, port: Port) -> Port | None:
-    for (protocol, from_port, to_port), endpoints in port_map.items():
-        endpoints = '*' if '*' in endpoints else tuple(sorted(endpoints))
-        assert endpoints
-        this_port = ops.Port(
-            protocol=protocol,
-            port=from_port,
-            to_port=to_port,
-            endpoints=endpoints,
-        )
-        if port._overlaps(this_port):
-            return port
-    return None
+def _port_str(port: Port | ops.Port) -> str:
+    """Return the Juju string representation of a port (without endpoints)."""
+    if port.port is None:
+        return port.protocol
+    if port.to_port is None:
+        return f'{port.port}/{port.protocol}'
+    return f'{port.port}-{port.to_port}/{port.protocol}'
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1724,13 +1725,13 @@ class State:
             else port
             for port in self.opened_ports
         ]
-        port_map = _port_map([])
+        port_map = _PortMap()
         for port in normalised_ports:
-            if (p := _get_overlapping(port_map, port)) is not None:
+            if (p := port_map.get_first_overlap(port)) is not None:
                 e = f'cannot open {_port_str(port)}: port range conflicts with {_port_str(p)}'
                 raise StateValidationError(e)
-            _open_port(port_map, port)
-        normalised_ports = _ports_from_map(port_map)
+            port_map.open_port(port)
+        normalised_ports = port_map.get_ports()
         if self.opened_ports != normalised_ports:
             object.__setattr__(self, 'opened_ports', normalised_ports)
 
