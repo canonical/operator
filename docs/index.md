@@ -40,41 +40,17 @@ Supports Django, FastAPI, Go, and more!
 
 ## In this documentation
 
-````{grid} 1 1 2 2
+**Starting a project:** [Manage charms](howto/manage-charms) • [Write and structure charm code](howto/write-and-structure-charm-code)
 
-```{grid-item-card} [Tutorials](tutorial/index)
-**Start here:** hands-on introductions to Ops, guiding you through writing charms
-- [Write your first machine charm](tutorial/write-your-first-machine-charm)
-- [Write your first Kubernetes charm](tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/index)
-```
+**Running workloads:** [Manage packages on machines](howto/run-workloads-with-a-charm-machines) • [Manage Kubernetes workloads](howto/manage-containers/index)
 
-```{grid-item-card} [How-to guides](howto/index)
-**Step-by-step guides** covering key operations and common tasks
-- [Manage charms](howto/manage-charms)
-- [Manage relations](howto/manage-relations)
-- [Manage containers](howto/manage-containers/index)
-```
+**Adding functionality:** [Manage relations](howto/manage-relations) • [Manage configuration](howto/manage-configuration) • [More Juju features](#how-to-guides-managing-features)
 
-````
+**Testing & CI:** [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests with Jubilant](howto/write-integration-tests-for-a-charm)
 
-````{grid} 1 1 2 2
-:reverse:
+**Design & best practices:** [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
 
-```{grid-item-card} [Reference](reference/index)
-**Technical information** about Ops APIs
-- [ops](reference/ops)
-- [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing)
-- [ops.pebble](reference/pebble)
-```
-
-```{grid-item-card} [Explanation](explanation/index)
-**Discussion and clarification** of key topics
-- [Testing](explanation/testing)
-- [Tracing](explanation/tracing)
-- [Security](explanation/security)
-```
-
-````
+**Publishing:** [Make your charm discoverable](howto/make-your-charm-discoverable)
 
 ## How this documentation is organised
 
