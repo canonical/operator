@@ -743,7 +743,8 @@ class Unit:
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
-                or ``port`` is not provided when ``protocol`` is 'tcp' or 'udp'.
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
         if isinstance(port, tuple):
             port, to_port = port
@@ -777,7 +778,8 @@ class Unit:
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
-                or ``port`` is not provided when ``protocol`` is 'tcp' or 'udp'.
+                or ``port`` is not provided when ``protocol`` is 'tcp' or
+                'udp'.
         """
         if isinstance(port, tuple):
             port, to_port = port
