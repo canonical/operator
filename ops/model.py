@@ -868,6 +868,8 @@ class Port:
     Will be ``None`` if a single port was specified (or if protocol is ``'icmp'``).
     """
 
+    _: dataclasses.KW_ONLY
+
     endpoints: tuple[str, ...] | Literal['*'] = '*'
     """The endpoints for which the port is open.
 
