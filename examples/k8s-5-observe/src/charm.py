@@ -78,8 +78,8 @@ class FastAPIDemoCharm(ops.CharmBase):
         # The 'database_name' is the name of the database that our application requires.
         self.database = DatabaseRequires(self, relation_name='database', database_name='names_db')
         # See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-        framework.observe(self.database.on.database_created, self._on_database_created)
-        framework.observe(self.database.on.endpoints_changed, self._on_database_created)
+        framework.observe(self.database.on.database_created, self._on_database_endpoint)
+        framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
         # Events on charm actions that are run via 'juju run'.
         framework.observe(self.on.get_db_info_action, self._on_get_db_info_action)
         # Enable pushing application logs to Loki.
@@ -102,10 +102,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         )
 
     def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
-        self._update_layer_and_restart()
+        self._replan_workload()
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
-        self._update_layer_and_restart()
+        self._replan_workload()
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         try:
@@ -128,17 +128,17 @@ class FastAPIDemoCharm(ops.CharmBase):
         # If nothing is wrong, then the status is active.
         event.add_status(ops.ActiveStatus())
 
-    def _on_database_created(
+    def _on_database_endpoint(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
-        """Event is fired when postgres database is created."""
-        self._update_layer_and_restart()
+        """Event is fired when the database is created or its endpoint is changed."""
+        self._replan_workload()
 
     def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
         """Return information about the integrated database.
 
         This method is called when "get_db_info" action is called. It shows information about
-        database access points by calling the `fetch_postgres_relation_data` method and creates
+        database access points by calling the `fetch_database_relation_data` method and creates
         an output dictionary containing the host, port, if show_password is True, then include
         username, and password of the database.
 
@@ -147,7 +147,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
         """
         params = event.load_params(GetDbInfoAction, errors='fail')
-        db_data = self.fetch_postgres_relation_data()
+        db_data = self.fetch_database_relation_data()
         if not db_data:
             event.fail('No database connected')
             return
@@ -164,7 +164,7 @@ class FastAPIDemoCharm(ops.CharmBase):
             )
         event.set_results(output)
 
-    def _update_layer_and_restart(self) -> None:
+    def _replan_workload(self) -> None:
         """Define and start a workload using the Pebble API.
 
         You'll need to specify the right entrypoint and environment
@@ -225,39 +225,19 @@ class FastAPIDemoCharm(ops.CharmBase):
         return ops.pebble.Layer(pebble_layer)
 
     def get_app_environment(self) -> dict[str, str]:
-        """Prepare environment variables for the application.
-
-        This property method creates a dictionary containing environment variables
-        for the application. It retrieves the database authentication data by calling
-        the `fetch_postgres_relation_data` method and uses it to populate the dictionary.
-        If any of the values are not present, it will be set to None.
-        The method returns this dictionary as output.
-        """
-        db_data = self.fetch_postgres_relation_data()
+        """Return a dictionary of environment variables for the application."""
+        db_data = self.fetch_database_relation_data()
         if not db_data:
             return {}
-        env = {
-            key: value
-            for key, value in {
-                'DEMO_SERVER_DB_HOST': db_data.get('db_host', None),
-                'DEMO_SERVER_DB_PORT': db_data.get('db_port', None),
-                'DEMO_SERVER_DB_USER': db_data.get('db_username', None),
-                'DEMO_SERVER_DB_PASSWORD': db_data.get('db_password', None),
-            }.items()
-            if value is not None
+        return {
+            'DEMO_SERVER_DB_HOST': db_data['db_host'],
+            'DEMO_SERVER_DB_PORT': db_data['db_port'],
+            'DEMO_SERVER_DB_USER': db_data['db_username'],
+            'DEMO_SERVER_DB_PASSWORD': db_data['db_password'],
         }
-        return env
 
-    def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """Fetch postgres relation data.
-
-        This function retrieves relation data from a postgres database using
-        the `fetch_relation_data` method of the `database` object. The retrieved data is
-        then logged for debugging purposes, and any non-empty data is processed to extract
-        endpoint information, username, and password. This processed data is then returned as
-        a dictionary. If no data is retrieved, the unit is set to waiting status and
-        the program exits with a zero status code.
-        """
+    def fetch_database_relation_data(self) -> dict[str, str]:
+        """Retrieve relation data from a database."""
         relations = self.database.fetch_relation_data()
         logger.debug('Got following database data: %s', relations)
         for data in relations.values():

@@ -627,11 +627,17 @@ def test_config_from_raw():
     assert meta.config['sssh'].description == 'a user secret'
 
 
-def test_actions_from_charm_root():
+@pytest.mark.parametrize('additional_properties', [False, True])
+def test_actions_from_charm_root(additional_properties: bool):
     with tempfile.TemporaryDirectory() as d:
         td = pathlib.Path(d)
         (td / 'actions.yaml').write_text(
-            yaml.safe_dump({'foo': {'description': 'foos the bar', 'additionalProperties': False}})
+            yaml.safe_dump({
+                'foo': {
+                    'description': 'foos the bar',
+                    'additionalProperties': additional_properties,
+                }
+            })
         )
         (td / 'metadata.yaml').write_text(
             yaml.safe_dump({'name': 'bob', 'requires': {'foo': {'interface': 'bar'}}})
@@ -640,8 +646,23 @@ def test_actions_from_charm_root():
         meta = ops.CharmMeta.from_charm_root(td)
         assert meta.name == 'bob'
         assert meta.requires['foo'].interface_name == 'bar'
-        assert not meta.actions['foo'].additional_properties
+        assert meta.actions['foo'].additional_properties == additional_properties
         assert meta.actions['foo'].description == 'foos the bar'
+
+
+@pytest.mark.parametrize(
+    'juju_version,additional_properties',
+    [('2.9', True), ('3.6.12', True), ('4.0.0', False), ('4.1', False), (None, True)],
+)
+def test_actions_additional_properties(
+    monkeypatch: pytest.MonkeyPatch, juju_version: str | None, additional_properties: bool
+):
+    if juju_version is None:
+        monkeypatch.delenv('JUJU_VERSION', raising=False)
+    else:
+        monkeypatch.setenv('JUJU_VERSION', juju_version)
+    action = ops.ActionMeta('foo', {})
+    assert action.additional_properties == additional_properties
 
 
 def _setup_test_action(fake_script: FakeScript):

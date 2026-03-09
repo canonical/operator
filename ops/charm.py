@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
+import os
 import pathlib
 import warnings
 from collections.abc import Mapping
@@ -45,6 +46,7 @@ from .framework import (
     Object,
     ObjectEvents,
 )
+from .jujuversion import JujuVersion
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -380,7 +382,7 @@ class ConfigChangedEvent(HookEvent):
     - Right after the unit starts up for the first time.
       This event notifies the charm of its initial configuration.
       Typically, this event will fire between an :class:`~ops.InstallEvent`
-      and a :class:~`ops.StartEvent` during the startup sequence
+      and a :class:`~ops.StartEvent` during the startup sequence
       (when a unit is first deployed), but in general it will fire whenever
       the unit is (re)started, for example after pod churn on Kubernetes, on unit
       rescheduling, on unit upgrade or refresh, and so on.
@@ -2209,7 +2211,9 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        self.additional_properties = raw.get('additionalProperties', True)
+        # The default in Juju 4 is False. The default in earlier Juju versions is True.
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+        self.additional_properties = raw.get('additionalProperties', juju_version < '4.0.0')
 
 
 @dataclasses.dataclass(frozen=True)

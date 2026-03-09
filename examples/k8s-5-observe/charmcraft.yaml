@@ -69,6 +69,7 @@ actions:
         description: Show username and password in output information
         type: boolean
         default: False
+    additionalProperties: false
 
 containers:
   demo-server:

@@ -331,7 +331,7 @@ def test_credential_get_all(run: Run):
 
 def test_goal_state(run: Run):
     gs = {
-        'units': {'my-unit/0': {'status': 'active', 'since': '2025-08-28T13:20:00'}},
+        'units': {'my-unit/0': {'status': 'active', 'since': '2026-01-04 06:29:46Z'}},
         'relations': {},
     }
     run.handle(['goal-state', '--format=json'], stdout=json.dumps(gs))
@@ -897,3 +897,40 @@ def test_storage_list_named(run: Run):
     run.handle(['storage-list', '--format=json', 'stor'], stdout='["stor/1", "stor/2"]')
     result = hookcmds.storage_list('stor')
     assert result == ['stor/1', 'stor/2']
+
+
+@pytest.mark.parametrize(
+    'timestamp,expected',
+    [
+        # Juju 3.6 format (no fractional seconds)
+        (
+            '2026-01-05T23:28:38Z',
+            datetime.datetime(2026, 1, 5, 23, 28, 38, tzinfo=datetime.timezone.utc),
+        ),
+        # Juju 4.0 format (8 digits)
+        (
+            '2026-01-05T23:34:25.50029526Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 500295, tzinfo=datetime.timezone.utc),
+        ),
+        # 5 digits (reported in https://github.com/canonical/operator/issues/2263)
+        (
+            '2026-04-10T18:34:45.65844+00:00',
+            datetime.datetime(2026, 4, 10, 18, 34, 45, 658440, tzinfo=datetime.timezone.utc),
+        ),
+        # Edge case: 1 digit
+        (
+            '2026-01-05T23:34:25.1Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 100000, tzinfo=datetime.timezone.utc),
+        ),
+        # Edge case: 9 digits (nanosecond precision)
+        (
+            '2026-01-05T23:34:25.123456789Z',
+            datetime.datetime(2026, 1, 5, 23, 34, 25, 123457, tzinfo=datetime.timezone.utc),
+        ),
+    ],
+)
+def test_secret_expiry_formats(timestamp: str, expected: datetime.datetime):
+    secret_info = hookcmds.SecretInfo._from_dict({'test-id': {'revision': 1, 'expiry': timestamp}})
+    assert secret_info.id == 'test-id'
+    assert secret_info.revision == 1
+    assert secret_info.expiry == expected

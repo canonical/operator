@@ -47,11 +47,11 @@ another state.
 Writing these tests should nudge you into thinking of a charm as a black-box
 'input to output' function. The inputs are:
 
-- Event: why am I, the charm, being executed
-- State: am I the leader? what is my relation data? what is my config?
-- Context: what relations can I have? what containers can I have?
+- Event (:class:`CharmEvents <ops.testing.CharmEvents>`): why am I, the charm, being executed?
+- :class:`State <ops.testing.State>`: am I the leader? what is my relation data? what is my config?
+- :class:`Context <ops.testing.Context>`: what relations can I have? what containers can I have?
 
-The output is another `State`: the state after
+The output is another ``State``: the state after
 the charm has interacted with the mocked Juju model.
 The output state is the same type of data structure as the input state.
 
@@ -62,6 +62,8 @@ Writing unit tests for a charm, then, means verifying that:
 
 - the output state (as compared with the input state) is as expected
 - the charm does not raise uncaught exceptions while handling the event
+
+When the testing framework runs the event, the input state isn't modified. Instead, the output state is a new :class:`State <ops.testing.State>` object. ``State`` objects are generally immutable - but be careful when working with ``dict`` attributes, as they don't enforce immutability.
 
 A test consists of three broad steps:
 

@@ -53,12 +53,12 @@ class FastAPIDemoCharm(ops.CharmBase):
         framework.observe(self.on.config_changed, self._on_config_changed)
 
     def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
-        self._update_layer_and_restart()
+        self._replan_workload()
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
-        self._update_layer_and_restart()
+        self._replan_workload()
 
-    def _update_layer_and_restart(self) -> None:
+    def _replan_workload(self) -> None:
         """Define and start a workload using the Pebble API.
 
         You'll need to specify the right entrypoint and environment
