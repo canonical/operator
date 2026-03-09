@@ -20,6 +20,24 @@ The core `ops` package provides an API to respond to Juju events and manage the 
 
 Ops promotes consistent and maintainable charm code. Its APIs help you separate different aspects of the charm, such as managing the application's state and integrating with other charms.
 
+## Get started
+
+````{grid} 1 1 2 2
+
+```{grid-item-card} Write your first charm from scratch
+For a hands-on introduction to charm development with Ops, try our tutorials:
+- [Write your first machine charm](tutorial/write-your-first-machine-charm)
+- [Write your first Kubernetes charm](tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/index)
+```
+
+```{grid-item-card} Charm a 12-factor app
+Alternatively, use our opinionated framework to develop a charm - no knowledge of Ops required. [Get started](https://documentation.ubuntu.com/charmcraft/latest/tutorial/)
+
+Supports Django, FastAPI, Go, and more!
+```
+
+````
+
 ## In this documentation
 
 ````{grid} 1 1 2 2
