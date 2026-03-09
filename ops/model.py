@@ -812,10 +812,7 @@ class Unit:
                 ``port`` is not ``None``, or where ``protocol`` is 'tcp' or 'udp' and ``port``
                 is ``None``.
         """
-        # Normalise to get easier comparisons.
         existing = self._backend.opened_ports()
-        # FIXME: we might need to drop this nice set logic and do an explicit loop instead
-        # depending how how Juju handles overlapping open/close with port ranges
         desired = {Port('tcp', port) if isinstance(port, int) else port for port in ports}
         for p in existing - desired:
             self._backend.close_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
