@@ -161,7 +161,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
         for p in ports:
-            if port_._overlaps(p):
+            if port_ != p and port_._overlaps(p):
                 e = f'cannot open {port_._juju_str()}: port range conflicts with {p._juju_str()}'
                 raise ModelError(e)
         if port_ not in ports:
@@ -181,7 +181,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         port_ = _port_cls_by_protocol[protocol](port=port, to_port=to_port)  # type: ignore
         ports = set(self._state.opened_ports)
         for p in ports:
-            if port_._overlaps(p):
+            if port_ != p and port_._overlaps(p):
                 e = f'cannot close {port_._juju_str()}: port range conflicts with {p._juju_str()}'
                 raise ModelError(e)
         if port_ in ports:

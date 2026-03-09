@@ -1401,6 +1401,7 @@ class Port:
             raise RuntimeError(
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
+        self._validate_ports()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
