@@ -259,6 +259,16 @@ def test_close_port_range(run: Run):
     hookcmds.close_port(protocol='tcp', port=8080, to_port=8090)
 
 
+def test_close_port_range_and_endpoints(run: Run):
+    run.handle(['close-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'])
+    hookcmds.close_port(protocol='tcp', port=8080, to_port=8090, endpoints=['ep1', 'ep2'])
+
+
+def test_close_port_to_port_without_port():
+    with pytest.raises(TypeError):
+        hookcmds.close_port(protocol='tcp', to_port=8090)
+
+
 def test_config_get(run: Run):
     run.handle(['config-get', '--format=json'], stdout='{"foo": "bar"}')
     result = hookcmds.config_get()
@@ -427,6 +437,31 @@ def test_open_port_single(run: Run):
 def test_open_port_range(run: Run):
     run.handle(['open-port', '8080-8090/tcp'])
     hookcmds.open_port(protocol='tcp', port=8080, to_port=8090)
+
+
+def test_open_port_range_and_endpoints(run: Run):
+    run.handle(['open-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'])
+    hookcmds.open_port(protocol='tcp', port=8080, to_port=8090, endpoints=['ep1', 'ep2'])
+
+
+def test_open_port_to_port_without_port():
+    with pytest.raises(TypeError):
+        hookcmds.open_port(protocol='tcp', to_port=8090)
+
+
+def test_open_port_nonexistent_endpoint(run: Run):
+    # Juju exits 0 but prints an error to stdout when the endpoint does not exist.
+    # hookcmds.open_port returns the error string; the ModelError is raised higher up.
+    error_msg = (
+        'cannot open/close ports: open port range: endpoint "nonexistent-ep"'
+        ' for unit "app/0" not found'
+    )
+    run.handle(
+        ['open-port', '--endpoints', 'nonexistent-ep', '8080/tcp'],
+        stdout=error_msg,
+    )
+    result = hookcmds.open_port(protocol='tcp', port=8080, endpoints=['nonexistent-ep'])
+    assert result == error_msg
 
 
 def test_opened_ports(run: Run):

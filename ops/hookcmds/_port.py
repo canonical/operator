@@ -124,6 +124,11 @@ def open_port(
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
+    # In the happy case (already open or opened successfully) open-ports exits silently with 0.
+    # If open-port exits with an error code, then run will raise an Error.
+    # Specifying a non-existent endpoint exits with 0, but prints an error message,
+    # **and does not open the port**. In this case, we return the error message.
+    # Ops will use this to raise an error.
     result = run('open-port', *args).strip()
     return result or None
 

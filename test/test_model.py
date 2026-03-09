@@ -4296,11 +4296,37 @@ class TestPorts:
             ['open-port', '--endpoints', '*', '8080/tcp'],
         ]
 
+    def test_open_port_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+
+        unit.open_port('tcp', 8080, endpoints=['ep1', 'ep2'])
+        unit.open_port('udp', 4000, endpoints=['ep1'])
+
+        assert fake_script.calls(clear=True) == [
+            ['open-port', '--endpoints', 'ep1,ep2', '8080/tcp'],
+            ['open-port', '--endpoints', 'ep1', '4000/udp'],
+        ]
+
+    def test_open_port_range_and_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+
+        unit.open_port('tcp', (8080, 8090), endpoints=['ep1', 'ep2'])
+
+        assert fake_script.calls(clear=True) == [
+            ['open-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'],
+        ]
+
     def test_open_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', 'exit 0')
 
         with pytest.raises(TypeError):
             unit.open_port('tcp', (None, 8090))  # type: ignore
+
+    def test_open_port_empty_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+
+        with pytest.raises(TypeError):
+            unit.open_port('tcp', 8080, endpoints=[])
 
     def test_open_port_error(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('open-port', "echo 'ERROR bad protocol' >&2; exit 1")
@@ -4311,6 +4337,21 @@ class TestPorts:
 
         assert fake_script.calls(clear=True) == [
             ['open-port', '--endpoints', '*', '8080/ftp'],
+        ]
+
+    def test_open_port_nonexistent_endpoint(self, fake_script: FakeScript, unit: ops.Unit):
+        # Juju exits 0 but prints an error to stdout when the endpoint does not exist.
+        error_msg = (
+            'cannot open/close ports: open port range: endpoint "nonexistent-ep"'
+            ' for unit "myapp/0" not found'
+        )
+        fake_script.write('open-port', f"echo '{error_msg}'")
+
+        with pytest.raises(ops.ModelError):
+            unit.open_port('tcp', 8080, endpoints=['nonexistent-ep'])
+
+        assert fake_script.calls(clear=True) == [
+            ['open-port', '--endpoints', 'nonexistent-ep', '8080/tcp'],
         ]
 
     def test_close_port(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4339,11 +4380,37 @@ class TestPorts:
             ['close-port', '--endpoints', '*', '8080/tcp'],
         ]
 
+    def test_close_port_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('close-port', 'exit 0')
+
+        unit.close_port('tcp', 8080, endpoints=['ep1', 'ep2'])
+        unit.close_port('udp', 4000, endpoints=['ep1'])
+
+        assert fake_script.calls(clear=True) == [
+            ['close-port', '--endpoints', 'ep1,ep2', '8080/tcp'],
+            ['close-port', '--endpoints', 'ep1', '4000/udp'],
+        ]
+
+    def test_close_port_range_and_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('close-port', 'exit 0')
+
+        unit.close_port('tcp', (8080, 8090), endpoints=['ep1', 'ep2'])
+
+        assert fake_script.calls(clear=True) == [
+            ['close-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'],
+        ]
+
     def test_close_port_range_none_port(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('close-port', 'exit 0')
 
         with pytest.raises(TypeError):
             unit.close_port('tcp', (None, 8090))  # type: ignore
+
+    def test_close_port_empty_endpoints(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('close-port', 'exit 0')
+
+        with pytest.raises(TypeError):
+            unit.close_port('tcp', 8080, endpoints=[])
 
     def test_close_port_error(self, fake_script: FakeScript, unit: ops.Unit):
         fake_script.write('close-port', "echo 'ERROR bad protocol' >&2; exit 1")
@@ -4354,6 +4421,21 @@ class TestPorts:
 
         assert fake_script.calls(clear=True) == [
             ['close-port', '--endpoints', '*', '8080/ftp'],
+        ]
+
+    def test_close_port_nonexistent_endpoint(self, fake_script: FakeScript, unit: ops.Unit):
+        # Juju exits 0 but prints an error to stdout when the endpoint does not exist.
+        error_msg = (
+            'cannot open/close ports: close port range: endpoint "nonexistent-ep"'
+            ' for unit "myapp/0" not found'
+        )
+        fake_script.write('close-port', f"echo '{error_msg}'")
+
+        with pytest.raises(ops.ModelError):
+            unit.close_port('tcp', 8080, endpoints=['nonexistent-ep'])
+
+        assert fake_script.calls(clear=True) == [
+            ['close-port', '--endpoints', 'nonexistent-ep', '8080/tcp'],
         ]
 
     def test_opened_ports(self, fake_script: FakeScript, unit: ops.Unit):
@@ -4464,6 +4546,26 @@ class TestPorts:
         fake_script.write('close-port', 'exit 0')
         fake_script.write('opened-ports', """echo '["8000/tcp (*)"]'""")
         unit.set_ports(ops.Port('tcp', 8000))
+        assert fake_script.calls(clear=True) == [
+            ['opened-ports', '--endpoints', '--format=json'],
+        ]
+
+    def test_set_ports_with_tuple(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+        fake_script.write('close-port', 'exit 0')
+        fake_script.write('opened-ports', 'echo []')
+        unit.set_ports((8000, 8090))
+        calls = fake_script.calls(clear=True)
+        assert calls.pop(0) == ['opened-ports', '--endpoints', '--format=json']
+        assert calls == [
+            ['open-port', '--endpoints', '*', '8000-8090/tcp'],
+        ]
+
+    def test_set_ports_noop_with_range(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+        fake_script.write('close-port', 'exit 0')
+        fake_script.write('opened-ports', """echo '["8000-8090/tcp (*)"]'""")
+        unit.set_ports(ops.Port('tcp', 8000, to_port=8090))
         assert fake_script.calls(clear=True) == [
             ['opened-ports', '--endpoints', '--format=json'],
         ]
