@@ -85,7 +85,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 - [Reference](reference/index), including [ops](reference/ops), [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing), and [ops.pebble](reference/pebble)
 - [Explanation](explanation/index)
 
-## Releases
+## Ops releases
 
 [Read the release notes](https://github.com/canonical/operator/releases)
 
