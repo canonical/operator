@@ -73,8 +73,8 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch
-    return sort_patch(patch)
+    patch: list[dict[str, Any]] = jsonpatch.make_patch(dict_other, dict_self).patch  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+    return sort_patch(patch)  # pyright: ignore[reportUnknownArgumentType]
 
 
 def sort_patch(
