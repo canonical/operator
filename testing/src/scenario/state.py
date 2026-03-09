@@ -1413,7 +1413,7 @@ class Port:
                 and self.to_port == other.to_port
                 and self.endpoints == other.endpoints
             )
-        return NotImplemented
+        return False  # FIXME: should be NotImplemented, but needs testing for compatibility.
 
     def _to_ops(self) -> ops.Port:
         return ops.Port(protocol=self.protocol, port=self.port, to_port=self.to_port)
@@ -1434,7 +1434,7 @@ class Port:
         # Overlapping port ranges are allowed if the protocols are different.
         if self.protocol != other.protocol:
             return False
-        # Only and ICMP port has port=None, and since ICMP ports don't have port ranges,
+        # Only an ICMP port has port=None, and since ICMP ports don't have port ranges,
         # they can't overlap with each other.
         if self.port is None or other.port is None:
             return False
@@ -1448,18 +1448,10 @@ class Port:
             return False
         # Same protocol, non-identical ports -- Juju will error if the ranges overlap.
         # Note that if to_port is None, the range will just include the single port.
-        # (Port values are already validated to be in the range [1:65535].)
+        # (Port values are validated to be in the range [1:65535] when constructed.)
         a = range(self.port, self.to_port or self.port + 1)
         b = range(other.port, other.to_port or other.port + 1)
         return a.start in b or b.start in a
-
-
-def _juju_str(port: Port | ops.Port) -> str:
-    if port.port is None:
-        return port.protocol
-    if port.to_port is None:
-        return f'{port.port}/{port.protocol}'
-    return f'{port.port}-{port.to_port}/{port.protocol}'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1510,6 +1502,14 @@ class ICMPPort(Port):
         super().__post_init__()
         if (self.port, self.to_port) != (None, None):
             raise StateValidationError('`port` cannot be set for `ICMPPort`')
+
+
+def _port_str(port: Port | ops.Port) -> str:
+    if port.port is None:
+        return port.protocol
+    if port.to_port is None:
+        return f'{port.port}/{port.protocol}'
+    return f'{port.port}-{port.to_port}/{port.protocol}'
 
 
 _port_cls_by_protocol = {
@@ -1727,7 +1727,7 @@ class State:
         port_map = _port_map([])
         for port in normalised_ports:
             if (p := _get_overlapping(port_map, port)) is not None:
-                e = f'cannot open {_juju_str(port)}: port range conflicts with {_juju_str(p)}'
+                e = f'cannot open {_port_str(port)}: port range conflicts with {_port_str(p)}'
                 raise StateValidationError(e)
             _open_port(port_map, port)
         normalised_ports = _ports_from_map(port_map)

@@ -62,10 +62,10 @@ from .state import (
     _close_port,
     _EntityStatus,
     _get_overlapping,
-    _juju_str,
     _open_port,
     _port_cls_by_protocol,
     _port_map,
+    _port_str,
     _ports_from_map,
     _RawPortProtocolLiteral,
 )
@@ -175,7 +175,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         )
         port_map = _port_map(self._state.opened_ports)
         if (p := _get_overlapping(port_map, port_)) is not None:
-            e = f'cannot open {_juju_str(port_)}: port range conflicts with {_juju_str(p)}'
+            e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
             raise ModelError(e)
         _open_port(port_map, port_)
         ports = _ports_from_map(port_map)
@@ -200,7 +200,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         )
         port_map = _port_map(self._state.opened_ports)
         if (p := _get_overlapping(port_map, port_)) is not None:
-            e = f'cannot open {port_._juju_str()}: port range conflicts with {p._juju_str()}'
+            e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
             raise ModelError(e)
         all_endpoints = [e for e, _ in self._charm_spec.get_all_relations()]
         _close_port(port_map, port_, all_endpoints=all_endpoints)
