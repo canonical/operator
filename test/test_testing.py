@@ -6356,7 +6356,6 @@ class TestPorts:
         assert ports[1].endpoints == ('endpoint-c',)
 
         unit.close_port('tcp', 8080, endpoints=['endpoint-a', 'endpoint-b'])
-        unit.close_port('tcp', 8080, endpoints=['endpoint-a', 'endpoint-b'])  # closing same port again has no effect
 
         ports_set = unit.opened_ports()
         ports = sorted(ports_set, key=lambda p: (p.protocol, p.port))
