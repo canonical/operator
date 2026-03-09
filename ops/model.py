@@ -742,6 +742,8 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed for ICMP.
                 May be a tuple of two integers to specify a port range.
+            endpoints: The endpoints for which to open the port.
+                '*' means to open the port for all endpoints.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
@@ -781,6 +783,8 @@ class Unit:
                 uppercase is also supported).
             port: The port to open. Required for TCP and UDP; not allowed for ICMP.
                 May be a tuple of two integers to specify a port range.
+            endpoints: The endpoints for which to close the port.
+                '*' means to close the port for all endpoints.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
