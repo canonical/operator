@@ -22,8 +22,8 @@ The output module contains three dictionaries per extension:
 from __future__ import annotations
 
 import pathlib
-import pprint
 import subprocess
+import sys
 import tempfile
 from typing import Any
 
@@ -108,18 +108,6 @@ def extract_extension_data(
     return metadata, config, actions
 
 
-def format_dict(d: dict[str, Any], indent: int = 4) -> str:
-    """Format a dict as a Python literal string."""
-    formatted = pprint.pformat(d, width=100, sort_dicts=True)
-    if '\n' in formatted:
-        lines = formatted.splitlines()
-        result = lines[0]
-        for line in lines[1:]:
-            result += '\n' + ' ' * indent + line
-        return result
-    return formatted
-
-
 def generate_module(
     all_data: dict[str, tuple[dict[str, Any], dict[str, Any], dict[str, Any]]],
 ) -> str:
@@ -135,34 +123,36 @@ def generate_module(
         '',
         'from __future__ import annotations',
         '',
-        'from typing import Any',
+        'from typing import Any, TypedDict',
+        '',
+        '',
+        'class _ExtensionMetadata(TypedDict, total=False):',
+        '    assumes: list[str]',
+        '    containers: dict[str, Any]',
+        '    peers: dict[str, Any]',
+        '    provides: dict[str, Any]',
+        '    requires: dict[str, Any]',
+        '    resources: dict[str, Any]',
+        '',
         '',
     ]
 
-    # Build the three top-level dicts.
+    # Build the three top-level dicts, pre-sorting keys.
     metadata_entries: dict[str, dict[str, Any]] = {}
     config_entries: dict[str, dict[str, Any]] = {}
     action_entries: dict[str, dict[str, Any]] = {}
     for profile, (metadata, config, actions) in sorted(all_data.items()):
-        metadata_entries[profile] = metadata
-        config_entries[profile] = config
-        action_entries[profile] = actions
+        metadata_entries[profile] = {k: metadata[k] for k in sorted(metadata)}
+        config_entries[profile] = {k: config[k] for k in sorted(config)}
+        action_entries[profile] = {k: actions[k] for k in sorted(actions)}
 
-    for var_name, data, doc_name in [
-        ('METADATA', metadata_entries, 'Metadata'),
-        ('CONFIG', config_entries, 'Config options'),
-        ('ACTIONS', action_entries, 'Actions'),
+    for var_name, data, type_str, doc_name in [
+        ('METADATA', metadata_entries, 'dict[str, _ExtensionMetadata]', 'Metadata'),
+        ('CONFIG', config_entries, 'dict[str, dict[str, Any]]', 'Config options'),
+        ('ACTIONS', action_entries, 'dict[str, dict[str, Any]]', 'Actions'),
     ]:
         lines.append(f'# {doc_name} added by each charmcraft extension.')
-        lines.append(f'{var_name}: dict[str, dict[str, Any]] = {{')
-        for profile in sorted(data):
-            lines.append(f'    {profile!r}: {{')
-            for key in sorted(data[profile]):
-                val = data[profile][key]
-                formatted = format_dict(val, indent=8)
-                lines.append(f'        {key!r}: {formatted},')
-            lines.append('    },')
-        lines.append('}')
+        lines.append(f'{var_name}: {type_str} = {data!r}')
         lines.append('')
 
     return '\n'.join(lines)
@@ -181,13 +171,6 @@ def main() -> int:  # noqa: D103
             all_data[profile] = extract_extension_data(expanded)
 
     module_source = generate_module(all_data)
-
-    if OUTPUT_FILE.exists():
-        response = input(f'{OUTPUT_FILE} already exists. Overwrite? [y/N] ').strip().lower()
-        if response != 'y':
-            print('Aborted.')
-            return 1
-
     OUTPUT_FILE.write_text(module_source)
     print(f'Written to {OUTPUT_FILE}')
 

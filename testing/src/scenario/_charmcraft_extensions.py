@@ -8,10 +8,20 @@ Do not edit manually.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
+
+
+class _ExtensionMetadata(TypedDict, total=False):
+    assumes: list[str]
+    containers: dict[str, Any]
+    peers: dict[str, Any]
+    provides: dict[str, Any]
+    requires: dict[str, Any]
+    resources: dict[str, Any]
+
 
 # Metadata added by each charmcraft extension.
-METADATA: dict[str, dict[str, Any]] = {
+METADATA: dict[str, _ExtensionMetadata] = {
     'django-framework': {
         'assumes': ['k8s-api'],
         'containers': {'django-app': {'resource': 'django-app-image'}},

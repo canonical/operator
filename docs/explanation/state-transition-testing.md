@@ -253,9 +253,9 @@ state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingre
 ```
 
 If your `charmcraft.yaml` defines keys that overlap with what the extension
-provides (for example, a config option or relation with the same name), the
-testing framework will raise a `ValueError`, matching the behaviour of
-`charmcraft pack`. Rename or remove the overlapping keys to fix this.
+provides (for example, a config option or relation with the same name), both
+`charmcraft pack` and the testing framework will raise an error. Rename or
+remove the overlapping keys to fix this.
 
 ## Immutability
 

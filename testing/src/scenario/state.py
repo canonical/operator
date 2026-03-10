@@ -1862,8 +1862,8 @@ def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     return True
 
 
-def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, Any]:
-    """Merge charmcraft extension defaults into the charm metadata.
+def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
+    """Merge charmcraft extension defaults into the charm metadata in place.
 
     Extension defaults are applied first, then the local charmcraft.yaml
     values are merged on top, simulating what ``charmcraft expand-extensions``
@@ -1881,8 +1881,8 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
 
         if not ext_meta and not ext_config and not ext_actions:
             warnings.warn(
-                f'Unknown charmcraft extension {ext_name!r}; '
-                f'ignoring. You may need to update to a newer ops.',
+                f'Unknown charmcraft extension {ext_name!r}; ignoring. '
+                "Ensure you're running the latest ops, and open an issue if this persists.",
                 stacklevel=2,
             )
             continue
@@ -1905,9 +1905,7 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
                 meta[key] = merged
             elif isinstance(ext_value, list) and isinstance(meta[key], list):
                 merged = copy.deepcopy(ext_value)
-                for item in meta[key]:
-                    if item not in merged:
-                        merged.append(item)
+                merged.extend(i for i in meta[key] if i not in merged)
                 meta[key] = merged
 
         # Merge config options; error on overlapping keys.
@@ -1938,8 +1936,6 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
             merged_actions = copy.deepcopy(ext_actions)
             merged_actions.update(local_actions)
             meta['actions'] = merged_actions
-
-    return meta
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1991,7 +1987,7 @@ class _CharmSpec(Generic[CharmType]):
         # Apply charmcraft extensions before extracting config/actions.
         extensions = meta.pop('extensions', None)
         if extensions:
-            meta = _apply_extensions(meta, extensions)
+            _apply_extensions(meta, extensions)
 
         config = meta.pop('config', None)
         actions = meta.pop('actions', None)
