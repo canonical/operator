@@ -82,21 +82,19 @@ def get_extensions() -> list[str]:
 
 def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict[str, Any]:
     """Run charmcraft init + expand-extensions and return the expanded YAML as a dict."""
-    subprocess.run(
+    subprocess.check_call(
         ['charmcraft', 'init', '--profile', profile, '--name', 'test-charm'],
         cwd=workdir,
-        check=True,
-        capture_output=True,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
-    result = subprocess.run(
+    output = subprocess.check_output(
         ['charmcraft', 'expand-extensions'],
         cwd=workdir,
-        check=True,
-        capture_output=True,
         text=True,
+        stderr=subprocess.DEVNULL,
     )
-    return yaml.safe_load(result.stdout)
+    return yaml.safe_load(output)
 
 
 def extract_extension_data(
