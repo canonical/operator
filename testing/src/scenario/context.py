@@ -685,19 +685,6 @@ class Context(Generic[CharmType]):
             ``juju trust``).
         :arg charm_root: virtual charm filesystem root the charm will be executed with.
         """
-        meta = copy.deepcopy(meta)
-        config = copy.deepcopy(config)
-        actions = copy.deepcopy(actions)
-        # Extract config and actions from meta if it contains them (e.g., charmcraft.yaml)
-        # and they were not explicitly provided
-        if meta is not None:
-            meta_config = meta.pop('config', None)
-            if config is None:
-                config = meta_config
-            meta_actions = meta.pop('actions', None)
-            if actions is None:
-                actions = meta_actions
-
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
@@ -709,13 +696,13 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
-            spec = _CharmSpec(
-                charm_type=charm_type,
-                meta=meta,
-                actions=copy.deepcopy(actions),
-                config=copy.deepcopy(config),
-            )
+            meta_raw = copy.deepcopy(meta or {})
+            meta_actions = meta_raw.pop('actions', None)
+            meta_config = meta_raw.pop('config', None)
+            meta = meta_raw or {'name': str(charm_type.__name__)}
+            actions = copy.deepcopy(actions) if actions is not None else meta_actions
+            config = copy.deepcopy(config) if config is not None else meta_config
+            spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec
         self.charm_root = charm_root
