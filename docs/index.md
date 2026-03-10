@@ -59,7 +59,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 ## Related documentation
 
-- **{external+charmcraft:doc}`Charmcraft <index>`** - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful as you develop your charm.
+- **{external+charmcraft:doc}`Charmcraft <index>`** - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful.
 
 - **{external+charmlibs:doc}`Charmlibs <index>`** - A listing of charm libraries and guidance on how to distribute your own libraries.
 
@@ -67,9 +67,9 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 - **{external+jubilant:doc}`Jubilant <index>`** - A Python library that wraps the Juju CLI. Recommended for use in integration tests.
 
-- **{external+juju:doc}`Juju <index>`** - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful as you develop your charm. Juju's hooks correspond to events that your charm can observe.
+- **{external+juju:doc}`Juju <index>`** - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful. Juju's hooks correspond to events that your charm can observe.
 
-- **{external+pebble:doc}`Pebble <index>`** - The service manager inside containers (Kubernetes charms only). You'll find the {external+pebble:ref}`layer specification <layer-specification>` especially helpful as you develop your charm.
+- **{external+pebble:doc}`Pebble <index>`** - The service manager inside containers (Kubernetes charms only). You'll find the {external+pebble:ref}`layer specification <layer-specification>` especially helpful.
 
 ## Demo charms
 
