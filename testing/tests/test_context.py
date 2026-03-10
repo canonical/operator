@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
 from typing import Any
 from unittest.mock import patch
 
@@ -194,10 +193,10 @@ def test_charm_spec_is_deprecated():
         _ = ctx.charm_spec  # type: ignore
 
 
-CONFIG: Mapping[str, Any] = {
+CONFIG: dict[str, Any] = {
     'options': {'perambulator-abbreviation': {'type': 'string', 'default': 'pram'}}
 }
-ACTIONS: Mapping[str, Any] = {'do-foo': {'description': 'Who do? Foo do.'}}
+ACTIONS: dict[str, Any] = {'do-foo': {'description': 'Who do? Foo do.'}}
 
 
 def test_init_with_meta_only():
