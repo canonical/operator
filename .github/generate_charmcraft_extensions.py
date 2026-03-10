@@ -64,14 +64,9 @@ OUTPUT_FILE = (
 
 def get_extensions() -> list[str]:
     """Get the list of available charmcraft extensions via ``charmcraft list-extensions``."""
-    result = subprocess.run(
-        ['charmcraft', 'list-extensions'],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = subprocess.check_output(['charmcraft', 'list-extensions'], text=True)
     extensions = []
-    for line in result.stdout.splitlines():
+    for line in result.splitlines():
         # Skip header and separator lines.
         if not line or line.startswith('Extension') or line.startswith('---'):
             continue
@@ -85,14 +80,11 @@ def run_charmcraft(profile: str, workdir: pathlib.Path) -> dict[str, Any]:
     subprocess.check_call(
         ['charmcraft', 'init', '--profile', profile, '--name', 'test-charm'],
         cwd=workdir,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
     )
     output = subprocess.check_output(
         ['charmcraft', 'expand-extensions'],
         cwd=workdir,
         text=True,
-        stderr=subprocess.DEVNULL,
     )
     return yaml.safe_load(output)
 
