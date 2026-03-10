@@ -13,10 +13,11 @@ from scenario import Context, State
 from scenario.errors import ContextSetupError, UncaughtCharmError
 from scenario.state import _Event, _next_action_id
 
+import ops
 from ops import CharmBase
 
 
-class MyCharm(CharmBase):
+class MyCharm(ops.CharmBase):
     pass
 
 
@@ -57,12 +58,13 @@ def test_run_action():
     assert isinstance(e, _Event)
     assert e.name == 'do_foo_action'
     assert s is state
+    assert e.action is not None
     assert e.action.id == expected_id
 
 
 @pytest.mark.parametrize('app_name', ('foo', 'bar', 'george'))
 @pytest.mark.parametrize('unit_id', (1, 2, 42))
-def test_app_name(app_name, unit_id):
+def test_app_name(app_name: str, unit_id: int):
     ctx = Context(MyCharm, meta={'name': 'foo'}, app_name=app_name, unit_id=unit_id)
     with ctx(ctx.on.start(), State()) as mgr:
         assert mgr.charm.app.name == app_name
@@ -70,7 +72,7 @@ def test_app_name(app_name, unit_id):
 
 
 @pytest.mark.parametrize('machine_id', ('0', None, '42', '0/lxd/4'))
-def test_machine_id_envvar(machine_id):
+def test_machine_id_envvar(machine_id: str | None):
     ctx = Context(MyCharm, meta={'name': 'foo'}, machine_id=machine_id)
     os.environ.pop('JUJU_MACHINE_ID', None)  # cleanup env to be sure
     with ctx(ctx.on.start(), State()):
@@ -78,7 +80,7 @@ def test_machine_id_envvar(machine_id):
 
 
 @pytest.mark.parametrize('availability_zone', ('zone1', None, 'us-east-1a'))
-def test_availability_zone_envvar(availability_zone):
+def test_availability_zone_envvar(availability_zone: str | None):
     ctx = Context(MyCharm, meta={'name': 'foo'}, availability_zone=availability_zone)
     os.environ.pop('JUJU_AVAILABILITY_ZONE', None)  # cleanup env to be sure
     with ctx(ctx.on.start(), State()):
@@ -86,7 +88,7 @@ def test_availability_zone_envvar(availability_zone):
 
 
 @pytest.mark.parametrize('principal_unit', ('main/0', None, 'app/42'))
-def test_principal_unit_envvar(principal_unit):
+def test_principal_unit_envvar(principal_unit: str | None):
     ctx = Context(MyCharm, meta={'name': 'foo'}, principal_unit=principal_unit)
     os.environ.pop('JUJU_PRINCIPAL_UNIT', None)  # cleanup env to be sure
     with ctx(ctx.on.start(), State()):
@@ -118,14 +120,14 @@ def test_app_name_and_unit_id():
 
 
 @pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
-def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
-    class CrashyCharm(CharmBase):
-        def __init__(self, framework):
+def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch):
+    class CrashyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             raise RuntimeError('Crash!')
 
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
@@ -138,14 +140,14 @@ def test_context_manager_uncaught_error(bare_charm_errors: str, monkeypatch: pyt
 
 
 @pytest.mark.parametrize('bare_charm_errors', ('1', '0'))
-def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypatch):
-    class CrashyCharm(CharmBase):
-        def __init__(self, framework):
+def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.MonkeyPatch):
+    class CrashyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             raise RuntimeError('Crash!')
 
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', bare_charm_errors)
@@ -156,13 +158,13 @@ def test_run_uncaught_error(bare_charm_errors: str, monkeypatch: pytest.Monkeypa
 
 
 def test_context_manager_env_cleared():
-    class GoodCharm(CharmBase):
-        def __init__(self, framework):
+    class GoodCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
             os.environ['TEST_ENV_VAR'] = '1'
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             os.environ['TEST_ENV_VAR'] = '2'
 
     ctx = Context(GoodCharm, meta={'name': 'crashy'})
@@ -173,12 +175,12 @@ def test_context_manager_env_cleared():
 
 
 def test_run_env_cleared():
-    class GoodCharm(CharmBase):
-        def __init__(self, framework):
+    class GoodCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.start, self._on_start)
 
-        def _on_start(self, event):
+        def _on_start(self, event: ops.EventBase):
             os.environ['TEST_ENV_VAR'] = '1'
 
     ctx = Context(GoodCharm, meta={'name': 'crashy'})

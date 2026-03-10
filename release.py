@@ -169,7 +169,7 @@ def parse_release_notes(release_notes: str) -> tuple[dict[str, list[tuple[str, s
         A tuple containing:
         - A dict with conventional commit types as keys and lists of tuples (description, PR link)
           as values.
-        - The full changelog line if present, or None if not found.
+        - The full changelog line if present, or ``None`` if not found.
     """
     release_notes = re.sub(
         r'(## New Contributors.*?)(\n|$)', r'\2', release_notes, flags=re.DOTALL

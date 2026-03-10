@@ -1,7 +1,7 @@
 .. _ops_testing:
 
-`ops.testing` (was: Scenario)
-=============================
+`ops.testing`
+=============
 
 Install ops with the ``testing`` extra to use this API; for example:
 ``pip install ops[testing]``
@@ -14,7 +14,7 @@ See also:
 - :doc:`/howto/write-unit-tests-for-a-charm`
 - :doc:`/explanation/testing` - A summary of types of charm tests
 
-State-transition tests expect you to define the
+State-transition tests (previously called 'Scenario' tests) expect you to define the
 Juju state all at once, define the Juju context against which to test the charm,
 and fire a single event on the charm to execute its logic. The tests can then
 assert that the Juju state has changed as expected.
