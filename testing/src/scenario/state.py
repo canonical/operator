@@ -1862,10 +1862,7 @@ def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     return True
 
 
-def _apply_extensions(
-    meta: dict[str, Any],
-    extensions: list[str],
-) -> dict[str, Any]:
+def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, Any]:
     """Merge charmcraft extension defaults into the charm metadata.
 
     Extension defaults are applied first, then the local charmcraft.yaml
