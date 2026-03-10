@@ -1,7 +1,3 @@
----
-relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/stable/), [Charmlibs](https://documentation.ubuntu.com/charmlibs/), [Concierge](https://github.com/canonical/concierge), [Jubilant](https://documentation.ubuntu.com/jubilant/), [Juju](https://documentation.ubuntu.com/juju/3.6/), [Pebble](https://documentation.ubuntu.com/pebble/)"
----
-
 # Ops documentation
 
 ```{toctree}
@@ -16,9 +12,9 @@ explanation/index
 
 Ops is a Python framework for writing and testing [Juju](https://canonical.com/juju) charms.
 
-The core `ops` package provides an API to respond to Juju events and manage the charm's application. Ops also includes extra packages for testing and tracing charms.
+The core `ops` package provides an API to respond to Juju events and manage your charm's application. Ops also includes extra packages for testing and tracing charms.
 
-Ops promotes consistent and maintainable charm code. Its APIs help you separate different aspects of the charm, such as managing the application's state and integrating with other charms.
+Ops promotes consistent and maintainable charm code. Its APIs help you separate different aspects of your charm, such as managing the application's state and integrating with other charms.
 
 ## Get started
 
@@ -61,6 +57,24 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 - [Reference](reference/index), including [ops](reference/ops), [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing), and [ops.pebble](reference/pebble)
 - [Explanation](explanation/index)
 
+## Related documentation
+
+- **{external+charmcraft:doc}`Charmcraft <index>`** - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful as you develop your charm.
+
+- **{external+charmlibs:doc}`Charmlibs <index>`** - A listing of charm libraries and guidance on how to distribute your own libraries.
+
+- **[Concierge](https://github.com/canonical/concierge)** - A CLI tool for setting up charm development environments.
+
+- **{external+jubilant:doc}`Jubilant <index>`** - A Python library that wraps the Juju CLI. Recommended for use in integration tests.
+
+- **{external+juju:doc}`Juju <index>`** - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful as you develop your charm. Juju's hooks correspond to events that your charm can observe.
+
+- **{external+pebble:doc}`Pebble <index>`** - The service manager inside containers (Kubernetes charms only). You'll find the {external+pebble:ref}`layer specification <layer-specification>` especially helpful as you develop your charm.
+
+## Demo charms
+
+The Ops repository has several [demo charms](https://github.com/canonical/operator/tree/main/examples) that you can experiment with.
+
 ## Ops releases
 
 [Read the release notes](https://github.com/canonical/operator/releases)
@@ -79,12 +93,4 @@ Ops is a member of the Ubuntu family. It's an open source project that warmly we
 
 For support, join [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix. You'll be able to chat with the maintainers of Ops (the Canonical Charm Tech team) and a friendly community of charm developers!
 
-## Looking for more?
-
-The Ops repository has several [demo charms](https://github.com/canonical/operator/tree/main/examples) that you can experiment with.
-
-If you're new to charm development, the {external+charmcraft:ref}`Charmcraft tutorials <tutorial>` are a great place to start. The tutorials don't require any experience with Ops. You can learn about Ops after completing one of the tutorials.
-
 To follow along with updates and tips about charm development, join our [Discourse forum](https://discourse.charmhub.io/).
-
-[Learn more about the Juju ecosystem](https://canonical.com/juju/docs)
