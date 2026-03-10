@@ -27,9 +27,9 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 ```
 
 ```{grid-item-card} Charm a 12-factor app
-Alternatively, use our opinionated framework to develop a charm - no knowledge of Ops required. [Get started](https://documentation.ubuntu.com/charmcraft/latest/tutorial/)
+Alternatively, use Charmcraft to generate charm code for your web app. Charmcraft supports Django, FastAPI, Go, and more!
 
-Supports Django, FastAPI, Go, and more!
+[Try a Charmcraft tutorial](https://documentation.ubuntu.com/charmcraft/latest/tutorial/)
 ```
 
 ````
