@@ -1549,7 +1549,7 @@ class _PortMap:
             for (protocol, port, to_port), endpoints in self._map.items()
         )
 
-    def get_first_overlap(self, port: Port) -> Port | None:
+    def get_first_overlap(self, port: Port) -> ops.Port | None:
         for (protocol, from_port, to_port), endpoints in self._map.items():
             endpoints = '*' if '*' in endpoints else tuple(sorted(endpoints))
             assert endpoints
@@ -1560,7 +1560,7 @@ class _PortMap:
                 endpoints=endpoints,
             )
             if port._overlaps(this_port):
-                return port
+                return this_port
         return None
 
 
