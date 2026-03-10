@@ -101,15 +101,8 @@ def extract_extension_data(
     expanded: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Extract metadata, config options, and actions from expanded charmcraft YAML."""
-    metadata: dict[str, Any] = {}
-    for key in METADATA_KEYS:
-        if key in expanded:
-            metadata[key] = expanded[key]
-
-    config: dict[str, Any] = {}
-    if 'config' in expanded and 'options' in expanded['config']:
-        config = expanded['config']['options']
-
+    metadata = {key: expanded[key] for key in METADATA_KEYS if key in expanded}
+    config = expanded.get('config', {}).get('options', {})
     actions: dict[str, Any] = expanded.get('actions', {})
 
     return metadata, config, actions
@@ -155,16 +148,12 @@ def generate_module(
         config_entries[profile] = config
         action_entries[profile] = actions
 
-    for var_name, data, docstring in [
-        (
-            'METADATA',
-            metadata_entries,
-            'Metadata added by each charmcraft extension.',
-        ),
-        ('CONFIG', config_entries, 'Config options added by each charmcraft extension.'),
-        ('ACTIONS', action_entries, 'Actions added by each charmcraft extension.'),
+    for var_name, data, doc_name in [
+        ('METADATA', metadata_entries, 'Metadata'),
+        ('CONFIG', config_entries, 'Config options'),
+        ('ACTIONS', action_entries, 'Actions'),
     ]:
-        lines.append(f'# {docstring}')
+        lines.append(f'# {doc_name} added by each charmcraft extension.')
         lines.append(f'{var_name}: dict[str, dict[str, Any]] = {{')
         for profile in sorted(data):
             lines.append(f'    {profile!r}: {{')
@@ -213,4 +202,4 @@ def main() -> int:  # noqa: D103
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    sys.exit(main())
