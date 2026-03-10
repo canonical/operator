@@ -127,6 +127,11 @@ If your `charmcraft.yaml` uses a charmcraft extension (e.g.
 `extensions: [flask-framework]`), the metadata, config, and actions that
 the extension adds are automatically merged in when the testing framework
 loads the charm spec. You do not need to manually specify them.
+
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (e.g. a config option with the same name), the testing framework
+will raise a `ValueError`, matching the behaviour of `charmcraft pack`.
+Rename or remove the overlapping keys to fix this.
 ```
 
 ## Mock beyond the State

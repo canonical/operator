@@ -1868,6 +1868,11 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
     Extension defaults are applied first, then the local charmcraft.yaml
     values are merged on top, simulating what ``charmcraft expand-extensions``
     does.
+
+    Raises:
+        ValueError: if the local charmcraft.yaml defines keys that overlap
+            with what the extension provides (matching ``charmcraft pack``
+            behaviour).
     """
     for ext_name in extensions:
         ext_meta = _charmcraft_extensions.METADATA.get(ext_name, {})
@@ -1882,12 +1887,19 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
             )
             continue
 
-        # Merge metadata: for dicts, extension provides defaults that
-        # the local yaml overrides. For lists, combine them.
+        # Merge metadata: for dicts, error on overlapping keys
+        # (matching charmcraft behaviour). For lists, combine them.
         for key, ext_value in ext_meta.items():
             if key not in meta:
                 meta[key] = copy.deepcopy(ext_value)
             elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
+                overlap = set(ext_value) & set(meta[key])
+                if overlap:
+                    raise ValueError(
+                        f'overlapping keys {overlap} in {key} of '
+                        f'charmcraft.yaml which conflict with the '
+                        f'{ext_name} extension, please rename or remove them'
+                    )
                 merged = copy.deepcopy(ext_value)
                 merged.update(meta[key])
                 meta[key] = merged
@@ -1898,17 +1910,31 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> dict[str, 
                         merged.append(item)
                 meta[key] = merged
 
-        # Merge config options.
+        # Merge config options; error on overlapping keys.
         if ext_config:
             local_config = meta.get('config', {})
             local_options = local_config.get('options', {})
+            overlap = set(ext_config) & set(local_options)
+            if overlap:
+                raise ValueError(
+                    f'overlapping keys {overlap} in config.options of '
+                    f'charmcraft.yaml which conflict with the '
+                    f'{ext_name} extension, please rename or remove them'
+                )
             merged_options = copy.deepcopy(ext_config)
             merged_options.update(local_options)
             meta['config'] = {'options': merged_options}
 
-        # Merge actions.
+        # Merge actions; error on overlapping keys.
         if ext_actions:
             local_actions = meta.get('actions', {})
+            overlap = set(ext_actions) & set(local_actions)
+            if overlap:
+                raise ValueError(
+                    f'overlapping keys {overlap} in actions of '
+                    f'charmcraft.yaml which conflict with the '
+                    f'{ext_name} extension, please rename or remove them'
+                )
             merged_actions = copy.deepcopy(ext_actions)
             merged_actions.update(local_actions)
             meta['actions'] = merged_actions

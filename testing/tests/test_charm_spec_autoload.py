@@ -224,8 +224,8 @@ class TestExtensions:
             assert spec.actions is not None
             assert 'rotate-secret-key' in spec.actions
 
-    def test_local_meta_overrides_extension(self, tmp_path):
-        """Local charmcraft.yaml values take precedence over extension defaults."""
+    def test_local_meta_overlaps_extension_errors(self, tmp_path):
+        """Overlapping metadata keys with extension cause an error."""
         with create_tempcharm(
             tmp_path,
             meta={
@@ -239,17 +239,33 @@ class TestExtensions:
                 },
             },
         ) as charm:
+            with pytest.raises(ValueError, match=r'overlapping keys.*requires.*flask-framework'):
+                _CharmSpec.autoload(charm)
+
+    def test_local_meta_no_overlap_with_extension(self, tmp_path):
+        """Non-overlapping local metadata keys merge with extension."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+                'requires': {
+                    'my-custom-relation': {'interface': 'custom'},
+                },
+            },
+        ) as charm:
             spec = _CharmSpec.autoload(charm)
-            # Local override wins.
-            assert spec.meta['requires']['ingress'] == {
-                'interface': 'custom-ingress',
-                'limit': 5,
-            }
-            # Extension-only entries are still present.
+            # Local-only entry is present.
+            assert 'my-custom-relation' in spec.meta['requires']
+            # Extension entries are still present.
+            assert 'ingress' in spec.meta['requires']
             assert 'logging' in spec.meta['requires']
 
-    def test_local_config_overrides_extension(self, tmp_path):
-        """Local config options override extension config defaults."""
+    def test_local_config_overlaps_extension_errors(self, tmp_path):
+        """Overlapping config options with extension cause an error."""
         with create_tempcharm(
             tmp_path,
             meta={
@@ -266,17 +282,38 @@ class TestExtensions:
                 },
             },
         ) as charm:
+            with pytest.raises(
+                ValueError, match=r'overlapping keys.*config\.options.*flask-framework'
+            ):
+                _CharmSpec.autoload(charm)
+
+    def test_local_config_no_overlap_with_extension(self, tmp_path):
+        """Non-overlapping local config options merge with extension."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+            config={
+                'options': {
+                    'my-custom-option': {'type': 'string'},
+                },
+            },
+        ) as charm:
             spec = _CharmSpec.autoload(charm)
             options = spec.config['options']
-            # Local override wins.
-            assert options['flask-debug'] == {'type': 'boolean', 'default': True}
             # Local-only option is present.
             assert 'my-custom-option' in options
             # Extension-only options are still present.
+            assert 'flask-debug' in options
             assert 'webserver-workers' in options
 
-    def test_local_actions_override_extension(self, tmp_path):
-        """Local actions override extension action defaults."""
+    def test_local_actions_overlap_extension_errors(self, tmp_path):
+        """Overlapping actions with extension cause an error."""
         with create_tempcharm(
             tmp_path,
             meta={
@@ -291,13 +328,29 @@ class TestExtensions:
                 'my-action': {'description': 'custom action'},
             },
         ) as charm:
+            with pytest.raises(ValueError, match=r'overlapping keys.*actions.*flask-framework'):
+                _CharmSpec.autoload(charm)
+
+    def test_local_actions_no_overlap_with_extension(self, tmp_path):
+        """Non-overlapping local actions merge with extension."""
+        with create_tempcharm(
+            tmp_path,
+            meta={
+                'type': 'charm',
+                'name': 'my-flask',
+                'summary': 'foo',
+                'description': 'foo',
+                'extensions': ['flask-framework'],
+            },
+            actions={
+                'my-action': {'description': 'custom action'},
+            },
+        ) as charm:
             spec = _CharmSpec.autoload(charm)
-            # Local override wins.
-            assert spec.actions['rotate-secret-key'] == {
-                'description': 'custom rotate',
-            }
             # Local-only action is present.
             assert 'my-action' in spec.actions
+            # Extension action is still present.
+            assert 'rotate-secret-key' in spec.actions
 
     def test_local_assumes_merged_with_extension(self, tmp_path):
         """Local assumes list is merged with extension assumes."""

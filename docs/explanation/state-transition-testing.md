@@ -252,9 +252,10 @@ ctx = testing.Context(MyFlaskCharm)
 state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingress')}))
 ```
 
-Local values in `charmcraft.yaml` take precedence over extension defaults. For
-example, if you define a custom `ingress` relation in your `charmcraft.yaml`, it
-will override the one provided by the extension.
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (for example, a config option or relation with the same name), the
+testing framework will raise a `ValueError`, matching the behaviour of
+`charmcraft pack`. Rename or remove the overlapping keys to fix this.
 
 ## Immutability
 
