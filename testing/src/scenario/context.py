@@ -696,12 +696,13 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            meta_raw = copy.deepcopy(meta or {})
-            meta_actions = meta_raw.pop('actions', None)
-            meta_config = meta_raw.pop('config', None)
-            meta = meta_raw or {'name': str(charm_type.__name__)}
-            actions = copy.deepcopy(actions) if actions is not None else meta_actions
-            config = copy.deepcopy(config) if config is not None else meta_config
+            meta = copy.deepcopy(meta) if meta is not None else {'name': str(charm_type.__name__)}
+            if actions is not None and 'actions' in meta:
+                raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
+            actions = copy.deepcopy(actions) if actions is not None else meta.pop('actions', None)
+            if config is not None and 'config' in meta:
+                raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
+            config = copy.deepcopy(config) if config is not None else meta.pop('config', None)
             spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec

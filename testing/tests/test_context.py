@@ -232,9 +232,14 @@ def test_init_with_no_meta():
         Context(MyCharm)
 
 
-def test_init_with_bad_meta():
-    ctx = Context(MyCharm, meta={'a truth universally acknowledged': 'it'})
-    with pytest.raises((UncaughtCharmError, KeyError)):
+def test_init_and_run_with_bad_meta():
+    bad_meta = {'a truth universally acknowledged': 'it'}
+    ctx = Context(MyCharm, bad_meta)
+    spec = ctx._charm_spec
+    assert spec.meta == bad_meta
+    assert spec.config is None
+    assert spec.actions is None
+    with pytest.raises((UncaughtCharmError, KeyError), match='name'):
         ctx.run(ctx.on.update_status(), State())
 
 
@@ -259,13 +264,15 @@ def test_init_with_charmcraft_yaml_as_meta_w_config():
 
 
 def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
-    charmcraft_yaml = {'config': CONFIG, 'actions': ACTIONS}
-    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    ctx = Context(MyCharm, {'config': CONFIG, 'actions': ACTIONS})
     spec = ctx._charm_spec
-    assert spec.meta == {'name': 'MyCharm'}
-    assert spec.config == charmcraft_yaml['config']
-    assert spec.actions == charmcraft_yaml['actions']
-    ctx.run(ctx.on.update_status(), State())
+    assert spec.meta == {}
+    assert spec.config == CONFIG
+    assert spec.actions == ACTIONS
+    with pytest.raises((UncaughtCharmError, KeyError), match='name'):
+        ctx.run(ctx.on.update_status(), State())
+
+
 
 
 def test_init_with_full_charmcraft_yaml_as_meta():
@@ -281,22 +288,12 @@ def test_init_with_full_charmcraft_yaml_as_meta():
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
-    ctx = Context(MyCharm, meta=charmcraft_yaml, config=config)
-    spec = ctx._charm_spec
-    assert spec.meta == {'name': 'elizabeth'}
-    assert spec.config == config
-    assert spec.config != charmcraft_yaml['config']
-    assert spec.actions == charmcraft_yaml['actions']
-    ctx.run(ctx.on.update_status(), State())
+    with pytest.raises(ValueError, match='config'):
+        ctx = Context(MyCharm, meta=charmcraft_yaml, config=config)
 
 
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     charmcraft_yaml = {'name': 'catherine', 'config': CONFIG, 'actions': ACTIONS}
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
-    ctx = Context(MyCharm, meta=charmcraft_yaml, actions=actions)
-    spec = ctx._charm_spec
-    assert spec.meta == {'name': 'catherine'}
-    assert spec.config == charmcraft_yaml['config']
-    assert spec.actions == actions
-    assert spec.actions != charmcraft_yaml['actions']
-    ctx.run(ctx.on.update_status(), State())
+    with pytest.raises(ValueError, match='actions'):
+        ctx = Context(MyCharm, meta=charmcraft_yaml, actions=actions)
