@@ -273,8 +273,6 @@ def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
         ctx.run(ctx.on.update_status(), State())
 
 
-
-
 def test_init_with_full_charmcraft_yaml_as_meta():
     charmcraft_yaml = {'name': 'anne', 'config': CONFIG, 'actions': ACTIONS}
     ctx = Context(MyCharm, charmcraft_yaml)
@@ -289,11 +287,11 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
     with pytest.raises(ValueError, match='config'):
-        ctx = Context(MyCharm, charmcraft_yaml, config=config)
+        Context(MyCharm, charmcraft_yaml, config=config)
 
 
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     charmcraft_yaml = {'name': 'catherine', 'config': CONFIG, 'actions': ACTIONS}
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
     with pytest.raises(ValueError, match='actions'):
-        ctx = Context(MyCharm, charmcraft_yaml, actions=actions)
+        Context(MyCharm, charmcraft_yaml, actions=actions)
