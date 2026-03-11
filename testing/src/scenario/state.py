@@ -1758,10 +1758,10 @@ class State:
             ValueError: If a relation object is passed but the found relation
                 has a mismatched type, endpoint, or interface.
         """
-        rel_id = relation if isinstance(relation, int) else relation.id
+        rel_id = relation.id if isinstance(relation, RelationBase) else relation
         for state_relation in self.relations:
             if state_relation.id == rel_id:
-                if not isinstance(relation, int):
+                if isinstance(relation, RelationBase):
                     if type(state_relation) is not type(relation):
                         raise ValueError(
                             f'relation with id={rel_id} has type {type(state_relation).__name__!r}'
