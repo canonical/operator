@@ -54,14 +54,21 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
+      - name: Write mypy-requirements.txt
+        shell: python
+        run: |
+          import tomllib, pathlib
+          pyproject_toml = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
+          deps = '\n'.join(pyproject_toml['dependency-groups']['mypy'])
+          print(deps)  # logging
+          pathlib.Path('mypy-requirements.txt').write_text(deps)
       - name: Run mypy
         working-directory: ${{ matrix.dir }}
         env:
           MYPYPATH: 'src:lib:../..'
         run: |
           uv run \
-            --with 'mypy~=1.19.0' \
-            --with=types-PyYAML \
+            --with-requirements=../../mypy-requirements.txt \
             --with=../.. \
             --with=../../testing \
             --group=lint \
