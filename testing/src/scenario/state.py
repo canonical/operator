@@ -1761,22 +1761,15 @@ class State:
         rel_id = relation.id if isinstance(relation, RelationBase) else relation
         for state_relation in self.relations:
             if state_relation.id == rel_id:
-                if isinstance(relation, RelationBase):
-                    if type(state_relation) is not type(relation):
-                        raise ValueError(
-                            f'relation with id={rel_id} has type {type(state_relation).__name__!r}'
-                            f', but get_relation was called with {relation!r}'
-                        )
-                    if state_relation.endpoint != relation.endpoint:
-                        raise ValueError(
-                            f'relation with id={rel_id} has endpoint {state_relation.endpoint!r}'
-                            f', but get_relation was called with {relation!r}'
-                        )
-                    if state_relation.interface != relation.interface:
-                        raise ValueError(
-                            f'relation with id={rel_id} has interface {state_relation.interface!r}'
-                            f', but get_relation was called with {relation!r}'
-                        )
+                if isinstance(relation, RelationBase) and (
+                    (type(state_relation), state_relation.endpoint)
+                    != (type(relation), relation.endpoint)
+                ):
+                    raise ValueError(
+                        f'State.get_relation() result does not match\n'
+                        f'Called with:\n{relation!r}\n'
+                        f'Result:\n{state_relation!r}\n'
+                    )
                 return state_relation
         raise KeyError(f'relation: id={rel_id} not found in the State')
 

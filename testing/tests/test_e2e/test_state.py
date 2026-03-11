@@ -999,7 +999,7 @@ def test_get_relation_by_rel_obj_wrong_type():
     relation = Relation(endpoint='foo')
     state = State(relations={relation})
     wrong_type = PeerRelation(endpoint='foo', id=relation.id)
-    with pytest.raises(ValueError, match='type'):
+    with pytest.raises(ValueError, match='get_relation'):
         state.get_relation(wrong_type)
 
 
@@ -1011,12 +1011,12 @@ def test_get_relation_by_rel_obj_wrong_endpoint():
         state.get_relation(wrong_endpoint)
 
 
-def test_get_relation_by_rel_obj_wrong_interface():
+def test_get_relation_by_rel_obj_wrong_interface_doesnt_raise():
     relation = Relation(endpoint='foo', interface='bar')
     state = State(relations={relation})
     wrong_interface = Relation(endpoint='foo', interface='baz', id=relation.id)
-    with pytest.raises(ValueError, match='interface'):
-        state.get_relation(wrong_interface)
+    state.get_relation(wrong_interface)
+    assert relation is not wrong_interface
 
 
 @pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
