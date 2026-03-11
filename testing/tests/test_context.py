@@ -201,7 +201,7 @@ ACTIONS: dict[str, Any] = {'do-foo': {'description': 'Who do? Foo do.'}}
 
 def test_init_with_meta_only():
     meta = {'name': 'jane'}
-    ctx = Context(MyCharm, meta=meta)
+    ctx = Context(MyCharm, meta)
     spec = ctx._charm_spec
     assert spec.meta == meta
     assert spec.config is None
@@ -245,7 +245,7 @@ def test_init_and_run_with_bad_meta():
 
 def test_init_with_charmcraft_yaml_as_meta_w_actions():
     charmcraft_yaml = {'name': 'mary', 'actions': ACTIONS}
-    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    ctx = Context(MyCharm, charmcraft_yaml)
     spec = ctx._charm_spec
     assert spec.meta == {'name': 'mary'}
     assert spec.config is None
@@ -255,7 +255,7 @@ def test_init_with_charmcraft_yaml_as_meta_w_actions():
 
 def test_init_with_charmcraft_yaml_as_meta_w_config():
     charmcraft_yaml = {'name': 'lydia', 'config': CONFIG}
-    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    ctx = Context(MyCharm, charmcraft_yaml)
     spec = ctx._charm_spec
     assert spec.meta == {'name': 'lydia'}
     assert spec.config == charmcraft_yaml['config']
@@ -277,7 +277,7 @@ def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
 
 def test_init_with_full_charmcraft_yaml_as_meta():
     charmcraft_yaml = {'name': 'anne', 'config': CONFIG, 'actions': ACTIONS}
-    ctx = Context(MyCharm, meta=charmcraft_yaml)
+    ctx = Context(MyCharm, charmcraft_yaml)
     spec = ctx._charm_spec
     assert spec.meta == {'name': 'anne'}
     assert spec.config == charmcraft_yaml['config']
@@ -289,11 +289,11 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
     with pytest.raises(ValueError, match='config'):
-        ctx = Context(MyCharm, meta=charmcraft_yaml, config=config)
+        ctx = Context(MyCharm, charmcraft_yaml, config=config)
 
 
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     charmcraft_yaml = {'name': 'catherine', 'config': CONFIG, 'actions': ACTIONS}
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
     with pytest.raises(ValueError, match='actions'):
-        ctx = Context(MyCharm, meta=charmcraft_yaml, actions=actions)
+        ctx = Context(MyCharm, charmcraft_yaml, actions=actions)
