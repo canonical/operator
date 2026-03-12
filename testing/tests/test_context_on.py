@@ -6,13 +6,14 @@ from __future__ import annotations
 import copy
 import datetime
 import typing
+from typing import Any, Literal
 
 import pytest
 import scenario
 
 import ops
 
-META = {
+META: dict[str, Any] = {
     'name': 'context-charm',
     'containers': {
         'bar': {},
@@ -83,7 +84,7 @@ def test_simple_events(event_name: str, event_kind: type[ops.EventBase]):
         ('post_series_upgrade', ops.PostSeriesUpgradeEvent),
     ],
 )
-def test_simple_deprecated_events(event_name, event_kind):
+def test_simple_deprecated_events(event_name: str, event_kind: type[ops.EventBase]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     # These look like:
     #   ctx.run(ctx.on.pre_series_upgrade(), state)
@@ -103,7 +104,12 @@ def test_simple_deprecated_events(event_name, event_kind):
         ('secret_rotate', ops.SecretRotateEvent, 'app'),
     ],
 )
-def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
+def test_simple_secret_events(
+    as_kwarg: bool,
+    event_name: str,
+    event_kind: type[ops.SecretEvent],
+    owner: Literal['unit', 'app'] | None,
+):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret({'password': 'xxxx'}, owner=owner)
     state_in = scenario.State(secrets={secret})
@@ -132,7 +138,9 @@ def test_simple_secret_events(as_kwarg, event_name, event_kind, owner):
         ('secret_remove', ops.SecretRemoveEvent),
     ],
 )
-def test_revision_secret_events(event_name, event_kind):
+def test_revision_secret_events(
+    event_name: str, event_kind: type[ops.SecretExpiredEvent | ops.SecretRemoveEvent]
+):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
         tracked_content={'password': 'yyyy'},
@@ -154,7 +162,7 @@ def test_revision_secret_events(event_name, event_kind):
 
 
 @pytest.mark.parametrize('event_name', ['secret_expired', 'secret_remove'])
-def test_revision_secret_events_as_positional_arg(event_name):
+def test_revision_secret_events_as_positional_arg(event_name: str):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     secret = scenario.Secret(
         tracked_content={'password': 'yyyy'},
@@ -173,7 +181,7 @@ def test_revision_secret_events_as_positional_arg(event_name):
         ('storage_detaching', ops.StorageDetachingEvent),
     ],
 )
-def test_storage_events(event_name, event_kind):
+def test_storage_events(event_name: str, event_kind: type[ops.StorageEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     storage = scenario.Storage('foo')
     state_in = scenario.State(storages=[storage])
@@ -236,7 +244,7 @@ def test_pebble_ready_event():
         ('relation_broken', ops.RelationBrokenEvent),
     ],
 )
-def test_relation_app_events(as_kwarg, event_name, event_kind):
+def test_relation_app_events(as_kwarg: bool, event_name: str, event_kind: type[ops.RelationEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
@@ -275,7 +283,7 @@ def test_relation_complex_name():
 
 
 @pytest.mark.parametrize('event_name', ['relation_created', 'relation_broken'])
-def test_relation_events_as_positional_arg(event_name):
+def test_relation_events_as_positional_arg(event_name: str):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz')
     state_in = scenario.State(relations=[relation])
@@ -290,7 +298,7 @@ def test_relation_events_as_positional_arg(event_name):
         ('relation_changed', ops.RelationChangedEvent),
     ],
 )
-def test_relation_unit_events_default_unit(event_name, event_kind):
+def test_relation_unit_events_default_unit(event_name: str, event_kind: type[ops.RelationEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}})
     state_in = scenario.State(relations=[relation])
@@ -303,6 +311,7 @@ def test_relation_unit_events_default_unit(event_name, event_kind):
         assert isinstance(relation_event, event_kind)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
+        assert relation_event.unit is not None
         assert relation_event.unit.name == 'remote/1'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
@@ -314,7 +323,7 @@ def test_relation_unit_events_default_unit(event_name, event_kind):
         ('relation_changed', ops.RelationChangedEvent),
     ],
 )
-def test_relation_unit_events(event_name, event_kind):
+def test_relation_unit_events(event_name: str, event_kind: type[ops.RelationEvent]):
     ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
     relation = scenario.Relation('baz', remote_units_data={1: {'x': 'y'}, 2: {'x': 'z'}})
     state_in = scenario.State(relations=[relation])
@@ -326,6 +335,7 @@ def test_relation_unit_events(event_name, event_kind):
         assert isinstance(relation_event, event_kind)
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
+        assert relation_event.unit is not None
         assert relation_event.unit.name == 'remote/2'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
@@ -343,6 +353,7 @@ def test_relation_departed_event():
         assert relation_event.relation.id == relation.id
         assert relation_event.app.name == relation.remote_app_name
         assert relation_event.unit.name == 'remote/2'
+        assert relation_event.departing_unit is not None
         assert relation_event.departing_unit.name == 'remote/1'
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
@@ -502,7 +513,7 @@ class CustomCharm(ContextCharm):
 
 def test_custom_event_no_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
-    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:  # type: ignore
         mgr.run()
         custom_event, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)
@@ -512,7 +523,7 @@ def test_custom_event_no_args():
 def test_custom_event_with_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with ctx(
-        ctx.on.custom(MyConsumer.on.foo_changed, 'foo', arg1=42),
+        ctx.on.custom(MyConsumer.on.foo_changed, 'foo', arg1=42),  # type: ignore
         scenario.State(),
     ) as mgr:
         mgr.run()
@@ -526,7 +537,7 @@ def test_custom_event_with_args():
 def test_custom_event_is_hookevent():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with pytest.raises(ValueError):
-        ctx.on.custom(MyConsumer.on.foo_relation_changed)
+        ctx.on.custom(MyConsumer.on.foo_relation_changed)  # type: ignore
 
 
 def test_custom_event_with_scenario_args():
@@ -571,7 +582,7 @@ def test_custom_event_with_scenario_args():
 
     with ctx(
         ctx.on.custom(
-            MyConsumer.on.state_event,
+            MyConsumer.on.state_event,  # type: ignore
             cloudcredential=cloudcredential,
             cloudspec=cloudspec,
             secret=secret,
@@ -664,13 +675,13 @@ class TwoLibraryCharm(ContextCharm):
 def test_custom_event_two_libraries():
     ctx = scenario.Context(TwoLibraryCharm, meta=META, actions=ACTIONS)
 
-    with ctx(ctx.on.custom(MyConsumer.on.foo_changed), scenario.State()) as mgr:
+    with ctx(ctx.on.custom(MyConsumer.on.foo_changed), scenario.State()) as mgr:  # type: ignore
         mgr.run()
         evt, cs = mgr.charm.observed
         assert isinstance(cs, ops.CollectStatusEvent)
         assert isinstance(evt, CustomEvent)
 
-    with ctx(ctx.on.custom(OtherConsumer.on.foo_changed), scenario.State()) as mgr:
+    with ctx(ctx.on.custom(OtherConsumer.on.foo_changed), scenario.State()) as mgr:  # type: ignore
         mgr.run()
         evt, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)

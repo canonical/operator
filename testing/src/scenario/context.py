@@ -9,6 +9,7 @@ specific `State` exists in, and the events that can be executed on that `State`.
 
 from __future__ import annotations
 
+import copy
 import functools
 import pathlib
 import tempfile
@@ -691,13 +692,12 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            if not meta:
-                meta = {'name': str(charm_type.__name__)}
+            meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
             spec = _CharmSpec(
                 charm_type=charm_type,
                 meta=meta,
-                actions=actions,
-                config=config,
+                actions=copy.deepcopy(actions),
+                config=copy.deepcopy(config),
             )
 
         self._charm_spec = spec

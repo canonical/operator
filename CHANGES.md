@@ -1,3 +1,32 @@
+# 3.6.0 - 26 February 2026
+
+## Features
+
+* Bump default Juju version in `ops.testing.Context` to 3.6.14 (#2316)
+
+## Fixes
+
+* Correct the `Model.get_binding()` return type (#2329)
+* Only show executable in `ExecError.__str__`, not full command line (#2336)
+* Support Pydantic `MISSING` sentinel in `ops.Relation.save` (#2306)
+
+## Documentation
+
+* Add how-to subcategory for managing containers (#2309)
+* Remove 2.19 version in docs, tweak ops.testing title (#2332)
+* Use "true" and "false" consistently in the reference documentation (#2330)
+* Add CLI args as another place to not put sensitive data (#2334)
+* Fix remote unit kwarg in testing example (#2342)
+* Clarify that secret labels are not names (#2337)
+
+## Tests
+
+* Set `SCENARIO_BARE_CHARM_ERRORS=true` in Ops tests that care (#2314)
+
+## CI
+
+* Fix releasing on branches with no `versions.md` doc (#2323)
+
 # 3.5.2 - 11 February 2026
 
 ## Fixes
