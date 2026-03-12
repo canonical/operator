@@ -49,3 +49,28 @@ def test_database_integration(juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+
+def test_cos_lite(cos_juju: jubilant.Juju):
+    """Deploy COS Lite and verify a Loki offer is created.
+
+    Waits for all COS Lite applications to settle down, then offers the
+    Loki logging endpoint for cross-model integration.
+    """
+    cos_juju.deploy("cos-lite", trust=True)
+    cos_juju.wait(jubilant.all_active)
+
+    cos_juju.offer("loki", endpoint="logging")
+
+    # Verify the Loki offer was created.
+    offers = cos_juju.cli("find-offers", f"admin/{cos_juju.model}", include_model=False)
+    assert "loki" in offers
+
+
+def test_loki_integration(juju: jubilant.Juju, cos_juju: jubilant.Juju):
+    """Verify that the charm integrates with Loki.
+
+    Assert that the charm remains active after the Loki integration is established.
+    """
+    juju.integrate(APP_NAME, f"admin/{cos_juju.model}.loki")
+    juju.wait(jubilant.all_active)
