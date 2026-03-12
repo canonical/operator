@@ -44,7 +44,7 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 
 **Adding functionality:** [Manage relations](howto/manage-relations) • [Manage configuration](howto/manage-configuration) • [More Juju features](#how-to-guides-managing-features)
 
-**Testing & CI:** [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests with Jubilant](howto/write-integration-tests-for-a-charm)
+**Testing & CI:** [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests](howto/write-integration-tests-for-a-charm)
 
 **Design & best practices:** [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
 
@@ -67,7 +67,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 - **[Concierge](https://github.com/canonical/concierge)** - A CLI tool for setting up charm development environments.
 
-- **{external+jubilant:doc}`Jubilant <index>`** - A Python library that wraps the Juju CLI. Recommended for use in integration tests.
+- **{external+jubilant:doc}`Jubilant <index>`** - A Python library that wraps the Juju CLI. Use Jubilant for your integration tests.
 
 - **{external+juju:doc}`Juju <index>`** - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful. Juju's hooks correspond to events that your charm can observe.
 
