@@ -1999,7 +1999,7 @@ class _CharmSpec(Generic[CharmType]):
         return meta, config, actions
 
     @staticmethod
-    def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmType]:
+    def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmBase]:
         """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file

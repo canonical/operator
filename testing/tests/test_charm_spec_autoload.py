@@ -30,7 +30,7 @@ def import_name(name: str, source: Path) -> Iterator[type[CharmBase]]:
     pkg_path = str(source.parent)
     sys.path.append(pkg_path)
     charm = importlib.import_module('mycharm')
-    obj = getattr(charm, name)
+    obj: type[CharmBase] = getattr(charm, name)
     sys.path.remove(pkg_path)
     yield obj
     del sys.modules['mycharm']
@@ -174,7 +174,7 @@ def test_config_defaults(tmp_path: Path, legacy: bool):
 class TestExtensions:
     """Tests for charmcraft extension autoloading."""
 
-    def test_extension_adds_metadata(self, tmp_path):
+    def test_extension_adds_metadata(self, tmp_path: Path):
         """An extension injects its metadata (containers, requires, etc.)."""
         with create_tempcharm(
             tmp_path,
@@ -194,7 +194,7 @@ class TestExtensions:
             assert 'flask-app-image' in spec.meta.get('resources', {})
             assert 'k8s-api' in spec.meta.get('assumes', [])
 
-    def test_extension_adds_config(self, tmp_path):
+    def test_extension_adds_config(self, tmp_path: Path):
         """An extension injects its config options."""
         with create_tempcharm(
             tmp_path,
@@ -212,7 +212,7 @@ class TestExtensions:
             assert 'flask-debug' in options
             assert 'webserver-workers' in options
 
-    def test_extension_adds_actions(self, tmp_path):
+    def test_extension_adds_actions(self, tmp_path: Path):
         """An extension injects its actions."""
         with create_tempcharm(
             tmp_path,
@@ -228,7 +228,7 @@ class TestExtensions:
             assert spec.actions is not None
             assert 'rotate-secret-key' in spec.actions
 
-    def test_local_meta_overlaps_extension_errors(self, tmp_path):
+    def test_local_meta_overlaps_extension_errors(self, tmp_path: Path):
         """Overlapping metadata keys with extension cause an error."""
         with create_tempcharm(
             tmp_path,
@@ -246,7 +246,7 @@ class TestExtensions:
             with pytest.raises(ValueError, match=r'overlapping keys.*requires.*flask-framework'):
                 _CharmSpec.autoload(charm)
 
-    def test_local_meta_no_overlap_with_extension(self, tmp_path):
+    def test_local_meta_no_overlap_with_extension(self, tmp_path: Path):
         """Non-overlapping local metadata keys merge with extension."""
         with create_tempcharm(
             tmp_path,
@@ -268,7 +268,7 @@ class TestExtensions:
             assert 'ingress' in spec.meta['requires']
             assert 'logging' in spec.meta['requires']
 
-    def test_local_config_overlaps_extension_errors(self, tmp_path):
+    def test_local_config_overlaps_extension_errors(self, tmp_path: Path):
         """Overlapping config options with extension cause an error."""
         with create_tempcharm(
             tmp_path,
@@ -291,7 +291,7 @@ class TestExtensions:
             ):
                 _CharmSpec.autoload(charm)
 
-    def test_local_config_no_overlap_with_extension(self, tmp_path):
+    def test_local_config_no_overlap_with_extension(self, tmp_path: Path):
         """Non-overlapping local config options merge with extension."""
         with create_tempcharm(
             tmp_path,
@@ -309,6 +309,7 @@ class TestExtensions:
             },
         ) as charm:
             spec = _CharmSpec.autoload(charm)
+            assert spec.config is not None
             options = spec.config['options']
             # Local-only option is present.
             assert 'my-custom-option' in options
@@ -316,7 +317,7 @@ class TestExtensions:
             assert 'flask-debug' in options
             assert 'webserver-workers' in options
 
-    def test_local_actions_overlap_extension_errors(self, tmp_path):
+    def test_local_actions_overlap_extension_errors(self, tmp_path: Path):
         """Overlapping actions with extension cause an error."""
         with create_tempcharm(
             tmp_path,
@@ -335,7 +336,7 @@ class TestExtensions:
             with pytest.raises(ValueError, match=r'overlapping keys.*actions.*flask-framework'):
                 _CharmSpec.autoload(charm)
 
-    def test_local_actions_no_overlap_with_extension(self, tmp_path):
+    def test_local_actions_no_overlap_with_extension(self, tmp_path: Path):
         """Non-overlapping local actions merge with extension."""
         with create_tempcharm(
             tmp_path,
@@ -351,12 +352,13 @@ class TestExtensions:
             },
         ) as charm:
             spec = _CharmSpec.autoload(charm)
+            assert spec.actions is not None
             # Local-only action is present.
             assert 'my-action' in spec.actions
             # Extension action is still present.
             assert 'rotate-secret-key' in spec.actions
 
-    def test_local_assumes_merged_with_extension(self, tmp_path):
+    def test_local_assumes_merged_with_extension(self, tmp_path: Path):
         """Local assumes list is merged with extension assumes."""
         with create_tempcharm(
             tmp_path,
@@ -374,7 +376,7 @@ class TestExtensions:
             assert 'k8s-api' in assumes
             assert 'juju >= 3.1' in assumes
 
-    def test_django_extension_has_create_superuser(self, tmp_path):
+    def test_django_extension_has_create_superuser(self, tmp_path: Path):
         """Django extension adds the create-superuser action."""
         with create_tempcharm(
             tmp_path,
@@ -387,10 +389,11 @@ class TestExtensions:
             },
         ) as charm:
             spec = _CharmSpec.autoload(charm)
+            assert spec.actions is not None
             assert 'create-superuser' in spec.actions
             assert 'rotate-secret-key' in spec.actions
 
-    def test_unknown_extension_warns(self, tmp_path):
+    def test_unknown_extension_warns(self, tmp_path: Path):
         """An unknown extension name emits a warning and is skipped."""
         with create_tempcharm(
             tmp_path,
@@ -407,7 +410,7 @@ class TestExtensions:
             # No extension data merged, but the charm still loads.
             assert spec.meta['name'] == 'my-app'
 
-    def test_extension_stripped_from_meta(self, tmp_path):
+    def test_extension_stripped_from_meta(self, tmp_path: Path):
         """The 'extensions' key should not remain in the loaded meta."""
         with create_tempcharm(
             tmp_path,
@@ -422,7 +425,7 @@ class TestExtensions:
             spec = _CharmSpec.autoload(charm)
             assert 'extensions' not in spec.meta
 
-    def test_extension_with_relations_in_context(self, tmp_path):
+    def test_extension_with_relations_in_context(self, tmp_path: Path):
         """Relations from an extension can be used in a Context run."""
         with create_tempcharm(
             tmp_path,
