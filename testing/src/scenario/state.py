@@ -1907,6 +1907,11 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
                 merged = copy.deepcopy(ext_value)
                 merged.extend(i for i in meta[key] if i not in merged)
                 meta[key] = merged
+            else:
+                raise ValueError(
+                    'Conflict between local and extension metadata. '
+                    'Please check that your charmcraft.yaml is valid'
+                )
 
         # Merge config options; error on overlapping keys.
         if ext_config:
