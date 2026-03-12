@@ -38,17 +38,22 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 
 ## In this documentation
 
-**Starting a project:** [Manage charms](howto/manage-charms) • [Write and structure charm code](howto/write-and-structure-charm-code)
+```{list-table}
+:class: top-aligned
 
-**Running workloads:** [Manage packages on machines](howto/run-workloads-with-a-charm-machines) • [Manage Kubernetes workloads](howto/manage-containers/index)
-
-**Adding functionality:** [Manage relations](howto/manage-relations) • [Manage configuration](howto/manage-configuration) • [More Juju features](#how-to-guides-managing-features)
-
-**Testing & CI:** [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests](howto/write-integration-tests-for-a-charm)
-
-**Design & best practices:** [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
-
-**Publishing:** [Make your charm discoverable](howto/make-your-charm-discoverable)
+* - **Starting a project**
+  - [Manage charms](howto/manage-charms) • [Write and structure charm code](howto/write-and-structure-charm-code)
+* - **Running workloads**
+  - [Manage packages on machines](howto/run-workloads-with-a-charm-machines) • [Manage Kubernetes workloads](howto/manage-containers/index)
+* - **Adding functionality**
+  - [Manage relations](howto/manage-relations) • [Manage configuration](howto/manage-configuration) • [More Juju features](#how-to-guides-managing-features)
+* - **Testing & CI**
+  - [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests](howto/write-integration-tests-for-a-charm)
+* - **Design & best practices**
+  - [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
+* - **Publishing**
+  - [Make your charm discoverable](howto/make-your-charm-discoverable)
+```
 
 ## How this documentation is organised
 
@@ -61,17 +66,22 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 ## Related documentation
 
-- **{external+charmcraft:doc}`Charmcraft <index>`** - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful.
+```{list-table}
+:class: top-aligned
 
-- **{external+charmlibs:doc}`Charmlibs <index>`** - A listing of charm libraries and guidance on how to distribute your own libraries.
-
-- **[Concierge](https://github.com/canonical/concierge)** - A CLI tool for setting up charm development environments.
-
-- **{external+jubilant:doc}`Jubilant <index>`** - A Python library that wraps the Juju CLI. Use Jubilant for your integration tests.
-
-- **{external+juju:doc}`Juju <index>`** - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful. Juju's hooks correspond to events that your charm can observe.
-
-- **{external+pebble:doc}`Pebble <index>`** - The service manager inside containers (Kubernetes charms only). You'll find the {external+pebble:ref}`layer specification <layer-specification>` especially helpful.
+* - **{external+charmcraft:doc}`Charmcraft <index>`**
+  - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful.
+* - **{external+charmlibs:doc}`Charmlibs <index>`**
+  - A listing of charm libraries and guidance on how to distribute your own libraries.
+* - **[Concierge](https://github.com/canonical/concierge)**
+  - A CLI tool for setting up charm development environments.
+* - **{external+jubilant:doc}`Jubilant <index>`**
+  - A Python library that wraps the Juju CLI. Use Jubilant for your integration tests.
+* - **{external+juju:doc}`Juju <index>`**
+  - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful. Juju's hooks correspond to events that your charm can observe.
+* - **{external+pebble:doc}`Pebble <index>`**
+  - The service manager inside containers (Kubernetes charms only). You'll find the {external+pebble:ref}`layer specification <layer-specification>` especially helpful.
+```
 
 ## Demo charms
 

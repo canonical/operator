@@ -8,3 +8,11 @@ body {
     -webkit-mask-image: var(--icon-star);
     mask-image: var(--icon-star);
 }
+
+/* Vertically align text in table cells and add an initial horizontal line */
+table.docutils.top-aligned td {
+    vertical-align: top;
+}
+table.docutils.top-aligned tbody > tr:first-child > td {
+    border-top: 1px solid var(--color-table-border);
+}
