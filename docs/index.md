@@ -61,7 +61,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 
 - [Tutorials](tutorial/index)
 - [How-to guides](howto/index)
-- [Reference](reference/index), including [ops](reference/ops), [ops.testing](reference/ops-testing), [ops.tracing](reference/ops-tracing), and [ops.pebble](reference/pebble)
+- [Reference](reference/index), including [ops](reference/ops), [ops.testing](reference/ops-testing), and [ops.tracing](reference/ops-tracing)
 - [Explanation](explanation/index)
 
 ## Related documentation
