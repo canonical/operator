@@ -4,6 +4,11 @@ The framework for state-transition testing in Ops was originally developed under
 
 This page compares Scenario to Harness and explains how state-transition tests work. For a summary of how to write unit tests, see [](/howto/write-unit-tests-for-a-charm).
 
+If you are migrating an existing charm and need realistic starting data, you
+can capture a live model snapshot and convert it into a state-transition test.
+For a workflow focused on relation debugging, see
+[](/howto/manage-relations#generate-tests-from-a-deployed-model).
+
 ```{note}
 In your testing dependencies, add `ops[testing]` rather than `ops-scenario`, and
 this will ensure that an appropriate version of the framework is installed.

@@ -134,6 +134,15 @@ will raise a `ValueError`, matching the behaviour of `charmcraft pack`.
 Rename or remove the overlapping keys to fix this.
 ```
 
+## Generate tests from a deployed model
+
+If your test needs realistic relation inputs from a deployed model, you can use
+`jhack scenario snapshot` to capture state, then adapt the generated data to
+`ops.testing.State` and `ops.testing.Context`.
+
+For a workflow focused on relation debugging, see
+[](/howto/manage-relations#generate-tests-from-a-deployed-model).
+
 ## Mock beyond the State
 
 If you wish to use the framework to test an existing charm type, you will probably need to mock out certain calls that are not covered by the `State` data structure. In that case, you will have to manually mock, patch or otherwise simulate those calls.
