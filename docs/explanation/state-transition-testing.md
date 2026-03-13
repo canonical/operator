@@ -236,6 +236,32 @@ ctx = testing.Context(
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 
+## Charmcraft extensions
+
+If your `charmcraft.yaml` uses a charmcraft extension such as `flask-framework`
+or `django-framework`, the testing framework will automatically expand it when
+automatically loading metadata. The extension's metadata (containers, relations, resources,
+and so on), config options, and actions are merged into the charm spec, simulating what
+`charmcraft expand-extensions` does at pack time.
+
+This means you can write tests against a charm that uses extensions without having
+to manually specify all the metadata the extension adds:
+
+```python
+# Given a charmcraft.yaml with:
+#   extensions:
+#     - flask-framework
+
+ctx = testing.Context(MyFlaskCharm)
+# The 'ingress' relation is provided by the flask-framework extension.
+state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingress')}))
+```
+
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (for example, a config option or relation with the same name), both
+`charmcraft pack` and the testing framework will raise an error. Rename or
+remove the overlapping keys to fix this.
+
 ## Immutability
 
 All of the data structures in the state, (`State`, `Relation`, `Container`, and

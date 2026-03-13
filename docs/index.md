@@ -14,7 +14,7 @@ reference/index
 explanation/index
 ```
 
-Ops is a Python framework for writing and testing [Juju](https://juju.is/) charms.
+Ops is a Python framework for writing and testing [Juju](https://canonical.com/juju) charms.
 
 The core `ops` package provides an API to respond to Juju events and manage the charm's application. Ops also includes extra packages for testing and tracing charms.
 
@@ -84,4 +84,4 @@ If you're new to charm development, the {external+charmcraft:ref}`Charmcraft tut
 
 To follow along with updates and tips about charm development, join our [Discourse forum](https://discourse.charmhub.io/).
 
-[Learn more about the Juju ecosystem](https://juju.is/docs)
+[Learn more about the Juju ecosystem](https://canonical.com/juju/docs)

@@ -122,6 +122,18 @@ def test_peer_changed():
 
 > See more: [](ops.testing.State.from_context)
 
+```{note}
+If your `charmcraft.yaml` uses a charmcraft extension (e.g.
+`extensions: [flask-framework]`), the metadata, config, and actions that
+the extension adds are automatically merged in when the testing framework
+loads the charm spec. You do not need to manually specify them.
+
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (e.g. a config option with the same name), the testing framework
+will raise a `ValueError`, matching the behaviour of `charmcraft pack`.
+Rename or remove the overlapping keys to fix this.
+```
+
 ## Generate tests from a deployed model
 
 If your test needs realistic relation inputs from a deployed model, you can use
