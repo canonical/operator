@@ -659,6 +659,9 @@ class Context(Generic[CharmType]):
             ``actions`` will be automatically extracted from it (if not explicitly provided).
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
             ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
+            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            ``extensions: [flask-framework]``), the extension's metadata,
+            config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
             If none is provided, will be extracted from ``meta`` if present.
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
