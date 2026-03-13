@@ -362,7 +362,7 @@ def test_active_with_another_app(juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-(manage-relations-generate-tests-from-a-deployed-model)=
+(generate-tests-from-a-deployed-model)=
 ### Generate tests from a deployed model
 
 When a relation bug is only reproducible in a live deployment, you can snapshot

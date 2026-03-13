@@ -38,8 +38,6 @@ from ops import testing
 
 ## Write a test
 
-> See first: [](/howto/manage-relations#manage-relations-generate-tests-from-a-deployed-model)
-
 To write a test function, use a `Context` object to encapsulate the charm type (`MyCharm`) and any necessary metadata. The test should then define the initial `State` and call `Context.run` with an `event` and initial `State`.
 
 This follows the typical test structure:
@@ -131,7 +129,7 @@ If your test needs realistic relation inputs from a deployed model, you can use
 `ops.testing.State` and `ops.testing.Context`.
 
 For a workflow focused on relation debugging, see
-[](/howto/manage-relations#manage-relations-generate-tests-from-a-deployed-model).
+[](/howto/manage-relations#generate-tests-from-a-deployed-model).
 
 ## Mock beyond the State
 
