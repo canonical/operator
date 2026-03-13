@@ -40,6 +40,20 @@ def juju(request: pytest.FixtureRequest):
             print(log, end="", file=sys.stderr)
 
 
+@pytest.fixture(scope="module")
+def cos_juju(request: pytest.FixtureRequest):
+    """Create a temporary Juju model for COS Lite."""
+    with jubilant.temp_model() as juju:
+        juju.wait_timeout = 10 * 60
+        yield juju
+
+        if request.session.testsfailed:
+            logger.info("Collecting Juju logs from COS Lite model...")
+            time.sleep(0.5)  # Wait for Juju to process logs.
+            log = juju.debug_log(limit=1000)
+            print(log, end="", file=sys.stderr)
+
+
 @pytest.fixture(scope="session")
 def charm():
     """Return the path of the charm under test."""
