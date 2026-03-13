@@ -18,9 +18,9 @@
 import json
 import logging
 import pathlib
-import urllib.request
 
 import jubilant
+import requests
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,6 @@ def test_loki_integration(juju: jubilant.Juju, cos_juju: jubilant.Juju):
 
     # Confirm that our application appears in Loki's label values.
     api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
-    with urllib.request.urlopen(api_url) as response:
-        body = json.loads(response.read())
-    assert APP_NAME in body["data"]
+    response = requests.get(api_url)
+    response.raise_for_status()
+    assert APP_NAME in response.json()["data"]
