@@ -15,7 +15,7 @@ from test.charms.test_secrets.src.charm import SecretsCharm
 
 @pytest.fixture
 def secrets_context(secrets_charm_meta: dict[str, Any]):
-    return Context(SecretsCharm, meta=secrets_charm_meta, actions=secrets_charm_meta['actions'])
+    return Context(SecretsCharm, meta=secrets_charm_meta)
 
 
 @pytest.fixture
