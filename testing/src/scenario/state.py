@@ -1768,7 +1768,7 @@ class State:
                     raise ValueError(
                         f'State.get_relation() result does not match\n'
                         f'Called with:\n{relation!r}\n'
-                        f'Result:\n{state_relation!r}\n'
+                        Found:\n{state_relation!r}\n'
                     )
                 return state_relation
         raise KeyError(f'relation: id={rel_id} not found in the State')
