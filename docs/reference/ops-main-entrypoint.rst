@@ -12,5 +12,3 @@ legacy main module
 
 .. automodule:: ops.main
    :noindex:
-
-

@@ -286,6 +286,16 @@ class CapturingFramework(ops.Framework):
         super().__init__(*args, **kwargs)
         self._context = context
 
+    def set_breakpointhook(self) -> None:
+        """No-op to avoid Ops interfering with breakpoint() in tests.
+
+        Ops unconditionally overrides sys.breakpointhook to a handler that does nothing
+        unless ``JUJU_DEBUG_AT`` is set -- but if ``JUJU_DEBUG_AT`` is set, then it will
+        drop into a debugger when the event is emitted, which is not what we want in tests.
+        By leaving it unchanged, we allow charm code to use breakpoint() as expected in tests.
+        """
+        pass
+
     def _emit(self, event: ops.EventBase):
         if self._context.capture_framework_events or not isinstance(
             event,
