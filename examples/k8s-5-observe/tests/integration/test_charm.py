@@ -15,8 +15,10 @@
 # The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
 # To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
+import json
 import logging
 import pathlib
+import urllib.request
 
 import jubilant
 import yaml
@@ -69,7 +71,19 @@ def test_cos_lite(cos_juju: jubilant.Juju):
 def test_loki_integration(juju: jubilant.Juju, cos_juju: jubilant.Juju):
     """Verify that the charm integrates with Loki.
 
-    Assert that the charm remains active after the Loki integration is established.
+    Assert that the charm remains active after the Loki integration is established,
+    and that Loki has registered the application as a log source.
     """
     juju.integrate(APP_NAME, f"admin/{cos_juju.model}.loki")
     juju.wait(jubilant.all_active)
+
+    # Find the Loki API base URL via Traefik's show-proxied-endpoints action.
+    task = cos_juju.run("traefik/0", "show-proxied-endpoints")
+    endpoints = json.loads(task.results["proxied-endpoints"])
+    loki_url = endpoints["loki/0"]["url"]
+
+    # Confirm that our application appears in Loki's label values.
+    api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
+    with urllib.request.urlopen(api_url) as response:
+        body = json.loads(response.read())
+    assert APP_NAME in body["data"]
