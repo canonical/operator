@@ -47,7 +47,7 @@ def cos_juju(request: pytest.FixtureRequest):
         yield juju
 
         if request.session.testsfailed:
-            logger.info("Collecting COS Lite Juju logs...")
+            logger.info("Collecting Juju logs from COS Lite model...")
             time.sleep(0.5)  # Wait for Juju to process logs.
             log = juju.debug_log(limit=1000)
             print(log, end="", file=sys.stderr)

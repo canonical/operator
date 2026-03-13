@@ -62,9 +62,8 @@ def test_cos_lite(cos_juju: jubilant.Juju):
 
     cos_juju.offer("loki", endpoint="logging")
 
-    # Verify the Loki offer was created.
-    offers = cos_juju.cli("find-offers", f"admin/{cos_juju.model}", include_model=False)
-    assert "loki" in offers
+    # Verify the Loki offer was created; raises CLIError if not found.
+    cos_juju.cli("find-offers", "--interface", "loki_push_api", include_model=False)
 
 
 def test_loki_integration(juju: jubilant.Juju, cos_juju: jubilant.Juju):
