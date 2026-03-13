@@ -976,6 +976,51 @@ def _make_generator(items: Iterable[Any]) -> Generator[Any]:
     return (item for item in items)
 
 
+def test_get_relation_by_id():
+    relation = Relation(endpoint='foo', interface='bar')
+    state = State(relations={relation})
+    result = state.get_relation(relation.id)
+    assert result is relation  # since this is the same state
+
+
+@pytest.mark.parametrize('relation_type', [Relation, PeerRelation, SubordinateRelation])
+def test_get_relation_by_rel_obj(relation_type: type[RelationBase]):
+    relation = relation_type(endpoint='foo')
+    state = State(relations={relation})
+    result = state.get_relation(relation)
+    assert result is relation  # since this is the same state
+
+
+@pytest.mark.parametrize('missing', [123, Relation(endpoint='foo')])
+def test_get_relation_not_found(missing: int | Relation):
+    with pytest.raises(KeyError):
+        State().get_relation(missing)
+
+
+def test_get_relation_by_rel_obj_wrong_type():
+    relation = Relation(endpoint='foo')
+    state = State(relations={relation})
+    wrong_type = PeerRelation(endpoint='foo', id=relation.id)
+    with pytest.raises(ValueError, match='get_relation'):
+        state.get_relation(wrong_type)
+
+
+def test_get_relation_by_rel_obj_wrong_endpoint():
+    relation = Relation(endpoint='foo')
+    state = State(relations={relation})
+    wrong_endpoint = Relation(endpoint='bar', id=relation.id)
+    with pytest.raises(ValueError, match='endpoint'):
+        state.get_relation(wrong_endpoint)
+
+
+def test_get_relation_by_rel_obj_wrong_interface_doesnt_raise():
+    relation = Relation(endpoint='foo', interface='bar')
+    state = State(relations={relation})
+    wrong_interface = Relation(endpoint='foo', interface='baz', id=relation.id)
+    state.get_relation(wrong_interface)
+    assert relation is not wrong_interface
+
+
 @pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])
 def test_state_from_non_sets(iterable: Callable[..., Any]):
     meta = {
