@@ -44,6 +44,7 @@ def juju(request: pytest.FixtureRequest):
 def cos_juju(request: pytest.FixtureRequest):
     """Create a temporary Juju model for COS Lite."""
     with jubilant.temp_model() as juju:
+        juju.wait_timeout = 10 * 60
         yield juju
 
         if request.session.testsfailed:
