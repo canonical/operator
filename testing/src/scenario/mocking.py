@@ -13,7 +13,7 @@ import datetime
 import io
 import shutil
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -61,6 +61,8 @@ from .state import (
     SubordinateRelation,
     _EntityStatus,
     _port_cls_by_protocol,
+    _port_str,
+    _PortMap,
     _RawPortProtocolLiteral,
 )
 
@@ -147,18 +149,32 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def opened_ports(self) -> set[Port_Ops]:
         return {
-            Port_Ops(protocol=port.protocol, port=port.port) for port in self._state.opened_ports
+            Port_Ops(protocol=port.protocol, port=port.port, to_port=port.to_port)
+            for port in self._state.opened_ports
         }
 
     def open_port(
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
     ):
-        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
-        ports = set(self._state.opened_ports)
-        if port_ not in ports:
-            ports.add(port_)
+        if port is None and to_port is not None:
+            raise TypeError('to_port cannot be specified if port is not specified')
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        port_ = _port_cls_by_protocol[protocol](
+            port=port,  # type: ignore
+            to_port=to_port,
+            endpoints=endpoints,  # type: ignore
+        )
+        port_map = _PortMap(self._state.opened_ports)
+        if (p := port_map.get_first_overlap(port_)) is not None:
+            e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
+            raise ModelError(e)
+        port_map.open_port(port_)
+        ports = port_map.get_ports()
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
@@ -166,11 +182,25 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
     ):
-        port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
-        ports = set(self._state.opened_ports)
-        if port_ in ports:
-            ports.remove(port_)
+        if port is None and to_port is not None:
+            raise TypeError('to_port cannot be specified if port is not specified')
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        port_ = _port_cls_by_protocol[protocol](
+            port=port,  # type: ignore
+            to_port=to_port,
+            endpoints=endpoints,  # type: ignore
+        )
+        port_map = _PortMap(self._state.opened_ports)
+        if (p := port_map.get_first_overlap(port_)) is not None:
+            e = f'cannot open {_port_str(port_)}: port range conflicts with {_port_str(p)}'
+            raise ModelError(e)
+        all_endpoints = [e for e, _ in self._charm_spec.get_all_relations()]
+        port_map.close_port(port_, all_endpoints)
+        ports = port_map.get_ports()
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
