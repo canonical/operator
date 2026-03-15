@@ -1091,7 +1091,7 @@ class Container:
                 if name in services and service.override == 'merge':
                     services[name]._merge(service)
                 else:
-                    services[name] = service
+                    services[name] = copy.deepcopy(service)
         return services
 
     def _render_checks(self) -> dict[str, pebble.Check]:
@@ -1101,7 +1101,7 @@ class Container:
                 if name in checks and check.override == 'merge':
                     checks[name]._merge(check)
                 else:
-                    checks[name] = check
+                    checks[name] = copy.deepcopy(check)
         return checks
 
     def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
@@ -1111,7 +1111,7 @@ class Container:
                 if name in log_targets and log_target.override == 'merge':
                     log_targets[name]._merge(log_target)
                 else:
-                    log_targets[name] = log_target
+                    log_targets[name] = copy.deepcopy(log_target)
         return log_targets
 
     @property
