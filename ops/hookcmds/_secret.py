@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import tempfile
 from typing import Any, Literal, overload
 
@@ -63,7 +64,8 @@ def secret_add(
     args.extend(['--owner', owner])
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in content.items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+            fd = os.open(f'{tmp}/{k}', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
         stdout = run('secret-add', *args)
@@ -302,7 +304,8 @@ def secret_set(
     # via /proc.
     with tempfile.TemporaryDirectory() as tmp:
         for k, v in (content or {}).items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+            fd = os.open(f'{tmp}/{k}', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, mode='w', encoding='utf-8') as f:
                 f.write(v)
             args.append(f'{k}#file={tmp}/{k}')
         run('secret-set', *args)

@@ -17,11 +17,12 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import json
+import os
 import pathlib
 import subprocess
 import uuid
 from collections.abc import Generator
-from typing import Any, Literal
+from typing import IO, Any, Literal
 
 import pytest
 
@@ -127,6 +128,7 @@ class TemporaryDirectory:
     def __init__(self):
         self.name = 'path/to/temp_dir_name'
         self.files: list[NamedTemporaryFile] = []
+        self.last_open_mode: int = 0
 
     def __call__(self, *args: Any, **kwargs: Any):
         return self
@@ -161,19 +163,29 @@ def mock_file(monkeypatch: pytest.MonkeyPatch) -> Generator[NamedTemporaryFile]:
 
 @pytest.fixture
 def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirectory]:
-    """Pytest fixture that patches tempfile.TemporaryDirectory and open()."""
+    """Pytest fixture that patches tempfile.TemporaryDirectory, os.open(), and os.fdopen()."""
     dir_mock = TemporaryDirectory()
     monkeypatch.setattr('tempfile.TemporaryDirectory', dir_mock)
 
-    def mock_open(path: str, *args: Any, **kwargs: Any) -> Any:
-        if path.startswith(f'{dir_mock.name}/'):
+    real_os_open = os.open
+    real_os_fdopen = os.fdopen
+
+    def mock_os_open(path: str, flags: int, mode: int = 0o777, *args: Any, **kwargs: Any) -> int:
+        if isinstance(path, str) and path.startswith(f'{dir_mock.name}/'):
+            dir_mock.last_open_mode = mode
+            return -1  # Sentinel fd for mocked files
+        return real_os_open(path, flags, mode, *args, **kwargs)
+
+    def mock_os_fdopen(fd: int, *args: Any, **kwargs: Any) -> IO[Any]:
+        if fd == -1:  # Sentinel fd from our mock
             file_mock = NamedTemporaryFile()
             file_mock.name = f'{dir_mock.name}/{file_mock.name}'
             dir_mock.files.append(file_mock)
             return file_mock
-        return open(path, *args, **kwargs)  # type: ignore
+        return real_os_fdopen(fd, *args, **kwargs)
 
-    monkeypatch.setattr('builtins.open', mock_open)
+    monkeypatch.setattr('os.open', mock_os_open)
+    monkeypatch.setattr('os.fdopen', mock_os_fdopen)
 
     yield dir_mock
 
@@ -555,6 +567,16 @@ def test_secret_add(run: Run, mock_temp_dir: str):
     assert result == 'secretid'
 
 
+def test_secret_add_file_permissions(run: Run, mock_temp_dir: TemporaryDirectory):
+    """Verify that secret_add creates temporary files with 0o600 permissions."""
+    run.handle(
+        ['secret-add', '--owner', 'application', f'foo#file={mock_temp_dir}/foo'],
+        stdout='secretid',
+    )
+    hookcmds.secret_add({'foo': 'bar'})
+    assert mock_temp_dir.last_open_mode == 0o600
+
+
 @pytest.mark.parametrize('owner', ['application', 'unit'])
 def test_secret_add_with_metadata(
     run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
@@ -731,6 +753,19 @@ def test_secret_set(run: Run, mock_temp_dir: str):
         f'foo#file={mock_temp_dir}/foo',
     ])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
+
+
+def test_secret_set_file_permissions(run: Run, mock_temp_dir: TemporaryDirectory):
+    """Verify that secret_set creates temporary files with 0o600 permissions."""
+    run.handle([
+        'secret-set',
+        '--owner',
+        'application',
+        'secret:123',
+        f'foo#file={mock_temp_dir}/foo',
+    ])
+    hookcmds.secret_set('secret:123', content={'foo': 'bar'})
+    assert mock_temp_dir.last_open_mode == 0o600
 
 
 @pytest.mark.parametrize('owner', ['application', 'unit'])
