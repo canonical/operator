@@ -536,7 +536,7 @@ def _calculate_expiry(
     if isinstance(expire, datetime.datetime):
         return expire
     elif isinstance(expire, datetime.timedelta):
-        return datetime.datetime.now() + expire
+        return datetime.datetime.now(tz=datetime.timezone.utc) + expire
     else:
         raise TypeError(
             'Expiration time must be a datetime or timedelta from now, '
@@ -3044,7 +3044,7 @@ class Container:
             type=ftype,
             size=info.st_size,
             permissions=stat.S_IMODE(info.st_mode),
-            last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
+            last_modified=datetime.datetime.fromtimestamp(info.st_mtime, tz=datetime.timezone.utc),
             user_id=info.st_uid,
             user=pw_name,
             group_id=info.st_gid,

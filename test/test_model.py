@@ -42,7 +42,7 @@ from ops._private import yaml
 from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
-from ops.model import _ModelBackend
+from ops.model import _calculate_expiry, _ModelBackend
 from test.test_helpers import FakeScript
 
 
@@ -4775,6 +4775,47 @@ def test_departing_unit_data_available(fake_script: FakeScript):
     ]
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/0'] in calls
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/1'] in calls
+
+
+class TestTimezoneAwareDatetimes:
+    def test_calculate_expiry_with_timedelta_returns_utc(self):
+        """_calculate_expiry with a timedelta should return a timezone-aware UTC datetime."""
+        delta = datetime.timedelta(hours=1)
+        result = _calculate_expiry(delta)
+        assert result is not None
+        assert result.tzinfo is not None, (
+            '_calculate_expiry should return a timezone-aware datetime'
+        )
+        assert result.tzinfo == datetime.timezone.utc
+
+    def test_calculate_expiry_with_datetime_returns_as_is(self):
+        """_calculate_expiry with a datetime should return it unchanged."""
+        dt = datetime.datetime(2025, 6, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        result = _calculate_expiry(dt)
+        assert result is dt
+
+    def test_calculate_expiry_with_none_returns_none(self):
+        """_calculate_expiry with None should return None."""
+        assert _calculate_expiry(None) is None
+
+    @mock.patch('pwd.getpwuid')
+    @mock.patch('grp.getgrgid')
+    def test_build_fileinfo_returns_utc_timestamp(
+        self, getgrgid: mock.MagicMock, getpwuid: mock.MagicMock
+    ):
+        """Container._build_fileinfo should return a timezone-aware last_modified."""
+        getpwuid.side_effect = KeyError
+        getgrgid.side_effect = KeyError
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir) / 'test.txt'
+            path.write_text('hello')
+            fileinfo = ops.Container._build_fileinfo(path)
+
+        assert fileinfo.last_modified.tzinfo is not None, (
+            '_build_fileinfo should return a timezone-aware last_modified'
+        )
+        assert fileinfo.last_modified.tzinfo == datetime.timezone.utc
 
 
 if __name__ == '__main__':
