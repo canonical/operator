@@ -3782,6 +3782,30 @@ class TestTestingModelBackend:
         with pytest.raises(ops.RelationNotFoundError):
             backend.relation_get(1234, 'unit/0', False)
 
+    def test_relation_get_returns_copy(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(
+            ops.CharmBase,
+            meta="""
+            name: test-charm
+            requires:
+              db:
+                interface: pgsql
+            """,
+        )
+        request.addfinalizer(harness.cleanup)
+        rel_id = harness.add_relation('db', 'postgresql')
+        harness.add_relation_unit(rel_id, 'postgresql/0')
+        harness.update_relation_data(rel_id, 'postgresql/0', {'key': 'value'})
+        backend = harness._backend
+
+        data1 = backend.relation_get(rel_id, 'postgresql/0', False)
+        data1['key'] = 'mutated'
+        data1['extra'] = 'injected'
+
+        data2 = backend.relation_get(rel_id, 'postgresql/0', False)
+        assert data2['key'] == 'value'
+        assert 'extra' not in data2
+
     def test_relation_list_unknown_relation_id(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,

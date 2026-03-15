@@ -2455,7 +2455,7 @@ class _TestingModelBackend:
             member_name = member_name.split('/')[0]
         if relation_id not in self._relation_data_raw:
             raise model.RelationNotFoundError()
-        return self._relation_data_raw[relation_id][member_name]
+        return self._relation_data_raw[relation_id][member_name].copy()
 
     def update_relation_data(
         self,
