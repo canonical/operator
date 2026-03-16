@@ -141,7 +141,7 @@ If your test needs realistic relation inputs from a deployed model, you can use
 `ops.testing.State` and `ops.testing.Context`.
 
 For a workflow focused on relation debugging, see
-[](/howto/manage-relations#generate-tests-from-a-deployed-model).
+[](#generate-tests-from-a-deployed-model).
 
 ## Mock beyond the State
 
