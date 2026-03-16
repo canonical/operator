@@ -8,3 +8,17 @@ body {
     -webkit-mask-image: var(--icon-star);
     mask-image: var(--icon-star);
 }
+
+/* Vertically align text in table cells and add an initial horizontal line */
+table.docutils.top-aligned td {
+    vertical-align: top;
+}
+table.docutils.top-aligned tbody > tr:first-child > td {
+    border-top: 1px solid var(--color-table-border);
+}
+
+/* Show a box-with-arrow icon after links */
+a.show-external::after {
+    content: url("data:image/svg+xml;charset=utf-8,%3Csvg width='12' height='12' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23333' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M0 0h24v24H0z' stroke='none'/%3E%3Cpath d='M11 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-5M10 14 20 4M15 4h5v5'/%3E%3C/svg%3E");
+    margin-left: 0.25rem;
+}

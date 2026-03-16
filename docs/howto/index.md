@@ -86,6 +86,7 @@ Your charm can configure Pebble so that you can access metrics for services and 
 
 - {doc}`Manage Pebble metrics <manage-containers/manage-pebble-metrics>`
 
+(how-to-guides-managing-features)=
 ## Managing features
 
 Ops features broadly map to Juju features.
