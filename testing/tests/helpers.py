@@ -73,7 +73,12 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
-    # The jsonpatch library is untyped.
-    # See: https://github.com/stefankoegl/python-json-patch/issues/158
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
-    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])  # type: ignore
+    patch: list[dict[str, Any]] = jsonpatch.make_patch(dict_other, dict_self).patch  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+    return sort_patch(patch)  # pyright: ignore[reportUnknownArgumentType]
+
+
+def sort_patch(
+    patch: list[dict[str, Any]],
+    key: Callable[[dict[str, Any]], str] = lambda obj: obj['path'] + obj['op'],
+) -> list[dict[str, Any]]:
+    return sorted(patch, key=key)
