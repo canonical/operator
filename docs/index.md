@@ -19,21 +19,17 @@ Ops promotes consistent and maintainable charm code. Its APIs help you separate 
 ## Get started
 
 ````{grid} 1 1 2 2
-
 ```{grid-item-card} Generate charm code for a web app
-
 Use our CLI tools to turn your 12-factor app into a charm that's ready to deploy. We support Django, FastAPI, Go, and more!
 
-[Write your first 12-factor app charm](https://documentation.ubuntu.com/charmcraft/latest/tutorial/)
+<a class="show-external" href="https://documentation.ubuntu.com/charmcraft/latest/tutorial/" target="_blank">Write your first 12-factor app charm</a>
 ```
-
 ```{grid-item-card} Write your first charm from scratch
 For a hands-on introduction to charm development with Ops, try our tutorials:
 
 - [Write your first machine charm](tutorial/write-your-first-machine-charm)
 - [Write your first Kubernetes charm](tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/index)
 ```
-
 ````
 
 ## In this documentation
