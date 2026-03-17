@@ -793,7 +793,11 @@ def test_storedstate_consistency():
         ),
     )
     assert_inconsistent(
-        State(stored_states={StoredState(owner_path=None, content={'secret': Secret({})})}),
+        State(
+            stored_states={
+                StoredState(owner_path=None, content={'secret': Secret({'key': 'value'})})
+            }
+        ),
         _Event('start'),
         _CharmSpec(
             MyCharm,
