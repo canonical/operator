@@ -141,4 +141,4 @@ Harness is a deprecated framework for writing unit tests. You should migrate to 
 
 Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
 
-- {doc}`Turn a hooks-based charm into an ops charm <migrate/turn-a-hooks-based-charm-into-an-ops-charm>`
+- {doc}`Migrate from a hooks-based charm <migrate/migrate-from-a-hooks-based-charm>`

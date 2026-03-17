@@ -19,5 +19,5 @@ Hooks-based charms use script files instead of Python code with Ops. You should 
 ```{toctree}
 :maxdepth: 1
 
-Turn a hooks-based charm into an ops charm <turn-a-hooks-based-charm-into-an-ops-charm>
+Migrate from a hooks-based charm <migrate-from-a-hooks-based-charm>
 ```
