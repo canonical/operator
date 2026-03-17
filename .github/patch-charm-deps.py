@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script --no-project
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "tomli-w~=1.2.0",
+# ]
+# ///
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 """Patch charm dependencies to use ops 3.x for compatibility testing.
@@ -13,10 +19,12 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import copy
 import re
 import sys
 from pathlib import Path
 
+import tomli_w
 import tomllib
 
 
@@ -37,6 +45,98 @@ def get_tox_config_path(charm_root: Path) -> Path | None:
     return None
 
 
+def _update_tox_python_version_ini(tox_config: Path, charm_root: Path) -> None:
+    """Update Python version in tox.ini configuration.
+
+    Args:
+        tox_config: Path to tox.ini file
+        charm_root: Root directory of charm (for relative path display)
+    """
+    config = configparser.ConfigParser()
+    config.read(tox_config)
+    modified = False
+
+    for section in config.sections():
+        # Update basepython to use python3.10 if it's set to 3.8 or 3.9
+        if config.get(section, 'basepython', fallback=None) in ('python3.8', 'python3.9'):
+            config.set(section, 'basepython', 'python3.10')
+            modified = True
+
+        # Update envlist to replace py38/py39 with py310
+        # Only replace if py310 doesn't already exist to avoid duplicates
+        if config.has_option(section, 'envlist'):
+            envlist = config.get(section, 'envlist')
+            new_envlist = envlist
+            if 'py310' not in envlist:
+                new_envlist = new_envlist.replace('py38', 'py310').replace('py39', 'py310')
+            else:
+                # py310 already exists, just remove py38/py39 references
+                new_envlist = re.sub(r'\bpy38\b,?\s*', '', new_envlist)
+                new_envlist = re.sub(r'\bpy39\b,?\s*', '', new_envlist)
+                new_envlist = re.sub(r'\{py38\},?\s*', '', new_envlist)
+                new_envlist = re.sub(r'\{py39\},?\s*', '', new_envlist)
+                # Clean up any trailing commas or whitespace
+                new_envlist = re.sub(r',\s*$', '', new_envlist)
+                new_envlist = re.sub(r',\s*\n', '\n', new_envlist)
+            if new_envlist != envlist:
+                config.set(section, 'envlist', new_envlist)
+                modified = True
+
+    if modified:
+        with open(tox_config, 'w') as f:
+            config.write(f)
+        print(f'  ✓ Updated {tox_config.relative_to(charm_root)}')
+
+
+def _update_tox_python_version_toml(tox_config: Path, charm_root: Path) -> None:
+    """Update Python version in tox.toml configuration.
+
+    Args:
+        tox_config: Path to tox.toml file
+        charm_root: Root directory of charm (for relative path display)
+    """
+    with open(tox_config, 'rb') as f:
+        original = tomllib.load(f)
+    data = copy.deepcopy(original)
+
+    def _update_section(section_data: dict) -> None:
+        """Update basepython and envlist in a single tox section."""
+        if section_data.get('basepython') in ('python3.8', 'python3.9'):
+            section_data['basepython'] = 'python3.10'
+
+        if 'envlist' not in section_data:
+            return
+        envlist = section_data['envlist']
+        if isinstance(envlist, list):
+            has_py310 = any('py310' in str(e) for e in envlist)
+            if not has_py310:
+                envlist = [
+                    str(e).replace('py38', 'py310').replace('py39', 'py310') for e in envlist
+                ]
+            else:
+                envlist = [e for e in envlist if not re.search(r'py3[89]', str(e))]
+            section_data['envlist'] = envlist
+        elif isinstance(envlist, str):
+            if 'py310' not in envlist:
+                section_data['envlist'] = envlist.replace('py38', 'py310').replace('py39', 'py310')
+            else:
+                envs = [e for e in envlist.split(',') if not re.search(r'py3[89]', e)]
+                section_data['envlist'] = ','.join(envs)
+
+    # Update top-level, env_run_base, and individual envs
+    _update_section(data)
+    if 'env_run_base' in data:
+        _update_section(data['env_run_base'])
+    if 'env' in data:
+        for env_data in data['env'].values():
+            _update_section(env_data)
+
+    if data != original:
+        with open(tox_config, 'wb') as f:
+            tomli_w.dump(data, f)
+        print(f'  ✓ Updated {tox_config.relative_to(charm_root)}')
+
+
 def update_tox_python_version(tox_config: Path, charm_root: Path) -> None:
     """Update Python version in tox configuration (tox.ini or tox.toml).
 
@@ -45,69 +145,9 @@ def update_tox_python_version(tox_config: Path, charm_root: Path) -> None:
         charm_root: Root directory of charm (for relative path display)
     """
     if tox_config.suffix == '.ini':
-        config = configparser.ConfigParser()
-        config.read(tox_config)
-        modified = False
-
-        for section in config.sections():
-            # Update basepython to use python3.10 if it's set to 3.8 or 3.9
-            if config.has_option(section, 'basepython'):
-                basepython = config.get(section, 'basepython')
-                if basepython in ('python3.8', 'python3.9'):
-                    config.set(section, 'basepython', 'python3.10')
-                    modified = True
-
-            # Update envlist to replace py38/py39 with py310
-            # Only replace if py310 doesn't already exist to avoid duplicates
-            if config.has_option(section, 'envlist'):
-                envlist = config.get(section, 'envlist')
-                new_envlist = envlist
-                if 'py310' not in envlist:
-                    new_envlist = new_envlist.replace('py38', 'py310').replace('py39', 'py310')
-                    new_envlist = new_envlist.replace('{py38}', '{py310}')
-                    new_envlist = new_envlist.replace('{py39}', '{py310}')
-                else:
-                    # py310 already exists, just remove py38/py39 references
-                    new_envlist = re.sub(r'\bpy38\b,?\s*', '', new_envlist)
-                    new_envlist = re.sub(r'\bpy39\b,?\s*', '', new_envlist)
-                    new_envlist = re.sub(r'\{py38\},?\s*', '', new_envlist)
-                    new_envlist = re.sub(r'\{py39\},?\s*', '', new_envlist)
-                    # Clean up any trailing commas or whitespace
-                    new_envlist = re.sub(r',\s*$', '', new_envlist)
-                    new_envlist = re.sub(r',\s*\n', '\n', new_envlist)
-                if new_envlist != envlist:
-                    config.set(section, 'envlist', new_envlist)
-                    modified = True
-
-        if modified:
-            with open(tox_config, 'w') as f:
-                config.write(f)
-            print(f'  ✓ Updated {tox_config.relative_to(charm_root)}')
-
+        _update_tox_python_version_ini(tox_config, charm_root)
     elif tox_config.suffix == '.toml':
-        # Handle tox.toml using regex (no standard library for writing TOML)
-        content = tox_config.read_text()
-        original = content
-
-        # Update basepython
-        content = re.sub(
-            r'(basepython\s*=\s*["\'])python3\.[89](["\'])', r'\1python3.10\2', content
-        )
-
-        # Update envlist - only replace if py310 doesn't already exist to avoid duplicates
-        if 'py310' not in content:
-            content = content.replace('py38', 'py310').replace('py39', 'py310')
-            content = content.replace('{py38}', '{py310}').replace('{py39}', '{py310}')
-        else:
-            # py310 already exists, just remove py38/py39 references
-            content = re.sub(r'\bpy38\b,?\s*', '', content)
-            content = re.sub(r'\bpy39\b,?\s*', '', content)
-            content = re.sub(r'\{py38\},?\s*', '', content)
-            content = re.sub(r'\{py39\},?\s*', '', content)
-
-        if content != original:
-            tox_config.write_text(content)
-            print(f'  ✓ Updated {tox_config.relative_to(charm_root)}')
+        _update_tox_python_version_toml(tox_config, charm_root)
 
 
 def update_pyproject_python_version(
@@ -120,57 +160,22 @@ def update_pyproject_python_version(
         charm_root: Root directory of charm (for relative path display)
         max_version: Optional maximum Python version (e.g., "3.12")
     """
-    content = pyproject.read_text()
+    data = tomllib.loads(pyproject.read_text())
 
-    # Parse TOML
-    try:
-        data = tomllib.loads(content)
-    except tomllib.TOMLDecodeError:
-        # Fall back to regex if TOML parsing fails
-        print(f'  ⚠ Warning: Could not parse {pyproject.name} as TOML, using regex fallback')
-        original = content
-        if max_version:
-            version_constraint = f'">=3.10,<{max_version}"'
-            content = re.sub(
-                r'requires-python = ["\'][^"\']+["\']',
-                f'requires-python = {version_constraint}',
-                content,
-            )
-        else:
-            content = re.sub(
-                r'requires-python = ["\']>=3\.[89](\.[0-9]+)?["\']',
-                'requires-python = ">=3.10"',
-                content,
-            )
-        if content != original:
-            pyproject.write_text(content)
-            print(f'  ✓ Updated {pyproject.relative_to(charm_root)}')
+    requires_python = data.get('project', {}).get('requires-python')
+    if requires_python is None:
         return
 
-    # Update requires-python if it exists
-    modified = False
-    if 'project' in data and 'requires-python' in data['project']:
-        requires_python = data['project']['requires-python']
+    if max_version:
+        new_requires = f'>=3.10,<{max_version}'
+    elif re.match(r'>=3\.[89]', requires_python):
+        new_requires = '>=3.10'
+    else:
+        return
 
-        if max_version:
-            # Cap at max_version
-            new_requires = f'>=3.10,<{max_version}'
-        elif re.match(r'>=3\.[89]', requires_python):
-            # Update to >=3.10 if currently <3.10
-            new_requires = '>=3.10'
-        else:
-            new_requires = None
-
-        if new_requires:
-            # Use regex to preserve the exact format (quotes, whitespace)
-            content = re.sub(
-                r'(requires-python\s*=\s*)["\'][^"\']+["\']', f'\\1"{new_requires}"', content
-            )
-            modified = True
-
-    if modified:
-        pyproject.write_text(content)
-        print(f'  ✓ Updated {pyproject.relative_to(charm_root)}')
+    data['project']['requires-python'] = new_requires
+    pyproject.write_text(tomli_w.dumps(data))
+    print(f'  ✓ Updated {pyproject.relative_to(charm_root)}')
 
 
 def update_python_version_file(
@@ -187,7 +192,7 @@ def update_python_version_file(
     # Replace any 3.8 or 3.9 version with 3.10 (or 3.11 if max_version is 3.12)
     # Use fullmatch with explicit minor versions to avoid matching 3.80, 3.81, etc.
     if re.fullmatch(r'3\.(8|9)(\.\d+)?', content):
-        new_version = '3.11' if max_version == '3.12' else '3.10'
+        new_version = '3.10'
         python_version_file.write_text(new_version + '\n')
         print(f'  ✓ Updated {python_version_file.relative_to(charm_root)} to {new_version}')
 
@@ -265,7 +270,7 @@ def _detect_tox_uv_toml(data: dict) -> bool:
 def add_tox_pip_commands_ini(
     tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool
 ) -> None:
-    """Add pip to allowlist_externals and commands_post to force-reinstall ops wheels (INI format).
+    """Add pip to allowlist_externals and commands_pre to force-reinstall ops wheels (INI format).
 
     Args:
         tox_ini_path: Path to tox.ini
@@ -281,7 +286,7 @@ def add_tox_pip_commands_ini(
         print(f'  Section [{section}] not found in tox.ini, skipping')
         return
 
-    print(f'  Adding pip to allowlist_externals and commands_post in [{section}]')
+    print(f'  Adding pip to allowlist_externals and commands_pre in [{section}]')
 
     pip_cmd = 'uv pip install' if use_uv_pip else 'pip install'
 
@@ -290,22 +295,18 @@ def add_tox_pip_commands_ini(
         allowlist = config.get(section, 'allowlist_externals')
         if 'pip' not in allowlist.split():
             print('    Found existing allowlist_externals, appending pip')
-            # Preserve multi-line format if it exists
-            if '\n' in allowlist:
-                config.set(section, 'allowlist_externals', allowlist + '\n    pip')
-            else:
-                config.set(section, 'allowlist_externals', allowlist + '\n    pip')
+            config.set(section, 'allowlist_externals', allowlist + '\n    pip')
     else:
         print('    Creating new allowlist_externals with pip')
         config.set(section, 'allowlist_externals', 'pip')
 
-    # Add commands_post
-    print(f"    Adding commands_post to force-reinstall ops 3.x (using '{pip_cmd}')")
-    commands_post = (
+    # Add commands_pre
+    print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
+    commands_pre = (
         f'\n    {pip_cmd} --force-reinstall --no-deps {ops_wheel}'
         f'\n    {pip_cmd} --no-deps {ops_scenario_wheel}'
     )
-    config.set(section, 'commands_post', commands_post)
+    config.set(section, 'commands_pre', commands_pre)
 
     with open(tox_ini_path, 'w') as f:
         config.write(f)
@@ -314,7 +315,7 @@ def add_tox_pip_commands_ini(
 def add_tox_pip_commands_toml(
     tox_toml_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool
 ) -> None:
-    """Add pip to allowlist_externals and commands_post to force-reinstall ops wheels.
+    """Add pip to allowlist_externals and commands_pre to force-reinstall ops wheels.
 
     This function handles TOML format tox configuration files.
 
@@ -325,98 +326,63 @@ def add_tox_pip_commands_toml(
         ops_scenario_wheel: Path to ops-scenario wheel file
         use_uv_pip: Whether to use 'uv pip install' instead of 'pip install'
     """
-    content = tox_toml_path.read_text()
-
-    # Parse to check if section exists and what keys are already present
-    try:
-        data = tomllib.loads(content)
-    except tomllib.TOMLDecodeError as e:
-        print(f'  ⚠ Warning: Could not parse tox.toml: {e}')
-        return
+    with open(tox_toml_path, 'rb') as f:
+        data = tomllib.load(f)
 
     # Convert section name format: testenv:unit -> env.unit, testenv -> env_run_base
     if section == 'testenv':
-        toml_section = 'env_run_base'
+        section_keys = ['env_run_base']
     elif section.startswith('testenv:'):
         env_name = section.split(':', 1)[1]
-        toml_section = f'env.{env_name}'
+        section_keys = ['env', env_name]
     else:
         print(f'  Unknown section format: {section}, skipping')
         return
 
-    # Check if section exists in TOML
-    section_parts = toml_section.split('.')
+    # Navigate to the target section
     current = data
-    for part in section_parts:
-        if part not in current:
+    for key in section_keys:
+        if key not in current:
+            toml_section = '.'.join(section_keys)
             print(f'  Section {toml_section} not found in tox.toml, skipping')
             return
-        current = current[part]
+        current = current[key]
 
-    # Check what already exists in this section
-    has_allowlist = 'allowlist_externals' in current
-    has_commands_post = 'commands_post' in current
-
-    print(f'  Adding pip to allowlist_externals and commands_post in [{toml_section}]')
+    toml_section = '.'.join(section_keys)
+    print(f'  Adding pip to allowlist_externals and commands_pre in [{toml_section}]')
 
     pip_cmd = 'uv pip install' if use_uv_pip else 'pip install'
+    modified = False
 
-    if not has_allowlist:
+    # Update allowlist_externals
+    if 'allowlist_externals' not in current:
         print('    Creating new allowlist_externals with pip')
-        # Add after section header - find the line after the section header
-        content = re.sub(
-            rf'(\[{re.escape(toml_section)}\]\s*\n)',
-            r'\1allowlist_externals = ["pip"]\n',
-            content,
-        )
-    else:
+        current['allowlist_externals'] = ['pip']
+        modified = True
+    elif (
+        isinstance(current['allowlist_externals'], list)
+        and 'pip' not in current['allowlist_externals']
+    ):
         print('    Found existing allowlist_externals, appending pip')
-        # Check if "pip" is already in the array
-        if (
-            isinstance(current['allowlist_externals'], list)
-            and 'pip' not in current['allowlist_externals']
-        ):
-            # Add pip to the existing array
-            content = re.sub(
-                r'(allowlist_externals\s*=\s*\[)([^\]]*?)(\])',
-                lambda m: (
-                    f'{m.group(1)}{m.group(2)}, "pip"{m.group(3)}'
-                    if m.group(2).strip()
-                    else f'{m.group(1)}"pip"{m.group(3)}'
-                ),
-                content,
-                count=1,
-            )
-        else:
-            print('      pip already in allowlist_externals, skipping')
-
-    if not has_commands_post:
-        print(f"    Adding commands_post to force-reinstall ops 3.x (using '{pip_cmd}')")
-        commands_post_str = (
-            f'commands_post = [\n'
-            f'    "{pip_cmd} --force-reinstall --no-deps {ops_wheel}",\n'
-            f'    "{pip_cmd} --no-deps {ops_scenario_wheel}",\n'
-            f']'
-        )
-
-        # Add after allowlist_externals if it exists, otherwise after section header
-        if 'allowlist_externals' in content:
-            # Add after the allowlist_externals line(s)
-            content = re.sub(
-                r'(allowlist_externals\s*=\s*\[[^\]]*\]\s*\n)',
-                rf'\1{commands_post_str}\n',
-                content,
-                count=1,
-            )
-        else:
-            # Add after section header
-            content = re.sub(
-                rf'(\[{re.escape(toml_section)}\]\s*\n)', rf'\1{commands_post_str}\n', content
-            )
+        current['allowlist_externals'].append('pip')
+        modified = True
     else:
-        print('    commands_post already exists, skipping')
+        print('      pip already in allowlist_externals, skipping')
 
-    tox_toml_path.write_text(content)
+    # Update commands_pre
+    if 'commands_pre' not in current:
+        print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
+        current['commands_pre'] = [
+            f'{pip_cmd} --force-reinstall --no-deps {ops_wheel}',
+            f'{pip_cmd} --no-deps {ops_scenario_wheel}',
+        ]
+        modified = True
+    else:
+        print('    commands_pre already exists, skipping')
+
+    if modified:
+        with open(tox_toml_path, 'wb') as f:
+            tomli_w.dump(data, f)
 
 
 def _patch_tox_testenv_sections_toml(
@@ -432,12 +398,8 @@ def _patch_tox_testenv_sections_toml(
     Returns:
         True if any sections were patched, False otherwise
     """
-    try:
-        with open(tox_config, 'rb') as f:
-            data = tomllib.load(f)
-    except tomllib.TOMLDecodeError:
-        print(f'  ⚠ Warning: Could not parse {tox_config.name}')
-        return False
+    with open(tox_config, 'rb') as f:
+        data = tomllib.load(f)
 
     use_uv_pip = _detect_tox_uv_toml(data)
     if use_uv_pip:
@@ -566,14 +528,9 @@ def patch_requirements_txt(charm_root: Path, ops_wheel: str, ops_scenario_wheel:
 
         deps = config.get(section, 'deps')
         # Remove ops and ops-scenario deps using the helper function
-        new_deps_lines = [
-            line.strip()
-            for line in deps.split('\n')
-            if line.strip() and not _is_ops_dependency_line(line.strip())
-        ]
-
-        original_count = len([ln for ln in deps.split('\n') if ln.strip()])
-        if len(new_deps_lines) == original_count:
+        deps_lines = [stripped for line in deps.splitlines() if (stripped := line.strip())]
+        new_deps_lines = [dep for dep in deps_lines if not _is_ops_dependency_line(dep)]
+        if deps_lines == new_deps_lines:
             continue
 
         print('  Found inline ops deps in tox.ini, patching...')
@@ -637,6 +594,7 @@ def main() -> int:
     parser.add_argument(
         '--max-python-version',
         help="Maximum Python version to support (e.g., '3.12'). "
+        "Must be strictly greater than '3.10'. "
         'If specified, requires-python will be capped.',
     )
     parser.add_argument(
@@ -659,15 +617,11 @@ def main() -> int:
     # Update Python version requirements
     update_python_version_requirements(args.charm_root, args.max_python_version)
 
-    # Track whether we successfully updated any dependencies
-    updated = False
-
     # Detect dependency management system and patch accordingly
     print('\nDetecting dependency management system...')
 
     # 1. Handle requirements.txt-based charms
-    req_files = list(args.charm_root.glob('*requirements*.txt'))
-    if req_files:
+    if list(args.charm_root.glob('*requirements*.txt')):
         updated = patch_requirements_txt(args.charm_root, args.ops_wheel, args.ops_scenario_wheel)
 
     # 2. Handle Poetry-based charms
@@ -679,6 +633,7 @@ def main() -> int:
         updated = patch_uv(args.charm_root, args.ops_wheel, args.ops_scenario_wheel)
 
     else:
+        updated = False
         print(
             '✗ Error: No recognised dependency files found '
             '(requirements.txt, poetry.lock, or uv.lock)'
