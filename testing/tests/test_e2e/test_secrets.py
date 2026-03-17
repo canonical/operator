@@ -737,18 +737,18 @@ def test_secret_get_content_returns_copy(owner: str):
         charm = mgr.charm
         secret_obj = charm.model.get_secret(id=secret.id)
 
-        # Mutate tracked content returned by get_content().
-        content = secret_obj.get_content()
-        assert content == {'a': 'b'}
-        content['a'] = 'MUTATED'
-        content['extra'] = 'INJECTED'
+    # Mutate tracked content returned by get_content().
+    content = secret_obj.get_content()
+    assert content == {'a': 'b'}
+    content['a'] = 'MUTATED'
+    content['extra'] = 'INJECTED'
 
-        # A subsequent call must return the original data, unaffected.
-        assert secret_obj.get_content() == {'a': 'b'}
+    # A subsequent call must return the original data, unaffected.
+    assert secret_obj.get_content() == {'a': 'b'}
 
-        # Same check for refresh (latest_content path).
-        refreshed = secret_obj.get_content(refresh=True)
-        assert refreshed == {'a': 'c'}
-        refreshed['a'] = 'MUTATED'
+    # Same check for refresh (latest_content path).
+    refreshed = secret_obj.get_content(refresh=True)
+    assert refreshed == {'a': 'c'}
+    refreshed['a'] = 'MUTATED'
 
-        assert secret_obj.get_content() == {'a': 'c'}
+    assert secret_obj.get_content() == {'a': 'c'}

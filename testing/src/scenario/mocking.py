@@ -9,6 +9,7 @@ to interact with the Juju controller and the Pebble service manager.
 
 from __future__ import annotations
 
+import copy
 import datetime
 import io
 import shutil
@@ -650,7 +651,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-get',
             )
-        return dict(action.params)
+        return copy.deepcopy(action.params)
 
     def storage_add(self, name: str, count: int = 1):
         if not isinstance(count, int) or isinstance(count, bool):

@@ -304,6 +304,15 @@ class Secret:
     def __hash__(self) -> int:
         return hash(self.id)
 
+    def __post_init__(self):
+        self._validate_content(self.tracked_content, 'tracked_content')
+        if self.latest_content is not None:
+            self._validate_content(self.latest_content, 'latest_content')
+        if self.latest_content is None:
+            # bypass frozen dataclass
+            object.__setattr__(self, 'latest_content', self.tracked_content)
+        _deepcopy_mutable_fields(self)
+
     @staticmethod
     def _validate_content(content: dict[str, str], name: str):
         if not isinstance(content, dict):
@@ -323,15 +332,6 @@ class Secret:
                 f'Secret.{name} should be dict[str, str]; '
                 f'found non-string key(s)/value(s): {bad}',
             )
-
-    def __post_init__(self):
-        self._validate_content(self.tracked_content, 'tracked_content')
-        if self.latest_content is not None:
-            self._validate_content(self.latest_content, 'latest_content')
-        if self.latest_content is None:
-            # bypass frozen dataclass
-            object.__setattr__(self, 'latest_content', self.tracked_content)
-        _deepcopy_mutable_fields(self)
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
