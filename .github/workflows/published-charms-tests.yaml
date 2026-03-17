@@ -67,8 +67,6 @@ jobs:
           - charm-repo: canonical/jimm
             charm-root: charms/jimm
           - charm-repo: canonical/k8s-operator
-            charm-root: charms/worker
-          - charm-repo: canonical/k8s-operator
             charm-root: charms/worker/k8s
           - charm-repo: canonical/kafka-k8s-operator
             charm-root: .

@@ -76,7 +76,7 @@ CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
     'catalogue-k8s-operator': ['charm'],
     'jimm': ['charms/jimm'],
-    'k8s-operator': ['charms/worker', 'charms/worker/k8s'],
+    'k8s-operator': ['charms/worker/k8s'],
     'katib-operators': ['charms/katib-controller', 'charms/katib-db-manager', 'charms/katib-ui'],
     'kfp-operators': [
         'charms/kfp-api',
