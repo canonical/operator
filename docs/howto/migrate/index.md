@@ -1,6 +1,6 @@
-# Legacy how-to guides
+# Migration guides
 
-These guides cover deprecated approaches to charming.
+These guides help you migrate away from deprecated approaches to charming.
 
 ## Harness
 
