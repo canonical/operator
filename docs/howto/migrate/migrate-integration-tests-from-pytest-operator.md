@@ -369,5 +369,6 @@ def fast_forward(juju: jubilant.Juju):
 
 ## See more
 
+- [](write-integration-tests-for-a-charm)
 - {external+jubilant:doc}`Jubilant's API Reference <reference/jubilant>`
 - [This discourse-k8s migration PR](https://github.com/canonical/discourse-k8s-operator/pull/326) shows how we migrated a real charm's integration tests
