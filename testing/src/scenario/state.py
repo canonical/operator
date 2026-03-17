@@ -314,12 +314,15 @@ class Secret:
             raise StateValidationError(
                 f'Secret.{name} must not be empty; Juju requires at least one key',
             )
-        for k, v in content.items():
-            if not isinstance(k, str) or not isinstance(v, str):
-                raise StateValidationError(
-                    f'Secret.{name} should be Dict[str, str]; '
-                    f'found key of type {type(k)} and value of type {type(v)}',
-                )
+        bad = {
+            k: v for k, v in content.items()
+            if not isinstance(k, str) or not isinstance(v, str)
+        }
+        if bad:
+            raise StateValidationError(
+                f'Secret.{name} should be dict[str, str]; '
+                f'found non-string key(s)/value(s): {bad}',
+            )
 
     def __post_init__(self):
         self._validate_content(self.tracked_content, 'tracked_content')
