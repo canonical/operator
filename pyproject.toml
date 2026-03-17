@@ -235,6 +235,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
     "S607",  # Starting a process with a partial executable path
 ]
+".github/patch-charm-deps.py" = [
+    "S607",  # Starting a process with a partial executable path
+]
 "docs/custom_conf.py" = [
     "D100",  # Missing docstring in public module
     "D101",  # Missing docstring in public class

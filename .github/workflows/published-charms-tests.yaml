@@ -219,14 +219,14 @@ jobs:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels
 
-      - name: Install patch dependencies
-        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
-
       - name: Set up Python 3.11 for wordpress-k8s (mysql-connector-python has no 3.12 wheels)
         if: matrix.charm-repo == 'canonical/wordpress-k8s-operator'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Install patch dependencies
+        run: pip install poetry~=2.0 uv~=0.6 tox-uv~=1.2
 
       - name: Update 'ops' and 'ops-scenario' dependencies in test charm to latest
         working-directory: charm-repo/${{ matrix.charm-root }}
@@ -235,7 +235,7 @@ jobs:
           # Get the absolute paths to the wheels
           ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
           ops_scenario_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops_scenario-*.whl)"
-          
+
           # Use --max-python-version for wordpress-k8s to cap at 3.11
           if [ "${{ matrix.charm-repo }}" = "canonical/wordpress-k8s-operator" ]; then
             python /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}" --max-python-version=3.12
@@ -244,12 +244,26 @@ jobs:
           fi
       - name: Install dependencies
         id: deps
-        run: pip install tox~=4.2
+        run: |
+          pip install tox~=4.2
+          uv tool install 'coverage[toml]'
 
         # The following test steps will only run if the last setup step (deps) succeeded.
 
+      - name: Check for tox unit environment
+        id: has-unit
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: charm-repo/${{ matrix.charm-root }}
+        run: |
+          set -xueo pipefail
+          if tox list --no-desc | grep '^unit$'; then
+            echo 'unit=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'unit=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run the charm's unit tests
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}  # default behaviour if 1st step
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-unit.outputs.unit == 'true' }}
         working-directory: charm-repo/${{ matrix.charm-root }}
         run: tox -vve unit
         env:

@@ -21,6 +21,7 @@ import argparse
 import configparser
 import copy
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -177,6 +178,21 @@ def update_pyproject_python_version(
     pyproject.write_text(tomli_w.dumps(data))
     print(f'  ✓ Updated {pyproject.relative_to(charm_root)}')
 
+    # If a uv.lock exists, update it to reflect the new requires-python
+    uv_lock = charm_root / 'uv.lock'
+    if uv_lock.exists():
+        print('  Updating uv.lock after requires-python change...')
+        result = subprocess.run(
+            ['uv', 'lock', '--python-preference', 'system'],
+            cwd=charm_root,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            print('  ✓ Updated uv.lock')
+        else:
+            print(f'  ✗ Failed to update uv.lock: {result.stderr.strip()}')
+
 
 def update_python_version_file(
     python_version_file: Path, charm_root: Path, max_version: str | None = None
@@ -300,13 +316,14 @@ def add_tox_pip_commands_ini(
         print('    Creating new allowlist_externals with pip')
         config.set(section, 'allowlist_externals', 'pip')
 
-    # Add commands_pre
+    # Append to commands_pre (preserve existing commands like 'poetry install')
     print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
-    commands_pre = (
+    new_commands = (
         f'\n    {pip_cmd} --force-reinstall --no-deps {ops_wheel}'
         f'\n    {pip_cmd} --no-deps {ops_scenario_wheel}'
     )
-    config.set(section, 'commands_pre', commands_pre)
+    existing = config.get(section, 'commands_pre', fallback='')
+    config.set(section, 'commands_pre', existing + new_commands)
 
     with open(tox_ini_path, 'w') as f:
         config.write(f)
@@ -369,16 +386,24 @@ def add_tox_pip_commands_toml(
     else:
         print('      pip already in allowlist_externals, skipping')
 
-    # Update commands_pre
+    # Update commands_pre (tox 4 TOML format requires list-of-lists)
+    pip_args = ['uv', 'pip', 'install'] if use_uv_pip else ['pip', 'install']
+    new_commands = [
+        [*pip_args, '--force-reinstall', '--no-deps', ops_wheel],
+        [*pip_args, '--no-deps', ops_scenario_wheel],
+    ]
     if 'commands_pre' not in current:
         print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
-        current['commands_pre'] = [
-            f'{pip_cmd} --force-reinstall --no-deps {ops_wheel}',
-            f'{pip_cmd} --no-deps {ops_scenario_wheel}',
-        ]
+        current['commands_pre'] = new_commands
         modified = True
     else:
-        print('    commands_pre already exists, skipping')
+        print(f"    Appending to existing commands_pre (using '{pip_cmd}')")
+        existing = current['commands_pre']
+        if isinstance(existing, list):
+            current['commands_pre'] = existing + new_commands
+        else:
+            current['commands_pre'] = new_commands
+        modified = True
 
     if modified:
         with open(tox_toml_path, 'wb') as f:
@@ -565,6 +590,81 @@ def patch_poetry(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> b
     return False
 
 
+def _patch_uv_deps_directly(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
+    """Patch uv dependencies directly via uv CLI when no tox config exists.
+
+    Args:
+        charm_root: Root directory of the charm
+        ops_wheel: Path to ops wheel file
+        ops_scenario_wheel: Path to ops-scenario wheel file
+
+    Returns:
+        True if patched successfully, False otherwise
+    """
+    print('  No tox config found, patching dependencies directly via uv CLI')
+
+    # Read pyproject.toml to find where ops-scenario lives (might be in a group)
+    pyproject = charm_root / 'pyproject.toml'
+    scenario_group = None
+    if pyproject.exists():
+        data = tomllib.loads(pyproject.read_text())
+        # Check dependency-groups for ops-scenario
+        for group_name, group_deps in data.get('dependency-groups', {}).items():
+            for dep in group_deps:
+                if isinstance(dep, str) and re.match(r'^ops-scenario\b', dep):
+                    scenario_group = group_name
+                    break
+
+    # Remove existing ops deps (ignore errors - they may not exist)
+    for dep_name in ('ops[testing]', 'ops'):
+        subprocess.run(
+            ['uv', 'remove', dep_name, '--frozen'],
+            cwd=charm_root,
+            capture_output=True,
+            text=True,
+        )
+
+    # Remove ops-scenario from its group (if found)
+    if scenario_group:
+        subprocess.run(
+            ['uv', 'remove', 'ops-scenario', '--group', scenario_group, '--frozen'],
+            cwd=charm_root,
+            capture_output=True,
+            text=True,
+        )
+
+    # Add the ops wheel
+    result = subprocess.run(
+        ['uv', 'add', ops_wheel, '--raw-sources', '--prerelease=if-necessary-or-explicit'],
+        cwd=charm_root,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f'    ✗ Failed to add ops wheel: {result.stderr.strip()}')
+        return False
+    print('    ✓ Added ops wheel')
+
+    # Add the ops-scenario wheel (to its original group if known)
+    scenario_cmd = [
+        'uv',
+        'add',
+        ops_scenario_wheel,
+        '--raw-sources',
+        '--prerelease=if-necessary-or-explicit',
+    ]
+    if scenario_group:
+        scenario_cmd.extend(['--group', scenario_group])
+    result = subprocess.run(scenario_cmd, cwd=charm_root, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f'    ✗ Failed to add ops-scenario wheel: {result.stderr.strip()}')
+        # Still return True since ops was updated successfully
+    else:
+        print('    ✓ Added ops-scenario wheel')
+
+    return True
+
+
 def patch_uv(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
     """Patch uv-based charm dependencies.
 
@@ -572,16 +672,15 @@ def patch_uv(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
         True if patched successfully, False otherwise
     """
     print('✓ Found uv-based charm')
-    print('  Strategy: Force-reinstall wheels via tox after uv install')
 
-    # uv doesn't support adding local wheels to the lock file
-    # Instead, patch tox config to force-reinstall the wheels after uv installs its dependencies
+    # Try tox config first
     if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel):
+        print('  Strategy: Force-reinstall wheels via tox after uv install')
         print('    ✓ Updated tox config to force-reinstall ops 3.x wheels')
         return True
-    else:
-        print('    ✗ Error: uv-based charm has no tox config to patch')
-        return False
+
+    # No tox config - patch deps directly via uv CLI
+    return _patch_uv_deps_directly(charm_root, ops_wheel, ops_scenario_wheel)
 
 
 def main() -> int:
