@@ -12,6 +12,16 @@ Harness is a deprecated framework for writing unit tests. You should migrate to 
 Migrate unit tests from Harness <migrate-unit-tests-from-harness>
 ```
 
+## pytest-operator
+
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+
+```{toctree}
+:maxdepth: 1
+
+Migrate integration tests from pytest-operator <migrate-integration-tests-from-pytest-operator>
+```
+
 ## Hooks-based charms
 
 Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
