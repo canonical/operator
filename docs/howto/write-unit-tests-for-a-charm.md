@@ -136,9 +136,7 @@ Rename or remove the overlapping keys to fix this.
 
 ## Generate tests from a deployed model
 
-If your test needs realistic relation inputs from a deployed model, you can use
-`jhack scenario snapshot` to capture state, then adapt the generated data to
-`ops.testing.State` and `ops.testing.Context`.
+If your test needs realistic relation inputs from a deployed model, you can use `jhack scenario snapshot` to capture state, then adapt the generated data to `ops.testing` code.
 
 For a workflow focused on relation debugging, see
 [](#generate-tests-from-a-deployed-model).
