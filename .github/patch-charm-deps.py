@@ -168,7 +168,7 @@ def update_pyproject_python_version(
         return
 
     if max_version:
-        new_requires = f'>=3.10,<{max_version}'
+        new_requires = f'>=3.10,<={max_version}'
     elif re.match(r'>=3\.[89]', requires_python):
         new_requires = '>=3.10'
     else:
@@ -188,10 +188,10 @@ def update_pyproject_python_version(
             capture_output=True,
             text=True,
         )
-        if result.returncode == 0:
-            print('  ✓ Updated uv.lock')
-        else:
+        if result.returncode != 0:
             print(f'  ✗ Failed to update uv.lock: {result.stderr.strip()}')
+            sys.exit(1)
+        print('  ✓ Updated uv.lock')
 
 
 def update_python_version_file(
@@ -376,10 +376,7 @@ def add_tox_pip_commands_toml(
         print('    Creating new allowlist_externals with pip')
         current['allowlist_externals'] = ['pip']
         modified = True
-    elif (
-        isinstance(current['allowlist_externals'], list)
-        and 'pip' not in current['allowlist_externals']
-    ):
+    elif 'pip' not in current['allowlist_externals']:
         print('    Found existing allowlist_externals, appending pip')
         current['allowlist_externals'].append('pip')
         modified = True
@@ -603,17 +600,18 @@ def _patch_uv_deps_directly(charm_root: Path, ops_wheel: str, ops_scenario_wheel
     """
     print('  No tox config found, patching dependencies directly via uv CLI')
 
-    # Read pyproject.toml to find where ops-scenario lives (might be in a group)
+    # Read pyproject.toml to find which groups contain ops-scenario
     pyproject = charm_root / 'pyproject.toml'
-    scenario_group = None
+    scenario_groups: list[str] = []
     if pyproject.exists():
         data = tomllib.loads(pyproject.read_text())
         # Check dependency-groups for ops-scenario
-        for group_name, group_deps in data.get('dependency-groups', {}).items():
-            for dep in group_deps:
-                if isinstance(dep, str) and re.match(r'^ops-scenario\b', dep):
-                    scenario_group = group_name
-                    break
+        scenario_groups = [
+            group_name
+            for group_name, group_deps in data.get('dependency-groups', {}).items()
+            for dep in group_deps
+            if isinstance(dep, str) and re.match(r'^ops-scenario\b', dep)
+        ]
 
     # Remove existing ops deps (ignore errors - they may not exist)
     for dep_name in ('ops[testing]', 'ops'):
@@ -624,10 +622,10 @@ def _patch_uv_deps_directly(charm_root: Path, ops_wheel: str, ops_scenario_wheel
             text=True,
         )
 
-    # Remove ops-scenario from its group (if found)
-    if scenario_group:
+    # Remove ops-scenario from all groups where it was found
+    for group in scenario_groups:
         subprocess.run(
-            ['uv', 'remove', 'ops-scenario', '--group', scenario_group, '--frozen'],
+            ['uv', 'remove', 'ops-scenario', '--group', group, '--frozen'],
             cwd=charm_root,
             capture_output=True,
             text=True,
@@ -645,22 +643,25 @@ def _patch_uv_deps_directly(charm_root: Path, ops_wheel: str, ops_scenario_wheel
         return False
     print('    ✓ Added ops wheel')
 
-    # Add the ops-scenario wheel (to its original group if known)
-    scenario_cmd = [
-        'uv',
-        'add',
-        ops_scenario_wheel,
-        '--raw-sources',
-        '--prerelease=if-necessary-or-explicit',
-    ]
-    if scenario_group:
-        scenario_cmd.extend(['--group', scenario_group])
-    result = subprocess.run(scenario_cmd, cwd=charm_root, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f'    ✗ Failed to add ops-scenario wheel: {result.stderr.strip()}')
-        # Still return True since ops was updated successfully
-    else:
-        print('    ✓ Added ops-scenario wheel')
+    # Add the ops-scenario wheel to each group it was originally in
+    scenario_add_targets = scenario_groups or [None]
+    for group in scenario_add_targets:
+        scenario_cmd = [
+            'uv',
+            'add',
+            ops_scenario_wheel,
+            '--raw-sources',
+            '--prerelease=if-necessary-or-explicit',
+        ]
+        if group:
+            scenario_cmd.extend(['--group', group])
+        result = subprocess.run(scenario_cmd, cwd=charm_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f'    ✗ Failed to add ops-scenario wheel: {result.stderr.strip()}')
+            # Still return True since ops was updated successfully
+        else:
+            group_label = f' (group: {group})' if group else ''
+            print(f'    ✓ Added ops-scenario wheel{group_label}')
 
     return True
 

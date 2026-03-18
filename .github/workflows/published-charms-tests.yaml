@@ -236,9 +236,9 @@ jobs:
 
           # Use --max-python-version for wordpress-k8s to cap at 3.11
           if [ "${{ matrix.charm-repo }}" = "canonical/wordpress-k8s-operator" ]; then
-            python /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}" --max-python-version=3.12
+            /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}" --max-python-version=3.11
           else
-            python /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}"
+            /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}"
           fi
       - name: Install dependencies
         id: deps
