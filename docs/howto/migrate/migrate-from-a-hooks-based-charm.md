@@ -1,5 +1,5 @@
 (turn-a-hooks-based-charm-into-an-ops-charm)=
-# How to turn a hooks-based charm into an ops charm
+# How to migrate from a hooks-based charm
 > See first: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
 
 Suppose you have a hooks-based charm and you decide to rewrite it using the Ops framework in Python.

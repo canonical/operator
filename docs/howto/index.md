@@ -127,18 +127,22 @@ Trace your charm <trace-your-charm>
 Make your charm discoverable <make-your-charm-discoverable>
 ```
 
-## Legacy guides
+## Migration guides
 
 ```{toctree}
 :hidden:
 
-Legacy how-to guides <legacy/index>
+Migration guides <migrate/index>
 ```
 
 Harness is a deprecated framework for writing unit tests. You should migrate to state-transition tests.
 
-- {doc}`Migrate unit tests from Harness <legacy/migrate-unit-tests-from-harness>`
+- {doc}`Migrate unit tests from Harness <migrate/migrate-unit-tests-from-harness>`
+
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+
+- {doc}`Migrate integration tests from pytest-operator <migrate/migrate-integration-tests-from-pytest-operator>`
 
 Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
 
-- {doc}`Turn a hooks-based charm into an ops charm <legacy/turn-a-hooks-based-charm-into-an-ops-charm>`
+- {doc}`Migrate from a hooks-based charm <migrate/migrate-from-a-hooks-based-charm>`
