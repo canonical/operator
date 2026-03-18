@@ -151,15 +151,12 @@ def update_tox_python_version(tox_config: Path, charm_root: Path) -> None:
         _update_tox_python_version_toml(tox_config, charm_root)
 
 
-def update_pyproject_python_version(
-    pyproject: Path, charm_root: Path, max_version: str | None = None
-) -> None:
+def update_pyproject_python_version(pyproject: Path, charm_root: Path) -> None:
     """Update requires-python in pyproject.toml.
 
     Args:
         pyproject: Path to pyproject.toml
         charm_root: Root directory of charm (for relative path display)
-        max_version: Optional maximum Python version (e.g., "3.12")
     """
     data = tomllib.loads(pyproject.read_text())
 
@@ -167,9 +164,7 @@ def update_pyproject_python_version(
     if requires_python is None:
         return
 
-    if max_version:
-        new_requires = f'>=3.10,<={max_version}'
-    elif re.match(r'>=3\.[89]', requires_python):
+    if re.match(r'>=3\.[89]', requires_python):
         new_requires = '>=3.10'
     else:
         return
@@ -194,18 +189,14 @@ def update_pyproject_python_version(
         print('  ✓ Updated uv.lock')
 
 
-def update_python_version_file(
-    python_version_file: Path, charm_root: Path, max_version: str | None = None
-) -> None:
+def update_python_version_file(python_version_file: Path, charm_root: Path) -> None:
     """Update .python-version file.
 
     Args:
         python_version_file: Path to .python-version
         charm_root: Root directory of charm (for relative path display)
-        max_version: Optional maximum Python version (e.g., "3.12")
     """
     content = python_version_file.read_text().strip()
-    # Replace any 3.8 or 3.9 version with 3.10 (or 3.11 if max_version is 3.12)
     # Use fullmatch with explicit minor versions to avoid matching 3.80, 3.81, etc.
     if re.fullmatch(r'3\.(8|9)(\.\d+)?', content):
         new_version = '3.10'
@@ -213,12 +204,11 @@ def update_python_version_file(
         print(f'  ✓ Updated {python_version_file.relative_to(charm_root)} to {new_version}')
 
 
-def update_python_version_requirements(charm_root: Path, max_version: str | None = None) -> None:
-    """Update Python version requirements to >=3.10 (and optionally cap at max_version).
+def update_python_version_requirements(charm_root: Path) -> None:
+    """Update Python version requirements to >=3.10.
 
     Args:
         charm_root: Root directory of the charm
-        max_version: Optional maximum Python version (e.g., "3.12")
     """
     print('\nUpdating Python version requirements...')
 
@@ -230,12 +220,12 @@ def update_python_version_requirements(charm_root: Path, max_version: str | None
     # Update pyproject.toml requires-python
     pyproject = charm_root / 'pyproject.toml'
     if pyproject.exists():
-        update_pyproject_python_version(pyproject, charm_root, max_version)
+        update_pyproject_python_version(pyproject, charm_root)
 
     # Update .python-version
     python_version_file = charm_root / '.python-version'
     if python_version_file.exists():
-        update_python_version_file(python_version_file, charm_root, max_version)
+        update_python_version_file(python_version_file, charm_root)
 
 
 def _detect_tox_uv_ini(config: configparser.ConfigParser) -> bool:
@@ -692,12 +682,6 @@ def main() -> int:
     parser.add_argument('ops_wheel', help='Path to ops wheel file')
     parser.add_argument('ops_scenario_wheel', help='Path to ops-scenario wheel file')
     parser.add_argument(
-        '--max-python-version',
-        help="Maximum Python version to support (e.g., '3.12'). "
-        "Must be strictly greater than '3.10'. "
-        'If specified, requires-python will be capped.',
-    )
-    parser.add_argument(
         '--charm-root',
         type=Path,
         default=Path.cwd(),
@@ -710,12 +694,10 @@ def main() -> int:
     print('Patching charm dependencies for ops 3.x compatibility testing')
     print(f'OPS WHEEL: {args.ops_wheel}')
     print(f'OPS-SCENARIO WHEEL: {args.ops_scenario_wheel}')
-    if args.max_python_version:
-        print(f'MAX PYTHON VERSION: {args.max_python_version}')
     print('=========================================')
 
     # Update Python version requirements
-    update_python_version_requirements(args.charm_root, args.max_python_version)
+    update_python_version_requirements(args.charm_root)
 
     # Detect dependency management system and patch accordingly
     print('\nDetecting dependency management system...')

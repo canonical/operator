@@ -71,6 +71,10 @@ SKIP = {
     'charm-weebl',
     # Read-only partial mirror of mysql-router-operators.
     'mysql-router-k8s-operator',
+    # mysql-connector-python has no wheels for Python 3.12+, and the charm
+    # pins Python 3.11 in .python-version.  Rather than adding per-charm
+    # version-cap logic, skip it until the dependency situation improves.
+    'wordpress-k8s-operator',
 }
 CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
