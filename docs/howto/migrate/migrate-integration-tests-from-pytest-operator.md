@@ -3,6 +3,10 @@
 
 Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to Jubilant.
 
+```{tip}
+Try bootstrapping your migration with an AI Agent (such as GitHub Copilot or Claude Code). Instruct the agent to clone the canonical/jubilant and canonical/pytest-jubilant repositories, study them, and then migrate the charm integration tests to Jubilant. You should end up with a great starting point to then continue as outlined in the rest of this guide.
+```
+
 To get help while you're migrating tests, please keep the {external+jubilant:doc}`Jubilant API Reference <reference/jubilant>` handy, and make use of your IDE's autocompletion -- Jubilant tries to provide good type annotations and docstrings.
 
 Migrating your tests can be broken into three steps:
