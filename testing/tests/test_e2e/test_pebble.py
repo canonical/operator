@@ -947,9 +947,6 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
         layers={'base': layer1, 'override': layer2},
     )
 
-    # Access plan twice and snapshot list fields immediately.  Without
-    # deepcopy the plans share the same underlying objects, so comparing
-    # plan1 vs plan2 attributes directly would always pass (same object).
     plan1 = container.plan
     svc1_after = list(plan1.services['svc-a'].after)
     svc1_before = list(plan1.services['svc-a'].before)
