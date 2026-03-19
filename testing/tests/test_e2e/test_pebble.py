@@ -921,6 +921,9 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
             'svc-a': {
                 'override': 'merge',
                 'command': '/bin/a2',
+                'after': ['redis'],
+                'before': ['cleanup'],
+                'requires': ['dep2'],
             },
         },
         'checks': {
@@ -933,6 +936,7 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
             'lt-a': {
                 'override': 'merge',
                 'location': 'https://loki2.example.com',
+                'services': ['svc-b'],
             },
         },
     })
