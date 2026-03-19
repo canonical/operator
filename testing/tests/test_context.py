@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 from scenario import Context, State
-from scenario.errors import UncaughtCharmError
+from scenario.errors import ContextSetupError, UncaughtCharmError
 from scenario.state import _Event, _next_action_id
 
 import ops
@@ -190,3 +191,107 @@ def test_charm_spec_is_deprecated():
     ctx = Context(CharmBase, meta={'name': 'some-name'})
     with pytest.warns(DeprecationWarning):
         _ = ctx.charm_spec  # type: ignore
+
+
+CONFIG: dict[str, Any] = {
+    'options': {'perambulator-abbreviation': {'type': 'string', 'default': 'pram'}}
+}
+ACTIONS: dict[str, Any] = {'do-foo': {'description': 'Who do? Foo do.'}}
+
+
+def test_init_with_meta_only():
+    meta = {'name': 'jane'}
+    ctx = Context(MyCharm, meta)
+    spec = ctx._charm_spec
+    assert spec.meta == meta
+    assert spec.config is None
+    assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_config_only():
+    ctx = Context(MyCharm, config=CONFIG)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'MyCharm'}
+    assert spec.config == CONFIG
+    assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_actions_only():
+    ctx = Context(MyCharm, actions=ACTIONS)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'MyCharm'}
+    assert spec.config is None
+    assert spec.actions == ACTIONS
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_no_meta():
+    with pytest.raises(ContextSetupError):
+        Context(MyCharm)
+
+
+def test_init_and_run_with_bad_meta():
+    bad_meta = {'a truth universally acknowledged': 'it'}
+    ctx = Context(MyCharm, bad_meta)
+    spec = ctx._charm_spec
+    assert spec.meta == bad_meta
+    assert spec.config is None
+    assert spec.actions is None
+    with pytest.raises((UncaughtCharmError, KeyError), match='name'):
+        ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_charmcraft_yaml_as_meta_w_actions():
+    charmcraft_yaml = {'name': 'mary', 'actions': ACTIONS}
+    ctx = Context(MyCharm, charmcraft_yaml)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'mary'}
+    assert spec.config is None
+    assert spec.actions == charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_charmcraft_yaml_as_meta_w_config():
+    charmcraft_yaml = {'name': 'lydia', 'config': CONFIG}
+    ctx = Context(MyCharm, charmcraft_yaml)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'lydia'}
+    assert spec.config == charmcraft_yaml['config']
+    assert spec.actions is None
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_charmcraft_yaml_as_meta_w_config_and_actions_only():
+    ctx = Context(MyCharm, {'config': CONFIG, 'actions': ACTIONS})
+    spec = ctx._charm_spec
+    assert spec.meta == {}
+    assert spec.config == CONFIG
+    assert spec.actions == ACTIONS
+    with pytest.raises((UncaughtCharmError, KeyError), match='name'):
+        ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_full_charmcraft_yaml_as_meta():
+    charmcraft_yaml = {'name': 'anne', 'config': CONFIG, 'actions': ACTIONS}
+    ctx = Context(MyCharm, charmcraft_yaml)
+    spec = ctx._charm_spec
+    assert spec.meta == {'name': 'anne'}
+    assert spec.config == charmcraft_yaml['config']
+    assert spec.actions == charmcraft_yaml['actions']
+    ctx.run(ctx.on.update_status(), State())
+
+
+def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
+    charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    with pytest.raises(ValueError, match='config'):
+        Context(MyCharm, charmcraft_yaml, config=config)
+
+
+def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
+    charmcraft_yaml = {'name': 'catherine', 'config': CONFIG, 'actions': ACTIONS}
+    actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
+    with pytest.raises(ValueError, match='actions'):
+        Context(MyCharm, charmcraft_yaml, actions=actions)
