@@ -943,20 +943,33 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
         layers={'base': layer1, 'override': layer2},
     )
 
-    # Access plan twice: the second access should return identical results.
+    # Access plan twice and snapshot list fields immediately.  Without
+    # deepcopy the plans share the same underlying objects, so comparing
+    # plan1 vs plan2 attributes directly would always pass (same object).
     plan1 = container.plan
+    svc1_after = list(plan1.services['svc-a'].after)
+    svc1_before = list(plan1.services['svc-a'].before)
+    svc1_requires = list(plan1.services['svc-a'].requires)
+    chk1_level = plan1.checks['chk-a'].level
+    lt1_services = list(plan1.log_targets['lt-a'].services)
+
     plan2 = container.plan
+    svc2_after = list(plan2.services['svc-a'].after)
+    svc2_before = list(plan2.services['svc-a'].before)
+    svc2_requires = list(plan2.services['svc-a'].requires)
+    chk2_level = plan2.checks['chk-a'].level
+    lt2_services = list(plan2.log_targets['lt-a'].services)
 
     # Service list fields must not accumulate duplicates.
-    assert plan1.services['svc-a'].after == plan2.services['svc-a'].after
-    assert plan1.services['svc-a'].before == plan2.services['svc-a'].before
-    assert plan1.services['svc-a'].requires == plan2.services['svc-a'].requires
+    assert svc1_after == svc2_after
+    assert svc1_before == svc2_before
+    assert svc1_requires == svc2_requires
 
     # Check fields must be stable across accesses.
-    assert plan1.checks['chk-a'].level == plan2.checks['chk-a'].level
+    assert chk1_level == chk2_level
 
     # Log target list fields must not accumulate duplicates.
-    assert plan1.log_targets['lt-a'].services == plan2.log_targets['lt-a'].services
+    assert lt1_services == lt2_services
 
     # Also verify the original layer objects are not mutated.
     assert layer1.services['svc-a'].after == ['other']
