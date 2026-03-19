@@ -296,7 +296,7 @@ from ops import testing
 ctx = testing.Context(MyCharm)
 relation = testing.Relation(endpoint='smtp', remote_units_data={1: {}})
 state_in = testing.State(relations={relation})
-state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit_id=1), state=state_in)
+state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit=1), state=state_in)
 assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
 ```
 

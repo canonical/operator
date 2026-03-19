@@ -3360,25 +3360,23 @@ class TestExecError:
 
     def test_str(self):
         e = pebble.ExecError[str](['x'], 1, None, None)
-        assert str(e) == "non-zero exit code 1 executing ['x']"
+        assert str(e) == "non-zero exit code 1 executing 'x'"
 
         e = pebble.ExecError(['x'], 1, 'only-out', None)
-        assert str(e) == "non-zero exit code 1 executing ['x'], stdout='only-out'"
+        assert str(e) == "non-zero exit code 1 executing 'x', stdout='only-out'"
 
         e = pebble.ExecError(['x'], 1, None, 'only-err')
-        assert str(e) == "non-zero exit code 1 executing ['x'], stderr='only-err'"
+        assert str(e) == "non-zero exit code 1 executing 'x', stderr='only-err'"
 
-        e = pebble.ExecError(['a', 'b'], 1, 'out', 'err')
-        assert (
-            str(e) == "non-zero exit code 1 executing ['a', 'b'], " + "stdout='out', stderr='err'"
-        )
+        e = pebble.ExecError(['a', 'b', 'c'], 1, 'out', 'err')
+        assert str(e) == "non-zero exit code 1 executing 'a', " + "stdout='out', stderr='err'"
 
     def test_str_truncated(self):
         e = pebble.ExecError(['foo'], 2, 'longout', 'longerr')
         e.STR_MAX_OUTPUT = 5  # type: ignore
         assert (
             str(e)
-            == "non-zero exit code 2 executing ['foo'], "
+            == "non-zero exit code 2 executing 'foo', "
             + "stdout='longo' [truncated], stderr='longe' [truncated]"
         )
 
