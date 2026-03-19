@@ -699,7 +699,7 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            meta = copy.deepcopy(meta) if meta is not None else {'name': str(charm_type.__name__)}
+            meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
             if actions is not None and 'actions' in meta:
                 raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
             actions = copy.deepcopy(actions) if actions is not None else meta.pop('actions', None)
