@@ -1089,6 +1089,7 @@ class Container:
         for layer in self.layers.values():
             for name, service in layer.services.items():
                 if name in services and service.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     services[name]._merge(service)
                 else:
                     services[name] = copy.deepcopy(service)
@@ -1099,6 +1100,7 @@ class Container:
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     checks[name]._merge(check)
                 else:
                     checks[name] = copy.deepcopy(check)
@@ -1109,6 +1111,7 @@ class Container:
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     log_targets[name]._merge(log_target)
                 else:
                     log_targets[name] = copy.deepcopy(log_target)
