@@ -3044,7 +3044,8 @@ class Container:
             type=ftype,
             size=info.st_size,
             permissions=stat.S_IMODE(info.st_mode),
-            last_modified=datetime.datetime.fromtimestamp(info.st_mtime, tz=datetime.timezone.utc),
+            # This is unused, but a required FileInfo field.
+            last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pw_name,
             group_id=info.st_gid,
