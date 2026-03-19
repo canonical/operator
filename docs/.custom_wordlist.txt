@@ -12,6 +12,7 @@ Dependabot
 dict's
 failover
 IDE's
+jhack
 Jubilant's
 lightkube
 liveness
