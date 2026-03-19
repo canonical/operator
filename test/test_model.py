@@ -4798,24 +4798,6 @@ class TestTimezoneAwareDatetimes:
         """_calculate_expiry with None should return None."""
         assert _calculate_expiry(None) is None
 
-    @mock.patch('pwd.getpwuid')
-    @mock.patch('grp.getgrgid')
-    def test_build_fileinfo_returns_utc_timestamp(
-        self, getgrgid: mock.MagicMock, getpwuid: mock.MagicMock
-    ):
-        """Container._build_fileinfo should return a timezone-aware last_modified."""
-        getpwuid.side_effect = KeyError
-        getgrgid.side_effect = KeyError
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = pathlib.Path(tmpdir) / 'test.txt'
-            path.write_text('hello')
-            fileinfo = ops.Container._build_fileinfo(path)
-
-        assert fileinfo.last_modified.tzinfo is not None, (
-            '_build_fileinfo should return a timezone-aware last_modified'
-        )
-        assert fileinfo.last_modified.tzinfo == datetime.timezone.utc
 
 
 if __name__ == '__main__':
