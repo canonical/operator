@@ -1089,9 +1089,10 @@ class Container:
         for layer in self.layers.values():
             for name, service in layer.services.items():
                 if name in services and service.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     services[name]._merge(service)
                 else:
-                    services[name] = service
+                    services[name] = copy.deepcopy(service)
         return services
 
     def _render_checks(self) -> dict[str, pebble.Check]:
@@ -1099,9 +1100,10 @@ class Container:
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     checks[name]._merge(check)
                 else:
-                    checks[name] = check
+                    checks[name] = copy.deepcopy(check)
         return checks
 
     def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
@@ -1109,9 +1111,10 @@ class Container:
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     log_targets[name]._merge(log_target)
                 else:
-                    log_targets[name] = log_target
+                    log_targets[name] = copy.deepcopy(log_target)
         return log_targets
 
     @property
