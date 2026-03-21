@@ -316,14 +316,13 @@ class Secret:
         )
         object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
         object.__setattr__(self, 'owner', owner)
-        remote_grants = {k: frozenset(v) for k, v in remote_grants.items()}
-        object.__setattr__(self, 'remote_grants', remote_grants)
+        object.__setattr__(
+            self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()}
+        )
         object.__setattr__(self, 'label', label)
         object.__setattr__(self, 'description', description)
         object.__setattr__(self, 'expire', expire)
         object.__setattr__(self, 'rotate', rotate)
-        object.__setattr__(self, '_tracked_revision', 1)
-        object.__setattr__(self, '_latest_revision', 1)
         _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
