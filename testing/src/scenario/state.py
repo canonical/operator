@@ -324,13 +324,11 @@ class Secret:
                 f'Secret.{name} must not be empty; Juju requires at least one key',
             )
         bad = {
-            k: v for k, v in content.items()
-            if not isinstance(k, str) or not isinstance(v, str)
+            k: v for k, v in content.items() if not isinstance(k, str) or not isinstance(v, str)
         }
         if bad:
             raise StateValidationError(
-                f'Secret.{name} should be dict[str, str]; '
-                f'found non-string key(s)/value(s): {bad}',
+                f'Secret.{name} should be dict[str, str]; found non-string key(s)/value(s): {bad}',
             )
 
     def _set_label(self, label: str):
