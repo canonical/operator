@@ -1,6 +1,7 @@
 # Leave a blank line at the end of this file to support concatenation
 backoff
 balancer's
+breakpoint
 callables
 Canonical's
 databag
@@ -34,6 +35,7 @@ subprocess
 tinyproxy
 traceback
 tracebacks
+uniter
 untyped
 unpatched
 uv

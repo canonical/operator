@@ -18,7 +18,7 @@ juju debug-log --include unit-myapp-0            # only logs from myapp/0
 juju debug-log --include-module unit.myapp/0.juju-log  # only charm-level logs
 ```
 
-Multiple `--include` or `--exclude` flags are ORed within each category, and the categories (entity, module, label) are ANDed together. This lets you build precise filters. For example, to see only charm logs and uniter operations at DEBUG level:
+Multiple `--include` or `--exclude` flags are combined with 'OR' within each category, and the categories (entity, module, label) are joined with 'AND'. This lets you build precise filters. For example, to see only charm logs and uniter operations at DEBUG level:
 
 ```shell
 juju debug-log --debug \
@@ -51,20 +51,20 @@ If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), rememb
 (debug-hooks)=
 ## Interactively debug hooks with `juju debug-hooks`
 
-The `juju debug-hooks` command opens a [tmux](https://github.com/tmux/tmux/wiki) session on a unit. When a matching hook fires, the session navigates to the charm directory with the full hook environment configured -- but the hook is **not** executed automatically. This gives you a chance to inspect the environment, modify files, and run the hook yourself.
+The `juju debug-hooks` command opens a [`tmux`](https://github.com/tmux/tmux/wiki) session on a unit. When a matching hook fires, the session navigates to the charm directory with the full hook environment configured -- but the hook is **not** executed automatically. This gives you a chance to inspect the environment, modify files, and run the hook yourself.
 
 ```shell
 juju debug-hooks myapp/0                       # intercept all hooks and actions
 juju debug-hooks myapp/0 config-changed        # intercept only config-changed
 ```
 
-*Once a hook fires*, the tmux session lands in the charm directory. From there you can:
+*Once a hook fires*, the `tmux` session lands in the charm directory. From there you can:
 
 - Inspect the environment variables that Juju provides (e.g. `JUJU_DISPATCH_PATH`).
 - Examine or modify files under `src/`.
 - Run `./dispatch` to execute the hook manually.
 - Run `./dispatch` again after making changes, to iterate.
-- Exit the tmux session to let the unit resume normal operation.
+- Exit the `tmux` session to let the unit resume normal operation.
 
 ```{note}
 While a hook is being debugged, the unit is paused. Other hooks queue up and execute in order once you exit. Keep your debugging sessions short to avoid blocking the unit for too long.
@@ -108,7 +108,7 @@ Python's built-in {external+python:func}`breakpoint` also works when `JUJU_DEBUG
 (remote-debugging-with-vs-code)=
 ## Remote debugging with VS Code
 
-For a richer debugging experience, you can attach VS Code's debugger to a running charm using [debugpy](https://github.com/microsoft/debugpy). This gives you a full graphical debugger with breakpoints, variable inspection, watch expressions, and call stack navigation.
+For a richer debugging experience, you can attach VS Code's debugger to a running charm using [`debugpy`](https://github.com/microsoft/debugpy). This gives you a full graphical debugger with breakpoints, variable inspection, watch expressions, and call stack navigation.
 
 ### Set up the charm
 
@@ -257,6 +257,6 @@ A typical debugging workflow combines several of these tools:
 3. Start `jhack sync myapp/0 -s ./src -s ./lib` so that local code changes are pushed to the unit automatically.
 4. Add `self.framework.breakpoint('my-bp')` at the point you want to inspect.
 5. Run `juju debug-code myapp/0` and trigger the relevant event (either by waiting for it naturally or using `jhack fire`).
-6. Step through the code in pdb, inspect variables, and identify the problem.
+6. Step through the code in `pdb`, inspect variables, and identify the problem.
 7. Fix the code locally -- `jhack sync` pushes it to the unit -- and use `jhack fire` to re-trigger the event.
 8. Watch the result with `jhack tail` or `juju debug-log`.
