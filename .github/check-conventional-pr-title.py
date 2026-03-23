@@ -58,8 +58,7 @@ def _main() -> None:
     scope = match.group('scope')
     if scope is not None:
         print(
-            f'Scopes are not used in PR titles.\n'
-            f'Got: {title!r}',
+            f'Scopes are not used in PR titles.\nGot: {title!r}',
             file=sys.stderr,
         )
         sys.exit(1)
