@@ -42,7 +42,7 @@ from ops._private import yaml
 from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
-from ops.model import _calculate_expiry, _ModelBackend
+from ops.model import _ModelBackend
 from test.test_helpers import FakeScript
 
 
@@ -3498,6 +3498,19 @@ class TestSecrets:
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
+    def test_app_add_secret_timedelta_expire_is_utc(
+        self, fake_script: FakeScript, model: ops.Model
+    ):
+        fake_script.write('secret-add', 'echo secret:234')
+
+        model.app.add_secret({'foo': 'x'}, expire=datetime.timedelta(hours=1))
+
+        calls = fake_script.calls(clear=True)
+        expire_arg = calls[0][calls[0].index('--expire') + 1]
+        assert expire_arg.endswith('Z'), (
+            f'Expected UTC timezone suffix Z, got {expire_arg!r}'
+        )
+
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
 
@@ -4776,27 +4789,6 @@ def test_departing_unit_data_available(fake_script: FakeScript):
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/0'] in calls
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/1'] in calls
 
-
-class TestTimezoneAwareDatetimes:
-    def test_calculate_expiry_with_timedelta_returns_utc(self):
-        """_calculate_expiry with a timedelta should return a timezone-aware UTC datetime."""
-        delta = datetime.timedelta(hours=1)
-        result = _calculate_expiry(delta)
-        assert result is not None
-        assert result.tzinfo is not None, (
-            '_calculate_expiry should return a timezone-aware datetime'
-        )
-        assert result.tzinfo == datetime.timezone.utc
-
-    def test_calculate_expiry_with_datetime_returns_as_is(self):
-        """_calculate_expiry with a datetime should return it unchanged."""
-        dt = datetime.datetime(2025, 6, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
-        result = _calculate_expiry(dt)
-        assert result is dt
-
-    def test_calculate_expiry_with_none_returns_none(self):
-        """_calculate_expiry with None should return None."""
-        assert _calculate_expiry(None) is None
 
 
 
