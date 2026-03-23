@@ -31,7 +31,7 @@ _TYPES = frozenset({
 
 # <type>[optional scope][optional !]: <description>
 _PATTERN = re.compile(
-    r'^(?P<type>[a-z]+)'
+    r'^(?p<type>[a-za-z]+)'  # lower-case only, but let this be validated by _TYPES
     r'(?:\((?P<scope>[^()]+)\))?'
     r'(?P<breaking>!)?'
     r': '
@@ -50,7 +50,8 @@ def _main() -> None:
         print(
             f'PR title does not follow Conventional Commits format.\n'
             f'Expected: <type>[!]: <description>\n'
-            f'Got: {title!r}',
+            f'Got: {title!r}\n'
+            'Read more: https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#pull-requests',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -58,7 +59,9 @@ def _main() -> None:
     scope = match.group('scope')
     if scope is not None:
         print(
-            f'Scopes are not used in PR titles.\nGot: {title!r}',
+            f'Scopes are not used in PR titles.\n'
+            f'Got: {title!r}\n'
+            'Read more: https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#pull-requests',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -68,7 +71,8 @@ def _main() -> None:
         print(
             f'Invalid type {commit_type!r} in PR title.\n'
             f'Valid types: {", ".join(sorted(_TYPES))}\n'
-            f'Got: {title!r}',
+            f'Got: {title!r}\n'
+            'Read more: https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#pull-requests',
             file=sys.stderr,
         )
         sys.exit(1)
