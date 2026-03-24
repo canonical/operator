@@ -147,6 +147,7 @@ def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
 
 A good integration testing suite will check that the charm continues to operate as expected whenever possible, by combining these simple elements.
 
+(write-integration-tests-for-a-charm-write-your-tests)
 ## Write your tests
 
 ### Write fixtures
