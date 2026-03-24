@@ -1,19 +1,7 @@
 (write-integration-tests-for-a-charm)=
 # How to write integration tests for a charm
 
-> See also: {ref}`testing`
-
-This document shows how to write integration tests for a charm.
-
-```{important}
-
-Integration testing is only one part of a comprehensive testing strategy. Also see {ref}`write-unit-tests-for-a-charm`.
-
-```
-
-The instructions all use the Jubilant library.
-
-> See more: [Jubilant documentation](https://documentation.ubuntu.com/jubilant/)
+Integration testing is only one part of a comprehensive testing strategy. For an overview of charm testing, see {ref}`testing`.
 
 (write-integration-tests-for-a-charm-prepare-your-environment)=
 ## Prepare your environment
