@@ -111,7 +111,7 @@ Below is an example of a typical integration test:
 ```python
 def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy this charm:
-    juju.deploy(f"./{charm}", config={"foo": ...})
+    juju.deploy(charm.resolve(), config={"foo": ...})
 
     # Deploy some charm from Charmhub:
     juju.deploy("ubuntu")
@@ -196,7 +196,7 @@ import jubilant
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
-    juju.deploy(f"./{charm}")
+    juju.deploy(charm.resolve())
     juju.wait(jubilant.all_active)
 ```
 
@@ -218,7 +218,7 @@ A charm can require `file` or `oci-image` resources to work, which have revision
 ```python
     ...
     resources = {"resource_name": "localhost:32000/image_name:latest"}
-    juju.deploy(f"./{charm}", resources=resources)
+    juju.deploy(charm.resolve(), resources=resources)
     ...
 ```
 
@@ -240,7 +240,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
         for name, res in METADATA["resources"].items()
     }
 
-    juju.deploy(f"./{charm}", resources=resources)
+    juju.deploy(charm.resolve(), resources=resources)
     juju.wait(jubilant.all_active)
 ```
 
