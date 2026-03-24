@@ -98,43 +98,6 @@ integration = [
 ]
 ```
 
-## Create a test file
-
-By convention, integration tests are kept in the charm’s source tree, in a directory called `tests/integration`.
-
-If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
-
-Also create a leaf file called `conftest.py`. We'll edit this file later.
-
-Below is an example of a typical integration test:
-
-```python
-def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
-    # Deploy this charm:
-    juju.deploy(charm.resolve(), config={"foo": ...})
-
-    # Deploy some charm from Charmhub:
-    juju.deploy("ubuntu")
-
-    # Integrate the charms:
-    juju.integrate("your-app:endpoint1", "ubuntu:endpoint2")
-
-    # Scale your application up:
-    juju.add_unit("your-app", num_units=2)
-
-    # Ensure that both applications and all units reach a good state:
-    juju.wait(jubilant.all_active)
-
-    # Run an action on a unit:
-    result = juju.run("your-app/0", "some-action")
-    assert result.results["key"] == "value"
-
-    # What this means depends on the workload:
-    assert charm_operates_correctly()
-```
-
-A good integration testing suite will check that the charm continues to operate as expected whenever possible, by combining these simple elements.
-
 (write-integration-tests-for-a-charm-write-your-tests)=
 ## Write your tests
 
@@ -184,6 +147,14 @@ The integration tests will depend on these fixtures.
 
 These fixtures don't pack your charm. You'll need to pack your charm before running the tests.
 
+> See more: [](jubilant.temp_model)
+
+### Create a test file
+
+By convention, integration tests are kept in the charm's source tree, in a directory called `tests/integration`.
+
+If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
+
 ### Deploy your charm
 
 Add this test in your integration test file:
@@ -200,14 +171,38 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
-
-> See more: [](jubilant.temp_model)
-
-#### Example implementations
+For examples, see:
 
 - [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/e54b482a4b72c45006451cd7436ec9f6e40162d6/tests/integration/test_charm.py#L15-L21)
 - [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/integration)
+
+Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
+
+### Exercise your charm
+
+After `test_deploy`, add more tests to check that your charm operates correctly. For example:
+
+```python
+def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
+    # Deploy some other charm from Charmhub:
+    juju.deploy("ubuntu")
+
+    # Integrate the charms:
+    juju.integrate("your-app:endpoint1", "ubuntu:endpoint2")
+
+    # Scale your application up:
+    juju.add_unit("your-app", num_units=2)
+
+    # Ensure that both applications and all units reach a good state:
+    juju.wait(jubilant.all_active)
+
+    # Run an action on a unit:
+    result = juju.run("your-app/0", "some-action")
+    assert result.results["key"] == "value"
+
+    # What this means depends on the workload:
+    assert charm_operates_correctly()
+```
 
 ### Deploy your charm with resources
 
