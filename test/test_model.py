@@ -3507,9 +3507,7 @@ class TestSecrets:
 
         calls = fake_script.calls(clear=True)
         expire_arg = calls[0][calls[0].index('--expire') + 1]
-        assert expire_arg.endswith('Z'), (
-            f'Expected UTC timezone suffix Z, got {expire_arg!r}'
-        )
+        assert expire_arg.endswith('Z'), f'Expected UTC timezone suffix Z, got {expire_arg!r}'
 
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
@@ -4788,8 +4786,6 @@ def test_departing_unit_data_available(fake_script: FakeScript):
     ]
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/0'] in calls
     assert ['relation-get', '--format=json', '-r', '1', '-', 'db/1'] in calls
-
-
 
 
 if __name__ == '__main__':
