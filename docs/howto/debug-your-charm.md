@@ -125,7 +125,7 @@ if os.getenv('JUJU_DEBUG_AT'):
     debugpy.wait_for_client()
 ```
 
-Place this at the top of the event handler you want to debug, or in your charm's `__init__` to intercept every hook.
+Place this at the top of the event handler you want to debug, or in your charm's `__init__` to intercept every hook. Note that to get access to the event data, you'll need to breakpoint in an event handler, not `__init__`.
 
 Repack and deploy the charm with `charmcraft pack`.
 
