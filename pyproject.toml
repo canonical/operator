@@ -43,6 +43,10 @@ lint = [
     "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
+mypy = [  # used to type check example charms in CI
+    "mypy>=1.19",
+    "types-PyYAML",
+]
 unit = [
     "ops[testing,tracing]",
     "pytest~=8.4",
@@ -239,6 +243,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 ]
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+    "S607",  # Starting a process with a partial executable path
+]
+".github/patch-charm-deps.py" = [
     "S607",  # Starting a process with a partial executable path
 ]
 "docs/custom_conf.py" = [
