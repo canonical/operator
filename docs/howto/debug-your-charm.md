@@ -40,7 +40,7 @@ The `--level` and `--debug` flags on `juju debug-log` only filter what is *displ
 juju model-config logging-config="<root>=WARNING;unit=DEBUG"
 ```
 
-This tells Juju to store DEBUG-level messages from charm units while keeping everything else at WARNING.
+This tells Juju to store DEBUG-level messages from charm units while keeping everything else at WARNING. For this to show up in your logs, you'll need to set `logging-config` *before* the event you're interested in runs.
 
 ```{tip}
 If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), remember to restore it to the default once you are done. Verbose logs consume storage in the Juju database and can affect controller performance.
