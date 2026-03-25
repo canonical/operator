@@ -46,7 +46,7 @@ This tells Juju to store DEBUG-level messages from charm units while keeping eve
 If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), remember to restore it to the default once you are done. Verbose logs consume storage in the Juju database and can affect controller performance.
 ```
 
-> See more: {external+juju:ref}`Juju | juju debug-log <command-juju-debug-log>`
+> See more: {external+juju:ref}`Juju | juju debug-log <command-juju-debug-log>`, {external+juju:ref}`Juju | logging-config <model-config-logging-config>`
 
 (use-jhack)=
 ## Use jhack for a faster debugging workflow
