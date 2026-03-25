@@ -48,6 +48,70 @@ If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), rememb
 
 > See more: {external+juju:ref}`Juju | juju debug-log <command-juju-debug-log>`
 
+(use-jhack)=
+## Use jhack for a faster debugging workflow
+
+[jhack](https://github.com/canonical/jhack) is a toolkit that provides higher-level utilities on top of Juju. Several of its commands are particularly useful during charm development and debugging, but in general jhack is not intended for production use. You do not need to modify your charm to use jhack, just install it:
+
+```shell
+sudo snap install jhack
+sudo snap connect jhack:dot-local-share-juju snapd
+```
+
+### Monitor events with `jhack tail`
+
+`jhack tail` watches the Juju log and displays charm events in a colour-coded, formatted table. It is much easier to scan than raw `juju debug-log` output when you want to understand the flow of events:
+
+```shell
+jhack tail myapp
+```
+
+### Trigger events with `jhack fire`
+
+`jhack fire` simulates a specific event on a live unit. This is useful for triggering an event on demand without waiting for Juju to emit it naturally:
+
+```shell
+jhack fire myapp/0 update-status
+jhack fire myapp/0 config-changed
+```
+
+```{caution}
+Firing events manually can desynchronise charm state from Juju state if your event handlers are not idempotent. Use this only in development and test environments.
+```
+
+### Push local changes with `jhack sync`
+
+`jhack sync` watches local directories and automatically pushes file changes to remote charm units. Combined with `jhack fire`, this enables a rapid edit-trigger-observe loop:
+
+```shell
+jhack sync myapp/0 --source ./src --source ./lib
+```
+
+### Inspect state with `jhack script`
+
+`jhack script` runs a custom Python script directly on a live unit. The script receives a charm instance and can inspect relations, config, and stored state without waiting for an event:
+
+```python
+# inspect_relations.py
+def main(charm):
+    for relation in charm.model.relations['database']:
+        print(relation.data[relation.app])
+```
+
+```shell
+jhack script myapp/0 ./inspect_relations.py
+```
+
+### Inspect relation data with `jhack show-relation`
+
+`jhack show-relation` displays the relation databags for all units involved in a relation:
+
+```shell
+jhack show-relation myapp:database postgresql:database
+```
+
+> See more: [jhack](https://github.com/canonical/jhack)
+
 (debug-hooks)=
 ## Interactively debug hooks with `juju debug-hooks`
 
@@ -190,70 +254,6 @@ ssh -N -L 5678:${UNIT_IP}:5678 ubuntu@${VM_IP}
 
 Then, in your `launch.json`, set `"host"` to `"localhost"` instead of the unit IP. VS Code will connect to the forwarded port on your host, and the SSH tunnel will relay traffic to `debugpy` on the charm unit inside the VM.
 ````
-
-(use-jhack)=
-## Use jhack for a faster debugging workflow
-
-[jhack](https://github.com/canonical/jhack) is a toolkit that provides higher-level utilities on top of Juju. Several of its commands are particularly useful during charm development and debugging, but in general jhack is not intended for production use. You do not need to modify your charm to use jhack, just install it:
-
-```shell
-sudo snap install jhack
-sudo snap connect jhack:dot-local-share-juju snapd
-```
-
-### Monitor events with `jhack tail`
-
-`jhack tail` watches the Juju log and displays charm events in a colour-coded, formatted table. It is much easier to scan than raw `juju debug-log` output when you want to understand the flow of events:
-
-```shell
-jhack tail myapp
-```
-
-### Trigger events with `jhack fire`
-
-`jhack fire` simulates a specific event on a live unit. This is useful for triggering an event on demand without waiting for Juju to emit it naturally:
-
-```shell
-jhack fire myapp/0 update-status
-jhack fire myapp/0 config-changed
-```
-
-```{caution}
-Firing events manually can desynchronise charm state from Juju state if your event handlers are not idempotent. Use this only in development and test environments.
-```
-
-### Push local changes with `jhack sync`
-
-`jhack sync` watches local directories and automatically pushes file changes to remote charm units. Combined with `jhack fire`, this enables a rapid edit-trigger-observe loop:
-
-```shell
-jhack sync myapp/0 --source ./src --source ./lib
-```
-
-### Inspect state with `jhack script`
-
-`jhack script` runs a custom Python script directly on a live unit. The script receives a charm instance and can inspect relations, config, and stored state without waiting for an event:
-
-```python
-# inspect_relations.py
-def main(charm):
-    for relation in charm.model.relations['database']:
-        print(relation.data[relation.app])
-```
-
-```shell
-jhack script myapp/0 ./inspect_relations.py
-```
-
-### Inspect relation data with `jhack show-relation`
-
-`jhack show-relation` displays the relation databags for all units involved in a relation:
-
-```shell
-jhack show-relation myapp:database postgresql:database
-```
-
-> See more: [jhack](https://github.com/canonical/jhack)
 
 ## Putting it all together
 
