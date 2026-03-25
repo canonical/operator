@@ -194,7 +194,12 @@ Then, in your `launch.json`, set `"host"` to `"localhost"` instead of the unit I
 (use-jhack)=
 ## Use jhack for a faster debugging workflow
 
-[jhack](https://github.com/canonical/jhack) is a toolkit that provides higher-level utilities on top of Juju. Several of its commands are particularly useful during charm development and debugging.
+[jhack](https://github.com/canonical/jhack) is a toolkit that provides higher-level utilities on top of Juju. Several of its commands are particularly useful during charm development and debugging, but in general jhack is not intended for production use. You do not need to modify your charm to use jhack, just install it:
+
+```shell
+sudo snap install jhack
+sudo snap connect jhack:dot-local-share-juju snapd
+```
 
 ### Monitor events with `jhack tail`
 
