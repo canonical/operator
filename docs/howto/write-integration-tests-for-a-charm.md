@@ -214,6 +214,8 @@ def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
     assert charm_operates_correctly()
 ```
 
+> See more: {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+
 ### Deploy your charm with resources
 
 > See first: {ref}`manage-resources`
