@@ -177,10 +177,14 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-For examples, see:
+This test deploys your charm and waits for all applications and units to be active.
 
-- [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/e54b482a4b72c45006451cd7436ec9f6e40162d6/tests/integration/test_charm.py#L15-L21)
-- [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/integration)
+Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
+
+For more examples of tests that deploy charms, see:
+
+- [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
+- [httpbin-demo](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/integration/test_charm.py)
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
 
