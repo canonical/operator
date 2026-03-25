@@ -176,9 +176,9 @@ For a richer debugging experience, you can attach VS Code's debugger to a runnin
 
 ### Set up the charm
 
-Add `debugpy` as a dependency of your charm. For example, with uv run `uv add debugpy` to add it to the `[project]` dependencies in `pyproject.toml`; with Poetry run `poetry add debugpy`; or with a plain `requirements.txt`, add a `debugpy` line.
+Add `debugpy` as a dependency of your charm. For example, with uv run `uv add debugpy` to add it to the `[project]` dependencies in `pyproject.toml`; with Poetry run `poetry add debugpy`; or with a plain `requirements.txt`, add a `debugpy` line. Remember to remove this when you're finished debugging.
 
-Then, in your charm code, add a `debugpy` listener that activates when `JUJU_DEBUG_AT` is set (i.e. when you run `juju debug-code`):
+Then, at the top of your `charm.py` module, add a `debugpy` listener that activates when you run `juju debug-code`:
 
 ```python
 import os
@@ -188,8 +188,6 @@ if os.getenv('JUJU_DEBUG_AT'):
     debugpy.listen(('0.0.0.0', 5678))
     debugpy.wait_for_client()
 ```
-
-Place this at the top of the event handler you want to debug, or in your charm's `__init__` to intercept every hook. Note that to get access to the event data, you'll need to breakpoint in an event handler, not `__init__`.
 
 Repack and deploy the charm with `charmcraft pack`.
 
@@ -231,7 +229,7 @@ juju show-unit myapp/0 | yq '.*.address'
 
 1. Run `juju debug-code myapp/0` to tell Juju to set `JUJU_DEBUG_AT` on the next hook execution.
 2. Trigger the hook you want to debug (or wait for it to fire naturally). The charm will start `debugpy` and block until a client connects.
-3. In VS Code, set your breakpoints and press **F5** (or click **Run > Start Debugging**).
+3. In VS Code, set your breakpoints (note that you'll need to have a breakpoint in an event handler to get access to the Ops event object) and press **F5** (or click **Run > Start Debugging**).
 
 ````{tip}
 **Debugging when Juju runs inside a Multipass VM**
