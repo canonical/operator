@@ -14,27 +14,31 @@ repos:
       - id: check-toml
       - id: mixed-line-ending
       - id: end-of-file-fixer
+        exclude: '^docs/reuse/best-practices\.txt$'
       - id: trailing-whitespace
+        exclude: '^docs/reuse/best-practices\.txt$'
       - id: detect-private-key
-  # Run the Ruff linter.
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.2
+  - repo: local
     hooks:
       - id: ruff
-        args: [ --preview ]
-        exclude: '^examples/'
+        name: ruff (uv)
+        entry: uv run --group lint -- ruff check --preview --force-exclude
+        language: system
+        types_or: [python, pyi]
+        exclude: '^(examples/|docs/conf\.py|docs/\.sphinx/|tracing/ops_tracing/vendor/)'
       - id: ruff-format
-        args: [ --preview ]
-        exclude: '^examples/'
-  # Spellcheck the code.
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
-    hooks:
-    - id: codespell
-      additional_dependencies:
-        - tomli
-  # Check workflow security.
-  - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.11.0
-    hooks:
-    - id: zizmor
+        name: ruff-format (uv)
+        entry: uv run --group lint -- ruff format --preview --force-exclude
+        language: system
+        types_or: [python, pyi]
+        exclude: '^(examples/|docs/conf\.py|docs/\.sphinx/|tracing/ops_tracing/vendor/)'
+      - id: codespell
+        name: codespell (uv)
+        entry: uv run --group lint -- codespell
+        language: system
+        types: [text]
+      - id: zizmor
+        name: zizmor (uv)
+        entry: uv run --group lint -- zizmor
+        language: system
+        files: '^\.github/workflows/.*\.ya?ml$'

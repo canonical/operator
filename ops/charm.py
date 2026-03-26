@@ -2019,7 +2019,7 @@ class RelationMeta:
     """
 
     optional: bool
-    """If True, the relation is considered optional.
+    """If true, the relation is considered optional.
 
     This value is informational only and is not used by Juju itself (all
     relations are optional from Juju's perspective), but it may be set in
@@ -2079,7 +2079,7 @@ class StorageMeta:
     multiple_range: tuple[int, int | None] | None
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = list[str]
+    properties: list[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: _StorageMetaDict):

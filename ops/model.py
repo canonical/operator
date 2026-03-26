@@ -259,7 +259,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key: str | Relation) -> Binding | None:
+    def get_binding(self, binding_key: str | Relation) -> Binding:
         """Get a network space binding.
 
         Args:
@@ -1382,7 +1382,7 @@ class Secret:
         identifier for identifying one secret in a set of secrets of arbitrary
         size, use :attr:`unique_identifier` -- this should be rare.)
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         return self._id
@@ -1401,7 +1401,7 @@ class Secret:
         cases where the charm has a set of secrets of arbitrary size, for
         example, a group of 10 or 20 TLS certificates.
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with a label but no ID.
         """
         if self._id is None:
@@ -1445,7 +1445,7 @@ class Secret:
         Juju will ensure that the entity (the owner or observer) only has one
         secret with this label at once.
 
-        This will be None if the secret was obtained using
+        This will be ``None`` if the secret was obtained using
         :meth:`Model.get_secret` with an ID but no label.
         """
         return self._label
@@ -1873,6 +1873,10 @@ class Relation:
                 # data.destination will be stored under the Juju relation key 'to'
                 relation.save(data, self.unit)
 
+        If a Pydantic model's ``model_dump`` method omits any field (e.g. if its
+        value is Pydantic's ``MISSING`` sentinel) the field will be erased from
+        the relation data.
+
         Args:
             obj: an object with attributes to save to the relation data, typically
                 a Pydantic ``BaseModel`` subclass or dataclass.
@@ -1915,7 +1919,11 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
-        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
+        # Missing values are erased from the databag using empty string values.
+        data = {
+            field: encoder(values[attr]) if attr in values else ''
+            for attr, field in sorted(fields.items())
+        }
         self.data[dst].update(data)
 
 
@@ -2643,9 +2651,9 @@ class Container:
                 combining).
             layer: A YAML string, configuration layer dict, or pebble.Layer
                 object containing the Pebble layer to add.
-            combine: If combine is False (the default), append the new layer
+            combine: If combine is false (the default), append the new layer
                 as the top layer with the given label (must be unique). If
-                combine is True and the label already exists, the two layers
+                combine is true and the label already exists, the two layers
                 are combined into a single one considering the layer override
                 rules; if the layer doesn't exist, it is added as usual.
         """
@@ -2798,7 +2806,7 @@ class Container:
             encoding: Encoding to use for encoding source str to bytes, or
                 strings read from source if it is a TextIO type. Ignored if
                 source is bytes or BinaryIO.
-            make_dirs: If True, create parent directories if they don't exist.
+            make_dirs: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create file with (Pebble default
                 is 0o644).
             user_id: User ID (UID) for file. If neither ``group_id`` nor ``group`` is provided,
@@ -3130,7 +3138,7 @@ class Container:
 
         Args:
             path: Path of the directory to create on the remote system.
-            make_parents: If True, create parent directories if they don't exist.
+            make_parents: If true, create parent directories if they don't exist.
             permissions: Permissions (mode) to create directory with (Pebble
                 default is 0o755).
             user_id: User ID (UID) for directory. If neither ``group_id`` nor ``group``
@@ -3158,13 +3166,13 @@ class Container:
 
         Args:
             path: Path of the file or directory to delete from the remote system.
-            recursive: If True, and path is a directory, recursively delete it and
+            recursive: If true, and path is a directory, recursively delete it and
                        everything under it. If path is a file, delete the file. In
                        either case, do nothing if the file or directory does not
                        exist. Behaviourally similar to ``rm -rf <file|dir>``.
 
         Raises:
-            pebble.PathError: If a relative path is provided, or if `recursive` is False
+            pebble.PathError: If a relative path is provided, or if ``recursive`` is ``False``
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         self._pebble.remove_path(path, recursive=recursive)
@@ -4277,7 +4285,7 @@ class CloudSpec:
     """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
+    """If this is the cloud used by the controller, defaults to ``False``."""
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> CloudSpec:

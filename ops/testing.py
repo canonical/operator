@@ -54,7 +54,7 @@ from ._private.harness import (
     YAMLStringOrFile,
 )
 from .charm import CharmBase, CharmMeta, RelationRole
-from .model import Container, RelationNotFoundError
+from .model import RelationNotFoundError
 from .pebble import ExecProcess
 
 # The Harness unit testing framework.
@@ -118,7 +118,7 @@ try:
         layer_from_rockcraft,
     )
 except ImportError:
-    pass
+    from .model import Container
 else:
     # The Scenario unit testing framework.
     __all__.extend([
