@@ -46,7 +46,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
-        config: dict[str, str | int | float | bool]
+        config: Mapping[str, str | int | float | bool]
         relations: Iterable[RelationBase]
         networks: Iterable[Network]
         containers: Iterable[Container]
@@ -65,7 +65,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
-RawSecretRevisionContents = RawDataBagContents = dict[str, str]
+RawSecretRevisionContents = RawDataBagContents = Mapping[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -644,7 +644,7 @@ class Relation(RelationBase):
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""
-    remote_units_data: dict[UnitID, RawDataBagContents] = dataclasses.field(
+    remote_units_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
         default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
     """The current content of the databag for each unit in the relation."""
@@ -729,7 +729,7 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
+    peers_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
     """Current contents of the peer databags.
 
     Note that this does not include data for the unit being tested. Data for
@@ -1725,7 +1725,7 @@ class State:
     def __init__(
         self,
         *,
-        config: dict[str, str | int | float | bool] | None = None,
+        config: Mapping[str, str | int | float | bool] | None = None,
         relations: Iterable[RelationBase] = (),
         networks: Iterable[Network] = (),
         containers: Iterable[Container] = (),
@@ -1903,7 +1903,7 @@ class State:
         ctx: Context[CharmType],
         *,
         # If provided, these merge with or replace the generated versions.
-        config: dict[str, str | int | float | bool] | None = None,
+        config: Mapping[str, str | int | float | bool] | None = None,
         relations: Iterable[RelationBase] | None = None,
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
@@ -2004,9 +2004,9 @@ class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
 
     charm_type: type[CharmBase]
-    meta: dict[str, Any]
-    actions: dict[str, Any] | None = None
-    config: dict[str, Any] | None = None
+    meta: Mapping[str, Any]
+    actions: Mapping[str, Any] | None = None
+    config: Mapping[str, Any] | None = None
 
     # autoloaded means: we are running a 'real' charm class, living in some
     # /src/charm.py, and the metadata files are 'real' metadata files.

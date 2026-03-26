@@ -371,7 +371,6 @@ def test_replace_state():
         (CloudCredential, 'attributes', {'auth_type': 'foo'}),
         (Secret, 'tracked_content', {}),
         (Secret, 'latest_content', {'tracked_content': {'password': 'password'}}),
-        (Secret, 'remote_grants', {'tracked_content': {'password': 'password'}}),
         (Relation, 'local_app_data', {'endpoint': 'foo'}),
         (Relation, 'local_unit_data', {'endpoint': 'foo'}),
         (Relation, 'remote_app_data', {'endpoint': 'foo'}),
@@ -403,6 +402,19 @@ def test_immutable_content_dict(
     object.__setattr__(obj1, attribute, {'baz': 'qux'})
     assert getattr(obj1, attribute) == {'baz': 'qux'}
     assert getattr(obj2, attribute) == {'foo': 'bar'}
+
+
+def test_immutable_remote_grants():
+    content = {0: {'app1', 'app2'}}
+    obj1 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    obj2 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    assert obj1.remote_grants is not obj2.remote_grants
+    content[1] = {'app3'}
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    object.__setattr__(obj1, 'remote_grants', {1: frozenset({'app3'})})
+    assert obj1.remote_grants == {1: frozenset({'app3'})}
+    assert obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
 
 
 @pytest.mark.parametrize(
