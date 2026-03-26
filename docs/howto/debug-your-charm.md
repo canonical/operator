@@ -272,7 +272,13 @@ By default, `juju debug-code` sets `JUJU_DEBUG_AT=all`, activating every breakpo
 juju debug-code --at=config-start myapp/0 config-changed
 ```
 
-Python's built-in {external+python:func}`breakpoint` also works when `JUJU_DEBUG_AT` is set, so you can use either form.
+The `--at` value can be a string you have used with the `ops.Framework.breakpoint()` method, or the special value `hook`, which will break into the code at the start of each event handler.
+
+Python's built-in {external+python:func}`breakpoint` also works when `JUJU_DEBUG_AT` is set, so you can use either form. The advantage of `ops.Framework.breakpoint` is that you can combine it with labels that you use with `--at` to control where you breakpoint without changing the code.
+
+```{tip}
+`ops.Framework.breakpoint()` won't trigger during state-transition tests, but the built-in `breakpoint()` will trigger as if `JUJU_DEBUG_AT` was set to `all`.
+```
 
 > See more: {external+juju:ref}`Juju | juju debug-code <command-juju-debug-code>`
 
