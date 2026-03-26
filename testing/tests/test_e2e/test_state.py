@@ -41,7 +41,7 @@ import ops
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
-from tests.helpers import jsonpatch_delta, sort_patch, trigger
+from tests.helpers import jsonpatch_delta, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     'relation_created',
@@ -138,12 +138,14 @@ def test_status_setting(state: State, mycharm: type[CharmBase]):
 
     # ignore stored state in the delta
     out_purged = replace(out, stored_states=state.stored_states)
-    assert jsonpatch_delta(out_purged, state) == sort_patch([
+    # This should be sorted by path then op.
+    expected = [
         {'op': 'replace', 'path': '/app_status/message', 'value': 'foo barz'},
         {'op': 'replace', 'path': '/app_status/name', 'value': 'waiting'},
         {'op': 'replace', 'path': '/unit_status/message', 'value': 'foo test'},
         {'op': 'replace', 'path': '/unit_status/name', 'value': 'active'},
-    ])
+    ]
+    assert jsonpatch_delta(out_purged, state) == expected
 
 
 @pytest.mark.parametrize('connect', (True, False))
@@ -982,6 +984,51 @@ def test_state_from_context_skip_exiting_stored_state():
 
 def _make_generator(items: Iterable[Any]) -> Generator[Any]:
     return (item for item in items)
+
+
+def test_get_relation_by_id():
+    relation = Relation(endpoint='foo', interface='bar')
+    state = State(relations={relation})
+    result = state.get_relation(relation.id)
+    assert result is relation  # since this is the same state
+
+
+@pytest.mark.parametrize('relation_type', [Relation, PeerRelation, SubordinateRelation])
+def test_get_relation_by_rel_obj(relation_type: type[RelationBase]):
+    relation = relation_type(endpoint='foo')
+    state = State(relations={relation})
+    result = state.get_relation(relation)
+    assert result is relation  # since this is the same state
+
+
+@pytest.mark.parametrize('missing', [123, Relation(endpoint='foo')])
+def test_get_relation_not_found(missing: int | Relation):
+    with pytest.raises(KeyError):
+        State().get_relation(missing)
+
+
+def test_get_relation_by_rel_obj_wrong_type():
+    relation = Relation(endpoint='foo')
+    state = State(relations={relation})
+    wrong_type = PeerRelation(endpoint='foo', id=relation.id)
+    with pytest.raises(ValueError, match='get_relation'):
+        state.get_relation(wrong_type)
+
+
+def test_get_relation_by_rel_obj_wrong_endpoint():
+    relation = Relation(endpoint='foo')
+    state = State(relations={relation})
+    wrong_endpoint = Relation(endpoint='bar', id=relation.id)
+    with pytest.raises(ValueError, match='endpoint'):
+        state.get_relation(wrong_endpoint)
+
+
+def test_get_relation_by_rel_obj_wrong_interface_doesnt_raise():
+    relation = Relation(endpoint='foo', interface='bar')
+    state = State(relations={relation})
+    wrong_interface = Relation(endpoint='foo', interface='baz', id=relation.id)
+    state.get_relation(wrong_interface)
+    assert relation is not wrong_interface
 
 
 @pytest.mark.parametrize('iterable', [frozenset, tuple, list, _make_generator])

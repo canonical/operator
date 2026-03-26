@@ -10,20 +10,24 @@ on:
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   db-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: f298e1ecf07c6e12f4ca6f3afb25ea6b989f0b5a  # 2025-11-22T01:16:13Z
+            commit: 1c379314d5c2e44d2cf9a2d6986656fef5310daf  # 2025-12-19T13:24:29Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: f660c4f698f3e0d67b5f3fe9518159f7e7cfa8a2  # 2025-10-23T11:38:44Z
+            commit: 1ebe7272293fcc5cd88cd630d3f48041011f0c0e  # 2025-12-19T01:11:29Z
           - charm-repo: canonical/mysql-operator
-            commit: 9dba9415ea55ca2296ee00d13400e8ade45ee3a9  # 2025-11-19T12:26:08Z
+            commit: bd8b3ddabe24d6bcb1b181c4ecedf8515cd98ce0  # 2025-12-15T20:38:04Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 3405d6943c4e631f7b9388d412b084168e8b84e8  # 2025-11-24T14:29:53Z
+            commit: 2bce272828c2462df6ee4f11f677019ecbf982f8  # 2025-12-15T20:17:50Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v6
@@ -32,23 +36,24 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
-      - name: Checkout the operator repository
-        uses: actions/checkout@v6
+      - name: Download operator wheels
+        uses: actions/download-artifact@v8
         with:
-          path: myops
-          persist-credentials: false
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
 
       - name: Install patch dependencies
         run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
           else
-            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock
+            poetry remove ops --lock
+            poetry add "${ops_wheel}" --lock
           fi
 
       - name: Install dependencies

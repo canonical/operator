@@ -1,3 +1,116 @@
+# 3.6.0 - 26 February 2026
+
+## Features
+
+* Bump default Juju version in `ops.testing.Context` to 3.6.14 (#2316)
+
+## Fixes
+
+* Correct the `Model.get_binding()` return type (#2329)
+* Only show executable in `ExecError.__str__`, not full command line (#2336)
+* Support Pydantic `MISSING` sentinel in `ops.Relation.save` (#2306)
+
+## Documentation
+
+* Add how-to subcategory for managing containers (#2309)
+* Remove 2.19 version in docs, tweak ops.testing title (#2332)
+* Use "true" and "false" consistently in the reference documentation (#2330)
+* Add CLI args as another place to not put sensitive data (#2334)
+* Fix remote unit kwarg in testing example (#2342)
+* Clarify that secret labels are not names (#2337)
+
+## Tests
+
+* Set `SCENARIO_BARE_CHARM_ERRORS=true` in Ops tests that care (#2314)
+
+## CI
+
+* Fix releasing on branches with no `versions.md` doc (#2323)
+
+# 3.5.2 - 11 February 2026
+
+## Fixes
+
+* Make testing.CheckInfo level arg type match pebble.CheckInfo.level (#2274)
+* Make testing consistency check aware that `credential-get` is available on k8s in newer Juju (#2307)
+* Drop unused `setuptools_scm` build dependency (#2310)
+
+## Documentation
+
+* Update Pebble version in Juju 3.6 (#2295)
+* Refresh K8s tutorial to use Concierge and uv-based Charmcraft profile (#2285)
+* Add missing "How to" in page titles (#2289)
+* Fix and improve observability part of K8s tutorial (#2305)
+
+# 3.5.1 - 28 January 2026
+
+## Fixes
+
+* Use `parse_rfc3339` for datetime parsing to support Juju 4 (#2264)
+* Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
+* Prevent `KeyError` on `auth-type` when creating `CloudCredential` object (#2268)
+* `_checks_action` should return empty list when there are no changes (#2270)
+
+## Documentation
+
+* Provide examples in unit testing how-to, and other small improvements (#2251)
+* Update the action how-to to explain the additionalProperties default flip (#2249)
+* For state-transition tests, clarify about immutability and reusing state (#2153)
+* Fix and clarify holistic example of handling storage (#2098)
+* Remove comments from K8s tutorial and clarify about persisting data (#2253)
+* Clarify handling of postgres relation data in K8s tutorial (#2256)
+* Improve unit tests of httpbin demo charm (#2254)
+* Add version information for tools in the charming ecosystem (#2231)
+* Avoid emojis that render differently across platforms (#2273)
+* Secrets over CMR comment added (#2271)
+* Fix charm name in httpbin deploy command (#2276)
+* Updated security@ubuntu.com PGP key (#2286)
+
+## Tests
+
+* Remove unnecessary test module (#2247)
+
+## CI
+
+* Replace git reference injection with wheel artifacts in charm test workflows (#2252)
+* Explicitly provide the charmcraft repo location in CI (#2277)
+* Remove outdated custom signature generation (#2280)
+
+# 3.5.0 - 18 December 2025
+
+## Features
+
+* Env var to control exception wrapping in tests (#2142)
+* Deprecate testing.Context.charm_spec (#2219)
+
+## Documentation
+
+* Fix charmcraft init command (#2210)
+* Update CI examples to use uv and tox-uv (#2213)
+* Update and clarify info about environment prep (#2217)
+* Match Charmcraft profiles in tox.ini example for integration testing (#2221)
+* Use base 24.04 for httpbin-demo charm (#2222)
+* Clarify parts of the machine charm tutorial (#2223)
+* Match Charmcraft profiles in "Write and structure charm code" (#2220)
+* Use cosl binary in K8s tutorial charm to work around error (#2232)
+* Fix URL issues by updating doc starter pack (#2238)
+
+## Tests
+
+* Don't skip tests if ops[testing] isn't installed (#2215)
+* Switch the integration test charms to use the uv plugin (#2218)
+
+## CI
+
+* Avoid jitter in the best practice doc PRs (#2193)
+* Ignore PERF401 (manual list comprehension) across the repo (#2201)
+* The git commands need to be run in the operator directory as well (#2197)
+* Have cycle in the sbomber manifests use the default value (#2209)
+* Add pytest.warns to note an expected warning (#2092)
+* Update release script to handle non-final versions (#2199)
+* Add ops-tracing as a dependency for the observability tests (#2239)
+* Add scheduled workflow for packing and integration testing example charms (#2233)
+
 # 3.4.0 - 27 November 2025
 
 ## Breaking Changes

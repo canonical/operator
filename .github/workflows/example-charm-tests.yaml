@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: '${{ matrix.python-version }}'
       - name: Set up uv
-        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Charmcraft
@@ -54,3 +54,27 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
+      - name: Write mypy-requirements.txt
+        shell: uv run --script --no-project {0}
+        run: |
+          # /// script
+          # dependencies = ["tomli"]  # drop for tomllib when we're Python 3.11+
+          # ///
+          import tomli, pathlib
+          pyproject_toml = tomli.loads(pathlib.Path('pyproject.toml').read_text())
+          deps = '\n'.join(pyproject_toml['dependency-groups']['mypy'])
+          print(deps)  # logging
+          pathlib.Path('mypy-requirements.txt').write_text(deps)
+      - name: Run mypy
+        working-directory: ${{ matrix.dir }}
+        env:
+          MYPYPATH: 'src:lib:../..'
+        run: |
+          uv run \
+            --with-requirements=../../mypy-requirements.txt \
+            --with=../.. \
+            --with=../../testing \
+            --group=lint \
+            --group=unit \
+            --group=integration \
+            mypy --explicit-package-bases --follow-imports=silent src tests

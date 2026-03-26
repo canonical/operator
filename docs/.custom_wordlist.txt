@@ -1,13 +1,19 @@
 # Leave a blank line at the end of this file to support concatenation
 backoff
+balancer's
+callables
 Canonical's
 databag
 databags
 dataclasses
 declaratively
+docstrings
 Dependabot
 dict's
 failover
+IDE's
+jhack
+Jubilant's
 lightkube
 liveness
 manpages
@@ -27,9 +33,11 @@ systemd
 subprocess
 tinyproxy
 traceback
+tracebacks
 untyped
 unpatched
 uv
 VM
+websockets
 Wordpress
 zizmor

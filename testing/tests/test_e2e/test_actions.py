@@ -9,10 +9,10 @@ import pytest
 from scenario import Context
 from scenario.state import State, _Action, _next_action_id
 
-from ops import __version__ as ops_version
 from ops._private.harness import ActionFailed
 from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
+from ops.version import version as ops_version
 
 
 @pytest.fixture(scope='function')
@@ -237,3 +237,41 @@ def test_default_arguments():
     assert action.name == name
     assert action.params == {}
     assert action.id == expected_id
+
+
+def test_action_get_returns_copy(mycharm):
+    """Mutating the dict returned by action_get() must not affect subsequent calls.
+
+    ActionEvent.params is populated via the backend's action_get() method.
+    Each call to action_get() should return an independent copy so that
+    mutations do not leak into the Scenario state.
+    """
+    results = []
+
+    def handle_evt(_: CharmBase, evt):
+        if not isinstance(evt, ActionEvent):
+            return
+        backend = evt.framework.model._backend
+        first = backend.action_get()
+        first['bar'] = 'MUTATED'
+        first['extra'] = 'INJECTED'
+        second = backend.action_get()
+        results.append((first, second))
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(
+        mycharm,
+        meta={'name': 'foo'},
+        actions={'foo': {'params': {'bar': {'type': 'number'}}}},
+    )
+    ctx.run(ctx.on.action('foo', params={'bar': 10}), State())
+
+    assert len(results) == 1
+    mutated, fresh = results[0]
+    # The mutated copy should have our changes.
+    assert mutated['bar'] == 'MUTATED'
+    assert mutated['extra'] == 'INJECTED'
+    # The fresh copy must reflect the original params, unaffected.
+    assert fresh == {'bar': 10}
+    assert 'extra' not in fresh

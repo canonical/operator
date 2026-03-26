@@ -1,5 +1,5 @@
 (make-your-charm-discoverable)=
-# Make your charm discoverable
+# How to make your charm discoverable
 
 > See first: [Charm maturity](#charm-maturity)
 

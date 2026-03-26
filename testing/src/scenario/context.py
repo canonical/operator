@@ -9,12 +9,15 @@ specific `State` exists in, and the events that can be executed on that `State`.
 
 from __future__ import annotations
 
+import copy
 import functools
 import pathlib
 import tempfile
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generic
+
+from typing_extensions import deprecated
 
 import ops
 from ops._private.harness import ActionFailed
@@ -54,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = scenario_logger.getChild('runtime')
 
-_DEFAULT_JUJU_VERSION = '3.6.4'
+_DEFAULT_JUJU_VERSION = '3.6.14'
 
 
 class Manager(Generic[CharmType]):
@@ -652,11 +655,21 @@ class Context(Generic[CharmType]):
 
         :arg charm_type: the :class:`ops.CharmBase` subclass to handle the event.
         :arg meta: charm metadata to use. Needs to be a valid metadata.yaml format (as a dict).
-            If none is provided, we will search for a ``metadata.yaml`` file in the charm root.
+            Alternatively, can be a full ``charmcraft.yaml`` dict, in which case ``config`` and
+            ``actions`` will be automatically extracted from it (if not explicitly provided).
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
+            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            ``extensions: [flask-framework]``), the extension's metadata,
+            config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
-            If none is provided, we will search for a ``actions.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present.
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``actions.yaml``).
         :arg config: charm config to use. Needs to be a valid config.yaml format (as a dict).
-            If none is provided, we will search for a ``config.yaml`` file in the charm root.
+            If none is provided, will be extracted from ``meta`` if present
+            Otherwise, if no meta, actions, or config were provided, will be loaded from the
+            ``charmcraft.yaml`` file in the charm root (falling back to ``config.yaml``).
         :arg juju_version: Juju agent version to simulate.
         :arg app_name: App name that this charm is deployed as. Defaults to the charm name as
             defined in the metadata.
@@ -686,16 +699,22 @@ class Context(Generic[CharmType]):
                 ) from e
 
         else:
-            if not meta:
-                meta = {'name': str(charm_type.__name__)}
-            spec = _CharmSpec(
-                charm_type=charm_type,
-                meta=meta,
-                actions=actions,
-                config=config,
-            )
+            meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
+            if actions is None:
+                actions = meta.pop('actions', None)
+            elif 'actions' in meta:
+                raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
+            else:
+                actions = copy.deepcopy(actions)
+            if config is None:
+                config = meta.pop('config', None)
+            elif 'config' in meta:
+                raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
+            else:
+                config = copy.deepcopy(config)
+            spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
-        self.charm_spec = spec
+        self._charm_spec = spec
         self.charm_root = charm_root
         self.juju_version = juju_version
         if juju_version.split('.')[0] == '2':
@@ -703,7 +722,7 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self.charm_spec.meta.get('name')
+        self.app_name = app_name or self._charm_spec.meta.get('name')
         self.unit_id = unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
@@ -735,6 +754,19 @@ class Context(Generic[CharmType]):
         self._action_failure_message: str | None = None
 
         self.on = CharmEvents()
+
+    @property
+    @deprecated('Use State.from_context to generate a State from charm metadata.', stacklevel=2)
+    def charm_spec(self):
+        """Deprecated property for accessing the Context's charm specification.
+
+        The ``_CharmSpec`` class is private and intended for internal use only.
+        ``Context.charm_spec`` will be removed in a future major version.
+
+        Consider accessing the charm class or metadata directly, or using
+        :meth:`State.from_context` to generate a ``State`` from your charm's metadata.
+        """
+        return self._charm_spec
 
     def _set_output_state(self, output_state: State):
         """Hook for Runtime to set the output state."""
@@ -853,7 +885,7 @@ class Context(Generic[CharmType]):
     def _run(self, event: _Event, state: State):
         runtime = Runtime(
             app_name=self.app_name,
-            charm_spec=self.charm_spec,
+            charm_spec=self._charm_spec,
             juju_version=self.juju_version,
             charm_root=self.charm_root,
             unit_id=self.unit_id,

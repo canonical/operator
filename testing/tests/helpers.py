@@ -7,16 +7,14 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
-import jsonpatch
+import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State
-
-    _CT = TypeVar('_CT', bound=type[CharmType])
 
 logger = logging.getLogger()
 
@@ -75,7 +73,9 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch
+    # The jsonpatch library is untyped.
+    # See: https://github.com/stefankoegl/python-json-patch/issues/158
+    patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
     return sort_patch(patch)
 
 

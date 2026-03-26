@@ -296,7 +296,7 @@ from ops import testing
 ctx = testing.Context(MyCharm)
 relation = testing.Relation(endpoint='smtp', remote_units_data={1: {}})
 state_in = testing.State(relations={relation})
-state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit_id=1), state=state_in)
+state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit=1), state=state_in)
 assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
 ```
 
@@ -361,3 +361,24 @@ def test_active_with_another_app(juju: jubilant.Juju):
 
     juju.wait(jubilant.all_active)
 ```
+
+(generate-tests-from-a-deployed-model)=
+### Generate tests from a deployed model
+
+When a relation bug is only reproducible in a live deployment, you can snapshot
+the live relation state and turn it into a state-transition test.
+
+A practical workflow is:
+
+1. Reproduce the issue in a deployed model.
+2. Use `jhack scenario snapshot` to export representative relation state.
+3. Adapt the generated test scaffolding to your `ops.testing` setup (`Context`,
+    `State`, and `ctx.on.relation_*` events).
+4. Keep one failing test that captures the bug, then fix charm code until the
+    test passes.
+
+This is especially useful when relation databags, relation IDs, or unit/app
+combinations are difficult to reconstruct by hand.
+
+For command syntax and tool updates, see the
+[jhack repository](https://github.com/canonical/jhack).

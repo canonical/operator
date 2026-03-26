@@ -114,9 +114,9 @@
             "uid": "${prometheusds}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
           "interval": "",
-          "legendFormat": "p99",
+          "legendFormat": "p90",
           "range": true,
           "refId": "A"
         },
@@ -126,38 +126,14 @@
             "uid": "${prometheusds}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
+          "expr": "histogram_quantile(0.60, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
           "hide": false,
-          "legendFormat": "p95",
+          "legendFormat": "p60",
           "range": true,
           "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${prometheusds}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.9, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
-          "hide": false,
-          "legendFormat": "p90",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${prometheusds}"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.75, sum(rate(starlette_request_duration_seconds_bucket[2m])) by (le))",
-          "hide": false,
-          "legendFormat": "p75",
-          "range": true,
-          "refId": "D"
         }
       ],
-      "title": "HTTP Request Duration Percentiles",
+      "title": "HTTP request duration percentiles",
       "type": "timeseries"
     },
     {
@@ -251,12 +227,12 @@
           },
           "editorMode": "code",
           "expr": "100 * sum(\n        increase(starlette_requests_total{path!=\"/metrics\", status_code=~\"[45]..\"}[2m])\n    ) / sum(\n            increase(starlette_requests_total{path!=\"/metrics\"}[2m])\n        )",
-          "legendFormat": "4xx,5xx codes per 2min",
+          "legendFormat": "4xx and 5xx status codes",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Percent of failed requests",
+      "title": "Percentage of failed requests",
       "type": "timeseries"
     },
     {
@@ -288,12 +264,12 @@
             "uid": "${lokids}"
           },
           "editorMode": "builder",
-          "expr": "{juju_charm=\"demo-api-charm\"} |= ``",
+          "expr": "{charm=\"fastapi-demo\"} |= ``",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "FastAPI Logs",
+      "title": "FastAPI logs from the workload container",
       "type": "logs"
     }
   ],

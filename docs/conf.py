@@ -107,7 +107,7 @@ ogp_site_name = project
 #
 # TODO: To customise the preview image, update as needed.
 
-ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg"
+ogp_image = "https://assets.ubuntu.com/v1/cc828679-docs_illustration.svg"
 
 
 # Product favicon; shown in bookmarks, browser tabs, etc.
@@ -129,7 +129,7 @@ html_context = {
     # TODO: If there's no such website,
     #       remove the {{ product_page }} link from the page header template
     #       (usually .sphinx/_templates/header.html; also, see README.rst).
-    "product_page": "juju.is",
+    "product_page": "canonical.com/juju/docs",
     # Product tag image; the orange part of your logo, shown in the page header
     #
     # TODO: To add a tag image, uncomment and update as needed.
@@ -198,18 +198,13 @@ slug = 'ops'
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
 #######################
 
-# Base URL of RTD hosted project
+# Use RTD canonical URL to ensure duplicate pages have a specific canonical URL
 
-html_baseurl = 'https://documentation.ubuntu.com/ops/'
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
 
-# URL scheme. Add language and version scheme elements.
-# When configured with RTD variables, check for RTD environment so manual runs succeed:
+# sphinx-sitemap uses html_baseurl to generate the full URL for each page:
 
-if 'READTHEDOCS_VERSION' in os.environ:
-    version = os.environ["READTHEDOCS_VERSION"]
-    sitemap_url_scheme = '{version}{link}'
-else:
-    sitemap_url_scheme = 'MANUAL/{link}'
+sitemap_url_scheme = '{link}'
 
 # Include `lastmod` dates in the sitemap:
 
@@ -305,14 +300,28 @@ linkcheck_retries = 3
 
 extensions = [
     "canonical_sphinx",
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_reredirects",
+    "sphinx_tabs.tabs",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    "sphinx_config_options",
+    "sphinx_contributor_listing",
+    "sphinx_filtered_toctree",
+    "sphinx_related_links",
+    "sphinx_roles",
+    "sphinx_terminal",
+    "sphinx_ubuntu_images",
+    "sphinx_youtube_links",
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
+    "sphinx.ext.intersphinx",
+    "sphinx_sitemap",
     'sphinx.ext.autodoc',
-    'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
-    "sphinx_sitemap",
 ]
 
 # Excludes files or directories from processing
@@ -501,12 +510,8 @@ nitpick_ignore = [
     ('py:class', 'scenario.state.CharmType'),
     ('py:class', 'scenario.state._EntityStatus'),
     ('py:class', 'scenario.state._Event'),
-    ('py:class', 'scenario.state._max_posargs.<locals>._MaxPositionalArgs'),
+    ('py:class', 'scenario.state._RelationType'),
 ]
-
-# Monkeypatch Sphinx to look for __init__ rather than __new__ for the subclasses
-# of _MaxPositionalArgs.
-_real_get_signature = sphinx.ext.autodoc.ClassDocumenter._get_signature
 
 # Pull in fix from https://github.com/sphinx-doc/sphinx/pull/11222/files to fix
 # "invalid signature for autoattribute ('ops.pebble::ServiceDict.backoff-delay')"
@@ -522,24 +527,6 @@ sphinx.ext.autodoc.py_ext_sig_re = re.compile(
           """,
     re.VERBOSE,
 )
-
-
-def _custom_get_signature(self):
-    if any(p.__name__ == '_MaxPositionalArgs' for p in self.object.__mro__):
-        signature = inspect.signature(self.object)
-        parameters = []
-        for position, param in enumerate(signature.parameters.values()):
-            if position >= self.object._max_positional_args:
-                parameters.append(param.replace(kind=inspect.Parameter.KEYWORD_ONLY))
-            else:
-                parameters.append(param)
-        signature = signature.replace(parameters=parameters)
-        return None, None, signature
-    return _real_get_signature(self)
-
-
-sphinx.ext.autodoc.ClassDocumenter._get_signature = _custom_get_signature
-
 
 # This is very strongly based on
 # https://github.com/sphinx-doc/sphinx/blob/03b9134ee00e98df4f8b5f6d22f345cdafe31870/sphinx/domains/changeset.py#L46

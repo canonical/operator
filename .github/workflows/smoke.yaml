@@ -30,7 +30,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244  # v7.1.4
+      - uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
 
       - run: uv tool install tox --with tox-uv
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Archive charmcraft logs
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: charmcraft-logs
           path: /home/runner/.local/state/charmcraft/log/*.log
