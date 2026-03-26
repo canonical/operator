@@ -157,7 +157,7 @@ class CloudCredential:  # noqa: D101
     auth_type: str
     """Authentication type."""
 
-    attributes: dict[str, str]
+    attributes: Mapping[str, str]
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -165,7 +165,7 @@ class CloudCredential:  # noqa: D101
     can be found here.
     """
 
-    redacted: list[str]
+    redacted: Sequence[str]
     """A list of redacted generic cloud API secrets."""
 
     def __init__(
@@ -212,7 +212,7 @@ class CloudSpec:  # noqa: D101
     credential: CloudCredential | None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: list[str]
+    ca_certificates: Sequence[str]
     """A list of CA certificates."""
 
     skip_tls_verify: bool
@@ -301,7 +301,7 @@ class Secret:
     to this unit.
     """
 
-    remote_grants: dict[int, set[str]]
+    remote_grants: Mapping[int, set[str]]
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
@@ -473,12 +473,12 @@ class Network:
 
     binding_name: str
     """The name of the network space."""
-    bind_addresses: list[BindAddress]
+    bind_addresses: Sequence[BindAddress]
     """Addresses that the charm's application should bind to."""
 
-    ingress_addresses: list[str]
+    ingress_addresses: Sequence[str]
     """Addresses other applications should use to connect to the unit."""
-    egress_subnets: list[str]
+    egress_subnets: Sequence[str]
     """Subnets that other units will see the charm connecting from."""
 
     def __init__(
@@ -831,7 +831,7 @@ def _generate_new_change_id():
 class Exec:
     """Mock data for simulated :meth:`ops.Container.exec` calls."""
 
-    command_prefix: tuple[str, ...]
+    command_prefix: Sequence[str, ...]
 
     return_code: int
     """The return code of the process.
@@ -941,7 +941,7 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str]
+    last_data: Mapping[str, str]
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None
@@ -1104,10 +1104,10 @@ class Container:
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: dict[str, Any]
+    _base_plan: Mapping[str, Any]
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
-    layers: dict[str, pebble.Layer]
+    layers: Mapping[str, pebble.Layer]
     """All :class:`ops.pebble.Layer` definitions that have already been added to the container.
 
     Note that the layers should be added to the dictionary in the order in which they would have
@@ -1116,10 +1116,10 @@ class Container:
     this means adding them in the order of the API calls.
     """
 
-    service_statuses: dict[str, pebble.ServiceStatus]
+    service_statuses: Mapping[str, pebble.ServiceStatus]
     """The current status of each Pebble service running in the container."""
 
-    mounts: dict[str, Mount]
+    mounts: Mapping[str, Mount]
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
@@ -1163,7 +1163,7 @@ class Container:
         )
     """
 
-    notices: list[Notice]
+    notices: Sequence[Notice]
     """Any Pebble notices that already exist in the container."""
 
     check_infos: frozenset[CheckInfo]
@@ -1473,7 +1473,7 @@ class StoredState:
     # However, it's complex to describe those types, since it's a recursive
     # definition - even in TypeShed the _Marshallable type includes containers
     # like list[Any], which seems to defeat the point.
-    content: dict[str, Any]
+    content: Mapping[str, Any]
     """The content of the :class:`ops.StoredState` instance."""
 
     _data_type_name: str
@@ -1665,7 +1665,7 @@ class State:
     return data from `State.leader`, and so on.
     """
 
-    config: dict[str, str | int | float | bool]
+    config: Mapping[str, str | int | float | bool]
     """The present configuration of this charm."""
     relations: frozenset[RelationBase]
     """All relations that currently exist for this charm."""
@@ -1709,7 +1709,7 @@ class State:
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
-    deferred: list[DeferredEvent]
+    deferred: Sequence[DeferredEvent]
     """Events that have been deferred on this charm by some previous execution."""
     stored_states: frozenset[StoredState]
     """Contents of a charm's stored state."""
