@@ -29,6 +29,8 @@ repo
 requirers
 reusability
 snappass
+stderr
+stdout
 storages
 systemd
 subprocess

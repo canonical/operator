@@ -10,7 +10,7 @@ When your charm isn't behaving as expected, Juju and the broader charming ecosys
 
 The quickest way to poke around a live unit is to SSH into it with `juju ssh`. What you connect to depends on the substrate:
 
-**Machine charms.** `juju ssh` connects you to the machine itself. You land in a shell as the `ubuntu` user, which has passwordless `sudo`:
+**Machine charms.** `juju ssh` connects you to the machine itself. You land in a shell as the `ubuntu` user, which has password-less `sudo`:
 
 ```shell
 juju ssh myapp/0
