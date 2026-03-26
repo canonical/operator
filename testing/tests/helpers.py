@@ -7,7 +7,7 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
@@ -75,7 +75,7 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
     # The jsonpatch library is untyped.
     # See: https://github.com/stefankoegl/python-json-patch/issues/158
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
+    patch = cast('list[dict[str, Any]]', jsonpatch.make_patch(dict_other, dict_self).patch)  # type: ignore
     return sort_patch(patch)
 
 
