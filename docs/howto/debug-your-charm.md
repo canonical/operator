@@ -260,7 +260,7 @@ In your charm code, call [](ops.Framework.breakpoint) to define breakpoints that
 ```python
 class MyCharm(ops.CharmBase):
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        self.framework.breakpoint('config-start')
+        self.framework.breakpoint('config-start')  # 'config-start' is an arbitrary string you use with `--at`
         new_val = self.config['setting']
         # ... process the new value ...
         self.framework.breakpoint('config-end')
