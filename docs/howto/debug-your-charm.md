@@ -3,7 +3,114 @@
 
 > See first: {ref}`log-from-your-charm`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
-When your charm isn't behaving as expected, Juju and the broader charming ecosystem provide several tools to help you investigate. This guide covers how to read charm logs, interactively debug hook execution, and use third-party tools to accelerate your debugging workflow.
+When your charm isn't behaving as expected, Juju and the broader charming ecosystem provide several tools to help you investigate. This guide covers how to get a shell on a running unit, read charm logs, interactively debug hook execution, and use third-party tools to accelerate your debugging workflow.
+
+(ssh-into-a-unit)=
+## Get a shell on a running unit with `juju ssh`
+
+The quickest way to poke around a live unit is to SSH into it with `juju ssh`. What you connect to depends on the substrate:
+
+**Machine charms.** `juju ssh` connects you to the machine itself. You land in a shell as the `ubuntu` user, which has passwordless `sudo`:
+
+```shell
+juju ssh myapp/0
+```
+
+**Kubernetes charms.** A K8s charm pod typically has multiple containers (the charm container and one or more workload containers). Use `--container` to choose which container to connect to:
+
+```shell
+juju ssh --container myworkload myapp/0
+```
+
+If you omit `--container`, `juju ssh` targets the charm container by default.
+
+````{important}
+**Juju 4: SSH keys are no longer added automatically.**
+
+In Juju 3.x, your SSH public key is automatically added to every model you create. In Juju 4, this no longer happens -- you must add your key explicitly before `juju ssh` will work:
+
+```shell
+juju add-ssh-key "$(cat ~/.ssh/id_ed25519.pub)"
+```
+
+You can also import keys from GitHub or Launchpad:
+
+```shell
+juju import-ssh-key gh:<your-github-username>
+```
+````
+
+> See more: {external+juju:ref}`Juju | juju ssh <command-juju-ssh>`
+
+(debug-with-pebble)=
+## Inspect the workload with Pebble (Kubernetes charms)
+
+In Kubernetes charms, each workload container runs {external+pebble:doc}`Pebble <index>` as its init system. You can use Pebble commands to inspect and interact with the workload directly. First, SSH into the workload container:
+
+```shell
+juju ssh --container <container-name> <unit>
+```
+
+Then use the Pebble CLI (available at `/charm/bin/pebble`) to inspect the workload.
+
+### Check service status
+
+`pebble services` shows whether each service in the container is running:
+
+```text
+$ /charm/bin/pebble services
+Service   Startup  Current  Since
+workload  enabled  active   today at 02:05 UTC
+```
+
+A service in `backoff` or `error` state tells you the workload has been crashing.
+
+### View service logs
+
+`pebble logs` shows recent stdout and stderr from services. Use `-f` to follow in real time:
+
+```shell
+/charm/bin/pebble logs              # last 30 lines from all services
+/charm/bin/pebble logs -f           # tail and follow
+/charm/bin/pebble logs -n all       # show all buffered output
+```
+
+```{note}
+Pebble keeps the most recent output from each service in a 100 KB ring buffer. Older output is discarded, so if you need persistent logs consider configuring a Pebble {external+pebble:doc}`log forwarding target <how-to/forward-logs-to-loki>`.
+```
+
+### Run commands in the container
+
+`pebble exec` runs a one-off command inside the container. This is useful for checking files, environment variables, or connectivity:
+
+```shell
+/charm/bin/pebble exec -- ls /etc/myapp/
+/charm/bin/pebble exec --context myworkload -- env   # inherit the service's environment
+```
+
+### View the effective Pebble plan
+
+`pebble plan` prints the merged configuration that Pebble is currently using. This is helpful to verify that the layers your charm wrote are correct:
+
+```text
+$ /charm/bin/pebble plan
+services:
+    myworkload:
+        summary: my workload service
+        startup: enabled
+        override: replace
+        command: my-workload
+```
+
+### Check health checks
+
+If the charm configures Pebble health checks, `pebble checks` shows their current status:
+
+```shell
+/charm/bin/pebble checks
+```
+
+> See more: {external+pebble:doc}`Pebble | CLI commands <reference/cli-commands>`
 
 (read-charm-logs)=
 ## Read charm logs with `juju debug-log`
