@@ -359,16 +359,3 @@ ssh -N -L 5678:${UNIT_IP}:5678 ubuntu@${VM_IP}
 
 Then, in your `launch.json`, set `"host"` to `"localhost"` instead of the unit IP. VS Code will connect to the forwarded port on your host, and the SSH tunnel will relay traffic to `debugpy` on the charm unit inside the VM.
 ````
-
-## Putting it all together
-
-A typical debugging workflow combines several of these tools:
-
-1. Check `juju status` for blocked or error states and read the status message.
-2. Run `juju debug-log --include unit-myapp-0 --level DEBUG` to look for errors or unexpected behaviour in the logs.
-3. Start `jhack sync myapp/0 -s ./src -s ./lib` so that local code changes are pushed to the unit automatically.
-4. Add `self.framework.breakpoint('my-bp')` at the point you want to inspect.
-5. Run `juju debug-code myapp/0` and trigger the relevant event (either by waiting for it naturally or using `jhack fire`).
-6. Step through the code in `pdb`, inspect variables, and identify the problem.
-7. Fix the code locally -- `jhack sync` pushes it to the unit -- and use `jhack fire` to re-trigger the event.
-8. Watch the result with `jhack tail` or `juju debug-log`.
