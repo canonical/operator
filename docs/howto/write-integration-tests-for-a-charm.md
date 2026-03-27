@@ -138,9 +138,9 @@ def charm():
         charm_path = pathlib.Path(os.environ["CHARM_PATH"])
         if not charm_path.exists():
             raise FileNotFoundError(f"Charm does not exist: {charm_path}")
-        return charm_path
+        return charm_path.resolve()
     # Modify below if you're building for multiple bases or architectures.
-    return next(pathlib.Path(".").glob("*.charm"))
+    return next(pathlib.Path(".").glob("*.charm")).resolve()
 ```
 
 The integration tests will depend on these fixtures.
@@ -171,7 +171,7 @@ import jubilant
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
-    juju.deploy(charm.resolve())
+    juju.deploy(charm)
     juju.wait(jubilant.all_active)
 ```
 
@@ -220,7 +220,7 @@ A charm can require `file` or `oci-image` resources to work, which have revision
 ```python
     ...
     resources = {"resource_name": "localhost:32000/image_name:latest"}
-    juju.deploy(charm.resolve(), resources=resources)
+    juju.deploy(charm, resources=resources)
     ...
 ```
 
@@ -242,7 +242,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
         for name, res in METADATA["resources"].items()
     }
 
-    juju.deploy(charm.resolve(), resources=resources)
+    juju.deploy(charm, resources=resources)
     juju.wait(jubilant.all_active)
 ```
 
