@@ -149,8 +149,6 @@ These fixtures use [pytest](https://docs.pytest.org/en/stable/) and {external+ju
 
 - The `juju` fixture creates a temporary Juju model for each test file. The [](jubilant.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit.
 
-    You may want to adjust the [scope](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixture-scopes) of this fixture. For example, to create a new model for every test function (pytest's default behavior), omit the scope.
-
 - The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
 
 For general guidance about `conftest.py`, see [conftest.py: sharing fixtures across multiple files](https://docs.pytest.org/en/stable/reference/fixtures.html#conftest-py-sharing-fixtures-across-multiple-files).
