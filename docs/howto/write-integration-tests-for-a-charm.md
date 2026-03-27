@@ -193,10 +193,10 @@ After `test_deploy`, add more tests to check that your charm operates correctly.
 ```python
 def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy some other charm from Charmhub:
-    juju.deploy("ubuntu")
+    juju.deploy("other-app")
 
     # Integrate the charms:
-    juju.integrate("your-app:endpoint1", "ubuntu:endpoint2")
+    juju.integrate("your-app:endpoint1", "other-app:endpoint2")
 
     # Ensure that both applications and all units reach a good state:
     juju.wait(jubilant.all_active)
