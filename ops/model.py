@@ -1391,7 +1391,7 @@ class Secret:
     def unique_identifier(self) -> str | None:
         """Unique identifier of this secret.
 
-        This is the secret's globally-unique identifier (20 characters).
+        This is the secret's globally-unique identifier (alphanumeric).
 
         Charms should use :attr:`id` (the secret's locator ID) to send
         the secret's ID across relation data, and labels (:attr:`label`) to
