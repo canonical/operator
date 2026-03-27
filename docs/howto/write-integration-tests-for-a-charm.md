@@ -198,9 +198,6 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     # Integrate the charms:
     juju.integrate("your-app:endpoint1", "ubuntu:endpoint2")
 
-    # Scale your application up:
-    juju.add_unit("your-app", num_units=2)
-
     # Ensure that both applications and all units reach a good state:
     juju.wait(jubilant.all_active)
 
