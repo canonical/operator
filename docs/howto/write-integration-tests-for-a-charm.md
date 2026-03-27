@@ -191,7 +191,7 @@ Tests run sequentially in the order they are written in the file. It can be usef
 After `test_deploy`, add more tests to check that your charm operates correctly. For example:
 
 ```python
-def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
+def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy some other charm from Charmhub:
     juju.deploy("ubuntu")
 
