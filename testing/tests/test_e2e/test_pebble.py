@@ -6,7 +6,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import io
-import logging
 from pathlib import Path
 
 import pytest
@@ -1003,8 +1002,7 @@ def test_warning_on_non_empty_container():
     ctx.run(ctx.on.start(), state)
 
     assert any(
-        'mycontainer' in line.message and 'non-empty' in line.message
-        for line in ctx.juju_log
+        'mycontainer' in line.message and 'non-empty' in line.message for line in ctx.juju_log
     )
 
 
@@ -1023,6 +1021,5 @@ def test_no_warning_on_empty_container():
     ctx.run(ctx.on.start(), state)
 
     assert not any(
-        'mycontainer' in line.message and 'non-empty' in line.message
-        for line in ctx.juju_log
+        'mycontainer' in line.message and 'non-empty' in line.message for line in ctx.juju_log
     )
