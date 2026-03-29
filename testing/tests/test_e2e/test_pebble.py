@@ -980,7 +980,7 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
     assert layer1.log_targets['lt-a'].services == ['svc-a']
 
 
-def test_warning_on_non_empty_container(caplog: pytest.LogCaptureFixture):
+def test_warning_on_non_empty_container():
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):
             super().__init__(framework)
@@ -1000,16 +1000,15 @@ def test_warning_on_non_empty_container(caplog: pytest.LogCaptureFixture):
     ctx.run(ctx.on.start(), state)
 
     # Second run should warn that the container root is non-empty.
-    with caplog.at_level(logging.WARNING, logger='ops-scenario.mocking'):
-        ctx.run(ctx.on.start(), state)
+    ctx.run(ctx.on.start(), state)
 
     assert any(
-        'mycontainer' in record.message and 'non-empty' in record.message
-        for record in caplog.records
+        'mycontainer' in line.message and 'non-empty' in line.message
+        for line in ctx.juju_log
     )
 
 
-def test_no_warning_on_empty_container(caplog: pytest.LogCaptureFixture):
+def test_no_warning_on_empty_container():
     ctx = Context(
         CharmBase,
         meta={'name': 'foo', 'containers': {'mycontainer': {}}},
@@ -1021,10 +1020,9 @@ def test_no_warning_on_empty_container(caplog: pytest.LogCaptureFixture):
     ctx.run(ctx.on.start(), state)
 
     # Second run should not warn since the container root is empty.
-    with caplog.at_level(logging.WARNING, logger='ops-scenario.mocking'):
-        ctx.run(ctx.on.start(), state)
+    ctx.run(ctx.on.start(), state)
 
     assert not any(
-        'mycontainer' in record.message and 'non-empty' in record.message
-        for record in caplog.records
+        'mycontainer' in line.message and 'non-empty' in line.message
+        for line in ctx.juju_log
     )
