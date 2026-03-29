@@ -95,7 +95,7 @@ sudo concierge prepare -p machine --extra-snaps astral-uv
 
 This first installs Concierge, then uses Concierge to install and configure the other tools (except tox). The option `-p machine` tells Concierge that we want tools for developing machine charms.
 
-This step should take less than 15 minutes, but the time depends on your computer and network. When the tools have been installed, you'll see a message that ends with:
+This step should take less than 15 minutes, but the time depends on your computer and network. As `concierge` runs, you may see a number of messages that appear to be errors, like `ERROR controller ... not found`. Don't worry about these, they're because of how `concierge` currently exposes the output of the commands it runs internally. You only need to worry if your `concierge prepare` call fails -- then you should investigate the output, and reach out to us if you can't solve the problem yourself. When the tools have been installed, you'll see a message that ends with:
 
 ```text
 msg="Bootstrapped Juju" provider=lxd
