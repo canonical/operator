@@ -3498,6 +3498,17 @@ class TestSecrets:
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
+    def test_app_add_secret_timedelta_expire_is_utc(
+        self, fake_script: FakeScript, model: ops.Model
+    ):
+        fake_script.write('secret-add', 'echo secret:234')
+
+        model.app.add_secret({'foo': 'x'}, expire=datetime.timedelta(hours=1))
+
+        calls = fake_script.calls(clear=True)
+        expire_arg = calls[0][calls[0].index('--expire') + 1]
+        assert expire_arg.endswith('Z'), f'Expected UTC timezone suffix Z, got {expire_arg!r}'
+
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
 

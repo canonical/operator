@@ -18,14 +18,14 @@ Before secrets, the owner charm might have looked as below:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined, 
+        self.framework.observe(self.on.database_relation_joined,
                                self._on_database_relation_joined)
 
     ...  # other methods and event handlers
-   
+
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
-        event.relation.data[self.app]['username'] = 'admin' 
-        event.relation.data[self.app]['password'] = 'admin'  # don't do this at home   
+        event.relation.data[self.app]['username'] = 'admin'
+        event.relation.data[self.app]['password'] = 'admin'  # don't do this at home
 ```
 
 With secrets, this can be rewritten as:
@@ -444,4 +444,3 @@ state_out = ctx.run(
 )
 assert ctx.removed_secret_revisions == [old_revision]
 ```
-

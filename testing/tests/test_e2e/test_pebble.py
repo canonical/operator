@@ -883,6 +883,103 @@ def test_layers_merge_in_plan(layer1_name, layer2_name):
     assert log_target.location == 'https://loki2.example.com'
 
 
+def test_plan_accessed_twice_does_not_accumulate_list_fields():
+    """Regression test: accessing .plan multiple times must not mutate original layers.
+
+    When rendering services/checks/log_targets, storing a direct reference to
+    a layer's object means that a subsequent merge call mutates the original.
+    This causes list fields (after, before, requires, services) to accumulate
+    duplicates on each access.
+    """
+    layer1 = pebble.Layer({
+        'services': {
+            'svc-a': {
+                'override': 'replace',
+                'command': '/bin/a',
+                'after': ['other'],
+                'before': ['another'],
+                'requires': ['dep'],
+            },
+        },
+        'checks': {
+            'chk-a': {
+                'override': 'replace',
+                'level': 'ready',
+                'http': {'url': 'http://localhost:8080'},
+            },
+        },
+        'log-targets': {
+            'lt-a': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['svc-a'],
+            },
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'svc-a': {
+                'override': 'merge',
+                'command': '/bin/a2',
+                'after': ['redis'],
+                'before': ['cleanup'],
+                'requires': ['dep2'],
+            },
+        },
+        'checks': {
+            'chk-a': {
+                'override': 'merge',
+                'level': 'alive',
+            },
+        },
+        'log-targets': {
+            'lt-a': {
+                'override': 'merge',
+                'location': 'https://loki2.example.com',
+                'services': ['svc-b'],
+            },
+        },
+    })
+
+    container = Container(
+        'my-container',
+        can_connect=True,
+        layers={'base': layer1, 'override': layer2},
+    )
+
+    plan1 = container.plan
+    svc1_after = list(plan1.services['svc-a'].after)
+    svc1_before = list(plan1.services['svc-a'].before)
+    svc1_requires = list(plan1.services['svc-a'].requires)
+    chk1_level = plan1.checks['chk-a'].level
+    lt1_services = list(plan1.log_targets['lt-a'].services)
+
+    plan2 = container.plan
+    svc2_after = list(plan2.services['svc-a'].after)
+    svc2_before = list(plan2.services['svc-a'].before)
+    svc2_requires = list(plan2.services['svc-a'].requires)
+    chk2_level = plan2.checks['chk-a'].level
+    lt2_services = list(plan2.log_targets['lt-a'].services)
+
+    # Service list fields must not accumulate duplicates.
+    assert svc1_after == svc2_after
+    assert svc1_before == svc2_before
+    assert svc1_requires == svc2_requires
+
+    # Check fields must be stable across accesses.
+    assert chk1_level == chk2_level
+
+    # Log target list fields must not accumulate duplicates.
+    assert lt1_services == lt2_services
+
+    # Also verify the original layer objects are not mutated.
+    assert layer1.services['svc-a'].after == ['other']
+    assert layer1.services['svc-a'].before == ['another']
+    assert layer1.services['svc-a'].requires == ['dep']
+    assert layer1.log_targets['lt-a'].services == ['svc-a']
+
+
 def test_warning_on_non_empty_container(caplog: pytest.LogCaptureFixture):
     class MyCharm(CharmBase):
         def __init__(self, framework: Framework):

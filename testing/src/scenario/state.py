@@ -13,6 +13,7 @@ import pathlib
 import random
 import re
 import string
+import warnings
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import chain
@@ -25,6 +26,7 @@ from typing import (
     NoReturn,
     TypeVar,
     cast,
+    overload,
 )
 from uuid import uuid4
 
@@ -35,6 +37,7 @@ from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
 
+from . import _charmcraft_extensions
 from .errors import MetadataNotFoundError, StateValidationError
 from .logger import logger as scenario_logger
 
@@ -69,6 +72,7 @@ RawSecretRevisionContents = RawDataBagContents = dict[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
+_RelationType = TypeVar('_RelationType', bound='RelationBase')
 
 logger = scenario_logger.getChild('state')
 
@@ -301,10 +305,31 @@ class Secret:
         return hash(self.id)
 
     def __post_init__(self):
+        self._validate_content(self.tracked_content, 'tracked_content')
+        if self.latest_content is not None:
+            self._validate_content(self.latest_content, 'latest_content')
         if self.latest_content is None:
             # bypass frozen dataclass
             object.__setattr__(self, 'latest_content', self.tracked_content)
         _deepcopy_mutable_fields(self)
+
+    @staticmethod
+    def _validate_content(content: dict[str, str], name: str):
+        if not isinstance(content, dict):
+            raise StateValidationError(
+                f'Secret.{name} should be a dict, not {type(content)}',
+            )
+        if not content:
+            raise StateValidationError(
+                f'Secret.{name} must not be empty; Juju requires at least one key',
+            )
+        bad = {
+            k: v for k, v in content.items() if not isinstance(k, str) or not isinstance(v, str)
+        }
+        if bad:
+            raise StateValidationError(
+                f'Secret.{name} should be dict[str, str]; found non-string key(s)/value(s): {bad}',
+            )
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
@@ -1085,9 +1110,10 @@ class Container:
         for layer in self.layers.values():
             for name, service in layer.services.items():
                 if name in services and service.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     services[name]._merge(service)
                 else:
-                    services[name] = service
+                    services[name] = copy.deepcopy(service)
         return services
 
     def _render_checks(self) -> dict[str, pebble.Check]:
@@ -1095,9 +1121,10 @@ class Container:
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     checks[name]._merge(check)
                 else:
-                    checks[name] = check
+                    checks[name] = copy.deepcopy(check)
         return checks
 
     def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
@@ -1105,9 +1132,10 @@ class Container:
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     log_targets[name]._merge(log_target)
                 else:
-                    log_targets[name] = log_target
+                    log_targets[name] = copy.deepcopy(log_target)
         return log_targets
 
     @property
@@ -1739,12 +1767,37 @@ class State:
             f'storage: name={storage}, index={index} not found in the State',
         )
 
-    def get_relation(self, relation: int, /) -> RelationBase:
-        """Get relation from this State, based on the relation's id."""
+    @overload
+    def get_relation(self, relation: int, /) -> RelationBase: ...
+    @overload
+    def get_relation(self, relation: _RelationType, /) -> _RelationType: ...
+    def get_relation(self, relation: int | RelationBase, /) -> RelationBase:
+        """Get relation from this State, based on the relation's id.
+
+        Args:
+            relation: A relation ID, or a relation object from a previous state.
+                If a relation object is passed, its ID is used to find the relation, and the
+                type, endpoint and interface of the found relation are validated against it.
+
+        Raises:
+            KeyError: If no relation matching the id is found.
+            ValueError: If a relation object is passed but the found relation
+                has a mismatched type, endpoint, or interface.
+        """
+        rel_id = relation.id if isinstance(relation, RelationBase) else relation
         for state_relation in self.relations:
-            if state_relation.id == relation:
+            if state_relation.id == rel_id:
+                if isinstance(relation, RelationBase) and (
+                    (type(state_relation), state_relation.endpoint)
+                    != (type(relation), relation.endpoint)
+                ):
+                    raise ValueError(
+                        f'State.get_relation() result does not match\n'
+                        f'Called with:\n{relation!r}\n'
+                        f'Found:\n{state_relation!r}\n'
+                    )
                 return state_relation
-        raise KeyError(f'relation: id={relation} not found in the State')
+        raise KeyError(f'relation: id={rel_id} not found in the State')
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
         """Get all relations on this endpoint from the current state."""
@@ -1860,6 +1913,87 @@ def _is_valid_charmcraft_25_metadata(meta: dict[str, Any]):
     return True
 
 
+def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
+    """Merge charmcraft extension defaults into the charm metadata in place.
+
+    Extension defaults are applied first, then the local charmcraft.yaml
+    values are merged on top, simulating what ``charmcraft expand-extensions``
+    does.
+
+    Raises:
+        ValueError: if the local charmcraft.yaml defines keys that overlap
+            with what the extension provides (matching ``charmcraft pack``
+            behaviour).
+    """
+    for ext_name in extensions:
+        ext_meta = _charmcraft_extensions.METADATA.get(ext_name, {})
+        ext_config = _charmcraft_extensions.CONFIG.get(ext_name, {})
+        ext_actions = _charmcraft_extensions.ACTIONS.get(ext_name, {})
+
+        if not ext_meta and not ext_config and not ext_actions:
+            warnings.warn(
+                f'Unknown charmcraft extension {ext_name!r}; ignoring. '
+                "Ensure you're running the latest ops, and open an issue if this persists.",
+                stacklevel=2,
+            )
+            continue
+
+        # Merge metadata: for dicts, error on overlapping keys
+        # (matching charmcraft behaviour). For lists, combine them.
+        for key, ext_value in ext_meta.items():
+            if key not in meta:
+                meta[key] = copy.deepcopy(ext_value)
+            elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
+                overlap = set(ext_value) & set(meta[key])
+                if overlap:
+                    raise ValueError(
+                        f'overlapping keys {overlap} in {key} of '
+                        f'charmcraft.yaml which conflict with the '
+                        f'{ext_name} extension, please rename or remove them'
+                    )
+                merged = copy.deepcopy(ext_value)
+                merged.update(meta[key])
+                meta[key] = merged
+            elif isinstance(ext_value, list) and isinstance(meta[key], list):
+                merged = copy.deepcopy(ext_value)
+                merged.extend(i for i in meta[key] if i not in merged)
+                meta[key] = merged
+            else:
+                raise ValueError(
+                    'Conflict between local and extension metadata. '
+                    'Please check that your charmcraft.yaml is valid'
+                )
+
+        # Merge config options; error on overlapping keys.
+        if ext_config:
+            local_config = meta.get('config', {})
+            local_options = local_config.get('options', {})
+            overlap = set(ext_config) & set(local_options)
+            if overlap:
+                raise ValueError(
+                    f'overlapping keys {overlap} in config.options of '
+                    f'charmcraft.yaml which conflict with the '
+                    f'{ext_name} extension, please rename or remove them'
+                )
+            merged_options = copy.deepcopy(ext_config)
+            merged_options.update(local_options)
+            meta['config'] = {'options': merged_options}
+
+        # Merge actions; error on overlapping keys.
+        if ext_actions:
+            local_actions = meta.get('actions', {})
+            overlap = set(ext_actions) & set(local_actions)
+            if overlap:
+                raise ValueError(
+                    f'overlapping keys {overlap} in actions of '
+                    f'charmcraft.yaml which conflict with the '
+                    f'{ext_name} extension, please rename or remove them'
+                )
+            merged_actions = copy.deepcopy(ext_actions)
+            merged_actions.update(local_actions)
+            meta['actions'] = merged_actions
+
+
 @dataclasses.dataclass(frozen=True)
 class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
@@ -1892,19 +2026,31 @@ class _CharmSpec(Generic[CharmType]):
 
     @staticmethod
     def _load_metadata(charm_root: pathlib.Path):
-        """Load metadata from charm projects created with Charmcraft >= 2.5."""
+        """Load metadata from charm projects created with Charmcraft >= 2.5.
+
+        If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+        ``extensions: [flask-framework]``), the extension's metadata, config,
+        and actions are merged in before the values are returned, simulating
+        what ``charmcraft expand-extensions`` does at pack time.
+        """
         metadata_path = charm_root / 'charmcraft.yaml'
         meta: dict[str, Any] = (
             yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
         )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
+
+        # Apply charmcraft extensions before extracting config/actions.
+        extensions = meta.pop('extensions', None)
+        if extensions:
+            _apply_extensions(meta, extensions)
+
         config = meta.pop('config', None)
         actions = meta.pop('actions', None)
         return meta, config, actions
 
     @staticmethod
-    def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmType]:
+    def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmBase]:
         """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file
