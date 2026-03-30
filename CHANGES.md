@@ -3,7 +3,7 @@
 ## Features
 
 * Enable interactive debugging via `breakpoint` in testing (#2363)
-* Ops.testing autoload support for charmcraft extensions (#2367)
+* ops.testing autoload support for charmcraft extensions (#2367)
 * Allow testing.State.get_relation to accept relation objects (#2359)
 * Support charmcraft.yaml format as meta for testing.Context (#2296)
 
@@ -12,8 +12,8 @@
 * Correct type annotation for StorageMeta.properties (#2348)
 * Move the testing.Container compatibility import so that mypy style checkers understand it (#2343)
 * Hold only copies of user provided meta/config/actions in testing.Context (#2349)
-* Deep-copy layer objects during Scenario plan rendering (#2380)
-* Return copies from Scenario secret_get and action_get (#2379)
+* Deep-copy layer objects during testing.State plan rendering (#2380)
+* Return copies from testing.State secret_get and action_get (#2379)
 * Use timezone-aware datetimes in expiry calculation (#2378)
 * Warn before clearing non-empty container in testing (#2365)
 
