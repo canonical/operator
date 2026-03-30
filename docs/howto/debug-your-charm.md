@@ -234,8 +234,8 @@ jhack show-relation myapp:database postgresql:database
 The `juju debug-hooks` command opens a [`tmux`](https://github.com/tmux/tmux/wiki) session on a unit. When a matching hook fires, the session navigates to the charm directory with the full hook environment configured -- but the hook is *not* executed automatically. This gives you a chance to inspect the environment, modify files, and run the hook yourself.
 
 ```shell
-juju debug-hooks myapp/0                       # intercept all hooks and actions
-juju debug-hooks myapp/0 config-changed        # intercept only config-changed
+juju debug-hooks myapp/0                 # intercept all hooks and actions
+juju debug-hooks myapp/0 config-changed  # intercept only config-changed
 ```
 
 *Once a hook fires*, the `tmux` session lands in the charm directory. From there you can:
