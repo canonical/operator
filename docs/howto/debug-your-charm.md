@@ -91,7 +91,7 @@ Pebble keeps the most recent output from each service in a 100 KB ring buffer. O
 
 ```shell
 /charm/bin/pebble exec -- ls /etc/myapp/
-/charm/bin/pebble exec --context myworkload -- env   # inherit the service's environment
+/charm/bin/pebble exec --context myworkload -- env  # inherit the service's environment
 ```
 
 ### View the effective Pebble plan
