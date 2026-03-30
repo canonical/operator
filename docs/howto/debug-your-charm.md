@@ -350,7 +350,7 @@ juju show-unit myapp/0 | yq '.*.address'
 
 1. Run `juju debug-code myapp/0` to tell Juju to set `JUJU_DEBUG_AT` on the next hook execution.
 2. Trigger the hook you want to debug (or wait for it to fire naturally). The charm will start `debugpy` and block until a client connects.
-3. In VS Code, set your breakpoints (note that you'll need to have a breakpoint in an event handler to get access to the Ops event object) and press **F5** (or click **Run > Start Debugging**).
+3. In VS Code, set your breakpoints and press **F5** (or click **Run > Start Debugging**). To get access to an Ops event object, you'll need to set a breakpoint inside the corresponding event handler.
 
 ````{tip}
 **Debugging when Juju runs inside a Multipass VM**
