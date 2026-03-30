@@ -1,3 +1,44 @@
+# 3.7.0 - 30 March 2026
+
+## Features
+
+* Enable interactive debugging via `breakpoint` in testing (#2363)
+* Ops.testing autoload support for charmcraft extensions (#2367)
+* Allow testing.State.get_relation to accept relation objects (#2359)
+* Support charmcraft.yaml format as meta for testing.Context (#2296)
+
+## Fixes
+
+* Correct type annotation for StorageMeta.properties (#2348)
+* Move the testing.Container compatibility import so that mypy style checkers understand it (#2343)
+* Hold only copies of user provided meta/config/actions in testing.Context (#2349)
+* Deep-copy layer objects during Scenario plan rendering (#2380)
+* Return copies from Scenario secret_get and action_get (#2379)
+* Use timezone-aware datetimes in expiry calculation (#2378)
+* Warn before clearing non-empty container in testing (#2365)
+
+## Documentation
+
+* Replace links to juju.is by canonical.com/juju (#2368)
+* Refactor homepage to better put Ops in context (#2370)
+* Add pytest-operator migration guide from Jubilant docs (#2381)
+* Add a tip about AI help in the Jubilant migration guide (#2382)
+* Mention jhack scenario snapshot (#2351)
+* Update integration testing how-to guide (#2390)
+* Explain K8s charms briefly at the start of the tutorial (#2392)
+* Juju secrets identifier is now an opaque string (#2387)
+
+## Tests
+
+* Extend the type checking of the ops-scenario tests (#2230)
+
+## CI
+
+* Run ruff check --fix in tox -e format (#2369)
+* Check example charms with mypy in CI (#2360)
+* Update the list of published charms in the compatibility tests (#2384)
+* Adjust minimum Python version in broad charm compatibility tests (#2317)
+
 # 3.6.0 - 26 February 2026
 
 ## Features
