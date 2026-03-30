@@ -246,9 +246,7 @@ juju debug-hooks myapp/0 config-changed  # intercept only config-changed
 - Run `./dispatch` again after making changes, to iterate.
 - Exit the `tmux` session to let the unit resume normal operation.
 
-```{note}
 While a hook is being debugged, the unit is paused. Other hooks queue up and execute in order once you exit. Keep your debugging sessions short to avoid blocking the unit for too long.
-```
 
 > See more: {external+juju:ref}`Juju | juju debug-hooks <command-juju-debug-hooks>`
 
