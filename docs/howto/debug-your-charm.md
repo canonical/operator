@@ -12,11 +12,13 @@ For advice about debugging a 12-factor app charm, also see {external+charmcraft:
 
 The quickest way to poke around a live unit is to SSH into it with `juju ssh`. What you connect to depends on the substrate:
 
-**Machine charms.** `juju ssh` connects you to the machine itself. You land in a shell as the `ubuntu` user, which has password-less `sudo`:
+**Machine charms.** `juju ssh` connects you to the machine itself:
 
 ```shell
 juju ssh myapp/0
 ```
+
+You land in a shell as the `ubuntu` user, which has password-less `sudo`.
 
 **Kubernetes charms.** A K8s charm pod typically has multiple containers (the charm container and one or more workload containers). Use `--container` to choose which container to connect to:
 
