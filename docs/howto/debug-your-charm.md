@@ -118,7 +118,6 @@ If the charm configures Pebble health checks, `pebble checks` shows their curren
 /charm/bin/pebble checks
 ```
 
-> See more: {external+pebble:doc}`Pebble | CLI commands <reference/cli-commands>`
 
 (read-charm-logs)=
 ## Read charm logs with `juju debug-log`
