@@ -43,6 +43,10 @@ lint = [
     "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
+mypy = [  # used to type check example charms in CI
+    "mypy>=1.19",
+    "types-PyYAML",
+]
 unit = [
     "ops[testing,tracing]",
     "pytest~=8.4",
@@ -227,12 +231,21 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 ]
+"testing/src/scenario/_charmcraft_extensions.py" = [
+    "E501",  # Auto-generated file; long description strings are unavoidable.
+]
+".github/generate_charmcraft_extensions.py" = [
+    "S607",  # Intentionally calls charmcraft/tox by name.
+]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
 ]
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+    "S607",  # Starting a process with a partial executable path
+]
+".github/patch-charm-deps.py" = [
     "S607",  # Starting a process with a partial executable path
 ]
 "docs/custom_conf.py" = [
@@ -254,8 +267,32 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py"]
-exclude = ["tracing/*"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+exclude = [
+    "tracing/*",
+    "testing/tests/test_e2e/test_network.py",
+    "testing/tests/test_e2e/test_cloud_spec.py",
+    "testing/tests/test_e2e/test_play_assertions.py",
+    "testing/tests/test_e2e/test_vroot.py",
+    "testing/tests/test_e2e/test_resource.py",
+    "testing/tests/test_e2e/test_state.py",
+    "testing/tests/test_e2e/test_actions.py",
+    "testing/tests/test_e2e/test_config.py",
+    "testing/tests/test_e2e/test_event.py",
+    "testing/tests/test_e2e/test_deferred.py",
+    "testing/tests/test_e2e/test_stored_state.py",
+    "testing/tests/test_e2e/conftest.py",
+    "testing/tests/test_e2e/test_secrets.py",
+    "testing/tests/test_e2e/test_relations.py",
+    "testing/tests/test_e2e/test_trace_data.py",
+    "testing/tests/test_e2e/test_juju_log.py",
+    "testing/tests/test_e2e/test_status.py",
+    "testing/tests/test_e2e/test_storage.py",
+    "testing/tests/test_e2e/test_manager.py",
+    "testing/tests/test_e2e/test_ports.py",
+    "testing/tests/test_e2e/test_rubbish_events.py",
+    "testing/tests/test_e2e/test_pebble.py",
+]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
