@@ -49,7 +49,7 @@ juju import-ssh-key gh:<your-github-username>
 (debug-with-pebble)=
 ## Inspect the workload with Pebble (Kubernetes charms)
 
-In Kubernetes charms, each workload container runs {external+pebble:doc}`Pebble <index>` as its init system. You can use Pebble commands to inspect and interact with the workload directly. First, SSH into the workload container:
+In Kubernetes charms, each workload container runs {external+pebble:doc}`Pebble <index>` as its service manager. You can use Pebble commands to inspect and interact with the workload directly. First, SSH into the workload container:
 
 ```shell
 juju ssh --container <container-name> <unit>
