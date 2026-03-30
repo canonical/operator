@@ -83,6 +83,8 @@ A service in `backoff` or `error` state tells you the workload has been crashing
 
 ```{note}
 Pebble keeps the most recent output from each service in a 100 KB ring buffer. Older output is discarded, so if you need persistent logs consider configuring a Pebble {external+pebble:doc}`log forwarding target <how-to/forward-logs-to-loki>`.
+
+For a full observability setup -- including log forwarding, metrics, and dashboards -- see {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>` and the [Canonical Observability Stack documentation](https://documentation.ubuntu.com/observability/).
 ```
 
 ### Run commands in the container
@@ -122,7 +124,7 @@ If the charm configures Pebble health checks, `pebble checks` shows their curren
 (read-charm-logs)=
 ## Read charm logs with `juju debug-log`
 
-The `juju debug-log` command streams log messages from every agent in a model. It is the first tool to reach for when something goes wrong. By default it shows recent log lines and then tails new output. Common flags:
+The {external+juju:ref}`juju debug-log <command-juju-debug-log>` command streams log messages from every agent in a model. It is the first tool to reach for when something goes wrong. By default it shows recent log lines and then tails new output. Common flags:
 
 ```shell
 juju debug-log --replay                          # show full history, then tail
@@ -160,7 +162,7 @@ This tells Juju to store DEBUG-level messages from charm units while keeping eve
 If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), remember to restore it to the default once you are done. Verbose logs consume storage in the Juju database and can affect controller performance.
 ```
 
-> See more: {external+juju:ref}`Juju | juju debug-log <command-juju-debug-log>`, {external+juju:ref}`Juju | logging-config <model-config-logging-config>`
+> See more: {external+juju:ref}`Juju | logging-config <model-config-logging-config>`
 
 (use-jhack)=
 ## Use jhack for a faster debugging workflow
@@ -230,7 +232,7 @@ jhack show-relation myapp:database postgresql:database
 (debug-hooks)=
 ## Interactively debug hooks with `juju debug-hooks`
 
-The `juju debug-hooks` command opens a [`tmux`](https://github.com/tmux/tmux/wiki) session on a unit. When a matching hook fires, the session navigates to the charm directory with the full hook environment configured -- but the hook is *not* executed automatically. This gives you a chance to inspect the environment, modify files, and run the hook yourself.
+The {external+juju:ref}`juju debug-hooks <command-juju-debug-hooks>` command opens a [`tmux`](https://github.com/tmux/tmux/wiki) session on a unit. When a matching hook fires, the session navigates to the charm directory with the full hook environment configured -- but the hook is *not* executed automatically. This gives you a chance to inspect the environment, modify files, and run the hook yourself.
 
 ```shell
 juju debug-hooks myapp/0                 # intercept all hooks and actions
@@ -247,12 +249,10 @@ juju debug-hooks myapp/0 config-changed  # intercept only config-changed
 
 While a hook is being debugged, the unit is paused. Other hooks queue up and execute in order once you exit. Keep your debugging sessions short to avoid blocking the unit for too long.
 
-> See more: {external+juju:ref}`Juju | juju debug-hooks <command-juju-debug-hooks>`
-
 (debug-code)=
 ## Step through charm code with `juju debug-code`
 
-The `juju debug-code` command is similar to `debug-hooks`, but the hook *is* executed automatically. Juju sets the `JUJU_DEBUG_AT` environment variable, which Ops uses to activate breakpoints. When execution reaches a breakpoint, you are dropped into a {external+python:mod}`pdb` session where you can inspect variables and step through the code.
+The {external+juju:ref}`juju debug-code <command-juju-debug-code>` command is similar to `debug-hooks`, but the hook *is* executed automatically. Juju sets the `JUJU_DEBUG_AT` environment variable, which Ops uses to activate breakpoints. When execution reaches a breakpoint, you are dropped into a {external+python:mod}`pdb` session where you can inspect variables and step through the code.
 
 ```shell
 juju debug-code myapp/0                 # debug all hooks
@@ -284,8 +284,6 @@ Python's built-in {external+python:func}`breakpoint` also works when `JUJU_DEBUG
 
 ```{note}
 `ops.Framework.breakpoint()` won't trigger during state-transition tests, but the built-in `breakpoint()` will trigger as if `JUJU_DEBUG_AT` was set to `all`.
-
-> See more: {external+juju:ref}`Juju | juju debug-code <command-juju-debug-code>`
 
 (remote-debugging-with-vs-code)=
 ## Remote debugging with VS Code
@@ -349,8 +347,7 @@ juju show-unit myapp/0 | yq '.*.address'
 2. Trigger the hook you want to debug (or wait for it to fire naturally). The charm will start `debugpy` and block until a client connects.
 3. In VS Code, set your breakpoints and press **F5** (or click **Run > Start Debugging**). To get access to an Ops event object, you'll need to set a breakpoint inside the corresponding event handler.
 
-````{tip}
-**Debugging when Juju runs inside a Multipass VM**
+### Debugging from outside a Multipass VM
 
 If your Juju model is inside a Multipass VM (a common setup for local charm development), VS Code on your host machine cannot reach the charm unit's IP directly. Use an SSH port forward through the VM to bridge the gap:
 
@@ -369,4 +366,3 @@ ssh -N -L 5678:${UNIT_IP}:5678 ubuntu@${VM_IP}
 ```
 
 Then, in your `launch.json`, set `"host"` to `"localhost"` instead of the unit IP. VS Code will connect to the forwarded port on your host, and the SSH tunnel will relay traffic to `debugpy` on the charm unit inside the VM.
-````
