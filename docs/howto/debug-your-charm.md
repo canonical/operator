@@ -76,9 +76,9 @@ A service in `backoff` or `error` state tells you the workload has been crashing
 `pebble logs` shows recent stdout and stderr from services. Use `-f` to follow in real time:
 
 ```shell
-/charm/bin/pebble logs              # last 30 lines from all services
-/charm/bin/pebble logs -f           # tail and follow
-/charm/bin/pebble logs -n all       # show all buffered output
+/charm/bin/pebble logs         # last 30 lines from all services
+/charm/bin/pebble logs -f      # tail and follow
+/charm/bin/pebble logs -n all  # show all buffered output
 ```
 
 ```{note}
