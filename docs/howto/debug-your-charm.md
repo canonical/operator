@@ -253,7 +253,7 @@ While a hook is being debugged, the unit is paused. Other hooks queue up and exe
 (debug-code)=
 ## Step through charm code with `juju debug-code`
 
-The `juju debug-code` command is similar to `debug-hooks`, but the hook **is** executed automatically. Juju sets the `JUJU_DEBUG_AT` environment variable, which Ops uses to activate breakpoints. When execution reaches a breakpoint, you are dropped into a {external+python:mod}`pdb` session where you can inspect variables and step through the code.
+The `juju debug-code` command is similar to `debug-hooks`, but the hook *is* executed automatically. Juju sets the `JUJU_DEBUG_AT` environment variable, which Ops uses to activate breakpoints. When execution reaches a breakpoint, you are dropped into a {external+python:mod}`pdb` session where you can inspect variables and step through the code.
 
 ```shell
 juju debug-code myapp/0                        # debug all hooks
