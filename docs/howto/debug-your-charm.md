@@ -196,11 +196,13 @@ Firing events manually can desynchronise charm state from Juju state if your eve
 
 ### Push local changes with `jhack sync`
 
-`jhack sync` watches local directories and automatically pushes file changes to remote charm units. Combined with `jhack fire`, this enables a rapid edit-trigger-observe loop:
+`jhack sync` watches local directories and automatically pushes file changes to remote charm units:
 
 ```shell
 jhack sync myapp/0 --source ./src --source ./lib
 ```
+
+Combined with `jhack fire`, this enables a rapid edit-trigger-observe loop.
 
 ### Inspect state with `jhack script`
 
