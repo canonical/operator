@@ -2914,7 +2914,7 @@ class _TestingModelBackend:
 
     @classmethod
     def _generate_secret_id(cls) -> str:
-        # Not a proper Juju secrets-style xid, but that's okay
+        # Not a proper Juju secrets identifier, but that's okay
         return f'secret:{uuid.uuid4()}'
 
     def secret_add(
