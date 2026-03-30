@@ -5,6 +5,8 @@
 
 When your charm isn't behaving as expected, Juju and the broader charming ecosystem provide several tools to help you investigate. This guide covers how to get a shell on a running unit, read charm logs, interactively debug hook execution, and use third-party tools to accelerate your debugging workflow.
 
+For advice about debugging a 12-factor app charm, also see {external+charmcraft:ref}`Charmcraft | Use a 12-factor app charm <use-12-factor-charms-troubleshoot>`.
+
 (ssh-into-a-unit)=
 ## Get a shell on a running unit with `juju ssh`
 
