@@ -43,12 +43,13 @@ Integration tests check that your charm works correctly when deployed to a real 
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 ```
 
-Ops enables your charm to output logs to the Juju logs.
+Juju provides a variety of debugging tools, which Ops integrates with.
 
 ```{toctree}
 :maxdepth: 1
 
 Log from your charm <log-from-your-charm>
+Debug your charm <debug-your-charm>
 ```
 
 ## Managing machine workloads

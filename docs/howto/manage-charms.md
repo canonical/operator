@@ -71,6 +71,7 @@ and the charm workflow.
 > - {ref}`write-unit-tests-for-a-charm`
 > - {ref}`write-integration-tests-for-a-charm`
 > - {ref}`manage-logs`
+> - {ref}`debug-your-charm`
 
 The next thing to do is add functionality to your charm.
 As you do that, you'll frequently pack, test, and debug your charm.
