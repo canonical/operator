@@ -26,7 +26,7 @@ You land in a shell as the `ubuntu` user, which has password-less `sudo`.
 juju ssh --container myworkload myapp/0
 ```
 
-If you omit `--container`, `juju ssh` targets the charm container by default.
+If you omit `--container`, `juju ssh` connects to the charm container by default.
 
 ````{important}
 **Juju 4: SSH keys are no longer added automatically.**
