@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
-
 import pytest
 from scenario import Context
 from scenario.state import State, _CharmSpec, _Event, _EventType

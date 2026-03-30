@@ -12,7 +12,6 @@ from scenario.state import State, _Action, _next_action_id
 from ops._private.harness import ActionFailed
 from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
-from ops.version import version as ops_version
 
 
 @pytest.fixture(scope='function')

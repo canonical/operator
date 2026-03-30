@@ -7,7 +7,7 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
