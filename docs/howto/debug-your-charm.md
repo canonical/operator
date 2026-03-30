@@ -96,7 +96,7 @@ Pebble keeps the most recent output from each service in a 100 KB ring buffer. O
 
 ### View the effective Pebble plan
 
-`pebble plan` prints the merged configuration that Pebble is currently using. This is helpful to verify that the layers your charm wrote are correct:
+`pebble plan` prints the merged configuration that Pebble is currently using:
 
 ```text
 $ /charm/bin/pebble plan
@@ -107,6 +107,8 @@ services:
         override: replace
         command: my-workload
 ```
+
+This is helpful to verify that your charm wrote the correct layers.
 
 ### Check health checks
 
