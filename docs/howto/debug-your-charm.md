@@ -240,7 +240,7 @@ juju debug-hooks myapp/0 config-changed  # intercept only config-changed
 
 *Once a hook fires*, the `tmux` session lands in the charm directory. From there you can:
 
-- Inspect the environment variables that Juju provides (e.g. `JUJU_DISPATCH_PATH`).
+- Inspect the environment variables that Juju provides, such as `JUJU_DISPATCH_PATH`.
 - Examine or modify files under `src/`.
 - Run `./dispatch` to execute the hook manually.
 - Run `./dispatch` again after making changes, to iterate.
