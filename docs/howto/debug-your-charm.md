@@ -227,7 +227,6 @@ jhack script myapp/0 ./inspect_relations.py
 jhack show-relation myapp:database postgresql:database
 ```
 
-> See more: [jhack](https://github.com/canonical/jhack)
 
 (debug-hooks)=
 ## Interactively debug hooks with `juju debug-hooks`
