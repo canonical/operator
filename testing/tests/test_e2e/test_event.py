@@ -78,8 +78,6 @@ def test_emitted_framework():
 
 def test_emitted_deferred():
     class MyCharm(ops.CharmBase):
-        META: ClassVar[dict[str, Any]] = {'name': 'joop'}
-
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._on_update_status)
