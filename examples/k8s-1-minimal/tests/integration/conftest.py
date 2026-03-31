@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# The integration tests use the pytest-jubilant plugin (https://github.com/canonical/pytest-jubilant).
-# pytest-jubilant provides a module-scoped ``juju`` fixture that creates a temporary Juju model.
+# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
+# The pytest-jubilant plugin (https://github.com/canonical/pytest-jubilant) provides a
+# module-scoped ``juju`` fixture that creates a temporary Juju model.
 # To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 import os
