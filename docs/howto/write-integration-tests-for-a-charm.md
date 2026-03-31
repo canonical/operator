@@ -87,7 +87,7 @@ commands =
         {posargs}
 ```
 
-Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. Integration tests use two packages: [Jubilant](https://documentation.ubuntu.com/jubilant/), which wraps the Juju CLI, and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), a pytest plugin that manages Juju models during tests. Pin to the current stable major versions, which are maintained with strong backwards compatibility guarantees. For example:
+Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. Integration tests use two packages: {external+jubilant:doc}`Jubilant <index>`, which wraps the Juju CLI, and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), a pytest plugin that manages Juju models during tests. Pin to the current stable major versions, which are maintained with strong backwards compatibility guarantees. For example:
 
 ```toml
 [dependency-groups]
@@ -103,7 +103,7 @@ integration = [
 
 ### Write fixtures
 
-The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`. In your test code, you use the {external+jubilant:doc}`Jubilant <index>` API directly — for example, `jubilant.Juju` for type annotations and helpers such as `jubilant.all_active`.
+The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`. In your test code, you use the {external+jubilant:doc}`Jubilant <reference/jubilant>` API directly — for example, `jubilant.Juju` for type annotations and helpers such as `jubilant.all_active`.
 
 In `conftest.py` in your integration test directory, add a `charm` fixture:
 
@@ -416,7 +416,7 @@ Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs a
   - run: tox -e integration -- --juju-dump-logs
   - name: Upload logs
     if: ${{ !cancelled() }}
-    uses: actions/upload-artifact@v4
+    uses: actions/upload-artifact@v7
     with:
       name: juju-dump-logs
       path: .logs

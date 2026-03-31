@@ -1,7 +1,7 @@
 (pytest-operator-migration)=
 # How to migrate integration tests from pytest-operator
 
-Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), which uses the Jubilant library.
+Older charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to Jubilant and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
 
 ```{tip}
 Try bootstrapping your migration with an AI Agent (such as GitHub Copilot or Claude Code). Instruct the agent to clone the `canonical/jubilant` and `canonical/pytest-jubilant` repositories, study them, and then migrate the charm integration tests to Jubilant. You should end up with a great starting point to then continue as outlined in the rest of this guide.
@@ -45,7 +45,7 @@ If you're migrating a large number of tests, you may want to do it in stages. In
 
 ## Add any extra fixtures to `conftest.py`
 
-The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix). This replaces the need to write a `juju` fixture yourself.
+The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix).
 
 If you have a hand-written `juju` fixture in your `conftest.py`, you can remove it.
 
