@@ -414,6 +414,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-jubilant"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jubilant" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/b6/d98999f1d0a0c9313154fe7bf8f4e3639729b7052c736f2f12cd7025201c/pytest_jubilant-2.0.0.tar.gz", hash = "sha256:c5f8382ac0b43bca8ef87e309f587e2fc1751ff7b2677dd28a66989b6605e063", size = 16250, upload-time = "2026-03-29T23:39:57.966Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/c3/234c3ec22b230e7e33732f91d19d72ad84101a97353b03be3450e4188c5c/pytest_jubilant-2.0.0-py3-none-any.whl", hash = "sha256:28fcf3750100eda16658c2967af099a39199af9fd102ab3b5ba230a028efec3e", size = 13354, upload-time = "2026-03-29T23:39:56.66Z" },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -496,8 +509,7 @@ dependencies = [
 
 [package.dev-dependencies]
 integration = [
-    { name = "jubilant" },
-    { name = "pytest" },
+    { name = "pytest-jubilant" },
 ]
 lint = [
     { name = "codespell" },
@@ -519,10 +531,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-integration = [
-    { name = "jubilant" },
-    { name = "pytest" },
-]
+integration = [{ name = "pytest-jubilant" }]
 lint = [
     { name = "codespell" },
     { name = "pyright" },

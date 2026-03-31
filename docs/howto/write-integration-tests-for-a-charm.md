@@ -93,8 +93,7 @@ Also check that `pyproject.toml` has an `integration` dependency group. Again, i
 [dependency-groups]
 ...
 integration = [
-    "jubilant",
-    "pytest",
+    "pytest-jubilant",
 ]
 ```
 
@@ -103,32 +102,15 @@ integration = [
 
 ### Write fixtures
 
-In `conftest.py` in your integration test directory, add these fixtures:
+The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`.
+
+In `conftest.py` in your integration test directory, add a `charm` fixture:
 
 ```python
-import logging
 import os
 import pathlib
-import sys
-import time
 
-import jubilant
 import pytest
-
-logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
-    """Create a temporary Juju model for running tests."""
-    with jubilant.temp_model() as juju:
-        yield juju
-
-        if request.session.testsfailed:
-            logger.info("Collecting Juju logs...")
-            time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=1000)
-            print(log, end="", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")
@@ -143,13 +125,9 @@ def charm():
     return next(pathlib.Path(".").glob("*.charm")).resolve()
 ```
 
-The integration tests will depend on these fixtures.
+The integration tests will depend on this fixture and on the `juju` fixture from `pytest-jubilant`.
 
-These fixtures use [pytest](https://docs.pytest.org/en/stable/) and {external+jubilant:doc}`Jubilant <index>`:
-
-- The `juju` fixture creates a temporary Juju model for each test file. The [](jubilant.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit.
-
-- The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
+The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
 
 For general guidance about `conftest.py`, see [conftest.py: sharing fixtures across multiple files](https://docs.pytest.org/en/stable/reference/fixtures.html#conftest-py-sharing-fixtures-across-multiple-files).
 
@@ -184,7 +162,7 @@ For more examples of tests that deploy charms, see:
 - [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
 - [httpbin-demo](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/integration/test_charm.py)
 
-Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
+Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. You can mark such tests with `@pytest.mark.juju_setup` -- if you later use `--no-juju-setup` to skip them, the model must already exist (see {ref}`run-your-tests` below). Adding extra checks or `asserts` in deployment tests is not recommended.
 
 ### Exercise your charm
 
@@ -343,15 +321,18 @@ Jubilant provides an escape hatch to invoke the Juju CLI. This can be useful for
 
 ### Use several models
 
-You can use Jubilant with several models, in the same cloud or in
-different clouds. This way you can, for example, integrate machine charms
-with Kubernetes charms easily.
+If you need multiple Juju models in a single test module, use the `juju_factory` fixture provided by `pytest-jubilant`:
 
 ```python
-    model_a = jubilant.Juju("some-model")
-    model_b = jubilant.Juju("another-controller:a-model")
-    new_model = jubilant.Juju().add_model("a-model", "some-cloud", controller=..., config=..., credential=...)
+import pytest_jubilant
+
+
+@pytest.fixture(scope="module")
+def other_model(juju_factory: pytest_jubilant.JujuFactory):
+    return juju_factory.get_juju(suffix="other")
 ```
+
+Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios, for example integrating machine charms with Kubernetes charms.
 
 > See more:
 > - {external+juju:ref}`Juju offers <manage-offers>`
@@ -411,13 +392,22 @@ CHARM_PATH=/path/to/foo.charm tox -e integration
 
 Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when all the tests in the module have finished. This is determined by the scope of the `juju` fixture.
 
-Use the `--cloud`, `--controller`, and `--model` parameters to specify the cloud, controller, and model name. If you specify the model name and include the `--keep-models` parameter, you can reuse a model from a previous test run. For example:
+The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle:
+
+| Option | Description |
+|---|---|
+| `--juju-model PREFIX` | Use a custom model name prefix instead of a random one. Required if using `--no-juju-setup`. |
+| `--no-juju-teardown` | Keep models after the tests finish, instead of destroying them. Also skips tests marked with `@pytest.mark.juju_teardown`. |
+| `--no-juju-setup` | Skip tests marked with `@pytest.mark.juju_setup` (for example, deployment tests). The model must already exist. Requires `--juju-model`. |
+| `--juju-dump-logs [PATH]` | Dump `juju debug-log` output to disk for each model. Defaults to `.logs/`. |
+
+For example, to deploy on a first run and then iterate without redeploying:
 
 ```text
-# in the initial execution, the new model will be created
-tox -e integration -- --keep-models --model test-example-model
-# in the next execution it will reuse the model created previously:
-tox -e integration -- --keep-models --model test-example-model --no-deploy
+# First run: deploy and keep the models
+tox -e integration -- --juju-model mytest --no-juju-teardown
+# Subsequent runs: skip deployment, reuse the models
+tox -e integration -- --juju-model mytest --no-juju-setup --no-juju-teardown
 ```
 
 There are different ways of specifying a subset of tests to run using `pytest`. With the `-k` option you can specify different expressions. For example, the next command will run all tests in the `test_charm.py` file except `test_one` function.

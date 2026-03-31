@@ -1,7 +1,7 @@
 (pytest-operator-migration)=
 # How to migrate integration tests from pytest-operator
 
-Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to Jubilant.
+Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to [pytest-jubilant](https://github.com/canonical/pytest-jubilant), which uses the Jubilant library.
 
 ```{tip}
 Try bootstrapping your migration with an AI Agent (such as GitHub Copilot or Claude Code). Instruct the agent to clone the canonical/jubilant and canonical/pytest-jubilant repositories, study them, and then migrate the charm integration tests to Jubilant. You should end up with a great starting point to then continue as outlined in the rest of this guide.
@@ -12,7 +12,7 @@ To get help while you're migrating tests, please keep the {external+jubilant:doc
 Migrating your tests can be broken into three steps:
 
 1. Update your dependencies
-2. Add fixtures to `conftest.py`
+2. Add any extra fixtures to `conftest.py`
 3. Update the tests themselves
 
 Let's look at each of these in turn.
@@ -20,7 +20,7 @@ Let's look at each of these in turn.
 
 ## Update your dependencies
 
-The first thing you'll need to do is add `jubilant` as a dependency to your `tox.ini` or `pyproject.toml` dependencies.
+The first thing you'll need to do is add `pytest-jubilant` as a dependency to your `tox.ini` or `pyproject.toml` dependencies.
 
 You can also remove the dependencies on `juju` (python-libjuju), `pytest-operator`, and `pytest-asyncio`.
 
@@ -32,7 +32,7 @@ If you're using `tox.ini`, the diff might look like:
      boto3
      cosl
 -    juju>=3.0
-+    jubilant~=1.0
++    pytest-jubilant
      pytest
 -    pytest-operator
 -    pytest-asyncio
@@ -42,42 +42,16 @@ If you're using `tox.ini`, the diff might look like:
 If you're migrating a large number of tests, you may want to do it in stages. In that case, keep the old dependencies in place till the end, and migrate tests one at a time, so that both pytest-operator and Jubilant tests can run together.
 
 
-## Add fixtures to `conftest.py`
+## Add any extra fixtures to `conftest.py`
 
-The pytest-operator library includes pytest fixtures, but Jubilant does not include any fixtures, so you'll need to add one or two fixtures to your `conftest.py`.
+The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix). This replaces the need to write a `juju` fixture yourself.
+
+If you have a hand-written `juju` fixture in your `conftest.py`, you can remove it.
 
 (a_juju_model_fixture)=
-### A `juju` model fixture
+### The `juju` model fixture
 
-Jubilant expects that a Juju controller has already been set up, either using [Concierge](https://github.com/jnsgruk/concierge) or a manual approach. However, you'll want a fixture that creates a temporary model. We recommend naming the fixture `juju`:
-
-```python
-# tests/integration/conftest.py
-
-import jubilant
-import pytest
-
-@pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest):
-    keep_models = bool(request.config.getoption('--keep-models'))
-
-    with jubilant.temp_model(keep=keep_models) as juju:
-        juju.wait_timeout = 10 * 60
-
-        yield juju  # run the test
-
-        if request.session.testsfailed:
-            log = juju.debug_log(limit=1000)
-            print(log, end='')
-
-def pytest_addoption(parser):
-    parser.addoption(
-        '--keep-models',
-        action='store_true',
-        default=False,
-        help='keep temporarily-created models',
-    )
-```
+`pytest-jubilant` expects that a Juju controller has already been set up, either using [Concierge](https://github.com/jnsgruk/concierge) or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
 
 In your tests, use the fixture like this:
 
@@ -94,9 +68,9 @@ def test_active(juju: jubilant.Juju):
 
 A few things to note about the fixture:
 
-* It includes a command-line parameter `--keep-models`, to match pytest-operator. If the parameter is set, the fixture keeps the temporary model around after running the tests.
-* It sets [`juju.wait_timeout`](jubilant.Juju.wait_timeout) to 10 minutes, to match python-libjuju's default `wait_for_idle` timeout.
-* If any of the tests fail, it uses `juju.debug_log` to display the last 1000 lines of `juju debug-log` output.
+* To keep models around after running the tests (matching pytest-operator's `--keep-models`), pass `--no-juju-teardown`.
+* The default wait timeout is Jubilant's default. To match python-libjuju's 10-minute `wait_for_idle` timeout, set `juju.wait_timeout = 10 * 60` in a wrapper fixture or at the start of your test.
+* If any of the tests fail, the plugin automatically dumps the last 1000 lines of `juju debug-log` output.
 * It is module-scoped, like pytest-operator's `ops_test` fixture. This means that a new model is created for every `test_*.py` file, but not for every test.
 
 (how_to_migrate_an_application_fixture)=
@@ -104,7 +78,7 @@ A few things to note about the fixture:
 
 If you don't want to deploy your application in each test, you can add a module-scoped `app` fixture that deploys your charm and waits for it to go active.
 
-The following fixture assumes that the charm has already been packed with `charmcraft pack` in a previous CI step (Jubilant has no equivalent of `ops_test.build_charm`):
+The following fixture assumes that the charm has already been packed with `charmcraft pack` in a previous CI step (`pytest-jubilant` has no equivalent of `ops_test.build_charm`):
 
 ```python
 # tests/integration/conftest.py

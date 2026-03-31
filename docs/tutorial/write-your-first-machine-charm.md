@@ -898,7 +898,7 @@ TOTAL                118     31     26      7    69%
 
 Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
 
-When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. We'll expand the tests to cover more of your charm's functionality.
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use the [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin, which provides a `juju` fixture backed by {external+jubilant:doc}`Jubilant <index>`. We'll expand the tests to cover more of your charm's functionality.
 
 In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
 
@@ -931,10 +931,10 @@ def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config("tinyproxy", reset="slug")
 ```
 
-Each test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+Each test depends on two fixtures:
 
-- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available.
-- `juju` - A Jubilant object for interacting with a temporary Juju model.
+- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available. This fixture is defined in `tests/integration/conftest.py`.
+- `juju` - A Jubilant object for interacting with a temporary Juju model. This fixture is provided by the `pytest-jubilant` plugin.
 
 The `juju` fixture is module-scoped. In other words, each test in `test_charm.py` affects the state of the same Juju model. This means that the order of the tests is significant. This also explains why we reset `slug` at the end of `test_block_on_invalid_config` - to ensure that any subsequent test could assume an unblocked charm.
 

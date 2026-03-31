@@ -100,8 +100,7 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant",
-    "pytest",
+    "pytest-jubilant",
 ]
 # Additional groups
 docs = [
@@ -447,7 +446,7 @@ a cloud in which to deploy it, is required. This example uses [Concierge](https:
         run: uv tool install tox --with tox-uv
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
-        run: tox -e integration -- --model testing
+        run: tox -e integration -- --juju-model testing
       - name: Dump logs
         uses: canonical/charm-logdump-action@main
         if: failure()
