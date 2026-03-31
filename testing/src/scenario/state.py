@@ -334,7 +334,7 @@ class Secret:
         latest_content: RawSecretRevisionContents | None = None,
         id: str | None = None,
         owner: Literal['unit', 'app'] | None = None,
-        remote_grants: Mapping[int, set[str]] = {},
+        remote_grants: Mapping[int, Iterable[str]] = {},
         label: str | None = None,
         description: str | None = None,
         expire: datetime.datetime | None = None,
