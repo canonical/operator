@@ -165,6 +165,8 @@ For more examples of tests that deploy charms, see:
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. You can mark such tests with `@pytest.mark.juju_setup` -- if you later use `--no-juju-setup` to skip them, the model must already exist (see {ref}`run-your-tests` below). Adding extra checks or `asserts` in deployment tests is not recommended.
 
+Similarly, if you have tests that perform destructive actions (for example, removing relations or applications), mark them with `@pytest.mark.juju_teardown`. These tests will be skipped when `--no-juju-teardown` is passed.
+
 ### Exercise your charm
 
 After `test_deploy`, add more tests to check that your charm operates correctly. For example:
@@ -398,10 +400,28 @@ The `pytest-jubilant` plugin provides several command-line options for controlli
 
 | Option | Description |
 |---|---|
-| `--juju-model PREFIX` | Use a custom model name prefix instead of a random one. Required if using `--no-juju-setup`. |
+| `--juju-model PREFIX` | Use a custom model name prefix instead of a random one. Required if using `--no-juju-setup`. Model names are formed as `PREFIX-MODULE` (or `PREFIX-MODULE-SUFFIX` for extra models created via `juju_factory`), where `MODULE` is derived from the test file name. For example, running `tests/integration/test_charm.py` with `--juju-model mytest` creates a model called `mytest-test-charm`. |
 | `--no-juju-teardown` | Keep models after the tests finish, instead of destroying them. Also skips tests marked with `@pytest.mark.juju_teardown`. |
 | `--no-juju-setup` | Skip tests marked with `@pytest.mark.juju_setup` (for example, deployment tests). The model must already exist. Requires `--juju-model`. |
+| `--juju-switch` | Switch to the active test model, so you can monitor it with `juju status` in another terminal. |
 | `--juju-dump-logs [PATH]` | Dump `juju debug-log` output to disk for each model. Defaults to `.logs/`. |
+
+If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr, even without `--juju-dump-logs`.
+
+````{tip}
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
+
+```yaml
+  # In your integration test job
+  - run: tox -e integration -- --juju-dump-logs
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v4
+    with:
+      name: juju-dump-logs
+      path: .logs
+```
+````
 
 For example, to deploy on a first run and then iterate without redeploying:
 
@@ -410,6 +430,10 @@ For example, to deploy on a first run and then iterate without redeploying:
 tox -e integration -- --juju-model mytest --no-juju-teardown
 # Subsequent runs: skip deployment, reuse the models
 tox -e integration -- --juju-model mytest --no-juju-setup --no-juju-teardown
+```
+
+```{tip}
+After each test run, `pytest-jubilant` prints a summary with the exact command-line flags to reuse or keep your models for the next run.
 ```
 
 There are different ways of specifying a subset of tests to run using `pytest`. With the `-k` option you can specify different expressions. For example, the next command will run all tests in the `test_charm.py` file except `test_one` function.
