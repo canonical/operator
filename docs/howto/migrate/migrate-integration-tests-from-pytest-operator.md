@@ -20,7 +20,7 @@ Let's look at each of these in turn.
 
 ## Update your dependencies
 
-The first thing you'll need to do is add `pytest-jubilant` as a dependency to your `tox.ini` or `pyproject.toml` dependencies.
+The first thing you'll need to do is add `jubilant` and `pytest-jubilant` as dependencies to your `tox.ini` or `pyproject.toml`. Jubilant (1.x) wraps the Juju CLI, and `pytest-jubilant` (2.x) is a pytest plugin that provides fixtures and CLI options for managing Juju models during tests.
 
 You can also remove the dependencies on `juju` (python-libjuju), `pytest-operator`, and `pytest-asyncio`.
 

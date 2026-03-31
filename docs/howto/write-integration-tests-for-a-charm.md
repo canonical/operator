@@ -87,7 +87,7 @@ commands =
         {posargs}
 ```
 
-Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. For example:
+Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. Integration tests use two packages: [Jubilant](https://documentation.ubuntu.com/jubilant/) (1.x), which wraps the Juju CLI, and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) (2.x), a pytest plugin that provides fixtures and CLI options for managing Juju models during tests. For example:
 
 ```toml
 [dependency-groups]
@@ -103,7 +103,7 @@ integration = [
 
 ### Write fixtures
 
-The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`.
+The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) (2.x) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`. In your test code, you use the {external+jubilant:doc}`Jubilant <index>` (1.x) API directly — for example, `jubilant.Juju` for type annotations and helpers such as `jubilant.all_active`.
 
 In `conftest.py` in your integration test directory, add a `charm` fixture:
 
