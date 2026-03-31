@@ -72,7 +72,7 @@ and the charm workflow.
 > - {ref}`write-unit-tests-for-a-charm`
 > - {ref}`write-integration-tests-for-a-charm`
 > - {ref}`set-up-ci`
-> - {ref}`manage-logs`
+> - {ref}`log-from-your-charm`
 > - {ref}`debug-your-charm`
 
 The next thing to do is add functionality to your charm.
