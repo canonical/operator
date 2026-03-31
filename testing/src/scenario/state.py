@@ -351,7 +351,7 @@ class Secret:
         )
         object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
         object.__setattr__(self, 'owner', owner)
-        object.__setattr__(self, 'remote_grants', dict(remote_grants))
+        object.__setattr__(self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()})
         object.__setattr__(self, 'label', label)
         object.__setattr__(self, 'description', description)
         object.__setattr__(self, 'expire', expire)
