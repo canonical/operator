@@ -305,7 +305,7 @@ class Secret:
     to this unit.
     """
 
-    remote_grants: Mapping[int, set[str]]
+    remote_grants: Mapping[int, frozenset[str]]
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
