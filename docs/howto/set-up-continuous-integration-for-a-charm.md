@@ -87,6 +87,8 @@ jobs:
       - name: Set up Juju and charm development tools
         run: sudo concierge prepare -p k8s
       - name: Pack the charm
+        # The integration tests don't pack the charm. Instead, they look for a .charm
+        # file in the project dir (or use CHARM_PATH, if set).
         run: charmcraft pack
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action.
