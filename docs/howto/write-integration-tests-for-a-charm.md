@@ -396,32 +396,7 @@ CHARM_PATH=/path/to/foo.charm tox -e integration
 
 Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when all the tests in the module have finished. This is determined by the scope of the `juju` fixture.
 
-The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle:
-
-| Option | Description |
-|---|---|
-| `--juju-model PREFIX` | Use a custom model name prefix instead of a random one. Required if using `--no-juju-setup`. Model names are formed as `PREFIX-MODULE` (or `PREFIX-MODULE-SUFFIX` for extra models created via `juju_factory`), where `MODULE` is derived from the test file name. For example, running `tests/integration/test_charm.py` with `--juju-model mytest` creates a model called `mytest-test-charm`. |
-| `--no-juju-teardown` | Keep models after the tests finish, instead of destroying them. Also skips tests marked with `@pytest.mark.juju_teardown`. |
-| `--no-juju-setup` | Skip tests marked with `@pytest.mark.juju_setup` (for example, deployment tests). The model must already exist. Requires `--juju-model`. |
-| `--juju-switch` | Switch to the active test model, so you can monitor it with `juju status` in another terminal. |
-| `--juju-dump-logs [PATH]` | Dump `juju debug-log` output to disk for each model. Defaults to `.logs/`. |
-
-If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr, even without `--juju-dump-logs`.
-
-````{tip}
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
-
-```yaml
-  # In your integration test job
-  - run: tox -e integration -- --juju-dump-logs
-  - name: Upload logs
-    if: ${{ !cancelled() }}
-    uses: actions/upload-artifact@v7
-    with:
-      name: juju-dump-logs
-      path: .logs
-```
-````
+The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle, including rerunning tests with the same models and applications, automatically switching to the next `juju` fixture model, and saving the `juju debug-log` before tearing models down. Read more about them in [the repository readme](https://github.com/canonical/pytest-jubilant).
 
 For example, to deploy on a first run and then iterate without redeploying:
 
@@ -444,6 +419,26 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 > See more:
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 > - [](#validate-your-charm-with-every-change)
+
+
+## View Juju logs
+
+If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr. You can also save the complete logs to disk with the `--juju-dump-logs` option.
+
+````{tip}
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
+
+```yaml
+  # In your integration test job
+  - run: tox -e integration -- --juju-dump-logs
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: juju-dump-logs
+      path: .logs
+```
+````
 
 ## Generate crash dumps
 
