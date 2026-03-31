@@ -93,7 +93,7 @@ Also check that `pyproject.toml` has an `integration` dependency group. Again, i
 [dependency-groups]
 ...
 integration = [
-    "jubilant>=1,<2",
+    "jubilant>=1.8,<2",
     "pytest-jubilant>=2,<3",
 ]
 ```

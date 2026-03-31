@@ -100,7 +100,7 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant>=1,<2",
+    "jubilant>=1.8,<2",
     "pytest-jubilant>=2,<3",
 ]
 # Additional groups
