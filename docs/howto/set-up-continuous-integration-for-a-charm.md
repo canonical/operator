@@ -86,6 +86,8 @@ jobs:
         run: sudo snap install --classic concierge
       - name: Set up Juju and charm development tools
         run: sudo concierge prepare -p k8s
+      - name: Pack the charm
+        run: charmcraft pack
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action.
         run: tox -e integration -- --model testing
