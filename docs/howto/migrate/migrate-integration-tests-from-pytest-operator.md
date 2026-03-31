@@ -12,11 +12,10 @@ To get help while you're migrating tests, please keep the {external+jubilant:doc
 Migrating your tests can be broken into three steps:
 
 1. Update your dependencies
-2. Add any extra fixtures to `conftest.py`
+2. Provide the resources your tests need
 3. Update the tests themselves
 
 Let's look at each of these in turn.
-
 
 ## Update your dependencies
 
@@ -40,17 +39,76 @@ If you're using `tox.ini`, the diff might look like:
      -r{toxinidir}/requirements.txt
 ```
 
-If you're migrating a large number of tests, you may want to do it in stages. In that case, keep the old dependencies in place till the end, and migrate tests one at a time, so that both pytest-operator and Jubilant tests can run together.
+If you're migrating a large number of tests, you may want to do it in stages. In that case, keep the old dependencies in place till the end, and migrate tests one at a time, so that both `pytest-operator` and Jubilant tests can run together. Note that `pytest-operator` and `pytest-jubilant` use completely different CLI options, so make sure you provide the correct ones for each if you're trying to do something fancy.
+
+## Provide the resources your tests need
+
+Your integration tests may use a combination of `pytest-operator` features for the resources they need, including packed charms, Juju models, and deployed applications. This section covers how to provide these resources when writing `Jubilant` based integration tests.
+
+### Provide packed charms to your Python tests
+
+`pytest-operator` provided a `build_charm` helper function. `pytest-jubilant` does not provide an equivalent helper, because it's cleaner to keep packing out of your Python integration tests.
+
+In CI, you may already follow a strategy of first packing your charms (in parallel), and then providing the packed charms to your (perhaps also parallised) integration tests. A good way to provide the charms is via environment variables.
+
+Locally, we recommend decoupling packing from integration testing by performing packing separately. In a simple case, where you have a single charm to test, this can be done with a single `charmcraft pack` command. Your local `integration` step might then look like this:
+
+```ini
+[testenv:integration]
+pass_env =
+    CHARM_PATH
+commands =
+    pytest --tb=native -vv --log-cli-level=DEBUG {toxinidir}/tests/integration {posargs}
+```
+
+In your integration tests themselves, you should define a fixture for your charm, which reads the environment variable if set, or falls back to looking for the packed charm in its expected location.
+
+```py
+# tests/integration/conftest.py
+import os
+import pathlib
 
 
-## Add any extra fixtures to `conftest.py`
+@pytest.fixture(scope="session")
+def charm_path():
+    yield get_charm_path(
+        env_var="CHARM_PATH",
+        # Assuming we're in <root>/tests/integration/conftest.py
+        # And assuming that the charm is defined in <root>
+        default_dir=pathlib.Path(__file__).parent.parent.parent,
+    )
 
-The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix).
 
-If you have a hand-written `juju` fixture in your `conftest.py`, you can remove it.
+def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
+    charm = os.environ.get(env_var)
+    if charm is None:
+        charms = list(default_dir.glob('*.charm'))
+        assert charms, f'No charms were found in {default_dir}'
+        assert len(charms) == 1, f'Found more than one charm in {default_dir}'
+        charm = charms[0]
+    path = pathlib.Path(charm).resolve()
+    assert path.is_file(), f'{path} is not a file'
+    yield path
+```
+
+#### Packing multiple charms
+
+In a more complicated case where you have multiple charms, you should use `*CHARM_PATH` in `pass_env` instead, and use named environment variables to pass each charm's location (e.g. `FOO_CHARM_PATH`, `BAR_CHARM_PATH`).
+
+In this case, you'd want one fixture per charm. If you *don't* make these auto-use fixtures, then if you're running tests for just one charm, the other charms won't need to be packed.
+
+When you have multiple charms, it may be useful to provide a local `pack` step like this:
+```ini
+[testenv:pack]
+commands =
+    bash -c "cd charms/foo && charmcraft pack"
+    bash -c "cd charms/bar && charmcraft pack"
+```
 
 (a_juju_model_fixture)=
-### The `juju` model fixture
+### The `juju` and `juju_factory` fixtures
+
+The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix).
 
 `pytest-jubilant` expects that a Juju controller has already been set up, either using [Concierge](https://github.com/jnsgruk/concierge) or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
 
@@ -59,8 +117,8 @@ In your tests, use the fixture like this:
 ```python
 # tests/integration/test_charm.py
 
-def test_active(juju: jubilant.Juju):
-    juju.deploy('mycharm')
+def test_active(juju: jubilant.Juju, charm_path: pathlib.Path):
+    juju.deploy(charm_path)
     juju.wait(jubilant.all_active)
 
     # Or wait for just 'mycharm' to be active (ignoring other apps):
@@ -74,26 +132,71 @@ A few things to note about the fixture:
 * If any of the tests fail, the plugin automatically dumps the last 1000 lines of `juju debug-log` output.
 * It is module-scoped, like pytest-operator's `ops_test` fixture. This means that a new model is created for every `test_*.py` file, but not for every test.
 
+If your `test_*.py` module needs multiple Juju models (previously managed with `ops_test.track_model`), use the `juju_factory` fixture. This fixture lets you add additional models with their own unique suffixes -- no suffix is equivalent to the `juju` fixture.
+
+```py
+import jubilant
+import pytest
+import pytest_jubilant
+
+
+@pytest.mark.fixture(scope="module")
+def other_model(juju_factory: pytest_jubilant.JujuFactory):
+    yield juju_factory.get_juju("other")
+
+
+def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju):
+    ...
+```
+
 (how_to_migrate_an_application_fixture)=
-### An application fixture
+### Application setup
 
-If you don't want to deploy your application in each test, you can add a module-scoped `app` fixture that deploys your charm and waits for it to go active.
+A lot of the time, you won't want to deploy your application in each test. In this case, you should use tests marked with `juju_setup`. These can be skipped in subsequent test runs using `--no-juju-setup` if you previously kept your models up and the applications deployed with `--no-juju-teardown`. This corresponds to `pytest-operator`'s `skip_if_deployed` functionality.
 
-The following fixture assumes that the charm has already been packed with `charmcraft pack` in a previous CI step (`pytest-jubilant` has no equivalent of `ops_test.build_charm`):
+```python
+# tests/integration/test_actions.py
+import pathlib
+
+import jubilant
+import pytest
+
+APP = 'mycharm'
+
+
+@pytest.mark.juju_setup
+def test_deploy(juju: jubilant.Juju, my_charm: pathlib.Path):
+    juju.deploy(charm_path, APP)
+    juju.wait(jubilant.all_active)
+    assert ...
+
+
+@pytest.mark.juju_setup
+def test_some_setup_action(juju: jubilant.Juju):
+    juju.run(f'{APP}/0', 'some-setup-action')
+    assert ...
+
+
+def test_some_repeatable_action(juju.jubilant.Juju):
+    task = juju.run(f'{APP}/0', 'some-setup-action')
+    assert task.results['...'] == '...'
+```
+
+Alternatively, if you just want your tests to depend on the deployed version of your application, you can write an application fixture.
 
 ```python
 # tests/integration/conftest.py
-
 import pathlib
 
 import jubilant
 import pytest
 
 @pytest.fixture(scope='module')
-def app(juju: jubilant.Juju):
+def app(juju: jubilant.Juju, charm_path: pathlib.Path):
+    my_app_name = "mycharm"
     juju.deploy(
-        charm_path('mycharm'),
-        'mycharm',
+        charm_path,
+        my_app_name,
         resources={
             'mycharm-image': 'ghcr.io/canonical/...',
         },
@@ -105,21 +208,10 @@ def app(juju: jubilant.Juju):
     )
     # ... do any other application setup here ...
     juju.wait(jubilant.all_active)
-
-    yield 'mycharm'  # run the test
-
-
-def charm_path(name: str) -> pathlib.Path:
-    """Return full absolute path to given test charm."""
-    # We're in tests/integration/conftest.py, so parent*3 is repo top level.
-    charm_dir = pathlib.Path(__file__).parent.parent.parent
-    charms = [p.absolute() for p in charm_dir.glob(f'{name}_*.charm')]
-    assert charms, f'{name}_*.charm not found'
-    assert len(charms) == 1, 'more than one .charm file, unsure which to use'
-    return charms[0]
+    yield my_app_name
 ```
 
-In your tests, you'll need to specify that the test depends on both fixtures:
+In your tests, you'll need to specify that the test depends on `juju` as well as `app` so that you have a reference to a `jubilant.Juju` object managing the correct model.
 
 ```python
 # tests/integration/test_charm.py
@@ -128,7 +220,6 @@ def test_active(juju: jubilant.Juju, app: str):
     status = juju.status()
     assert status.apps[app].is_active
 ```
-
 
 ## Update the tests themselves
 
