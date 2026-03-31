@@ -1,7 +1,7 @@
 (pytest-operator-migration)=
 # How to migrate integration tests from pytest-operator
 
-Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to [pytest-jubilant](https://github.com/canonical/pytest-jubilant), which uses the Jubilant library.
+Many charm integration tests use [pytest-operator](https://github.com/charmed-kubernetes/pytest-operator) and [python-libjuju](https://github.com/juju/python-libjuju). This guide explains how to migrate your integration tests from those libraries to [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), which uses the Jubilant library.
 
 ```{tip}
 Try bootstrapping your migration with an AI Agent (such as GitHub Copilot or Claude Code). Instruct the agent to clone the `canonical/jubilant` and `canonical/pytest-jubilant` repositories, study them, and then migrate the charm integration tests to Jubilant. You should end up with a great starting point to then continue as outlined in the rest of this guide.

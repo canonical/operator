@@ -325,6 +325,7 @@ Jubilant provides an escape hatch to invoke the Juju CLI. This can be useful for
 If you need multiple Juju models in a single test module, use the `juju_factory` fixture provided by `pytest-jubilant`:
 
 ```python
+import pytest
 import pytest_jubilant
 
 
