@@ -856,7 +856,7 @@ def _generate_new_change_id():
 class Exec:
     """Mock data for simulated :meth:`ops.Container.exec` calls."""
 
-    command_prefix: Sequence[str, ...]
+    command_prefix: Sequence[str]
 
     return_code: int
     """The return code of the process.
