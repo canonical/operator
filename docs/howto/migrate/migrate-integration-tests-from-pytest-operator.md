@@ -49,7 +49,7 @@ Your integration tests may use a combination of `pytest-operator` features for t
 
 `pytest-operator` provided a `build_charm` helper function. `pytest-jubilant` does not provide an equivalent helper, because it's cleaner to keep packing out of your Python integration tests.
 
-In CI, you may already follow a strategy of first packing your charms (in parallel), and then providing the packed charms to your (perhaps also parallised) integration tests. A good way to provide the charms is via environment variables.
+In CI, you may already follow a strategy of first packing your charms (in parallel), and then providing the packed charms to your (perhaps also parallelised) integration tests. A good way to provide the charms is via environment variables.
 
 Locally, we recommend decoupling packing from integration testing by performing packing separately. In a simple case, where you have a single charm to test, this can be done with a single `charmcraft pack` command. Your local `integration` step might then look like this:
 
