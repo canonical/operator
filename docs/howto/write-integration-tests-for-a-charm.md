@@ -396,7 +396,7 @@ CHARM_PATH=/path/to/foo.charm tox -e integration
 
 Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when all the tests in the module have finished. This is determined by the scope of the `juju` fixture.
 
-The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle, including rerunning tests with the same models and applications, automatically switching to the next `juju` fixture model, and saving the `juju debug-log` before tearing models down. Read more about them in [the repository readme](https://github.com/canonical/pytest-jubilant).
+The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle, including rerunning tests with the same models and applications, automatically switching to the next `juju` fixture model, and saving the `juju debug-log` before tearing models down. Read more about them in [the repository README](https://github.com/canonical/pytest-jubilant).
 
 For example, to deploy on a first run and then iterate without redeploying:
 
