@@ -509,6 +509,7 @@ dependencies = [
 
 [package.dev-dependencies]
 integration = [
+    { name = "jubilant" },
     { name = "pytest-jubilant" },
 ]
 lint = [
@@ -531,7 +532,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-integration = [{ name = "pytest-jubilant" }]
+integration = [
+    { name = "jubilant", specifier = ">=1,<2" },
+    { name = "pytest-jubilant", specifier = ">=2,<3" },
+]
 lint = [
     { name = "codespell" },
     { name = "pyright" },

@@ -32,7 +32,8 @@ If you're using `tox.ini`, the diff might look like:
      boto3
      cosl
 -    juju>=3.0
-+    pytest-jubilant
++    jubilant>=1,<2
++    pytest-jubilant>=2,<3
      pytest
 -    pytest-operator
 -    pytest-asyncio

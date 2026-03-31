@@ -115,6 +115,7 @@ dependencies = [
 
 [package.dev-dependencies]
 integration = [
+    { name = "jubilant" },
     { name = "pytest-jubilant" },
     { name = "pyyaml" },
 ]
@@ -134,7 +135,8 @@ requires-dist = [{ name = "ops", specifier = ">=3,<4" }]
 
 [package.metadata.requires-dev]
 integration = [
-    { name = "pytest-jubilant" },
+    { name = "jubilant", specifier = ">=1,<2" },
+    { name = "pytest-jubilant", specifier = ">=2,<3" },
     { name = "pyyaml" },
 ]
 lint = [

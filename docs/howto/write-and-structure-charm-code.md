@@ -100,7 +100,8 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "pytest-jubilant",
+    "jubilant>=1,<2",
+    "pytest-jubilant>=2,<3",
 ]
 # Additional groups
 docs = [
