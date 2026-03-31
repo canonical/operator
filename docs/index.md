@@ -72,7 +72,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 * - **[Concierge](https://github.com/canonical/concierge)**
   - A CLI tool for setting up charm development environments.
 * - **{external+jubilant:doc}`Jubilant <index>`**
-  - A Python library that wraps the Juju CLI. Use Jubilant (1.x) together with [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) (2.x) for your integration tests.
+  - A Python library that wraps the Juju CLI. Use Jubilant together with [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) for your integration tests.
 * - **{external+juju:doc}`Juju <index>`**
   - The orchestration engine and CLI tool. You'll find the {external+juju:ref}`hooks reference <hook>` especially helpful. Juju's hooks correspond to events that your charm can observe.
 * - **{external+pebble:doc}`Pebble <index>`**

@@ -20,7 +20,7 @@ Let's look at each of these in turn.
 
 ## Update your dependencies
 
-The first thing you'll need to do is add `jubilant` and `pytest-jubilant` as dependencies to your `tox.ini` or `pyproject.toml`. Jubilant (1.x) wraps the Juju CLI, and `pytest-jubilant` (2.x) is a pytest plugin that provides fixtures and CLI options for managing Juju models during tests.
+The first thing you'll need to do is add `jubilant` and `pytest-jubilant` as dependencies to your `tox.ini` or `pyproject.toml`. Pin to the current stable major versions, which are maintained with strong backwards compatibility guarantees.
 
 You can also remove the dependencies on `juju` (python-libjuju), `pytest-operator`, and `pytest-asyncio`.
 
@@ -70,7 +70,7 @@ def test_active(juju: jubilant.Juju):
 A few things to note about the fixture:
 
 * To keep models around after running the tests (matching pytest-operator's `--keep-models`), pass `--no-juju-teardown`.
-* The default wait timeout is Jubilant's default. To match python-libjuju's 10-minute `wait_for_idle` timeout, set `juju.wait_timeout = 10 * 60` in a wrapper fixture or at the start of your test.
+* To match python-libjuju's 10-minute `wait_for_idle` timeout, set `juju.wait_timeout = 10 * 60` in a wrapper fixture or at the start of your test.
 * If any of the tests fail, the plugin automatically dumps the last 1000 lines of `juju debug-log` output.
 * It is module-scoped, like pytest-operator's `ops_test` fixture. This means that a new model is created for every `test_*.py` file, but not for every test.
 
