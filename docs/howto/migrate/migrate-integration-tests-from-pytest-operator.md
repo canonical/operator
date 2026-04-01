@@ -84,7 +84,7 @@ def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
     if not charm:
         charms = list(default_dir.glob('*.charm'))
         assert charms, f'No charms were found in {default_dir}'
-        assert len(charms) == 1, f'Found more than one charm in {default_dir}'
+        assert len(charms) == 1, f'Found more than one charm {charms}'
         charm = charms[0]
     path = pathlib.Path(charm).resolve()
     assert path.is_file(), f'{path} is not a file'
