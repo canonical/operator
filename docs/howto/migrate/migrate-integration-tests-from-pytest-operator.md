@@ -88,7 +88,7 @@ def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
         charm = charms[0]
     path = pathlib.Path(charm).resolve()
     assert path.is_file(), f'{path} is not a file'
-    yield path
+    return path
 ```
 
 #### Packing multiple charms
