@@ -71,12 +71,8 @@ import pathlib
 
 @pytest.fixture(scope="session")
 def charm_path():
-    yield get_charm_path(
-        env_var="CHARM_PATH",
-        # Assuming we're in <root>/tests/integration/conftest.py
-        # And assuming that the charm is defined in <root>
-        default_dir=pathlib.Path(__file__).parent.parent.parent,
-    )
+    # Assuming the CWD is the charm root
+    yield get_charm_path(env_var="CHARM_PATH", default_dir=pathlib.Path())
 
 
 def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
