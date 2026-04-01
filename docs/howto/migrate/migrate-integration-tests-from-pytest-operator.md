@@ -81,7 +81,7 @@ def charm_path():
 
 def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
     charm = os.environ.get(env_var)
-    if charm is None:
+    if not charm:
         charms = list(default_dir.glob('*.charm'))
         assert charms, f'No charms were found in {default_dir}'
         assert len(charms) == 1, f'Found more than one charm in {default_dir}'
