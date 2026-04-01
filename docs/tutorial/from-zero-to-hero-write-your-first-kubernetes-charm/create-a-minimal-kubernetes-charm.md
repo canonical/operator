@@ -402,7 +402,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with {external:doc}`Jubilant <jubilant:index>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with {external+jubilant:doc}`Jubilant <reference/jubilant>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
