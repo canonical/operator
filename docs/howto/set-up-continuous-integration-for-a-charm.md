@@ -91,7 +91,6 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
         # file in the project dir (or use CHARM_PATH, if set).
         run: charmcraft pack
       - name: Run integration tests
-        # Set a predictable model name so it can be consumed by charm-logdump-action.
         run: tox -e integration -- --juju-dump-logs
       - name: Upload logs
         if: ${{ !cancelled() }}
@@ -104,3 +103,5 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
 The option `-p k8s` tells Concierge that we want a cloud managed by Canonical Kubernetes.
 
 If your charm is a machine charm, use `-p machine` instead.
+
+The "Upload logs" step assumes that your integration tests use Jubilant together with `pytest-jubilant`. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-view-juju-logs).
