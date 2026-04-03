@@ -12,12 +12,12 @@ This guide demonstrates how to automatically run your charm's tests against any 
 You might also want to automatically publish your charm on Charmhub or publish charm libraries on PyPI. [charming-actions](https://github.com/canonical/charming-actions) has some useful GitHub actions for publishing on Charmhub. For guidance about publishing libraries on PyPI, see {external+charmlibs:ref}`How to distribute charm libraries <python-package-distribution-pypi>`.
 
 (set-up-ci-linting-unit)=
-## Create a workflow for linting and unit tests
+## Run linting and unit tests in CI
 
-Create a file called `.github/workflows/tests.yaml`:
+Create a file called `.github/workflows/ci.yaml`:
 
 ```yaml
-name: Linting and unit tests
+name: Charm checks and tests
 on:
   push:
     branches:
@@ -55,26 +55,18 @@ jobs:
 ```
 
 (set-up-ci-integration)=
-## Create a workflow for integration tests
+## Run integration tests in CI
 
 Integration tests require a Juju controller and a cloud in which to deploy your charm. We recommend that you use [Concierge](https://github.com/canonical/concierge) to prepare the CI environment.
 
-If your charm is a Kubernetes charm, create a file called `.github/workflows/integration-tests.yaml`:
+If your charm is a Kubernetes charm, add the following job to `.github/workflows/ci.yaml`:
 
 ```yaml
-name: Integration tests
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-  workflow_call:
-  workflow_dispatch:
-
-jobs:
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
+    needs:
+      - unit
     steps:
       - name: Checkout
         uses: actions/checkout@v6
