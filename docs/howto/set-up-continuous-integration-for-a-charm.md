@@ -17,7 +17,7 @@ You might also want to automatically publish your charm on Charmhub or publish c
 Create a file called `.github/workflows/ci.yaml`:
 
 ```yaml
-name: Charm checks and tests
+name: Charm tests
 on:
   push:
     branches:
@@ -26,6 +26,8 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   lint:
     name: Linting
@@ -33,8 +35,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@7
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Lint the code
@@ -46,8 +50,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@7
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Run unit tests
@@ -70,8 +76,10 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@7
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Set up Concierge
@@ -84,13 +92,13 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
         run: charmcraft pack
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action.
-        run: tox -e integration -- --model testing
-      - name: Dump logs
-        uses: canonical/charm-logdump-action@main
-        if: failure()
+        run: tox -e integration -- --juju-dump-logs
+      - name: Upload logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
         with:
-          app: your-app
-          model: testing
+          name: juju-dump-logs
+          path: .logs
 ```
 
 The option `-p k8s` tells Concierge that we want a cloud managed by Canonical Kubernetes.
