@@ -15,12 +15,15 @@
 # The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
 # To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
+import json
 import logging
 import pathlib
+import time
 
 import jubilant
 import pytest
 import pytest_jubilant
+import requests
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -70,3 +73,27 @@ def test_loki_integration(juju: jubilant.Juju, cos: jubilant.Juju):
     juju.integrate(APP_NAME, f"{cos.model}.loki")
     juju.wait(jubilant.all_active)
     cos.wait(jubilant.all_active)
+
+
+def test_loki_data(cos: jubilant.Juju):
+    """Use Loki's HTTP API to verify that Loki has a label for our app.
+
+    COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
+    that tells us the base URL of Loki's API.
+    """
+    task = cos.run("traefik/0", "show-proxied-endpoints")
+    results = json.loads(task.results["proxied-endpoints"])
+    loki_url = results["loki/0"]["url"]
+    loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
+
+    # Wait for logs to be available from Loki, then check for our app.
+    for _ in range(20):
+        response = requests.get(loki_api_url)
+        if response.status_code == 200:
+            response_decoded = response.json()
+            if "data" in response_decoded:
+                juju_applications: list[str] = response_decoded["data"]
+                assert APP_NAME in juju_applications
+                return
+        time.sleep(1)
+    raise RuntimeError("No logs available from Loki")
