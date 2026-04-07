@@ -31,6 +31,7 @@ lint = [
     "ruff",
     "codespell",
     "pyright",
+    "types-requests",  # 'requests' doesn't provide its own type annotations.
 ]
 # Dependencies of unit tests
 unit = [
