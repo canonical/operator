@@ -59,7 +59,7 @@ def _main() -> None:
     scope = match.group('scope')
     if scope is not None:
         print(
-            f'Scopes are not used in PR titles.\n'
+            f'Scopes must not be used in PR titles.\n'
             f'Got: {title!r}\n'
             'Read more: https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#pull-requests',
             file=sys.stderr,
