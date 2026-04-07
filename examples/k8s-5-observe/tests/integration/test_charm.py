@@ -19,6 +19,8 @@ import logging
 import pathlib
 
 import jubilant
+import pytest
+import pytest_jubilant
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -49,3 +51,22 @@ def test_database_integration(juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+
+@pytest.fixture(scope="module")
+def cos(juju_factory: pytest_jubilant.JujuFactory):
+    yield juju_factory.get_juju(suffix="cos")
+
+
+def test_deploy_cos(cos: jubilant.Juju):
+    """Deploy COS Lite in a separate model."""
+    cos.deploy("cos-lite", trust=True)
+    cos.wait(jubilant.all_active, timeout=10 * 60)  # Use a long timeout for local testing.
+
+
+def test_loki_integration(juju: jubilant.Juju, cos: jubilant.Juju):
+    """Integrate our charm with Loki from COS Lite."""
+    cos.offer("loki", endpoint="logging")
+    juju.integrate(APP_NAME, f"{cos.model}.loki")
+    juju.wait(jubilant.all_active)
+    cos.wait(jubilant.all_active)
