@@ -53,7 +53,7 @@ def test_database_integration(juju: jubilant.Juju):
     """
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
-    juju.wait(jubilant.all_active)
+    juju.wait(jubilant.all_active, timeout=10 * 60)  # Use a long timeout for local testing.
 
 
 @pytest.fixture(scope="module")
