@@ -96,4 +96,4 @@ def test_loki_data(cos: jubilant.Juju):
                 assert APP_NAME in juju_applications
                 return
         time.sleep(1)
-    raise RuntimeError("No logs available from Loki")
+    pytest.fail("No logs available from Loki")
