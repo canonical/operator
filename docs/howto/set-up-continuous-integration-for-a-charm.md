@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Learn how to set up CI for your Juju charm, so that your charm's tests run on every pull request.
+---
+
 (set-up-ci)=
 # How to set up continuous integration for a charm
 
