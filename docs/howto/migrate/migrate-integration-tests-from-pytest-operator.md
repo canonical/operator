@@ -150,7 +150,7 @@ def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju):
 
 A lot of the time, you won't want to deploy your application in each test. In this case, you should test deployment in the first tests in a module, and assume deployment was successful in subsequent tests.
 
-It's a good idea to mark your deploy tests with `juju_setup`. If you use `--no-juju-teardown` to keep yoru models up and the applications deployed, then subsequent test runs can skip your `juju_setup` tests using `--no-juju-setup`. This corresponds to `pytest-operator`'s `skip_if_deployed` functionality.
+It's a good idea to mark your deploy tests with `juju_setup`. If you use `--no-juju-teardown` to keep your models up and the applications deployed, then subsequent test runs can skip your `juju_setup` tests using `--no-juju-setup`. This corresponds to `pytest-operator`'s `skip_if_deployed` functionality.
 
 ```python
 # tests/integration/test_actions.py
