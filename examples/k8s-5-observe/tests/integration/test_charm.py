@@ -43,7 +43,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_blocked, timeout=10 * 60)  # Use a long timeout for local testing.
+    juju.wait(jubilant.all_blocked)
 
 
 def test_database_integration(juju: jubilant.Juju):
@@ -53,7 +53,7 @@ def test_database_integration(juju: jubilant.Juju):
     """
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
-    juju.wait(jubilant.all_active, timeout=10 * 60)  # Use a long timeout for local testing.
+    juju.wait(jubilant.all_active)
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +64,7 @@ def cos(juju_factory: pytest_jubilant.JujuFactory):
 def test_deploy_cos(cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
-    cos.wait(jubilant.all_active, timeout=10 * 60)  # Use a long timeout for local testing.
+    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
 def test_loki_integration(juju: jubilant.Juju, cos: jubilant.Juju):
