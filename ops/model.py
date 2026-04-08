@@ -536,7 +536,7 @@ def _calculate_expiry(
     if isinstance(expire, datetime.datetime):
         return expire
     elif isinstance(expire, datetime.timedelta):
-        return datetime.datetime.now() + expire
+        return datetime.datetime.now(tz=datetime.timezone.utc) + expire
     else:
         raise TypeError(
             'Expiration time must be a datetime or timedelta from now, '
@@ -1391,8 +1391,7 @@ class Secret:
     def unique_identifier(self) -> str | None:
         """Unique identifier of this secret.
 
-        This is the secret's globally-unique identifier (currently a
-        20-character Xid, for example "9m4e2mr0ui3e8a215n4g").
+        This is the secret's globally-unique identifier (alphanumeric).
 
         Charms should use :attr:`id` (the secret's locator ID) to send
         the secret's ID across relation data, and labels (:attr:`label`) to
@@ -3044,6 +3043,7 @@ class Container:
             type=ftype,
             size=info.st_size,
             permissions=stat.S_IMODE(info.st_mode),
+            # This is unused, but a required FileInfo field.
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pw_name,

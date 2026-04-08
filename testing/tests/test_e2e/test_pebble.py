@@ -977,3 +977,49 @@ def test_plan_accessed_twice_does_not_accumulate_list_fields():
     assert layer1.services['svc-a'].before == ['another']
     assert layer1.services['svc-a'].requires == ['dep']
     assert layer1.log_targets['lt-a'].services == ['svc-a']
+
+
+def test_warning_on_non_empty_container():
+    class MyCharm(CharmBase):
+        def __init__(self, framework: Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: object):
+            self.unit.get_container('mycontainer').push('/foo.txt', 'hello')
+
+    ctx = Context(
+        MyCharm,
+        meta={'name': 'foo', 'containers': {'mycontainer': {}}},
+    )
+    container = Container(name='mycontainer', can_connect=True)
+    state = State(containers={container})
+
+    # First run populates the container root with a file.
+    ctx.run(ctx.on.start(), state)
+
+    # Second run should warn that the container root is non-empty.
+    ctx.run(ctx.on.start(), state)
+
+    assert any(
+        'mycontainer' in line.message and 'non-empty' in line.message for line in ctx.juju_log
+    )
+
+
+def test_no_warning_on_empty_container():
+    ctx = Context(
+        CharmBase,
+        meta={'name': 'foo', 'containers': {'mycontainer': {}}},
+    )
+    container = Container(name='mycontainer', can_connect=True)
+    state = State(containers={container})
+
+    # First run creates the container root.
+    ctx.run(ctx.on.start(), state)
+
+    # Second run should not warn since the container root is empty.
+    ctx.run(ctx.on.start(), state)
+
+    assert not any(
+        'mycontainer' in line.message and 'non-empty' in line.message for line in ctx.juju_log
+    )
