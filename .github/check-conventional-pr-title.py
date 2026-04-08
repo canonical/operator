@@ -31,7 +31,7 @@ _TYPES = frozenset({
 
 # <type>[optional scope][optional !]: <description>
 _PATTERN = re.compile(
-    r'^(?p<type>[a-za-z]+)'  # lower-case only, but let this be validated by _TYPES
+    r'^(?P<type>[A-Za-z]+)'  # lower-case only, but let this be validated by _TYPES
     r'(?:\((?P<scope>[^()]+)\))?'
     r'(?P<breaking>!)?'
     r': '
