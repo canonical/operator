@@ -49,7 +49,7 @@ Your integration tests may use a combination of `pytest-operator` features for t
 
 `pytest-operator` provided a `build_charm` helper function. `pytest-jubilant` does not provide an equivalent helper, because it's cleaner to keep packing out of your Python integration tests.
 
-In CI, you may already follow a strategy of first packing your charms (in parallel), and then providing the packed charms to your (perhaps also parallelised) integration tests. A good way to provide the charms is via environment variables.
+In CI, you may already follow a strategy of first packing your charms (in parallel), and then providing the packed charms to your (perhaps also parallelised) integration tests. A good way to provide the charms is by using environment variables.
 
 Locally, we recommend decoupling packing from integration testing by performing packing separately. In a simple case, where you have a single charm to test, this can be done with a single `charmcraft pack` command. Your local `integration` step might then look like this:
 
@@ -106,7 +106,7 @@ commands =
 
 The `pytest-jubilant` plugin provides a module-scoped `juju` fixture that creates a temporary model, destroys it after the tests, and dumps debug logs on failure. It also provides CLI options such as `--no-juju-teardown` (to keep models) and `--juju-model` (to set a custom model name prefix).
 
-`pytest-jubilant` expects that a Juju controller has already been set up, either using [Concierge](https://github.com/jnsgruk/concierge) or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
+`pytest-jubilant` expects that a Juju controller has already been set up, either using [Concierge](https://github.com/canonical/concierge) or a manual approach. The plugin automatically creates a temporary model per test module and tears it down afterward.
 
 In your tests, use the fixture like this:
 
@@ -148,7 +148,9 @@ def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju):
 (how_to_migrate_an_application_fixture)=
 ### Application setup
 
-A lot of the time, you won't want to deploy your application in each test. In this case, you should use tests marked with `juju_setup`. These can be skipped in subsequent test runs using `--no-juju-setup` if you previously kept your models up and the applications deployed with `--no-juju-teardown`. This corresponds to `pytest-operator`'s `skip_if_deployed` functionality.
+A lot of the time, you won't want to deploy your application in each test. In this case, you should test deployment in the first tests in a module, and assume deployment was successful in subsequent tests.
+
+It's a good idea to mark your deploy tests with `juju_setup`. If you use `--no-juju-teardown` to keep yoru models up and the applications deployed, then subsequent test runs can skip your `juju_setup` tests using `--no-juju-setup`. This corresponds to `pytest-operator`'s `skip_if_deployed` functionality.
 
 ```python
 # tests/integration/test_actions.py

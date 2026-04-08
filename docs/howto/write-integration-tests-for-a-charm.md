@@ -163,7 +163,9 @@ For more examples of tests that deploy charms, see:
 - [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
 - [httpbin-demo](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/integration/test_charm.py)
 
-Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. You can mark such tests with `@pytest.mark.juju_setup` -- if you later use `--no-juju-setup` to skip them, the model must already exist (see {ref}`run-your-tests` below). Adding extra checks or `asserts` in deployment tests is not recommended.
+Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file so the applications can be used by subsequent tests.
+
+You can mark such tests with `@pytest.mark.juju_setup`. If you later use `--no-juju-setup` to skip the deployment tests, the model must already exist. See {ref}`run-your-tests`.
 
 Similarly, if you have tests that perform destructive actions (for example, removing relations or applications), mark them with `@pytest.mark.juju_teardown`. These tests will be skipped when `--no-juju-teardown` is passed.
 
@@ -336,7 +338,7 @@ def other_model(juju_factory: pytest_jubilant.JujuFactory):
     return juju_factory.get_juju(suffix="other")
 ```
 
-Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios, for example integrating machine charms with Kubernetes charms.
+Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios. For example integrating machine charms with Kubernetes charms, or integrating with the [Canonical Observability Stack](https://charmhub.io/cos-lite).
 
 > See more:
 > - {external+juju:ref}`Juju offers <manage-offers>`
@@ -375,7 +377,7 @@ relations:
     juju.wait(jubilant.all_active)
 ```
 
-(run-your-tests)=
+(write-integration-tests-for-a-charm-run-your-tests)=
 ## Run your tests
 
 Make sure that you've packed your charm. Then run all your tests with:
@@ -421,11 +423,11 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 > - [](#validate-your-charm-with-every-change)
 
 
+(write-integration-tests-for-a-charm-view-juju-logs)=
 ## View Juju logs
 
 If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr. You can also save the complete logs to disk with the `--juju-dump-logs` option.
 
-````{tip}
 Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
 
 ```yaml
@@ -438,7 +440,6 @@ Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs a
       name: juju-dump-logs
       path: .logs
 ```
-````
 
 ## Generate crash dumps
 
