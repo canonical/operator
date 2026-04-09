@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Debug Juju charms with SSH, Pebble, debug-log, debug-hooks, debug-code breakpoints, jhack utilities, and VS Code remote debugging via debugpy.
+---
+
 (debug-your-charm)=
 # How to debug your charm
 
