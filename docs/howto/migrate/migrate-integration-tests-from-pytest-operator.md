@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Learn how to migrate your legacy pytest-operator based charm integration tests to Jubilant and pytest-jubilant.
+---
+
 (pytest-operator-migration)=
 # How to migrate integration tests from pytest-operator
 

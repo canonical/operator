@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Learn how to write Jubilant based integration tests for your charm.
+---
+
 (write-integration-tests-for-a-charm)=
 # How to write integration tests for a charm
 
