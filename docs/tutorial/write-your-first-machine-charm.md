@@ -173,7 +173,7 @@ charmcraft init --profile machine
 ````{tip}
 The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
 
-To use the profile versions used in the tutorial, initialiase a charm using `charmcraft` directly from Github, like this:
+To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
 ```
 uvx git+https://github.com/canonical/charmcraft@<FIXME: hash> init --profile machine
 ```
