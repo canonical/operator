@@ -97,13 +97,13 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
         # file in the project dir (or use CHARM_PATH, if set).
         run: charmcraft pack
       - name: Run integration tests
-        run: tox -e integration -- --juju-dump-logs
+        run: tox -e integration -- --juju-dump-logs logs
       - name: Upload logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: juju-dump-logs
-          path: .logs
+          path: logs
 ```
 
 The option `-p k8s` tells Concierge that we want a cloud managed by Canonical Kubernetes.
