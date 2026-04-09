@@ -170,6 +170,15 @@ cd ~/tinyproxy
 charmcraft init --profile machine
 ```
 
+````{tip}
+The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
+
+To use the profile versions used in the tutorial, initialiase a charm using `charmcraft` directly from Github, like this:
+```
+uvx git+https://github.com/canonical/charmcraft@<FIXME: hash> init --profile machine
+```
+````
+
 Charmcraft created several files, including:
 
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
