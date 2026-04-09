@@ -76,8 +76,9 @@ import pathlib
 
 
 @pytest.fixture(scope="session")
-def charm_path():
-    # Assuming the current working directory is the charm root:
+def charm():
+    """Return the path of the charm under test."""
+    # Assume the current working directory is the charm root.
     yield get_charm_path(env_var="CHARM_PATH", default_dir=pathlib.Path())
 
 
