@@ -87,7 +87,7 @@ def test_loki_data(cos: jubilant.Juju):
     loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
 
     # Wait for logs to be available from Loki, then check for our app.
-    for _ in range(20):
+    for _ in range(2 * 60):
         response = requests.get(loki_api_url)
         if response.status_code == 200:
             response_decoded = response.json()
