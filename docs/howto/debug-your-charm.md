@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: Debug Juju charms with SSH, Pebble, debug-log, debug-hooks, debug-code breakpoints, jhack utilities, and VS Code remote debugging via debugpy.
+    description: Debug Juju charms with SSH, Pebble, debug-log, debug-hooks, debug-code breakpoints, jhack utilities, and debugpy for remote debugging in VS Code.
 ---
 
 (debug-your-charm)=
