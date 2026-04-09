@@ -441,13 +441,13 @@ Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs a
 
 ```yaml
   # In your integration test job
-  - run: tox -e integration -- --juju-dump-logs
+  - run: tox -e integration -- --juju-dump-logs logs
   - name: Upload logs
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
     with:
       name: juju-dump-logs
-      path: .logs
+      path: logs
 ```
 
 ## Generate crash dumps
