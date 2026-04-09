@@ -165,7 +165,7 @@ For more examples of tests that deploy charms, see:
 
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file so the applications can be used by subsequent tests.
 
-You can mark such tests with `@pytest.mark.juju_setup`. If you later use `--no-juju-setup` to skip the deployment tests, the model must already exist. See {ref}`run-your-tests`.
+You can mark such tests with `@pytest.mark.juju_setup`. If you later use `--no-juju-setup` to skip the deployment tests, the model must already exist. See {ref}`write-integration-tests-for-a-charm-run-your-tests`.
 
 Similarly, if you have tests that perform destructive actions (for example, removing relations or applications), mark them with `@pytest.mark.juju_teardown`. These tests will be skipped when `--no-juju-teardown` is passed.
 
