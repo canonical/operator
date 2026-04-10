@@ -1422,19 +1422,64 @@ class Port:
     protocol: _RawPortProtocolLiteral = 'tcp'
     """The protocol that data transferred over the port will use."""
 
+    to_port: int | None = None
+
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
+
     def __post_init__(self):
         if type(self) is Port:
             raise RuntimeError(
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
+        self._validate_ports()
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
-            return (self.protocol, self.port) == (other.protocol, other.port)
-        return False
+            return (
+                self.protocol == other.protocol
+                and self.port == other.port
+                and self.to_port == other.to_port
+                and self.endpoints == other.endpoints
+            )
+        return False  # FIXME: should be NotImplemented, but needs testing for compatibility.
 
     def _to_ops(self) -> ops.Port:
-        return ops.Port(port=self.port, protocol=self.protocol)
+        return ops.Port(protocol=self.protocol, port=self.port, to_port=self.to_port)
+
+    def _validate_ports(self):
+        if self.port is None and self.to_port is not None:
+            # Raise TypeError following ops.hookcmds.open/close_port behaviour.
+            raise TypeError('to_port can only be specified if port is also specified')
+        for port_attr, port_value in (('port', self.port), ('to_port', self.to_port)):
+            if port_value is None:
+                continue
+            if port_value not in range(1, 65535 + 1):
+                raise StateValidationError(
+                    f'`{port_attr}` outside bounds [1:65535], got {port_value}',
+                )
+
+    def _overlaps(self, other: Port | ops.Port) -> bool:
+        # Overlapping port ranges are allowed if the protocols are different.
+        if self.protocol != other.protocol:
+            return False
+        # Only an ICMP port has port=None, and since ICMP ports don't have port ranges,
+        # they can't overlap with each other.
+        if self.port is None or other.port is None:
+            return False
+        # If the ports are identical aside from the endpoints, they aren't considered overlapping.
+        # It's valid to open/close the same port for different endpoints.
+        if (
+            self.protocol == other.protocol
+            and self.port == other.port
+            and self.to_port == other.to_port
+        ):
+            return False
+        # Same protocol, non-identical ports -- Juju will error if the ranges overlap.
+        # Note that if to_port is None, the range will just include the single port.
+        # (Port values are validated to be in the range [1:65535] when constructed.)
+        a = range(self.port, self.to_port or self.port + 1)
+        b = range(other.port, other.to_port or other.port + 1)
+        return a.start in b or b.start in a
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1448,13 +1493,9 @@ class TCPPort(Port):
 
     :meta private:
     """
+    to_port: int | None = None
 
-    def __post_init__(self):
-        super().__post_init__()
-        if not (1 <= self.port <= 65535):
-            raise StateValidationError(
-                f'`port` outside bounds [1:65535], got {self.port}',
-            )
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1468,13 +1509,9 @@ class UDPPort(Port):
 
     :meta private:
     """
+    to_port: int | None = None
 
-    def __post_init__(self):
-        super().__post_init__()
-        if not (1 <= self.port <= 65535):
-            raise StateValidationError(
-                f'`port` outside bounds [1:65535], got {self.port}',
-            )
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -1487,9 +1524,11 @@ class ICMPPort(Port):
     :meta private:
     """
 
+    endpoints: Literal['*'] | tuple[str, Unpack[tuple[str, ...]]] = '*'
+
     def __post_init__(self):
         super().__post_init__()
-        if self.port is not None:
+        if (self.port, self.to_port) != (None, None):
             raise StateValidationError('`port` cannot be set for `ICMPPort`')
 
 
@@ -1498,6 +1537,68 @@ _port_cls_by_protocol = {
     'udp': UDPPort,
     'icmp': ICMPPort,
 }
+
+
+class _PortMap:
+    def __init__(self, ports: Iterable[Port] | None = None):
+        self._map = {} if ports is None else self._make_map(ports)
+
+    @staticmethod
+    def _make_map(
+        ports: Iterable[Port],
+    ) -> dict[tuple[_RawPortProtocolLiteral, int | None, int | None], set[str]]:
+        return {(port.protocol, port.port, port.to_port): set(port.endpoints) for port in ports}
+
+    def open_port(self, port: Port) -> None:
+        key = (port.protocol, port.port, port.to_port)
+        self._map.setdefault(key, set()).update(port.endpoints)
+
+    def close_port(self, port: Port, all_endpoints: Sequence[str]) -> None:
+        key = (port.protocol, port.port, port.to_port)
+        if (endpoints := self._map.get(key)) is None:
+            return
+        if port.endpoints == '*':
+            del self._map[key]
+        elif '*' in endpoints:
+            endpoints.clear()
+            endpoints.update(all_endpoints)
+            endpoints.difference_update(port.endpoints)
+        else:
+            endpoints.difference_update(port.endpoints)
+
+    def get_ports(self) -> frozenset[Port]:
+        return frozenset(
+            _port_cls_by_protocol[protocol](
+                protocol=protocol,
+                port=port,  # type: ignore
+                to_port=to_port,
+                endpoints='*' if '*' in endpoints else tuple(sorted(endpoints)),  # type: ignore
+            )
+            for (protocol, port, to_port), endpoints in self._map.items()
+        )
+
+    def get_first_overlap(self, port: Port) -> ops.Port | None:
+        for (protocol, from_port, to_port), endpoints in self._map.items():
+            endpoints = '*' if '*' in endpoints else tuple(sorted(endpoints))
+            assert endpoints
+            this_port = ops.Port(
+                protocol=protocol,
+                port=from_port,
+                to_port=to_port,
+                endpoints=endpoints,
+            )
+            if port._overlaps(this_port):
+                return this_port
+        return None
+
+
+def _port_str(port: Port | ops.Port) -> str:
+    """Return the Juju string representation of a port (without endpoints)."""
+    if port.port is None:
+        return port.protocol
+    if port.to_port is None:
+        return f'{port.port}/{port.protocol}'
+    return f'{port.port}-{port.to_port}/{port.protocol}'
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1639,12 +1740,30 @@ class State:
                 object.__setattr__(self, name, _EntityStatus.from_ops(val))
             else:
                 raise TypeError(f'Invalid status.{name}: {val!r}')
+
+        # ports
         normalised_ports = [
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
+            _port_cls_by_protocol[port.protocol](
+                protocol=port.protocol,
+                port=port.port,  # type: ignore
+                to_port=port.to_port,
+                endpoints=port.endpoints,
+            )
+            if isinstance(port, ops.Port)
+            else port
             for port in self.opened_ports
         ]
+        port_map = _PortMap()
+        for port in normalised_ports:
+            if (p := port_map.get_first_overlap(port)) is not None:
+                e = f'cannot open {_port_str(port)}: port range conflicts with {_port_str(p)}'
+                raise StateValidationError(e)
+            port_map.open_port(port)
+        normalised_ports = port_map.get_ports()
         if self.opened_ports != normalised_ports:
             object.__setattr__(self, 'opened_ports', normalised_ports)
+
+        # storage
         normalised_storage = [
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)

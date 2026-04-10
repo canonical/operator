@@ -29,7 +29,7 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 @overload
 def close_port(
     protocol: str | None,
@@ -37,14 +37,14 @@ def close_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 def close_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> str | None:
     """Register a request to close a port or port range.
 
     For more details, see:
@@ -58,13 +58,16 @@ def close_port(
     if port is None:
         if protocol is None:
             raise TypeError('You must provide a port or protocol.')
+        if to_port is not None:
+            raise TypeError('to_port cannot be specified if port is not specified')
         args.append(protocol)
     else:
         port_arg = f'{port}-{to_port}' if to_port is not None else str(port)
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run('close-port', *args)
+    result = run('close-port', *args).strip()
+    return result or None
 
 
 @overload
@@ -74,7 +77,7 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 @overload
 def open_port(
     protocol: str | None,
@@ -82,14 +85,14 @@ def open_port(
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-) -> None: ...
+) -> str | None: ...
 def open_port(
     protocol: str | None = None,
     port: int | None = None,
     *,
     to_port: int | None = None,
     endpoints: str | Iterable[str] | None = None,
-):
+) -> str | None:
     """Register a request to open a port or port range.
 
     For more details, see:
@@ -113,13 +116,21 @@ def open_port(
     if port is None:
         if protocol is None:
             raise TypeError('You must provide a port or protocol.')
+        if to_port is not None:
+            raise TypeError('to_port can only be specified if port is also specified')
         args.append(protocol)
     else:
         port_arg = f'{port}-{to_port}' if to_port is not None else str(port)
         if protocol is not None:
             port_arg = f'{port_arg}/{protocol}'
         args.append(port_arg)
-    run('open-port', *args)
+    # In the happy case (already open or opened successfully) open-ports exits silently with 0.
+    # If open-port exits with an error code, then run will raise an Error.
+    # Specifying a non-existent endpoint exits with 0, but prints an error message,
+    # **and does not open the port**. In this case, we return the error message.
+    # Ops will use this to raise an error.
+    result = run('open-port', *args).strip()
+    return result or None
 
 
 def opened_ports(*, endpoints: bool = False) -> list[Port]:
@@ -146,7 +157,8 @@ def opened_ports(*, endpoints: bool = False) -> list[Port]:
     # '8000-8999/tcp' or '8000-8999/udp' (where the two numbers can be any ports)
     # '8000-8999' (where these could be any port number)
     # If ``--endpoints`` is used, then each port will be followed by a
-    # (possibly empty) tuple of endpoints.
+    # (non-empty) tuple of endpoints, e.g. '8000-8999/tcp (ep1,ep2)' or '80/tcp (*)'.
+    # (*) indicates that the port applies to all endpoints.
     for port in result:
         if endpoints:
             port, port_endpoints = port.rsplit(' ', 1)

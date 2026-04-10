@@ -3000,15 +3000,39 @@ class _TestingModelBackend:
         else:
             self._secrets = [s for s in self._secrets if not self._secret_ids_are_equal(s.id, id)]
 
-    def open_port(self, protocol: str, port: int | None = None):
+    def open_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
+    ):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
-        self._opened_ports.add(model.Port(protocol_lit, port))
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        # This only really works for the happy path.
+        # We should really be checking for overlapping port ranges (and erroring),
+        # and merging with existing entries for endpoints, but since harness is deprecated,
+        # and this is only needed for charms adopting this new feature, we can get away with it.
+        self._opened_ports.add(model.Port(protocol_lit, port, to_port, endpoints=endpoints))
 
-    def close_port(self, protocol: str, port: int | None = None):
+    def close_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
+    ):
         self._check_protocol_and_port(protocol, port)
         protocol_lit = cast('Literal["tcp", "udp", "icmp"]', protocol)
-        self._opened_ports.discard(model.Port(protocol_lit, port))
+        endpoints = tuple(endpoints) if endpoints != '*' else '*'
+        # This only really works for the happy path.
+        # We should really be checking for overlapping port ranges (and erroring),
+        # and merging with existing entries for endpoints, but since harness is deprecated,
+        # and this is only needed for charms adopting this new feature, we can get away with it.
+        self._opened_ports.discard(model.Port(protocol_lit, port, to_port, endpoints=endpoints))
 
     def opened_ports(self) -> set[model.Port]:
         return set(self._opened_ports)

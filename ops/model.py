@@ -37,7 +37,7 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping
+from collections.abc import Callable, Generator, Iterable, Mapping, MutableMapping, Sequence
 from pathlib import Path, PurePath
 from typing import (
     Any,
@@ -719,7 +719,11 @@ class Unit:
         )
 
     def open_port(
-        self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
+        self,
+        protocol: typing.Literal['tcp', 'udp', 'icmp'],
+        port: int | tuple[int, int | None] | None = None,
+        *,
+        endpoints: Sequence[str] = '*',
     ) -> None:
         """Open a port with the given protocol for this unit.
 
@@ -736,18 +740,30 @@ class Unit:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
                 uppercase is also supported).
-            port: The port to open. Required for TCP and UDP; not allowed
-                for ICMP.
+            port: The port to open. Required for TCP and UDP; not allowed for ICMP.
+                May be a tuple of two integers to specify a port range.
+            endpoints: The endpoints for which to open the port.
+                '*' means to open the port for all endpoints.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
                 or ``port`` is not provided when ``protocol`` is 'tcp' or
                 'udp'.
         """
-        self._backend.open_port(protocol.lower(), port)
+        if isinstance(port, tuple):
+            port, to_port = port
+        else:
+            port, to_port = port, None
+        if not endpoints:
+            raise TypeError('endpoints must be a non-empty string or sequence of strings')
+        self._backend.open_port(protocol.lower(), port, to_port=to_port, endpoints=endpoints)
 
     def close_port(
-        self, protocol: typing.Literal['tcp', 'udp', 'icmp'], port: int | None = None
+        self,
+        protocol: typing.Literal['tcp', 'udp', 'icmp'],
+        port: int | tuple[int, int | None] | None = None,
+        *,
+        endpoints: Sequence[str] = '*',
     ) -> None:
         """Close a port with the given protocol for this unit.
 
@@ -765,21 +781,29 @@ class Unit:
             protocol: String representing the protocol; must be one of
                 'tcp', 'udp', or 'icmp' (lowercase is recommended, but
                 uppercase is also supported).
-            port: The port to open. Required for TCP and UDP; not allowed
-                for ICMP.
+            port: The port to open. Required for TCP and UDP; not allowed for ICMP.
+                May be a tuple of two integers to specify a port range.
+            endpoints: The endpoints for which to close the port.
+                '*' means to close the port for all endpoints.
 
         Raises:
             ModelError: If ``port`` is provided when ``protocol`` is 'icmp'
                 or ``port`` is not provided when ``protocol`` is 'tcp' or
                 'udp'.
         """
-        self._backend.close_port(protocol.lower(), port)
+        if isinstance(port, tuple):
+            port, to_port = port
+        else:
+            port, to_port = port, None
+        if not endpoints:
+            raise TypeError('endpoints must be a non-empty string or sequence of strings')
+        self._backend.close_port(protocol.lower(), port, to_port=to_port, endpoints=endpoints)
 
     def opened_ports(self) -> set[Port]:
         """Return a list of opened ports for this unit."""
         return self._backend.opened_ports()
 
-    def set_ports(self, *ports: int | Port) -> None:
+    def set_ports(self, *ports: int | tuple[int, int | None] | Port) -> None:
         """Set the open ports for this unit, closing any others that are open.
 
         Some behaviour, such as whether the port is opened or closed externally without
@@ -800,16 +824,19 @@ class Unit:
                 ``port`` is not ``None``, or where ``protocol`` is 'tcp' or 'udp' and ``port``
                 is ``None``.
         """
-        # Normalise to get easier comparisons.
-        existing = {(port.protocol, port.port) for port in self._backend.opened_ports()}
+        existing = self._backend.opened_ports()
         desired = {
-            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
+            Port('tcp', port)
+            if isinstance(port, int)
+            else Port('tcp', port[0], to_port=port[1])
+            if isinstance(port, tuple)
+            else port
             for port in ports
         }
-        for protocol, port in existing - desired:
-            self._backend.close_port(protocol, port)
-        for protocol, port in desired - existing:
-            self._backend.open_port(protocol, port)
+        for p in existing - desired:
+            self._backend.close_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
+        for p in desired - existing:
+            self._backend.open_port(p.protocol, p.port, to_port=p.to_port, endpoints=p.endpoints)
 
     def reboot(self, now: bool = False) -> None:
         """Reboot the host machine.
@@ -845,6 +872,21 @@ class Port:
 
     port: int | None
     """The port number. Will be ``None`` if protocol is ``'icmp'``."""
+
+    to_port: int | None = None
+    """The end of the port range, if a range was specified.
+
+    Will be ``None`` if a single port was specified (or if protocol is ``'icmp'``).
+    """
+
+    _: dataclasses.KW_ONLY
+
+    endpoints: tuple[str, ...] | Literal['*'] = '*'
+    """The endpoints for which the port is open.
+
+    Will be ``"*"`` if open for all endpoints,
+    or a tuple of endpoint names if specified for particular endpoints.
+    """
 
 
 OpenedPort = Port
@@ -4037,26 +4079,59 @@ class _ModelBackend:
         with self._wrap_hookcmd('secret-remove', id=id, revision=revision):
             hookcmds.secret_remove(id, revision=revision)
 
-    def open_port(self, protocol: str, port: int | None = None):
-        with self._wrap_hookcmd('open-port', protocol=protocol, port=port):
-            hookcmds.open_port(protocol, port)
+    def open_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
+    ):
+        with self._wrap_hookcmd(
+            'open-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
+        ):
+            result = hookcmds.open_port(protocol, port, to_port=to_port, endpoints=endpoints)
+        if result is not None:
+            raise ModelError(result)
 
-    def close_port(self, protocol: str, port: int | None = None):
-        with self._wrap_hookcmd('close-port', protocol=protocol, port=port):
-            hookcmds.close_port(protocol, port)
+    def close_port(
+        self,
+        protocol: str,
+        port: int | None = None,
+        *,
+        to_port: int | None = None,
+        endpoints: Sequence[str] = '*',
+    ):
+        with self._wrap_hookcmd(
+            'close-port', protocol=protocol, port=port, to_port=to_port, endpoints=endpoints
+        ):
+            result = hookcmds.close_port(protocol, port, to_port=to_port, endpoints=endpoints)
+        if result is not None:
+            raise ModelError(result)
 
     def opened_ports(self) -> set[Port]:
-        with self._wrap_hookcmd('opened-ports'):
-            results = hookcmds.opened_ports()
+        with self._wrap_hookcmd('opened-ports', endpoints=True):
+            result = hookcmds.opened_ports(endpoints=True)
         ports: set[Port] = set()
-        for raw_port in results:
-            if raw_port.protocol not in ('tcp', 'udp', 'icmp'):
-                logger.warning('Unexpected opened-ports protocol: %s', raw_port.protocol)
+        for port in result:
+            if port.protocol not in ('tcp', 'udp', 'icmp'):
+                logger.warning('Unexpected opened-ports protocol: %s', port.protocol)
                 continue
-            if raw_port.to_port is not None:
-                logger.warning('Ignoring opened-ports port range: %s', raw_port)
-            port = Port(raw_port.protocol or 'tcp', raw_port.port)
-            ports.add(port)
+            if not port.endpoints:
+                logger.warning('opened-ports result with no endpoints: %s', port)
+                continue
+            match port.endpoints:
+                case ['*']:
+                    model_endpoints = '*'
+                case _:
+                    model_endpoints = tuple(port.endpoints)
+            model_port = Port(
+                port.protocol,
+                port.port,
+                to_port=port.to_port,
+                endpoints=model_endpoints,
+            )
+            ports.add(model_port)
         return ports
 
     def reboot(self, now: bool = False):

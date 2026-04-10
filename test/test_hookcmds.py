@@ -259,6 +259,16 @@ def test_close_port_range(run: Run):
     hookcmds.close_port(protocol='tcp', port=8080, to_port=8090)
 
 
+def test_close_port_range_and_endpoints(run: Run):
+    run.handle(['close-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'])
+    hookcmds.close_port(protocol='tcp', port=8080, to_port=8090, endpoints=['ep1', 'ep2'])
+
+
+def test_close_port_to_port_without_port():
+    with pytest.raises(TypeError):
+        hookcmds.close_port(protocol='tcp', to_port=8090)
+
+
 def test_config_get(run: Run):
     run.handle(['config-get', '--format=json'], stdout='{"foo": "bar"}')
     result = hookcmds.config_get()
@@ -429,6 +439,31 @@ def test_open_port_range(run: Run):
     hookcmds.open_port(protocol='tcp', port=8080, to_port=8090)
 
 
+def test_open_port_range_and_endpoints(run: Run):
+    run.handle(['open-port', '--endpoints', 'ep1,ep2', '8080-8090/tcp'])
+    hookcmds.open_port(protocol='tcp', port=8080, to_port=8090, endpoints=['ep1', 'ep2'])
+
+
+def test_open_port_to_port_without_port():
+    with pytest.raises(TypeError):
+        hookcmds.open_port(protocol='tcp', to_port=8090)
+
+
+def test_open_port_nonexistent_endpoint(run: Run):
+    # Juju exits 0 but prints an error to stdout when the endpoint does not exist.
+    # hookcmds.open_port returns the error string; the ModelError is raised higher up.
+    error_msg = (
+        'cannot open/close ports: open port range: endpoint "nonexistent-ep"'
+        ' for unit "app/0" not found'
+    )
+    run.handle(
+        ['open-port', '--endpoints', 'nonexistent-ep', '8080/tcp'],
+        stdout=error_msg,
+    )
+    result = hookcmds.open_port(protocol='tcp', port=8080, endpoints=['nonexistent-ep'])
+    assert result == error_msg
+
+
 def test_opened_ports(run: Run):
     run.handle(
         ['opened-ports', '--format=json'],
@@ -449,12 +484,21 @@ def test_opened_ports(run: Run):
 def test_opened_ports_endpoints(run: Run):
     run.handle(
         ['opened-ports', '--endpoints', '--format=json'],
-        stdout='["8080/tcp (ep1,ep2)"]',
+        stdout='["8080/tcp (ep1,ep2)", "1234/ftp (ep1)", "1000-2000/udp (*)"]',
     )
     result = hookcmds.opened_ports(endpoints=True)
-    assert result[0].port == 8080
     assert result[0].protocol == 'tcp'
+    assert result[0].port == 8080
+    assert result[0].to_port is None
     assert result[0].endpoints == ['ep1', 'ep2']
+    assert result[1].protocol == 'ftp'
+    assert result[1].port == 1234
+    assert result[1].to_port is None
+    assert result[1].endpoints == ['ep1']
+    assert result[2].protocol == 'udp'
+    assert result[2].port == 1000
+    assert result[2].to_port == 2000
+    assert result[2].endpoints == ['*']
 
 
 @pytest.mark.parametrize('id', [None, 123])
