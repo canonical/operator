@@ -13,6 +13,10 @@ As you write your charm, you'll use tools and resources from around the charming
 Manage charms <manage-charms>
 ```
 
+To make your charm deployable from Charmhub, publish your charm.
+
+- {doc}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
+
 Once your charm is ready for wide production use, your next goal should be to get it publicly listed on Charmhub, so that it is visible in searches.
 
 - {doc}`Make your charm discoverable <make-your-charm-discoverable>`
@@ -125,6 +129,7 @@ Trace your charm <trace-your-charm>
 ```{toctree}
 :hidden:
 
+Publish your charm on Charmhub <publish-your-charm-on-charmhub>
 Make your charm discoverable <make-your-charm-discoverable>
 ```
 
