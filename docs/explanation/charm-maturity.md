@@ -15,7 +15,7 @@ Anyone can publish a charm to Charmhub (you'll need to create an account, and th
 
 Privately-listed charms will not show up in searches on Charmhub, or general web searches.
 
-> See more: {external+charmcraft:ref}`Charmcraft | How to manage charms | Public a charm <publish-a-charm>`
+> See more: [](#publish-your-charm)
 
 ## Phase 3: Public listing on Charmhub
 
