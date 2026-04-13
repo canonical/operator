@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.5.0.dev0",
+    "ops-scenario==8.8.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.5.0.dev0",
+    "ops-tracing==3.8.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -43,9 +43,13 @@ lint = [
     "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
+mypy = [  # used to type check example charms in CI
+    "mypy>=1.19",
+    "types-PyYAML",
+]
 unit = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
@@ -60,7 +64,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
@@ -94,7 +98,7 @@ ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
 
 [tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.lib"]
+include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
@@ -227,12 +231,21 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 ]
+"testing/src/scenario/_charmcraft_extensions.py" = [
+    "E501",  # Auto-generated file; long description strings are unavoidable.
+]
+".github/generate_charmcraft_extensions.py" = [
+    "S607",  # Intentionally calls charmcraft/tox by name.
+]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
 ]
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+    "S607",  # Starting a process with a partial executable path
+]
+".github/patch-charm-deps.py" = [
     "S607",  # Starting a process with a partial executable path
 ]
 "docs/custom_conf.py" = [
@@ -257,19 +270,10 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
-    "testing/tests/helpers.py",
-    "testing/tests/test_charm_spec_autoload.py",
-    "testing/tests/test_consistency_checker.py",
-    "testing/tests/test_context_on.py",
-    "testing/tests/test_context.py",
-    "testing/tests/test_emitted_events_util.py",
-    "testing/tests/test_plugin.py",
-    "testing/tests/test_runtime.py",
     "testing/tests/test_e2e/test_network.py",
     "testing/tests/test_e2e/test_cloud_spec.py",
     "testing/tests/test_e2e/test_play_assertions.py",
     "testing/tests/test_e2e/test_vroot.py",
-    "testing/tests/test_e2e/__init__.py",
     "testing/tests/test_e2e/test_resource.py",
     "testing/tests/test_e2e/test_state.py",
     "testing/tests/test_e2e/test_actions.py",

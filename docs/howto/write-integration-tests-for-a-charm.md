@@ -1,19 +1,7 @@
 (write-integration-tests-for-a-charm)=
 # How to write integration tests for a charm
 
-> See also: {ref}`testing`
-
-This document shows how to write integration tests for a charm.
-
-```{important}
-
-Integration testing is only one part of a comprehensive testing strategy. Also see {ref}`write-unit-tests-for-a-charm`.
-
-```
-
-The instructions all use the Jubilant library.
-
-> See more: [Jubilant documentation](https://documentation.ubuntu.com/jubilant/)
+Integration testing is only one part of a comprehensive testing strategy. For an overview of charm testing, see {ref}`testing`.
 
 (write-integration-tests-for-a-charm-prepare-your-environment)=
 ## Prepare your environment
@@ -110,43 +98,7 @@ integration = [
 ]
 ```
 
-## Create a test file
-
-By convention, integration tests are kept in the charm’s source tree, in a directory called `tests/integration`.
-
-If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
-
-Also create a leaf file called `conftest.py`. We'll edit this file later.
-
-Below is an example of a typical integration test:
-
-```python
-def test_operation(charm: pathlib.Path, juju: jubilant.Juju):
-    # Deploy this charm:
-    juju.deploy(f"./{charm}", config={"foo": ...})
-
-    # Deploy some charm from Charmhub:
-    juju.deploy("ubuntu")
-
-    # Integrate the charms:
-    juju.integrate("your-app:endpoint1", "ubuntu:endpoint2")
-
-    # Scale your application up:
-    juju.add_unit("your-app", num_units=2)
-
-    # Ensure that both applications and all units reach a good state:
-    juju.wait(jubilant.all_active)
-
-    # Run an action on a unit:
-    result = juju.run("your-app/0", "some-action")
-    assert result.results["key"] == "value"
-
-    # What this means depends on the workload:
-    assert charm_operates_correctly()
-```
-
-A good integration testing suite will check that the charm continues to operate as expected whenever possible, by combining these simple elements.
-
+(write-integration-tests-for-a-charm-write-your-tests)=
 ## Write your tests
 
 ### Write fixtures
@@ -186,14 +138,26 @@ def charm():
         charm_path = pathlib.Path(os.environ["CHARM_PATH"])
         if not charm_path.exists():
             raise FileNotFoundError(f"Charm does not exist: {charm_path}")
-        return charm_path
+        return charm_path.resolve()
     # Modify below if you're building for multiple bases or architectures.
-    return next(pathlib.Path(".").glob("*.charm"))
+    return next(pathlib.Path(".").glob("*.charm")).resolve()
 ```
 
 The integration tests will depend on these fixtures.
 
-These fixtures don't pack your charm. You'll need to pack your charm before running the tests.
+These fixtures use [pytest](https://docs.pytest.org/en/stable/) and {external+jubilant:doc}`Jubilant <index>`:
+
+- The `juju` fixture creates a temporary Juju model for each test file. The [](jubilant.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit.
+
+- The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
+
+For general guidance about `conftest.py`, see [conftest.py: sharing fixtures across multiple files](https://docs.pytest.org/en/stable/reference/fixtures.html#conftest-py-sharing-fixtures-across-multiple-files).
+
+### Create a test file
+
+By convention, integration tests are kept in the charm's source tree, in a directory called `tests/integration`.
+
+If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
 
 ### Deploy your charm
 
@@ -207,18 +171,45 @@ import jubilant
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
-    juju.deploy(f"./{charm}")
+    juju.deploy(charm)
     juju.wait(jubilant.all_active)
 ```
 
+This test deploys your charm and waits for all applications and units to be active.
+
+Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
+
+For more examples of tests that deploy charms, see:
+
+- [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
+- [httpbin-demo](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/integration/test_charm.py)
+
 Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
 
-> See more: [](jubilant.temp_model)
+### Exercise your charm
 
-#### Example implementations
+After `test_deploy`, add more tests to check that your charm operates correctly. For example:
 
-- [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/e54b482a4b72c45006451cd7436ec9f6e40162d6/tests/integration/test_charm.py#L15-L21)
-- [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo/tests/integration)
+```python
+def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
+    # Deploy some other charm from Charmhub:
+    juju.deploy("other-app")
+
+    # Integrate the charms:
+    juju.integrate("your-app:endpoint1", "other-app:endpoint2")
+
+    # Ensure that both applications and all units reach a good state:
+    juju.wait(jubilant.all_active)
+
+    # Run an action on a unit:
+    result = juju.run("your-app/0", "some-action")
+    assert result.results["key"] == "value"
+
+    # What this means depends on the workload:
+    assert charm_operates_correctly()
+```
+
+> See more: {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
 
 ### Deploy your charm with resources
 
@@ -229,7 +220,7 @@ A charm can require `file` or `oci-image` resources to work, which have revision
 ```python
     ...
     resources = {"resource_name": "localhost:32000/image_name:latest"}
-    juju.deploy(f"./{charm}", resources=resources)
+    juju.deploy(charm, resources=resources)
     ...
 ```
 
@@ -251,7 +242,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
         for name, res in METADATA["resources"].items()
     }
 
-    juju.deploy(f"./{charm}", resources=resources)
+    juju.deploy(charm, resources=resources)
     juju.wait(jubilant.all_active)
 ```
 

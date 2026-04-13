@@ -69,10 +69,19 @@ SKIP = {
     'cos-lite-bundle',
     # Source is not public.
     'charm-weebl',
+    # Read-only partial mirror of mysql-router-operators.
+    'mysql-router-k8s-operator',
+    # mysql-connector-python has no wheels for Python 3.12+, and the charm
+    # pins Python 3.11 in .python-version.  Rather than adding per-charm
+    # version-cap logic, skip it until the dependency situation improves.
+    'wordpress-k8s-operator',
 }
 CHARM_ROOTS = {
     'argo-operators': ['charms/argo-controller'],
+    'catalogue-k8s-operator': ['charm'],
     'jimm': ['charms/jimm'],
+    # k8s-operator has an odd structure where there is a charm in charms/worker, and
+    # also another separate charm not as a sibling, but inside a subfolder.
     'k8s-operator': ['charms/worker', 'charms/worker/k8s'],
     'katib-operators': ['charms/katib-controller', 'charms/katib-db-manager', 'charms/katib-ui'],
     'kfp-operators': [
@@ -85,7 +94,9 @@ CHARM_ROOTS = {
         'charms/kfp-viewer',
         'charms/kfp-viz',
     ],
+    'mysql-router-operators': ['machines', 'kubernetes'],
     'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
+    'tempo-operators': ['coordinator', 'worker'],
     'vault-k8s-operator': ['k8s', 'machine'],
 }
 

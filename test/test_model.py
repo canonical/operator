@@ -37,7 +37,7 @@ import pytest
 
 import ops
 import ops.testing
-from ops import pebble
+from ops import hookcmds, pebble
 from ops._private import yaml
 from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
@@ -3498,6 +3498,17 @@ class TestSecrets:
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
+    def test_app_add_secret_timedelta_expire_is_utc(
+        self, fake_script: FakeScript, model: ops.Model
+    ):
+        fake_script.write('secret-add', 'echo secret:234')
+
+        model.app.add_secret({'foo': 'x'}, expire=datetime.timedelta(hours=1))
+
+        calls = fake_script.calls(clear=True)
+        expire_arg = calls[0][calls[0].index('--expire') + 1]
+        assert expire_arg.endswith('Z'), f'Expected UTC timezone suffix Z, got {expire_arg!r}'
+
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
 
@@ -4522,6 +4533,39 @@ class TestCloudCredential:
     @pytest.fixture()
     def model(self, fake_juju_version: None):
         return ops.Model(ops.CharmMeta(), _ModelBackend('myapp/0'))
+
+    def test_credential_get_from_hookcmds(self, monkeypatch: pytest.MonkeyPatch, model: ops.Model):
+        hook_credential = hookcmds.CloudCredential(
+            auth_type='test-auth', attributes={'foo': 'bar'}, redacted=['one', 'two']
+        )
+        hook_spec = hookcmds.CloudSpec(
+            type='test',
+            name='test-cloud',
+            region='nz',
+            endpoint='end',
+            identity_endpoint='id',
+            storage_endpoint='stor',
+            credential=hook_credential,
+            ca_certificates=['cert1', 'cert2'],
+            skip_tls_verify=True,
+            is_controller_cloud=True,
+        )
+        monkeypatch.setattr(hookcmds, 'credential_get', lambda: hook_spec)
+        spec = model.get_cloud_spec()
+        assert spec.type == hook_spec.type
+        assert spec.name == hook_spec.name
+        assert spec.region == hook_spec.region
+        assert spec.endpoint == hook_spec.endpoint
+        assert spec.identity_endpoint == hook_spec.identity_endpoint
+        assert spec.storage_endpoint == hook_spec.storage_endpoint
+        assert spec.ca_certificates == hook_spec.ca_certificates
+        assert spec.skip_tls_verify == hook_spec.skip_tls_verify
+        assert spec.is_controller_cloud == hook_spec.is_controller_cloud
+        model_credential = spec.credential
+        assert model_credential is not None
+        assert model_credential.auth_type == hook_credential.auth_type
+        assert model_credential.attributes == hook_credential.attributes
+        assert model_credential.redacted == hook_credential.redacted
 
     def test_from_dict(self):
         d = {

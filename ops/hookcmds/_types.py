@@ -26,7 +26,7 @@ from typing import (
     TypedDict,
 )
 
-from ._utils import datetime_from_iso
+from .._private import timeconv
 
 SecretRotate = Literal['never', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']
 SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
@@ -154,7 +154,7 @@ class CloudSpec:
     """Whether to skip TLS verification."""
 
     is_controller_cloud: bool = False
-    """If this is the cloud used by the controller, defaults to False."""
+    """If this is the cloud used by the controller, defaults to ``False``."""
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> CloudSpec:
@@ -196,7 +196,7 @@ class Goal:
     def _from_dict(cls, d: GoalDict) -> Goal:
         return cls(
             status=d['status'],
-            since=datetime_from_iso(d['since']),
+            since=timeconv.parse_rfc3339(d['since']),
         )
 
 
@@ -298,9 +298,9 @@ class SecretInfo:
             id=id,
             label=data.get('label'),
             description=data.get('description'),
-            expiry=datetime_from_iso(data['expiry']) if data.get('expiry') else None,
+            expiry=timeconv.parse_rfc3339(data['expiry']) if data.get('expiry') else None,
             rotation=data.get('rotation'),
-            rotates=datetime_from_iso(data['rotates']) if data.get('rotates') else None,
+            rotates=timeconv.parse_rfc3339(data['rotates']) if data.get('rotates') else None,
             revision=data['revision'],
         )
 

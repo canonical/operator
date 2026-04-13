@@ -3,18 +3,19 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from scenario import Context
 from scenario.state import State, _Action, _next_action_id
 
-from ops import __version__ as ops_version
 from ops._private.harness import ActionFailed
 from ops.charm import ActionEvent, CharmBase
 from ops.framework import Framework
 
 
 @pytest.fixture(scope='function')
-def mycharm():
+def mycharm() -> type[CharmBase]:
     class MyCharm(CharmBase):
         _evt_handler = None
 
@@ -23,7 +24,7 @@ def mycharm():
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ActionEvent):
             if handler := self._evt_handler:
                 handler(event)
 
@@ -31,8 +32,8 @@ def mycharm():
 
 
 @pytest.mark.parametrize('baz_value', (True, False))
-def test_action_event(mycharm, baz_value):
-    ctx = Context(
+def test_action_event(mycharm: type[CharmBase], baz_value: bool):
+    ctx: Context[CharmBase] = Context(
         mycharm,
         meta={'name': 'foo'},
         actions={'foo': {'params': {'bar': {'type': 'number'}, 'baz': {'type': 'boolean'}}}},
@@ -48,11 +49,11 @@ def test_action_event(mycharm, baz_value):
 
 def test_action_no_results():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.act_action, self._on_act_action)
 
-        def _on_act_action(self, _):
+        def _on_act_action(self, _: ActionEvent):
             pass
 
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'act': {}})
@@ -62,27 +63,27 @@ def test_action_no_results():
 
 
 @pytest.mark.parametrize('res_value', ('one', 1, [2], ['bar'], (1,), {1, 2}))
-def test_action_event_results_invalid(mycharm, res_value):
+def test_action_event_results_invalid(mycharm: type[CharmBase], res_value: object):
     def handle_evt(charm: CharmBase, evt: ActionEvent):
         with pytest.raises((TypeError, AttributeError)):
-            evt.set_results(res_value)
+            evt.set_results(res_value)  # type: ignore
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo'), State())
 
 
 @pytest.mark.parametrize('res_value', ({'a': {'b': {'c'}}}, {'d': 'e'}))
-def test_action_event_results_valid(mycharm, res_value):
-    def handle_evt(_: CharmBase, evt):
+def test_action_event_results_valid(mycharm: type[CharmBase], res_value: dict[str, Any]):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
         evt.set_results(res_value)
         evt.log('foo')
         evt.log('bar')
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
 
@@ -92,7 +93,7 @@ def test_action_event_results_valid(mycharm, res_value):
 
 
 @pytest.mark.parametrize('res_value', ({'a': {'b': {'c'}}}, {'d': 'e'}))
-def test_action_event_outputs(mycharm, res_value):
+def test_action_event_outputs(mycharm: type[CharmBase], res_value: dict[str, Any]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
@@ -102,7 +103,7 @@ def test_action_event_outputs(mycharm, res_value):
         evt.log('log2')
         evt.fail('failed becozz')
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -112,13 +113,13 @@ def test_action_event_outputs(mycharm, res_value):
     assert ctx.action_logs == ['log1', 'log2']
 
 
-def test_action_event_fail(mycharm):
+def test_action_event_fail(mycharm: type[CharmBase]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
         evt.fail('action failed!')
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -126,13 +127,13 @@ def test_action_event_fail(mycharm):
     assert exc_info.value.message == 'action failed!'
 
 
-def test_action_event_fail_context_manager(mycharm):
+def test_action_event_fail_context_manager(mycharm: type[CharmBase]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
         evt.fail('action failed!')
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     with pytest.raises(ActionFailed) as exc_info:
@@ -143,11 +144,11 @@ def test_action_event_fail_context_manager(mycharm):
 
 def test_action_continues_after_fail():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_action, self._on_foo_action)
 
-        def _on_foo_action(self, event):
+        def _on_foo_action(self, event: ActionEvent):
             event.log('starting')
             event.set_results({'initial': 'result'})
             event.fail('oh no!')
@@ -161,30 +162,19 @@ def test_action_continues_after_fail():
     assert ctx.action_results == {'initial': 'result', 'final': 'result'}
 
 
-def _ops_less_than(wanted_major, wanted_minor):
-    major, minor = (int(v) for v in ops_version.split('.')[:2])
-    if major < wanted_major:
-        return True
-    if major == wanted_major and minor < wanted_minor:
-        return True
-    return False
-
-
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
-def test_action_event_has_id(mycharm):
+def test_action_event_has_id(mycharm: type[CharmBase]):
     def handle_evt(_: CharmBase, evt: ActionEvent):
         if not isinstance(evt, ActionEvent):
             return
         assert isinstance(evt.id, str) and evt.id != ''
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo'), State())
 
 
-@pytest.mark.skipif(_ops_less_than(2, 11), reason="ops 2.10 and earlier don't have ActionEvent.id")
-def test_action_event_has_override_id(mycharm):
+def test_action_event_has_override_id(mycharm: type[CharmBase]):
     uuid = '0ddba11-cafe-ba1d-5a1e-dec0debad'
 
     def handle_evt(charm: CharmBase, evt: ActionEvent):
@@ -192,7 +182,7 @@ def test_action_event_has_override_id(mycharm):
             return
         assert evt.id == uuid
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
     ctx.run(ctx.on.action('foo', id=uuid), State())
@@ -200,16 +190,16 @@ def test_action_event_has_override_id(mycharm):
 
 def test_two_actions_same_context():
     class MyCharm(CharmBase):
-        def __init__(self, framework):
+        def __init__(self, framework: Framework):
             super().__init__(framework)
             framework.observe(self.on.foo_action, self._on_foo_action)
             framework.observe(self.on.bar_action, self._on_bar_action)
 
-        def _on_foo_action(self, event):
+        def _on_foo_action(self, event: ActionEvent):
             event.log('foo')
             event.set_results({'foo': 'result'})
 
-        def _on_bar_action(self, event):
+        def _on_bar_action(self, event: ActionEvent):
             event.log('bar')
             event.set_results({'bar': 'result'})
 
@@ -225,7 +215,7 @@ def test_two_actions_same_context():
 
 def test_positional_arguments():
     with pytest.raises(TypeError):
-        _Action('foo', {})
+        _Action('foo', {})  # type: ignore
 
 
 def test_default_arguments():
@@ -235,3 +225,41 @@ def test_default_arguments():
     assert action.name == name
     assert action.params == {}
     assert action.id == expected_id
+
+
+def test_action_get_returns_copy(mycharm):
+    """Mutating the dict returned by action_get() must not affect subsequent calls.
+
+    ActionEvent.params is populated via the backend's action_get() method.
+    Each call to action_get() should return an independent copy so that
+    mutations do not leak into the Scenario state.
+    """
+    results = []
+
+    def handle_evt(_: CharmBase, evt):
+        if not isinstance(evt, ActionEvent):
+            return
+        backend = evt.framework.model._backend
+        first = backend.action_get()
+        first['bar'] = 'MUTATED'
+        first['extra'] = 'INJECTED'
+        second = backend.action_get()
+        results.append((first, second))
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(
+        mycharm,
+        meta={'name': 'foo'},
+        actions={'foo': {'params': {'bar': {'type': 'number'}}}},
+    )
+    ctx.run(ctx.on.action('foo', params={'bar': 10}), State())
+
+    assert len(results) == 1
+    mutated, fresh = results[0]
+    # The mutated copy should have our changes.
+    assert mutated['bar'] == 'MUTATED'
+    assert mutated['extra'] == 'INJECTED'
+    # The fresh copy must reflect the original params, unaffected.
+    assert fresh == {'bar': 10}
+    assert 'extra' not in fresh

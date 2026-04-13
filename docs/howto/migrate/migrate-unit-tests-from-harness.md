@@ -541,5 +541,5 @@ For more information about state-transition testing, see:
 
 For more examples of collect-status event handlers, see:
 
-- The [httpbin-demo charm](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/src/charm.py)
+- The [httpbin-demo charm](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/src/charm.py) and [its unit tests](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/unit/test_charm.py)
 - [Update the unit status to reflect the relation state](#integrate-your-charm-with-postgresql-update-unit-status) in the Kubernetes charm tutorial

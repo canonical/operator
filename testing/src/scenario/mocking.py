@@ -9,6 +9,7 @@ to interact with the Juju controller and the Pebble service manager.
 
 from __future__ import annotations
 
+import copy
 import datetime
 import io
 import shutil
@@ -481,9 +482,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             if refresh:
                 secret._track_latest_revision()
             assert secret.latest_content is not None
-            return secret.latest_content
+            return secret.latest_content.copy()
 
-        return secret.tracked_content
+        return secret.tracked_content.copy()
 
     def secret_info_get(
         self,
@@ -650,7 +651,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-get',
             )
-        return action.params
+        return copy.deepcopy(action.params)
 
     def storage_add(self, name: str, count: int = 1):
         if not isinstance(count, int) or isinstance(count, bool):
@@ -778,6 +779,14 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # wipe just in case
         if container_root.exists():
+            if any(container_root.iterdir()):
+                logger.warning(
+                    'Container %r has a non-empty filesystem that will be wiped before this run.'
+                    ' If you are trying to mock filesystem contents, use Mounts instead.'
+                    ' If you are reusing a Context instance across multiple ctx.run() calls,'
+                    ' note that the filesystem is cleared between runs.',
+                    container_name,
+                )
             # Path.rmdir will fail if root is nonempty
             shutil.rmtree(container_root)
 

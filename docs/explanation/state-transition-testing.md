@@ -4,6 +4,9 @@ The framework for state-transition testing in Ops was originally developed under
 
 This page compares Scenario to Harness and explains how state-transition tests work. For a summary of how to write unit tests, see [](/howto/write-unit-tests-for-a-charm).
 
+If you are migrating an existing charm and need realistic starting data or writing a regression test, you can capture a live model snapshot and convert it into a state-transition test.
+For a workflow focused on relation debugging, see [](#generate-tests-from-a-deployed-model).
+
 ```{note}
 In your testing dependencies, add `ops[testing]` rather than `ops-scenario`, and
 this will ensure that an appropriate version of the framework is installed.
@@ -40,6 +43,8 @@ that:
 
 - the charm does not raise uncaught exceptions while handling the event
 - the output state (or the diff with the input state) is as expected.
+
+When the testing framework runs the event, the input state isn't modified. Instead, the output state is a new `State` object. `State` objects are generally immutable - but be careful when working with `dict` attributes, as they don't enforce immutability.
 
 ## Core concepts
 
@@ -228,6 +233,32 @@ ctx = testing.Context(
 )
 state = ctx.run(ctx.on.start(), testing.State())
 ```
+
+## Charmcraft extensions
+
+If your `charmcraft.yaml` uses a charmcraft extension such as `flask-framework`
+or `django-framework`, the testing framework will automatically expand it when
+automatically loading metadata. The extension's metadata (containers, relations, resources,
+and so on), config options, and actions are merged into the charm spec, simulating what
+`charmcraft expand-extensions` does at pack time.
+
+This means you can write tests against a charm that uses extensions without having
+to manually specify all the metadata the extension adds:
+
+```python
+# Given a charmcraft.yaml with:
+#   extensions:
+#     - flask-framework
+
+ctx = testing.Context(MyFlaskCharm)
+# The 'ingress' relation is provided by the flask-framework extension.
+state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingress')}))
+```
+
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (for example, a config option or relation with the same name), both
+`charmcraft pack` and the testing framework will raise an error. Rename or
+remove the overlapping keys to fix this.
 
 ## Immutability
 

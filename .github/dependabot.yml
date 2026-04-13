@@ -6,10 +6,13 @@ updates:
       interval: "monthly"  # This is hard-coded to the 1st of the month
     labels:
       - "dependencies"
-  - package-ecosystem: "pip"
+    cooldown:
+        default-days: 7
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "daily"
-    open-pull-requests-limit: 0  # Security updates only
+      interval: "monthly"
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7

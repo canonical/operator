@@ -4,19 +4,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, ClassVar
 
 import pytest
-from scenario.context import Context
+from scenario import Context, PeerRelation, Relation, State, SubordinateRelation
 from scenario.errors import StateValidationError, UncaughtCharmError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
-    PeerRelation,
-    Relation,
     RelationBase,
-    State,
-    SubordinateRelation,
-    _Event,
     _next_relation_id,
 )
 
@@ -24,34 +19,41 @@ import ops
 from tests.helpers import trigger
 
 
-@pytest.fixture(scope='function')
-def mycharm():
-    class MyCharmEvents(ops.CharmEvents):
-        @classmethod
-        def define_event(cls, event_kind: str, event_type: type[ops.EventBase]):
-            if getattr(cls, event_kind, None):
-                delattr(cls, event_kind)
-            return super().define_event(event_kind, event_type)
-
-    class MyCharm(ops.CharmBase):
-        _call: Callable[[_Event], None] | None = None
-        called = False
-        on: ops.CharmEvents = MyCharmEvents()
-
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
-
-        def _on_event(self, event: ops.EventBase):
-            if self._call:
-                MyCharm.called = True
-                self._call(cast('Any', event))
-
-    return MyCharm
+class CharmEvents(ops.CharmEvents):
+    @classmethod
+    def define_event(cls, event_kind: str, event_type: type[ops.EventBase]):
+        if getattr(cls, event_kind, None):
+            delattr(cls, event_kind)
+        return super().define_event(event_kind, event_type)
 
 
-def test_get_relation(mycharm: Any):
+class Charm(ops.CharmBase):
+    _call: ClassVar[Callable[[Any], None] | None] = None
+    called: ClassVar[bool] = False
+    on = CharmEvents()
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for evt in self.on.events().values():
+            framework.observe(evt, self._on_event)
+
+    def _on_event(self, event: ops.EventBase) -> None:
+        if Charm._call:
+            Charm.called = True
+            Charm._call(event)
+
+
+@pytest.fixture(autouse=True)
+def reset_charm_state():
+    """Reset class-level state before each test."""
+    Charm._call = None
+    Charm.called = False
+    yield
+    Charm._call = None
+    Charm.called = False
+
+
+def test_get_relation():
     def pre_event(charm: ops.CharmBase):
         assert charm.model.get_relation('foo')
         assert charm.model.get_relation('bar') is None
@@ -68,7 +70,7 @@ def test_get_relation(mycharm: Any):
             },
         ),
         'start',
-        mycharm,
+        Charm,
         meta={
             'name': 'local',
             'requires': {
@@ -92,7 +94,7 @@ def test_get_relation(mycharm: Any):
 def test_relation_validates_access(is_leader: bool, test_context: str):
     """Test that relation databag read/write access in __init__ is the same as in observers."""
 
-    class Charm(ops.CharmBase):
+    class ValidateCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on['my-act'].action, self._on_action)
@@ -133,7 +135,7 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
             assert 'k' in local_app_data
 
     ctx = Context(
-        Charm,
+        ValidateCharm,
         meta={
             'name': 'charm',
             'requires': {'my-rel': {'interface': 'my-face'}},
@@ -153,7 +155,7 @@ def test_relation_validates_access(is_leader: bool, test_context: str):
 def test_relation_set_single_add_del_change():
     relation_name = 'relation-name'
 
-    class Charm(ops.CharmBase):
+    class SetCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
@@ -167,7 +169,7 @@ def test_relation_set_single_add_del_change():
             data['new-key'] = 'new-val'
 
     ctx = Context(
-        Charm,
+        SetCharm,
         meta={
             'name': 'charm-name',
             'peers': {relation_name: {'interface': 'interface-name'}},
@@ -296,7 +298,7 @@ def test_relation_set_bulk_update(
 ):
     relation_name = 'relation-name'
 
-    class Charm(ops.CharmBase):
+    class BulkCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
@@ -308,7 +310,7 @@ def test_relation_set_bulk_update(
             data.update(new_data)
 
     ctx = Context(
-        Charm,
+        BulkCharm,
         meta={
             'name': 'charm-name',
             'peers': {relation_name: {'interface': 'interface-name'}},
@@ -328,23 +330,22 @@ def test_relation_set_bulk_update(
     'remote_app_name',
     ('remote', 'prometheus', 'aodeok123'),
 )
-def test_relation_events(mycharm: Any, evt_name: str, remote_app_name: str):
+def test_relation_events(evt_name: str, remote_app_name: str):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
-    def callback(charm: ops.CharmBase, e: ops.EventBase):
-        if not isinstance(e, ops.RelationEvent):
+    def callback(event: ops.EventBase):
+        if not isinstance(event, ops.RelationEvent):
             return  # filter out collect status events
 
         if evt_name == 'broken':
-            assert charm.model.get_relation('foo') is None
-            assert e.relation.app.name == remote_app_name
+            assert event.relation.app.name == remote_app_name
         else:
-            rel = charm.model.get_relation('foo')
-            assert rel is not None
+            rel = event.relation
             assert rel.app is not None
             assert rel.app.name == remote_app_name
 
-    mycharm._call = callback
+    Charm._call = callback
+    Charm.called = False
 
     trigger(
         State(
@@ -353,7 +354,7 @@ def test_relation_events(mycharm: Any, evt_name: str, remote_app_name: str):
             },
         ),
         f'relation_{evt_name}',
-        mycharm,
+        Charm,
         meta={
             'name': 'local',
             'requires': {
@@ -382,29 +383,25 @@ def test_relation_events(mycharm: Any, evt_name: str, remote_app_name: str):
     (0, 1),
 )
 def test_relation_events_attrs(
-    mycharm: Any,
-    evt_name: str,
-    has_unit: bool,
-    remote_app_name: str,
-    remote_unit_id: int,
+    evt_name: str, has_unit: bool, remote_app_name: str, remote_unit_id: int
 ):
     relation = Relation(endpoint='foo', interface='foo', remote_app_name=remote_app_name)
 
-    def callback(charm: ops.CharmBase, event: ops.EventBase):
+    def callback(event: ops.EventBase):
         if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, ops.RelationEvent):
-            assert event.app
-            if not isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
-                assert event.unit
-            if isinstance(event, ops.RelationDepartedEvent):
-                assert event.departing_unit
+        assert event.app  # type: ignore
+        if not isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
+            assert event.unit  # type: ignore
+        if isinstance(event, ops.RelationDepartedEvent):
+            assert event.departing_unit
 
-    mycharm._call = callback
+    Charm._call = callback
+    Charm.called = False
 
     ctx = Context(
-        charm_type=mycharm,
+        charm_type=Charm,
         meta={
             'name': 'local',
             'requires': {
@@ -413,7 +410,7 @@ def test_relation_events_attrs(
         },
     )
     state = State(relations={relation})
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     if has_unit:
         kwargs['remote_unit'] = remote_unit_id
     event = getattr(ctx.on, f'relation_{evt_name}')(relation, **kwargs)
@@ -429,7 +426,7 @@ def test_relation_events_attrs(
     ('remote', 'prometheus', 'aodeok123'),
 )
 def test_relation_events_no_attrs(
-    mycharm: Any, evt_name: str, remote_app_name: str, caplog: pytest.LogCaptureFixture
+    evt_name: str, remote_app_name: str, caplog: pytest.LogCaptureFixture
 ):
     relation = Relation(
         endpoint='foo',
@@ -438,20 +435,20 @@ def test_relation_events_no_attrs(
         remote_units_data={0: {}, 1: {}},  # 2 units
     )
 
-    def callback(charm: ops.CharmBase, event: ops.EventBase):
+    def callback(event: ops.EventBase):
         if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, ops.RelationEvent):
-            assert event.app  # that's always present
-            # .unit is always None for created and broken.
-            if isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
-                assert event.unit is None
-            else:
-                assert event.unit
-            assert (evt_name == 'departed') is bool(getattr(event, 'departing_unit', False))
+        assert event.app  # type: ignore  # that's always present
+        # .unit is always None for created and broken.
+        if isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
+            assert event.unit is None  # type: ignore
+        else:
+            assert event.unit  # type: ignore
+        assert (evt_name == 'departed') is bool(getattr(event, 'departing_unit', False))
 
-    mycharm._call = callback
+    Charm._call = callback
+    Charm.called = False
 
     trigger(
         State(
@@ -460,7 +457,7 @@ def test_relation_events_no_attrs(
             },
         ),
         f'relation_{evt_name}',
-        mycharm,
+        Charm,
         meta={
             'name': 'local',
             'requires': {
@@ -491,24 +488,22 @@ def test_relation_default_unit_data_peer():
 
 
 @pytest.mark.parametrize('evt_name', ('broken', 'created'))
-def test_relation_events_no_remote_units(
-    mycharm: Any, evt_name: str, caplog: pytest.LogCaptureFixture
-):
+def test_relation_events_no_remote_units(evt_name: str, caplog: pytest.LogCaptureFixture):
     relation = Relation(
         endpoint='foo',
         interface='foo',
         remote_units_data={},  # no units
     )
 
-    def callback(charm: ops.CharmBase, event: ops.EventBase):
+    def callback(event: ops.EventBase):
         if isinstance(event, ops.CollectStatusEvent):
             return
 
-        if isinstance(event, ops.RelationEvent):
-            assert event.app  # that's always present
-            assert not event.unit
+        assert event.app  # type: ignore  # that's always present
+        assert not event.unit  # type: ignore
 
-    mycharm._call = callback
+    Charm._call = callback
+    Charm.called = False
 
     trigger(
         State(
@@ -517,7 +512,7 @@ def test_relation_events_no_remote_units(
             },
         ),
         f'relation_{evt_name}',
-        mycharm,
+        Charm,
         meta={
             'name': 'local',
             'requires': {
@@ -530,16 +525,16 @@ def test_relation_events_no_remote_units(
         assert 'remote unit ID unset; no remote unit data present' in caplog.text
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore
-def test_relation_unit_data_bad_types(mycharm: Any, data: object):
+@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
+def test_relation_unit_data_bad_types(data: object):
     with pytest.raises(StateValidationError):
-        Relation(endpoint='foo', interface='foo', remote_units_data={0: {'a': cast('Any', data)}})
+        Relation(endpoint='foo', interface='foo', remote_units_data={0: {'a': data}})  # type: ignore
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))  # type: ignore
-def test_relation_app_data_bad_types(mycharm: Any, data: object):
+@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
+def test_relation_app_data_bad_types(data: object):
     with pytest.raises(StateValidationError):
-        Relation(endpoint='foo', interface='foo', local_app_data={'a': cast('Any', data)})
+        Relation(endpoint='foo', interface='foo', local_app_data={'a': data})  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -554,7 +549,7 @@ def test_relation_app_data_bad_types(mycharm: Any, data: object):
         SubordinateRelation('c'),
     ),
 )
-def test_relation_event_trigger(relation: RelationBase, evt_name: str, mycharm: Any):
+def test_relation_event_trigger(relation: RelationBase, evt_name: str):
     meta = {
         'name': 'mycharm',
         'requires': {'a': {'interface': 'i1'}},
@@ -570,12 +565,12 @@ def test_relation_event_trigger(relation: RelationBase, evt_name: str, mycharm: 
     trigger(
         State(relations={relation}),
         f'relation_{evt_name}',
-        mycharm,
+        Charm,
         meta=meta,
     )
 
 
-def test_trigger_sub_relation(mycharm: Any):
+def test_trigger_sub_relation():
     meta = {
         'name': 'mycharm',
         'provides': {
@@ -599,7 +594,7 @@ def test_trigger_sub_relation(mycharm: Any):
     trigger(
         State(relations={sub1, sub2}),
         'update_status',
-        mycharm,
+        Charm,
         meta=meta,
         post_event=post_event,
     )
@@ -619,10 +614,10 @@ def test_relation_ids():
         assert rel.id == initial_id + i
 
 
-def test_broken_relation_not_in_model_relations(mycharm: Any):
+def test_broken_relation_not_in_model_relations():
     rel = Relation('foo')
 
-    ctx = Context(mycharm, meta={'name': 'local', 'requires': {'foo': {'interface': 'foo'}}})
+    ctx = Context(Charm, meta={'name': 'local', 'requires': {'foo': {'interface': 'foo'}}})
     with ctx(ctx.on.relation_broken(rel), state=State(relations={rel})) as mgr:
         charm = mgr.charm
 
@@ -631,11 +626,13 @@ def test_broken_relation_not_in_model_relations(mycharm: Any):
 
 
 def test_get_relation_when_missing():
-    class MyCharm(ops.CharmBase):
+    class MissingCharm(ops.CharmBase):
+        relation: ops.Relation | None
+
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.framework.observe(self.on.update_status, self._on_update_status)
-            self.framework.observe(self.on.config_changed, self._on_config_changed)
+            framework.observe(self.on.update_status, self._on_update_status)
+            framework.observe(self.on.config_changed, self._on_config_changed)
             self.relation = None
 
         def _on_update_status(self, _: ops.EventBase):
@@ -647,7 +644,7 @@ def test_get_relation_when_missing():
             self.relation = self.model.get_relation('foo', relation_id)
 
     ctx = Context(
-        MyCharm,
+        MissingCharm,
         meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
         config={'options': {'relation-id': {'type': 'int', 'description': 'foo'}}},
     )
@@ -674,7 +671,7 @@ def test_get_relation_when_missing():
         assert not rel.active
 
     # If there's no defined relation with the name, then get_relation raises KeyError.
-    ctx = Context(MyCharm, meta={'name': 'foo'})
+    ctx = Context(MissingCharm, meta={'name': 'foo'})
     with pytest.raises((KeyError, UncaughtCharmError)) as exc:
         ctx.run(ctx.on.update_status(), State())
     assert isinstance(exc.value, KeyError) or isinstance(exc.value.__cause__, KeyError)
@@ -683,7 +680,7 @@ def test_get_relation_when_missing():
 @pytest.mark.parametrize('klass', (Relation, PeerRelation, SubordinateRelation))
 def test_relation_positional_arguments(klass: type[RelationBase]):
     with pytest.raises(TypeError):
-        cast('Any', klass)('foo', 'bar', None)
+        klass('foo', 'bar', None)  # type: ignore
 
 
 def test_relation_default_values():
@@ -732,17 +729,19 @@ def test_peer_relation_default_values():
 
 
 def test_relation_remote_model():
-    class MyCharm(ops.CharmBase):
+    class RemoteCharm(ops.CharmBase):
+        remote_model_uuid: str
+
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.framework.observe(self.on.start, self._on_start)
+            framework.observe(self.on.start, self._on_start)
 
         def _on_start(self, event: ops.EventBase):
             relation = self.model.get_relation('foo')
             assert relation is not None
             self.remote_model_uuid = relation.remote_model.uuid
 
-    ctx = Context(MyCharm, meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}})
+    ctx = Context(RemoteCharm, meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}})
     state = State(relations={Relation('foo')})
     with ctx(ctx.on.start(), state) as mgr:
         mgr.run()
@@ -759,7 +758,7 @@ def test_relation_remote_model():
 def test_peer_relation_units_does_not_contain_this_unit():
     relation_name = 'relation-name'
 
-    class Charm(ops.CharmBase):
+    class PeerCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on.update_status, self._update_status)
@@ -772,7 +771,7 @@ def test_peer_relation_units_does_not_contain_this_unit():
             data['this-unit'] = str(self.unit)
 
     ctx = Context(
-        Charm,
+        PeerCharm,
         meta={
             'name': 'charm-name',
             'peers': {relation_name: {'interface': 'interface-name'}},
