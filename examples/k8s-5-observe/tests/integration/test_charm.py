@@ -67,8 +67,8 @@ def test_deploy_cos(cos: jubilant.Juju):
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
-def test_loki_integration(juju: jubilant.Juju, cos: jubilant.Juju):
-    """Integrate our charm with Loki from COS Lite."""
+def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+    """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
     juju.wait(jubilant.all_active)
@@ -87,7 +87,7 @@ def test_loki_data(cos: jubilant.Juju):
     loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
 
     # Wait for logs to be available from Loki, then check for our app.
-    for _ in range(2 * 60):
+    for _ in range(60):
         response = requests.get(loki_api_url)
         if response.status_code == 200:
             response_decoded = response.json()
