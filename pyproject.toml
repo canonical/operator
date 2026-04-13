@@ -49,7 +49,7 @@ mypy = [  # used to type check example charms in CI
 ]
 unit = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
@@ -64,7 +64,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
