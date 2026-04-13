@@ -236,7 +236,7 @@ def test_action_get_returns_copy(mycharm: type[CharmBase]):
     """
     results: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
-    def handle_evt(evt: ActionEvent) -> None:
+    def handle_evt(_: CharmBase, evt: ActionEvent) -> None:
         if not isinstance(evt, ActionEvent):
             return
         backend = evt.framework.model._backend
