@@ -246,7 +246,7 @@ def test_action_get_returns_copy(mycharm: type[CharmBase]):
         second = backend.action_get()
         results.append((first, second))
 
-    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
+    mycharm._evt_handler = handle_evt  # type: ignore
 
     ctx: Context[CharmBase] = Context(
         mycharm,
