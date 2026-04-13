@@ -227,16 +227,16 @@ def test_default_arguments():
     assert action.id == expected_id
 
 
-def test_action_get_returns_copy(mycharm):
+def test_action_get_returns_copy(mycharm: type[CharmBase]):
     """Mutating the dict returned by action_get() must not affect subsequent calls.
 
     ActionEvent.params is populated via the backend's action_get() method.
     Each call to action_get() should return an independent copy so that
     mutations do not leak into the Scenario state.
     """
-    results = []
+    results: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
-    def handle_evt(_: CharmBase, evt):
+    def handle_evt(evt: ActionEvent) -> None:
         if not isinstance(evt, ActionEvent):
             return
         backend = evt.framework.model._backend
@@ -246,9 +246,9 @@ def test_action_get_returns_copy(mycharm):
         second = backend.action_get()
         results.append((first, second))
 
-    mycharm._evt_handler = handle_evt
+    mycharm._evt_handler = handle_evt  # type: ignore[attr-defined]
 
-    ctx = Context(
+    ctx: Context[CharmBase] = Context(
         mycharm,
         meta={'name': 'foo'},
         actions={'foo': {'params': {'bar': {'type': 'number'}}}},

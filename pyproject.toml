@@ -270,18 +270,6 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
-    "testing/tests/test_e2e/test_network.py",
-    "testing/tests/test_e2e/test_cloud_spec.py",
-    "testing/tests/test_e2e/test_play_assertions.py",
-    "testing/tests/test_e2e/test_vroot.py",
-    "testing/tests/test_e2e/test_resource.py",
-    "testing/tests/test_e2e/test_state.py",
-    "testing/tests/test_e2e/test_actions.py",
-    "testing/tests/test_e2e/test_config.py",
-    "testing/tests/test_e2e/test_event.py",
-    "testing/tests/test_e2e/test_deferred.py",
-    "testing/tests/test_e2e/test_stored_state.py",
-    "testing/tests/test_e2e/conftest.py",
 ]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
