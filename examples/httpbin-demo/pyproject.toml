@@ -24,7 +24,7 @@ requires-python = ">=3.10"
 # 'charm-libs' block in charmcraft.yaml, run `charmcraft fetch-libs` to download the libraries,
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
-    "ops>=2.23,<4",  # Version 2.23 introduced the load_config() method.
+    "ops>=3,<4",
 ]
 
 [dependency-groups]
