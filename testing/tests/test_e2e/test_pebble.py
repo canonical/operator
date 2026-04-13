@@ -17,7 +17,7 @@ import ops
 from ops import CharmBase, Framework, pebble
 from ops.log import _get_juju_log_and_app_id
 
-from ..helpers import jsonpatch_delta, trigger  # type: ignore
+from ..helpers import jsonpatch_delta, trigger
 
 if TYPE_CHECKING:
     from ops.pebble import LayerDict, ServiceDict
@@ -520,10 +520,8 @@ def capture_info_failure_charm(monkeypatch: pytest.MonkeyPatch) -> type[CheckFai
     return CheckFailedCharm
 
 
-def test_pebble_check_failed(capture_info_failure_charm: CheckFailedCharm):
-    ctx: Context[CheckFailedCharm] = Context(
-        capture_info_failure_charm, meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
+def test_pebble_check_failed(capture_info_failure_charm: type[CheckFailedCharm]):
+    ctx = Context(capture_info_failure_charm, meta={'name': 'foo', 'containers': {'foo': {}}})
     layer = ops.pebble.Layer({
         'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
     })
@@ -565,7 +563,7 @@ def capture_info_recovered_charm(monkeypatch: pytest.MonkeyPatch) -> type[CheckR
     return CheckRecoveredCharm
 
 
-def test_pebble_check_recovered(capture_info_recovered_charm: CheckRecoveredCharm):
+def test_pebble_check_recovered(capture_info_recovered_charm: type[CheckRecoveredCharm]):
     ctx = Context(capture_info_recovered_charm, meta={'name': 'foo', 'containers': {'foo': {}}})
     layer = ops.pebble.Layer({
         'checks': {'http-check': {'override': 'replace', 'startup': 'enabled', 'threshold': 3}}
@@ -613,9 +611,9 @@ def capture_info_double_charm(monkeypatch: pytest.MonkeyPatch) -> type[DoubleCha
     return DoubleCharm
 
 
-def test_pebble_check_failed_two_containers(capture_info_recovered_charm: DoubleCharm):
+def test_pebble_check_failed_two_containers(capture_info_double_charm: type[DoubleCharm]):
     ctx = Context(
-        capture_info_recovered_charm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}}
+        capture_info_double_charm, meta={'name': 'foo', 'containers': {'foo': {}, 'bar': {}}}
     )
 
     layer = ops.pebble.Layer({

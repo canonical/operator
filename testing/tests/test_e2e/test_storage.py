@@ -74,7 +74,7 @@ def test_storage_add(storage_ctx: Context[MyCharmWithStorage], n: int):
 def test_storage_usage(storage_ctx: Context[MyCharmWithStorage]):
     storage = Storage('foo')
     # setup storage with some content
-    (storage.get_filesystem(storage_ctx) / 'myfile.txt').write_text('helloworld')  # type: ignore
+    (storage.get_filesystem(storage_ctx) / 'myfile.txt').write_text('helloworld')
 
     with storage_ctx(storage_ctx.on.update_status(), State(storages={storage})) as mgr:
         foo = mgr.charm.model.storages['foo'][0]
@@ -87,9 +87,7 @@ def test_storage_usage(storage_ctx: Context[MyCharmWithStorage]):
         myfile.write_text('helloworlds')
 
     # post-mortem: inspect fs contents.
-    assert (
-        storage.get_filesystem(storage_ctx) / 'path.py'  # type: ignore
-    ).read_text() == 'helloworlds'
+    assert (storage.get_filesystem(storage_ctx) / 'path.py').read_text() == 'helloworlds'
 
 
 def test_storage_attached_event(storage_ctx: Context[MyCharmWithStorage]):
