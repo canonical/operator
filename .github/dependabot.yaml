@@ -13,3 +13,45 @@ updates:
     open-pull-requests-limit: 0  # Security updates only
     labels:
       - "dependencies"
+  - package-ecosystem: "uv"
+    directory: "/examples/httpbin-demo"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+  - package-ecosystem: "uv"
+    directory: "/examples/k8s-5-observe"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "ops"
+      - dependency-name: "ruff"
+      - dependency-name: "codespell"
+      - dependency-name: "pyright"
+      - dependency-name: "coverage"
+      - dependency-name: "pytest"
+      - dependency-name: "jubilant"
+      - dependency-name: "PyYAML"
+    labels:
+      - "dependencies"
+  - package-ecosystem: "uv"
+    directory: "/examples/machine-tinyproxy"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "ops"
+      - dependency-name: "ruff"
+      - dependency-name: "codespell"
+      - dependency-name: "pyright"
+      - dependency-name: "coverage"
+      - dependency-name: "pytest"
+      - dependency-name: "jubilant"
+      - dependency-name: "PyYAML"
+    labels:
+      - "dependencies"
