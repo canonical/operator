@@ -1,11 +1,11 @@
 (files-in-containers)=
 # How to manage files in the workload container
 
-The [`Container`](ops.Container) class provides methods to manage files in the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
+The [](ops.Container) class provides methods to manage files in the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
 
 ## Push
 
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
+Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload. For example, a PostgreSQL configuration file:
 
 ```python
 config = """
@@ -15,7 +15,9 @@ max_connections = 1000
 container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
 ```
 
-The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
+This code would be inside one of your charm's event handlers.
+
+`make_dirs=True` tells `push` to create the intermediate directories if they don't exist (`/etc/pg` in this case).
 
 `Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
 
@@ -23,7 +25,7 @@ The `make_dirs=True` flag tells `push` to create the intermediate directories if
 
 To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
 
-The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
+To update a file, use `pull` followed by `push`:
 
 ```python
 import re
