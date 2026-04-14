@@ -17,14 +17,14 @@ wheels = [
 
 [[package]]
 name = "charmlibs-apt"
-version = "1.0.0"
+version = "1.0.0.post0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0c/38/72c357b6ab23ff8f2428afb319fe40c3a32a5a06957bb09f6dcb1f599565/charmlibs_apt-1.0.0.tar.gz", hash = "sha256:1e628ad8e23a142664255b962494eb0c6c7b390de7954049af958f010b8b88b7", size = 30298, upload-time = "2025-08-31T23:25:04.166Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/58/33e87779fdbcf62a3b34e3444d7175c1168b4b2726cc29c98849c09ac086/charmlibs_apt-1.0.0.post0.tar.gz", hash = "sha256:9c2e0b3c1f553ebcaae99c9aad72e15383aec56677a8dd3f6479dc6f084189a6", size = 31942, upload-time = "2025-10-15T02:40:29.521Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e7/06/5802851d3ff7440699e9afebcc47d9ded6968967becafec8c9314b6d0969/charmlibs_apt-1.0.0-py3-none-any.whl", hash = "sha256:5ab3355943c888c1e3aff40ee942c27f91889cae19694bcd55187d3b9a04baa4", size = 19181, upload-time = "2025-08-31T23:25:02.889Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/92/4db19cd8bc94db51a115f7a2e3c46d96b991ca7ebe27207beac9a6570bc6/charmlibs_apt-1.0.0.post0-py3-none-any.whl", hash = "sha256:958e84719eb1feff539f058dc6c7af648c53c88b9ebe7c6157ec8d2bdf5fbfc6", size = 19287, upload-time = "2025-10-15T02:40:27.756Z" },
 ]
 
 [[package]]
@@ -512,7 +512,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "charmlibs-apt", specifier = ">=1,<2" },
+    { name = "charmlibs-apt", specifier = ">=1.0.0.post0,<2" },
     { name = "charmlibs-pathops", specifier = ">=1,<2" },
     { name = "ops", specifier = ">=3,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
