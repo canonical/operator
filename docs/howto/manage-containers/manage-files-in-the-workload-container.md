@@ -17,7 +17,7 @@ container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
 
 The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
 
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](ops.Container.push) for details.
+`Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
 
 ## Pull
 
