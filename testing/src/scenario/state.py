@@ -127,19 +127,6 @@ _SECRET_EVENTS = {
 }
 
 
-def _deepcopy_mutable_fields(obj: object):
-    # We don't have a frozendict to freeze any dictionaries, and while we
-    # could freeze a list into a tuple, we would break tests that currently
-    # assert that they get a list, so we can't do that until 8.0. That means
-    # we can't actually freeze the content here, but we can at least
-    # disassociate it from the original object.
-    for attr, value in obj.__dict__.items():
-        if isinstance(value, (dict, list)):
-            # We expect that the obj is a frozen dataclass, so have to use
-            # object.__setattr__ to bypass the frozen check.
-            object.__setattr__(obj, attr, copy.deepcopy(value))
-
-
 # A lot of JujuLogLine objects are created, so we want them to be fast and light.
 # Dataclasses define __slots__, so are small, and a namedtuple is actually
 # slower to create than a dataclass. A plain dictionary (or TypedDict) would be
@@ -343,22 +330,23 @@ class Secret:
         self._validate_content(tracked_content, 'tracked_content')
         if latest_content is not None:
             self._validate_content(latest_content, 'latest_content')
-        object.__setattr__(self, 'tracked_content', tracked_content)
+        object.__setattr__(self, 'tracked_content', dict(tracked_content))
         object.__setattr__(
             self,
             'latest_content',
-            latest_content if latest_content is not None else tracked_content,
+            dict(latest_content) if latest_content is not None else dict(tracked_content),
         )
         object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
         object.__setattr__(self, 'owner', owner)
-        object.__setattr__(self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()})
+        object.__setattr__(
+            self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()}
+        )
         object.__setattr__(self, 'label', label)
         object.__setattr__(self, 'description', description)
         object.__setattr__(self, 'expire', expire)
         object.__setattr__(self, 'rotate', rotate)
         object.__setattr__(self, '_tracked_revision', 1)
         object.__setattr__(self, '_latest_revision', 1)
-        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -462,7 +450,8 @@ class BindAddress:
     """The MAC address of the interface."""
 
     def __post_init__(self):
-        _deepcopy_mutable_fields(self)
+        # Stored as list for backwards compatibility.
+        object.__setattr__(self, 'addresses', list(self.addresses))
 
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook command would."""
@@ -509,29 +498,15 @@ class Network:
     def __init__(
         self,
         binding_name: str,
-        bind_addresses: Iterable[BindAddress] | None = None,
+        bind_addresses: Iterable[BindAddress] = (BindAddress([Address('192.0.2.0')]),),
         *,
-        ingress_addresses: Iterable[str] | None = None,
-        egress_subnets: Iterable[str] | None = None,
+        ingress_addresses: Iterable[str] = ('192.0.2.0',),
+        egress_subnets: Iterable[str] = ('192.0.2.0/24',),
     ):
         object.__setattr__(self, 'binding_name', binding_name)
-        object.__setattr__(
-            self,
-            'bind_addresses',
-            list(bind_addresses)
-            if bind_addresses is not None
-            else [BindAddress([Address('192.0.2.0')])],
-        )
-        object.__setattr__(
-            self,
-            'ingress_addresses',
-            list(ingress_addresses) if ingress_addresses is not None else ['192.0.2.0'],
-        )
-        object.__setattr__(
-            self,
-            'egress_subnets',
-            list(egress_subnets) if egress_subnets is not None else ['192.0.2.0/24'],
-        )
+        object.__setattr__(self, 'bind_addresses', list(bind_addresses))
+        object.__setattr__(self, 'ingress_addresses', list(ingress_addresses))
+        object.__setattr__(self, 'egress_subnets', list(egress_subnets))
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
@@ -631,7 +606,10 @@ class RelationBase:
         for databag in self._databags:
             self._validate_databag(databag)
 
-        _deepcopy_mutable_fields(self)
+        # Deepcopy mutable fields to disassociate from the caller's objects.
+        for attr, value in self.__dict__.items():
+            if isinstance(value, (dict, list)):
+                object.__setattr__(self, attr, copy.deepcopy(value))
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -888,6 +866,7 @@ class Exec:
         stderr: str = '',
         _change_id: int | None = None,
     ):
+        # Stored as tuple (rather than list) for hashability.
         object.__setattr__(self, 'command_prefix', tuple(command_prefix))
         object.__setattr__(self, 'return_code', return_code)
         object.__setattr__(self, 'stdout', stdout)
@@ -1209,14 +1188,14 @@ class Container:
     ):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'can_connect', can_connect)
-        object.__setattr__(self, '_base_plan', dict(_base_plan))
-        object.__setattr__(self, 'layers', dict(layers))
+        object.__setattr__(self, '_base_plan', copy.deepcopy(dict(_base_plan)))
+        object.__setattr__(self, 'layers', copy.deepcopy(dict(layers)))
         object.__setattr__(self, 'service_statuses', dict(service_statuses))
         object.__setattr__(self, 'mounts', dict(mounts))
         object.__setattr__(self, 'execs', frozenset(execs))
+        # Stored as list for backwards compatibility.
         object.__setattr__(self, 'notices', list(notices))
         object.__setattr__(self, 'check_infos', frozenset(check_infos))
-        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -1516,9 +1495,8 @@ class StoredState:
     ):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'owner_path', owner_path)
-        object.__setattr__(self, 'content', dict(content))
+        object.__setattr__(self, 'content', copy.deepcopy(content))
         object.__setattr__(self, '_data_type_name', _data_type_name)
-        _deepcopy_mutable_fields(self)
 
     @property
     def _handle_path(self):

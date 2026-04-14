@@ -477,46 +477,46 @@ def test_immutable_content_dict_of_dicts(
 
 
 @pytest.mark.parametrize(
-    'component,attribute,expected_type,input_value,required_args',
+    'component,required_args,attribute,input_value,expected_type',
     [
         # Mapping -> dict
-        (CloudCredential, 'attributes', dict, {'a': 'b'}, {'auth_type': 'foo'}),
-        (Secret, 'remote_grants', dict, {1: {'app'}}, {'tracked_content': {'k': 'v'}}),
-        (Notice, 'last_data', dict, {'k': 'v'}, {'key': 'foo'}),
-        (Container, 'layers', dict, {}, {'name': 'foo'}),
-        (Container, 'service_statuses', dict, {}, {'name': 'foo'}),
-        (Container, 'mounts', dict, {}, {'name': 'foo'}),
-        (StoredState, 'content', dict, {'k': 'v'}, {}),
+        (CloudCredential, {'auth_type': 'foo'}, 'attributes', {'a': 'b'}, dict),
+        (Secret, {'tracked_content': {'k': 'v'}}, 'remote_grants', {1: {'app'}}, dict),
+        (Notice, {'key': 'foo'}, 'last_data', {'k': 'v'}, dict),
+        (Container, {'name': 'foo'}, 'layers', {}, dict),
+        (Container, {'name': 'foo'}, 'service_statuses', {}, dict),
+        (Container, {'name': 'foo'}, 'mounts', {}, dict),
+        (StoredState, {}, 'content', {'k': 'v'}, dict),
         # Iterable -> list
-        (CloudCredential, 'redacted', list, ('a', 'b'), {'auth_type': 'foo'}),
-        (CloudSpec, 'ca_certificates', list, ('a', 'b'), {'type': 'foo'}),
+        (CloudCredential, {'auth_type': 'foo'}, 'redacted', ('a', 'b'), list),
+        (CloudSpec, {'type': 'foo'}, 'ca_certificates', ('a', 'b'), list),
         (
             Network,
-            'bind_addresses',
-            list,
-            iter([BindAddress([Address('192.0.2.0')])]),
             {'binding_name': 'foo'},
+            'bind_addresses',
+            iter([BindAddress([Address('192.0.2.0')])]),
+            list,
         ),
-        (Network, 'ingress_addresses', list, ('1.2.3.4',), {'binding_name': 'foo'}),
-        (Network, 'egress_subnets', list, ('1.2.3.0/24',), {'binding_name': 'foo'}),
-        (Container, 'notices', list, (Notice(key='foo'),), {'name': 'foo'}),
-        (State, 'deferred', list, (), {}),
+        (Network, {'binding_name': 'foo'}, 'ingress_addresses', ('1.2.3.4',), list),
+        (Network, {'binding_name': 'foo'}, 'egress_subnets', ('1.2.3.0/24',), list),
+        (Container, {'name': 'foo'}, 'notices', (Notice(key='foo'),), list),
+        (State, {}, 'deferred', (), list),
         # Iterable -> frozenset
-        (Container, 'execs', frozenset, (), {'name': 'foo'}),
-        (Container, 'check_infos', frozenset, (), {'name': 'foo'}),
-        (State, 'relations', frozenset, (Relation(endpoint='foo'),), {}),
-        (State, 'networks', frozenset, (Network(binding_name='foo'),), {}),
-        (State, 'containers', frozenset, (Container(name='foo'),), {}),
-        (State, 'secrets', frozenset, (Secret(tracked_content={'k': 'v'}),), {}),
-        (State, 'stored_states', frozenset, (), {}),
+        (Container, {'name': 'foo'}, 'execs', (), frozenset),
+        (Container, {'name': 'foo'}, 'check_infos', (), frozenset),
+        (State, {}, 'relations', (Relation(endpoint='foo'),), frozenset),
+        (State, {}, 'networks', (Network(binding_name='foo'),), frozenset),
+        (State, {}, 'containers', (Container(name='foo'),), frozenset),
+        (State, {}, 'secrets', (Secret(tracked_content={'k': 'v'}),), frozenset),
+        (State, {}, 'stored_states', (), frozenset),
     ],
 )
 def test_init_converts_to_concrete_type(
     component: type[object],
-    attribute: str,
-    expected_type: type,
-    input_value: Any,
     required_args: dict[str, Any],
+    attribute: str,
+    input_value: Any,
+    expected_type: type,
 ):
     """Verify that __init__ converts broader input types to concrete attribute types."""
     obj = component(**required_args, **{attribute: input_value})
