@@ -37,6 +37,7 @@ updates:
       - dependency-name: "pyright"
       - dependency-name: "coverage"
       - dependency-name: "pytest"
+      - dependency-name: "pytest-jubilant"
       - dependency-name: "jubilant"
       - dependency-name: "PyYAML"
     labels:
@@ -54,7 +55,7 @@ updates:
       - dependency-name: "pyright"
       - dependency-name: "coverage"
       - dependency-name: "pytest"
+      - dependency-name: "pytest-jubilant"
       - dependency-name: "jubilant"
-      - dependency-name: "PyYAML"
     labels:
       - "dependencies"
