@@ -147,64 +147,63 @@ nicely wrapping data and passing it to the charm via the container.
 
 ### Check files written in the container
 
-`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
+`container.push` works similarly to `container.pull`. For example, suppose a charm pushes a config file when Pebble is ready:
+
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, _):
+        foo = self.unit.get_container('foo')
+        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
+```
+
+One way to verify this is to mount the path as a temporary file and check the file's content after the event runs:
 
 ```python
 import tempfile
 
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+from charm import MyCharm
 
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
 
-def test_pebble_push():
+def test_pebble_push_with_mount():
+    """Test that on pebble-ready, config is written to the mounted path."""
     with tempfile.NamedTemporaryFile() as local_file:
+        # Arrange:
+        ctx = testing.Context(MyCharm)
         container = testing.Container(
             name='foo',
             can_connect=True,
-            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)}
+            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)},
         )
         state_in = testing.State(containers={container})
-        ctx = testing.Context(
-            MyCharm,
-            meta={'name': 'foo', 'containers': {'foo': {}}}
-        )
-        ctx.run(
-            ctx.on.pebble_ready(container),
-            state_in,
-        )
+
+        # Act:
+        ctx.run(ctx.on.pebble_ready(container), state_in)
+
+        # Assert:
         assert local_file.read().decode() == 'TEST'
 ```
 
-If the charm writes files to a container (to a location you didn't mount as a temporary folder you
-have access to), you will be able to inspect them using `get_filesystem`.
+Another option is to use `get_filesystem` to inspect the simulated container filesystem directly, without needing to set up a mount:
 
 ```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
+from charm import MyCharm
 
 
-def test_pebble_push():
+def test_pebble_push_with_get_filesystem():
+    """Test that on pebble-ready, config is written to the container filesystem."""
+    # Arrange:
+    ctx = testing.Context(MyCharm)
     container = testing.Container(name='foo', can_connect=True)
     state_in = testing.State(containers={container})
-    ctx = testing.Context(
-        MyCharm,
-        meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
 
+    # Act:
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
-    # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
+    # Assert:
     container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
     cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
     assert cfg_file.read_text() == 'TEST'
