@@ -103,7 +103,7 @@ container.remove_path('/tmp/mysubdir', recursive=True)
 
 ## Check file and directory existence
 
-To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to Python's `os.path.exists` and `os.path.isdir` functions.  For example:
+To check if a path exists, use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories. These functions are analogous to Python's `os.path.exists` and `os.path.isdir` functions. For example:
 
 ```python
 # if /tmp/myfile exists
