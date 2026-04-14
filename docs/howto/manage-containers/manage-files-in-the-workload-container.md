@@ -26,10 +26,12 @@ To read a file from the workload, use [`Container.pull`](ops.Container.pull), wh
 The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
 
 ```python
-# Add port if not already configured, then restart service
+import re
+
+# Update the port number and restart the service
 config = container.pull('/etc/pg/postgresql.conf').read()
-if 'port =' not in config:
-    config += '\nport = 8888\n'
+new_port = self.config['port']
+config = re.sub(r'port = \d+', f'port = {new_port}', config)
 container.push('/etc/pg/postgresql.conf', config)
 container.restart('postgresql')
 ```
