@@ -26,7 +26,7 @@ To read a file from the workload, use [`Container.pull`](ops.Container.pull), wh
 The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
 
 ```python
-# Update port to 8888 and restart service
+# Add port if not already configured, then restart service
 config = container.pull('/etc/pg/postgresql.conf').read()
 if 'port =' not in config:
     config += '\nport = 8888\n'
@@ -38,7 +38,7 @@ If you specify the keyword argument `encoding=None` on the `pull()` call, reads 
 
 ## Push recursive
 
-To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -52,7 +52,7 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## Pull recursive
 
-To copy several files to the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files from the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -101,7 +101,7 @@ container.remove_path('/tmp/mysubdir', recursive=True)
 
 ## Check file and directory existence
 
-To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
+To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to Python's `os.path.exists` and `os.path.isdir` functions.  For example:
 
 ```python
 # if /tmp/myfile exists
@@ -200,7 +200,7 @@ def test_pebble_push():
         meta={'name': 'foo', 'containers': {'foo': {}}}
     )
 
-    state_out = ctx.run(ctx.on.start(), state_in)
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
     # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
     container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
