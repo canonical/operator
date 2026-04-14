@@ -1,7 +1,7 @@
 (files-in-containers)=
 # How to manage files in the workload container
 
-Pebble's files API allows charm authors to read and write files on the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
+The [`Container`](ops.Container) class provides methods to manage files in the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
 
 ## Push
 
