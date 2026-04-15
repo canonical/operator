@@ -76,6 +76,10 @@ release = [
     "pygithub~=2.6",
     "rich~=14.1",
 ]
+tiobe = [
+    "flake8==7.3.0",
+    "pylint==4.0.5",
+]
 
 [project.urls]
 "Homepage" = "https://documentation.ubuntu.com/ops/latest/"
