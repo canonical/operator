@@ -68,8 +68,8 @@ JUJU_TYPES: Final[Mapping[type, str]] = {
 }
 
 # We currently only handle the basic types that we expect to see in real charms.
-# Arrays, objects, and dicts (lists, tuples, and dicts) are handled without
-# using this mapping.
+# JSON arrays and objects (lists/tuples and dicts) are handled without using
+# this mapping.
 JSON_TYPES: Final[Mapping[type, str]] = {
     bool: 'boolean',
     int: 'integer',

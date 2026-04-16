@@ -81,6 +81,34 @@ def test_extractor_assign_without_annotation():
     assert docs == {'bar': 'This is bar.'}
 
 
+def test_extractor_class_docstring_not_attributed():
+    # The class's own docstring must not be attached to the first attribute.
+    docs = _extract("""\
+        class Foo:
+            '''Class docstring.'''
+            bar: str = "bar"
+            '''This is bar.'''
+    """)
+    assert docs == {'bar': 'This is bar.'}
+
+
+def test_extractor_method_between_attributes():
+    # An interleaved method must not interfere with subsequent attribute
+    # docstrings.
+    docs = _extract("""\
+        class Foo:
+            bar: str = "bar"
+            '''This is bar.'''
+
+            def method(self):
+                return self.bar
+
+            baz: int = 42
+            '''This is baz.'''
+    """)
+    assert docs == {'bar': 'This is bar.', 'baz': 'This is baz.'}
+
+
 # -- get_attr_docstrings tests --
 
 
