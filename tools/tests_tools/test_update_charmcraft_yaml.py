@@ -242,13 +242,11 @@ def test_yaml_output_verbatim_config():
 
     schema = ops_tools.config_to_juju_schema(VerbatimConfig)
     output = yaml.safe_dump(schema, indent=2)
-    # Note: ops.Secret | None currently resolves to 'string' because
-    # _attr_to_yaml_type doesn't filter NoneType from union types.
     expected = textwrap.dedent("""\
         options:
           my-secret:
             description: A user secret.
-            type: string
+            type: secret
           my-str:
             default: foo
             description: A string value.
@@ -272,7 +270,7 @@ def test_readme_config_example():
             options:
                 my-secret:
                     description: A user secret.
-                    type: string
+                    type: secret
                 my-str:
                     default: foo
                     description: A string value.

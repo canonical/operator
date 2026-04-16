@@ -125,7 +125,8 @@ def _attr_to_yaml_type(cls: type[object], name: str, yaml_types: dict[type, str]
     if origin in (list, tuple):
         return fallback
 
-    hints = set(get_args(raw_hint)) if origin else {raw_hint}
+    # Strip NoneType so `T | None` (Optional[T]) is treated the same as `T`.
+    hints = {arg for arg in get_args(raw_hint) if arg is not type(None)} if origin else {raw_hint}
     # If there are multiple types -- for example, the type annotation is
     # `int | str` -- then we can't determine the type.
     # Likewise if there are no hints somehow (generic used without args?).
@@ -357,6 +358,25 @@ def config_to_juju_schema(cls: type[object]) -> dict[str, dict[str, OptionDict]]
     return {'options': options}
 
 
+def _resolve_refs(value: Mapping[str, Any], defs: Mapping[str, Any]) -> dict[str, Any]:
+    """Inline any ``$ref`` entries in a Pydantic-generated JSON schema.
+
+    Pydantic 2 emits referenced schemas (for example, for ``Enum`` types) under
+    ``$defs`` and points to them with ``$ref``. Juju's action schema expects
+    the definition to be inlined, so we merge the referenced schema into the
+    property and drop the ``$ref`` / ``title`` noise.
+    """
+    if '$ref' in value:
+        ref = value['$ref']
+        if not ref.startswith('#/$defs/'):
+            return dict(value)
+        target = defs[ref[len('#/$defs/') :]]
+        merged = {**target, **{k: v for k, v in value.items() if k != '$ref'}}
+        merged.pop('title', None)
+        return merged
+    return dict(value)
+
+
 def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     """Translate the class to a dictionary suitable for ``charmcraft.yaml``.
 
@@ -382,10 +402,12 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
           description: Backup the database.
           params:
             compression:
-              type: string
               default: gzip
               description: The type of compression to use.
-              enum: [gzip, bzip2]
+              enum:
+              - gzip
+              - bzip2
+              type: string
             filename:
               description: The name of the backup file.
               title: Filename
@@ -409,13 +431,17 @@ def action_to_juju_schema(cls: type[object]) -> dict[str, Any]:
     action = {}
     if cls.__doc__:
         action['description'] = cls.__doc__
-    # Pydantic classes provide this, so we can just get it directly.
-    # The type: ignores are to avoid importing pydantic.
-    if hasattr(cls, 'schema'):
-        schema = cls.schema()  # type: ignore
-        params = {key.replace('_', '-'): value for key, value in schema['properties'].items()}  # type: ignore
-        required_params = [key.replace('_', '-') for key in schema['required']]  # type: ignore
-        required_params.sort()  # type: ignore
+    # Pydantic BaseModel classes provide `model_json_schema`, so we can just
+    # get the schema directly. The type: ignores are to avoid importing
+    # pydantic here.
+    if hasattr(cls, 'model_json_schema'):
+        schema = cls.model_json_schema()  # type: ignore
+        defs = schema.get('$defs', {})  # type: ignore
+        params = {  # type: ignore
+            key.replace('_', '-'): _resolve_refs(value, defs)  # type: ignore
+            for key, value in schema['properties'].items()  # type: ignore
+        }
+        required_params = sorted(key.replace('_', '-') for key in schema.get('required', ()))  # type: ignore
     else:
         params, required_params = to_json_schema(cls)
     if params:
