@@ -18,6 +18,9 @@ uv tool install tox --with tox-uv
 uv tool update-shell
 ```
 
+Optionally, to run checks automatically before each commit, install
+[pre-commit](https://pre-commit.com/#install) and run `pre-commit install`.
+
 You can validate that you have a working installation by running:
 
 ```sh

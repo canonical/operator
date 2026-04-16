@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.6.0.dev0",
+    "ops-scenario==8.8.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.6.0.dev0",
+    "ops-tracing==3.8.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -39,23 +39,19 @@ harness = []
 lint = [
     "ruff==0.11.2",
     "codespell==2.4.1",
+    "zizmor==1.11.0",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
 ]
-docs = [
-    "ops[testing,tracing]",
-    "ops-tools",
-    "canonical-sphinx[full]",
-    "packaging",
-    "sphinxcontrib-svg2pdfconverter[CairoSVG]",
-    "sphinx-last-updated-by-git",
-    "sphinx-sitemap~=2.8",
+mypy = [  # used to type check example charms in CI
+    "mypy>=1.19",
+    "types-PyYAML",
 ]
 unit = [
     "ops[testing,tracing]",
     "ops-tools",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
@@ -70,7 +66,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
@@ -80,6 +76,10 @@ release = [
     "packaging~=24.0",
     "pygithub~=2.6",
     "rich~=14.1",
+]
+tiobe = [
+    "flake8==7.3.0",
+    "pylint==4.0.5",
 ]
 
 [project.urls]
@@ -105,7 +105,7 @@ ops-tracing = { workspace = true }
 ops-tools = { workspace = true }
 
 [tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.lib"]
+include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ops.version.version"}
@@ -242,12 +242,21 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 ]
+"testing/src/scenario/_charmcraft_extensions.py" = [
+    "E501",  # Auto-generated file; long description strings are unavoidable.
+]
+".github/generate_charmcraft_extensions.py" = [
+    "S607",  # Intentionally calls charmcraft/tox by name.
+]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
 ]
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
+    "S607",  # Starting a process with a partial executable path
+]
+".github/patch-charm-deps.py" = [
     "S607",  # Starting a process with a partial executable path
 ]
 "docs/custom_conf.py" = [
@@ -269,8 +278,32 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "tools/src/*.py", "tools/tests_tools/*.py"]
-exclude = ["tracing/*"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py", "tools/src/*.py", "tools/tests_tools/*.py"]
+exclude = [
+    "tracing/*",
+    "testing/tests/test_e2e/test_network.py",
+    "testing/tests/test_e2e/test_cloud_spec.py",
+    "testing/tests/test_e2e/test_play_assertions.py",
+    "testing/tests/test_e2e/test_vroot.py",
+    "testing/tests/test_e2e/test_resource.py",
+    "testing/tests/test_e2e/test_state.py",
+    "testing/tests/test_e2e/test_actions.py",
+    "testing/tests/test_e2e/test_config.py",
+    "testing/tests/test_e2e/test_event.py",
+    "testing/tests/test_e2e/test_deferred.py",
+    "testing/tests/test_e2e/test_stored_state.py",
+    "testing/tests/test_e2e/conftest.py",
+    "testing/tests/test_e2e/test_secrets.py",
+    "testing/tests/test_e2e/test_relations.py",
+    "testing/tests/test_e2e/test_trace_data.py",
+    "testing/tests/test_e2e/test_juju_log.py",
+    "testing/tests/test_e2e/test_status.py",
+    "testing/tests/test_e2e/test_storage.py",
+    "testing/tests/test_e2e/test_manager.py",
+    "testing/tests/test_e2e/test_ports.py",
+    "testing/tests/test_e2e/test_rubbish_events.py",
+    "testing/tests/test_e2e/test_pebble.py",
+]
 extraPaths = ["testing", "tracing", "tools"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
@@ -286,5 +319,5 @@ disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]
-skip = './docs/_build,.venv,venv,build,examples'
+skip = './docs/_build,.venv,venv,build,examples,uv.lock'
 quiet-level = 3

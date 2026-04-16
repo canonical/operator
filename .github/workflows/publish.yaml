@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41  # v7.2.1
+      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
         with:
           enable-cache: false
       - run: uv build --all
@@ -28,7 +28,7 @@ jobs:
         run: |
           set -xueo pipefail
           uvx --with "$(echo -n dist/ops-*.whl)[testing,tracing]" --with dist/ops_scenario-*.whl --with dist/ops_tracing-*.whl python -c 'import ops, scenario, ops_tracing; print("OK")'
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'dist/*'
       - uses: pypa/gh-action-pypi-publish@release/v1

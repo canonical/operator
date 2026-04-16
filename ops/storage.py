@@ -192,7 +192,7 @@ class SQLiteStorage:
 
         Args:
             event_path: If supplied, will only yield events that match event_path. If not
-                supplied (or None/'') will return all events.
+                supplied (or ``None``/``''``) will return all events.
 
         Returns:
             Iterable of (event_path, observer_path, method_name) tuples
@@ -294,7 +294,7 @@ class JujuStorage:
 
         Args:
             event_path: If supplied, will only yield events that match event_path. If not
-                supplied (or None/'') will return all events.
+                supplied (or ``None``/``''``) will return all events.
 
         Returns:
             Iterable of (event_path, observer_path, method_name) tuples

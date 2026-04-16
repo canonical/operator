@@ -1,3 +1,88 @@
+# 3.7.0 - 30 March 2026
+
+## Features
+
+* Enable interactive debugging via `breakpoint` in testing (#2363)
+* ops.testing autoload support for charmcraft extensions (#2367)
+* Allow testing.State.get_relation to accept relation objects (#2359)
+* Support charmcraft.yaml format as meta for testing.Context (#2296)
+
+## Fixes
+
+* Correct type annotation for StorageMeta.properties (#2348)
+* Move the testing.Container compatibility import so that mypy style checkers understand it (#2343)
+* Hold only copies of user provided meta/config/actions in testing.Context (#2349)
+* Deep-copy layer objects during testing.State plan rendering (#2380)
+* Return copies from testing.State secret_get and action_get (#2379)
+* Use timezone-aware datetimes in expiry calculation (#2378)
+* Warn before clearing non-empty container in testing (#2365)
+
+## Documentation
+
+* Replace links to juju.is by canonical.com/juju (#2368)
+* Refactor homepage to better put Ops in context (#2370)
+* Add pytest-operator migration guide from Jubilant docs (#2381)
+* Add a tip about AI help in the Jubilant migration guide (#2382)
+* Mention jhack scenario snapshot (#2351)
+* Update integration testing how-to guide (#2390)
+* Explain K8s charms briefly at the start of the tutorial (#2392)
+* Juju secrets identifier is now an opaque string (#2387)
+
+## Tests
+
+* Extend the type checking of the ops-scenario tests (#2230)
+
+## CI
+
+* Run ruff check --fix in tox -e format (#2369)
+* Check example charms with mypy in CI (#2360)
+* Update the list of published charms in the compatibility tests (#2384)
+* Adjust minimum Python version in broad charm compatibility tests (#2317)
+
+# 3.6.0 - 26 February 2026
+
+## Features
+
+* Bump default Juju version in `ops.testing.Context` to 3.6.14 (#2316)
+
+## Fixes
+
+* Correct the `Model.get_binding()` return type (#2329)
+* Only show executable in `ExecError.__str__`, not full command line (#2336)
+* Support Pydantic `MISSING` sentinel in `ops.Relation.save` (#2306)
+
+## Documentation
+
+* Add how-to subcategory for managing containers (#2309)
+* Remove 2.19 version in docs, tweak ops.testing title (#2332)
+* Use "true" and "false" consistently in the reference documentation (#2330)
+* Add CLI args as another place to not put sensitive data (#2334)
+* Fix remote unit kwarg in testing example (#2342)
+* Clarify that secret labels are not names (#2337)
+
+## Tests
+
+* Set `SCENARIO_BARE_CHARM_ERRORS=true` in Ops tests that care (#2314)
+
+## CI
+
+* Fix releasing on branches with no `versions.md` doc (#2323)
+
+# 3.5.2 - 11 February 2026
+
+## Fixes
+
+* Make testing.CheckInfo level arg type match pebble.CheckInfo.level (#2274)
+* Make testing consistency check aware that `credential-get` is available on k8s in newer Juju (#2307)
+* Drop unused `setuptools_scm` build dependency (#2310)
+
+## Documentation
+
+* Update Pebble version in Juju 3.6 (#2295)
+* Refresh K8s tutorial to use Concierge and uv-based Charmcraft profile (#2285)
+* Add missing "How to" in page titles (#2289)
+* Fix and improve observability part of K8s tutorial (#2305)
+
 # 3.5.1 - 28 January 2026
 
 ## Fixes

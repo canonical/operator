@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ops-tools"
 
-version = "1.2.0.dev0"
+version = "1.8.0.dev0"
 
 authors = [
     { name = "The Charm Tech team at Canonical Ltd." }
@@ -18,7 +18,7 @@ license.text = "Apache-2.0"
 keywords = ["juju", "ops", "charms"]
 
 dependencies = [
-    "ops==3.2.0.dev0",
+    "ops==3.8.0.dev0",
     "PyYAML>=6.0.1",
     "typing_extensions~=4.2",
 ]

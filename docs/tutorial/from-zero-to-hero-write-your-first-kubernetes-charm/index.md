@@ -3,6 +3,9 @@
 
 This tutorial will guide you through the steps of writing a Kubernetes charm for an application.
 
+Kubernetes charms manage their workload application from a separate 'sidecar' container, with Juju and Ops providing functionality to help with this.
+This contrasts with machine charms, which run in the same machine as their workload.
+
 By the end of the tutorial, you'll have equipped the application with operational logic and used Juju to deploy the application to a local Kubernetes cluster.
 You'll also have learned how to implement typical functionality of a charm, including configuration, relations, and actions.
 

@@ -11,18 +11,12 @@ First of all, install the Ops testing framework. To do this in a virtual environ
 pip install ops[testing]
 ```
 
-When we want to run repeatable unit tests, we'll normally pin `ops[testing]` to the latest minor version in the dependency group for our unit tests. For example, in a `test-requirements.txt` file:
-
-```text
-ops[testing] ~= 2.19
-```
-
-Or in `pyproject.toml`:
+Or using `pyproject.toml`:
 
 ```toml
 [dependency-groups]
 test = [
-  "ops[testing] ~= 2.19",
+  "ops[testing]",
 ]
 ```
 
@@ -127,6 +121,25 @@ def test_peer_changed():
 ```
 
 > See more: [](ops.testing.State.from_context)
+
+```{note}
+If your `charmcraft.yaml` uses a charmcraft extension (e.g.
+`extensions: [flask-framework]`), the metadata, config, and actions that
+the extension adds are automatically merged in when the testing framework
+loads the charm spec. You do not need to manually specify them.
+
+If your `charmcraft.yaml` defines keys that overlap with what the extension
+provides (e.g. a config option with the same name), the testing framework
+will raise a `ValueError`, matching the behaviour of `charmcraft pack`.
+Rename or remove the overlapping keys to fix this.
+```
+
+## Generate tests from a deployed model
+
+If your test needs realistic relation inputs from a deployed model, you can use `jhack scenario snapshot` to capture state, then adapt the generated data to `ops.testing` code.
+
+For a workflow focused on relation debugging, see
+[](#generate-tests-from-a-deployed-model).
 
 ## Mock beyond the State
 

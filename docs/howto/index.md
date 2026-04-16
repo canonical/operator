@@ -43,15 +43,16 @@ Integration tests check that your charm works correctly when deployed to a real 
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 ```
 
-Ops enables your charm to output logs to the Juju logs.
+Juju provides a variety of debugging tools, which Ops integrates with.
 
 ```{toctree}
 :maxdepth: 1
 
 Log from your charm <log-from-your-charm>
+Debug your charm <debug-your-charm>
 ```
 
-## Running workloads
+## Managing machine workloads
 
 Your charm is responsible for interacting with a workload.
 
@@ -59,13 +60,34 @@ Your charm is responsible for interacting with a workload.
 :maxdepth: 1
 
 Run workloads with a machine charm <run-workloads-with-a-charm-machines>
-Run workloads with a Kubernetes charm <run-workloads-with-a-charm-kubernetes>
 ```
 
-Kubernetes charms use Pebble to manage containers. Your charm can configure Pebble so that you can access metrics for services and health checks.
+## Managing containers
 
-- {doc}`Manage metrics <manage-metrics>`
+```{toctree}
+:hidden:
 
+Manage containers <manage-containers/index>
+```
+
+In a Kubernetes charm, your charm manages the workload by defining the {external+pebble:doc}`Pebble <index>` service configuration. Your charm can also use Pebble to run commands and read and write files in the workload container.
+
+- {doc}`Manage the workload container <manage-containers/manage-the-workload-container>`
+- {doc}`Manage files in the workload container <manage-containers/manage-files-in-the-workload-container>`
+
+Pebble can regularly check that the workload is healthy and report back to your charm.
+
+- {doc}`Manage Pebble health checks <manage-containers/manage-pebble-health-checks>`
+
+Custom notices enable the workload to tell your charm that something has happened.
+
+- {doc}`Manage Pebble custom notices <manage-containers/manage-pebble-custom-notices>`
+
+Your charm can configure Pebble so that you can access metrics for services and health checks.
+
+- {doc}`Manage Pebble metrics <manage-containers/manage-pebble-metrics>`
+
+(how-to-guides-managing-features)=
 ## Managing features
 
 Ops features broadly map to Juju features.
@@ -88,14 +110,6 @@ Manage the charm version <manage-the-charm-version>
 Manage the workload version <manage-the-workload-version>
 ```
 
-% TOC only. Nothing shown on the page.
-
-```{toctree}
-:hidden:
-
-Manage metrics <manage-metrics>
-```
-
 ## Tracing
 
 Ops enables you to trace your charm code and send data to sources such as the [Canonical Observability Stack](https://documentation.ubuntu.com/observability/).
@@ -114,18 +128,22 @@ Trace your charm <trace-your-charm>
 Make your charm discoverable <make-your-charm-discoverable>
 ```
 
-## Legacy guides
+## Migration guides
 
 ```{toctree}
 :hidden:
 
-Legacy how-to guides <legacy/index>
+Migration guides <migrate/index>
 ```
 
 Harness is a deprecated framework for writing unit tests. You should migrate to state-transition tests.
 
-- {doc}`Migrate unit tests from Harness <legacy/migrate-unit-tests-from-harness>`
+- {doc}`Migrate unit tests from Harness <migrate/migrate-unit-tests-from-harness>`
+
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+
+- {doc}`Migrate integration tests from pytest-operator <migrate/migrate-integration-tests-from-pytest-operator>`
 
 Hooks-based charms use script files instead of Python code with Ops. You should migrate to Ops.
 
-- {doc}`Turn a hooks-based charm into an ops charm <legacy/turn-a-hooks-based-charm-into-an-ops-charm>`
+- {doc}`Migrate from a hooks-based charm <migrate/migrate-from-a-hooks-based-charm>`
