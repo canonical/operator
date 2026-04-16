@@ -39,6 +39,7 @@ harness = []
 lint = [
     "ruff==0.11.2",
     "codespell==2.4.1",
+    "zizmor==1.11.0",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -74,6 +75,10 @@ release = [
     "packaging~=24.0",
     "pygithub~=2.6",
     "rich~=14.1",
+]
+tiobe = [
+    "flake8==7.3.0",
+    "pylint==4.0.5",
 ]
 
 [project.urls]
@@ -308,5 +313,5 @@ disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]
-skip = './docs/_build,.venv,venv,build,examples'
+skip = './docs/_build,.venv,venv,build,examples,uv.lock'
 quiet-level = 3
