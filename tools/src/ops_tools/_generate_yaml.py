@@ -33,6 +33,7 @@ from typing import (
 from typing_extensions import NotRequired
 
 import ops
+from ops import charm as _ops_charm
 
 from . import _attrdocs
 
@@ -190,24 +191,16 @@ def juju_schema_from_model_fields(cls: type[object]) -> dict[str, OptionDict]:
 def juju_names(cls: type[object]) -> Generator[str]:
     """Iterates over all the names to include in the config or action YAML.
 
-    This is similar to ``ops.charm._juju_fields`` but is intentionally separate:
-    ``_juju_fields`` is strict and raises ``ValueError`` on unsupported types,
-    whereas this function is permissive and falls back to ``get_type_hints``.
+    Delegates to ``ops.charm._juju_fields`` for dataclasses and Pydantic
+    models so the Juju naming (including ``alias`` handling) stays in one
+    place. For plain classes ``_juju_fields`` raises ``ValueError``, and we
+    fall back to ``get_type_hints``: charms that need more specific field
+    selection should use a dataclass or Pydantic model instead.
     """
-    # Note that this should match the behaviour of ops.Relation.save().
-    if dataclasses.is_dataclass(cls):
-        for field in dataclasses.fields(cls):
-            yield field.metadata.get('alias', field.name)
-        return
-    if hasattr(cls, 'model_fields'):
-        # Pydantic models:
-        for name, field in cls.model_fields.items():  # type: ignore
-            yield field.alias or name  # type: ignore
-        return
-    # If we could not otherwise determine the fields for the class, store all
-    # the fields that have type annotations. If a charm needs a more specific
-    # set of fields, then it should use a dataclass or Pydantic model instead.
-    yield from get_type_hints(cls)
+    try:
+        yield from _ops_charm._juju_fields(cls)
+    except ValueError:
+        yield from get_type_hints(cls)
 
 
 def to_json_schema(cls: type[object]) -> tuple[dict[str, Any], list[str]]:
