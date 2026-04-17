@@ -29,14 +29,14 @@ wheels = [
 
 [[package]]
 name = "charmlibs-pathops"
-version = "1.1.1"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ops" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/55/7c76d5da112ed010a0c60ae50566a531f2589a2f4a9105e836e929e5385c/charmlibs_pathops-1.1.1.tar.gz", hash = "sha256:7980d5f15a64174fa5270e5970c530e979b01a79f8fc09cb1dc4740033ff1ae6", size = 21731, upload-time = "2025-09-03T10:31:50.105Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/18/120f0635f449af7ef9e1a431b7f1c21eb4e09a39870f3862350853ba92a1/charmlibs_pathops-1.2.1.tar.gz", hash = "sha256:00fa50f95bb7fbfbe3d5507de94e583f7333f63ec6ef42a49600b641aabbcfd3", size = 21892, upload-time = "2026-02-06T00:34:03.882Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/e1/1b526923954cf64d3258786ec231dcd9c6c0ab26876c61e3125fc7da49ab/charmlibs_pathops-1.1.1-py3-none-any.whl", hash = "sha256:f753387f1401589067db2a24fa3eb30abfa253eafa0e3880865da151b15b109a", size = 26930, upload-time = "2025-09-03T10:31:49.008Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/57/b54e4fcb9c53085fde0bc6016232e0bb5f88cbf7a03ef78176848793b648/charmlibs_pathops-1.2.1-py3-none-any.whl", hash = "sha256:36dc4e5f76ae3eb89020df916c14e169f71ba856f71a430dab94b0b7948e9b10", size = 27005, upload-time = "2026-02-06T00:34:02.669Z" },
 ]
 
 [[package]]
@@ -513,7 +513,7 @@ unit = [
 [package.metadata]
 requires-dist = [
     { name = "charmlibs-apt", specifier = ">=1,<2" },
-    { name = "charmlibs-pathops", specifier = ">=1,<2" },
+    { name = "charmlibs-pathops", specifier = ">=1.2.1,<2" },
     { name = "ops", specifier = ">=3,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]
