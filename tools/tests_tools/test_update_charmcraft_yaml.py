@@ -22,11 +22,8 @@ import textwrap
 
 import pytest
 import yaml
-from ops_tools._update_charmcraft_yaml import (
-    _insert_into_charmcraft_yaml,
-    get_class_from_module,
-    main,
-)
+from ops_tools._generate_juju_yaml import get_class_from_module
+from ops_tools._update_charmcraft_yaml import _insert_into_charmcraft_yaml, main
 
 import ops
 

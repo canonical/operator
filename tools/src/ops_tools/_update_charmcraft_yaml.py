@@ -25,30 +25,14 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import re
 import sys
-from collections.abc import Generator
 from typing import Any
 
 import yaml
 
 from . import ActionDict, OptionDict, action_to_juju_schema, config_to_juju_schema
-
-
-def get_class_from_module(class_specifier: str) -> Generator[type]:
-    """Import the specified module and get the class from the top-level namespace."""
-    if ':' in class_specifier:
-        module_name, class_name = class_specifier.rsplit(':', 1)
-    else:
-        module_name = 'src.charm'
-        class_name = class_specifier
-    module = importlib.import_module(module_name)
-    for attr in dir(module):
-        if not isinstance(getattr(module, attr), type):
-            continue
-        if re.fullmatch(class_name, attr):
-            yield getattr(module, attr)
+from ._generate_juju_yaml import get_class_from_module
 
 
 def _insert_into_charmcraft_yaml(

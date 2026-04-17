@@ -47,6 +47,8 @@ classifiers = [
 
 [project.scripts]
 update-charmcraft-schema = "ops_tools._update_charmcraft_yaml:main"
+generate-juju-config = "ops_tools._generate_juju_yaml:config_main"
+generate-juju-actions = "ops_tools._generate_juju_yaml:action_main"
 
 [project.urls]
 "Homepage" = "https://github.com/canonical/operator"
