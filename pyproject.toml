@@ -50,6 +50,7 @@ mypy = [  # used to type check example charms in CI
 ]
 unit = [
     "ops[testing,tracing]",
+    "ops-tools",
     "pytest~=9.0",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
@@ -95,12 +96,13 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.uv.workspace]
-members = ["tracing", "testing"]
+members = ["tracing", "testing", "tools"]
 
 [tool.uv.sources]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
+ops-tools = { workspace = true }
 
 [tool.setuptools.packages.find]
 include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
@@ -236,6 +238,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 ]
+"tools/tests_tools/*" = [
+    # All documentation linting.
+    "D",
+]
 "testing/src/scenario/_charmcraft_extensions.py" = [
     "E501",  # Auto-generated file; long description strings are unavoidable.
 ]
@@ -272,7 +278,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py", "tools/src/*.py", "tools/tests_tools/*.py"]
 exclude = [
     "tracing/*",
     "testing/tests/test_e2e/test_network.py",
@@ -298,7 +304,7 @@ exclude = [
     "testing/tests/test_e2e/test_rubbish_events.py",
     "testing/tests/test_e2e/test_pebble.py",
 ]
-extraPaths = ["testing", "tracing"]
+extraPaths = ["testing", "tracing", "tools"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

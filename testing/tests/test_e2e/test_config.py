@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
+import ops_tools
 import pytest
+from scenario.context import Context
 from scenario.state import State
 
 import ops
@@ -19,7 +22,7 @@ def mycharm() -> type[ops.CharmBase]:
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
         def _on_event(self, event: ops.EventBase):
             pass
@@ -81,7 +84,7 @@ def test_config_in_not_mutated(mycharm: type[ops.CharmBase], cfg_in: dict[str, A
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
+                framework.observe(evt, self._on_event)
 
         def _on_event(self, event: ops.EventBase):
             # access the config to trigger a config-get
@@ -106,3 +109,27 @@ def test_config_in_not_mutated(mycharm: type[ops.CharmBase], cfg_in: dict[str, A
     )
     # check config was not mutated by scenario
     assert state_out.config == cfg_in
+
+
+def test_config_using_generated_config():
+    @dataclasses.dataclass
+    class Config:
+        a: int
+        b: float
+        c: str
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.config_changed, self._on_config_changed)
+
+        def _on_config_changed(self, event: ops.ConfigChangedEvent):
+            self.typed_config = self.load_config(Config, 10, c='foo')
+
+    schema = ops_tools.config_to_juju_schema(Config)
+    ctx = Context(Charm, meta={'name': 'foo'}, config=schema)
+    with ctx(ctx.on.config_changed(), State(config={'b': 3.14})) as mgr:
+        mgr.run()
+        assert mgr.charm.typed_config.a == 10
+        assert mgr.charm.typed_config.b == 3.14
+        assert mgr.charm.typed_config.c == 'foo'

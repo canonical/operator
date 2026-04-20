@@ -28,3 +28,10 @@ artifacts:
         name: 'ops-tracing'
         version: ''
         channel: 'stable'
+
+  - name: 'ops-tools'
+    type: 'wheel'
+    ssdlc_params:
+        name: 'ops-tools'
+        version: ''
+        channel: 'stable'

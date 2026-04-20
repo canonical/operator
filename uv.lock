@@ -15,6 +15,7 @@ resolution-markers = [
 members = [
     "ops",
     "ops-scenario",
+    "ops-tools",
     "ops-tracing",
 ]
 
@@ -895,6 +896,7 @@ tiobe = [
 unit = [
     { name = "jsonpatch" },
     { name = "ops", extra = ["testing", "tracing"] },
+    { name = "ops-tools" },
     { name = "pydantic" },
     { name = "pytest" },
 ]
@@ -947,6 +949,7 @@ tiobe = [
 unit = [
     { name = "jsonpatch", specifier = "~=1.33" },
     { name = "ops", extras = ["testing", "tracing"], editable = "." },
+    { name = "ops-tools", editable = "tools" },
     { name = "pydantic", specifier = "~=2.10" },
     { name = "pytest", specifier = "~=9.0" },
 ]
@@ -967,6 +970,23 @@ requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "typing-extensions", specifier = ">=4.9.0" },
+]
+
+[[package]]
+name = "ops-tools"
+version = "1.8.0.dev0"
+source = { editable = "tools" }
+dependencies = [
+    { name = "ops" },
+    { name = "pyyaml" },
+    { name = "typing-extensions" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ops", editable = "." },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "typing-extensions", specifier = "~=4.2" },
 ]
 
 [[package]]
