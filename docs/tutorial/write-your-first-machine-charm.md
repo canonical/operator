@@ -170,12 +170,13 @@ cd ~/tinyproxy
 charmcraft init --profile machine
 ```
 
+<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
 ````{tip}
 The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
 
 To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
 ```
-uvx git+https://github.com/canonical/charmcraft@<FIXME: hash> init --profile machine
+uvx git+https://github.com/canonical/charmcraft@460e8df init --profile machine
 ```
 ````
 
