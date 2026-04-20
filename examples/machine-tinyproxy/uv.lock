@@ -517,7 +517,7 @@ requires-dist = [
     { name = "charmlibs-apt", specifier = ">=1,<2" },
     { name = "charmlibs-pathops", specifier = ">=1.2.1,<2" },
     { name = "ops", specifier = ">=3,<4" },
-    { name = "pydantic", specifier = ">=2.13.2" },
+    { name = "pydantic", specifier = ">=2.13.3" },
 ]
 
 [package.metadata.requires-dev]
