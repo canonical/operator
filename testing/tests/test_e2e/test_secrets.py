@@ -36,7 +36,7 @@ def test_get_secret_no_secret():
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret(owner: str):
+def test_get_secret(owner: Literal['app', 'unit']):
     ctx = Context(Charm, meta={'name': 'local'})
     secret = Secret({'a': 'b'}, owner=owner)
     with ctx(
@@ -47,7 +47,7 @@ def test_get_secret(owner: str):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret_get_refresh(owner: str):
+def test_get_secret_get_refresh(owner: Literal['app', 'unit']):
     ctx = Context(Charm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -87,7 +87,7 @@ def test_get_secret_nonowner_peek_update(app: bool):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_get_secret_owner_peek_update(owner: str):
+def test_get_secret_owner_peek_update(owner: Literal['app', 'unit']):
     ctx = Context(Charm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -109,7 +109,7 @@ def test_get_secret_owner_peek_update(owner: str):
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_secret_changed_owner_evt_fails(owner: str):
+def test_secret_changed_owner_evt_fails(owner: Literal['app', 'unit']):
     ctx = Context(Charm, meta={'name': 'local'})
     secret = Secret(
         tracked_content={'a': 'b'},
@@ -287,7 +287,7 @@ def test_meta(app: bool):
 
 @pytest.mark.parametrize('leader', (True, False))
 @pytest.mark.parametrize('owner', ('app', 'unit', None))
-def test_secret_permission_model(leader: bool, owner: str | None):
+def test_secret_permission_model(leader: bool, owner: Literal['app', 'unit'] | None):
     expect_manage = bool(
         # if you're the leader and own this app secret
         (owner == 'app' and leader)
@@ -359,6 +359,7 @@ def test_grant(app: bool):
         charm = mgr.charm
         secret_obj = charm.model.get_secret(label='mylabel')
         foo = charm.model.get_relation('foo')
+        assert foo is not None
         if app:
             secret_obj.grant(relation=foo)
         else:
@@ -597,7 +598,7 @@ def test_add_secret(secrets_context: Context[SecretsCharm]):
 
     result = cast('Result', secrets_context.action_results)
     assert result is not None
-    assert result['secretid']
+    assert result.get('secretid')
 
     scenario_secret = next(iter(state.secrets))
 
@@ -705,8 +706,10 @@ def common_assertions(scenario_secret: Secret | None, result: Result):
         assert scenario_secret.owner == 'app'
         assert not scenario_secret.remote_grants
 
-        assert result.get('after')
-        info = result['after']['info']
+        after = result.get('after')
+        assert after is not None
+        info = after['info']
+        assert info is not None
         # Verify that the unit and the scaffolding see the same data
         #
         # Scenario presents a secret with a full secret URI to the charm
@@ -720,12 +723,12 @@ def common_assertions(scenario_secret: Secret | None, result: Result):
         # https://github.com/canonical/operator/issues/2104
         assert info['rotates'] is None
 
-        assert scenario_secret.tracked_content == result['after']['tracked']
-        assert scenario_secret.latest_content == result['after']['latest']
+        assert scenario_secret.tracked_content == after['tracked']
+        assert scenario_secret.latest_content == after['latest']
 
 
 @pytest.mark.parametrize('owner', ('app', 'unit'))
-def test_secret_get_content_returns_copy(owner: str):
+def test_secret_get_content_returns_copy(owner: Literal['app', 'unit']):
     """Mutating the dict returned by get_content() must not affect subsequent calls."""
     ctx = Context(Charm, meta={'name': 'local'})
     secret = Secret(
