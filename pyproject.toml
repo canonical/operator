@@ -39,6 +39,7 @@ harness = []
 lint = [
     "ruff==0.11.2",
     "codespell==2.4.1",
+    "zizmor==1.11.0",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -49,7 +50,7 @@ mypy = [  # used to type check example charms in CI
 ]
 unit = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
@@ -64,7 +65,7 @@ benchmark = [
 ]
 integration = [
     "ops[testing,tracing]",
-    "pytest~=8.4",
+    "pytest~=9.0",
     "jubilant~=1.5",
     "jubilant-backports",
     "minio~=7.2",
@@ -74,6 +75,10 @@ release = [
     "packaging~=24.0",
     "pygithub~=2.6",
     "rich~=14.1",
+]
+tiobe = [
+    "flake8==7.3.0",
+    "pylint==4.0.5",
 ]
 
 [project.urls]
@@ -270,28 +275,6 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
-    "testing/tests/test_e2e/test_network.py",
-    "testing/tests/test_e2e/test_cloud_spec.py",
-    "testing/tests/test_e2e/test_play_assertions.py",
-    "testing/tests/test_e2e/test_vroot.py",
-    "testing/tests/test_e2e/test_resource.py",
-    "testing/tests/test_e2e/test_state.py",
-    "testing/tests/test_e2e/test_actions.py",
-    "testing/tests/test_e2e/test_config.py",
-    "testing/tests/test_e2e/test_event.py",
-    "testing/tests/test_e2e/test_deferred.py",
-    "testing/tests/test_e2e/test_stored_state.py",
-    "testing/tests/test_e2e/conftest.py",
-    "testing/tests/test_e2e/test_secrets.py",
-    "testing/tests/test_e2e/test_relations.py",
-    "testing/tests/test_e2e/test_trace_data.py",
-    "testing/tests/test_e2e/test_juju_log.py",
-    "testing/tests/test_e2e/test_status.py",
-    "testing/tests/test_e2e/test_storage.py",
-    "testing/tests/test_e2e/test_manager.py",
-    "testing/tests/test_e2e/test_ports.py",
-    "testing/tests/test_e2e/test_rubbish_events.py",
-    "testing/tests/test_e2e/test_pebble.py",
 ]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
@@ -308,5 +291,5 @@ disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]
-skip = './docs/_build,.venv,venv,build,examples'
+skip = './docs/_build,.venv,venv,build,examples,uv.lock'
 quiet-level = 3
