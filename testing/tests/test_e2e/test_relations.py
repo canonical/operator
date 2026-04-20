@@ -30,7 +30,7 @@ class CharmEvents(ops.CharmEvents):
 class Charm(ops.CharmBase):
     _call: ClassVar[Callable[[Any], None] | None] = None
     called: ClassVar[bool] = False
-    on = CharmEvents()
+    on: ClassVar[CharmEvents] = CharmEvents()
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -442,7 +442,7 @@ def test_relation_events_no_attrs(
         assert event.app  # type: ignore  # that's always present
         # .unit is always None for created and broken.
         if isinstance(event, ops.RelationCreatedEvent | ops.RelationBrokenEvent):
-            assert event.unit is None  # type: ignore
+            assert event.unit is None
         else:
             assert event.unit  # type: ignore
         assert (evt_name == 'departed') is bool(getattr(event, 'departing_unit', False))
@@ -525,13 +525,13 @@ def test_relation_events_no_remote_units(evt_name: str, caplog: pytest.LogCaptur
         assert 'remote unit ID unset; no remote unit data present' in caplog.text
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
+@pytest.mark.parametrize('data', (set[str](), {}, [], (), 1, 1.0, None, b''))
 def test_relation_unit_data_bad_types(data: object):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', remote_units_data={0: {'a': data}})  # type: ignore
 
 
-@pytest.mark.parametrize('data', (set(), {}, [], (), 1, 1.0, None, b''))
+@pytest.mark.parametrize('data', (set[str](), {}, [], (), 1, 1.0, None, b''))
 def test_relation_app_data_bad_types(data: object):
     with pytest.raises(StateValidationError):
         Relation(endpoint='foo', interface='foo', local_app_data={'a': data})  # type: ignore
