@@ -69,14 +69,10 @@ def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path):
         State(),
     ) as mgr:
         assert meta_file.exists()
-        assert meta_file.read_text() == yaml.safe_dump({'name': 'my-charm'})
+        assert meta_file.read_text() == raw_ori_meta  # we don't write metadata to temp dir
         assert mgr.charm.meta.name == 'my-charm'  # not karl! Context.meta takes precedence
         mgr.run()
         assert meta_file.exists()
-
-    # meta file was restored to its previous contents
-    assert meta_file.read_text() == raw_ori_meta
-    assert meta_file.exists()
 
 
 def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root: Path):
@@ -89,8 +85,7 @@ def test_charm_virtual_root_cleanup_if_not_exists(charm_virtual_root: Path):
         ctx.on.start(),
         State(),
     ) as mgr:
-        assert meta_file.exists()
-        assert meta_file.read_text() == yaml.safe_dump({'name': 'my-charm'})
+        assert not meta_file.exists()  # we don't write metadata to temp dir
         mgr.run()
         assert not meta_file.exists()
 
