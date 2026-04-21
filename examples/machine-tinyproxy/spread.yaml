@@ -1,0 +1,35 @@
+project: tinyproxy
+
+backends:
+  craft:
+    type: craft
+    systems:
+      - ubuntu-24.04:
+
+prepare: |
+  # Juju needs the charm etc. to be owned by the running user.
+  chown -R "${USER}" "${PROJECT_PATH}"
+
+environment:
+  # `uv tool install` places binaries under the invoking user's ~/.local/bin.
+  PATH: $PATH:/root/.local/bin
+
+suites:
+  spread/integration/:
+    summary: Integration tests
+
+    prepare: |
+      sudo snap install --classic concierge
+      sudo concierge prepare --trace -p machine --extra-snaps astral-uv
+      uv tool install tox --with tox-uv
+
+exclude:
+  - .git
+  - .tox
+  - .venv
+  - .ruff_cache
+  - .pytest_cache
+  - .coverage
+  - "*.charm"
+
+kill-timeout: 90m
