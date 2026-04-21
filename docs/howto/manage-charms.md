@@ -17,8 +17,9 @@ To deploy your charm locally and to run integration tests, you'll also need a Ju
 
 > See more:
 >
+> - [Prepare your environment to develop Kubernetes charms](#set-up-your-development-environment)
 > - [Prepare your environment to develop machine charms](#machine-charm-tutorial-environment)
-> - [Prepare a continuous integration environment](#validate-your-charm-with-every-change)
+> - [Prepare a continuous integration environment](#set-up-ci-integration)
 
 ## Initialise your charm project
 
@@ -70,7 +71,8 @@ and the charm workflow.
 > - {ref}`write-and-structure-charm-code`
 > - {ref}`write-unit-tests-for-a-charm`
 > - {ref}`write-integration-tests-for-a-charm`
-> - {ref}`manage-logs`
+> - {ref}`set-up-ci`
+> - {ref}`log-from-your-charm`
 > - {ref}`debug-your-charm`
 
 The next thing to do is add functionality to your charm.

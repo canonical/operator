@@ -43,6 +43,14 @@ Integration tests check that your charm works correctly when deployed to a real 
 Write integration tests for a charm <write-integration-tests-for-a-charm>
 ```
 
+You should automate your charm's tests using a continuous integration (CI) system.
+
+```{toctree}
+:maxdepth: 1
+
+Set up continuous integration for a charm <set-up-continuous-integration-for-a-charm>
+```
+
 Juju provides a variety of debugging tools, which Ops integrates with.
 
 ```{toctree}

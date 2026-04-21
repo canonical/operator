@@ -44,7 +44,7 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 * - **Adding functionality**
   - [Manage relations](howto/manage-relations) • [Manage configuration](howto/manage-configuration) • [More Juju features](#how-to-guides-managing-features)
 * - **Testing & CI**
-  - [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests](howto/write-integration-tests-for-a-charm)
+  - [Write unit tests](howto/write-unit-tests-for-a-charm) • [Write integration tests](howto/write-integration-tests-for-a-charm) • [Set up continuous integration](howto/set-up-continuous-integration-for-a-charm)
 * - **Design & best practices**
   - [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
 * - **Publishing**
