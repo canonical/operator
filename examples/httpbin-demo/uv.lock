@@ -148,7 +148,7 @@ unit = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ops", specifier = ">=2.23,<4" }]
+requires-dist = [{ name = "ops", specifier = ">=3,<4" }]
 
 [package.metadata.requires-dev]
 integration = [
