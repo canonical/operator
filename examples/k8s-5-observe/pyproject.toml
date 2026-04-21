@@ -40,8 +40,8 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant",
-    "pytest",
+    "jubilant>=1.8,<2",
+    "pytest-jubilant>=2,<3",
     "PyYAML",
 ]
 

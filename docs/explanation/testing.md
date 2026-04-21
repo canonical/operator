@@ -111,8 +111,9 @@ When writing an integration test, it is not sufficient to simply check that Juju
 
 ### Tools
 
-- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [Jubilant](https://documentation.ubuntu.com/jubilant/)
+- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html)
+- [Jubilant](https://documentation.ubuntu.com/jubilant/), which wraps the Juju CLI
+- [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), a pytest plugin that manages Juju models during tests
 
 Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
@@ -172,7 +173,7 @@ Integration tests are a bit more complex, because these tests require a Juju con
           channel: 1.32-strict/stable
       - name: Run integration tests
         # Set a predictable model name so it can be consumed by charm-logdump-action
-        run: tox -e integration -- --model testing
+        run: tox -e integration -- --juju-model testing
       - name: Dump logs
         uses: canonical/charm-logdump-action@main
         if: failure()
