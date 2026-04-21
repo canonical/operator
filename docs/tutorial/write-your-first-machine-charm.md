@@ -243,7 +243,7 @@ PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
 
 def ensure_config(port: int, slug: str) -> bool:
     """Ensure that tinyproxy is configured. Return True if any changes were made."""
-    # For the config file format, see https://manpages.ubuntu.com/manpages/jammy/en/man5/tinyproxy.conf.5.html
+    # For the config file format, see https://manpages.ubuntu.com/manpages/noble/en/man5/tinyproxy.conf.5.html
     config = f"""\
 PidFile "{PID_FILE}"
 Port {port}
@@ -263,10 +263,10 @@ def get_version() -> str:
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    # Install a specific package from ubuntu@22.04
-    # See https://packages.ubuntu.com/jammy/tinyproxy-bin
+    # Install a specific package from ubuntu@24.04
+    # See https://packages.ubuntu.com/noble/tinyproxy-bin
     # In general, it's good practice for charms to pin workload versions.
-    apt.add_package("tinyproxy-bin", "1.11.0-1")
+    apt.add_package("tinyproxy-bin", "1.11.1-3")
     # If this call fails, the charm will go into error status. The Juju logs will show the error:
     # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
 
@@ -287,7 +287,7 @@ def reload_config() -> None:
     if not pid:
         raise RuntimeError("tinyproxy is not running")
     # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
-    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+    # See https://manpages.ubuntu.com/manpages/noble/en/man8/tinyproxy.8.html#signals
     os.kill(pid, signal.SIGUSR1)
 
 
@@ -610,13 +610,13 @@ Model    Controller     Cloud/Region         Version  SLA          Timestamp
 testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:01:38+08:00
 
 App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
-tinyproxy  1.11.0   active      1  tinyproxy             0  no
+tinyproxy  1.11.1   active      1  tinyproxy             0  no
 
 Unit          Workload  Agent  Machine  Public address  Ports  Message
 tinyproxy/0*  active    idle   0        10.71.67.208
 
 Machine  State    Address       Inst id        Base          AZ            Message
-0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04  juju-sandbox  Running
+0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@24.04  juju-sandbox  Running
 ```
 
 ```{tip}
@@ -921,7 +921,7 @@ This extends the duration that Jubilant waits for your charm to deploy, in case 
 Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
 
 ```python
-    assert version == "1.11.0"  # The version installed by tinyproxy.install.
+    assert version == "1.11.1"  # The version installed by tinyproxy.install.
 ```
 
 You should now have the following tests:
