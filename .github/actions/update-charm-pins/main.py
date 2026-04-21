@@ -4,6 +4,7 @@
 
 import logging
 import os
+import re
 import sys
 
 from httpx import Client
@@ -20,6 +21,8 @@ github = Client(
     },
 )
 
+charm_repo_pattern = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
+
 
 def update_charm_pins(workflow):
     """Update pinned versions of charms in the given GitHub Actions workflow."""
@@ -31,6 +34,8 @@ def update_charm_pins(workflow):
 
     for idx, item in enumerate(doc['jobs'][job_name]['strategy']['matrix']['include']):
         charm_repo = item['charm-repo']
+        if not charm_repo_pattern.fullmatch(charm_repo):
+            raise ValueError(f'Invalid charm-repo: {charm_repo!r}')
         commit = github.get(f'{charm_repo}/commits').raise_for_status().json()[0]
         data = github.get(f'{charm_repo}/tags').raise_for_status().json()
         comment = ' '.join(
