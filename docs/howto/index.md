@@ -148,7 +148,7 @@ Harness is a deprecated framework for writing unit tests. You should migrate to 
 
 - {doc}`Migrate unit tests from Harness <migrate/migrate-unit-tests-from-harness>`
 
-pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant and `pytest-jubilant`.
 
 - {doc}`Migrate integration tests from pytest-operator <migrate/migrate-integration-tests-from-pytest-operator>`
 
