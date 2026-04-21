@@ -23,6 +23,7 @@ Parca
 protobuf
 pydantic
 pytest
+README
 reinstantiate
 replan
 repo
