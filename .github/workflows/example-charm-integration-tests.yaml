@@ -12,7 +12,7 @@ jobs:
   # example charm. Each `spread/integration/<module>/task.yaml` becomes a
   # separate matrix entry, so adding a new task.yaml automatically adds a job.
   collect-spread-jobs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     outputs:
       jobs: ${{ steps.collect.outputs.jobs }}
     steps:
@@ -31,9 +31,7 @@ jobs:
   integration:
     name: ${{ matrix.charm }} / ${{ matrix.task }}
     needs: collect-spread-jobs
-    # Pinned to 22.04 while LXD+Docker networking is broken on 24.04 runners
-    # (charmcraft's managed pack instance fails with "no network access").
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -66,4 +64,4 @@ jobs:
         # a nested LXD VM. `sg lxd -c` picks up the new lxd group membership
         # without needing to re-login.
         run: |
-          sg lxd -c 'charmcraft test "craft:ubuntu-22.04:spread/integration/${{ matrix.task }}"'
+          sg lxd -c 'charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"'
