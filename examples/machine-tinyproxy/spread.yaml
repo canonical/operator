@@ -30,6 +30,5 @@ exclude:
   - .ruff_cache
   - .pytest_cache
   - .coverage
-  - "*.charm"
 
 kill-timeout: 90m
