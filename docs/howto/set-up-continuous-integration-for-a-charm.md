@@ -111,3 +111,42 @@ The option `-p k8s` tells Concierge that we want a cloud managed by Canonical Ku
 If your charm is a machine charm, use `-p machine` instead.
 
 The "Upload logs" step assumes that your integration tests use Jubilant together with `pytest-jubilant`. See [How to write integration tests for a charm](#write-integration-tests-for-a-charm-view-juju-logs).
+
+This single job runs every integration test module sequentially. As your suite grows, split tests across modules and run each module in its own CI job — see {ref}`write-integration-tests-for-a-charm-split-across-modules`.
+
+(set-up-ci-charmcraft-test)=
+## Run integration tests in parallel with `charmcraft test`
+
+If you initialised your charm with `charmcraft init --profile test-machine` or `--profile test-kubernetes` (both currently experimental), your charm includes a `spread.yaml` and one `spread/integration/<module>/task.yaml` per test module. You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `test_*.py` module — along with its `task.yaml` — automatically adds a new CI job.
+
+A minimal workflow looks like:
+
+```yaml
+  integration:
+    name: Integration / ${{ matrix.task }}
+    runs-on: ubuntu-latest
+    needs:
+      - unit
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - test_charm
+          # Add one entry per spread/integration/<module>/task.yaml.
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up LXD
+        uses: canonical/setup-lxd@8c6a87bfb56aa48f3fb9b830baa18562d8bfd4ee  # v1
+        with:
+          channel: 5.21/stable
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+      - name: Run spread test
+        # On GitHub Actions (CI=true) charmcraft test runs spread against the
+        # runner itself, instead of launching a nested LXD VM.
+        run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
+```
+
+For a complete workflow that discovers modules dynamically (no hard-coded matrix), see the Ops repository's [example-charm-integration-tests.yaml](https://github.com/canonical/operator/blob/main/.github/workflows/example-charm-integration-tests.yaml). For the matching charm-side files, see [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) and [k8s-1-minimal](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal).

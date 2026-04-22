@@ -416,6 +416,10 @@ You can ensure this by writing integration tests for your charm. In the charming
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
+```{tip}
+Charmcraft can also scaffold a spread configuration and a GitHub Actions workflow that runs your integration tests under `charmcraft test`. From your project directory, run `charmcraft init --profile test-kubernetes --force` to drop in the extra files. This profile is currently experimental. You can see a worked example, with a few extra optimisations, in the [k8s-1-minimal charm](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal).
+```
+
 ### Write a test
 
 Let's write the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will deploy the charm, then verify that the installation event is handled without errors.

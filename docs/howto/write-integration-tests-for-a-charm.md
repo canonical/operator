@@ -147,6 +147,26 @@ By convention, integration tests are kept in the charm's source tree, in a direc
 
 If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
 
+(write-integration-tests-for-a-charm-split-across-modules)=
+### Split tests across modules
+
+As your suite grows, split your integration tests across several `test_*.py` modules, grouped by feature. Tests within a module share a single `juju` fixture (and therefore a single Juju model), so keep tests that need to build on each other together. Across modules, each gets a fresh model, which makes modules independent of each other.
+
+A common split:
+
+- `test_charm.py` — smoke tests: pack, deploy, and check the charm reaches active status.
+- `test_<feature>.py` — one module per feature area (for example, `test_backups.py`, `test_tls.py`, `test_upgrade.py`, `test_scaling.py`).
+
+The main reason to split is **parallel CI execution**: each module can run as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules. `tox -e integration` still runs every module sequentially on a single machine; it's the CI matrix (see {ref}`set-up-ci-integration`) that turns module boundaries into parallel jobs. Adding a new `test_*.py` file then automatically adds a new CI job — no workflow changes needed.
+
+For real-world examples of module-per-feature splits, see:
+
+- [postgresql-operator](https://github.com/canonical/postgresql-operator/tree/main/tests/integration) — machine charm, split across many feature modules (backups, TLS, upgrades, HA, and so on).
+- [postgresql-k8s-operator](https://github.com/canonical/postgresql-k8s-operator/tree/main/tests/integration) — the Kubernetes equivalent.
+- [opensearch-operator](https://github.com/canonical/opensearch-operator/tree/main/tests/integration) — larger suite with per-cloud backup modules.
+
+For a minimal scaffold that you can lift into your own charm, see the example charms in the Ops repository ([machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) and [k8s-1-minimal](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal)).
+
 ### Deploy your charm
 
 Add this test in your integration test file:
