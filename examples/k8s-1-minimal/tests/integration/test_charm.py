@@ -37,7 +37,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
-# If you implement my_application.get_version in the charm source,
+# If you implement a get_version method in the charm source,
 # remove the @pytest.mark.skip line to enable this test.
 # Alternatively, remove this test if you don't need it.
 @pytest.mark.skip(reason="my_application.get_version is not implemented")
