@@ -10,13 +10,13 @@ prepare: |
   # Juju needs the charm etc. to be owned by the running user.
   chown -R "${USER}" "${PROJECT_PATH}"
 
-environment:
-  # `uv tool install` places binaries under the invoking user's ~/.local/bin.
-  PATH: $PATH:/root/.local/bin
-
 suites:
   spread/integration/:
     summary: Integration tests
+
+    environment:
+      # `uv tool install` places binaries under the invoking user's ~/.local/bin.
+      PATH: $PATH:/root/.local/bin
 
     prepare: |
       sudo snap install --classic concierge
