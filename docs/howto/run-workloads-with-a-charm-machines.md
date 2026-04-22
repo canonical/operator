@@ -48,7 +48,10 @@ class MyCharm(ops.CharmBase):
         myworkload.stop()
 
     def _on_remove(self, event: ops.RemoveEvent) -> None:
-        myworkload.uninstall()
+        # On shared machines, avoid uninstalling system packages by default.
+        # Stop the workload here, and only remove packages as an explicit,
+        # charm-specific step when you know the machine is dedicated to it.
+        myworkload.stop()
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         if not myworkload.is_installed():
