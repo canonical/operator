@@ -19,7 +19,6 @@ import logging
 import pathlib
 
 import jubilant
-import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -35,13 +34,3 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
     juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
-
-
-# If you implement a get_version method in the charm source,
-# remove the @pytest.mark.skip line to enable this test.
-# Alternatively, remove this test if you don't need it.
-@pytest.mark.skip(reason="get_version is not implemented")
-def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
-    """Check that the correct version of the workload is running."""
-    version = juju.status().apps[APP_NAME].version
-    assert version == "3.14"  # TODO: Replace 3.14 with the expected workload version.
