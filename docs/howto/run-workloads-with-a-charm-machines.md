@@ -13,7 +13,7 @@ For a complete worked example, see the [machine-tinyproxy](https://github.com/ca
 
 ## Put workload logic in its own module
 
-Keep charming concerns (event handlers, status, config parsing) in `src/charm.py`, and put workload-specific logic (installing, starting, configuring, stopping the workload) in a separate module such as `src/myworkload.py`. The charm calls the module; the module doesn't know about Ops.
+Keep charming concerns (event handlers, status, config parsing) in `src/charm.py`, and put workload-specific logic (installing, starting, configuring, stopping the workload) in a separate module such as `src/myworkload.py`. The charm calls the module; the module doesn't know about Ops. If you use `charmcraft init --profile machine`, Charmcraft creates a `charm.py` and `<workload>.py` placeholder.
 
 This separation:
 
