@@ -44,4 +44,4 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
     """Check that the correct version of the workload is running."""
     version = juju.status().apps[APP_NAME].version
-    assert version == "3.14"  # Replace 3.14 with the expected version of the workload.
+    assert version == "3.14"  # TODO: Replace 3.14 with the expected workload version.
