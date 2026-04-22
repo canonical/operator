@@ -356,7 +356,7 @@ def test_blocks_on_invalid_config(juju: jubilant.Juju):
     juju.config("myworkload", reset="slug")
 ```
 
-The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file — see the [machine-tinyproxy integration conftest](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py) for a reusable template.
+The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file — see the [machine-tinyproxy integration `conftest`](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py) for a reusable template.
 
 For how to pack the charm, set up a virtual machine to run the tests, and configure CI, see {ref}`write-integration-tests-for-a-charm` and {ref}`set-up-ci`.
 
