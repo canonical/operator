@@ -40,17 +40,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Set up LXD
+        # `charmcraft test` packs the charm in a managed LXD VM. The Docker
+        # preinstalled on GHA runners drops LXD bridge traffic in the FORWARD
+        # chain; canonical/setup-lxd adds the LXD bridge to DOCKER-USER so the
+        # build VM has network access. It also sets the lxd daemon group to
+        # `adm` (already the runner user's group), so no `sg` wrapper is needed.
+        uses: canonical/setup-lxd@8c6a87bfb56aa48f3fb9b830baa18562d8bfd4ee  # v1
+        with:
+          channel: 5.21/stable
       - name: Install charmcraft
         run: sudo snap install charmcraft --classic
-      - name: Set up LXD
-        # `charmcraft test` packs the charm on the host, which uses LXD. On
-        # GitHub-hosted runners the user isn't in the `lxd` group by default,
-        # so charmcraft's auto-install of LXD fails. Pre-install and pre-init.
-        run: |
-          sudo snap refresh lxd --channel=5.21/stable \
-            || sudo snap install lxd --channel=5.21/stable
-          sudo lxd init --auto
-          sudo adduser "$USER" lxd
       - name: Fetch any charmlibs
         working-directory: examples/${{ matrix.charm }}
         run: |
@@ -61,7 +61,5 @@ jobs:
         working-directory: examples/${{ matrix.charm }}
         # GitHub Actions sets CI=true, so charmcraft test uses the `ci`
         # allocator (runs against the runner itself) instead of launching
-        # a nested LXD VM. `sg lxd -c` picks up the new lxd group membership
-        # without needing to re-login.
-        run: |
-          sg lxd -c 'charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"'
+        # a nested LXD VM for the spread target.
+        run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
