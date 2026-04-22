@@ -183,6 +183,8 @@ juju refresh \
   demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
+If the app is in an `awaiting error resolution` state, `juju refresh` will not work. In this situation, `juju remove-application` may also fail; use `juju remove-application fastapi-demo --force` instead.
+
 Now, check the available configuration options:
 
 ```text
