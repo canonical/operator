@@ -177,13 +177,14 @@ First, repack and refresh your charm:
 
 ```text
 charmcraft pack
-juju refresh \
-  --path="./fastapi-demo_amd64.charm" \
-  fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
-If the app is in an `awaiting error resolution` state, `juju refresh` will not work. In this situation, `juju remove-application` may also fail; use `juju remove-application fastapi-demo --force` instead.
+```{tip}
+`--force-units` ensures that the refresh succeeds even if the application is in an error state. This option is useful during development, when your charm code might be the cause of the error. You should avoid using `--force-units` when refreshing applications in production.
+```
 
 Now, check the available configuration options:
 
