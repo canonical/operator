@@ -1,5 +1,0 @@
-summary: Run test_charm integration tests
-
-execute: |
-  cd "${SPREAD_PATH}"
-  CHARM_PATH="${CRAFT_ARTIFACT}" tox run -e integration -- tests/integration/test_charm.py

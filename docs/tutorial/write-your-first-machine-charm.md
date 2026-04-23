@@ -910,10 +910,6 @@ Integration tests are an important way to check that your charm works correctly 
 
 When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests. We'll expand the tests to cover more of your charm's functionality.
 
-```{tip}
-Charmcraft can also scaffold a spread configuration and a GitHub Actions workflow that runs your integration tests under `charmcraft test`. From your project directory, run `charmcraft init --profile test-machine --force` to drop in the extra files. This profile is currently experimental. You can see a worked example, with a few extra optimisations, in the [machine-tinyproxy charm](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
-```
-
 In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
 
 ```python

@@ -149,4 +149,4 @@ A minimal workflow looks like:
         run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
 ```
 
-For a complete workflow that discovers modules dynamically (no hard-coded matrix), see the Ops repository's [example-charm-integration-tests.yaml](https://github.com/canonical/operator/blob/main/.github/workflows/example-charm-integration-tests.yaml). For the matching charm-side files, see [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) and [k8s-1-minimal](https://github.com/canonical/operator/tree/main/examples/k8s-1-minimal).
+For a complete workflow that discovers modules dynamically (no hard-coded matrix), see the Ops repository's [example-charm-charmcraft-test.yaml](https://github.com/canonical/operator/blob/main/.github/workflows/example-charm-charmcraft-test.yaml). For the matching charm-side files, see the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm.
