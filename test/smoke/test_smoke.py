@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 CHARMCRAFT3_YAML = """
 type: "charm"
+name: smoke
+summary: basic minimal charm for running smoke tests
+description: smoke test charm
 base: ubuntu@{base}
 platforms:
   amd64:
