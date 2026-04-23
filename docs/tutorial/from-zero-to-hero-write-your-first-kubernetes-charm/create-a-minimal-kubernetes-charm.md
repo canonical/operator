@@ -417,7 +417,7 @@ You can ensure this by writing integration tests for your charm. In the charming
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
 ```{tip}
-Charmcraft can also scaffold a spread configuration and a GitHub Actions workflow that runs your integration tests under `charmcraft test`. From your project directory, run `charmcraft init --profile test-kubernetes --force` to drop in the extra files. This profile is currently experimental. You can see a worked example, with a few extra optimisations, in the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
+Charmcraft can also scaffold a spread configuration that runs your integration tests under `charmcraft test`. From your project directory, run `charmcraft init --profile test-kubernetes --force` to drop in the extra files. This profile is currently experimental. You can see a worked example, with a few extra optimisations, in the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
 ```
 
 ### Write a test
