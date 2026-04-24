@@ -38,7 +38,7 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 :class: top-aligned
 
 * - **Starting a project**
-  - [Manage charms](howto/manage-charms) • [Write and structure charm code](howto/write-and-structure-charm-code)
+  - [Manage charms](howto/manage-charms) • [Initialise your project](howto/initialise-your-project) • [Write and structure charm code](howto/write-and-structure-charm-code)
 * - **Running workloads**
   - [Manage packages on machines](howto/run-workloads-with-a-charm-machines) • [Manage Kubernetes workloads](howto/manage-containers/index)
 * - **Adding functionality**
