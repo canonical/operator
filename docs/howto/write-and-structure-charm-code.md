@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Define your charm's dependencies and Python modules, handle status and errors in a standard way, and follow best practices for charm development.
+---
+
 (write-and-structure-charm-code)=
 # How to write and structure charm code
 
