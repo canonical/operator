@@ -67,7 +67,7 @@ def pack(charm_dir: pathlib.Path):
     return dest_name.absolute()
 
 
-@pytest.mark.parametrize('base', ['22.04', '24.04'])
+@pytest.mark.parametrize('base', ['22.04', '24.04', '26.04'])
 def test_smoke(juju: jubilant_backports.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
