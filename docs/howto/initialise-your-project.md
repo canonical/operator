@@ -69,7 +69,7 @@ If your repository will hold multiple charms, or a charm and source for another 
 
 If your charm's workload was built with a web framework such as Django or FastAPI, consider using one of Charmcraft's 12-factor app profiles instead of `kubernetes` or `machine`. These profiles accelerate development by generating charms that are ready to deploy. {external+charmcraft:ref}`Write your first 12-factor app charm <tutorial>`.
 
-<!-- TODO: Can we link to a real example of a charm monorepo? -->
+<!-- Can we link to a real example of a charm monorepo? -->
 
 ## Next steps
 
