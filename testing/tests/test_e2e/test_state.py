@@ -372,7 +372,6 @@ def test_replace_state():
         (CloudCredential, 'attributes', {'auth_type': 'foo'}),
         (Secret, 'tracked_content', {}),
         (Secret, 'latest_content', {'tracked_content': {'password': 'password'}}),
-        (Secret, 'remote_grants', {'tracked_content': {'password': 'password'}}),
         (Relation, 'local_app_data', {'endpoint': 'foo'}),
         (Relation, 'local_unit_data', {'endpoint': 'foo'}),
         (Relation, 'remote_app_data', {'endpoint': 'foo'}),
@@ -386,7 +385,6 @@ def test_replace_state():
         (Container, 'layers', {'name': 'foo'}),
         (Container, 'service_statuses', {'name': 'foo'}),
         (Container, 'mounts', {'name': 'foo'}),
-        (Container, 'notices', {'name': 'foo'}),
         (StoredState, 'content', {}),
     ],
 )
@@ -407,6 +405,19 @@ def test_immutable_content_dict(
     assert getattr(obj2, attribute) == {'foo': 'bar'}
 
 
+def test_immutable_remote_grants():
+    content = {0: {'app1', 'app2'}}
+    obj1 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    obj2 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    assert obj1.remote_grants is not obj2.remote_grants
+    content[1] = {'app3'}
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    object.__setattr__(obj1, 'remote_grants', {1: frozenset({'app3'})})
+    assert obj1.remote_grants == {1: frozenset({'app3'})}
+    assert obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+
+
 @pytest.mark.parametrize(
     'component,attribute,required_args',
     [
@@ -416,6 +427,7 @@ def test_immutable_content_dict(
         (Network, 'bind_addresses', {'binding_name': 'foo'}),
         (Network, 'ingress_addresses', {'binding_name': 'foo'}),
         (Network, 'egress_subnets', {'binding_name': 'foo'}),
+        (Container, 'notices', {'name': 'foo'}),
     ],
 )
 def test_immutable_content_list(
@@ -461,6 +473,53 @@ def test_immutable_content_dict_of_dicts(
     object.__setattr__(obj1, attribute, {0: {'foo': 'qux'}})
     assert getattr(obj1, attribute) == {0: {'foo': 'qux'}}
     assert getattr(obj2, attribute) == {0: {'foo': 'bar'}, 1: {'baz': 'qux'}}
+
+
+@pytest.mark.parametrize(
+    'component,required_args,attribute,input_value,expected_type',
+    [
+        # Mapping -> dict
+        (CloudCredential, {'auth_type': 'foo'}, 'attributes', {'a': 'b'}, dict),
+        (Secret, {'tracked_content': {'k': 'v'}}, 'remote_grants', {1: {'app'}}, dict),
+        (Notice, {'key': 'foo'}, 'last_data', {'k': 'v'}, dict),
+        (Container, {'name': 'foo'}, 'layers', {}, dict),
+        (Container, {'name': 'foo'}, 'service_statuses', {}, dict),
+        (Container, {'name': 'foo'}, 'mounts', {}, dict),
+        (StoredState, {}, 'content', {'k': 'v'}, dict),
+        # Iterable -> list
+        (CloudCredential, {'auth_type': 'foo'}, 'redacted', ('a', 'b'), list),
+        (CloudSpec, {'type': 'foo'}, 'ca_certificates', ('a', 'b'), list),
+        (
+            Network,
+            {'binding_name': 'foo'},
+            'bind_addresses',
+            iter([BindAddress([Address('192.0.2.0')])]),
+            list,
+        ),
+        (Network, {'binding_name': 'foo'}, 'ingress_addresses', ('1.2.3.4',), list),
+        (Network, {'binding_name': 'foo'}, 'egress_subnets', ('1.2.3.0/24',), list),
+        (Container, {'name': 'foo'}, 'notices', (Notice(key='foo'),), list),
+        (State, {}, 'deferred', (), list),
+        # Iterable -> frozenset
+        (Container, {'name': 'foo'}, 'execs', (), frozenset),
+        (Container, {'name': 'foo'}, 'check_infos', (), frozenset),
+        (State, {}, 'relations', (Relation(endpoint='foo'),), frozenset),
+        (State, {}, 'networks', (Network(binding_name='foo'),), frozenset),
+        (State, {}, 'containers', (Container(name='foo'),), frozenset),
+        (State, {}, 'secrets', (Secret(tracked_content={'k': 'v'}),), frozenset),
+        (State, {}, 'stored_states', (), frozenset),
+    ],
+)
+def test_init_converts_to_concrete_type(
+    component: type[object],
+    required_args: dict[str, Any],
+    attribute: str,
+    input_value: Any,
+    expected_type: type,
+):
+    """Verify that __init__ converts broader input types to concrete attribute types."""
+    obj = component(**required_args, **{attribute: input_value})
+    assert isinstance(getattr(obj, attribute), expected_type)
 
 
 @pytest.mark.parametrize(

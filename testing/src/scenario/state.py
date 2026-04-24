@@ -49,7 +49,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from . import Context
 
     class _StateKwargs(TypedDict, total=False):
-        config: dict[str, str | int | float | bool]
+        config: Mapping[str, str | int | float | bool]
         relations: Iterable[RelationBase]
         networks: Iterable[Network]
         containers: Iterable[Container]
@@ -60,7 +60,7 @@ if TYPE_CHECKING:  # pragma: no cover
         secrets: Iterable[Secret]
         resources: Iterable[Resource]
         planned_units: int
-        deferred: Sequence[DeferredEvent]
+        deferred: Iterable[DeferredEvent]
         stored_states: Iterable[StoredState]
         app_status: _EntityStatus
         unit_status: _EntityStatus
@@ -68,7 +68,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 AnyJson = str | bool | dict[str, 'AnyJson'] | int | float | list['AnyJson']
-RawSecretRevisionContents = RawDataBagContents = dict[str, str]
+RawSecretRevisionContents = RawDataBagContents = Mapping[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
@@ -127,19 +127,6 @@ _SECRET_EVENTS = {
 }
 
 
-def _deepcopy_mutable_fields(obj: object):
-    # We don't have a frozendict to freeze any dictionaries, and while we
-    # could freeze a list into a tuple, we would break tests that currently
-    # assert that they get a list, so we can't do that until 8.0. That means
-    # we can't actually freeze the content here, but we can at least
-    # disassociate it from the original object.
-    for attr, value in obj.__dict__.items():
-        if isinstance(value, (dict, list)):
-            # We expect that the obj is a frozen dataclass, so have to use
-            # object.__setattr__ to bypass the frozen check.
-            object.__setattr__(obj, attr, copy.deepcopy(value))
-
-
 # A lot of JujuLogLine objects are created, so we want them to be fast and light.
 # Dataclasses define __slots__, so are small, and a namedtuple is actually
 # slower to create than a dataclass. A plain dictionary (or TypedDict) would be
@@ -154,14 +141,14 @@ class JujuLogLine:
     """The log message."""
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True, init=False)
 class CloudCredential:  # noqa: D101
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
     """Authentication type."""
 
-    attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    attributes: Mapping[str, str]
     """A dictionary containing cloud credentials.
 
     For example, for AWS, it contains `access-key` and `secret-key`;
@@ -169,11 +156,19 @@ class CloudCredential:  # noqa: D101
     can be found here.
     """
 
-    redacted: Sequence[str] = dataclasses.field(default_factory=list)
+    redacted: Sequence[str]
     """A list of redacted generic cloud API secrets."""
 
-    def __post_init__(self):
-        _deepcopy_mutable_fields(self)
+    def __init__(
+        self,
+        *,
+        auth_type: str,
+        attributes: Mapping[str, str] = {},
+        redacted: Iterable[str] = (),
+    ):
+        object.__setattr__(self, 'auth_type', auth_type)
+        object.__setattr__(self, 'attributes', dict(attributes))
+        object.__setattr__(self, 'redacted', list(redacted))
 
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
@@ -183,44 +178,64 @@ class CloudCredential:  # noqa: D101
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class CloudSpec:  # noqa: D101
     __doc__ = ops.CloudSpec.__doc__
 
     type: str
     """Type of the cloud."""
 
-    _: dataclasses.KW_ONLY
-
-    name: str = 'localhost'
+    name: str
     """Juju cloud name."""
 
-    region: str | None = None
+    region: str | None
     """Region of the cloud."""
 
-    endpoint: str | None = None
+    endpoint: str | None
     """Endpoint of the cloud."""
 
-    identity_endpoint: str | None = None
+    identity_endpoint: str | None
     """Identity endpoint of the cloud."""
 
-    storage_endpoint: str | None = None
+    storage_endpoint: str | None
     """Storage endpoint of the cloud."""
 
-    credential: CloudCredential | None = None
+    credential: CloudCredential | None
     """Cloud credentials with key-value attributes."""
 
-    ca_certificates: Sequence[str] = dataclasses.field(default_factory=list)
+    ca_certificates: Sequence[str]
     """A list of CA certificates."""
 
-    skip_tls_verify: bool = False
+    skip_tls_verify: bool
     """Whether to skip TLS verification."""
 
-    is_controller_cloud: bool = False
+    is_controller_cloud: bool
     """If this is the cloud used by the controller."""
 
-    def __post_init__(self):
-        _deepcopy_mutable_fields(self)
+    def __init__(
+        self,
+        type: str,
+        *,
+        name: str = 'localhost',
+        region: str | None = None,
+        endpoint: str | None = None,
+        identity_endpoint: str | None = None,
+        storage_endpoint: str | None = None,
+        credential: CloudCredential | None = None,
+        ca_certificates: Iterable[str] = (),
+        skip_tls_verify: bool = False,
+        is_controller_cloud: bool = False,
+    ):
+        object.__setattr__(self, 'type', type)
+        object.__setattr__(self, 'name', name)
+        object.__setattr__(self, 'region', region)
+        object.__setattr__(self, 'endpoint', endpoint)
+        object.__setattr__(self, 'identity_endpoint', identity_endpoint)
+        object.__setattr__(self, 'storage_endpoint', storage_endpoint)
+        object.__setattr__(self, 'credential', credential)
+        object.__setattr__(self, 'ca_certificates', list(ca_certificates))
+        object.__setattr__(self, 'skip_tls_verify', skip_tls_verify)
+        object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
 
     def _to_ops(self) -> CloudSpec_Ops:
         return CloudSpec_Ops(
@@ -244,7 +259,7 @@ def _generate_secret_id():
     return f'secret:{secret_id}'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Secret:
     """A Juju secret.
 
@@ -257,21 +272,19 @@ class Secret:
     This is the content the charm will receive with a
     :meth:`ops.Secret.get_content` call."""
 
-    _: dataclasses.KW_ONLY
-
-    latest_content: RawSecretRevisionContents | None = None
+    latest_content: RawSecretRevisionContents
     """The content of the latest revision of the secret.
 
     This is the content the charm will receive with a
     :meth:`ops.Secret.peek_content` call."""
 
-    id: str = dataclasses.field(default_factory=_generate_secret_id)
+    id: str
     """The Juju ID of the secret.
 
     This is automatically assigned and should not usually need to be explicitly set.
     """
 
-    owner: Literal['unit', 'app', None] = None
+    owner: Literal['unit', 'app'] | None
     """Indicates if the secret is owned by *this* unit, *this* application, or
     another application/unit.
 
@@ -279,39 +292,64 @@ class Secret:
     to this unit.
     """
 
-    remote_grants: Mapping[int, set[str]] = dataclasses.field(default_factory=dict)
+    remote_grants: Mapping[int, frozenset[str]]
     """Mapping from relation IDs to remote units and applications to which this
     secret has been granted."""
 
-    label: str | None = None
+    label: str | None
     """A human-readable label the charm can use to retrieve the secret.
 
     If this is set, it implies that the charm has previously set the label.
     """
-    description: str | None = None
+    description: str | None
     """A human-readable description of the secret."""
-    expire: datetime.datetime | None = None
+    expire: datetime.datetime | None
     """The time at which the secret will expire."""
-    rotate: SecretRotate | None = None
+    rotate: SecretRotate | None
     """The rotation policy for the secret."""
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
-    _tracked_revision: int = 1
+    _tracked_revision = 1
 
     # what revision is the latest for this secret.
-    _latest_revision: int = 1
+    _latest_revision = 1
+
+    def __init__(
+        self,
+        tracked_content: RawSecretRevisionContents,
+        *,
+        latest_content: RawSecretRevisionContents | None = None,
+        id: str | None = None,
+        owner: Literal['unit', 'app'] | None = None,
+        remote_grants: Mapping[int, Iterable[str]] = {},
+        label: str | None = None,
+        description: str | None = None,
+        expire: datetime.datetime | None = None,
+        rotate: SecretRotate | None = None,
+    ):
+        self._validate_content(tracked_content, 'tracked_content')
+        if latest_content is not None:
+            self._validate_content(latest_content, 'latest_content')
+        object.__setattr__(self, 'tracked_content', dict(tracked_content))
+        object.__setattr__(
+            self,
+            'latest_content',
+            dict(latest_content) if latest_content is not None else dict(tracked_content),
+        )
+        object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
+        object.__setattr__(self, 'owner', owner)
+        object.__setattr__(
+            self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()}
+        )
+        object.__setattr__(self, 'label', label)
+        object.__setattr__(self, 'description', description)
+        object.__setattr__(self, 'expire', expire)
+        object.__setattr__(self, 'rotate', rotate)
+        object.__setattr__(self, '_tracked_revision', 1)
+        object.__setattr__(self, '_latest_revision', 1)
 
     def __hash__(self) -> int:
         return hash(self.id)
-
-    def __post_init__(self):
-        self._validate_content(self.tracked_content, 'tracked_content')
-        if self.latest_content is not None:
-            self._validate_content(self.latest_content, 'latest_content')
-        if self.latest_content is None:
-            # bypass frozen dataclass
-            object.__setattr__(self, 'latest_content', self.tracked_content)
-        _deepcopy_mutable_fields(self)
 
     @staticmethod
     def _validate_content(content: dict[str, str], name: str):
@@ -412,7 +450,8 @@ class BindAddress:
     """The MAC address of the interface."""
 
     def __post_init__(self):
-        _deepcopy_mutable_fields(self)
+        # Stored as list for backwards compatibility.
+        object.__setattr__(self, 'addresses', list(self.addresses))
 
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook command would."""
@@ -425,7 +464,7 @@ class BindAddress:
         return dct
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Network:
     """A Juju network space.
 
@@ -448,27 +487,29 @@ class Network:
 
     binding_name: str
     """The name of the network space."""
-    bind_addresses: Sequence[BindAddress] = dataclasses.field(
-        default_factory=lambda: [BindAddress([Address('192.0.2.0')])],
-    )
+    bind_addresses: Sequence[BindAddress]
     """Addresses that the charm's application should bind to."""
 
-    _: dataclasses.KW_ONLY
-
-    ingress_addresses: Sequence[str] = dataclasses.field(
-        default_factory=lambda: ['192.0.2.0'],
-    )
+    ingress_addresses: Sequence[str]
     """Addresses other applications should use to connect to the unit."""
-    egress_subnets: Sequence[str] = dataclasses.field(
-        default_factory=lambda: ['192.0.2.0/24'],
-    )
+    egress_subnets: Sequence[str]
     """Subnets that other units will see the charm connecting from."""
+
+    def __init__(
+        self,
+        binding_name: str,
+        bind_addresses: Iterable[BindAddress] = (BindAddress([Address('192.0.2.0')]),),
+        *,
+        ingress_addresses: Iterable[str] = ('192.0.2.0',),
+        egress_subnets: Iterable[str] = ('192.0.2.0/24',),
+    ):
+        object.__setattr__(self, 'binding_name', binding_name)
+        object.__setattr__(self, 'bind_addresses', list(bind_addresses))
+        object.__setattr__(self, 'ingress_addresses', list(ingress_addresses))
+        object.__setattr__(self, 'egress_subnets', list(egress_subnets))
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
-
-    def __post_init__(self):
-        _deepcopy_mutable_fields(self)
 
     def _hook_tool_output_fmt(self):
         # dumps itself to dict in the same format the hook command would
@@ -565,7 +606,10 @@ class RelationBase:
         for databag in self._databags:
             self._validate_databag(databag)
 
-        _deepcopy_mutable_fields(self)
+        # Deepcopy mutable fields to disassociate from the caller's objects.
+        for attr, value in self.__dict__.items():
+            if isinstance(value, (dict, list)):
+                object.__setattr__(self, attr, copy.deepcopy(value))
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -603,7 +647,7 @@ class Relation(RelationBase):
 
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
     """The current content of the application databag."""
-    remote_units_data: dict[UnitID, RawDataBagContents] = dataclasses.field(
+    remote_units_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
         default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
     )
     """The current content of the databag for each unit in the relation."""
@@ -688,7 +732,7 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: dict[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
+    peers_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
     """Current contents of the peer databags.
 
     Note that this does not include data for the unit being tested. Data for
@@ -786,26 +830,24 @@ def _generate_new_change_id():
     return _CHANGE_IDS
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Exec:
     """Mock data for simulated :meth:`ops.Container.exec` calls."""
 
     command_prefix: Sequence[str]
 
-    _: dataclasses.KW_ONLY
-
-    return_code: int = 0
+    return_code: int
     """The return code of the process.
 
     Use 0 to mock the process ending successfully, and other values for failure.
     """
-    stdout: str = ''
+    stdout: str
     """Any content written to stdout by the process.
 
     Provide content that the real process would write to stdout, which can be
     read by the charm.
     """
-    stderr: str = ''
+    stderr: str
     """Any content written to stderr by the process.
 
     Provide content that the real process would write to stderr, which can be
@@ -813,14 +855,25 @@ class Exec:
     """
 
     # change ID: used internally to keep track of mocked processes
-    _change_id: int = dataclasses.field(default_factory=_generate_new_change_id)
+    _change_id: int
 
-    def __post_init__(self):
-        # The command prefix can be any sequence type, and a list is tidier to
-        # write when there's only one string. However, this object needs to be
-        # hashable, so can't contain a list. We 'freeze' the sequence to a tuple
-        # to support that.
-        object.__setattr__(self, 'command_prefix', tuple(self.command_prefix))
+    def __init__(
+        self,
+        command_prefix: Sequence[str],
+        *,
+        return_code: int = 0,
+        stdout: str = '',
+        stderr: str = '',
+        _change_id: int | None = None,
+    ):
+        # Stored as tuple (rather than list) for hashability.
+        object.__setattr__(self, 'command_prefix', tuple(command_prefix))
+        object.__setattr__(self, 'return_code', return_code)
+        object.__setattr__(self, 'stdout', stdout)
+        object.__setattr__(self, 'stderr', stderr)
+        object.__setattr__(
+            self, '_change_id', _change_id if _change_id is not None else _generate_new_change_id()
+        )
 
     def _run(self) -> int:
         return self._change_id
@@ -856,7 +909,7 @@ def _next_notice_id(*, update: bool = True):
     return str(cur)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Notice:
     """A Pebble notice."""
 
@@ -867,44 +920,72 @@ class Notice:
     ``canonical.com/postgresql/backup`` or ``example.com/mycharm/notice``.
     """
 
-    _: dataclasses.KW_ONLY
-
-    id: str = dataclasses.field(default_factory=_next_notice_id)
+    id: str
     """Unique ID for this notice."""
 
-    user_id: int | None = None
+    user_id: int | None
     """UID of the user who may view this notice (None means notice is public)."""
 
-    type: pebble.NoticeType | str = pebble.NoticeType.CUSTOM
+    type: pebble.NoticeType | str
     """Type of the notice."""
 
-    first_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    first_occurred: datetime.datetime
     """The first time one of these notices (type and key combination) occurs."""
 
-    last_occurred: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    last_occurred: datetime.datetime
     """The last time one of these notices occurred."""
 
-    last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
+    last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
     See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
-    occurrences: int = 1
+    occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    last_data: Mapping[str, str]
     """Additional data captured from the last occurrence of one of these notices."""
 
-    repeat_after: datetime.timedelta | None = None
+    repeat_after: datetime.timedelta | None
     """Minimum time after one of these was last repeated before Pebble will repeat it again."""
 
-    expire_after: datetime.timedelta | None = None
+    expire_after: datetime.timedelta | None
     """How long since one of these last occurred until Pebble will drop the notice."""
 
-    def __post_init__(self):
-        _deepcopy_mutable_fields(self)
+    def __init__(
+        self,
+        key: str,
+        *,
+        id: str | None = None,
+        user_id: int | None = None,
+        type: pebble.NoticeType | str = pebble.NoticeType.CUSTOM,
+        first_occurred: datetime.datetime | None = None,
+        last_occurred: datetime.datetime | None = None,
+        last_repeated: datetime.datetime | None = None,
+        occurrences: int = 1,
+        last_data: Mapping[str, str] = {},
+        repeat_after: datetime.timedelta | None = None,
+        expire_after: datetime.timedelta | None = None,
+    ):
+        object.__setattr__(self, 'key', key)
+        object.__setattr__(self, 'id', id if id is not None else _next_notice_id())
+        object.__setattr__(self, 'user_id', user_id)
+        object.__setattr__(self, 'type', type)
+        object.__setattr__(
+            self, 'first_occurred', first_occurred if first_occurred is not None else _now_utc()
+        )
+        object.__setattr__(
+            self, 'last_occurred', last_occurred if last_occurred is not None else _now_utc()
+        )
+        object.__setattr__(
+            self, 'last_repeated', last_repeated if last_repeated is not None else _now_utc()
+        )
+        object.__setattr__(self, 'occurrences', occurrences)
+        object.__setattr__(self, 'last_data', dict(last_data))
+        object.__setattr__(self, 'repeat_after', repeat_after)
+        object.__setattr__(self, 'expire_after', expire_after)
 
     def _to_ops(self) -> pebble.Notice:
         return pebble.Notice(
@@ -1012,16 +1093,14 @@ class CheckInfo:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class Container:
     """A Kubernetes container where a charm's workload runs."""
 
     name: str
     """Name of the container, as found in the charm metadata."""
 
-    _: dataclasses.KW_ONLY
-
-    can_connect: bool = False
+    can_connect: bool
     """When False, all Pebble operations will fail."""
 
     # This is the base plan. On top of it, one can add layers.
@@ -1029,10 +1108,10 @@ class Container:
     # pebble or derive them from the resulting plan (which one CAN get from pebble).
     # So if we are instantiating Container by fetching info from a 'live' charm, the 'layers'
     # will be unknown. all that we can know is the resulting plan (the 'computed plan').
-    _base_plan: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    _base_plan: Mapping[str, Any]
     # We expect most of the user-facing testing to be covered by this 'layers' attribute,
     # as it is all that will be known when unit-testing.
-    layers: Mapping[str, pebble.Layer] = dataclasses.field(default_factory=dict)
+    layers: Mapping[str, pebble.Layer]
     """All :class:`ops.pebble.Layer` definitions that have already been added to the container.
 
     Note that the layers should be added to the dictionary in the order in which they would have
@@ -1041,12 +1120,10 @@ class Container:
     this means adding them in the order of the API calls.
     """
 
-    service_statuses: Mapping[str, pebble.ServiceStatus] = dataclasses.field(
-        default_factory=dict,
-    )
+    service_statuses: Mapping[str, pebble.ServiceStatus]
     """The current status of each Pebble service running in the container."""
 
-    mounts: Mapping[str, Mount] = dataclasses.field(default_factory=dict)
+    mounts: Mapping[str, Mount]
     """Provides access to the contents of the simulated container filesystem.
 
     For example, suppose you want to express that your container has:
@@ -1069,7 +1146,7 @@ class Container:
     be safely modified.
     """
 
-    execs: Iterable[Exec] = frozenset()
+    execs: frozenset[Exec]
     """Simulate executing commands in the container.
 
     Specify each command the charm might run in the container and an :class:`Exec`
@@ -1090,20 +1167,38 @@ class Container:
         )
     """
 
-    notices: Sequence[Notice] = dataclasses.field(default_factory=list)
+    notices: Sequence[Notice]
     """Any Pebble notices that already exist in the container."""
 
-    check_infos: Iterable[CheckInfo] = frozenset()
+    check_infos: frozenset[CheckInfo]
     """All Pebble health checks that have been added to the container."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        can_connect: bool = False,
+        _base_plan: Mapping[str, Any] = {},
+        layers: Mapping[str, pebble.Layer] = {},
+        service_statuses: Mapping[str, pebble.ServiceStatus] = {},
+        mounts: Mapping[str, Mount] = {},
+        execs: Iterable[Exec] = (),
+        notices: Iterable[Notice] = (),
+        check_infos: Iterable[CheckInfo] = (),
+    ):
+        object.__setattr__(self, 'name', name)
+        object.__setattr__(self, 'can_connect', can_connect)
+        object.__setattr__(self, '_base_plan', copy.deepcopy(dict(_base_plan)))
+        object.__setattr__(self, 'layers', copy.deepcopy(dict(layers)))
+        object.__setattr__(self, 'service_statuses', dict(service_statuses))
+        object.__setattr__(self, 'mounts', dict(mounts))
+        object.__setattr__(self, 'execs', frozenset(execs))
+        # Stored as list for backwards compatibility.
+        object.__setattr__(self, 'notices', list(notices))
+        object.__setattr__(self, 'check_infos', frozenset(check_infos))
 
     def __hash__(self) -> int:
         return hash(self.name)
-
-    def __post_init__(self):
-        if not isinstance(self.execs, frozenset):
-            # Allow passing a regular set (or other iterable) of Execs.
-            object.__setattr__(self, 'execs', frozenset(self.execs))
-        _deepcopy_mutable_fields(self)
 
     def _render_services(self):
         services: dict[str, pebble.Service] = {}
@@ -1360,11 +1455,11 @@ _EntityStatus._entity_statuses.update(
 )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class StoredState:
     """Represents unit-local state that persists across events."""
 
-    name: str = '_stored'
+    name: str
     """The attribute in the parent Object where the state is stored.
 
     For example, ``_stored`` in this class::
@@ -1374,9 +1469,7 @@ class StoredState:
 
     """
 
-    _: dataclasses.KW_ONLY
-
-    owner_path: str | None = None
+    owner_path: str | None
     """The path to the owner of this StoredState instance.
 
     If ``None``, the owner is the Framework. Otherwise, /-separated object names,
@@ -1387,17 +1480,27 @@ class StoredState:
     # However, it's complex to describe those types, since it's a recursive
     # definition - even in TypeShed the _Marshallable type includes containers
     # like list[Any], which seems to defeat the point.
-    content: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    content: Mapping[str, Any]
     """The content of the :class:`ops.StoredState` instance."""
 
-    _data_type_name: str = 'StoredStateData'
+    _data_type_name: str
+
+    def __init__(
+        self,
+        name: str = '_stored',
+        *,
+        owner_path: str | None = None,
+        content: Mapping[str, Any] = {},
+        _data_type_name: str = 'StoredStateData',
+    ):
+        object.__setattr__(self, 'name', name)
+        object.__setattr__(self, 'owner_path', owner_path)
+        object.__setattr__(self, 'content', copy.deepcopy(content))
+        object.__setattr__(self, '_data_type_name', _data_type_name)
 
     @property
     def _handle_path(self):
         return f'{self.owner_path or ""}/{self._data_type_name}[{self.name}]'
-
-    def __post_init__(self):
-        _deepcopy_mutable_fields(self)
 
     def __hash__(self) -> int:
         return hash(self._handle_path)
@@ -1559,7 +1662,7 @@ class Resource:
     """A local path that will be provided to the charm as the content of the resource."""
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True, init=False)
 class State:
     """Represents the Juju-owned portion of a unit's state.
 
@@ -1568,13 +1671,11 @@ class State:
     return data from `State.leader`, and so on.
     """
 
-    config: dict[str, str | int | float | bool] = dataclasses.field(
-        default_factory=dict,
-    )
+    config: Mapping[str, str | int | float | bool]
     """The present configuration of this charm."""
-    relations: Iterable[RelationBase] = dataclasses.field(default_factory=frozenset)
+    relations: frozenset[RelationBase]
     """All relations that currently exist for this charm."""
-    networks: Iterable[Network] = dataclasses.field(default_factory=frozenset)
+    networks: frozenset[Network]
     """Manual overrides for any relation and extra bindings currently provisioned for this charm.
     If a metadata-defined relation endpoint is not explicitly mapped to a Network in this field,
     it will be defaulted.
@@ -1584,28 +1685,28 @@ class State:
         support it, but use at your own risk. If a metadata-defined extra-binding is left empty,
         it will be defaulted.
     """
-    containers: Iterable[Container] = dataclasses.field(default_factory=frozenset)
+    containers: frozenset[Container]
     """All containers (whether they can connect or not) that this charm is aware of."""
-    storages: Iterable[Storage] = dataclasses.field(default_factory=frozenset)
+    storages: frozenset[Storage]
     """All **attached** storage instances for this charm.
 
     If a storage is not attached, omit it from this listing."""
 
     # we don't use sets to make json serialization easier
-    opened_ports: Iterable[Port] = dataclasses.field(default_factory=frozenset)
+    opened_ports: frozenset[Port]
     """Ports opened by Juju on this charm."""
-    leader: bool = False
+    leader: bool
     """Whether this charm has leadership."""
-    model: Model = dataclasses.field(default_factory=Model)
+    model: Model
     """The model this charm lives in."""
-    secrets: Iterable[Secret] = dataclasses.field(default_factory=frozenset)
+    secrets: frozenset[Secret]
     """The secrets this charm has access to (as an owner, or as a grantee).
 
     The presence of a secret in this list entails that the charm can read it.
     Whether it can manage it or not depends on the individual secret's `owner` flag."""
-    resources: Iterable[Resource] = dataclasses.field(default_factory=frozenset)
+    resources: frozenset[Resource]
     """All resources that this charm can access."""
-    planned_units: int = 1
+    planned_units: int
     """Number of non-dying planned units that are expected to be running this application.
 
     Use with caution."""
@@ -1614,45 +1715,72 @@ class State:
     # dispatched, and represent the events that had been deferred during the previous run.
     # If the charm defers any events during "this execution", they will be appended
     # to this list.
-    deferred: Sequence[DeferredEvent] = dataclasses.field(default_factory=list)
+    deferred: Sequence[DeferredEvent]
     """Events that have been deferred on this charm by some previous execution."""
-    stored_states: Iterable[StoredState] = dataclasses.field(
-        default_factory=frozenset,
-    )
+    stored_states: frozenset[StoredState]
     """Contents of a charm's stored state."""
 
     # the current statuses.
-    app_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
+    app_status: _EntityStatus
     """Status of the application."""
-    unit_status: _EntityStatus = dataclasses.field(default_factory=UnknownStatus)
+    unit_status: _EntityStatus
     """Status of the unit."""
-    workload_version: str = ''
+    workload_version: str
     """Workload version."""
 
-    def __post_init__(self):
-        # Let people pass in the ops classes, and convert them to the appropriate Scenario classes.
-        for name in ['app_status', 'unit_status']:
-            val = getattr(self, name)
-            if isinstance(val, _EntityStatus):
-                pass
+    def __init__(
+        self,
+        *,
+        config: Mapping[str, str | int | float | bool] | None = None,
+        relations: Iterable[RelationBase] = (),
+        networks: Iterable[Network] = (),
+        containers: Iterable[Container] = (),
+        storages: Iterable[Storage] = (),
+        opened_ports: Iterable[Port] = (),
+        leader: bool = False,
+        model: Model | None = None,
+        secrets: Iterable[Secret] = (),
+        resources: Iterable[Resource] = (),
+        planned_units: int = 1,
+        deferred: Iterable[DeferredEvent] = (),
+        stored_states: Iterable[StoredState] = (),
+        app_status: _EntityStatus | StatusBase | None = None,
+        unit_status: _EntityStatus | StatusBase | None = None,
+        workload_version: str = '',
+    ):
+        object.__setattr__(self, 'config', config if config is not None else {})
+        object.__setattr__(self, 'leader', leader)
+        object.__setattr__(self, 'model', model if model is not None else Model())
+        object.__setattr__(self, 'planned_units', planned_units)
+        object.__setattr__(self, 'deferred', list(deferred))
+        object.__setattr__(self, 'workload_version', workload_version)
+
+        # Handle status conversion from ops types.
+        for name, val in [('app_status', app_status), ('unit_status', unit_status)]:
+            if val is None:
+                object.__setattr__(self, name, UnknownStatus())
+            elif isinstance(val, _EntityStatus):
+                object.__setattr__(self, name, val)
             elif isinstance(val, StatusBase):
                 object.__setattr__(self, name, _EntityStatus.from_ops(val))
             else:
                 raise TypeError(f'Invalid status.{name}: {val!r}')
-        normalised_ports = [
+
+        # Normalise ops.Port to scenario Port.
+        normalised_ports = frozenset(
             Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
-            for port in self.opened_ports
-        ]
-        if self.opened_ports != normalised_ports:
-            object.__setattr__(self, 'opened_ports', normalised_ports)
-        normalised_storage = [
+            for port in opened_ports
+        )
+        object.__setattr__(self, 'opened_ports', normalised_ports)
+
+        # Normalise ops.Storage to scenario Storage.
+        normalised_storage = frozenset(
             Storage(name=storage.name, index=storage.index)
             if isinstance(storage, ops.Storage)
             else storage
-            for storage in self.storages
-        ]
-        if self.storages != normalised_storage:
-            object.__setattr__(self, 'storages', normalised_storage)
+            for storage in storages
+        )
+        object.__setattr__(self, 'storages', normalised_storage)
 
         # ops.Container, ops.Model, ops.Relation, ops.Secret should not be instantiated by
         # charmers.
@@ -1660,23 +1788,12 @@ class State:
         # ops.Resources does not contain the source of the resource, so cannot be converted.
         # ops.StoredState is not convenient to initialise with data, so not useful here.
 
-        # It's convenient to pass a set, but we really want the attributes to be
-        # frozen sets to increase the immutability of State objects.
-        for name in [
-            'relations',
-            'containers',
-            'storages',
-            'networks',
-            'opened_ports',
-            'secrets',
-            'resources',
-            'stored_states',
-        ]:
-            val = getattr(self, name)
-            # It's ok to pass any iterable (of hashable objects), but you'll get
-            # a frozenset as the actual attribute.
-            if not isinstance(val, frozenset):
-                object.__setattr__(self, name, frozenset(val))
+        object.__setattr__(self, 'relations', frozenset(relations))
+        object.__setattr__(self, 'networks', frozenset(networks))
+        object.__setattr__(self, 'containers', frozenset(containers))
+        object.__setattr__(self, 'secrets', frozenset(secrets))
+        object.__setattr__(self, 'resources', frozenset(resources))
+        object.__setattr__(self, 'stored_states', frozenset(stored_states))
 
     def _update_workload_version(self, new_workload_version: str):
         """Update the current app version and record the previous one."""
@@ -1817,7 +1934,7 @@ class State:
         ctx: Context[CharmType],
         *,
         # If provided, these merge with or replace the generated versions.
-        config: dict[str, str | int | float | bool] | None = None,
+        config: Mapping[str, str | int | float | bool] | None = None,
         relations: Iterable[RelationBase] | None = None,
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
@@ -1999,9 +2116,9 @@ class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
 
     charm_type: type[CharmBase]
-    meta: dict[str, Any]
-    actions: dict[str, Any] | None = None
-    config: dict[str, Any] | None = None
+    meta: Mapping[str, Any]
+    actions: Mapping[str, Any] | None = None
+    config: Mapping[str, Any] | None = None
 
     # autoloaded means: we are running a 'real' charm class, living in some
     # /src/charm.py, and the metadata files are 'real' metadata files.
