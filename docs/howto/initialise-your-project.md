@@ -7,7 +7,7 @@ myst:
 (init-charm)=
 # How to initialise your project
 
-Before you initialise your project, install charm development tools. See {ref}`prepare-your-environment`.
+Before you initialise your project, install charm development tools. See [](#prepare-your-environment).
 
 This guide demonstrates how to name your charm and generate the recommended project structure. You should decide your charm's name before you create a repository for your charm.
 
