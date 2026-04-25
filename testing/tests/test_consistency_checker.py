@@ -479,6 +479,15 @@ def test_relation_not_in_state():
     )
 
 
+def test_relation_changed_remote_unit_zero_is_explicit():
+    relation = Relation('foo', remote_units_data={0: {}})
+    assert_consistent(
+        State(relations={relation}),
+        _Event('foo_relation_changed', relation=relation, relation_remote_unit_id=0),
+        _CharmSpec(MyCharm, {'requires': {'foo': {'interface': 'bar'}}}),
+    )
+
+
 def test_action_not_in_meta_inconsistent():
     ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
     assert_inconsistent(
