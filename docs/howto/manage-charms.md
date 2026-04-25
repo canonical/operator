@@ -32,6 +32,11 @@ configures development tooling.
 > * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
 > * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
 
+```{note}
+If you want your charm to show a custom icon on Charmhub, check the Charmcraft documentation for the plugin or profile you are using. Modern charms in this repository typically use the `uv` plugin, while older charms may use `dump`, so `icon.svg` is not handled in exactly the same way in every case.
+```
+
+
 <!--
 TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
 -->
