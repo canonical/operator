@@ -219,17 +219,19 @@ def test_evt_bad_container_name():
     ],
 )
 def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
-    layer = ops.pebble.Layer({
-        'checks': {
-            'chk1': {
-                'override': 'replace',
-                'level': 'ready',
-                'startup': 'disabled',
-                'threshold': 42,
-                'http': {'url': 'http://localhost:5000/version'},
+    layer = ops.pebble.Layer(
+        {
+            'checks': {
+                'chk1': {
+                    'override': 'replace',
+                    'level': 'ready',
+                    'startup': 'disabled',
+                    'threshold': 42,
+                    'http': {'url': 'http://localhost:5000/version'},
+                }
             }
         }
-    })
+    )
     state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
     asserter = assert_consistent if consistent else assert_inconsistent
     asserter(
@@ -475,6 +477,15 @@ def test_relation_not_in_state():
     assert_consistent(
         State(relations={relation}),
         _Event('foo_relation_changed', relation=relation),
+        _CharmSpec(MyCharm, {'requires': {'foo': {'interface': 'bar'}}}),
+    )
+
+
+def test_relation_changed_remote_unit_zero_is_explicit():
+    relation = Relation('foo', remote_units_data={0: {}})
+    assert_consistent(
+        State(relations={relation}),
+        _Event('foo_relation_changed', relation=relation, relation_remote_unit_id=0),
         _CharmSpec(MyCharm, {'requires': {'foo': {'interface': 'bar'}}}),
     )
 
