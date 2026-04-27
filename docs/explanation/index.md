@@ -55,6 +55,16 @@ The `defer()` mechanism in Ops is convenient, but has some limitations.
 defer-guidance
 ```
 
+## Subordinate charms
+
+A "subordinate" charm is a machine charm where each unit runs alongside a unit of another charm.
+
+```{toctree}
+:maxdepth: 1
+
+subordinate-charms
+```
+
 ## Security
 
 As you write your charm, follow good security practices and produce security documentation for your charm.
