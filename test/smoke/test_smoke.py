@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 CHARMCRAFT3_YAML = """
 type: "charm"
+name: smoke
+summary: basic minimal charm for running smoke tests
+description: smoke test charm
 base: ubuntu@{base}
 platforms:
   amd64:
@@ -64,7 +67,20 @@ def pack(charm_dir: pathlib.Path):
     return dest_name.absolute()
 
 
-@pytest.mark.parametrize('base', ['22.04', '24.04'])
+@pytest.mark.parametrize(
+    'base',
+    [
+        '22.04',
+        '24.04',
+        pytest.param(
+            '26.04',
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason='charmcraft 3.x/stable does not yet accept ubuntu@26.04 as a base',
+            ),
+        ),
+    ],
+)
 def test_smoke(juju: jubilant_backports.Juju, base: str):
     """Verify that we can build and deploy charms from supported bases."""
     with open('./test/charms/test_smoke/charmcraft.yaml', 'w') as outf:
