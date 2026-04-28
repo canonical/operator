@@ -155,7 +155,7 @@ As your suite grows, split your integration tests across several `test_*.py` mod
 A common split:
 
 - `test_charm.py` — smoke tests: pack, deploy, and check the charm reaches active status.
-- `test_<feature>.py` — one module per feature area (for example, `test_backups.py`, `test_tls.py`, `test_upgrade.py`, `test_scaling.py`).
+- `test_<feature>.py` — for example, `test_backups.py`, `test_tls.py`, `test_upgrade.py`, `test_scaling.py`.
 
 The main reason to split is **parallel CI execution**: each module can run as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules. `tox -e integration` still runs every module sequentially on a single machine; it's the CI matrix (see {ref}`set-up-ci-integration`) that turns module boundaries into parallel jobs. Adding a new `test_*.py` file then automatically adds a new CI job — no workflow changes needed.
 
