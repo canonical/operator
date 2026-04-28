@@ -7,22 +7,24 @@ myst:
 (run-workloads-with-a-charm-machines)=
 # How to run workloads with a machine charm
 
-A machine charm typically installs one or more system packages (from APT or as snaps), then starts and manages the workload as a long-running service. This how-to shows a pattern for structuring that code, installing packages, managing the service lifecycle, and testing the charm.
+A machine charm typically installs one or more system packages (from APT or as snaps), then starts and manages the workload as a long-running service. This guide shows patterns for structuring that code, installing packages, managing the service lifecycle, and testing the charm.
 
 For a complete worked example, see the [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) example charm and the {ref}`machine-charm-tutorial` tutorial. For a production charm, see [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator).
 
 ## Put workload logic in its own module
 
-Keep charming concerns (event handlers, status, config parsing) in `src/charm.py`, and put workload-specific logic (installing, starting, configuring, stopping the workload) in a separate module such as `src/myworkload.py`. The charm calls the module; the module doesn't know about Ops. If you use `charmcraft init --profile machine`, Charmcraft creates a `charm.py` and `<workload>.py` placeholder.
+Keep charming concerns (event handlers, status, config parsing) in `src/charm.py`, and put workload-specific logic (installing, starting, configuring, stopping the workload) in a separate module such as `src/myworkload.py`. The charm calls the module; the module doesn't know about Ops.
 
 This separation:
 
 - Makes the workload code reusable and easy to read.
-- Lets you unit test the charm by mocking the module (no `subprocess` patching at the charm-test layer).
+- Lets you unit test the charm by mocking the module (no `subprocess` patching in state-transition tests).
 - Lets you unit test the module on its own, patching only its direct system calls.
 
-```python
-# src/charm.py
+If you use `charmcraft init --profile machine`, Charmcraft creates `charm.py` and `<workload>.py` placeholders in the `src` directory.
+
+Below is an example of how `charm.py` calls the workload module. For more guidance, see {ref}`design-your-python-modules`.
+
 import ops
 import myworkload
 
@@ -48,7 +50,7 @@ class MyCharm(ops.CharmBase):
         myworkload.stop()
 
     def _on_remove(self, event: ops.RemoveEvent) -> None:
-        # On shared machines, avoid uninstalling system packages by default.
+        # On shared machines, avoid automatically uninstalling system packages.
         # Stop the workload here, and only remove packages as an explicit,
         # charm-specific step when you know the machine is dedicated to it.
         myworkload.stop()
@@ -107,7 +109,7 @@ Use {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>`:
 
 ```toml
 dependencies = [
-    "charmlibs-snap~=1.0",
+    "charmlibs-snap>=1,<2",
     # ...
 ]
 ```
@@ -139,22 +141,22 @@ If no library is available for the workload you need, call out to the tool with 
 :class: hint
 
 When running subprocesses:
-- Use absolute paths (e.g. `/usr/bin/apt` rather than `apt`) to avoid PATH-based attacks.
+- Use absolute paths to avoid PATH-based attacks. For example, `/usr/bin/apt` rather than `apt`.
 - Pass arguments as a list, not a shell string, so the shell doesn't interpret them.
 - Use `check=True` and `capture_output=True` so failures raise, and log the return code and `stderr` when they do.
 ```
 
 ### Uninstall with care on shared machines
 
-A machine charm doesn't necessarily own its machine. Another charm may have installed the same package before you did, may install it after you with `--skip-install`-style logic, or may rely on it for an unrelated purpose. Removing the package on `remove` can break those other consumers.
+A machine charm doesn't necessarily own its machine. Another charm may have installed the same package before you did, may install it after you, or may rely on it for an unrelated purpose. Removing the package on `remove` can break those other consumers.
 
 In your `remove` handler, always clean up the things that are unambiguously yours:
 
 - Config files and data directories your charm wrote.
 - systemd drop-ins or unit files your charm created.
-- Workload state that no other consumer would expect to find (e.g. a PID file you maintain).
+- Workload state that no other consumer would expect to find, such as a PID file you maintain.
 
-Be more cautious about the package itself. If you can't be sure that you're the only consumer, leave the snap or deb installed and just stop the service you started. The cost of leaving an unused package on a machine is much smaller than the cost of breaking another charm.
+Be more cautious about the package itself. If you can't be sure that you're the only consumer, leave the package installed and just stop the service you started. The cost of leaving an unused package on a machine is much smaller than the cost of breaking another charm.
 
 ## Manage the service lifecycle
 
@@ -162,11 +164,10 @@ How you start, stop, and signal the workload depends on how the package runs it:
 
 - **systemd units** (most APT packages) — use {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`, or call `systemctl` as a subprocess.
 - **snap services** — use `snap.Snap.start` / `.stop` / `.restart` from the snap library.
-- **A process you launch directly** — use `subprocess.run` to start the daemon (note that the charm process is short-lived, so the command you run should return immediately and have a daemonized process), and send signals with `os.kill` (e.g. `SIGTERM` to stop, `SIGUSR1` to reload config). Read the workload's man page for the signals it supports.
+- **A process you launch directly** — use `subprocess.run` to start the daemon. The charm process is short-lived, so the command you run should return immediately and have a daemonized process. Send signals with `os.kill` (such as `SIGTERM` to stop and `SIGUSR1` to reload config). Read the workload's man page for the signals it supports.
 
 For example, signalling a directly-launched process to reload its config:
 
-```python
 import os
 import signal
 
@@ -194,7 +195,7 @@ For a longer-lived charm that may be upgraded in place, also observe `upgrade_ch
 
 ## Write unit tests
 
-Unit tests for a machine charm come in two layers, matching the module split above. Together they cover the whole charm without ever installing the real package.
+Unit tests for a machine charm come in two layers, matching the charm's modules. Together they cover the whole charm without ever installing the real package.
 
 ### State-transition tests for the charm
 
@@ -276,7 +277,7 @@ def test_stop(workload: MockWorkload):
 
 ### Tests for the workload module
 
-Test the module directly by patching the things it actually calls — `apt`, `subprocess.run`, `os.kill`, the snap cache. Keep these tests small: they exist to check that the module invokes its dependencies correctly, not to test those dependencies.
+Test the module directly by patching the things it actually calls — `apt`, `subprocess.run`, `os.kill`, the snap cache, and so on. Keep these tests small: they exist to check that the module invokes its dependencies correctly, not to test those dependencies.
 
 ```python
 # tests/unit/test_myworkload.py
@@ -324,6 +325,8 @@ def test_start_runs_subprocess(monkeypatch: pytest.MonkeyPatch):
     assert commands == [["myworkload"]]
 ```
 
+### Run the tests
+
 Run all your unit tests with:
 
 ```text
@@ -350,7 +353,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 def test_workload_version(juju: jubilant.Juju):
     version = juju.status().apps["myworkload"].version
-    assert version == "1.11.1"  # The version we pinned in install().
+    assert version == "1.11.1"  # The version we pinned in install(), as reported by the workload.
 
 
 def test_blocks_on_invalid_config(juju: jubilant.Juju):
@@ -359,9 +362,14 @@ def test_blocks_on_invalid_config(juju: jubilant.Juju):
     juju.config("myworkload", reset="slug")
 ```
 
-The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file — see the [machine-tinyproxy integration `conftest`](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py) for a reusable template.
+The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file. For an example, see [`conftest.py` in machine-tinyproxy's integration tests](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py).
 
-For how to pack the charm, set up a virtual machine to run the tests, and configure CI, see {ref}`write-integration-tests-for-a-charm` and {ref}`set-up-ci`.
+If you use `charmcraft init --profile machine`, Charmcraft creates a `charm` fixture and placeholder files for your tests.
+
+For guidance on running the tests, see:
+
+- {ref}`write-integration-tests-for-a-charm`
+- {ref}`set-up-ci`
 
 ## Examples
 
@@ -371,7 +379,7 @@ For how to pack the charm, set up a virtual machine to run the tests, and config
 
 ## See also
 
-- {ref}`machine-charm-tutorial` — build a machine charm from scratch.
-- {ref}`write-unit-tests-for-a-charm` — more on `ops.testing`.
-- {ref}`write-integration-tests-for-a-charm` — more on Jubilant.
-- {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`, {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>`, {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`, and {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>`.
+- {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`
+- {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>`
+- {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`
+- {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>`
