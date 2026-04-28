@@ -117,7 +117,12 @@ This single job runs every integration test module sequentially. As your suite g
 (set-up-ci-charmcraft-test)=
 ## Run integration tests in parallel with `charmcraft test`
 
-If you initialised your charm with `charmcraft init --profile test-machine` or `--profile test-kubernetes` (both currently experimental), your charm includes a `spread.yaml` and one `spread/integration/<module>/task.yaml` per test module. You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `test_*.py` module — along with its `task.yaml` — automatically adds a new CI job.
+If you initialised your charm with `charmcraft init --profile test-machine` or `--profile test-kubernetes` (both currently experimental), your charm includes extra testing machinery:
+
+- A [spread](https://github.com/canonical/spread) configuration file called `spread.yaml`.
+- One file `spread/integration/<module>/task.yaml` per test module.
+
+You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `test_*.py` module — along with its `task.yaml` — automatically adds a new CI job.
 
 A minimal workflow looks like:
 
@@ -149,4 +154,6 @@ A minimal workflow looks like:
         run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
 ```
 
-For a complete workflow that discovers modules dynamically (no hard-coded matrix), see the Ops repository's [example-charm-charmcraft-test.yaml](https://github.com/canonical/operator/blob/main/.github/workflows/example-charm-charmcraft-test.yaml). For the matching charm-side files, see the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm.
+It's also possible to discover modules dynamically (no hard-coded matrix), so that when you add a `test_*.py` module and corresponding `task.yaml` file, you automatically get a new CI job.
+
+For an example, see the Ops repository's [example-charm-charmcraft-test.yaml workflow](https://github.com/canonical/operator/blob/main/.github/workflows/example-charm-charmcraft-test.yaml). This workflow runs integration tests for the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm.
