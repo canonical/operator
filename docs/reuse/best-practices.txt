@@ -12,13 +12,15 @@
 **[How to manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)**
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. See [Write a library](#manage-libraries-write-a-library).
 
+**[How to set up continuous integration for a charm](https://documentation.ubuntu.com/ops/latest/howto/set-up-continuous-integration-for-a-charm/)**
+- The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system.
+
 **[How to write and structure charm code](https://documentation.ubuntu.com/ops/latest/howto/write-and-structure-charm-code/)**
 - Avoid using Charmcraft's `charm` plugin if possible. Instead, {external+charmcraft:ref}`migrate to the uv plugin <howto-migrate-to-uv>` or the {external+charmcraft:ref}`poetry plugin <howto-migrate-to-poetry>`. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Ensure that the `pyproject.toml` *and* the lock file are committed to version control, so that exact versions of charms can be reproduced. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Ensure that tooling is configured to automatically detect new versions, particularly security releases, for all your dependencies. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Name the repository using the pattern ``<charm name>-operator`` for a single charm, or ``<base charm name>-operators`` when the repository will hold multiple related charms. For the charm name, see {external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`. See [Create a repository and initialise it](#create-a-repository-and-initialise-it).
 - Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python) version in your `pyproject.toml` so that tooling will detect any use of Python features not available in the versions you support. See [Use the Python provided by the base](#define-the-required-dependencies).
-- The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system. See [Validate your charm with every change](#validate-your-charm-with-every-change).
 
 **[Manage charms](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-charms/)**
 - If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see {external+charmcraft:ref}`specify-a-name`. See {external+charmcraft:ref}`Initialise a charm <initialise-a-charm>`.
