@@ -494,7 +494,7 @@ This creates the scaffolding of a spread configuration. Our [httpbin-demo charm]
 - `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
 - The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
 
-When you run `charmcraft test`, spread packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
+When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
 
 It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-charmcraft-test`.
 
