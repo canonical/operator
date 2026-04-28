@@ -416,12 +416,6 @@ You can ensure this by writing integration tests for your charm. In the charming
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
-```{tip}
-Charmcraft can also scaffold a spread configuration that runs your integration tests under `charmcraft test`. From your project directory, run `charmcraft init --profile test-kubernetes --force` to drop in the extra files. This profile is currently experimental. You can see a worked example, with a few extra optimisations, in the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
-
-`charmcraft test` wraps [spread](https://github.com/canonical/spread) to provision a clean environment for each run: it packs the charm, launches an LXD VM (or configures a CI runner), uses [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate, then invokes your pytest integration tests inside it. Each `tests/integration/test_*.py` module becomes its own spread job, so CI can fan them out as a parallel matrix — adding a new test module automatically adds a new job.
-```
-
 ### Write a test
 
 Let's write the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will deploy the charm, then verify that the installation event is handled without errors.
