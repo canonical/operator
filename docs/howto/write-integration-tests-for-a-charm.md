@@ -159,7 +159,7 @@ A common split:
 
 The main reason to split is **parallel CI execution**: each module can run as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules. `tox -e integration` still runs every module sequentially on a single machine; it's the CI matrix (see {ref}`set-up-ci-integration`) that turns module boundaries into parallel jobs. Adding a new `test_*.py` file then automatically adds a new CI job — no workflow changes needed.
 
-For real-world examples of module-per-feature splits, see:
+For real-world examples of split tests, see:
 
 - [postgresql-operator](https://github.com/canonical/postgresql-operator/tree/main/tests/integration) — machine charm, split across many feature modules (backups, TLS, upgrades, HA, and so on).
 - [postgresql-k8s-operator](https://github.com/canonical/postgresql-k8s-operator/tree/main/tests/integration) — the Kubernetes equivalent.
