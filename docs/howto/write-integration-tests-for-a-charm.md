@@ -150,7 +150,7 @@ If you initialised the charm with `charmcraft init`, your charm directory should
 (write-integration-tests-for-a-charm-split-across-modules)=
 ### Split tests across modules
 
-As your suite grows, split your integration tests across several `test_*.py` modules, grouped by feature. Tests within a module share a single `juju` fixture (and therefore a single Juju model), so keep tests that need to build on each other together. Across modules, each gets a fresh model, which makes modules independent of each other.
+As your suite grows, split your integration tests across several `test_*.py` modules, grouped by feature. Tests within a module share a single `juju` fixture (and therefore a single Juju model), so keep tests that need to build on each other together. Each module gets a fresh model, which makes modules independent of each other.
 
 A common split:
 
