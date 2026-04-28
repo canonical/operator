@@ -165,7 +165,7 @@ For real-world examples of module-per-feature splits, see:
 - [postgresql-k8s-operator](https://github.com/canonical/postgresql-k8s-operator/tree/main/tests/integration) — the Kubernetes equivalent.
 - [opensearch-operator](https://github.com/canonical/opensearch-operator/tree/main/tests/integration) — larger suite with per-cloud backup modules.
 
-For a minimal scaffold that you can lift into your own charm, see the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm in the Ops repository.
+For a minimal scaffold that you can use in your own charm, see the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm in the Ops repository.
 
 ### Deploy your charm
 
