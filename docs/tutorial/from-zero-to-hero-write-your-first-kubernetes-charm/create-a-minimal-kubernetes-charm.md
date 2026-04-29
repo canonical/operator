@@ -483,7 +483,7 @@ If you're interested in trying `charmcraft test`, run the following command in y
 charmcraft init --profile test-kubernetes --force
 ```
 
-This creates the scaffolding of a spread configuration. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
+This creates the scaffolding of a spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
 
 - `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
 - The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
