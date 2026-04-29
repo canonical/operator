@@ -122,7 +122,7 @@ If you initialised your charm with `charmcraft init --profile test-machine` or `
 - A [spread](https://github.com/canonical/spread) configuration file called `spread.yaml`.
 - One file `spread/integration/<module>/task.yaml` per test module.
 
-You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `test_*.py` module — along with its `task.yaml` — automatically adds a new CI job.
+You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
 
 A minimal workflow looks like:
 
