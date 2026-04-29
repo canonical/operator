@@ -1,3 +1,6 @@
+# This file has some small modifications from the one installed by the profile.
+# In particular, it uses Concierge to prepare for the task.
+# The `.extension` file installed by the profile is exactly as provided by the profile.
 project: httpbin-demo
 
 backends:
