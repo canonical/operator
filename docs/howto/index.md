@@ -19,7 +19,15 @@ Once your charm is ready for wide production use, your next goal should be to ge
 
 ## Writing charm code and tests
 
-Your charm is Python code that depends on Ops, with standard structures for handling events, status, and errors. As you write your charm, make sure to follow best practices.
+Your charm is a Python project, with Juju-specific metadata in a file called `charmcraft.yaml`. After creating a repository for your charm, use {external+charmcraft:doc}`Charmcraft <index>` to generate the recommended project structure.
+
+```{toctree}
+:maxdepth: 1
+
+Initialise your project <initialise-your-project>
+```
+
+Your charm depends on Ops, with standard structures for handling events, status, and errors. As you write your charm, make sure to follow best practices.
 
 ```{toctree}
 :maxdepth: 1
