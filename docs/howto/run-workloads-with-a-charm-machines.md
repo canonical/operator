@@ -68,7 +68,7 @@ For more guidance, see {ref}`design-your-python-modules`.
 
 ## Install system packages
 
-Prefer purpose-built Python libraries over shelling out to `apt-get` or `snap`. Libraries give you typed errors, idempotent operations, and avoid the pitfalls of parsing CLI output.
+Prefer purpose-built Python libraries over subprocess calls to `apt-get` or `snap`. Libraries give you typed errors, idempotent operations, and avoid the pitfalls of parsing CLI output.
 
 ### APT packages
 
