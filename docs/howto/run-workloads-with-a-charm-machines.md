@@ -171,6 +171,7 @@ How you start, stop, and signal the workload depends on how the package runs it:
 
 For example, signalling a directly-launched process to reload its config:
 
+```python
 import os
 import signal
 
