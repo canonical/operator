@@ -51,7 +51,20 @@ Or for a machine charm:
 charmcraft init --name mega-calendar --profile machine
 ```
 
+<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
+````{tip}
+The `charmcraft` version that you have installed may come with older versions of the profiles.
+
+To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
+
+```text
+uvx git+https://github.com/canonical/charmcraft@460e8df init --name <name> --profile <profile>
+```
+````
+
 If you don't specify `--name` when running `charmcraft init`, Charmcraft uses the parent directory name for your charm. For example, `mega-calendar-k8s-operator`, from the name of the repository. So we recommend specifying `--name` to ensure that your charm's name doesn't end with `-operator`.
+
+## Inspect your charm
 
 Charmcraft's `kubernetes` and `machine` profiles are minimal charms that contain placeholder code and configuration.
 These profiles also give you starting points for unit tests and integration tests.
@@ -62,9 +75,9 @@ Important files to be aware of:
 - `pyproject.toml` - Python project configuration, including the dependencies of your charm.
 - `src/charm.py` - The Python file that will contain the main logic of your charm.
 
-If your charm's workload was built with a web framework such as Django or FastAPI, consider using one of Charmcraft's 12-factor app profiles instead of `kubernetes` or `machine`. These profiles accelerate development by generating charms that are ready to deploy. {external+charmcraft:ref}`Write your first 12-factor app charm <tutorial>`.
-
 ## Next steps
 
 - Start writing your charm code. See {ref}`write-and-structure-charm-code` and our other guides.
 - Provide metadata in `charmcraft.yaml`. See {external+charmcraft:ref}`Charmcraft | Configure package information <configure-package-information>`.
+
+If your charm's workload was built with a web framework such as Django or FastAPI, consider using one of Charmcraft's 12-factor app profiles instead of `kubernetes` or `machine`. These profiles accelerate development by generating charms that are ready to deploy. {external+charmcraft:ref}`Write your first 12-factor app charm <tutorial>`.
