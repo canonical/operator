@@ -7,7 +7,9 @@ myst:
 (make-your-charm-discoverable)=
 # How to make your charm discoverable
 
-> See first: [Charm maturity](#charm-maturity)
+> See first:
+> - {ref}`charm-maturity`
+> - {ref}`publish-your-charm`
 
 Once your charm is ready for wide production use, your next goal should be to get it publicly listed on [Charmhub](https://charmhub.io), so that it is visible in searches. This requires a lightweight review.
 
