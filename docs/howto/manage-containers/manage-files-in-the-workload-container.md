@@ -1,11 +1,11 @@
 (files-in-containers)=
 # How to manage files in the workload container
 
-Pebble's files API allows charm authors to read and write files on the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
+The [](ops.Container) class provides methods to manage files in the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
 
 ## Push
 
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
+Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload. For example, a PostgreSQL configuration file:
 
 ```python
 config = """
@@ -15,21 +15,25 @@ max_connections = 1000
 container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
 ```
 
-The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
+This code would be inside one of your charm's event handlers.
 
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](ops.Container.push) for details.
+`make_dirs=True` tells `push` to create the intermediate directories if they don't exist (`/etc/pg` in this case).
+
+`Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
 
 ## Pull
 
 To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
 
-The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
+To update a file, use `pull` followed by `push`:
 
 ```python
-# Update port to 8888 and restart service
+import re
+
+# Update the port number and restart the service
 config = container.pull('/etc/pg/postgresql.conf').read()
-if 'port =' not in config:
-    config += '\nport = 8888\n'
+new_port = self.config['port']
+config = re.sub(r'port = \d+', f'port = {new_port}', config)
 container.push('/etc/pg/postgresql.conf', config)
 container.restart('postgresql')
 ```
@@ -38,7 +42,7 @@ If you specify the keyword argument `encoding=None` on the `pull()` call, reads 
 
 ## Push recursive
 
-To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -52,7 +56,7 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## Pull recursive
 
-To copy several files to the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files from the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -101,7 +105,7 @@ container.remove_path('/tmp/mysubdir', recursive=True)
 
 ## Check file and directory existence
 
-To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
+To check if a path exists, use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories. These functions are analogous to Python's `os.path.exists` and `os.path.isdir` functions. For example:
 
 ```python
 # if /tmp/myfile exists
@@ -145,64 +149,63 @@ nicely wrapping data and passing it to the charm via the container.
 
 ### Check files written in the container
 
-`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
+`container.push` works similarly to `container.pull`. For example, suppose a charm pushes a config file when Pebble is ready:
+
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+
+    def _on_pebble_ready(self, _):
+        foo = self.unit.get_container('foo')
+        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
+```
+
+One way to verify this is to mount the path as a temporary file and check the file's content after the event runs:
 
 ```python
 import tempfile
 
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
+from charm import MyCharm
 
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
 
-def test_pebble_push():
+def test_pebble_push_with_mount():
+    """Test that on pebble-ready, config is written to the mounted path."""
     with tempfile.NamedTemporaryFile() as local_file:
+        # Arrange:
+        ctx = testing.Context(MyCharm)
         container = testing.Container(
             name='foo',
             can_connect=True,
-            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)}
+            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)},
         )
         state_in = testing.State(containers={container})
-        ctx = testing.Context(
-            MyCharm,
-            meta={'name': 'foo', 'containers': {'foo': {}}}
-        )
-        ctx.run(
-            ctx.on.pebble_ready(container),
-            state_in,
-        )
+
+        # Act:
+        ctx.run(ctx.on.pebble_ready(container), state_in)
+
+        # Assert:
         assert local_file.read().decode() == 'TEST'
 ```
 
-If the charm writes files to a container (to a location you didn't mount as a temporary folder you
-have access to), you will be able to inspect them using `get_filesystem`.
+Another option is to use `get_filesystem` to inspect the simulated container filesystem directly, without needing to set up a mount:
 
 ```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
+from charm import MyCharm
 
 
-def test_pebble_push():
+def test_pebble_push_with_get_filesystem():
+    """Test that on pebble-ready, config is written to the container filesystem."""
+    # Arrange:
+    ctx = testing.Context(MyCharm)
     container = testing.Container(name='foo', can_connect=True)
     state_in = testing.State(containers={container})
-    ctx = testing.Context(
-        MyCharm,
-        meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
 
-    state_out = ctx.run(ctx.on.start(), state_in)
+    # Act:
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
-    # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
+    # Assert:
     container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
     cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
     assert cfg_file.read_text() == 'TEST'
