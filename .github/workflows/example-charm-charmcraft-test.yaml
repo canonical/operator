@@ -22,6 +22,8 @@ jobs:
       - name: Collect spread jobs
         id: collect
         run: |
+          # Create a JSON map that includes all of the tasks to run with charmcraft test.
+          # Includes the charm and task, like: `[{"charm": "<charm-dir>", "task": "<task-dir-name"}]`
           jobs=$(find examples -path 'examples/*/spread/integration/*/task.yaml' -print \
             | sort \
             | jq -Rnc '[inputs | capture("examples/(?<charm>[^/]+)/spread/integration/(?<task>[^/]+)/task\\.yaml")]')
