@@ -15,7 +15,7 @@ Before publishing your charm, review the `charmcraft.yaml` file to make sure you
 
 To publish your charm, follow the instructions in {external+charmcraft:ref}`Charmcraft | Publish a charm <publish-a-charm>`.
 
-If your charm depends on resources that are binary files, make sure to provide binaries for all the CPU architectures you intend to support.
+If your charm depends on resources, also follow the instructions in {external+charmcraft:ref}`Charmcraft | Publish a resource <publish-a-resource>`.
 
 ## Manage tracks and channels
 
