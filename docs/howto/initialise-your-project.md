@@ -51,7 +51,7 @@ Or for a machine charm:
 charmcraft init --name mega-calendar --profile machine
 ```
 
-<!-- Mention that --name is optional? (Omitting it can cause confusion) -->
+If you don't specify `--name` when running `charmcraft init`, Charmcraft uses the parent directory name for your charm. For example, `mega-calendar-k8s-operator`, from the name of the repository. So we recommend specifying `--name` to ensure that your charm's name doesn't end with `-operator`.
 
 Charmcraft's `kubernetes` and `machine` profiles are minimal charms that contain placeholder code and configuration.
 These profiles also give you starting points for unit tests and integration tests.
