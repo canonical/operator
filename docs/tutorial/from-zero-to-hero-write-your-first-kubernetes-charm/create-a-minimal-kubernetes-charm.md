@@ -31,18 +31,15 @@ In your virtual machine, go into your project directory and create the initial v
 
 ```text
 cd ~/fastapi-demo
-charmcraft init --profile kubernetes
-```
-
-<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
-````{tip}
-The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
-
-To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
-```
 uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile kubernetes
 ```
-````
+
+<!--
+  When charmcraft stable is up-to-date, comment out this info and switch to 'charmcraft init --profile kubernetes' above.
+  If needed again later, restore the info and switch to 'uvx git+https://github.com/canonical/charmcraft@<hash> init --profile kubernetes'.
+-->
+The `uvx ...` command runs Charmcraft directly from GitHub. We recommend doing this because the installed version of Charmcraft may come with an older version of the profile used in the tutorial. You should use the installed version of Charmcraft for everything else (as we'll do later in the tutorial).
+
 
 Charmcraft created several files, including:
 
