@@ -21,7 +21,7 @@ If your charm depends on resources that are binary files, make sure to provide b
 
 Consider whether you need multiple "tracks" for your charm. By default, you'll have a track called `latest`, which is intended to correspond to the latest version of your charm's workload. Some charm developers choose to have a numbered track instead.
 
-If your charm supports multiple workload versions, you should maintain a track for each version. See {external+charmcraft:ref}`Charmcraft | Manage tracks <manage-tracks>` after publishing your charm.
+If your charm supports multiple workload versions, consider maintaining a track for each major version or major.minor version. See {external+charmcraft:ref}`Charmcraft | Manage tracks <manage-tracks>` after publishing your charm.
 
 Charmhub creates four "channels" within each track. By default, you'll have:
 
