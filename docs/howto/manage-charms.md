@@ -3,6 +3,7 @@
 
 > See first: {external+juju:ref}`Juju | Build a charm <build-a-charm>`, {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`
 
+(prepare-your-environment)=
 ## Prepare your environment
 
 You'll need the following tools:
@@ -29,12 +30,7 @@ configures development tooling.
 
 > See more:
 >
-> * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
-> * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
-
-<!--
-TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
--->
+> - {ref}`init-charm`
 
 (develop-your-charm)=
 ## Develop your charm
@@ -95,7 +91,7 @@ do it well.
 >   - {ref}`manage-resources`
 >   - {ref}`manage-secrets`
 > * Add functionality
->   - [Charmcraft | Add runtime details to a charm](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-runtime-details-to-a-charm)
+>   - {external+charmcraft:ref}`Charmcraft | Add runtime details to a charm <add-runtime-details-to-a-charm>`
 >   - {ref}`manage-actions`
 >   - {ref}`manage-configuration`
 >   - {ref}`manage-opened-ports`
@@ -109,9 +105,7 @@ When you're ready, you'll publish your charm on Charmhub.
 
 > See more:
 >
-> * {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>` (see especially the note on requesting formal review for your charm)
-
-If your charm depends on resources that are binary files, make sure to provide binaries for all the CPU architectures you intend to support.
+> * [](#publish-your-charm)
 
 A charm is software: while there can be milestones, there is never a finish
 line. So, keep investing in every bit of your charm so that it looks and feels

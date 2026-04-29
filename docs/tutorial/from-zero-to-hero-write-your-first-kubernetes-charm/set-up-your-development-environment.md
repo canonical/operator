@@ -14,7 +14,7 @@ First, install Multipass for managing virtual machines. See the [installation in
 Next, open a terminal, then run:
 
 ```text
-multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox-k8s
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox-k8s 24.04
 ```
 
 This creates a virtual machine called `juju-sandbox-k8s`.

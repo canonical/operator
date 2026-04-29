@@ -49,7 +49,7 @@ First, install Multipass for managing virtual machines. See the [installation in
 Next, open a terminal, then run:
 
 ```text
-multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 ```
 
 This creates a virtual machine called `juju-sandbox`.
@@ -176,7 +176,7 @@ The `charmcraft` version that you have installed may come with older versions of
 
 To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
 ```
-uvx git+https://github.com/canonical/charmcraft@460e8df init --profile machine
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile machine
 ```
 ````
 

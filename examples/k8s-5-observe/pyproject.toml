@@ -25,7 +25,7 @@ requires-python = ">=3.10"
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
     "cosl>=1.9.1",
-    "ops>=3,<4",
+    "ops~=3.7",
 ]
 
 [dependency-groups]

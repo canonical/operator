@@ -1,60 +1,17 @@
+---
+myst:
+  html_meta:
+    description: Define your charm's dependencies and Python modules, handle status and errors in a standard way, and follow best practices for charm development.
+---
+
 (write-and-structure-charm-code)=
 # How to write and structure charm code
 
-(create-a-repository-and-initialise-it)=
-## Create a repository and initialise it
+Before you write your charm code, create a repository and use Charmcraft to generate your charm's project structure. See [](#init-charm).
 
-Create a repository with your source control of choice. Commit the code you have
-added and changed after every significant change, so that you have a record of
-your work and can revert to an earlier version if required.
+This guide demonstrates how to use standard structures in your charm code and summarises best practices for charm development.
 
-```{admonition} Best practice
-:class: hint
-
-Name the repository using the pattern ``<charm name>-operator`` for a single
-charm, or ``<base charm name>-operators`` when the repository will hold
-multiple related charms. For the charm name, see
-{external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
-```
-
-In your new repository, run `charmcraft init` to generate the recommended
-structure for building a charm.
-
-```{note}
-In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
-If you are charming an application built with a popular framework, check if
-charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-```
-
-If your repository will hold multiple charms, or a charm and source for other
-artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft init` in each charm
-folder. You'll end up with a structure similar to:
-
-```
-my-charm-set-operators/
-├── charms
-│   ├── my-charm-core
-│   │   ├── charmcraft.yaml
-│   │   ├── pyproject.toml
-│   │   ├── README.md
-│   │   ├── src
-│   │   │   ├── charm.py
-│   │   │   └── core.py
-│   │   ├── tests
-|   |   |   └── ...
-│   │   ├── tox.ini
-│   │   └── uv.lock
-│   ├── my-charm-dashboard
-|   |   └── ...
-│   └── my-charm-helper
-|   |   └── ...
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── rock
-    └── ...
-```
+As you work on your charm, commit your changes after every significant change. You'll then have a record of your work and can revert to an earlier version if required.
 
 (define-the-required-dependencies)=
 ## Define the required dependencies

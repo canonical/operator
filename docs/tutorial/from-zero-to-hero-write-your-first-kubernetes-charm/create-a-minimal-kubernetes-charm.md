@@ -40,7 +40,7 @@ The `charmcraft` version that you have installed may come with older versions of
 
 To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
 ```
-uvx git+https://github.com/canonical/charmcraft@460e8df init --profile kubernetes
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile kubernetes
 ```
 ````
 
@@ -84,7 +84,7 @@ resources:
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.2
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 ### Define the charm class
@@ -232,7 +232,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 
@@ -273,7 +273,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.2"}
+{"version":"1.0.3"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!

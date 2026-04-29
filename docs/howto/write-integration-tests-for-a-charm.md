@@ -19,7 +19,7 @@ To run integration tests, you'll need a Juju controller and [tox](https://tox.wi
 Use [Multipass](https://canonical.com/multipass/install) to create a virtual machine:
 
 ```text
-multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 multipass shell juju-sandbox  # Switch to your virtual machine.
 ```
 
