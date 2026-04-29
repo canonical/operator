@@ -135,7 +135,7 @@ def stop() -> None:
 
 ### When there's no library
 
-If no library is available for the workload you need, call out to the tool with `subprocess`. Keep these calls isolated in the workload module.
+If no library is available for installing the workload, use `subprocess` to run commands that install and start the workload. Keep these calls isolated in the workload module.
 
 ```{admonition} Best practice
 :class: hint
