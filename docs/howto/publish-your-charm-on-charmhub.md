@@ -23,7 +23,7 @@ Consider whether you need multiple "tracks" for your charm. By default, you'll h
 
 If your charm supports multiple workload versions, consider maintaining a track for each major version or major.minor version. See {external+charmcraft:ref}`Charmcraft | Manage tracks <manage-tracks>` after publishing your charm.
 
-Charmhub creates four "channels" within each track. By default, you'll have:
+Charmhub creates four "channels":
 
 - `latest/stable`
 - `latest/candidate`
