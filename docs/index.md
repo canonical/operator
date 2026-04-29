@@ -48,7 +48,7 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 * - **Design & best practices**
   - [Holistic vs delta charms](explanation/holistic-vs-delta-charms) • [Follow best practices](#follow-best-practices) • [Trace your charm](howto/trace-your-charm)
 * - **Publishing**
-  - [](howto/publish-your-charm-on-charmhub) • [Make your charm discoverable](howto/make-your-charm-discoverable)
+  - [Publish your charm on Charmhub](howto/publish-your-charm-on-charmhub) • [Make your charm discoverable](howto/make-your-charm-discoverable)
 ```
 
 ## How this documentation is organised
