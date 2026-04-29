@@ -341,10 +341,9 @@ First, repack and refresh your charm:
 
 ```text
 charmcraft pack
-juju refresh \
-  --path="./fastapi-demo_amd64.charm" \
-  fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -480,7 +479,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, to expect blocked status in `juju.wait`. Replace the contents of `tests/integration/test_charm.py` with:
 
 ```python
 import logging

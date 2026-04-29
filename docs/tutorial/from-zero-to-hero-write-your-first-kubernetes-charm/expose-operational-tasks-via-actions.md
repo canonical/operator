@@ -108,10 +108,9 @@ First, repack and refresh your charm:
 
 ```text
 charmcraft pack
-juju refresh \
-  --path="./fastapi-demo_amd64.charm" \
-  fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 Next, test that the basic action invocation works:

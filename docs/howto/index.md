@@ -23,7 +23,15 @@ Once your charm is ready for wide production use, your next goal should be to ge
 
 ## Writing charm code and tests
 
-Your charm is Python code that depends on Ops, with standard structures for handling events, status, and errors. As you write your charm, make sure to follow best practices.
+Your charm is a Python project, with Juju-specific metadata in a file called `charmcraft.yaml`. After creating a repository for your charm, use {external+charmcraft:doc}`Charmcraft <index>` to generate the recommended project structure.
+
+```{toctree}
+:maxdepth: 1
+
+Initialise your project <initialise-your-project>
+```
+
+Your charm depends on Ops, with standard structures for handling events, status, and errors. As you write your charm, make sure to follow best practices.
 
 ```{toctree}
 :maxdepth: 1
@@ -45,6 +53,14 @@ Integration tests check that your charm works correctly when deployed to a real 
 :maxdepth: 1
 
 Write integration tests for a charm <write-integration-tests-for-a-charm>
+```
+
+You should automate your charm's tests using a continuous integration (CI) system.
+
+```{toctree}
+:maxdepth: 1
+
+Set up continuous integration for a charm <set-up-continuous-integration-for-a-charm>
 ```
 
 Juju provides a variety of debugging tools, which Ops integrates with.
@@ -145,7 +161,7 @@ Harness is a deprecated framework for writing unit tests. You should migrate to 
 
 - {doc}`Migrate unit tests from Harness <migrate/migrate-unit-tests-from-harness>`
 
-pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant and `pytest-jubilant`.
 
 - {doc}`Migrate integration tests from pytest-operator <migrate/migrate-integration-tests-from-pytest-operator>`
 

@@ -9,10 +9,14 @@ description: |
 
 # Documentation:
 # https://documentation.ubuntu.com/charmcraft/stable/howto/build-guides/select-platforms/
-base: ubuntu@22.04
+base: ubuntu@24.04
 platforms:
   amd64:
   arm64:
+
+assumes:
+  - juju >= 3.6
+  - k8s-api
 
 parts:
   charm:
@@ -42,4 +46,4 @@ resources:
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.2
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.3

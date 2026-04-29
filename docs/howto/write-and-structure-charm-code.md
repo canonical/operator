@@ -1,60 +1,17 @@
+---
+myst:
+  html_meta:
+    description: Define your charm's dependencies and Python modules, handle status and errors in a standard way, and follow best practices for charm development.
+---
+
 (write-and-structure-charm-code)=
 # How to write and structure charm code
 
-(create-a-repository-and-initialise-it)=
-## Create a repository and initialise it
+Before you write your charm code, create a repository and use Charmcraft to generate your charm's project structure. See [](#init-charm).
 
-Create a repository with your source control of choice. Commit the code you have
-added and changed after every significant change, so that you have a record of
-your work and can revert to an earlier version if required.
+This guide demonstrates how to use standard structures in your charm code and summarises best practices for charm development.
 
-```{admonition} Best practice
-:class: hint
-
-Name the repository using the pattern ``<charm name>-operator`` for a single
-charm, or ``<base charm name>-operators`` when the repository will hold
-multiple related charms. For the charm name, see
-{external+charmcraft:ref}`Charmcraft | Specify a name <specify-a-name>`.
-```
-
-In your new repository, run `charmcraft init` to generate the recommended
-structure for building a charm.
-
-```{note}
-In most cases, you'll want to use `--profile=machine` or `--profile=kubernetes`.
-If you are charming an application built with a popular framework, check if
-charmcraft has a {external+charmcraft:ref}`specific profile <tutorial>` for it.
-```
-
-If your repository will hold multiple charms, or a charm and source for other
-artifacts, such as a Rock, create a `charms` folder at the top level, then a folder
-for each charm inside of that one, and run `charmcraft init` in each charm
-folder. You'll end up with a structure similar to:
-
-```
-my-charm-set-operators/
-├── charms
-│   ├── my-charm-core
-│   │   ├── charmcraft.yaml
-│   │   ├── pyproject.toml
-│   │   ├── README.md
-│   │   ├── src
-│   │   │   ├── charm.py
-│   │   │   └── core.py
-│   │   ├── tests
-|   |   |   └── ...
-│   │   ├── tox.ini
-│   │   └── uv.lock
-│   ├── my-charm-dashboard
-|   |   └── ...
-│   └── my-charm-helper
-|   |   └── ...
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── rock
-    └── ...
-```
+As you work on your charm, commit your changes after every significant change. You'll then have a record of your work and can revert to an earlier version if required.
 
 (define-the-required-dependencies)=
 ## Define the required dependencies
@@ -100,8 +57,8 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant",
-    "pytest",
+    "jubilant>=1.8,<2",
+    "pytest-jubilant>=2,<3",
 ]
 # Additional groups
 docs = [
@@ -373,92 +330,4 @@ Notes on best practices for charm development and maintenance can be found acros
 
 Configure your continuous integration tooling so that whenever changes are
 proposed for or accepted into your main branch the `lint`, `unit`, and
-`integration` commands are run, and will block merging when failing.
-
-```{admonition} Best practice
-:class: hint
-
-The quality assurance pipeline of a charm should be automated using a
-continuous integration (CI) system.
-```
-
-If you are using GitHub, create a file called `.github/workflows/ci.yaml`. For
-example, to include a `lint` job that runs the `tox` `lint` environment:
-
-```yaml
-name: Tests
-on:
-  workflow_call:
-  workflow_dispatch:
-
-jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@7
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Run linters
-        run: tox -e lint
-```
-
-Other `tox` environments can be run similarly; for example unit tests:
-
-```yaml
-  unit-test:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@7
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Run tests
-        run: tox -e unit
-```
-
-Integration tests are a bit more complex, because in order to run those tests, a Juju controller and
-a cloud in which to deploy it, is required. This example uses [Concierge](https://github.com/canonical/concierge) to set up
-`k8s` and Juju:
-
-```
-  integration-test-k8s:
-    name: Integration tests (k8s)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install concierge
-        run: sudo snap install --classic concierge
-      - name: Install Juju and tools
-        run: sudo concierge prepare -p k8s
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@7
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Run integration tests
-        # Set a predictable model name so it can be consumed by charm-logdump-action
-        run: tox -e integration -- --model testing
-      - name: Dump logs
-        uses: canonical/charm-logdump-action@main
-        if: failure()
-        with:
-          app: my-app-name
-          model: testing
-```
-
-```{tip}
-
-The [charming-actions](https://github.com/canonical/charming-actions)
-repository includes actions to ensure that libraries are up-to-date, publish
-charms and libraries, and more.
-```
+`integration` commands are run, and will block merging when failing. See [](#set-up-ci).

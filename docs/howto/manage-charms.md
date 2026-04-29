@@ -3,6 +3,7 @@
 
 > See first: {external+juju:ref}`Juju | Build a charm <build-a-charm>`, {external+charmcraft:ref}`Charmcraft | Manage charms <manage-charms>`
 
+(prepare-your-environment)=
 ## Prepare your environment
 
 You'll need the following tools:
@@ -17,8 +18,9 @@ To deploy your charm locally and to run integration tests, you'll also need a Ju
 
 > See more:
 >
+> - [Prepare your environment to develop Kubernetes charms](#set-up-your-development-environment)
 > - [Prepare your environment to develop machine charms](#machine-charm-tutorial-environment)
-> - [Prepare a continuous integration environment](#validate-your-charm-with-every-change)
+> - [Prepare a continuous integration environment](#set-up-ci-integration)
 
 ## Initialise your charm project
 
@@ -28,12 +30,7 @@ configures development tooling.
 
 > See more:
 >
-> * {external+charmcraft:ref}`Charmcraft | Manage charms > Initialize a charm <initialise-a-charm>` (see also the best practice note on setting up a repository and considering your CI)
-> * [Charmcraft | Manage charms > Add charm project metadata, an icon, docs](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-charm-project-metadata-an-icon-docs)
-
-<!--
-TODO: Add a reference link in charmcraft for the link above and the 'runtime details' one below, and switch over to external refs.
--->
+> - {ref}`init-charm`
 
 (develop-your-charm)=
 ## Develop your charm
@@ -70,7 +67,8 @@ and the charm workflow.
 > - {ref}`write-and-structure-charm-code`
 > - {ref}`write-unit-tests-for-a-charm`
 > - {ref}`write-integration-tests-for-a-charm`
-> - {ref}`manage-logs`
+> - {ref}`set-up-ci`
+> - {ref}`log-from-your-charm`
 > - {ref}`debug-your-charm`
 
 The next thing to do is add functionality to your charm.
@@ -93,7 +91,7 @@ do it well.
 >   - {ref}`manage-resources`
 >   - {ref}`manage-secrets`
 > * Add functionality
->   - [Charmcraft | Add runtime details to a charm](https://canonical-charmcraft.readthedocs-hosted.com/en/latest/howto/manage-charms/#add-runtime-details-to-a-charm)
+>   - {external+charmcraft:ref}`Charmcraft | Add runtime details to a charm <add-runtime-details-to-a-charm>`
 >   - {ref}`manage-actions`
 >   - {ref}`manage-configuration`
 >   - {ref}`manage-opened-ports`

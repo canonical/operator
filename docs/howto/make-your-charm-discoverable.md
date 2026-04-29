@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Get your charm publicly listed on Charmhub by checking it against the listing criteria, requesting a review, and addressing reviewer feedback.
+---
+
 (make-your-charm-discoverable)=
 # How to make your charm discoverable
 

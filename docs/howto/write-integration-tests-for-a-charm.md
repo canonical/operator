@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Learn how to write Jubilant based integration tests for your charm.
+---
+
 (write-integration-tests-for-a-charm)=
 # How to write integration tests for a charm
 
@@ -13,7 +19,7 @@ To run integration tests, you'll need a Juju controller and [tox](https://tox.wi
 Use [Multipass](https://canonical.com/multipass/install) to create a virtual machine:
 
 ```text
-multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 multipass shell juju-sandbox  # Switch to your virtual machine.
 ```
 
@@ -87,14 +93,14 @@ commands =
         {posargs}
 ```
 
-Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. For example:
+Also check that `pyproject.toml` has an `integration` dependency group. Again, if you initialised the charm with `charmcraft init` it should already be there. Integration tests use two packages: {external+jubilant:doc}`Jubilant <index>`, which wraps the Juju CLI, and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), a pytest plugin that manages Juju models during tests. Pin to the current stable major versions, which are maintained with strong backwards compatibility guarantees. For example:
 
 ```toml
 [dependency-groups]
 ...
 integration = [
-    "jubilant",
-    "pytest",
+    "jubilant>=1.8,<2",
+    "pytest-jubilant>=2,<3",
 ]
 ```
 
@@ -103,53 +109,35 @@ integration = [
 
 ### Write fixtures
 
-In `conftest.py` in your integration test directory, add these fixtures:
+The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides a module-scoped `juju` fixture that creates a temporary Juju model for each test file and destroys the model when the tests have finished. It also dumps debug logs on test failure. This fixture is registered automatically when you install `pytest-jubilant`. In your test code, you use the {external+jubilant:doc}`Jubilant <reference/jubilant>` API directly — for example, `jubilant.Juju` for type annotations and helpers such as `jubilant.all_active`.
+
+In `conftest.py` in your integration test directory, add a `charm` fixture:
 
 ```python
-import logging
 import os
 import pathlib
-import sys
-import time
 
-import jubilant
 import pytest
-
-logger = logging.getLogger(__name__)
-
-
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
-    """Create a temporary Juju model for running tests."""
-    with jubilant.temp_model() as juju:
-        yield juju
-
-        if request.session.testsfailed:
-            logger.info("Collecting Juju logs...")
-            time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=1000)
-            print(log, end="", file=sys.stderr)
 
 
 @pytest.fixture(scope="session")
 def charm():
     """Return the path of the charm under test."""
-    if "CHARM_PATH" in os.environ:
-        charm_path = pathlib.Path(os.environ["CHARM_PATH"])
-        if not charm_path.exists():
-            raise FileNotFoundError(f"Charm does not exist: {charm_path}")
-        return charm_path.resolve()
-    # Modify below if you're building for multiple bases or architectures.
-    return next(pathlib.Path(".").glob("*.charm")).resolve()
+    charm = os.environ.get("CHARM_PATH")
+    if not charm:
+        charm_dir = pathlib.Path()  # Assume the current working directory is the charm root.
+        charms = list(charm_dir.glob("*.charm"))
+        assert charms, f"No charms were found in {charm_dir.absolute()}"
+        assert len(charms) == 1, f"Found more than one charm {charms}"
+        charm = charms[0]
+    path = pathlib.Path(charm).resolve()
+    assert path.is_file(), f"{path} is not a file"
+    return path
 ```
 
-The integration tests will depend on these fixtures.
+The integration tests will depend on this fixture and on the `juju` fixture from `pytest-jubilant`.
 
-These fixtures use [pytest](https://docs.pytest.org/en/stable/) and {external+jubilant:doc}`Jubilant <index>`:
-
-- The `juju` fixture creates a temporary Juju model for each test file. The [](jubilant.temp_model) context manager creates a randomly-named model on entry, and destroys the model on exit.
-
-- The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
+The `charm` fixture finds the charm to deploy (later we'll write a test that deploys the charm). This fixture doesn't pack your charm. You'll need to pack your charm before running the tests.
 
 For general guidance about `conftest.py`, see [conftest.py: sharing fixtures across multiple files](https://docs.pytest.org/en/stable/reference/fixtures.html#conftest-py-sharing-fixtures-across-multiple-files).
 
@@ -184,7 +172,11 @@ For more examples of tests that deploy charms, see:
 - [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
 - [httpbin-demo](https://github.com/canonical/operator/blob/main/examples/httpbin-demo/tests/integration/test_charm.py)
 
-Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file as the applications can be used by other tests. For that reason, adding extra checks or `asserts` in this test is not recommended.
+Tests run sequentially in the order they are written in the file. It can be useful to put tests that deploy applications in the top of the file so the applications can be used by subsequent tests.
+
+You can mark such tests with `@pytest.mark.juju_setup`. If you later use `--no-juju-setup` to skip the deployment tests, the model must already exist. See {ref}`write-integration-tests-for-a-charm-run-your-tests`.
+
+Similarly, if you have tests that perform destructive actions (for example, removing relations or applications), mark them with `@pytest.mark.juju_teardown`. These tests will be skipped when `--no-juju-teardown` is passed.
 
 ### Exercise your charm
 
@@ -343,15 +335,19 @@ Jubilant provides an escape hatch to invoke the Juju CLI. This can be useful for
 
 ### Use several models
 
-You can use Jubilant with several models, in the same cloud or in
-different clouds. This way you can, for example, integrate machine charms
-with Kubernetes charms easily.
+If you need multiple Juju models in a single test module, use the `juju_factory` fixture provided by `pytest-jubilant`:
 
 ```python
-    model_a = jubilant.Juju("some-model")
-    model_b = jubilant.Juju("another-controller:a-model")
-    new_model = jubilant.Juju().add_model("a-model", "some-cloud", controller=..., config=..., credential=...)
+import pytest
+import pytest_jubilant
+
+
+@pytest.fixture(scope="module")
+def other_model(juju_factory: pytest_jubilant.JujuFactory):
+    return juju_factory.get_juju(suffix="other")
 ```
+
+Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios. For example integrating machine charms with Kubernetes charms, or integrating with the [Canonical Observability Stack](https://charmhub.io/cos-lite).
 
 > See more:
 > - {external+juju:ref}`Juju offers <manage-offers>`
@@ -390,7 +386,7 @@ relations:
     juju.wait(jubilant.all_active)
 ```
 
-(run-your-tests)=
+(write-integration-tests-for-a-charm-run-your-tests)=
 ## Run your tests
 
 Make sure that you've packed your charm. Then run all your tests with:
@@ -411,13 +407,19 @@ CHARM_PATH=/path/to/foo.charm tox -e integration
 
 Your tests will use the current Juju controller. By default, a new model will be created for each test module. The model will be destroyed when all the tests in the module have finished. This is determined by the scope of the `juju` fixture.
 
-Use the `--cloud`, `--controller`, and `--model` parameters to specify the cloud, controller, and model name. If you specify the model name and include the `--keep-models` parameter, you can reuse a model from a previous test run. For example:
+The `pytest-jubilant` plugin provides several command-line options for controlling model lifecycle, including rerunning tests with the same models and applications, automatically switching to the next `juju` fixture model, and saving the `juju debug-log` before tearing models down. Read more about them in [the repository README](https://github.com/canonical/pytest-jubilant).
+
+For example, to deploy on a first run and then iterate without redeploying:
 
 ```text
-# in the initial execution, the new model will be created
-tox -e integration -- --keep-models --model test-example-model
-# in the next execution it will reuse the model created previously:
-tox -e integration -- --keep-models --model test-example-model --no-deploy
+# First run: deploy and keep the models
+tox -e integration -- --juju-model mytest --no-juju-teardown
+# Subsequent runs: skip deployment, reuse the models
+tox -e integration -- --juju-model mytest --no-juju-setup --no-juju-teardown
+```
+
+```{tip}
+After each test run, `pytest-jubilant` prints a summary with the exact command-line flags to reuse or keep your models for the next run.
 ```
 
 There are different ways of specifying a subset of tests to run using `pytest`. With the `-k` option you can specify different expressions. For example, the next command will run all tests in the `test_charm.py` file except `test_one` function.
@@ -428,6 +430,25 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 > See more:
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 > - [](#validate-your-charm-with-every-change)
+
+
+(write-integration-tests-for-a-charm-view-juju-logs)=
+## View Juju logs
+
+If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr. You can also save the complete logs to disk with the `--juju-dump-logs` option.
+
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
+
+```yaml
+  # In your integration test job
+  - run: tox -e integration -- --juju-dump-logs logs
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: juju-dump-logs
+      path: logs
+```
 
 ## Generate crash dumps
 

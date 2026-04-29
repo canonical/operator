@@ -49,7 +49,7 @@ First, install Multipass for managing virtual machines. See the [installation in
 Next, open a terminal, then run:
 
 ```text
-multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox
+multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 ```
 
 This creates a virtual machine called `juju-sandbox`.
@@ -170,6 +170,16 @@ cd ~/tinyproxy
 charmcraft init --profile machine
 ```
 
+<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
+````{tip}
+The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
+
+To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
+```
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile machine
+```
+````
+
 Charmcraft created several files, including:
 
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
@@ -233,7 +243,7 @@ PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
 
 def ensure_config(port: int, slug: str) -> bool:
     """Ensure that tinyproxy is configured. Return True if any changes were made."""
-    # For the config file format, see https://manpages.ubuntu.com/manpages/jammy/en/man5/tinyproxy.conf.5.html
+    # For the config file format, see https://manpages.ubuntu.com/manpages/noble/en/man5/tinyproxy.conf.5.html
     config = f"""\
 PidFile "{PID_FILE}"
 Port {port}
@@ -253,10 +263,10 @@ def get_version() -> str:
 def install() -> None:
     """Use APT to install the tinyproxy executable."""
     apt.update()
-    # Install a specific package from ubuntu@22.04
-    # See https://packages.ubuntu.com/jammy/tinyproxy-bin
+    # Install a specific package from ubuntu@24.04
+    # See https://packages.ubuntu.com/noble/tinyproxy-bin
     # In general, it's good practice for charms to pin workload versions.
-    apt.add_package("tinyproxy-bin", "1.11.0-1")
+    apt.add_package("tinyproxy-bin", "1.11.1-3")
     # If this call fails, the charm will go into error status. The Juju logs will show the error:
     # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
 
@@ -277,7 +287,7 @@ def reload_config() -> None:
     if not pid:
         raise RuntimeError("tinyproxy is not running")
     # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
-    # See https://manpages.ubuntu.com/manpages/jammy/en/man8/tinyproxy.8.html#signals
+    # See https://manpages.ubuntu.com/manpages/noble/en/man8/tinyproxy.8.html#signals
     os.kill(pid, signal.SIGUSR1)
 
 
@@ -600,13 +610,13 @@ Model    Controller     Cloud/Region         Version  SLA          Timestamp
 testing  concierge-lxd  localhost/localhost  3.6.11   unsupported  09:01:38+08:00
 
 App        Version  Status  Scale  Charm      Channel  Rev  Exposed  Message
-tinyproxy  1.11.0   active      1  tinyproxy             0  no
+tinyproxy  1.11.1   active      1  tinyproxy             0  no
 
 Unit          Workload  Agent  Machine  Public address  Ports  Message
 tinyproxy/0*  active    idle   0        10.71.67.208
 
 Machine  State    Address       Inst id        Base          AZ            Message
-0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@22.04  juju-sandbox  Running
+0        started  10.71.67.208  juju-8e7bd9-0  ubuntu@24.04  juju-sandbox  Running
 ```
 
 ```{tip}
@@ -898,7 +908,7 @@ TOTAL                118     31     26      7    69%
 
 Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
 
-When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. We'll expand the tests to cover more of your charm's functionality.
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests. We'll expand the tests to cover more of your charm's functionality.
 
 In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
 
@@ -911,7 +921,7 @@ This extends the duration that Jubilant waits for your charm to deploy, in case 
 Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
 
 ```python
-    assert version == "1.11.0"  # The version installed by tinyproxy.install.
+    assert version == "1.11.1"  # The version installed by tinyproxy.install.
 ```
 
 You should now have the following tests:
@@ -931,10 +941,10 @@ def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config("tinyproxy", reset="slug")
 ```
 
-Each test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+Each test depends on two fixtures:
 
-- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available.
-- `juju` - A Jubilant object for interacting with a temporary Juju model.
+- `charm` - The `.charm` file to deploy. Only `test_deploy` uses `charm`, but it's helpful for each test to depend on `charm`. This ensures that each test fails immediately if a `.charm` file isn't available. This fixture is defined in `tests/integration/conftest.py`.
+- `juju` - A Jubilant object for interacting with a temporary Juju model. This fixture is provided by the `pytest-jubilant` plugin.
 
 The `juju` fixture is module-scoped. In other words, each test in `test_charm.py` affects the state of the same Juju model. This means that the order of the tests is significant. This also explains why we reset `slug` at the end of `test_block_on_invalid_config` - to ensure that any subsequent test could assume an unblocked charm.
 

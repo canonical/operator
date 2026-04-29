@@ -85,12 +85,12 @@ If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other libra
 - `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
 - `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
 
-This means that you need to add `cosl>=0.0.53` to your charm's dependencies.
+This means that you need to add `cosl>=1.9.1` to your charm's dependencies.
 
 To update your charm's dependencies in `pyproject.toml`, run:
 
 ```text
-uv add 'cosl>=0.0.53'
+uv add 'cosl>=1.9.1'
 ```
 
 ## Integrate with Prometheus
@@ -229,10 +229,9 @@ First, repack and refresh your charm:
 
 ```text
 charmcraft pack
-juju refresh \
-  --path="./fastapi-demo_amd64.charm" \
-  fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.

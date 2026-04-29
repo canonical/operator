@@ -34,6 +34,16 @@ cd ~/fastapi-demo
 charmcraft init --profile kubernetes
 ```
 
+<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
+````{tip}
+The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
+
+To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
+```
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile kubernetes
+```
+````
+
 Charmcraft created several files, including:
 
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
@@ -74,7 +84,7 @@ resources:
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.2
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 ### Define the charm class
@@ -222,7 +232,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
 ```
 
 
@@ -263,7 +273,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.2"}
+{"version":"1.0.3"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
@@ -402,7 +412,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`jubilant`](https://documentation.ubuntu.com/jubilant/) library.
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with {external+jubilant:doc}`Jubilant <reference/jubilant>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
@@ -434,10 +444,10 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-This test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+This test depends on two fixtures:
 
-- `charm` - The `.charm` file to deploy.
-- `juju` - A Jubilant object for interacting with a temporary Juju model.
+- `charm` - The `.charm` file to deploy. This fixture is defined in `tests/integration/conftest.py`.
+- `juju` - A Jubilant object for interacting with a temporary Juju model. This fixture is provided by the `pytest-jubilant` plugin.
 
 ### Run the test
 
@@ -447,7 +457,7 @@ Run the following command from anywhere in the `~/fastapi-demo` directory:
 tox -e integration
 ```
 
-The test takes some time to run as Jubilant adds a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
+The test takes some time to run as a new Juju model is created and your charm is deployed. If successful, it'll verify that your packed charm can be deployed as expected.
 
 The result should be similar to the following output:
 
