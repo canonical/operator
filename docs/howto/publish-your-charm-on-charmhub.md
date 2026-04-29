@@ -32,7 +32,7 @@ Charmhub creates four "channels" within each track. By default, you'll have:
 
 These channels represent different risk levels for users of your charm. Users who deploy from `latest/stable` expect a production-ready, extensively tested, safe release with release notes. Users who deploy your charm from `latest/edge` expect to receive a new revision each time you push to your repository's main branch.
 
-To control which revision of your charm is available from each channel, follow the instructions in {external+charmcraft:ref}`Charmcraft | Manage revisions <manage-charm-revisions>`. You can also use Charmhub to manage revisions.
+To control which revision of your charm is available from each channel, follow the instructions in {external+charmcraft:ref}`Charmcraft | Manage revisions <manage-charm-revisions>`.
 
 ## Next steps
 
