@@ -62,14 +62,7 @@ Important files to be aware of:
 - `pyproject.toml` - Python project configuration, including the dependencies of your charm.
 - `src/charm.py` - The Python file that will contain the main logic of your charm.
 
-(alternative-project-structures)=
-## Alternative project structures
-
-If your repository will hold multiple charms, or a charm and source for another artifact, such as a [rock](https://ubuntu.com/containers/docs), create a `charms` directory at the repository root. Then create a subdirectory for each charm and run `charmcraft init` in each subdirectory.
-
 If your charm's workload was built with a web framework such as Django or FastAPI, consider using one of Charmcraft's 12-factor app profiles instead of `kubernetes` or `machine`. These profiles accelerate development by generating charms that are ready to deploy. {external+charmcraft:ref}`Write your first 12-factor app charm <tutorial>`.
-
-<!-- Can we link to a real example of a charm monorepo? -->
 
 ## Next steps
 
