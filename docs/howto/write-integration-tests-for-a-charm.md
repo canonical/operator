@@ -157,7 +157,9 @@ A common split:
 - `test_charm.py` — smoke tests: pack, deploy, and check the charm reaches active status.
 - `test_<feature>.py` — for example, `test_backups.py`, `test_tls.py`, `test_upgrade.py`, `test_scaling.py`.
 
-The main reason to split is **parallel CI execution**: each module can run as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules. `tox -e integration` still runs every module sequentially on a single machine; it's the CI matrix (see {ref}`set-up-ci-integration`) that turns module boundaries into parallel jobs. Adding a new `test_*.py` file then automatically adds a new CI job — no workflow changes needed.
+There are two main benefits to splitting. Firstly, it makes it easier to investigate test failures when they are more isolated. Secondly, it's much simpler to have parallel test execution, where each module runs as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules.
+
+`tox -e integration` runs every module sequentially on a single machine. `charmcraft test` will automatically run each task separately on your local machine, and you can set up a CI matrix (see {ref}`set-up-ci-integration`) that has the same behaviour in CI. Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job — no workflow changes needed.
 
 For real-world examples of split tests, see:
 
