@@ -23,8 +23,9 @@ This separation:
 
 If you use `charmcraft init --profile machine`, Charmcraft creates `charm.py` and `<workload>.py` placeholders in the `src` directory.
 
-Below is an example of how `charm.py` calls the workload module. For more guidance, see {ref}`design-your-python-modules`.
+Call the workload module from `charm.py`:
 
+```python
 import ops
 import myworkload
 
@@ -62,6 +63,8 @@ class MyCharm(ops.CharmBase):
             event.add_status(ops.MaintenanceStatus("Starting workload"))
         event.add_status(ops.ActiveStatus())
 ```
+
+For more guidance, see {ref}`design-your-python-modules`.
 
 ## Install system packages
 
