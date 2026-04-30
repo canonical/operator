@@ -187,7 +187,7 @@ def reload_config() -> None:
 
 ## Observe the right events
 
-For a long-running workload, the core lifecycle is:
+For a long-running workload, the core events are:
 
 - `install` — install packages and set the workload version.
 - `start` — start the service.
