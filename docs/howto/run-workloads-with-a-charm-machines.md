@@ -166,7 +166,7 @@ Be more cautious about the package itself. If you can't be sure that you're the 
 How you start, stop, and signal the workload depends on how the package runs it:
 
 - **systemd units** (most APT packages) — use {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`, or call `systemctl` as a subprocess.
-- **snap services** — use `snap.Snap.start` / `.stop` / `.restart` from the snap library.
+- **snap services** — use `start`, `stop`, and `restart` methods of the {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>` library.
 - **A process you launch directly** — use `subprocess.run` to start the daemon. The charm process is short-lived, so the command you run should return immediately and have a daemonized process. Send signals with `os.kill` (such as `SIGTERM` to stop and `SIGUSR1` to reload config). Read the workload's man page for the signals it supports.
 
 For example, signalling a directly-launched process to reload its config:
