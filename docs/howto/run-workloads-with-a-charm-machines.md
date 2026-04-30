@@ -193,7 +193,6 @@ For a long-running workload, the core events are:
 - `start` — start the service.
 - `config_changed` — write a new config file and signal the workload (or restart it).
 - `stop` / `remove` — stop the service and uninstall packages.
-- `collect_unit_status` — report status to Juju at the end of every hook, based on the current state of the workload.
 
 For a longer-lived charm that may be upgraded in place, also observe `upgrade_charm` and re-run the install and config steps so that packages and config stay in sync with the charm revision.
 
