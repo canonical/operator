@@ -37,7 +37,16 @@ We consider Ops too small a project to use scopes, so we don't use them.
 
 Note that the commit messages to the PR's branch do not need to follow the conventional commit format, as these will be squashed into a single commit to `main` using the PR title as the commit message.
 
-To help us review your changes, please rebase your pull request onto the `main` branch before you request a review. If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
+## Git workflow for external contributors
+
+We expect external contributors to work on a branch in their fork and open a pull request from that branch.
+
+Before you ask for review, please rebase your branch onto `main` so that the pull request is easy to review. After the review has started, avoid force-pushing if possible, since it makes it harder to follow the discussion and compare earlier revisions.
+
+If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
+
+We squash-merge pull requests, so your branch history does not need to be perfect. Focus on making the pull request easy to review rather than keeping a carefully curated commit history.
+
 
 # Tests
 
