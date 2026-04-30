@@ -1,0 +1,67 @@
+name: Example Charm charmcraft test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '50 16 * * 2'  # 16:50 UTC Tuesdays
+
+permissions: {}
+
+jobs:
+  # Discover one spread task per Python integration test module across every
+  # example charm. Each `spread/integration/<module>/task.yaml` becomes a
+  # separate matrix entry, so adding a new task.yaml automatically adds a job.
+  collect-spread-jobs:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.collect.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Collect spread jobs
+        id: collect
+        run: |
+          # Create a JSON map that includes all of the tasks to run with charmcraft test.
+          # Includes the charm and task, like: `[{"charm": "<charm-dir>", "task": "<task-dir-name"}]`
+          jobs=$(find examples -path 'examples/*/spread/integration/*/task.yaml' -print \
+            | sort \
+            | jq -Rnc '[inputs | capture("examples/(?<charm>[^/]+)/spread/integration/(?<task>[^/]+)/task\\.yaml")]')
+          echo "jobs=${jobs}" >> "$GITHUB_OUTPUT"
+          echo "${jobs}" | jq .
+
+  integration:
+    name: ${{ matrix.charm }} / ${{ matrix.task }}
+    needs: collect-spread-jobs
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.collect-spread-jobs.outputs.jobs) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up LXD
+        # `charmcraft test` packs the charm in a managed LXD VM. The Docker
+        # preinstalled on GHA runners drops LXD bridge traffic in the FORWARD
+        # chain; canonical/setup-lxd adds the LXD bridge to DOCKER-USER so the
+        # build VM has network access. It also sets the lxd daemon group to
+        # `adm` (already the runner user's group), so no `sg` wrapper is needed.
+        uses: canonical/setup-lxd@8c6a87bfb56aa48f3fb9b830baa18562d8bfd4ee  # v1
+        with:
+          channel: 5.21/stable
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+      - name: Fetch any charmlibs
+        working-directory: examples/${{ matrix.charm }}
+        run: |
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
+      - name: Run spread test
+        working-directory: examples/${{ matrix.charm }}
+        # GitHub Actions sets CI=true, so charmcraft test uses the `ci`
+        # allocator (runs against the runner itself) instead of launching
+        # a nested LXD VM for the spread target.
+        run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"

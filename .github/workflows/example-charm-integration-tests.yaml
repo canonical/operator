@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         dir:
-          - examples/httpbin-demo
+          # httpbin-demo runs under example-charm-charmcraft-test.yaml instead.
           - examples/k8s-1-minimal
           - examples/k8s-2-configurable
           - examples/k8s-3-postgresql

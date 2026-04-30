@@ -1,0 +1,37 @@
+# This file has some small modifications from the one installed by the profile.
+# In particular, it uses Concierge to prepare for the task.
+# The `.extension` file installed by the profile is exactly as provided by the profile.
+project: httpbin-demo
+
+backends:
+  craft:
+    type: craft
+    systems:
+      - ubuntu-24.04:
+
+prepare: |
+  # Juju needs the charm etc. to be owned by the running user.
+  chown -R "${USER}" "${PROJECT_PATH}"
+
+suites:
+  spread/integration/:
+    summary: Integration tests
+
+    environment:
+      # `uv tool install` places binaries under the invoking user's ~/.local/bin.
+      PATH: $PATH:/root/.local/bin
+
+    prepare: |
+      sudo snap install --classic concierge
+      sudo concierge prepare --trace -p k8s --extra-snaps astral-uv
+      uv tool install tox --with tox-uv
+
+exclude:
+  - .git
+  - .tox
+  - .venv
+  - .ruff_cache
+  - .pytest_cache
+  - .coverage
+
+kill-timeout: 90m
