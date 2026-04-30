@@ -1,112 +1,388 @@
+---
+myst:
+  html_meta:
+    description: Manage system packages (APT and snaps) and workloads in a machine charm, with unit tests using ops.testing and integration tests using Jubilant.
+---
+
 (run-workloads-with-a-charm-machines)=
 # How to run workloads with a machine charm
 
-There are several ways your charm might start a workload, depending on the type of charm you're authoring.
+A machine charm typically installs one or more system packages (from APT or as snaps), then starts and manages the workload as a long-running service. This guide shows patterns for structuring that code, installing packages, managing the service lifecycle, and testing the charm.
 
-For a machine charm, it is likely that packages will need to be fetched, installed and started to provide the desired charm functionality. This can be achieved by interacting with the system's package manager, ensuring that package and service status is maintained by reacting to events accordingly.
+For a complete worked example, see the [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) example charm and the {ref}`machine-charm-tutorial` tutorial. For a production charm, see [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator).
 
-It is important to consider which events to respond to in the context of your charm. A simple example might be:
+## Put workload logic in its own module
+
+Keep charming concerns (event handlers, status, config parsing) in `src/charm.py`, and put workload-specific logic (installing, starting, configuring, stopping the workload) in a separate module such as `src/myworkload.py`. The charm calls the module; the module doesn't know about Ops.
+
+This separation:
+
+- Makes the workload code reusable and easy to read.
+- Lets you unit test the charm by mocking the module (no `subprocess` patching in state-transition tests).
+- Lets you unit test the module on its own, patching only its direct system calls.
+
+If you use `charmcraft init --profile machine`, Charmcraft creates `charm.py` and `<workload>.py` placeholders in the `src` directory.
+
+Call the workload module from `charm.py`:
 
 ```python
-import subprocess
+import ops
+import myworkload
 
-class MachineCharm(ops.CharmBase):
-    ...
 
+class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on.install, self._on_install)
         framework.observe(self.on.start, self._on_start)
-        ...
+        framework.observe(self.on.stop, self._on_stop)
+        framework.observe(self.on.remove, self._on_remove)
+        framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
-    def _on_install(self, event: ops.InstallEvent):
-        """Handle the install event."""
-        self.unit.status = ops.MaintenanceStatus("Installing packages")
-        try:
-            # Install the openssh-server package using apt-get.
-            # Consider using the operator-libs-linux apt library instead:
-            # https://charmhub.io/operator-libs-linux/libraries/apt
-            subprocess.run(
-                ["/usr/bin/apt", "install", "-y", "openssh-server"],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError as e:
-            # If the command returns a non-zero return code, put the charm
-            # in blocked state.
-            logger.error(
-                "Package install failed with return code %d: %r",
-                e.returncode,
-                e.stderr,
-            )
-            self.unit.status = ops.BlockedStatus("Failed to install packages")
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        if not myworkload.is_installed():
+            myworkload.install()
+            self.unit.set_workload_version(myworkload.get_version())
 
-    def _on_start(self, event: ops.StartEvent):
-        """Handle the start event."""
-        self.unit.status = ops.MaintenanceStatus("Starting services")
-        try:
-            # Enable the ssh systemd unit, and start it
-            subprocess.run(
-                ["/usr/bin/systemctl", "enable", "--now", "openssh-server"],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError as e:
-            # If the command returns a non-zero return code, put the charm
-            # in blocked state.
-            logger.error(
-                "Starting systemd unit failed with return code %d: %r",
-                e.returncode,
-                e.sterr,
-            )
-            self.unit.status = ops.BlockedStatus(
-                "Failed to start/enable ssh service"
-            )
-            return
+    def _on_start(self, event: ops.StartEvent) -> None:
+        myworkload.start()
 
-        # Everything is awesome.
-        self.unit.status = ops.ActiveStatus()
+    def _on_stop(self, event: ops.StopEvent) -> None:
+        myworkload.stop()
+
+    def _on_remove(self, event: ops.RemoveEvent) -> None:
+        # On shared machines, avoid automatically uninstalling system packages.
+        # Stop the workload here, and only remove packages as an explicit,
+        # charm-specific step when you know the machine is dedicated to it.
+        myworkload.stop()
+
+    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
+        if not myworkload.is_installed():
+            event.add_status(ops.MaintenanceStatus("Installing workload"))
+        if not myworkload.is_running():
+            event.add_status(ops.MaintenanceStatus("Starting workload"))
+        event.add_status(ops.ActiveStatus())
 ```
 
-```{tip}
-When running subprocesses, log the return (exit) code as well as `stderr` when
-errors occur.
+For more guidance, see {ref}`design-your-python-modules`.
+
+## Install system packages
+
+Prefer purpose-built Python libraries over subprocess calls to `apt-get` or `snap`. Libraries give you typed errors, idempotent operations, and avoid the pitfalls of parsing CLI output.
+
+### APT packages
+
+Use {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`. Add it to `pyproject.toml`:
+
+```toml
+dependencies = [
+    "charmlibs-apt>=1,<2",
+    # ...
+]
 ```
 
-```{tip}
-Use absolute paths in subprocesses to prevent security issues.
-```
-
-```{tip}
-Execute processes directly rather than via the shell.
-```
-
-If the machine is likely to be long-running and endure multiple upgrades throughout its life, it may be prudent to ensure the package is installed more regularly, and handle the case where it needs upgrading or reinstalling. Consider this excerpt from the [ubuntu-advantage charm code](https://git.launchpad.net/charm-ubuntu-advantage/tree/src/charm.py) (with some additional comments):
+Then install a pinned version of the package from the charm's base:
 
 ```python
-class UbuntuAdvantageCharm(ops.CharmBase):
-    """Charm to handle ubuntu-advantage installation and configuration"""
+# src/myworkload.py
+from charmlibs import apt
 
-    _state = ops.StoredState()
 
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        self._state.set_default(hashed_token=None, package_needs_installing=True, ppa=None)
-        framework.observe(self.on.config_changed, self.config_changed)
+def install() -> None:
+    apt.update()
+    # Pin to a specific version so deployments are reproducible.
+    apt.add_package("tinyproxy-bin", "1.11.1-3")
+    # On failure, apt raises charmlibs.apt.PackageError, which puts the
+    # charm into error status with a clear message in the Juju logs.
 
-    def config_changed(self, event):
-        """Install and configure ubuntu-advantage tools and attachment"""
-        self.unit.status = ops.MaintenanceStatus("Configuring")
-        # Helper method to ensure a custom PPA from charm config is present on the system.
-        self._handle_ppa_state()
-        # Helper method to ensure latest package is installed.
-        self._handle_package_state()
-        # Handle some ubuntu-advantage specific configuration.
-        self._handle_token_state()
-        # Set the unit status using a helper _handle_status_state.
-        if isinstance(self.unit.status, ops.BlockedStatus):
-            return
-        self._handle_status_state()
+
+def uninstall() -> None:
+    apt.remove_package("tinyproxy-bin")
 ```
 
-In the example above, the package install status is ensured each time the charm's `config-changed` event fires, which should ensure correct state throughout the charm's deployed lifecycle.
+```{admonition} Best practice
+:class: hint
+
+Pin workload versions rather than installing the latest available package. A charm that silently upgrades between reconciliations is hard to debug, and can break if upstream introduces a breaking change.
+```
+
+### Snap packages
+
+Use {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>`:
+
+```toml
+dependencies = [
+    "charmlibs-snap>=1,<2",
+    # ...
+]
+```
+
+```python
+# src/myworkload.py
+from charmlibs import snap
+
+
+def install() -> None:
+    cache = snap.SnapCache()
+    workload = cache["my-workload"]
+    workload.ensure(snap.SnapState.Latest, channel="stable")
+
+
+def start() -> None:
+    snap.SnapCache()["my-workload"].start(enable=True)
+
+
+def stop() -> None:
+    snap.SnapCache()["my-workload"].stop(disable=True)
+```
+
+### When there's no library
+
+If no library is available for installing the workload, use `subprocess` to run commands that install and start the workload. Keep these calls isolated in the workload module.
+
+```{admonition} Best practice
+:class: hint
+
+When running subprocesses:
+- Use absolute paths to avoid PATH-based attacks. For example, `/usr/bin/apt` rather than `apt`.
+- Pass arguments as a list, not a shell string, so the shell doesn't interpret them.
+- Use `check=True` so that failures raise. Generally you will want to catch that exception, then log the return code and possibly `stderr`. Use `capture_output=True` so that output from the command doesn't leak into the Juju log.
+```
+
+### Uninstall with care on shared machines
+
+A machine charm doesn't necessarily own its machine. Another charm may have installed the same package before you did, may install it after you, or may rely on it for an unrelated purpose. Removing the package on `remove` can break those other consumers.
+
+In your `remove` handler, always clean up the things that are unambiguously yours:
+
+- Config files and data directories your charm wrote.
+- systemd drop-ins or unit files your charm created.
+- Workload state that no other consumer would expect to find, such as a PID file you maintain.
+
+Be more cautious about the package itself. If you can't be sure that you're the only consumer, leave the package installed and just stop the service you started. The cost of leaving an unused package on a machine is much smaller than the cost of breaking another charm.
+
+## Manage the service lifecycle
+
+How you start, stop, and signal the workload depends on how the package runs it:
+
+- **systemd units** (most APT packages) — use {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`, or call `systemctl` as a subprocess.
+- **snap services** — use `start`, `stop`, and `restart` methods of the {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>` library.
+- **A process you launch directly** — use `subprocess.run` to start the daemon. The charm process is short-lived, so the command you run should return immediately and have a daemonized process. Send signals with `os.kill` (such as `SIGTERM` to stop and `SIGUSR1` to reload config). Read the workload's man page for the signals it supports.
+
+For example, signalling a directly-launched process to reload its config:
+
+```python
+import os
+import signal
+
+from charmlibs import pathops
+
+PID_FILE = pathops.LocalPath("/var/run/myworkload.pid")
+
+
+def reload_config() -> None:
+    pid = int(PID_FILE.read_text())
+    os.kill(pid, signal.SIGUSR1)
+```
+
+## Observe the right events
+
+For a long-running workload, the core events are:
+
+- `install` — install packages and set the workload version.
+- `start` — start the service.
+- `config_changed` — write a new config file and signal the workload (or restart it).
+- `stop` / `remove` — stop the service and uninstall packages.
+
+For a longer-lived charm that may be upgraded in place, also observe `upgrade_charm` and re-run the install and config steps so that packages and config stay in sync with the charm revision.
+
+## Write unit tests
+
+Unit tests for a machine charm come in two layers, matching the charm's modules. Together they cover the whole charm without ever installing the real package.
+
+### State-transition tests for the charm
+
+Use `ops.testing.Context` and `ops.testing.State` to simulate events. Because the charm only calls the workload module, you mock the module — not `subprocess` or `apt` — so the tests stay readable and stable.
+
+```python
+# tests/unit/test_charm.py
+import pytest
+from ops import testing
+
+from charm import MyCharm
+
+
+class MockWorkload:
+    """In-memory stand-in for the workload module."""
+
+    def __init__(self, installed: bool = False, running: bool = False):
+        self.installed = installed
+        self.running = running
+        self.signals: list[str] = []
+
+    def install(self) -> None:
+        self.installed = True
+
+    def uninstall(self) -> None:
+        self.installed = False
+
+    def is_installed(self) -> bool:
+        return self.installed
+
+    def start(self) -> None:
+        self.running = True
+
+    def stop(self) -> None:
+        self.running = False
+
+    def is_running(self) -> bool:
+        return self.running
+
+    def reload_config(self) -> None:
+        self.signals.append("SIGUSR1")
+
+    def get_version(self) -> str:
+        return "1.0.0"
+
+
+@pytest.fixture
+def workload(monkeypatch: pytest.MonkeyPatch) -> MockWorkload:
+    mock = MockWorkload()
+    monkeypatch.setattr("charm.myworkload", mock)
+    return mock
+
+
+def test_install(workload: MockWorkload):
+    # Arrange
+    ctx = testing.Context(MyCharm)
+    # Act
+    state_out = ctx.run(ctx.on.install(), testing.State())
+    # Assert
+    assert workload.is_installed()
+    assert state_out.workload_version == "1.0.0"
+
+
+def test_start(workload: MockWorkload):
+    workload.installed = True
+    ctx = testing.Context(MyCharm)
+    state_out = ctx.run(ctx.on.start(), testing.State())
+    assert workload.is_running()
+    assert state_out.unit_status == testing.ActiveStatus()
+
+
+def test_stop(workload: MockWorkload):
+    workload.installed = True
+    workload.running = True
+    ctx = testing.Context(MyCharm)
+    ctx.run(ctx.on.stop(), testing.State())
+    assert not workload.is_running()
+```
+
+### Tests for the workload module
+
+Test the module directly by patching the things it actually calls — `apt`, `subprocess.run`, `os.kill`, the snap cache, and so on. Keep these tests small: they exist to check that the module invokes its dependencies correctly, not to test those dependencies.
+
+```python
+# tests/unit/test_myworkload.py
+import signal
+
+import pytest
+
+from charm import myworkload
+
+
+def test_install_calls_apt(monkeypatch: pytest.MonkeyPatch):
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "charm.myworkload.apt.update", lambda: calls.append(("update", "")),
+    )
+    monkeypatch.setattr(
+        "charm.myworkload.apt.add_package",
+        lambda name, version: calls.append((name, version)),
+    )
+    myworkload.install()
+    assert calls == [("update", ""), ("tinyproxy-bin", "1.11.1-3")]
+
+
+def test_reload_config_sends_sigusr1(
+    monkeypatch: pytest.MonkeyPatch, tmp_path,
+):
+    pid_file = tmp_path / "myworkload.pid"
+    pid_file.write_text("1234")
+    monkeypatch.setattr("charm.myworkload.PID_FILE", pid_file)
+
+    sent: list[tuple[int, int]] = []
+    monkeypatch.setattr("os.kill", lambda pid, sig: sent.append((pid, sig)))
+
+    myworkload.reload_config()
+    assert sent == [(1234, signal.SIGUSR1)]
+
+
+def test_start_runs_subprocess(monkeypatch: pytest.MonkeyPatch):
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda cmd, **kwargs: commands.append(cmd) or None,
+    )
+    myworkload.start()
+    assert commands == [["myworkload"]]
+```
+
+### Run the tests
+
+Run all your unit tests with:
+
+```text
+tox -e unit
+```
+
+For more on state-transition testing — including `State.from_context`, reusing state across events, and accessing the charm instance — see {ref}`write-unit-tests-for-a-charm`.
+
+## Write integration tests
+
+Integration tests deploy the packed charm to a real Juju model and check that the workload actually installs, starts, and behaves correctly. Use {external+jubilant:doc}`Jubilant <index>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
+
+```python
+# tests/integration/test_charm.py
+import pathlib
+
+import jubilant
+
+
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
+    juju.deploy(charm.resolve(), app="myworkload")
+    juju.wait(jubilant.all_active, timeout=600)
+
+
+def test_workload_version(juju: jubilant.Juju):
+    version = juju.status().apps["myworkload"].version
+    assert version == "1.11.1"  # The version we pinned in install(), as reported by the workload.
+
+
+def test_blocks_on_invalid_config(juju: jubilant.Juju):
+    juju.config("myworkload", {"slug": "not/valid"})
+    juju.wait(jubilant.all_blocked)
+    juju.config("myworkload", reset="slug")
+```
+
+The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file. For an example, see [`conftest.py` in machine-tinyproxy's integration tests](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py).
+
+If you use `charmcraft init --profile machine`, Charmcraft creates a `charm` fixture and placeholder files for your tests.
+
+For guidance on running the tests, see:
+
+- {ref}`write-integration-tests-for-a-charm`
+- {ref}`set-up-ci`
+
+## Examples
+
+- [machine-tinyproxy](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy) — the example charm from the {ref}`machine-charm-tutorial` tutorial, showing the full workload-module pattern, APT install, signal-based config reload, and both test layers.
+- [ubuntu-manpages-operator](https://github.com/canonical/ubuntu-manpages-operator) — a production machine charm. See its [`tests/unit`](https://github.com/canonical/ubuntu-manpages-operator/tree/main/tests/unit) for a real-world example of the test patterns above.
+- [openstack-exporter-operator](https://github.com/canonical/openstack-exporter-operator) — a production machine charm that installs its workload as a snap. The workload module is in [`src/service.py`](https://github.com/canonical/openstack-exporter-operator/blob/main/src/service.py).
+
+## See also
+
+- {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`
+- {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>`
+- {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`
+- {external+charmlibs:ref}`charmlibs-pathops <charmlibs-pathops>`
