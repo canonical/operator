@@ -9,8 +9,6 @@ myst:
 
 A "subordinate" charm is a machine charm where each unit runs alongside a unit of another charm, called the "principal" charm. In this setup, the principal unit and corresponding subordinate unit always run on the same machine.
 
-A subordinate charm typically communicates with the principal charm out of band. There isn't a dedicated Juju relation between a principal unit and the corresponding subordinate unit.
-
 Subordinate charms aren't always appropriate. If possible, instead of writing a subordinate charm, write a regular charm that communicates over relations.
 
 ## When to use a subordinate charm
@@ -29,18 +27,12 @@ A subordinate charm is declared in `charmcraft.yaml`:
 subordinate: true
 ```
 
-`charmcraft.yaml` doesn't specify a principal charm. A subordinate charm doesn't know which principal charm it will be deployed alongside. A Juju user is free to deploy a subordinate charm alongside any principal charm; your subordinate charm's code needs to decide whether it's running in the correct context.
+`charmcraft.yaml` doesn't specify a principal charm. A subordinate charm doesn't know which principal charm it will be deployed alongside. A Juju user is free to deploy a subordinate charm alongside any principal charm; your subordinate charm's code needs to determine whether it's running in the correct context.
 
 When you document a subordinate charm, clearly state the intended principal charm.
 
-```{important}
+## Runtime constraints
+
 A subordinate charm can't control the Ubuntu base that its units run on. If the principal charm supports multiple bases, consider publishing a separate revision of the subordinate charm for each base.
-```
 
-## After deployment
-
-TODO: What actually gets put on the machine? If I have two regular applications in my model, do I automatically get a unit of the subordinate for each unit of each regular application? So there isn't really a notion of "the" principal charm?
-
-TODO: Watch out - other subordinate charms might be configuring the same machine.
-
-TODO: What data can subordinate units see? Is there a peer relation with other units of the same subordinate charm? Review the relation how-to in Ops - "Note however that subordinate units cannot see each other's peer data".
+A subordinate unit shouldn't assume it's the only unit trying to configure the hardware or system. Subordinate units should minimise side effects when writing configuration and installing/uninstalling packages. For general advice, see {ref}`run-workloads-with-a-charm-machines`.
