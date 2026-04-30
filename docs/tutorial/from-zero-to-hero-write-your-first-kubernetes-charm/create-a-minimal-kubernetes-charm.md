@@ -220,6 +220,10 @@ The first time you run `charmcraft pack`, Charmcraft takes several minutes to pa
 
 If you run into inexplicable issues when running `charmcraft pack`, this may be because some of the cached information is out of date. Run `charmcraft clean` to fix this.
 
+```{warning}
+If `charmcraft pack` fails with `Too many levels of symbolic links`, remove local virtual environment directories such as `.venv` and `.tox` from your project directory, then try again. If the problem persists, report it to the Charmcraft team, since the specific cause is still being investigated.
+```
+
 ```{important}
 
 **Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents.
