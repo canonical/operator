@@ -28,7 +28,7 @@ jobs:
           pip install -e . -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
-        uses: tiobe/tics-github-action@a53037a6bb9f71b6a97cdeb0ac41632266804b9e  # v3.8.0
+        uses: tiobe/tics-github-action@3300ccc8de3c938cb83dc940ec4d07096c1bf185  # v3.9.1
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
