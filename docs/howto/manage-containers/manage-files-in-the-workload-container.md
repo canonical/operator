@@ -98,17 +98,20 @@ With `recursive=True`, the entire directory tree is deleted recursively (like `r
 
 ## Check file and directory existence
 
-To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
+To check whether a file exists, use [`Container.exists`](ops.Container.exists):
 
 ```python
-# if /tmp/myfile exists
-container.exists('/tmp/myfile') # True
-container.isdir('/tmp/myfile') # False
-
-# if /tmp/mydir exists
-container.exists('/tmp/mydir') # True
-container.isdir('/tmp/mydir') # True
+container.exists('/etc/myapp/backup.yaml')
 ```
+
+To check whether a directory exists, use `Container.exists` or [`Container.isdir`](ops.Container.isdir):
+
+```python
+container.isdir('/etc/myapp/cachedir')
+container.exists('/etc/myapp/cachedir')
+```
+
+`Container.exists` and `Container.isdir` are analogous to Python's `os.path.exists` and `os.path.isdir` functions.
 
 ## Write unit tests
 
