@@ -5,7 +5,7 @@ The [](ops.Container) class provides methods to manage files in the workload con
 
 This guide demonstrates how to use `ops.Container` methods. For a `pathlib`-like approach to managing files in the workload container, use `ContainerPath` methods from the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library.
 
-## Push
+## Write a file
 
 Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload container:
 
@@ -18,7 +18,7 @@ container.push('/etc/myapp/config.yaml', config, make_dirs=True)
 
 `Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
 
-## Pull
+## Read a file
 
 To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object:
 
@@ -28,7 +28,9 @@ backup = container.pull('/etc/myapp/backup.yaml').read()
 
 If you specify the keyword argument `encoding=None` on the `pull()` call, reads from the returned file-like object will return `bytes`. The default is `encoding='utf-8'`, which will decode the file's bytes from UTF-8 so that reads return a Python `str`.
 
-## Push recursive
+## Copy a directory tree
+
+### To the container
 
 To copy several files to the workload container, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
@@ -42,7 +44,7 @@ container.push_path('/source/dir/*', '/destination')
 
 A trailing "/*" on the source directory is the only supported globbing/matching.
 
-## Pull recursive
+### From the container
 
 To copy several files from the workload container, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
@@ -71,7 +73,7 @@ if 'host.conf' not in names:
 
 If you want information about the directory itself (instead of its contents), call `list_files(path, itself=True)`.
 
-## Create directory
+## Create a directory
 
 To create a directory, use [`Container.make_dir`](ops.Container.make_dir):
 
@@ -80,7 +82,7 @@ container.make_dir('/etc/myapp/private', user='myapp', group='myapp')
 container.make_dir('/etc/myapp/path/to/nested/dir', make_parents=True)
 ```
 
-## Remove path
+## Remove a file or directory
 
 To delete a file, use [`Container.remove_path`](ops.Container.remove_path):
 
@@ -96,7 +98,7 @@ container.remove_path('/etc/myapp/cachedir', recursive=True)
 
 With `recursive=True`, the entire directory tree is deleted recursively (like `rm -r`).
 
-## Check file and directory existence
+## Check existence
 
 To check whether a file exists, use [`Container.exists`](ops.Container.exists):
 
