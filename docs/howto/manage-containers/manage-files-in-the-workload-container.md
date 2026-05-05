@@ -20,17 +20,10 @@ container.push('/etc/myapp/config.yaml', config, make_dirs=True)
 
 ## Pull
 
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
-
-The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
+To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object:
 
 ```python
-# Update port to 8888 and restart service
-config = container.pull('/etc/pg/postgresql.conf').read()
-if 'port =' not in config:
-    config += '\nport = 8888\n'
-container.push('/etc/pg/postgresql.conf', config)
-container.restart('postgresql')
+backup = container.pull('/etc/myapp/backup.yaml').read()
 ```
 
 If you specify the keyword argument `encoding=None` on the `pull()` call, reads from the returned file-like object will return `bytes`. The default is `encoding='utf-8'`, which will decode the file's bytes from UTF-8 so that reads return a Python `str`.
