@@ -73,11 +73,11 @@ If you want information about the directory itself (instead of its contents), ca
 
 ## Create directory
 
-To create a directory, use [`Container.make_dir`](ops.Container.make_dir). It takes an optional `make_parents=True` argument (like `mkdir -p`), as well as optional permissions and user/group arguments. Some examples:
+To create a directory, use [`Container.make_dir`](ops.Container.make_dir):
 
 ```python
-container.make_dir('/etc/pg', user='postgres', group='postgres')
-container.make_dir('/some/other/nested/dir', make_parents=True)
+container.make_dir('/etc/myapp/private', user='myapp', group='myapp')
+container.make_dir('/etc/myapp/path/to/nested/dir', make_parents=True)
 ```
 
 ## Remove path
