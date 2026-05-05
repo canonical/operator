@@ -30,7 +30,7 @@ If you specify the keyword argument `encoding=None` on the `pull()` call, reads 
 
 ## Push recursive
 
-To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files to the workload container, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
@@ -44,7 +44,7 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## Pull recursive
 
-To copy several files to the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files from the workload container, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
