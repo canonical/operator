@@ -7,19 +7,16 @@ This guide demonstrates how to use `ops.Container` methods. For a `pathlib`-like
 
 ## Push
 
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
+Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload container:
 
 ```python
-config = """
-port = 7777
-max_connections = 1000
-"""
-container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
+config = '...'
+container.push('/etc/myapp/config.yaml', config, make_dirs=True)
 ```
 
-The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
+`make_dirs=True` tells `push` to create directories if they don't exist (`/etc/myapp` in this case).
 
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](ops.Container.push) for details.
+`Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
 
 ## Pull
 
