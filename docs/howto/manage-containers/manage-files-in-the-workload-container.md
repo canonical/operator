@@ -82,14 +82,19 @@ container.make_dir('/some/other/nested/dir', make_parents=True)
 
 ## Remove path
 
-To delete a file or directory, use [`Container.remove_path`](ops.Container.remove_path). If a directory is specified, it must be empty unless `recursive=True` is specified, in which case the entire directory tree is deleted, recursively (like `rm -r`). For example:
+To delete a file, use [`Container.remove_path`](ops.Container.remove_path):
 
 ```python
-# Delete Apache access log
-container.remove_path('/var/log/apache/access.log')
-# Blow away /tmp/mysubdir and all files under it
-container.remove_path('/tmp/mysubdir', recursive=True)
+container.remove_path('/etc/myapp/access.log')
 ```
+
+To delete a directory, also use `Container.remove_path`. The directory must be empty unless you specify `recursive=True`:
+
+```python
+container.remove_path('/etc/myapp/cachedir', recursive=True)
+```
+
+With `recursive=True`, the entire directory tree is deleted recursively (like `rm -r`).
 
 ## Check file and directory existence
 
