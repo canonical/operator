@@ -117,95 +117,51 @@ container.exists('/etc/myapp/cachedir')
 
 ## Write unit tests
 
-### Mount files in the container
-
-You can configure a container to have some files in it:
+To inspect the workload container's filesystem in a unit test, use [`Container.get_filesystem`](ops.testing.Container.get_filesystem):
 
 ```python
-import pathlib
+def test_pebble_ready():
+    ctx = testing.Context(MyCharm)
+    container = testing.Container('myapp', can_connect=True)
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
-local_file = pathlib.Path('/path/to/local/real/file.txt')
-
-container = testing.Container(
-    name='foo',
-    can_connect=True,
-    mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file)},
-    )
-state = testing.State(containers={container})
+    # Check that the workload container has the expected config file
+    # after our charm handles the pebble-ready event.
+    container_root = state_out.get_container('myapp').get_filesystem(ctx)
+    config_file = container_root / 'etc' / 'myapp' / 'config.yaml'
+    assert config_file.exists()
+    assert my_custom_checks(config_file)
 ```
 
-In this case, if the charm were to:
+`get_filesystem` returns a temporary directory that simulates the container's filesystem.
 
-```python
-def _on_start(self, _):
-    foo = self.unit.get_container('foo')
-    content = foo.pull('/local/share/config.yaml').read()
-```
-
-then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempfile` for
-nicely wrapping data and passing it to the charm via the container.
-
-### Check files written in the container
-
-`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
+Don't write to the filesystem that `get_filesystem` returns. If a unit test needs to ensure that particular data exists in the container, use [`Container.mounts`](ops.testing.Container.mounts):
 
 ```python
 import tempfile
 
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
 
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-def test_pebble_push():
-    with tempfile.NamedTemporaryFile() as local_file:
+def test_get_backup_action():
+    # Create a temporary file with placeholder data, then mount the file
+    # in the workload container so that our charm can see it.
+    with tempfile.NamedTemporaryFile() as backup_file:
+        backup_file.write_text(my_custom_data())
+        ctx = testing.Context(MyCharm)
         container = testing.Container(
-            name='foo',
+            'myapp',
             can_connect=True,
-            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)}
+            mounts={
+                'backup': testing.Mount(
+                    location='/etc/myapp/backup.yaml', source=backup_file
+                )
+            },
         )
         state_in = testing.State(containers={container})
-        ctx = testing.Context(
-            MyCharm,
-            meta={'name': 'foo', 'containers': {'foo': {}}}
-        )
-        ctx.run(
-            ctx.on.pebble_ready(container),
-            state_in,
-        )
-        assert local_file.read().decode() == 'TEST'
+        state_out = ctx.run(ctx.on.action('get-backup'), state_in)
+
+        # Check that the action returned the contents of backup_file.
+        assert ctx.action_results == {'data': my_custom_data()}
 ```
 
-If the charm writes files to a container (to a location you didn't mount as a temporary folder you
-have access to), you will be able to inspect them using `get_filesystem`.
-
-```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-
-def test_pebble_push():
-    container = testing.Container(name='foo', can_connect=True)
-    state_in = testing.State(containers={container})
-    ctx = testing.Context(
-        MyCharm,
-        meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
-
-    state_out = ctx.run(ctx.on.start(), state_in)
-
-    # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
-    container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
-    cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
-    assert cfg_file.read_text() == 'TEST'
-```
+If the charm writes to `/etc/myapp/backup.yaml` in the container while handling the event, `backup_file.read_text()` will return the data that the charm wrote.
