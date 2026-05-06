@@ -1,9 +1,54 @@
 (files-in-containers)=
 # How to manage files in the workload container
 
-The [](ops.Container) class provides methods to manage files in the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
+The [](ops.Container) class provides methods for managing files in a container.
 
-This guide demonstrates how to use `ops.Container` methods. For a `pathlib`-like approach to managing files in the workload container, use `ContainerPath` methods from the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library.
+Instead of using `ops.Container` directly, we recommend using the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library. `pathops` provides a `ContainerPath` class that uses a `pathlib`-like approach for managing files in a container.
+
+This guide demonstrates how to use `ContainerPath` methods where possible, and `ops.Container` methods for operations that `ContainerPath` doesn't support.
+
+We assume that your charm class has an attribute for the workload container:
+
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.container = self.unit.get_container('myapp')
+        # ...
+```
+
+## Add pathops to your charm
+
+Add {external+charmlibs:ref}`pathops <charmlibs-pathops>` to `pyproject.toml`:
+
+```toml
+dependencies = [
+    "charmlibs-pathops>=1,<2",
+    # ...
+]
+```
+
+Then import the library in your charm code:
+
+```python
+from charmlibs import pathops
+```
+
+## Create a directory
+
+Use {external+charmlibs:meth}`ContainerPath.mkdir <pathops.ContainerPath.mkdir>`:
+
+```python
+pathops.ContainerPath(
+    '/etc/myapp/path/to/nested/dir',
+    container=self.container,
+).mkdir(parents=True)
+
+pathops.ContainerPath(
+    '/etc/myapp/private',
+    container=self.container,
+).mkdir(user='myapp', group='myapp')
+```
 
 ## Write a file
 
@@ -72,15 +117,6 @@ if 'host.conf' not in names:
 ```
 
 If you want information about the directory itself (instead of its contents), call `list_files(path, itself=True)`.
-
-## Create a directory
-
-To create a directory, use [`Container.make_dir`](ops.Container.make_dir):
-
-```python
-container.make_dir('/etc/myapp/private', user='myapp', group='myapp')
-container.make_dir('/etc/myapp/path/to/nested/dir', make_parents=True)
-```
 
 ## Remove a file or directory
 
