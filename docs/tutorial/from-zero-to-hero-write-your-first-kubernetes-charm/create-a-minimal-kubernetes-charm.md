@@ -270,7 +270,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.3"}
+{"version":"1.0.4"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
