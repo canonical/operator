@@ -17,8 +17,6 @@ A subordinate charm is appropriate if you need to monitor or configure the under
 
 A subordinate charm is also appropriate if you need to manage how a particular workload interacts with the system. For example, how data is backed up or how connections are pooled. See [`pgbouncer`](https://github.com/canonical/pgbouncer-operator).
 
-In general, a subordinate charm should be lighter weight than its intended principal charm.
-
 ## Declaring a subordinate charm
 
 A subordinate charm is declared in `charmcraft.yaml`:
