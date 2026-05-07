@@ -7,17 +7,7 @@ Instead of using `ops.Container` directly, we recommend using the {external+char
 
 This guide demonstrates how to use `ContainerPath` methods where possible, and `ops.Container` methods for operations that `ContainerPath` doesn't support.
 
-We assume that your charm class has an attribute for the workload container:
-
-```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        self.container = self.unit.get_container('myapp')
-        # ...
-```
-
-## Add pathops to your charm
+## Prepare your charm code
 
 Add {external+charmlibs:ref}`pathops <charmlibs-pathops>` to `pyproject.toml`:
 
@@ -34,20 +24,27 @@ Then import the library in your charm code:
 from charmlibs import pathops
 ```
 
-## Create a directory
-
-Use {external+charmlibs:meth}`ContainerPath.mkdir <pathops.ContainerPath.mkdir>`:
+It's common to define an attribute on the charm class for the workload container. We recommend that you also define an attribute for the root directory that your charm will operate in. For example:
 
 ```python
-pathops.ContainerPath(
-    '/etc/myapp/path/to/nested/dir',
-    container=self.container,
-).mkdir(parents=True)
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.container = self.unit.get_container('myapp')
+        self.myapp_root = pathops.ContainerPath(
+            '/etc/myapp',
+            container=self.container,
+        )
+        # ...
+```
 
-pathops.ContainerPath(
-    '/etc/myapp/private',
-    container=self.container,
-).mkdir(user='myapp', group='myapp')
+## Create a directory
+
+To create a directory in the workload container, use {external+charmlibs:meth}`ContainerPath.mkdir <pathops.ContainerPath.mkdir>`:
+
+```python
+self.myapp_root.mkdir(parents=True)  # Creates parent directories if needed.
+(self.myapp_root / 'private').mkdir(user='myapp', group='myapp')
 ```
 
 ## Write a file
