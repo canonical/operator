@@ -27,7 +27,10 @@ subordinate: true
 
 `charmcraft.yaml` doesn't specify a principal charm. A subordinate charm doesn't know which principal charm it will be deployed alongside.
 
-Instead of specifying a principal charm, you define an endpoint with `scope: container`. The endpoint can use an application-specific interface or the generic `juju-info` interface. See {external+juju:ref}`Juju | The implicit juju-info relation <the-implicit-juju-info-relation-endpoint>`.
+Instead of specifying a principal charm, you define an endpoint with `scope: container`. The endpoint can use an application-specific interface or the generic `juju-info` interface.
+
+<!-- TODO when ref target is available (from https://github.com/juju/juju/pull/22373) -->
+<!-- See {external+juju:ref}`Juju | The implicit juju-info relation <the-implicit-juju-info-relation-endpoint>`. -->
 
 The Juju user is free to integrate a subordinate charm with any principal charm that supports the container-scoped endpoint. If you define a `juju-info` endpoint instead of an application-specific endpoint, this means that the subordinate charm can be integrated with any other charm as principal. The subordinate charm's code needs to determine whether it's running in the correct context.
 
