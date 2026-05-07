@@ -35,6 +35,6 @@ When you document a subordinate charm, clearly state which charms your subordina
 
 ## Runtime constraints
 
-A subordinate charm can't control the Ubuntu base that its units run on. If the principal charm supports multiple bases, consider publishing a separate revision of the subordinate charm for each base.
+A subordinate charm can't control the Ubuntu base that its units run on. When you document which charms your subordinate charm is intended to be used with, mention any differences in supported bases.
 
 A subordinate unit shouldn't assume it's the only unit trying to configure the hardware or system. Subordinate units should minimise side effects when writing configuration and installing/uninstalling packages. For general advice, see {ref}`run-workloads-with-a-charm-machines`.
