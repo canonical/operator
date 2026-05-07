@@ -9,7 +9,7 @@ myst:
 
 A "subordinate" charm is a machine charm where each unit runs alongside a unit of another charm, called the "principal" charm. In this setup, the principal unit and corresponding subordinate unit always run on the same machine.
 
-Subordinate charms aren't always appropriate. If possible, instead of writing a subordinate charm, write a regular charm that communicates over relations.
+When you deploy a subordinate charm, Juju doesn't create any units of the application. Instead, Juju creates subordinate units when you integrate with a principal charm. See {external+juju:ref}`Juju | Subordinate charm <subordinate-charm>` and {external+juju:ref}`Juju | Subordinate relation <subordinate-relation>`.
 
 ## When to use a subordinate charm
 
