@@ -104,10 +104,11 @@ A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## List files
 
-To iterate over a directory, use {external+charmlibs:meth}`ContainerPath.glob <pathops.ContainerPath.glob>`:
+To iterate over a directory, use {external+charmlibs:meth}`ContainerPath.iterdir <pathops.ContainerPath.iterdir>` or {external+charmlibs:meth}`ContainerPath.glob <pathops.ContainerPath.glob>`:
 
 ```python
-paths = self.myapp_root.glob('*.yaml')
+paths = self.myapp_root.iterdir()
+yaml_paths = self.myapp_root.glob('*.yaml')
 ```
 
 Alternatively, to list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). This method returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
