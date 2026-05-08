@@ -22,7 +22,7 @@ which component. We will then figure out a fix, get a CVE
 assigned, and coordinate the release of the fix.
 
 You may also send email to security@ubuntu.com. If you want to encrypt your email,
-follow [these instructions](https://ubuntu.com/security/disclosure-policy#contact-us).
+follow [Canonical's reporting instructions](https://ubuntu.com/security/disclosure-policy#contact-us).
 
 If you have a deadline for public disclosure, please let us know.
 Our vulnerability management team intends to respond within 3 working
