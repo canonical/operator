@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Use the pathops library and ops.Container methods to manage files in a charm's workload container.
+---
+
 (files-in-containers)=
 # How to manage files in the workload container
 
