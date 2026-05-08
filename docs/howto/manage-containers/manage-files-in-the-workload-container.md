@@ -181,29 +181,26 @@ def test_pebble_ready():
 Don't write to the filesystem that `get_filesystem` returns. If a unit test needs to ensure that particular data exists in the container, use [`Container.mounts`](ops.testing.Container.mounts):
 
 ```python
-import tempfile
-
-
-def test_get_backup_action():
+def test_get_backup_action(tmp_path):
     # Create a temporary file with placeholder data, then mount the file
     # in the workload container so that our charm can see it.
-    with tempfile.NamedTemporaryFile() as backup_file:
-        backup_file.write_text(my_custom_data())
-        ctx = testing.Context(MyCharm)
-        container = testing.Container(
-            'myapp',
-            can_connect=True,
-            mounts={
-                'backup': testing.Mount(
-                    location='/etc/myapp/backup.yaml', source=backup_file
-                )
-            },
-        )
-        state_in = testing.State(containers={container})
-        state_out = ctx.run(ctx.on.action('get-backup'), state_in)
+    backup_file = tmp_path / 'backup.yaml'
+    backup_file.write_text(my_custom_data())
+    ctx = testing.Context(MyCharm)
+    container = testing.Container(
+        'myapp',
+        can_connect=True,
+        mounts={
+            'backup': testing.Mount(
+                location='/etc/myapp/backup.yaml', source=backup_file
+            )
+        },
+    )
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.action('get-backup'), state_in)
 
-        # Check that the action returned the contents of backup_file.
-        assert ctx.action_results == {'data': my_custom_data()}
+    # Check that the action returned the contents of backup_file.
+    assert ctx.action_results == {'data': my_custom_data()}
 ```
 
 If the charm writes to `/etc/myapp/backup.yaml` in the container while handling the event, `backup_file.read_text()` will return the data that the charm wrote.
