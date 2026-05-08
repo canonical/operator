@@ -49,28 +49,30 @@ self.myapp_root.mkdir(parents=True)  # Creates parent directories if needed.
 
 ## Write a file
 
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload container:
+To write a file to the workload container, use {external+charmlibs:meth}`ContainerPath.write_text <pathops.ContainerPath.write_text>` or {external+charmlibs:meth}`ContainerPath.write_bytes <pathops.ContainerPath.write_bytes>`:
 
 ```python
 config = '...'
-container.push('/etc/myapp/config.yaml', config, make_dirs=True)
+(self.myapp_root / 'config.yaml').write_text(config)
 ```
 
-`make_dirs=True` tells `push` to create directories if they don't exist (`/etc/myapp` in this case).
+`pathops` also has a function {external+charmlibs:func}`ensure_contents <pathops.ensure_contents>` that ensures a file exists with the given contents:
 
-`Container.push` has many additional features, including the ability to send raw bytes and write data from a file-like object. You can also specify permissions and the user and group for the file.
+```python
+changed = pathops.ensure_contents(self.myapp_root / 'config.yaml', config)
+```
 
 ## Read a file
 
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object:
+To read a file from the workload container, use {external+charmlibs:meth}`ContainerPath.read_text <pathops.ContainerPath.read_text>` or {external+charmlibs:meth}`ContainerPath.read_bytes <pathops.ContainerPath.read_bytes>`:
 
 ```python
-backup = container.pull('/etc/myapp/backup.yaml').read()
+backup = (self.myapp_root / 'backup.yaml').read_text()
 ```
 
-If you specify the keyword argument `encoding=None` on the `pull()` call, reads from the returned file-like object will return `bytes`. The default is `encoding='utf-8'`, which will decode the file's bytes from UTF-8 so that reads return a Python `str`.
-
 ## Copy a directory tree
+
+`pathops` doesn't currently have a way to copy a directory tree. Instead, use `ops.Container` methods that are similar to {external+python:func}`shutil.copytree`.
 
 ### To the container
 
@@ -78,10 +80,10 @@ To copy several files to the workload container, use [`Container.push_path`](ops
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.push_path('/source/dir', '/destination')
+self.container.push_path('/source/dir', '/destination')
 
 # copy "/source/dir/[files]" into "/destination/[files]"
-container.push_path('/source/dir/*', '/destination')
+self.container.push_path('/source/dir/*', '/destination')
 ```
 
 A trailing "/*" on the source directory is the only supported globbing/matching.
@@ -92,61 +94,68 @@ To copy several files from the workload container, use [`Container.pull_path`](o
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.pull_path('/source/dir', '/destination')
+self.container.pull_path('/source/dir', '/destination')
 
 # copy "/source/dir/[files]" into "/destination/[files]"
-container.pull_path('/source/dir/*', '/destination')
+self.container.pull_path('/source/dir/*', '/destination')
 ```
 
 A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## List files
 
-To list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). It returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
+To iterate over a directory, use {external+charmlibs:meth}`ContainerPath.glob <pathops.ContainerPath.glob>`:
 
 ```python
-infos = container.list_files('/etc', pattern='*.conf')
+paths = self.myapp_root.glob('*.yaml')
+```
+
+Alternatively, to list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). This method returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
+
+```python
+infos = self.container.list_files('/etc/myapp', pattern='*.yaml')
 total_size = sum(f.size for f in infos)
-logger.info('total size of config files: %d', total_size)
+logger.info('total size of files: %d', total_size)
 names = set(f.name for f in infos)
-if 'host.conf' not in names:
-    raise Exception('This charm requires /etc/host.conf!')
 ```
 
 If you want information about the directory itself (instead of its contents), call `list_files(path, itself=True)`.
 
-## Remove a file or directory
+## Delete a file or directory
 
-To delete a file, use [`Container.remove_path`](ops.Container.remove_path):
-
-```python
-container.remove_path('/etc/myapp/access.log')
-```
-
-To delete a directory, also use `Container.remove_path`. The directory must be empty unless you specify `recursive=True`:
+To delete a file, use {external+charmlibs:meth}`ContainerPath.unlink <pathops.ContainerPath.unlink>`:
 
 ```python
-container.remove_path('/etc/myapp/cachedir', recursive=True)
+(self.myapp_root / 'access.log').unlink()
 ```
 
-With `recursive=True`, the entire directory tree is deleted recursively (like `rm -r`).
+To delete an empty directory, use {external+charmlibs:meth}`ContainerPath.rmdir <pathops.ContainerPath.rmdir>`:
+
+```python
+(self.myapp_root / 'cachedir').rmdir()
+```
+
+To delete a directory tree, use [`Container.remove_path`](ops.Container.remove_path):
+
+```python
+self.container.remove_path('/etc/myapp/cachedir', recursive=True)
+```
 
 ## Check existence
 
-To check whether a file exists, use [`Container.exists`](ops.Container.exists):
+To check whether a file exists, use {external+charmlibs:meth}`ContainerPath.exists <pathops.ContainerPath.exists>` or {external+charmlibs:meth}`ContainerPath.is_file <pathops.ContainerPath.is_file>`:
 
 ```python
-container.exists('/etc/myapp/backup.yaml')
+(self.myapp_root / 'backup.yaml').exists()
+(self.myapp_root / 'backup.yaml').is_file()
 ```
 
-To check whether a directory exists, use `Container.exists` or [`Container.isdir`](ops.Container.isdir):
+To check whether a directory exists, use {external+charmlibs:meth}`ContainerPath.exists <pathops.ContainerPath.exists>` or {external+charmlibs:meth}`ContainerPath.is_dir <pathops.ContainerPath.is_dir>`:
 
 ```python
-container.isdir('/etc/myapp/cachedir')
-container.exists('/etc/myapp/cachedir')
+(self.myapp_root / 'cachedir').exists()
+(self.myapp_root / 'cachedir').is_dir()
 ```
-
-`Container.exists` and `Container.isdir` are analogous to Python's `os.path.exists` and `os.path.isdir` functions.
 
 ## Write unit tests
 
