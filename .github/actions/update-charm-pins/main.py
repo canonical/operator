@@ -7,7 +7,7 @@ import os
 import sys
 
 from httpx import Client
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML  # ty:ignore[unresolved-import]
 
 yaml = YAML(typ='rt')
 yaml.indent(mapping=2, sequence=4, offset=2)

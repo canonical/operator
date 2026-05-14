@@ -120,7 +120,7 @@ class StoragePermutations(abc.ABC):
             def snapshot(self):
                 return self.content
 
-            def restore(self, content: typing.Any):
+            def restore(self, content: typing.Any):  # ty:ignore[invalid-method-override]
                 self.content = content
 
         class Events(ops.ObjectEvents):

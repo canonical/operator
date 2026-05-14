@@ -45,7 +45,7 @@ def charm_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 def test_top_level_import(charm_env: None):
     import ops
 
-    ops.main(ops.CharmBase)
+    ops.main(ops.CharmBase)  # ty:ignore[call-non-callable]
 
     with pytest.raises(TypeError):
         ops.main()  # type: ignore
@@ -81,7 +81,7 @@ def test_submodule_import_legacy_call(charm_env: None):
 def test_import_from_top_level_module(charm_env: None):
     from ops import main
 
-    main(ops.CharmBase)
+    main(ops.CharmBase)  # ty:ignore[call-non-callable]
 
     with pytest.raises(TypeError):
         main()  # type: ignore

@@ -17,14 +17,14 @@
 import ops
 from ops import testing
 
-from charm import FastAPIDemoCharm
+from charm import FastAPIDemoCharm  # ty:ignore[unresolved-import]
 
 
 def test_pebble_layer():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
     state_in = testing.State(
-        containers={container},
+        containers={container},  # ty:ignore[invalid-argument-type]
         leader=True,
     )
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
@@ -55,9 +55,9 @@ def test_pebble_layer():
 
 def test_config_changed():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
     state_in = testing.State(
-        containers={container},
+        containers={container},  # ty:ignore[invalid-argument-type]
         config={"server-port": 8080},
         leader=True,
     )
@@ -73,9 +73,9 @@ def test_config_changed():
 
 def test_config_changed_invalid_port():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
     state_in = testing.State(
-        containers={container},
+        containers={container},  # ty:ignore[invalid-argument-type]
         config={"server-port": 22},
         leader=True,
     )
@@ -97,9 +97,9 @@ def test_relation_data():
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
     state_in = testing.State(
-        containers={container},
+        containers={container},  # ty:ignore[invalid-argument-type]
         relations={relation},
         leader=True,
     )
@@ -118,9 +118,9 @@ def test_relation_data():
 
 def test_no_database_blocked():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name="demo-server", can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
     state_in = testing.State(
-        containers={container},
+        containers={container},  # ty:ignore[invalid-argument-type]
         leader=True,
     )  # We've omitted relation data from the input state.
 

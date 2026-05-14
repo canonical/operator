@@ -174,7 +174,7 @@ class Ops(_Manager, Generic[CharmType]):
         # useful in a testing context, so we reset it here.
         sys.excepthook = sys.__excepthook__
 
-    def _make_storage(self, _: _Dispatcher):
+    def _make_storage(self, _: _Dispatcher):  # ty:ignore[invalid-method-override]
         # TODO: add use_juju_for_storage support
         storage = ops.storage.SQLiteStorage(':memory:')
         logger.info('Copying input state to storage.')
@@ -322,7 +322,7 @@ class CapturingFramework(ops.Framework):
                 continue
             event = cast('ops.EventBase', event)
             event.deferred = False
-            self._forget(event)  # prevent tracking conflicts
+            self._forget(event)  # prevent tracking conflicts  # ty:ignore[invalid-argument-type]
 
             # Dump/undump the event to ensure any custom attributes are (re)set by restore().
             event.restore(event.snapshot())

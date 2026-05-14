@@ -20,7 +20,7 @@ import shutil
 import signal
 import subprocess
 
-from charmlibs import apt, pathops
+from charmlibs import apt, pathops  # ty:ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

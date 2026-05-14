@@ -5,17 +5,17 @@ import pathlib
 import sys
 import yaml
 
-from docutils import nodes
+from docutils import nodes  # ty:ignore[unresolved-import]
 
 import inspect
 import re
-import sphinx.ext.autodoc
-from sphinx import addnodes
-from sphinx.util.docutils import SphinxDirective
+import sphinx.ext.autodoc  # ty:ignore[unresolved-import]
+from sphinx import addnodes  # ty:ignore[unresolved-import]
+from sphinx.util.docutils import SphinxDirective  # ty:ignore[unresolved-import]
 
 
 # Check that the ops package is installed in the Sphinx venv.
-if importlib.util.find_spec("ops") is None:
+if importlib.util.find_spec("ops") is None:  # ty:ignore[possibly-missing-submodule]
     print(
         "Error: The ops package is not available. "
         "Check whether the $(VENVDIR) target in our Makefile has been changed or reverted."

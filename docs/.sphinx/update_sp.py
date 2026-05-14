@@ -11,11 +11,11 @@
 import glob
 import logging
 import os
-import requests
+import requests  # ty:ignore[unresolved-import]
 import re
 import subprocess
 import sys
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException  # ty:ignore[unresolved-import]
 from packaging.version import parse as parse_version
 
 SPHINX_DIR = os.path.abspath(os.path.dirname(__file__))

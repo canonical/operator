@@ -44,7 +44,7 @@ from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
 class Serializable(typing.Protocol):
     """The type returned by :meth:`Framework.load_snapshot`."""
 
-    handle_kind = ''
+    handle_kind = ''  # ty:ignore[ambiguous-protocol-member]
 
     @property
     def handle(self) -> 'Handle': ...  # noqa
@@ -113,7 +113,7 @@ class Handle:
     def __hash__(self):
         return hash((self.parent, self.kind, self.key))
 
-    def __eq__(self, other: Handle):
+    def __eq__(self, other: Handle):  # ty:ignore[invalid-method-override]
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
@@ -664,7 +664,7 @@ class Framework(Object):
         if old_breakpointhook is not None:
             # Hook into builtin breakpoint, so if Python >= 3.7, devs will be able to just do
             # breakpoint()
-            sys.breakpointhook = self.breakpoint
+            sys.breakpointhook = self.breakpoint  # ty:ignore[invalid-assignment]
         return old_breakpointhook
 
     def close(self) -> None:
@@ -1041,7 +1041,7 @@ class Framework(Object):
                 self._storage.drop_notice(event_path, observer_path, method_name)
             # We intentionally consider this event to be dead and reload it from
             # scratch in the next path.
-            self.framework._forget(event)
+            self.framework._forget(event)  # ty:ignore[invalid-argument-type]
 
         if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
@@ -1382,14 +1382,14 @@ class StoredList(typing.MutableSequence[Any]):
         self._stored_data = stored_data
         self._under = under
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int):  # ty:ignore[invalid-method-override]
         return _wrap_stored(self._stored_data, self._under[index])
 
-    def __setitem__(self, index: int, value: Any):
+    def __setitem__(self, index: int, value: Any):  # ty:ignore[invalid-method-override]
         self._under[index] = _unwrap_stored(self._stored_data, value)
         self._stored_data.dirty = True
 
-    def __delitem__(self, index: int):
+    def __delitem__(self, index: int):  # ty:ignore[invalid-method-override]
         del self._under[index]
         self._stored_data.dirty = True
 

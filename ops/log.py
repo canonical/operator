@@ -79,7 +79,7 @@ def setup_root_logging(
         """Direct the warning to Juju's debug-log, and don't include the code."""
         logger.warning('%s:%s: %s: %s', filename, lineno, category.__name__, message)
 
-    warnings.showwarning = custom_showwarning
+    warnings.showwarning = custom_showwarning  # ty:ignore[invalid-assignment]
 
     if debug:
         handler = logging.StreamHandler()

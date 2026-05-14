@@ -300,7 +300,7 @@ class Harness(Generic[CharmType]):
         self._backend = _TestingModelBackend(
             self._unit_name, self._meta, config_, self._juju_context
         )
-        self._model = model.Model(self._meta, self._backend)
+        self._model = model.Model(self._meta, self._backend)  # ty:ignore[invalid-argument-type]
         self._storage = storage.SQLiteStorage(':memory:')
         self._framework = framework.Framework(
             self._storage,
@@ -375,7 +375,7 @@ class Harness(Generic[CharmType]):
         """
         return self._framework._event_context(event_name)
 
-    def set_can_connect(self, container: str | model.Container, val: bool):
+    def set_can_connect(self, container: str | model.Container, val: bool):  # ty:ignore[unresolved-attribute]
         """Change the simulated connection status of a container's underlying Pebble client.
 
         After calling this, :meth:`ops.Container.can_connect` will return val.
@@ -398,12 +398,12 @@ class Harness(Generic[CharmType]):
         return self._charm
 
     @property
-    def model(self) -> model.Model:
+    def model(self) -> model.Model:  # ty:ignore[unresolved-attribute]
         """Return the :class:`~ops.model.Model` that is being driven by this Harness."""
         return self._model
 
     @property
-    def framework(self) -> framework.Framework:
+    def framework(self) -> framework.Framework:  # ty:ignore[unresolved-attribute]
         """Return the Framework that is being driven by this Harness."""
         return self._framework
 
@@ -428,7 +428,7 @@ class Harness(Generic[CharmType]):
 
         TestEvents.__name__ = self._charm_cls.on.__class__.__name__
 
-        class TestCharm(self._charm_cls):
+        class TestCharm(self._charm_cls):  # ty:ignore[shadowed-type-variable, unsupported-base]
             on = TestEvents()
 
         # Note: jam 2020-03-01 This is so that errors in testing say MyCharm has no attribute foo,
@@ -476,7 +476,7 @@ class Harness(Generic[CharmType]):
         # storage-attached events happen before install
         for storage_name in self._meta.storages:
             for storage_index in self._backend.storage_list(storage_name, include_detached=True):
-                s = model.Storage(storage_name, storage_index, self._backend)
+                s = model.Storage(storage_name, storage_index, self._backend)  # ty:ignore[invalid-argument-type]
                 if self._backend._storage_is_attached(storage_name, storage_index):
                     # Attaching was done already, but we still need the event to be emitted.
                     self.charm.on[storage_name].storage_attached.emit(s)
@@ -816,7 +816,7 @@ class Harness(Generic[CharmType]):
 
         ids: list[str] = []
         for storage_index in storage_indices:
-            s = model.Storage(storage_name, storage_index, self._backend)
+            s = model.Storage(storage_name, storage_index, self._backend)  # ty:ignore[invalid-argument-type]
             ids.append(s.full_id)
             if attach:
                 self.attach_storage(s.full_id)
@@ -843,7 +843,7 @@ class Harness(Generic[CharmType]):
         storage_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if storage_attached and self._hooks_enabled:
             self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend)
+                model.Storage(storage_name, storage_index, self._backend)  # ty:ignore[invalid-argument-type]
             )
         self._backend._storage_detach(storage_id)
 
@@ -875,7 +875,7 @@ class Harness(Generic[CharmType]):
 
         storage_index = int(storage_index)
         self.charm.on[storage_name].storage_attached.emit(
-            model.Storage(storage_name, storage_index, self._backend)
+            model.Storage(storage_name, storage_index, self._backend)  # ty:ignore[invalid-argument-type]
         )
 
     def remove_storage(self, storage_id: str) -> None:
@@ -902,7 +902,7 @@ class Harness(Generic[CharmType]):
         is_attached = self._backend._storage_is_attached(storage_name, storage_index)
         if self._charm is not None and self._hooks_enabled and is_attached:
             self.charm.on[storage_name].storage_detaching.emit(
-                model.Storage(storage_name, storage_index, self._backend)
+                model.Storage(storage_name, storage_index, self._backend)  # ty:ignore[invalid-argument-type]
             )
         self._backend._storage_remove(storage_id)
 
@@ -1034,7 +1034,7 @@ class Harness(Generic[CharmType]):
             self._model.relations._broken_relation_id = relation_id
             # Ensure that we don't offer a cached relation.
             self._model.relations._invalidate(relation_name)
-        self._emit_relation_broken(relation_name, relation_id, remote_app)
+        self._emit_relation_broken(relation_name, relation_id, remote_app)  # ty:ignore[invalid-argument-type]
         if self._model is not None:
             self._model.relations._broken_relation_id = prev_broken_id
             self._model.relations._invalidate(relation_name)
@@ -1213,7 +1213,7 @@ class Harness(Generic[CharmType]):
         name = _get_app_or_unit_name(app_or_unit)
 
         # bypass access control by going directly to raw
-        return self._backend._relation_data_raw[relation_id].get(name, None)
+        return self._backend._relation_data_raw[relation_id].get(name, None)  # ty:ignore[invalid-return-type]
 
     def get_pod_spec(self) -> tuple[Mapping[Any, Any], Mapping[Any, Any]]:
         """Return the content of the pod spec as last set by the charm.
@@ -1221,7 +1221,7 @@ class Harness(Generic[CharmType]):
         This returns both the pod spec and any k8s_resources that were supplied.
         See the signature of :meth:`Pod.set_spec <ops.Pod.set_spec>`.
         """
-        return self._backend._pod_spec
+        return self._backend._pod_spec  # ty:ignore[invalid-return-type]
 
     def get_container_pebble_plan(self, container_name: str) -> pebble.Plan:
         """Return the current plan that Pebble is executing for the given container.
@@ -1311,7 +1311,7 @@ class Harness(Generic[CharmType]):
 
     def get_workload_version(self) -> str:
         """Read the workload version that was set by the unit."""
-        return self._backend._workload_version
+        return self._backend._workload_version  # ty:ignore[invalid-return-type]
 
     def set_model_info(self, name: str | None = None, uuid: str | None = None) -> None:
         """Set the name and UUID of the model that this is representing.
@@ -1637,7 +1637,7 @@ class Harness(Generic[CharmType]):
             'egress-subnets': list(egress_subnets),
             'ingress-addresses': list(ingress_addresses),
         }
-        self._backend._networks[endpoint, relation_id] = data
+        self._backend._networks[endpoint, relation_id] = data  # ty:ignore[invalid-assignment]
 
     def _get_backend_calls(self, reset: bool = True) -> list[tuple[Any, ...]]:
         """Return the calls that we have made to the TestingModelBackend.
@@ -2141,7 +2141,7 @@ class Harness(Generic[CharmType]):
             )
         return action_under_test.output
 
-    def set_cloud_spec(self, spec: model.CloudSpec):
+    def set_cloud_spec(self, spec: model.CloudSpec):  # ty:ignore[unresolved-attribute]
         """Set cloud specification (metadata) including credentials.
 
         Call this method before the charm calls :meth:`ops.Model.get_cloud_spec`.
@@ -3128,7 +3128,7 @@ class _TestingPebbleClient:
         self._exec_handlers[prefix] = handler
 
     def _check_connection(self):
-        if not self._backend._can_connect(self):
+        if not self._backend._can_connect(self):  # ty:ignore[invalid-argument-type, missing-argument]
             msg = (
                 'Cannot connect to Pebble; did you forget to call '
                 'begin_with_initial_hooks() or set_can_connect()?'
@@ -3352,7 +3352,7 @@ class _TestingPebbleClient:
             raise TypeError(f'label must be a str, not {type(label).__name__}')
 
         if isinstance(layer, (str, dict)):
-            layer_obj = pebble.Layer(layer)
+            layer_obj = pebble.Layer(layer)  # ty:ignore[invalid-argument-type]
         elif isinstance(layer, pebble.Layer):
             layer_obj = layer
         else:

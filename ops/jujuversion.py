@@ -62,7 +62,7 @@ class JujuVersion:
             s += f'.{self.build}'
         return s
 
-    def __eq__(self, other: str | JujuVersion) -> bool:
+    def __eq__(self, other: str | JujuVersion) -> bool:  # ty:ignore[invalid-method-override]
         if self is other:
             return True
         if isinstance(other, str):

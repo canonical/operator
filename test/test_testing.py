@@ -2195,7 +2195,7 @@ class TestHarness:
                 # so the harness will let us:
                 event.relation.data[harness.charm.app]['foo'] = 'bar'
 
-        harness.charm._join_db = mock_join_db
+        harness.charm._join_db = mock_join_db  # ty:ignore[invalid-assignment]
         rel_id = harness.add_relation('db', 'remote')
         harness.add_relation_unit(rel_id, 'remote/0')
         rel = harness.charm.model.get_relation('db', rel_id)
@@ -3634,7 +3634,7 @@ class RelationEventCharm(RecordingCharm):
                 'relation_data': {
                     str(x.name): dict(event.relation.data[x]) for x in event.relation.data
                 }
-            })
+            })  # ty:ignore[no-matching-overload]
 
         self.changes.append(recording)
 
@@ -6275,11 +6275,11 @@ class TestPorts:
         assert isinstance(ports[0], ops.Port)
         assert ports[0].protocol == 'icmp'
         assert ports[0].port is None
-        assert ports[1].protocol == 'tcp'
-        assert ports[1].port == 8080
+        assert ports[1].protocol == 'tcp'  # ty:ignore[unresolved-attribute]
+        assert ports[1].port == 8080  # ty:ignore[unresolved-attribute]
         assert isinstance(ports[1], ops.Port)
-        assert ports[2].protocol == 'udp'
-        assert ports[2].port == 4000
+        assert ports[2].protocol == 'udp'  # ty:ignore[unresolved-attribute]
+        assert ports[2].port == 4000  # ty:ignore[unresolved-attribute]
 
         unit.close_port('tcp', 8080)
         unit.close_port('tcp', 8080)  # closing same port again has no effect

@@ -14,7 +14,7 @@
 
 import pytest
 
-from charm import tinyproxy
+from charm import tinyproxy  # ty:ignore[unresolved-import]
 
 
 class MockVersionProcess:

@@ -842,7 +842,7 @@ def test_state_from_context():
     assert state.get_relations('sub')[0].interface == 'below'
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert next(iter(state.storages)).name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'  # ty:ignore[unresolved-attribute]
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'
@@ -895,7 +895,7 @@ def test_state_from_context_extend():
     assert retrieved_relation.remote_app_data == {'a': 'b'}
     assert isinstance(state.storages, frozenset)
     assert len(state.storages) == 1
-    assert next(iter(state.storages)).name == 'storage'
+    assert next(iter(state.storages)).name == 'storage'  # ty:ignore[unresolved-attribute]
     assert isinstance(state.stored_states, frozenset)
     assert len(state.stored_states) == 1
     assert state.get_stored_state('_stored', owner_path='Charm').name == '_stored'

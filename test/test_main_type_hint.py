@@ -72,12 +72,12 @@ sink = MainCalls(None, None, None)  # type: ignore
 def top_level_import() -> None:
     import ops
 
-    sink.simple = ops.main
+    sink.simple = ops.main  # ty:ignore[invalid-assignment]
     sink.simple = ops.main.main
-    sink.full = ops.main
+    sink.full = ops.main  # ty:ignore[invalid-assignment]
     sink.full = ops.main.main
-    sink.bad = ops.main  # type: ignore[assignment]
-    sink.bad = ops.main.main  # type: ignore[assignment]
+    sink.bad = ops.main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
+    sink.bad = ops.main.main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
 
 
 def submodule_import() -> None:
@@ -87,19 +87,19 @@ def submodule_import() -> None:
     sink.simple = ops.main.main
     sink.full = ops.main  # type: ignore # type checker limitation https://github.com/microsoft/pyright/issues/8830
     sink.full = ops.main.main
-    sink.bad = ops.main  # type: ignore[assignment]
-    sink.bad = ops.main.main  # type: ignore[assignment]
+    sink.bad = ops.main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
+    sink.bad = ops.main.main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
 
 
 def import_from_top_level_module() -> None:
     from ops import main
 
-    sink.simple = main
+    sink.simple = main  # ty:ignore[invalid-assignment]
     sink.simple = main.main
-    sink.full = main
+    sink.full = main  # ty:ignore[invalid-assignment]
     sink.full = main.main
-    sink.bad = main  # type: ignore[assignment]
-    sink.bad = main.main  # type: ignore[assignment]
+    sink.bad = main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
+    sink.bad = main.main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]
 
 
 def import_from_submodule() -> None:
@@ -107,4 +107,4 @@ def import_from_submodule() -> None:
 
     sink.simple = main
     sink.full = main
-    sink.bad = main  # type: ignore[assignment]
+    sink.bad = main  # type: ignore[assignment]  # ty:ignore[invalid-assignment]

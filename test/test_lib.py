@@ -539,7 +539,7 @@ class TestLibFunctional:
         tmp_dir_b = tmp_path / 'temp_dir2'
         tmp_dir_b.mkdir()
 
-        sys.path = [tmp_dir_a, tmp_dir_b]
+        sys.path = [tmp_dir_a, tmp_dir_b]  # ty:ignore[invalid-assignment]
 
         _mklib(str(tmp_dir_a), pkg_a, lib_a).write_text(
             dedent("""

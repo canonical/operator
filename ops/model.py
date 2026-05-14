@@ -882,7 +882,7 @@ class _GenericLazyMapping(Mapping[str, _LazyValueType], ABC):
     def _invalidate(self):
         self._lazy_data = None
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: str) -> bool:  # ty:ignore[invalid-method-override]
         return key in self._data
 
     def __len__(self) -> int:
@@ -929,13 +929,13 @@ class RelationMapping(Mapping[str, list['Relation']]):
         self._broken_relation_id = broken_relation_id
         self._data: _RelationMapping_Raw = dict.fromkeys(relations_meta)
 
-    def __contains__(self, key: str):
+    def __contains__(self, key: str):  # ty:ignore[invalid-method-override]
         return key in self._data
 
     def __len__(self):
         return len(self._data)
 
-    def __iter__(self) -> Iterable[str]:
+    def __iter__(self) -> Iterable[str]:  # ty:ignore[invalid-method-override]
         return iter(self._data)
 
     def __getitem__(self, relation_name: str) -> list[Relation]:
@@ -1013,7 +1013,7 @@ class BindingMapping(Mapping[str, 'Binding']):
         self._backend = backend
         self._data: _BindingDictType = {}
 
-    def get(self, binding_key: str | Relation) -> Binding:
+    def get(self, binding_key: str | Relation) -> Binding:  # ty:ignore[invalid-method-override]
         """Get a specific Binding for an endpoint/relation.
 
         Not used directly by Charm authors. See :meth:`Model.get_binding`
@@ -1038,7 +1038,7 @@ class BindingMapping(Mapping[str, 'Binding']):
     def __getitem__(self, item: str | Relation) -> Binding:
         raise NotImplementedError()
 
-    def __iter__(self) -> Iterable[Binding]:
+    def __iter__(self) -> Iterable[Binding]:  # ty:ignore[invalid-method-override]
         raise NotImplementedError()
 
     def __len__(self) -> int:
@@ -1965,7 +1965,7 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
         if remote_unit is not None and remote_unit not in self._data:
             self._data[remote_unit] = RelationDataContent(self.relation, remote_unit, backend)
 
-    def __contains__(self, key: Unit | Application):
+    def __contains__(self, key: Unit | Application):  # ty:ignore[invalid-method-override]
         return key in self._data
 
     def __len__(self):
@@ -2126,7 +2126,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def update(
         self, data: Mapping[str, str] | Iterable[tuple[str, str]] = (), /, **kwargs: str
-    ) -> None:
+    ) -> None:  # ty:ignore[invalid-method-override]
         """Efficiently write multiple keys and values to the databag.
 
         Has the same ultimate result as this, but uses a single relation-set call::
@@ -2195,7 +2195,7 @@ class StatusBase:
     def __init_subclass__(cls):
         StatusBase._register(cls)
 
-    def __eq__(self, other: StatusBase) -> bool:
+    def __eq__(self, other: StatusBase) -> bool:  # ty:ignore[invalid-method-override]
         if not isinstance(self, type(other)):
             return False
         return self.message == other.message
@@ -2406,7 +2406,7 @@ class StorageMapping(Mapping[str, list['Storage']]):
         self._backend = backend
         self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
-    def __contains__(self, key: str):
+    def __contains__(self, key: str):  # ty:ignore[invalid-method-override]
         return key in self._storage_map
 
     def __len__(self):
@@ -2548,7 +2548,7 @@ class Container:
     """The name of the container from ``metadata.yaml``, for example "postgres"."""
 
     def __init__(
-        self, name: str, backend: _ModelBackend, pebble_client: pebble.Client | None = None
+        self, name: str, backend: _ModelBackend, pebble_client: pebble.Client | None = None  # ty:ignore[unresolved-attribute]
     ):
         self.name = name
 
@@ -2639,7 +2639,7 @@ class Container:
     def add_layer(
         self,
         label: str,
-        layer: str | pebble.LayerDict | pebble.Layer,
+        layer: str | pebble.LayerDict | pebble.Layer,  # ty:ignore[unresolved-attribute]
         *,
         combine: bool = False,
     ):
@@ -2658,7 +2658,7 @@ class Container:
         """
         self._pebble.add_layer(label, layer, combine=combine)
 
-    def get_plan(self) -> pebble.Plan:
+    def get_plan(self) -> pebble.Plan:  # ty:ignore[unresolved-attribute]
         """Get the combined Pebble configuration.
 
         This will immediately reflect changes from any previous
@@ -2667,7 +2667,7 @@ class Container:
         """
         return self._pebble.get_plan()
 
-    def get_services(self, *service_names: str) -> Mapping[str, pebble.ServiceInfo]:
+    def get_services(self, *service_names: str) -> Mapping[str, pebble.ServiceInfo]:  # ty:ignore[unresolved-attribute]
         """Fetch and return a mapping of status information indexed by service name.
 
         If no service names are specified, return status information for all
@@ -2677,7 +2677,7 @@ class Container:
         services = self._pebble.get_services(names)
         return ServiceInfoMapping(services)
 
-    def get_service(self, service_name: str) -> pebble.ServiceInfo:
+    def get_service(self, service_name: str) -> pebble.ServiceInfo:  # ty:ignore[unresolved-attribute]
         """Get status information for a single named service.
 
         Raises:
@@ -2691,7 +2691,7 @@ class Container:
         return services[service_name]
 
     def get_checks(
-        self, *check_names: str, level: pebble.CheckLevel | None = None
+        self, *check_names: str, level: pebble.CheckLevel | None = None  # ty:ignore[unresolved-attribute]
     ) -> CheckInfoMapping:
         """Fetch and return a mapping of check information indexed by check name.
 
@@ -2704,7 +2704,7 @@ class Container:
         checks = self._pebble.get_checks(names=check_names or None, level=level)
         return CheckInfoMapping(checks)
 
-    def get_check(self, check_name: str) -> pebble.CheckInfo:
+    def get_check(self, check_name: str) -> pebble.CheckInfo:  # ty:ignore[unresolved-attribute]
         """Get check information for a single named check.
 
         Raises:
@@ -2831,7 +2831,7 @@ class Container:
 
     def list_files(
         self, path: str | PurePath, *, pattern: str | None = None, itself: bool = False
-    ) -> list[pebble.FileInfo]:
+    ) -> list[pebble.FileInfo]:  # ty:ignore[unresolved-attribute]
         """Return list of directory entries from given path on remote system.
 
         Despite the name, this method returns a list of files *and*
@@ -3011,7 +3011,7 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: str | Path) -> pebble.FileInfo:
+    def _build_fileinfo(path: str | Path) -> pebble.FileInfo:  # ty:ignore[unresolved-attribute]
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
         if path.is_symlink():
@@ -3053,8 +3053,8 @@ class Container:
 
     @staticmethod
     def _list_recursive(
-        list_func: Callable[[Path], Iterable[pebble.FileInfo]], path: Path
-    ) -> Generator[pebble.FileInfo, None, None]:
+        list_func: Callable[[Path], Iterable[pebble.FileInfo]], path: Path  # ty:ignore[unresolved-attribute]
+    ) -> Generator[pebble.FileInfo, None, None]:  # ty:ignore[unresolved-attribute]
         """Recursively lists all files under path using the given list_func.
 
         Args:
@@ -3196,7 +3196,7 @@ class Container:
         stderr: TextIO | None = None,
         encoding: str = 'utf-8',
         combine_stderr: bool = False,
-    ) -> pebble.ExecProcess[str]: ...
+    ) -> pebble.ExecProcess[str]: ...  # ty:ignore[unresolved-attribute]
 
     # Exec I/O is bytes if encoding is explicitly set to None
     @typing.overload
@@ -3217,7 +3217,7 @@ class Container:
         stderr: BinaryIO | None = None,
         encoding: None,
         combine_stderr: bool = False,
-    ) -> pebble.ExecProcess[bytes]: ...
+    ) -> pebble.ExecProcess[bytes]: ...  # ty:ignore[unresolved-attribute]
 
     def exec(
         self,
@@ -3236,7 +3236,7 @@ class Container:
         stderr: TextIO | BinaryIO | None = None,
         encoding: str | None = 'utf-8',
         combine_stderr: bool = False,
-    ) -> pebble.ExecProcess[Any]:
+    ) -> pebble.ExecProcess[Any]:  # ty:ignore[unresolved-attribute]
         """Execute the given command on the remote system.
 
         See :meth:`ops.pebble.Client.exec` for documentation of the parameters
@@ -3269,7 +3269,7 @@ class Container:
             stderr=stderr,  # type: ignore
             encoding=encoding,  # type: ignore
             combine_stderr=combine_stderr,
-        )
+        )  # ty:ignore[no-matching-overload]
 
     def send_signal(self, sig: int | str, *service_names: str):
         """Send the given signal to one or more services.
@@ -3288,7 +3288,7 @@ class Container:
 
         self._pebble.send_signal(sig, service_names)
 
-    def get_notice(self, id: str) -> pebble.Notice:
+    def get_notice(self, id: str) -> pebble.Notice:  # ty:ignore[unresolved-attribute]
         """Get details about a single notice by ID.
 
         .. jujuadded:: 3.4
@@ -3306,11 +3306,11 @@ class Container:
     def get_notices(
         self,
         *,
-        users: pebble.NoticesUsers | None = None,
+        users: pebble.NoticesUsers | None = None,  # ty:ignore[unresolved-attribute]
         user_id: int | None = None,
-        types: Iterable[pebble.NoticeType | str] | None = None,
+        types: Iterable[pebble.NoticeType | str] | None = None,  # ty:ignore[unresolved-attribute]
         keys: Iterable[str] | None = None,
-    ) -> list[pebble.Notice]:
+    ) -> list[pebble.Notice]:  # ty:ignore[unresolved-attribute]
         """Query for notices that match all of the provided filters.
 
         See :meth:`ops.pebble.Client.get_notices` for documentation of the
@@ -3327,7 +3327,7 @@ class Container:
 
     # Define this last to avoid clashes with the imported "pebble" module
     @property
-    def pebble(self) -> pebble.Client:
+    def pebble(self) -> pebble.Client:  # ty:ignore[unresolved-attribute]
         """The low-level :class:`ops.pebble.Client` instance for this container."""
         return self._pebble
 
@@ -3697,7 +3697,7 @@ class _ModelBackend:
                 self._is_leader = hookcmds.is_leader()
 
         # We can cast to bool now since if we're here it means we checked.
-        return typing.cast('bool', self._is_leader)
+        return typing.cast('bool', self._is_leader)  # ty:ignore[redundant-cast]
 
     def resource_get(self, resource_name: str) -> str:
         with self._wrap_hookcmd('resource-get', resource_name=resource_name):
@@ -3735,9 +3735,9 @@ class _ModelBackend:
         # hookcmds doesn't constrain the status to the five that _StatusDict expects,
         # but we know that will be the case, so we type: ignore.
         return {
-            'status': content.status,  # type: ignore[arg-type]
+            'status': content.status,  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
             'message': content.message,
-        }
+        }  # ty:ignore[invalid-return-type]
 
     def status_set(
         self, status: _SettableStatusName, message: str = '', *, is_app: bool = False
@@ -3833,7 +3833,7 @@ class _ModelBackend:
             try:
                 hookcmds.juju_log(
                     line,
-                    level=level,  # type: ignore[arg-type]
+                    level=level,  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
                 )
             except hookcmds.Error as e:  # noqa: PERF203
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
@@ -3931,7 +3931,7 @@ class _ModelBackend:
                 label=label,  # type: ignore[arg-type]
                 refresh=refresh,  # type: ignore[arg-type]
                 peek=peek,  # type: ignore[arg-type]
-            )
+            )  # ty:ignore[no-matching-overload]
 
     def secret_info_get(self, *, id: str | None = None, label: str | None = None) -> SecretInfo:
         if id is not None:

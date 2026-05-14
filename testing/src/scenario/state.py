@@ -178,8 +178,8 @@ class CloudCredential:  # noqa: D101
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
             auth_type=self.auth_type,
-            attributes=self.attributes,
-            redacted=self.redacted,
+            attributes=self.attributes,  # ty:ignore[invalid-argument-type]
+            redacted=self.redacted,  # ty:ignore[invalid-argument-type]
         )
 
 
@@ -231,7 +231,7 @@ class CloudSpec:  # noqa: D101
             identity_endpoint=self.identity_endpoint,
             storage_endpoint=self.storage_endpoint,
             credential=self.credential._to_ops() if self.credential else None,
-            ca_certificates=self.ca_certificates,
+            ca_certificates=self.ca_certificates,  # ty:ignore[invalid-argument-type]
             skip_tls_verify=self.skip_tls_verify,
             is_controller_cloud=self.is_controller_cloud,
         )
@@ -401,7 +401,7 @@ class BindAddress:
 
     # This has the 'ops.testing.' prefix so that Sphinx knows which
     # 'Address' class it is (it's not the one from 'hookcmds').
-    addresses: Sequence[ops.testing.Address]
+    addresses: Sequence[ops.testing.Address]  # ty:ignore[possibly-missing-submodule]
     """The addresses in the space."""
 
     _: dataclasses.KW_ONLY
@@ -916,7 +916,7 @@ class Notice:
             last_occurred=self.last_occurred,
             last_repeated=self.last_repeated,
             occurrences=self.occurrences,
-            last_data=self.last_data,
+            last_data=self.last_data,  # ty:ignore[invalid-argument-type]
             repeat_after=self.repeat_after,
             expire_after=self.expire_after,
         )
@@ -991,7 +991,7 @@ class CheckInfo:
         object.__setattr__(self, 'threshold', threshold)
         if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
-                change_id = ''
+                change_id = ''  # ty:ignore[invalid-assignment]
             else:
                 change_id = pebble.ChangeID(_generate_new_change_id())
         object.__setattr__(self, 'change_id', change_id)
@@ -1822,7 +1822,7 @@ class State:
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
         stored_states: Iterable[StoredState] | None = None,
-        **kwargs: Unpack[_StateKwargs],
+        **kwargs: Unpack[_StateKwargs],  # ty:ignore[invalid-type-form]
     ) -> State:
         """Create a State from the charm context.
 
@@ -1895,7 +1895,7 @@ class State:
             containers=containers,
             storages=storages,
             stored_states=stored_states,
-            **kwargs,
+            **kwargs,  # ty:ignore[parameter-already-assigned]
         )
 
 

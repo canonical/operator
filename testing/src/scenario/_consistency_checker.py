@@ -764,7 +764,7 @@ def check_storedstate_consistency(
         # We don't need the marshalled state, just to know that it can be.
         # This is the same "only simple types" check that ops does.
         try:
-            marshal.dumps(ss.content)
+            marshal.dumps(ss.content)  # ty:ignore[invalid-argument-type]
         except ValueError:  # noqa: PERF203
             errors.append(
                 f'The StoredState object {ss.owner_path}.{ss.name} '

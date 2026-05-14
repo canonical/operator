@@ -151,7 +151,7 @@ class TestModel:
 
     def test_model_name_from_backend(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.set_model_name('default')
-        m = ops.Model(ops.CharmMeta(), harness._backend)
+        m = ops.Model(ops.CharmMeta(), harness._backend)  # ty:ignore[invalid-argument-type]
         assert m.name == 'default'
         with pytest.raises(AttributeError):
             m.name = 'changes-disallowed'  # type: ignore
@@ -599,7 +599,7 @@ class TestModel:
             backend._calls.append(('update_relation_data', relation_id, entity, data))
             raise ops.ModelError()
 
-        backend.update_relation_data = broken_update_relation_data
+        backend.update_relation_data = broken_update_relation_data  # ty:ignore[invalid-assignment]
 
         rel_db1 = self.ensure_relation(harness, 'db1')
         # Force memory cache to be loaded.
@@ -2395,7 +2395,7 @@ class MockPebbleClient:
         combine: bool = False,
     ):
         if isinstance(layer, dict):
-            layer = pebble.Layer(layer).to_yaml()
+            layer = pebble.Layer(layer).to_yaml()  # ty:ignore[invalid-argument-type]
         elif isinstance(layer, pebble.Layer):
             layer = layer.to_yaml()
         self.requests.append(('add_layer', label, layer, combine))
@@ -3031,7 +3031,7 @@ class TestModelBackend:
             with pytest.raises(TypeError):
                 backend.status_set(
                     'active',
-                    is_app=is_app_v,  # type: ignore[assignment]
+                    is_app=is_app_v,  # type: ignore[assignment]  # ty:ignore[invalid-argument-type]
                 )
 
     def test_status_set_message_not_str_raises(self, backend: _ModelBackend):
@@ -3039,7 +3039,7 @@ class TestModelBackend:
             with pytest.raises(TypeError):
                 backend.status_set(
                     'active',
-                    message=message,  # type: ignore[assignment]
+                    message=message,  # type: ignore[assignment]  # ty:ignore[invalid-argument-type]
                 )
 
     def test_storage_hook_command_errors(self, fake_script: FakeScript, backend: _ModelBackend):
@@ -3301,7 +3301,7 @@ class TestModelBackend:
             ({'a': float('nan')}, {}),
             ({'foo': 'bar'}, {}),  # type: ignore
             ({'foo': '1O'}, {}),
-        ]
+        ]  # ty:ignore[invalid-assignment]
         for metrics, labels in invalid_inputs:
             with pytest.raises(ops.ModelError):
                 backend.add_metrics(metrics, labels)

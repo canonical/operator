@@ -26,12 +26,12 @@ import subprocess
 import sys
 from collections.abc import Mapping
 
-import github
-import github.GitRelease
-import github.Repository
+import github  # ty:ignore[unresolved-import]
+import github.GitRelease  # ty:ignore[unresolved-import]
+import github.Repository  # ty:ignore[unresolved-import]
 import packaging.version
-import rich.logging
-import tomllib
+import rich.logging  # ty:ignore[unresolved-import]
+import tomllib  # ty:ignore[unresolved-import]
 
 logging.basicConfig(
     level=logging.INFO, format='%(message)s', handlers=[rich.logging.RichHandler()]

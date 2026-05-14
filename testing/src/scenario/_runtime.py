@@ -73,8 +73,8 @@ class Runtime(Generic[CharmType]):
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
-            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
+            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',  # ty:ignore[unresolved-attribute]
+            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,  # ty:ignore[unresolved-attribute]
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
@@ -197,7 +197,7 @@ class Runtime(Generic[CharmType]):
         WrappedEvents.__qualname__ = charm_type.on.__class__.__qualname__
         WrappedEvents.__module__ = charm_type.on.__class__.__module__
 
-        class WrappedCharm(charm_type):
+        class WrappedCharm(charm_type):  # ty:ignore[shadowed-type-variable, unsupported-base]
             """The test charm's type, but with events wrapped."""
 
             on = WrappedEvents()
@@ -293,7 +293,7 @@ class Runtime(Generic[CharmType]):
         """
         from ._consistency_checker import check_consistency  # avoid cycles
 
-        check_consistency(state, event, self._charm_spec, self._juju_version, self._unit_id)
+        check_consistency(state, event, self._charm_spec, self._juju_version, self._unit_id)  # ty:ignore[invalid-argument-type]
 
         charm_type = self._charm_spec.charm_type
         logger.info(f'Preparing to fire {event.name} on {charm_type.__name__}')
@@ -329,7 +329,7 @@ class Runtime(Generic[CharmType]):
                     context=context,
                     charm_spec=dataclasses.replace(
                         self._charm_spec,
-                        charm_type=self._wrap(charm_type),
+                        charm_type=self._wrap(charm_type),  # ty:ignore[invalid-argument-type]
                     ),
                     juju_context=juju_context,
                 )

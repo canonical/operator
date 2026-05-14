@@ -350,7 +350,7 @@ try:
     # We import it last, after all re-exported symbols.
     import ops_tracing as tracing
 except ImportError:
-    tracing = None
+    tracing = None  # ty:ignore[invalid-assignment]
 
 
 class _Main:

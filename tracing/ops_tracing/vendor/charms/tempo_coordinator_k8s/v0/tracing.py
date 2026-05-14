@@ -193,7 +193,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
         def load(cls, databag: MutableMapping):
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
-                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))  # ty:ignore[deprecated]
 
             try:
                 data = {
@@ -227,10 +227,10 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 databag = {}
 
             if self._NEST_UNDER:
-                databag[self._NEST_UNDER] = self.json(by_alias=True)
+                databag[self._NEST_UNDER] = self.json(by_alias=True)  # ty:ignore[deprecated]
                 return databag
 
-            dct = self.dict()
+            dct = self.dict()  # ty:ignore[deprecated]
             for key, field in self.__fields__.items():  # type: ignore
                 value = dct[key]
                 databag[field.alias or key] = json.dumps(value)
@@ -379,7 +379,7 @@ class Receiver(BaseModel):
     )
 
 
-class TracingProviderAppData(DatabagModel):  # noqa: D101
+class TracingProviderAppData(DatabagModel):  # noqa: D101  # ty:ignore[unsupported-base]
     """Application databag model for the tracing provider."""
 
     receivers: List[Receiver] = Field(
@@ -388,7 +388,7 @@ class TracingProviderAppData(DatabagModel):  # noqa: D101
     )
 
 
-class TracingRequirerAppData(DatabagModel):  # noqa: D101
+class TracingRequirerAppData(DatabagModel):  # noqa: D101  # ty:ignore[unsupported-base]
     """Application databag model for the tracing requirer."""
 
     receivers: List[ReceiverProtocol]

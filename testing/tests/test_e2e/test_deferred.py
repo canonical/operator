@@ -233,7 +233,7 @@ class MyConsumer(ops.Object):
 
 
 def test_defer_custom_event(mycharm: type[ops.CharmBase]):
-    class MyCharm(mycharm):
+    class MyCharm(mycharm):  # ty:ignore[unsupported-base]
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.consumer = MyConsumer(self)

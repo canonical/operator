@@ -17,7 +17,7 @@
 import pytest
 from ops import testing
 
-from charm import PORT, TinyproxyCharm
+from charm import PORT, TinyproxyCharm  # ty:ignore[unresolved-import]
 
 
 class MockTinyproxy:

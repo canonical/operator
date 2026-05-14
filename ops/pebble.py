@@ -221,7 +221,7 @@ _HeaderHandler = Callable[[bytearray], None]
 
 
 class _Tempfile(Protocol):
-    name = ''
+    name = ''  # ty:ignore[ambiguous-protocol-member]
 
     def write(self, data: bytearray): ...
 
@@ -564,7 +564,7 @@ class ExecError(Error, Generic[AnyStr]):
             if out is None:
                 continue
             truncated = ' [truncated]' if len(out) > self.STR_MAX_OUTPUT else ''
-            out = out[: self.STR_MAX_OUTPUT]
+            out = out[: self.STR_MAX_OUTPUT]  # ty:ignore[invalid-argument-type]
             message = f'{message}, {name}={out!r}{truncated}'
 
         return message
@@ -881,7 +881,7 @@ class Plan:
     def __repr__(self):
         return f'Plan({self.to_dict()!r})'
 
-    def __eq__(self, other: PlanDict | Plan) -> bool:
+    def __eq__(self, other: PlanDict | Plan) -> bool:  # ty:ignore[invalid-method-override]
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, Plan):
@@ -943,7 +943,7 @@ class Layer:
     def __repr__(self) -> str:
         return f'Layer({self.to_dict()!r})'
 
-    def __eq__(self, other: LayerDict | Layer) -> bool:
+    def __eq__(self, other: LayerDict | Layer) -> bool:  # ty:ignore[invalid-method-override]
         """Reports whether this layer configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1030,7 +1030,7 @@ class Service:
     def __repr__(self) -> str:
         return f'Service({self.to_dict()!r})'
 
-    def __eq__(self, other: ServiceDict | Service) -> bool:
+    def __eq__(self, other: ServiceDict | Service) -> bool:  # ty:ignore[invalid-method-override]
         """Reports whether this service configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1145,7 +1145,7 @@ class Check:
     def __repr__(self) -> str:
         return f'Check({self.to_dict()!r})'
 
-    def __eq__(self, other: CheckDict | Check) -> bool:
+    def __eq__(self, other: CheckDict | Check) -> bool:  # ty:ignore[invalid-method-override]
         """Reports whether this check configuration is equal to another."""
         if isinstance(other, dict):
             return self.to_dict() == other
@@ -1168,9 +1168,9 @@ class Check:
             if name == 'environment':
                 current = self.exec.get(name, {})
                 current.update(value)  # type: ignore
-                self.exec[name] = current
+                self.exec[name] = current  # ty:ignore[invalid-key]
             else:
-                self.exec[name] = value
+                self.exec[name] = value  # ty:ignore[invalid-key]
 
     def _merge_http(self, other: HttpDict) -> None:
         """Merges this http object with another http definition.
@@ -1186,9 +1186,9 @@ class Check:
             if name == 'headers':
                 current = self.http.get(name, {})
                 current.update(value)  # type: ignore
-                self.http[name] = current
+                self.http[name] = current  # ty:ignore[invalid-key]
             else:
-                self.http[name] = value
+                self.http[name] = value  # ty:ignore[invalid-key]
 
     def _merge_tcp(self, other: TcpDict) -> None:
         """Merges this tcp object with another tcp definition.
@@ -1201,7 +1201,7 @@ class Check:
         for name, value in other.items():
             if not value:
                 continue
-            self.tcp[name] = value
+            self.tcp[name] = value  # ty:ignore[invalid-key]
 
     def _merge(self, other: Check):
         """Merges this check object with another check definition.
@@ -1283,7 +1283,7 @@ class LogTarget:
     def __repr__(self):
         return f'LogTarget({self.to_dict()!r})'
 
-    def __eq__(self, other: LogTargetDict | LogTarget):
+    def __eq__(self, other: LogTargetDict | LogTarget):  # ty:ignore[invalid-method-override]
         if isinstance(other, dict):
             return self.to_dict() == other
         elif isinstance(other, LogTarget):
@@ -1948,7 +1948,7 @@ class _WebsocketWriter(io.BufferedIOBase):
         """Denote this file-like object as writable."""
         return True
 
-    def write(self, chunk: str | bytes) -> int:
+    def write(self, chunk: str | bytes) -> int:  # ty:ignore[invalid-method-override]
         """Write chunk to the websocket."""
         if not isinstance(chunk, bytes):
             raise TypeError(f'value to write must be bytes, not {type(chunk).__name__}')
@@ -1972,7 +1972,7 @@ class _WebsocketReader(io.BufferedIOBase):
         """Denote this file-like object as readable."""
         return True
 
-    def read(self, n: int = -1) -> str | bytes:
+    def read(self, n: int = -1) -> str | bytes:  # ty:ignore[invalid-method-override]
         """Read up to n bytes from the websocket (or one message if n<0)."""
         if self.eof:
             # Calling read() multiple times after EOF should still return EOF
@@ -2005,7 +2005,7 @@ class _WebsocketReader(io.BufferedIOBase):
         self.remaining = self.remaining[n:]
         return result
 
-    def read1(self, n: int = -1) -> str | bytes:
+    def read1(self, n: int = -1) -> str | bytes:  # ty:ignore[invalid-method-override]
         """An alias for read."""
         return self.read(n)
 
@@ -2100,7 +2100,7 @@ class Identity:
     def to_dict(self) -> IdentityDict:
         """Convert this identity to its dict representation."""
         result: IdentityDict = {
-            'access': str(self.access)  # pyright: ignore[reportAssignmentType]
+            'access': str(self.access)  # pyright: ignore[reportAssignmentType]  # ty:ignore[invalid-argument-type]
         }
         if self.local is not None:
             result['local'] = self.local.to_dict()
@@ -2553,7 +2553,7 @@ class Client:
             if isinstance(layer, str):
                 layer_yaml = layer
             elif isinstance(layer, dict):
-                layer_yaml = Layer(layer).to_yaml()
+                layer_yaml = Layer(layer).to_yaml()  # ty:ignore[invalid-argument-type]
             elif isinstance(layer, Layer):
                 layer_yaml = layer.to_yaml()
             else:

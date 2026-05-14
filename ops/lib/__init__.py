@@ -83,7 +83,7 @@ def use(name: str, api: int, author: str) -> ModuleType:
     if _libraries is None:
         autoimport()
 
-    versions = _libraries.get((name, author), ())
+    versions = _libraries.get((name, author), ())  # ty:ignore[unresolved-attribute]
     for lib in versions:
         if lib.api == api:
             return lib.import_module()
@@ -191,10 +191,10 @@ class _Missing:
 
     def __str__(self):
         exp = set(_NEEDED_KEYS)
-        got = set(self._found)
+        got = set(self._found)  # ty:ignore[invalid-argument-type]
         if len(got) == 0:
             return f'missing {_join_and(sorted(exp))}'
-        return f'got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}'
+        return f'got {_join_and(sorted(got))}, but missing {_join_and(sorted(exp - got))}'  # ty:ignore[invalid-argument-type]
 
 
 def _parse_lib(spec: ModuleSpec) -> _Lib | None:
@@ -215,7 +215,7 @@ def _parse_lib(spec: ModuleSpec) -> _Lib | None:
                     logger.debug(
                         '      Missing opslib metadata after reading to line %d: %s',
                         _MAX_LIB_LINES,
-                        _Missing(libinfo),
+                        _Missing(libinfo),  # ty:ignore[invalid-argument-type]
                     )
                     return None
                 m = _libline_re.match(line)
@@ -237,7 +237,7 @@ def _parse_lib(spec: ModuleSpec) -> _Lib | None:
                 if len(libinfo) != len(_NEEDED_KEYS):
                     logger.debug(
                         '      Missing opslib metadata after reading to end of file: %s',
-                        _Missing(libinfo),
+                        _Missing(libinfo),  # ty:ignore[invalid-argument-type]
                     )
                     return None
     except Exception as e:
@@ -269,7 +269,7 @@ class _Lib:
     def import_module(self) -> ModuleType:
         if self._module is None:
             module = module_from_spec(self.spec)
-            self.spec.loader.exec_module(module)
+            self.spec.loader.exec_module(module)  # ty:ignore[unresolved-attribute]
             self._module = module
         return self._module
 

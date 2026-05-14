@@ -16,7 +16,7 @@ import ops
 import pytest
 from ops import testing
 
-from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm
+from charm import CONTAINER_NAME, SERVICE_NAME, HttpbinDemoCharm  # ty:ignore[unresolved-import]
 
 # A mock Pebble layer - useful for testing the charm's status reporting code. The status reporting
 # code shouldn't care how the service is started, so the layer doesn't need the real command.
@@ -37,8 +37,8 @@ def test_pebble_ready():
     """Check that the charm correctly starts the service in the container."""
     # Arrange:
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container})
+    container = testing.Container(CONTAINER_NAME, can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
+    state_in = testing.State(containers={container})  # ty:ignore[invalid-argument-type]
     # Act:
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Assert:
@@ -71,11 +71,11 @@ def test_status_service_active():
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(
         CONTAINER_NAME,
-        layers={"base": MOCK_LAYER},
-        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.ACTIVE},
-        can_connect=True,
-    )
-    state_in = testing.State(containers={container})
+        layers={"base": MOCK_LAYER},  # ty:ignore[unknown-argument]
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.ACTIVE},  # ty:ignore[unknown-argument]
+        can_connect=True,  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
+    state_in = testing.State(containers={container})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.ActiveStatus()
 
@@ -85,11 +85,11 @@ def test_status_service_inactive():
     ctx = testing.Context(HttpbinDemoCharm)
     container = testing.Container(
         CONTAINER_NAME,
-        layers={"base": MOCK_LAYER},
-        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.INACTIVE},
-        can_connect=True,
-    )
-    state_in = testing.State(containers={container})
+        layers={"base": MOCK_LAYER},  # ty:ignore[unknown-argument]
+        service_statuses={SERVICE_NAME: ops.pebble.ServiceStatus.INACTIVE},  # ty:ignore[unknown-argument]
+        can_connect=True,  # ty:ignore[unknown-argument]
+    )  # ty:ignore[missing-argument]
+    state_in = testing.State(containers={container})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload")
 
@@ -97,8 +97,8 @@ def test_status_service_inactive():
 def test_status_no_service():
     """Check that the charm goes into maintenance status if the service hasn't been defined."""
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container})
+    container = testing.Container(CONTAINER_NAME, can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
+    state_in = testing.State(containers={container})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
@@ -106,8 +106,8 @@ def test_status_no_service():
 def test_status_no_pebble():
     """Check that the charm goes into maintenance status if the container is down."""
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=False)
-    state_in = testing.State(containers={container})
+    container = testing.Container(CONTAINER_NAME, can_connect=False)  # ty:ignore[missing-argument, unknown-argument]
+    state_in = testing.State(containers={container})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.update_status(), state_in)
     assert state_out.unit_status == testing.MaintenanceStatus("waiting for workload container")
 
@@ -122,8 +122,8 @@ def test_status_no_pebble():
 def test_config_changed(user_log_level: str, gunicorn_log_level: str):
     """Test a config-changed event when the config is valid."""
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
+    container = testing.Container(CONTAINER_NAME, can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     updated_plan = state_out.get_container(container.name).plan
     gunicorn_args = updated_plan.services[SERVICE_NAME].environment["GUNICORN_CMD_ARGS"]
@@ -141,8 +141,8 @@ def test_config_changed(user_log_level: str, gunicorn_log_level: str):
 def test_config_changed_invalid(user_log_level: str):
     """Test a config-changed event when the config is invalid."""
     ctx = testing.Context(HttpbinDemoCharm)
-    container = testing.Container(CONTAINER_NAME, can_connect=True)
-    state_in = testing.State(containers={container}, config={"log-level": user_log_level})
+    container = testing.Container(CONTAINER_NAME, can_connect=True)  # ty:ignore[missing-argument, unknown-argument]
+    state_in = testing.State(containers={container}, config={"log-level": user_log_level})  # ty:ignore[invalid-argument-type]
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
     assert state_out.unit_status.message.startswith(f"Invalid log level: '{user_log_level}'.")

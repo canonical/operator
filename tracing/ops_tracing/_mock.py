@@ -50,7 +50,7 @@ def patch_tracing() -> Generator[InMemorySpanExporter, None, None]:
     exporter = InMemorySpanExporter()
     SPAN_PROCESSOR.span_exporter = exporter
 
-    _backend._create_provider = _create_provider
+    _backend._create_provider = _create_provider  # ty:ignore[invalid-assignment]
     _backend._exporter = None
     try:
         yield exporter

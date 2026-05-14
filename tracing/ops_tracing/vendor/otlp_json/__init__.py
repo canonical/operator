@@ -86,7 +86,7 @@ def _attributes(
     assert thing.attributes is not None
     for k, v in thing.attributes.items():
         try:
-            rv["attributes"].append({"key": k, "value": _value(v)})
+            rv["attributes"].append({"key": k, "value": _value(v)})  # ty:ignore[invalid-argument-type]
         except ValueError:
             pass
 

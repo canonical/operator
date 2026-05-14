@@ -30,7 +30,7 @@ from ops import testing
 def benchmark_charm():
     charm_path = str(pathlib.Path(__file__).parent / 'charms' / 'benchmark_charm' / 'src')
     sys.path.append(charm_path)
-    from benchmark_charm import BenchmarkCharm
+    from benchmark_charm import BenchmarkCharm  # ty:ignore[unresolved-import]
 
     yield BenchmarkCharm
     sys.path.remove(charm_path)
@@ -129,7 +129,7 @@ def test_full_state(benchmark, benchmark_charm):
         rel = testing.Relation('rel')
         peer = testing.PeerRelation('peer')
         network = testing.Network('MySpace')
-        container = testing.Container('foo')
+        container = testing.Container('foo')  # ty:ignore[missing-argument]
         storage = testing.Storage('bar')
         tcp = testing.TCPPort(22)
         icmp = testing.ICMPPort()
@@ -140,7 +140,7 @@ def test_full_state(benchmark, benchmark_charm):
         state = testing.State(
             relations={rel, peer},
             networks={network},
-            containers={container},
+            containers={container},  # ty:ignore[invalid-argument-type]
             storages={storage},
             opened_ports={tcp, icmp, udp},
             secrets={secret},

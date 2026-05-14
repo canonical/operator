@@ -29,7 +29,7 @@ try:
     import pydantic
     import pydantic.dataclasses
 except ImportError:
-    pydantic = None
+    pydantic = None  # ty:ignore[invalid-assignment]
 
 try:
     from pydantic.experimental.missing_sentinel import MISSING
@@ -111,7 +111,7 @@ class BaseTestCharm(ops.CharmBase):
 
 
 class NestedEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
+    def default(self, obj: Any) -> Any:  # ty:ignore[invalid-method-override]
         if isinstance(obj, Nested):
             return {'sub': obj.sub}
         return super().default(obj)
@@ -248,7 +248,7 @@ if pydantic and MISSING is not None:
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_load_simple(charm_class: type[BaseTestCharm]):
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, event.app, decoder=self.decoder)
             self.newfoo = len(data.foo)
@@ -276,7 +276,7 @@ def test_relation_load_simple(charm_class: type[BaseTestCharm]):
 def test_relation_load_fail(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
 
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
 
@@ -295,7 +295,7 @@ def test_relation_load_fail_multi_field_validation(
 ):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
 
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             event.relation.load(self.databag_class, event.app, decoder=self.decoder)
 
@@ -434,7 +434,7 @@ def test_relation_load_extra_args():
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_simple(charm_class: type[BaseTestCharm]):
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(
                 foo='other-value', bar=28, baz=['x', 'y'], quux=Nested(sub=8)
@@ -460,7 +460,7 @@ def test_relation_save_no_access(
 ):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
 
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
             event.relation.save(data, event.app, encoder=self.encoder)
@@ -474,7 +474,7 @@ def test_relation_save_no_access(
 
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             self.data = event.relation.load(self.databag_class, self.app)
             self.data.foo = self.data.foo + '1'
@@ -506,7 +506,7 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
 def test_relation_save_invalid(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
 
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             def encoder(_: Any) -> int:
                 # This is invalid: Juju only accepts strings.
@@ -587,7 +587,7 @@ def test_relation_save_custom_encode(charm_class: type[BaseTestCharm]):
             return data[::-1]
         return data
 
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
             data = event.relation.load(self.databag_class, self.app, decoder=custom_decode)
             assert data.foo == 'eulav'
@@ -695,7 +695,7 @@ class CommonTypes(BaseTestCharmCommonTypes):
 
 
 class _IPJSONEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
+    def default(self, obj: Any) -> Any:  # ty:ignore[invalid-method-override]
         if isinstance(
             obj,
             (
@@ -828,7 +828,7 @@ if pydantic:
 
 @pytest.mark.parametrize('charm_class', _common_types_classes)
 def test_relation_common_types(charm_class: type[BaseTestCharmCommonTypes]):
-    class Charm(charm_class):
+    class Charm(charm_class):  # ty:ignore[unsupported-base]
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)

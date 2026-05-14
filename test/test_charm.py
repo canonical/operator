@@ -29,7 +29,7 @@ try:
     import pydantic
     import pydantic.dataclasses
 except ImportError:
-    pydantic = None
+    pydantic = None  # ty:ignore[invalid-assignment]
 
 import ops
 import ops.charm
@@ -1847,7 +1847,7 @@ my-action:
         harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
     # There should be a failure message, but we're not concerned with the exact
     # wording, which will differ between action classes.
-    assert harness._backend._running_action.failure_message
+    assert harness._backend._running_action.failure_message  # ty:ignore[unresolved-attribute]
 
 
 @pytest.mark.parametrize('charm_class', _test_action_classes)
@@ -1855,7 +1855,7 @@ def test_action_with_error_raise(
     charm_class: type[BaseTestActionCharm],
     request: pytest.FixtureRequest,
 ):
-    class RaiseCharm(charm_class):
+    class RaiseCharm(charm_class):  # ty:ignore[unsupported-base]
         errors = 'raise'
 
     action_yaml = """

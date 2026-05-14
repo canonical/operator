@@ -563,7 +563,7 @@ class TestFramework:
         class DeferringObserver(RecordingObserver):
             defer = True
 
-            def on_event(self, event: SimpleEventWithData):
+            def on_event(self, event: SimpleEventWithData):  # ty:ignore[invalid-method-override]
                 super().on_event(event)
                 if self.defer:
                     event.defer()
@@ -1005,7 +1005,7 @@ class TestFramework:
             def snapshot(self):
                 return self.value
 
-            def restore(self, value: typing.Any):
+            def restore(self, value: typing.Any):  # ty:ignore[invalid-method-override]
                 self.value = value
 
         class MyNotifier(ops.Object):
@@ -1333,31 +1333,31 @@ class TestStoredState:
         assert isinstance(obj, _StoredProtocol)
 
         try:
-            obj._stored.foo
+            obj._stored.foo  # ty:ignore[unresolved-attribute]
         except AttributeError as e:
             assert str(e) == "attribute 'foo' is not stored"
         else:
             pytest.fail('AttributeError not raised')
 
         try:
-            obj._stored.on = 'nonono'
+            obj._stored.on = 'nonono'  # ty:ignore[invalid-assignment]
         except AttributeError as e:
             assert str(e) == "attribute 'on' is reserved and cannot be set"
         else:
             pytest.fail('AttributeError not raised')
 
-        obj._stored.foo = 41
-        obj._stored.foo = 42
-        obj._stored.bar = 's'
-        obj._stored.baz = 4.2
-        obj._stored.bing = True
+        obj._stored.foo = 41  # ty:ignore[invalid-assignment]
+        obj._stored.foo = 42  # ty:ignore[invalid-assignment]
+        obj._stored.bar = 's'  # ty:ignore[invalid-assignment]
+        obj._stored.baz = 4.2  # ty:ignore[invalid-assignment]
+        obj._stored.bing = True  # ty:ignore[invalid-assignment]
 
-        assert obj._stored.foo == 42
+        assert obj._stored.foo == 42  # ty:ignore[unresolved-attribute]
 
         framework.commit()
 
         # This won't be committed, and should not be seen.
-        obj._stored.foo = 43
+        obj._stored.foo = 43  # ty:ignore[invalid-assignment]
 
         framework.close()
 
@@ -1365,10 +1365,10 @@ class TestStoredState:
         framework_copy = create_framework(request, tmpdir=tmp_path)
         obj_copy = cls(framework_copy, '1')
         assert isinstance(obj_copy, _StoredProtocol)
-        assert obj_copy._stored.foo == 42
-        assert obj_copy._stored.bar == 's'
-        assert obj_copy._stored.baz == 4.2
-        assert obj_copy._stored.bing
+        assert obj_copy._stored.foo == 42  # ty:ignore[unresolved-attribute]
+        assert obj_copy._stored.bar == 's'  # ty:ignore[unresolved-attribute]
+        assert obj_copy._stored.baz == 4.2  # ty:ignore[unresolved-attribute]
+        assert obj_copy._stored.bing  # ty:ignore[unresolved-attribute]
 
         framework_copy.close()
 

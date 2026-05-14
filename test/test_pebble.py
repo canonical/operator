@@ -34,7 +34,7 @@ from ops import pebble
 from ops._private import yaml
 
 # Ensure unittest diffs don't get truncated like "[17 chars]"
-unittest.util._MAX_LENGTH = 1000
+unittest.util._MAX_LENGTH = 1000  # ty:ignore[invalid-assignment]
 
 
 def datetime_utc(y: int, m: int, d: int, hour: int, min: int, sec: int, micro: int = 0):
@@ -1505,11 +1505,11 @@ def build_mock_change_dict(change_id: str = '70') -> pebble._ChangeDict:
                 'spawn-time': '2021-01-28T14:37:02.247158162+13:00',
                 'status': 'Done',
                 'summary': 'Start service "svc"',
-                'extra-field': 'foo',
+                'extra-field': 'foo',  # ty:ignore[invalid-key]
             },
-        ],
-        'extra-field': 'foo',
-    }
+        ],  # ty:ignore[invalid-argument-type]
+        'extra-field': 'foo',  # ty:ignore[invalid-key]
+    }  # ty:ignore[invalid-return-type]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -3953,7 +3953,7 @@ class TestExec:
 
     def test_connect_websocket_error(self):
         class Client(MockClient):
-            def _connect_websocket(self, change_id: str, websocket_id: str):
+            def _connect_websocket(self, change_id: str, websocket_id: str):  # ty:ignore[invalid-method-override]
                 raise websocket.WebSocketException('conn!')
 
         client = Client()
@@ -4044,7 +4044,7 @@ class TestIdentity:
         identity = pebble.Identity.from_dict({
             'access': pebble.IdentityAccess.ADMIN,  # type: ignore
             'local': {'user-id': 42},
-        })
+        })  # ty:ignore[invalid-argument-type]
         assert identity == pebble.Identity(
             access=pebble.IdentityAccess.ADMIN, local=pebble.LocalIdentity(user_id=42)
         )
@@ -4069,7 +4069,7 @@ class TestIdentity:
         identity = pebble.Identity.from_dict({
             'access': pebble.IdentityAccess.METRICS,  # type: ignore
             'basic': {'password': 'hashed password'},
-        })
+        })  # ty:ignore[invalid-argument-type]
         assert identity == pebble.Identity(
             access=pebble.IdentityAccess.METRICS,
             basic=pebble.BasicIdentity(password='hashed password'),
@@ -4089,12 +4089,12 @@ class TestIdentity:
         with pytest.raises(KeyError):
             raw: pebble.IdentityDict = {  # pyright: ignore[reportAssignmentType]
                 'local': {'user-id': 42}
-            }
+            }  # ty:ignore[missing-typed-dict-key]
             pebble.Identity.from_dict(raw)
 
     def test_invalid_access(self):
         raw: pebble.IdentityDict = {
-            'access': 'foo',  # pyright: ignore[reportAssignmentType]
+            'access': 'foo',  # pyright: ignore[reportAssignmentType]  # ty:ignore[invalid-argument-type]
             'local': {'user-id': 42},
         }
         identity = pebble.Identity.from_dict(raw)

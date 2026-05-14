@@ -140,7 +140,7 @@ class DatabagModel(BaseModel):
         populate_by_name=True,
         # Custom config key: whether to nest the whole datastructure (as json)
         # under a field or spread it out at the toplevel.
-        _NEST_UNDER=None,
+        _NEST_UNDER=None,  # ty:ignore[invalid-key]
     )  # type: ignore
     """Pydantic config."""
 

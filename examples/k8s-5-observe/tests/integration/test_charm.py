@@ -22,8 +22,8 @@ import time
 
 import jubilant
 import pytest
-import pytest_jubilant
-import requests
+import pytest_jubilant  # ty:ignore[unresolved-import]
+import requests  # ty:ignore[unresolved-import]
 import yaml
 
 logger = logging.getLogger(__name__)

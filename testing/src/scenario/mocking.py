@@ -155,7 +155,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
-    ):
+    ):  # ty:ignore[invalid-method-override]
         port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ not in ports:
@@ -167,7 +167,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         self,
         protocol: _RawPortProtocolLiteral,
         port: int | None = None,
-    ):
+    ):  # ty:ignore[invalid-method-override]
         port_ = _port_cls_by_protocol[protocol](port=port)  # type: ignore
         ports = set(self._state.opened_ports)
         if port_ in ports:
@@ -191,7 +191,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             _MockPebbleClient(
                 socket_path=socket_path,
                 container_root=container_root,
-                mounts=mounts,
+                mounts=mounts,  # ty:ignore[invalid-argument-type]
                 state=self._state,
                 event=self._event,
                 charm_spec=self._charm_spec,
@@ -295,7 +295,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_ids(self, relation_name: str):
         return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
-    def relation_list(self, relation_id: int) -> tuple[str, ...]:
+    def relation_list(self, relation_id: int) -> tuple[str, ...]:  # ty:ignore[invalid-method-override]
         relation = self._get_relation_by_id(relation_id)
 
         if isinstance(relation, PeerRelation):
@@ -426,7 +426,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
         owner: Literal['unit', 'application'] | None = None,
-    ) -> str:
+    ) -> str:  # ty:ignore[invalid-method-override]
         from .state import Secret
 
         secret = Secret(
@@ -840,7 +840,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                     spawn_time=now,
                     ready_time=now,
                 )
-                self._changes[check.change_id] = change
+                self._changes[check.change_id] = change  # ty:ignore[invalid-assignment]
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
@@ -907,14 +907,14 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     @property
     def _layers(self) -> dict[str, pebble.Layer]:
-        return self._container.layers
+        return self._container.layers  # ty:ignore[invalid-return-type]
 
     @property
     def _service_status(self) -> dict[str, pebble.ServiceStatus]:
-        return self._container.service_statuses
+        return self._container.service_statuses  # ty:ignore[invalid-return-type]
 
     # Based on a method of the same name from Harness.
-    def _find_exec_handler(self, command: list[str]) -> Exec | None:
+    def _find_exec_handler(self, command: list[str]) -> Exec | None:  # ty:ignore[invalid-method-override]
         handlers = {exe.command_prefix: exe for exe in self._container.execs}
         # Start with the full command and, each loop iteration, drop the last
         # element, until it matches one of the command prefixes in the execs.
@@ -945,7 +945,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         encoding: str | None = 'utf-8',
         combine_stderr: bool = False,
         **kwargs: Any,
-    ):
+    ):  # ty:ignore[invalid-method-override]
         handler = self._find_exec_handler(command)
         if not handler:
             raise ExecError(

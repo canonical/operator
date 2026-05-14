@@ -24,7 +24,7 @@ import ops
 # Import the 'data_interfaces' library.
 # The import statement omits the top-level 'lib' directory
 # because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import (
+from charms.data_platform_libs.v0.data_interfaces import (  # ty:ignore[unresolved-import]
     DatabaseCreatedEvent,
     DatabaseEndpointsChangedEvent,
     DatabaseRequires,

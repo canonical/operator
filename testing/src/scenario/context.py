@@ -96,7 +96,7 @@ class Manager(Generic[CharmType]):
             raise RuntimeError(
                 'you should __enter__ this context manager before accessing this',
             )
-        return self.ops.charm
+        return self.ops.charm  # ty:ignore[invalid-return-type]
 
     @property
     def _runner(self):
@@ -691,7 +691,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # ty:ignore[invalid-assignment]
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
@@ -722,8 +722,8 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self._charm_spec.meta.get('name')
-        self.unit_id = unit_id
+        self.app_name = app_name or self._charm_spec.meta.get('name')  # ty:ignore[invalid-assignment]
+        self.unit_id = unit_id  # ty:ignore[invalid-assignment]
         self._machine_id = machine_id
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit

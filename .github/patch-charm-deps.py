@@ -25,8 +25,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-import tomli_w
-import tomllib
+import tomli_w  # ty:ignore[unresolved-import]
+import tomllib  # ty:ignore[unresolved-import]
 
 # Manage the Python version in tox
 
