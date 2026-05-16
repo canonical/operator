@@ -85,7 +85,7 @@ If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other libra
 - `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
 - `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
 
-This means that you need to add `cosl>=1.9.1` to your charm's dependencies.
+You should add the latest version of the [cosl package](https://pypi.org/project/cosl/) to your charm's dependencies.
 
 To update your charm's dependencies in `pyproject.toml`, run:
 
