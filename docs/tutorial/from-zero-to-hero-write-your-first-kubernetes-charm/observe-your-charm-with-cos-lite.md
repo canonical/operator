@@ -511,6 +511,8 @@ We're now ready to write the tests.
 
 ### Deploy COS Lite and integrate with Loki
 
+Add two test functions to `tests/integration/test_charm.py`:
+
 ```python
 def test_deploy_cos(cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
@@ -527,6 +529,8 @@ def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
 ```
 
 ### Request logs from Loki
+
+Add a test function to `tests/integration/test_charm.py`:
 
 ```python
 def test_loki_data(cos: jubilant.Juju):
@@ -557,9 +561,20 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
     return None
 ```
 
+For more information, see:
+
+- [Traefik actions](https://charmhub.io/traefik-k8s/actions)
+- [Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-label-values)
+
 ### Run the tests
 
-TODO
+Run the following command from anywhere in the `~/fastapi-demo` directory:
+
+```text
+tox -e integration
+```
+
+The tests take 10-15 minutes to run, depending on your computer and network.
 
 ## Review the final code
 
