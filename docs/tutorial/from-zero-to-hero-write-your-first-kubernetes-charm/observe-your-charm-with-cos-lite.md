@@ -468,6 +468,97 @@ The search result should look like:
 
 Which means that `/names` has received 150 requests so far.
 
+## Write integration tests
+
+Let's write some integration tests to check that our application works correctly with COS Lite:
+
+1. Deploy COS Lite in a separate Juju model.
+2. Integrate our application with Loki from the COS Lite model.
+3. Ask Loki for logs related to our application.
+
+### Create a model for COS Lite
+
+The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
+
+First, update the imports at the beginning of `tests/integration/test_charm.py`:
+
+```python
+import json
+import logging
+import pathlib
+import time
+
+import jubilant
+import pytest
+import pytest_jubilant
+import requests
+import yaml
+```
+
+We need `pytest` and `pytest_jubilant` for the new fixture. We'll use the other additions (`json`, `time`, and `requests`) when we write the tests.
+
+Next, still in `tests/integration/test_charm.py`, define the new fixture:
+
+```python
+@pytest.fixture(scope="module")
+def cos(juju_factory: pytest_jubilant.JujuFactory):
+    yield juju_factory.get_juju(suffix="cos")
+```
+
+`get_juju` creates a model called `jubilant-<randomhex>-cos`.
+
+We're now ready to write the tests.
+
+### Deploy COS Lite and integrate with Loki
+
+```python
+@pytest.mark.juju_setup
+def test_deploy_cos(cos: jubilant.Juju):
+    """Deploy COS Lite in a separate model."""
+    cos.deploy("cos-lite", trust=True)
+    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
+
+
+@pytest.mark.juju_setup
+def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+    """Integrate our app with Loki from COS Lite."""
+    cos.offer("loki", endpoint="logging")
+    juju.integrate(APP_NAME, f"{cos.model}.loki")
+    juju.wait(jubilant.all_active)
+    cos.wait(jubilant.all_active)
+```
+
+### Request logs from Loki
+
+```python
+def test_loki_data(cos: jubilant.Juju):
+    """Use Loki's HTTP API to verify that Loki has a label for our app.
+
+    COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
+    that tells us the base URL of Loki's API.
+    """
+    task = cos.run("traefik/0", "show-proxied-endpoints")
+    results = json.loads(task.results["proxied-endpoints"])
+    loki_url = results["loki/0"]["url"]
+    loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
+
+    # Wait for logs to be available from Loki, then check for our app.
+    for _ in range(2 * 60):
+        response = requests.get(loki_api_url)
+        if response.status_code == 200:
+            response_decoded = response.json()
+            if "data" in response_decoded:
+                juju_applications: list[str] = response_decoded["data"]
+                assert APP_NAME in juju_applications
+                return
+        time.sleep(1)
+    pytest.fail("No logs available from Loki")
+```
+
+### Run the tests
+
+TODO
+
 ## Review the final code
 
 For the full code, see [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-5-observe).
