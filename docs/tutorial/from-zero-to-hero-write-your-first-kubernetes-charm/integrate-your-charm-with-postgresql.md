@@ -529,9 +529,17 @@ In your Multipass Ubuntu VM, run the test again:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
 ```
 
-The test may again take some time to run.
+The test may take some time to run, depending on your computer and network.
 
-When it's done, the output should show two passing tests:
+If the test fails with a timeout error, override the default timeout in `test_database_integration`:
+
+```python
+    juju.wait(jubilant.all_active, timeout=10 * 60)
+```
+
+Then run `tox -e integration` again.
+
+When the test is done, the output should show two passing tests:
 
 ```text
 tests/integration/test_charm.py::test_deploy
