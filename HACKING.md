@@ -348,49 +348,62 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 
 If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
 
-## Updating the Ops versions in the Charmcraft profiles
+## Updating the Charmcraft profiles
 
-The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a PR to Charmcraft to increase the minimum Ops version in the profiles and refresh the `uv.lock` templates.
+The Charmcraft `kubernetes` and `machine` profiles specify a minimum Ops version in their `pyproject.toml` templates. If an Ops release includes a major new feature or resolves a dependency issue, open a Charmcraft PR to increase the minimum Ops version in the profiles.
 
-1. Fork the [Charmcraft repo](https://github.com/canonical/charmcraft) and create a branch for local development. In your branch, run `make setup` to create a virtual environment, then run `source .venv/bin/activate`.
+Here's the general maintenance process for the Charmcraft profiles.
 
-    See also: Charmcraft's [contributing guide](https://github.com/canonical/charmcraft/blob/main/CONTRIBUTING.md)
+### Editing the profiles
 
-2. In your Charmcraft development branch, modify the Ops version specifier in:
+In your Charmcraft clone, check out a new branch, then edit the .j2 template files in these directories:
 
-    - `charmcraft/templates/init-kubernetes/pyproject.toml.j2`
-    - `charmcraft/templates/init-machine/pyproject.toml.j2`
+- `charmcraft/templates/init-kubernetes`
+- `charmcraft/templates/init-machine`
 
-2. Clone [charmcraft-profile-tools](https://github.com/canonical/charmcraft-profile-tools) locally.
+Don't commit changes yet. Wait until you've tested the charms that `charmcraft init` generates.
 
-3. In your clone of charmcraft-profile-tools, run:
+### Testing the profiles
 
-    ```text
-    CHARMCRAFT_DIR=/path/to/charmcraft just init
-    ```
+At the Charmcraft root, create a directory `.charms` and a script `.charms/generate.py`:
 
-    This initialises a Kubernetes charm and a machine charm based on your Charmcraft development branch.
+```python
+import pathlib
+import shutil
+import subprocess
 
-    If you don't have [just](https://just.systems/man/en/) installed, use `uvx --from rust-just just` instead.
+INIT = ["uv", "run", "--python", "3.10", "--no-dev", "charmcraft", "init"]
+LOCK = ["uv", "lock", "--python", "3.10"]
+TOX = ["uvx", "--python", "3.10", "--with", "tox-uv", "tox"]
 
-4. Lock the dependencies of the charms and generate `uv.lock.j2` files:
 
-    ```text
-    just lock
-    ```
+def init_and_test(profile: str):
+    name = f"myapp-{profile}"
+    if pathlib.Path(name).exists():
+        shutil.rmtree(name)
+    subprocess.run([*INIT, "--profile", profile, "--project-dir", name], check=True)
+    subprocess.run(LOCK, cwd=name, check=True)
+    subprocess.run([*TOX, "-e", "lint,unit"], cwd=name, check=True)
 
-5. Copy the `uv.lock.j2` files to your Charmcraft development branch:
 
-    ```text
-    cp .templates/init-kubernetes/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-kubernetes
-    cp .templates/init-machine/uv.lock.j2 /path/to/charmcraft/charmcraft/templates/init-machine
-    ```
+init_and_test("kubernetes")
+init_and_test("machine")
+```
 
-6. In your Charmcraft development branch, commit your changes.
+In the `.charms` directory, run `uv run --script generate.py`.
 
-    You should have changed these files:
+### Opening a Charmcraft PR
 
-    * charmcraft/templates/init-kubernetes/pyproject.toml.j2
-    * charmcraft/templates/init-kubernetes/uv.lock.j2
-    * charmcraft/templates/init-machine/pyproject.toml.j2
-    * charmcraft/templates/init-machine/uv.lock.j2
+Use a conventional commit type **for each commit**. For example, `chore(templates):`.
+
+Don't commit the `.charms` directory!
+
+### Updating the Ops docs and example charms
+
+After your Charmcraft PR has merged:
+
+1. Go to the [Charmcraft main branch](https://github.com/canonical/charmcraft/tree/main) and grab the hash of the latest commit that updates the profiles (which is probably the commit that came from your merged PR).
+
+2. In the Ops source, search for `uvx git+https://github.com/canonical/charmcraft@`, then update all instances to use the latest commit hash.
+
+3. Make sure that the Ops tutorials and example charms are consistent with your profile changes.
