@@ -7,7 +7,7 @@ authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
 license = "Apache-2.0"
-license-files = ["LICENSE.txt"]
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 5 - Production/Stable",

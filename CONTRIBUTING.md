@@ -130,7 +130,7 @@ Unmarked features are assumed to work and be available in the current LTS versio
 
 # Copyright
 
-The format for copyright notices is documented in the [LICENSE.txt](LICENSE.txt). New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE.txt](LICENSE.txt)). The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
+The format for copyright notices is documented in the [LICENSE file](LICENSE). New files should begin with a copyright line with the current year (e.g. Copyright 2024 Canonical Ltd.) and include the full boilerplate (see APPENDIX of [LICENSE](LICENSE)). The copyright information in existing files does not need to be updated when those files are modified -- only the initial creation year is required.
 
 # Reviews
 
