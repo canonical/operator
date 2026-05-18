@@ -195,6 +195,19 @@ that ensures that `ops.main` 'pauses' right before emitting the event to hand
 you some introspection hooks, but for the rest this is a regular test: you can't
 emit multiple events in a single charm execution.
 
+This is a modified version of the example above. Before ``mgr.run()``, 
+no event is emitted, hence the ``unknown`` status.
+
+```python
+@pytest.mark.parametrize('leader', (True, False))
+def test_status_leader(leader):
+    ctx = testing.Context(MyCharm, meta={'name': 'foo'})
+    with ctx(ctx.on.start(), testing.State(leader=leader)) as mgr:
+        assert mgr.charm.unit.status == testing.UnknownStatus()
+        mgr.run()
+        assert mgr.charm.unit.status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
+```
+
 ## The virtual charm root
 
 Before executing the charm, the framework writes the metadata, config, and actions
