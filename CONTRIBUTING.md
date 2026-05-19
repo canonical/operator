@@ -14,6 +14,19 @@ Please do not use tools (such as GitHub Copilot) to provide PR reviews. The Char
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
+- Work on a branch in your own fork.
+- Sequence your commits logically if possible. But don't worry too much -- we'll squash to `main` after review.
+- Don't force-push after review has started.
+- Follow conventional commit style for the PR title (not required for individual commits).
+
+## Branch updates
+
+Before you ask for review, please rebase your branch onto `main` so that your changes will merge cleanly.
+
+If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
+
+## Pull request titles
+
 Pull requests should have a short title that follows the [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
 
 - chore
@@ -32,21 +45,6 @@ Some examples:
 - fix!: correct the type hinting for config data
 - docs: clarify how to use mounts in ops.testing.Container
 - ci: adjust the workflow that publishes ops-scenario
-
-We consider Ops too small a project to use scopes, so we don't use them.
-
-Note that the commit messages to the PR's branch do not need to follow the conventional commit format, as these will be squashed into a single commit to `main` using the PR title as the commit message.
-
-## Git workflow for external contributors
-
-We expect external contributors to work on a branch in their fork and open a pull request from that branch.
-
-Before you ask for review, please rebase your branch onto `main` so that the pull request is easy to review. After the review has started, avoid force-pushing if possible, since it makes it harder to follow the discussion and compare earlier revisions.
-
-If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
-
-We squash-merge pull requests, so your branch history does not need to be perfect. Focus on making the pull request easy to review rather than keeping a carefully curated commit history.
-
 
 # Tests
 
