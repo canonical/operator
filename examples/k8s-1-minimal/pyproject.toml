@@ -24,7 +24,7 @@ requires-python = ">=3.10"
 # 'charm-libs' block in charmcraft.yaml, run `charmcraft fetch-libs` to download the libraries,
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
-    "ops>=3,<4",
+    "ops~=3.7",
 ]
 
 [dependency-groups]
@@ -43,7 +43,8 @@ unit = [
 # Dependencies of integration tests
 integration = [
     "jubilant>=1.8,<2",
-    "pytest-jubilant>=2,<3",
+    "pytest",
+    "pytest-jubilant>=2.0.1,<3",
     "PyYAML",
 ]
 

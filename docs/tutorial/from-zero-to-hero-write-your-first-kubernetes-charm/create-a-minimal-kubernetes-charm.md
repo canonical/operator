@@ -31,18 +31,15 @@ In your virtual machine, go into your project directory and create the initial v
 
 ```text
 cd ~/fastapi-demo
-charmcraft init --profile kubernetes
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile kubernetes
 ```
 
-<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
-````{tip}
-The `charmcraft` version that you have installed may come with older versions of the profiles than we use in this tutorial.
+<!--
+  When charmcraft stable is up-to-date, comment out this info and switch to 'charmcraft init --profile kubernetes' above.
+  If needed again later, restore the info and switch to 'uvx git+https://github.com/canonical/charmcraft@<hash> init --profile kubernetes'.
+-->
+The `uvx ...` command runs Charmcraft directly from GitHub. We recommend doing this because the installed version of Charmcraft may come with an older version of the profile used in the tutorial. You should use the installed version of Charmcraft for everything else (as we'll do later in the tutorial).
 
-To use the profile versions used in the tutorial, initialise a charm using `charmcraft` directly from Github, like this:
-```
-uvx git+https://github.com/canonical/charmcraft@460e8df init --profile kubernetes
-```
-````
 
 Charmcraft created several files, including:
 
@@ -472,6 +469,25 @@ The result should be similar to the following output:
 ```{tip}
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
+
+### Run tests with `charmcraft test`
+
+Charmcraft has an experimental command `charmcraft test` that uses [spread](https://github.com/canonical/spread) to run tests.
+
+If you're interested in trying `charmcraft test`, run the following command in your project directory:
+
+```text
+charmcraft init --profile test-kubernetes --force
+```
+
+This creates the scaffolding of a spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
+
+- `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
+- The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
+
+When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
+
+It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-charmcraft-test`.
 
 ## Review the final code
 
