@@ -619,4 +619,3 @@ def test_secret_get_content_returns_copy(owner: str):
     refreshed['a'] = 'MUTATED'
 
     assert secret_obj.get_content() == {'a': 'c'}
-

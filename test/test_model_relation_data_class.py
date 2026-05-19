@@ -31,7 +31,9 @@ except ImportError:
     pydantic = None
 
 try:
-    from pydantic.experimental.missing_sentinel import MISSING
+    from pydantic.experimental.missing_sentinel import (
+        MISSING,  # pyright: ignore[reportUnknownVariableType]
+    )
 except ImportError:
     MISSING = None  # type: ignore
 

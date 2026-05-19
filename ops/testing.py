@@ -78,7 +78,7 @@ except importlib.metadata.PackageNotFoundError:
     from .model import Container
 else:
     if not (_version and int(_version.split('.', 1)[0]) >= 7):
-        from .model import Container  # type: ignore[assignment]
+        from .model import Container
     if _version and int(_version.split('.', 1)[0]) >= 7:
         from scenario import (
             ActiveStatus,
