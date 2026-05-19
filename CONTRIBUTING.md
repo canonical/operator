@@ -46,6 +46,8 @@ Some examples:
 - docs: clarify how to use mounts in ops.testing.Container
 - ci: adjust the workflow that publishes ops-scenario
 
+We consider Ops too small a project to use scopes, so we don't use them.
+
 # Tests
 
 Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/) instead of legacy [ops.testing.Harness](https://documentation.ubuntu.com/ops/latest/reference/ops-testing-harness/) tests.
