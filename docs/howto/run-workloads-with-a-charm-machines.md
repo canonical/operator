@@ -167,7 +167,7 @@ How you start, stop, and signal the workload depends on how the package runs it:
 
 - **systemd units** (most APT packages) — use {external+charmlibs:ref}`charmlibs-systemd <charmlibs-systemd>`, or call `systemctl` as a subprocess.
 - **snap services** — use `start`, `stop`, and `restart` methods of the {external+charmlibs:ref}`charmlibs-snap <charmlibs-snap>` library.
-- **A process you launch directly** — use `subprocess.run` to start the daemon. The charm process is short-lived, so the command you run should return immediately and have a daemonized process. Send signals with `os.kill` (such as `SIGTERM` to stop and `SIGUSR1` to reload config). Read the workload's man page for the signals it supports.
+- **A process you launch directly** — useful for prototyping. Use `subprocess.run` to start the daemon. The charm process is short-lived, so the command you run should return immediately and have a daemonized process. Send signals with `os.kill` (such as `SIGTERM` to stop and `SIGUSR1` to reload config). Read the workload's man page for the signals it supports. For production, prefer packaging the workload as a snap (or deb) so that the system supervises it.
 
 For example, signalling a directly-launched process to reload its config:
 
@@ -337,6 +337,41 @@ tox -e unit
 ```
 
 For more on state-transition testing — including `State.from_context`, reusing state across events, and accessing the charm instance — see {ref}`write-unit-tests-for-a-charm`.
+
+## Write functional tests
+
+Functional tests exercise the workload module against a real system — apt, snap, systemd, and the actual workload binary — but without going through Juju. They sit between unit tests (fast, fully mocked) and integration tests (slow, full Juju model), and catch problems that mocks can't: a package name typo, an apt repo that isn't enabled on the charm's base, a service that fails to start.
+
+Run them inside an LXD container or VM that matches the charm's base, so the side effects don't touch your host.
+
+```python
+# tests/functional/test_myworkload.py
+import subprocess
+
+from charm import myworkload
+
+
+def test_install_and_start():
+    assert not myworkload.is_installed()
+    myworkload.install()
+    assert myworkload.is_installed()
+    assert myworkload.get_version() == "1.11.1"
+
+    myworkload.start()
+    assert myworkload.is_running()
+
+    # The real systemd unit should be active.
+    result = subprocess.run(
+        ["/usr/bin/systemctl", "is-active", "tinyproxy"],
+        capture_output=True, text=True,
+    )
+    assert result.stdout.strip() == "active"
+
+    myworkload.stop()
+    assert not myworkload.is_running()
+```
+
+Functional tests are typically run in CI on a fresh runner per test file, or locally inside a throwaway LXD container. Because they don't pack or deploy the charm, they're much faster than full Juju integration tests, which makes them a good fit for iterating on the workload module.
 
 ## Write integration tests
 
