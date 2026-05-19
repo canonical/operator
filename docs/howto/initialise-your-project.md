@@ -58,7 +58,7 @@ The `charmcraft` version that you have installed may come with older versions of
 To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
 
 ```text
-uvx git+https://github.com/canonical/charmcraft@460e8df init --name <name> --profile <profile>
+uvx git+https://github.com/canonical/charmcraft@fae9862 init --name <name> --profile <profile>
 ```
 ````
 

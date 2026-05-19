@@ -147,6 +147,28 @@ By convention, integration tests are kept in the charm's source tree, in a direc
 
 If you initialised the charm with `charmcraft init`, your charm directory should already contain a  `tests/integration/test_charm.py` file. Otherwise, manually create this directory structure and a test file. You can call the test file anything you like, as long as the name starts with `test_`.
 
+(write-integration-tests-for-a-charm-split-across-modules)=
+### Split tests across modules
+
+As your suite grows, split your integration tests across several `test_*.py` modules, grouped by feature. Tests within a module share a single `juju` fixture (and therefore a single Juju model), so keep tests that need to build on each other together. Each module gets a fresh model, which makes modules independent of each other.
+
+A common split:
+
+- `test_charm.py` — smoke tests: pack, deploy, and check the charm reaches active status.
+- `test_<feature>.py` — for example, `test_backups.py`, `test_tls.py`, `test_upgrade.py`, `test_scaling.py`.
+
+There are two main benefits to splitting. Firstly, it makes it easier to investigate test failures when they are more isolated. Secondly, it's much simpler to have parallel test execution, where each module runs as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules.
+
+`tox -e integration` runs every module sequentially on a single machine. `charmcraft test` will automatically run each task separately on your local machine, and you can set up a CI matrix (see {ref}`set-up-ci-integration`) that has the same behaviour in CI. Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job — no workflow changes needed.
+
+For real-world examples of split tests, see:
+
+- [postgresql-operator](https://github.com/canonical/postgresql-operator/tree/main/tests/integration) — machine charm, split across many feature modules (backups, TLS, upgrades, HA, and so on).
+- [postgresql-k8s-operator](https://github.com/canonical/postgresql-k8s-operator/tree/main/tests/integration) — the Kubernetes equivalent.
+- [opensearch-operator](https://github.com/canonical/opensearch-operator/tree/main/tests/integration) — larger suite with per-cloud backup modules.
+
+For a minimal scaffold that you can use in your own charm, see the [httpbin-demo](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) example charm in the Ops repository.
+
 ### Deploy your charm
 
 Add this test in your integration test file:
