@@ -9,11 +9,29 @@ myst:
 
 Publishing your charm enables other people to deploy your charm with `juju deploy <charm-name>`. Anyone who knows your charm's name can also see the [Charmhub](https://charmhub.io/) page for your charm.
 
+## Review metadata and add an icon
+
 Before publishing your charm, review the `charmcraft.yaml` file to make sure you've provided appropriate metadata. The metadata controls what appears on the Charmhub page for your charm. See {external+charmcraft:ref}`Charmcraft | Configure package information <configure-package-information>`.
 
-```{note}
-If you want your charm to show a custom icon on Charmhub, check the Charmcraft documentation for the plugin or profile you are using. Modern charms in this repository typically use the `uv` plugin, while older charms may use `dump`, so `icon.svg` is not handled in exactly the same way in every case.
+To add icon to your charm, create a file called `icon.svg` in the same directory as `charmcraft.yaml`, then use the Dump plugin to include the icon. In `charmcraft.yaml`:
+
+```yaml
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+  extra-files:
+    plugin: dump
+    source: .
+    stage:
+      - icon.svg
 ```
+
+See {external+charmcraft:ref}`Charmcraft | Manage icons <manage-icons>`.
+
+If your charm uses the Charm plugin, you don't need to use the Dump plugin to include the icon. Charmcraft automatically includes `icon.svg`. However, you should avoid using the Charm plugin if possible. Instead, {external+charmcraft:ref}`migrate to the uv plugin <howto-migrate-to-uv>` or the {external+charmcraft:ref}`Poetry plugin <howto-migrate-to-poetry>`.
 
 ## Publish your charm
 
