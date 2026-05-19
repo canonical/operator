@@ -37,10 +37,7 @@ class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.container = self.unit.get_container('myapp')
-        self.myapp_root = pathops.ContainerPath(
-            '/etc/myapp',
-            container=self.container,
-        )
+        self.myapp_root = pathops.ContainerPath('/etc/myapp', container=self.container)
         # ...
 ```
 
