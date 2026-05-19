@@ -537,7 +537,7 @@ If the test fails with a timeout error, override the default timeout in `test_da
     juju.wait(jubilant.all_active, timeout=10 * 60)
 ```
 
-Then run `tox -e integration` again.
+Then run `tox -e integration` again. If the test still fails, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
 
 When the test is done, the output should show two passing tests:
 
