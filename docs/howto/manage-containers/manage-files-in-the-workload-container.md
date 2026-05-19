@@ -59,11 +59,13 @@ config = '...'
 (self.myapp_root / 'config.yaml').write_text(config)
 ```
 
-`pathops` also has a function {external+charmlibs:func}`ensure_contents <pathops.ensure_contents>` that ensures a file exists with the given contents:
+`pathops` also has a function {external+charmlibs:func}`ensure_contents <pathops.ensure_contents>` that ensures a file exists with the given contents, ownership, and permissions:
 
 ```python
 changed = pathops.ensure_contents(self.myapp_root / 'config.yaml', config)
 ```
+
+`ensure_contents` makes no changes if the conditions are already satisfied.
 
 ## Read a file
 
