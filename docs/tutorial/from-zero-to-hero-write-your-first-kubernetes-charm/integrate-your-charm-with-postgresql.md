@@ -343,7 +343,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 Next, deploy the `postgresql-k8s` charm:
