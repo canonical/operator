@@ -183,30 +183,54 @@ execution context.
 
 ## Live charm introspection
 
-The testing framework is a black-box, state-transition testing framework. It
-makes it trivial to assert that a status went from A to B, but not to assert
-that, in the context of this charm execution, with this state, a certain
-charm-internal method was called and returned a given piece of data, or would
-return this and that _if_ it had been called.
+A typical state-transition test calls [`Context.run`](ops.testing.Context.run)
+to produce the [`State`](ops.testing.State) after some event has been handled,
+and makes assertions about that state. However, sometimes we'd also like to make
+assertions about the Python charm object that handled the event.
 
-The `Context` object can be used as a context manager for this use case. Note
-that you can't call `manager.run()` multiple times: the object is a context
-that ensures that `ops.main` 'pauses' right before emitting the event to hand
-you some introspection hooks, but for the rest this is a regular test: you can't
-emit multiple events in a single charm execution.
+Using the `Context` object as a context manager (instead of calling `Context.run` directly)
+produces a [](ops.testing.Manager) object with access to the charm object instantiated for this event.
 
-This is a modified version of the example above. Before ``mgr.run()``, 
-no event is emitted, hence the ``unknown`` status.
+Let's rewrite `test_status_leader` to make additional assertions about the charm instance:
 
 ```python
+import pytest
+
+
+class MyCharm(ops.CharmBase):
+    msg = ''
+
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, _):
+        if self.unit.is_leader():
+            self.msg = 'I rule'
+        else:
+            self.msg = 'I am ruled'
+        self.unit.status = ops.ActiveStatus(self.msg)
+
+
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
     ctx = testing.Context(MyCharm, meta={'name': 'foo'})
     with ctx(ctx.on.start(), testing.State(leader=leader)) as mgr:
-        assert mgr.charm.unit.status == testing.UnknownStatus()
-        mgr.run()
-        assert mgr.charm.unit.status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
+        charm = mgr.charm
+        assert charm.msg == ''
+        assert charm.unit.status == testing.UnknownStatus()
+        state_out = mgr.run()
+    msg = 'I rule' if leader else 'I am ruled'
+    assert charm.msg == msg
+    assert charm.unit.status == testing.ActiveStatus(msg)
+    assert state_out.unit_status == charm.unit.status
 ```
+
+Before calling [](ops.testing.Manager.run), the charm object was initialised based on the context's state.
+The state didn't specify a status for the unit, so at this point it's `unknown`.
+The charm's `_on_start` method runs and sets the status when `mgr.run()` is called.
+
+Calling `mgr.run()` multiple times is an error, as the context manager represents a single event and charm instance.
 
 ## The virtual charm root
 
