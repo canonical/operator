@@ -17,29 +17,9 @@ Changes are proposed as [pull requests on GitHub](https://github.com/canonical/o
 - Work on a branch in your own fork.
 - Sequence your commits logically if possible. But don't worry too much -- we'll squash to `main` after review.
 - Don't force-push after review has started.
-- Follow conventional commit style for the PR title (not required for individual commits).
+- Follow [conventional commit style](https://www.conventionalcommits.org/en/) for the PR title (not required for individual commits).
 
-## Branch updates
-
-Before you ask for review, please rebase your branch onto `main` so that your changes will merge cleanly.
-
-If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
-
-## Pull request titles
-
-Pull requests should have a short title that follows the [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
-
-- chore
-- ci
-- docs
-- feat
-- fix
-- perf
-- refactor
-- revert
-- test
-
-Some examples:
+Examples of PR titles:
 
 - feat: add the ability to observe change-updated events
 - fix!: correct the type hinting for config data
@@ -47,6 +27,12 @@ Some examples:
 - ci: adjust the workflow that publishes ops-scenario
 
 We consider Ops too small a project to use scopes, so we don't use them.
+
+## Branch updates
+
+Before you ask for review, please rebase your branch onto `main` so that your changes will merge cleanly.
+
+If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
 
 # Tests
 
