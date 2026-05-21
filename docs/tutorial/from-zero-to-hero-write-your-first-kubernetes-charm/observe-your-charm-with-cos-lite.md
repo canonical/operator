@@ -470,7 +470,7 @@ Which means that `/names` has received 150 requests so far.
 
 ## Write integration tests
 
-Let's write some integration tests to check that our application works correctly with COS Lite:
+Let's write some integration tests to check that our application works correctly with COS Lite. The tests will:
 
 1. Deploy COS Lite in a separate Juju model.
 2. Integrate our application with Loki from the COS Lite model.
@@ -480,7 +480,7 @@ Let's write some integration tests to check that our application works correctly
 
 The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
 
-First, update the imports at the beginning of `tests/integration/test_charm.py`:
+First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest`, `pytest_jubilant`, and `requests`. Your imports should now look like this:
 
 ```python
 import json
@@ -494,8 +494,6 @@ import pytest_jubilant
 import requests
 import yaml
 ```
-
-We need `pytest` and `pytest_jubilant` for the new fixture. We'll use the other additions (`json`, `time`, and `requests`) when we write the tests.
 
 Next, still in `tests/integration/test_charm.py`, define the new fixture:
 
