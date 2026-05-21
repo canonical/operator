@@ -90,7 +90,7 @@ You should add the latest version of the [cosl package](https://pypi.org/project
 To update your charm's dependencies in `pyproject.toml`, run:
 
 ```text
-uv add 'cosl>=1.9.1'
+uv add 'cosl>=1.9.1,<2'
 ```
 
 ## Integrate with Prometheus
