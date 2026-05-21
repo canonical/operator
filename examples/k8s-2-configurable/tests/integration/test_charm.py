@@ -35,5 +35,5 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     resources = {
         "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
-    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)

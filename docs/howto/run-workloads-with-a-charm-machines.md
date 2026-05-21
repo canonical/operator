@@ -385,7 +385,7 @@ import jubilant
 
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    juju.deploy(charm.resolve(), app="myworkload")
+    juju.deploy(charm, app="myworkload")
     juju.wait(jubilant.all_active, timeout=600)
 
 

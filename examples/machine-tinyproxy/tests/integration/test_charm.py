@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
-    juju.deploy(charm.resolve(), app="tinyproxy")
+    juju.deploy(charm, app="tinyproxy")
     juju.wait(jubilant.all_active, timeout=600)
 
 
