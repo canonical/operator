@@ -167,7 +167,7 @@ In your virtual machine, go into your project directory and create the initial v
 
 ```text
 cd ~/tinyproxy
-uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile machine
+uvx git+https://github.com/canonical/charmcraft@74d12bc init --profile machine
 ```
 
 <!--
