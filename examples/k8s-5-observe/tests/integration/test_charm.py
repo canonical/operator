@@ -49,7 +49,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_blocked)
 
 
-def test_database_integration(juju: jubilant.Juju):
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
@@ -64,13 +64,13 @@ def cos(juju_factory: pytest_jubilant.JujuFactory):
     yield juju_factory.get_juju(suffix="cos")
 
 
-def test_deploy_cos(cos: jubilant.Juju):
+def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
-def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+def test_integrate_loki(charm: pathlib.Path, juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
@@ -78,7 +78,7 @@ def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
     cos.wait(jubilant.all_active)
 
 
-def test_loki_data(cos: jubilant.Juju):
+def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
     """Use Loki's HTTP API to verify that Loki has a label for our app.
 
     COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action

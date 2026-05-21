@@ -513,7 +513,7 @@ Then, let's add another test case to check the integration is successful. For th
 In your `tests/integration/test_charm.py` file add the following test case:
 
 ```python
-def test_database_integration(juju: jubilant.Juju):
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
@@ -523,23 +523,25 @@ def test_database_integration(juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-In your Multipass Ubuntu VM, run the test again:
+This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
+
+In your Multipass Ubuntu VM, run the tests again:
 
 ```text
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
 ```
 
-The test may take some time to run, depending on your computer and network.
+The tests may take some time to run, depending on your computer and network.
 
-If the test fails with a timeout error, override the default timeout in `test_database_integration`:
+If the tests fail with a timeout error, override the default timeout in `test_database_integration`:
 
 ```python
     juju.wait(jubilant.all_active, timeout=10 * 60)
 ```
 
-Then run `tox -e integration` again. If the test still fails, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
+Then run `tox -e integration` again. If the tests still fail, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
 
-When the test is done, the output should show two passing tests:
+When the tests are done, the output should show two passing tests:
 
 ```text
 tests/integration/test_charm.py::test_deploy

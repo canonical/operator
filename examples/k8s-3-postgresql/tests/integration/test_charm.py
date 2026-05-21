@@ -44,7 +44,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_blocked)
 
 
-def test_database_integration(juju: jubilant.Juju):
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
