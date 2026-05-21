@@ -398,12 +398,4 @@ Use a conventional commit type **for each commit**. For example, `chore(template
 
 Don't commit the `.charms` directory!
 
-### Updating the Ops docs and example charms
-
-After your Charmcraft PR has merged:
-
-1. Go to the [Charmcraft main branch](https://github.com/canonical/charmcraft/tree/main) and grab the hash of the latest commit that updates the profiles (which is probably the commit that came from your merged PR).
-
-2. In the Ops source, search for `uvx git+https://github.com/canonical/charmcraft@`, then update all instances to use the latest commit hash.
-
-3. Make sure that the Ops tutorials and example charms are consistent with your profile changes.
+After your PR has merged and Charmcraft has released to `latest/stable`, make sure that the Ops tutorials and example charms are consistent with your profile changes.
