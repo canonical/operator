@@ -291,5 +291,5 @@ disableBytesTypePromotions = true
 stubPath = ""
 
 [tool.codespell]
-skip = './docs/_build,.venv,venv,build,examples,uv.lock'
+skip = './docs/_build,./docs/_dev,.venv,venv,build,examples,uv.lock'
 quiet-level = 3
