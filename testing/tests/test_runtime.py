@@ -68,8 +68,8 @@ def test_event_emission():
             state=State(),
             event=_Event('bar'),
             context=ctx,
-        ) as manager:
-            manager.run()
+        ) as mgr:
+            mgr.run()
 
         assert my_charm_type._event  # type: ignore
         assert isinstance(
@@ -102,8 +102,8 @@ def test_unit_name(app_name: str, unit_id: int):
         state=State(),
         event=_Event('start'),
         context=ctx,
-    ) as manager:
-        assert manager.charm.unit.name == f'{app_name}/{unit_id}'
+    ) as mgr:
+        assert mgr.charm.unit.name == f'{app_name}/{unit_id}'
 
 
 def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
@@ -129,8 +129,8 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
             state=State(relations={rel}),
             event=_Event('box_relation_changed', relation=rel),
             context=ctx,
-        ) as manager:
-            assert manager._juju_context.remote_app_name == remote_name
+        ) as mgr:
+            assert mgr._juju_context.remote_app_name == remote_name
             assert 'JUJU_REMOTE_APP' in os.environ
             _ = 1 / 0  # raise some error
     # Ensure that some other error didn't occur (like AssertionError!).

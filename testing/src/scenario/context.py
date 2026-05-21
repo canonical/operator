@@ -67,9 +67,9 @@ class Manager(Generic[CharmType]):
     in a ``with`` statement instead, for example::
 
         ctx = Context(MyCharm)
-        with ctx(ctx.on.start(), State()) as manager:
-            manager.charm.setup()
-            manager.run()
+        with ctx(ctx.on.start(), State()) as mgr:
+            mgr.charm.setup()
+            mgr.run()
     """
 
     def __init__(
@@ -796,10 +796,10 @@ class Context(Generic[CharmType]):
         Usage::
 
             ctx = Context(MyCharm)
-            with ctx(ctx.on.start(), State()) as manager:
-                manager.charm._some_private_setup()
-                manager.run()  # this will fire the event
-                assert manager.charm._some_private_attribute == "bar"  # noqa
+            with ctx(ctx.on.start(), State()) as mgr:
+                mgr.charm._some_private_setup()
+                mgr.run()  # this will fire the event
+                assert mgr.charm._some_private_attribute == "bar"  # noqa
 
         Args:
             event: the event that the charm will respond to.
