@@ -11,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# The integration tests use the Jubilant library and the pytest-jubilant plugin.
+# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+#
+# pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
+# The `charm` fixture is defined in conftest.py.
 
 import logging
 import pathlib

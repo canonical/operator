@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
-# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
+# The integration tests use the Jubilant library and the pytest-jubilant plugin.
+# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+#
+# pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
+# The `charm` fixture is defined in conftest.py.
 
 import json
 import logging
