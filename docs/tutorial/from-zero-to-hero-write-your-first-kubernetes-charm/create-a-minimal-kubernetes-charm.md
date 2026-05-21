@@ -35,8 +35,7 @@ uvx git+https://github.com/canonical/charmcraft@74d12bc init --profile kubernete
 ```
 
 <!--
-  When charmcraft stable is up-to-date, comment out this info and switch to 'charmcraft init --profile kubernetes' above.
-  If needed again later, restore the info and switch to 'uvx git+https://github.com/canonical/charmcraft@<hash> init --profile kubernetes'.
+  When charmcraft stable is up-to-date, remove this info and switch to 'charmcraft init --profile kubernetes' above.
 -->
 The `uvx ...` command runs Charmcraft directly from GitHub. We recommend doing this because the installed version of Charmcraft may come with an older version of the profile used in the tutorial. You should use the installed version of Charmcraft for everything else (as we'll do later in the tutorial).
 

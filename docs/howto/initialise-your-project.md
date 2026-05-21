@@ -51,7 +51,7 @@ Or for a machine charm:
 charmcraft init --name mega-calendar --profile machine
 ```
 
-<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
+<!-- Remove this tip when the charmcraft stable version is up-to-date. -->
 ````{tip}
 The `charmcraft` version that you have installed may come with older versions of the profiles.
 
