@@ -185,12 +185,11 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 The documentation uses Canonical's [Sphinx Stack](https://github.com/canonical/sphinx-stack).
 
-We've customised the documentation build in a couple of ways:
+Sphinx Stack provides [`docs/conf.py`](./docs/conf.py), which we've customised with project metadata (as expected). We've also added config that goes beyond the provisions of Sphinx Stack. Search for `[BEYOND SPHINX STACK]` in `docs/conf.py`.
 
-- The `$(DOCS_VENVDIR)` target in [`docs/Makefile`](./docs/Makefile) uses uv to ensure that `ops-scenario` and `ops-tracing` are installed in the virtual environment.
-- [`docs/conf.py`](./docs/conf.py) is extended with autodoc configuration, fixes, and custom directives.
+Sphinx Stack provides [`docs/Makefile`](./docs/Makefile). We've replaced the stock `$(DOCS_VENVDIR)` target by a custom version that uses uv to ensure that `ops-scenario` and `ops-tracing` are installed in the virtual environment.
 
-To upgrade Sphinx Stack, see [Update the new Sphinx Stack](https://documentation.ubuntu.com/sphinx-stack/latest/how-to/update-sphinx-stack/new-sphinx-stack/).
+Keep these customisations in mind when upgrading Sphinx Stack. To upgrade Sphinx Stack, see [Update the new Sphinx Stack](https://documentation.ubuntu.com/sphinx-stack/latest/how-to/update-sphinx-stack/new-sphinx-stack/).
 
 # Dependencies
 

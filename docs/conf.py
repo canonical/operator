@@ -13,7 +13,7 @@ from sphinx import addnodes
 from sphinx.util.docutils import SphinxDirective
 
 
-# Check that the ops package is installed in the Sphinx venv.
+# [BEYOND SPHINX STACK] Check that the ops package is installed in the Sphinx venv.
 if importlib.util.find_spec("ops") is None:
     print(
         "Error: The ops package is not available. "
@@ -21,8 +21,9 @@ if importlib.util.find_spec("ops") is None:
     )
     sys.exit(1)
 
-# Make sure that sphinx.ext.autodoc can find our Python source files.
+# [BEYOND SPHINX STACK] Make sure that sphinx.ext.autodoc can find our Python source files.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
 
 # Configuration for the Sphinx documentation builder.
 # All configuration specific to your project should be done in this file.
@@ -324,6 +325,10 @@ intersphinx_mapping = {
     "pebble": ("https://documentation.ubuntu.com/pebble", None),
     "otel": ("https://opentelemetry-python.readthedocs.io/en/latest/", None),
 }
+
+
+# [BEYOND SPHINX STACK]
+# The following Ops-specific config goes beyond the provisions of Sphinx Stack.
 
 # -- Options for sphinx.ext.todo ---------------------------------------------
 
