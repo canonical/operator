@@ -161,6 +161,7 @@ def test_add(mycharm, app):
     secret = output.get_secret(label='mylabel')
     assert secret.latest_content == secret.tracked_content == {'foo': 'bar'}
     assert secret.label == 'mylabel'
+    assert secret.owner == ('app' if app else 'unit')
 
 
 def test_set_legacy_behaviour(mycharm):
