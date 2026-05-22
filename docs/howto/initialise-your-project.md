@@ -32,11 +32,7 @@ Create a repository with your source control of choice.
 ```{admonition} Best practice
 :class: hint
 
-Name the repository using the pattern ``<charm name>-operator`` for a single
-charm, or ``<base charm name>-operators`` when the repository will hold
-multiple related charms. For the charm name, see [](#decide-your-charms-name).
-
-The suffix `-operator` applies only to charms that manage workloads and operate a particular software. Do not use "-operator" suffix for workless charm (e.g. integrator charms) that do not manage any workload for avoiding suffix stacking and favoring a leaner naming, such as `data-integrator` instead of `data-integrator-operator`. 
+Name the repository using the pattern ``<charm name>-operator`` for a single charm managing a workload. Workloadless charms managing integration with another charm should use the suffix ``integrator`` instead. Charms managing configuration for another charm should use ``configurator``. Monorepos containing multiple related charms should instead use a plural suffix, like ``operators``. For the charm name, see [](#decide-your-charms-name).
 ```
 
 For example, name the repository `mega-calendar-k8s-operator` if your charm will be called `mega-calendar-k8s`.
