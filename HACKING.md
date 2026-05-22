@@ -365,32 +365,27 @@ Don't commit changes yet. Wait until you've tested the charms that `charmcraft i
 
 ### Testing the profiles
 
-At the Charmcraft root, create a directory `.charms` and a script `.charms/generate.py`:
+Create a directory ourside your Charmcraft clone, for example `~/generated-charms`, and a script `~/generated-charms/generate.sh`:
 
-```python
-import pathlib
-import shutil
-import subprocess
+```sh
+#!/usr/bin/env bash
+set -xueo pipefail
 
-INIT = ["uv", "run", "--python", "3.10", "--no-dev", "charmcraft", "init"]
-LOCK = ["uv", "lock", "--python", "3.10"]
-TOX = ["uvx", "--python", "3.10", "--with", "tox-uv", "tox"]
+charmcraft_dir="$1"
 
-
-def init_and_test(profile: str):
-    name = f"myapp-{profile}"
-    if pathlib.Path(name).exists():
-        shutil.rmtree(name)
-    subprocess.run([*INIT, "--profile", profile, "--project-dir", name], check=True)
-    subprocess.run(LOCK, cwd=name, check=True)
-    subprocess.run([*TOX, "-e", "lint,unit"], cwd=name, check=True)
-
-
-init_and_test("kubernetes")
-init_and_test("machine")
+for profile in kubernetes machine; do
+    project="myapp-${profile}"
+    rm -rf "${project}"
+    uv run --project "$charmcraft_dir" --no-dev \
+        charmcraft init --profile "${profile}" --project-dir "${project}"
+    pushd "${project}"
+    uv lock
+    uvx --python 3.10 --with tox-uv tox -e lint,unit
+    popd
+done
 ```
 
-In the `.charms` directory, run `uv run --script generate.py`.
+Then run `./generate.sh <dir>` where `<dir>` is the location of your Charmcraft clone.
 
 ### Opening a Charmcraft PR
 
