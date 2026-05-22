@@ -183,32 +183,14 @@ a bunch of charms that use the operator framework. The script can be run locally
 
 # Maintaining the documentation
 
-## How to Pull in Style Changes
+The documentation uses Canonical's [Sphinx Stack](https://github.com/canonical/sphinx-stack).
 
-The documentation uses Canonical styling which is customised on top of the [Furo Sphinx theme](https://github.com/pradyunsg/furo). The easiest way to pull in Canonical style changes is by using the Canonical documentation starter pack, see [docs](https://canonical-starter-pack.readthedocs-hosted.com/) and [repository](https://github.com/canonical/sphinx-docs-starter-pack).
+We've customised the documentation build in a couple of ways:
 
-TL;DR:
+- The `$(DOCS_VENVDIR)` target in [`docs/Makefile`](./docs/Makefile) uses uv to ensure that `ops-scenario` and `ops-tracing` are installed in the virtual environment.
+- [`docs/conf.py`](./docs/conf.py) is extended with autodoc configuration, fixes, and custom directives.
 
-- Clone the starter pack repository to a local directory: `git clone git@github.com:canonical/sphinx-docs-starter-pack`.
-- Copy the folder `.sphinx` under the starter pack repo to the operator repo `docs/.sphinx`.
-
-## How to Customise Configurations
-
-There are two configuration files: [`docs/conf.py`](./docs/conf.py) and [`docs/custom_conf.py`](./docs/custom_conf.py), copied and customised from the starter pack repo.
-
-To customise, change the file [`docs/custom_conf.py`](./docs/custom_conf.py) only, and theoretically, we should not change [`docs/conf.py`](./docs/conf.py) (however, some changes are made to [`docs/conf.py`](./docs/conf.py), such as adding autodoc, PATH, fixing issues, etc.)
-
-## How to Pull in Dependency Changes
-
-The Canonical documentation starter pack uses Make to build the documentation, which will run the script [`docs/.sphinx/build_requirements.py`](./docs/.sphinx/build_requirements.py) and generate a requirement file `requirements.txt` under `docs/.sphinx/`.
-
-To pull in new dependency changes from the starter pack, change to the starter pack repository directory, and build with the following command. This will create a virtual environment, generate a dependency file, install the software dependencies, and build the documentation:
-
-```bash
-make html
-```
-
-Then, compare the generated file `.sphinx/requirements.txt` and the `docs` declaration in the `dependency-groups` section of [`pyproject.toml`](./pyproject.toml) and adjust the `pyproject.toml` file accordingly.
+To upgrade Sphinx Stack, see [Update the new Sphinx Stack](https://documentation.ubuntu.com/sphinx-stack/latest/how-to/update-sphinx-stack/new-sphinx-stack/).
 
 # Dependencies
 
