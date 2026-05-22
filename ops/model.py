@@ -275,7 +275,7 @@ class Model:
         """
         return self.relations._get_unique(relation_name, relation_id)
 
-    def get_binding(self, binding_key: str | Relation) -> Binding | None:
+    def get_binding(self, binding_key: str | Relation) -> Binding:
         """Get a network space binding.
 
         Args:
@@ -544,7 +544,7 @@ def _calculate_expiry(
     if isinstance(expire, datetime.datetime):
         return expire
     elif isinstance(expire, datetime.timedelta):
-        return datetime.datetime.now() + expire
+        return datetime.datetime.now(tz=datetime.timezone.utc) + expire
     else:
         raise TypeError(
             'Expiration time must be a datetime or timedelta from now, '
@@ -1921,6 +1921,10 @@ class Relation:
                 # data.destination will be stored under the Juju relation key 'to'
                 relation.save(data, self.unit)
 
+        If a Pydantic model's ``model_dump`` method omits any field (e.g. if its
+        value is Pydantic's ``MISSING`` sentinel) the field will be erased from
+        the relation data.
+
         Args:
             obj: an object with attributes to save to the relation data, typically
                 a Pydantic ``BaseModel`` subclass or dataclass.
@@ -1967,7 +1971,11 @@ class Relation:
             values = {field: getattr(obj, field) for field in fields}
 
         # Encode each value, and then pass it over to Juju.
-        data = {field: encoder(values[attr]) for attr, field in sorted(fields.items())}
+        # Missing values are erased from the databag using empty string values.
+        data = {
+            field: encoder(values[attr]) if attr in values else ''
+            for attr, field in sorted(fields.items())
+        }
         self.data[dst].update(data)
 
 
@@ -3076,6 +3084,7 @@ class Container:
             type=ftype,
             size=info.st_size,
             permissions=stat.S_IMODE(info.st_mode),
+            # This is unused, but a required FileInfo field.
             last_modified=datetime.datetime.fromtimestamp(info.st_mtime),
             user_id=info.st_uid,
             user=pw_name,

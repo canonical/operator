@@ -19,13 +19,13 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
+import os
 import pathlib
 import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    List,
     Literal,
     Mapping,
     NoReturn,
@@ -47,6 +47,7 @@ from .framework import (
     Object,
     ObjectEvents,
 )
+from .jujuversion import JujuVersion
 
 if TYPE_CHECKING:
     from typing_extensions import Required
@@ -2025,7 +2026,7 @@ class StorageMeta:
     multiple_range: tuple[int, int | None] | None
     """Range of numeric qualifiers when multiple storage units are used."""
 
-    properties = List[str]
+    properties: list[str]
     """List of additional characteristics of the storage."""
 
     def __init__(self, name: str, raw: _StorageMetaDict):
@@ -2157,7 +2158,9 @@ class ActionMeta:
         self.description = raw.get('description', '')
         self.parameters = raw.get('params', {})  # {<parameter name>: <JSON Schema definition>}
         self.required = raw.get('required', [])  # [<parameter name>, ...]
-        self.additional_properties = raw.get('additionalProperties', True)
+        # The default in Juju 4 is False. The default in earlier Juju versions is True.
+        juju_version = JujuVersion(os.environ.get('JUJU_VERSION', '0.0.0'))
+        self.additional_properties = raw.get('additionalProperties', juju_version < '4.0.0')
 
 
 @dataclasses.dataclass(frozen=True)

@@ -565,7 +565,7 @@ class ExecError(Error, Generic[AnyStr]):
         self.stderr = stderr
 
     def __str__(self):
-        message = f'non-zero exit code {self.exit_code} executing {self.command!r}'
+        message = f'non-zero exit code {self.exit_code} executing {self.command[0]!r}'
 
         for name, out in [('stdout', self.stdout), ('stderr', self.stderr)]:
             if out is None:
@@ -2537,7 +2537,10 @@ class Client:
             span.set_attribute('checks', checks)
             body = {'action': action, 'checks': checks}
             resp = self._request('POST', '/v1/checks', body=body)
-            return resp['result']['changed']
+            # Pebble may return `changed: null` if nothing has been stopped or started.
+            # Remove this crutch when Jujus that include affected Pebble have reached EOL.
+            # https://github.com/canonical/pebble/issues/788
+            return resp['result']['changed'] or []
 
     def add_layer(self, label: str, layer: str | LayerDict | Layer, *, combine: bool = False):
         """Dynamically add a new layer onto the Pebble configuration layers.
@@ -2632,32 +2635,30 @@ class Client:
                 raise ProtocolError(f'invalid boundary {boundary!r}')
 
             parser = _FilesParser(boundary)
+            try:
+                while True:
+                    chunk = response.read(self._chunk_size)
+                    if not chunk:
+                        break
+                    parser.feed(chunk)
 
-            while True:
-                chunk = response.read(self._chunk_size)
-                if not chunk:
-                    break
-                parser.feed(chunk)
+                resp = parser.get_response()
+                if resp is None:
+                    raise ProtocolError('no "response" field in multipart body')
+                self._raise_on_path_error(resp, path)
 
-            resp = parser.get_response()
-            if resp is None:
-                raise ProtocolError('no "response" field in multipart body')
-            self._raise_on_path_error(resp, path)
+                filenames = parser.filenames()
+                if not filenames:
+                    raise ProtocolError('no file content in multipart response')
+                elif len(filenames) > 1:
+                    raise ProtocolError('single file request resulted in a multi-file response')
 
-            filenames = parser.filenames()
-            if not filenames:
-                raise ProtocolError('no file content in multipart response')
-            elif len(filenames) > 1:
-                raise ProtocolError('single file request resulted in a multi-file response')
-
-            filename = filenames[0]
-            if filename != path:
-                raise ProtocolError(f'path not expected: {filename!r}')
-
-            f = parser.get_file(path, encoding)
-
-            parser.remove_files()
-            return f
+                filename = filenames[0]
+                if filename != path:
+                    raise ProtocolError(f'path not expected: {filename!r}')
+                return parser.get_file(path, encoding)
+            finally:
+                parser.remove_files()
 
     @staticmethod
     def _raise_on_path_error(resp: _FilesResponse, path: str):

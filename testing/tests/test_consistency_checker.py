@@ -734,6 +734,7 @@ def test_cloudspec_consistency():
         ),
     )
 
+    # CloudSpec on k8s is inconsistent with Juju < 3.6.10.
     assert_inconsistent(
         State(model=Model(name='k8s-model', type='kubernetes', cloud_spec=cloud_spec)),
         _Event('start'),
@@ -741,6 +742,18 @@ def test_cloudspec_consistency():
             MyCharm,
             meta={'name': 'MyK8sCharm'},
         ),
+        juju_version='3.6.9',
+    )
+
+    # CloudSpec on k8s is consistent with Juju >= 3.6.10.
+    assert_consistent(
+        State(model=Model(name='k8s-model', type='kubernetes', cloud_spec=cloud_spec)),
+        _Event('start'),
+        _CharmSpec(
+            MyCharm,
+            meta={'name': 'MyK8sCharm'},
+        ),
+        juju_version='3.6.10',
     )
 
 
@@ -763,7 +776,11 @@ def test_storedstate_consistency():
         ),
     )
     assert_inconsistent(
-        State(stored_states={StoredState(owner_path=None, content={'secret': Secret({})})}),
+        State(
+            stored_states={
+                StoredState(owner_path=None, content={'secret': Secret({'key': 'value'})})
+            }
+        ),
         _Event('start'),
         _CharmSpec(
             MyCharm,

@@ -382,10 +382,31 @@ class Secret(_max_posargs(1)):
         return hash(self.id)
 
     def __post_init__(self):
+        self._validate_content(self.tracked_content, 'tracked_content')
+        if self.latest_content is not None:
+            self._validate_content(self.latest_content, 'latest_content')
         if self.latest_content is None:
             # bypass frozen dataclass
             object.__setattr__(self, 'latest_content', self.tracked_content)
         _deepcopy_mutable_fields(self)
+
+    @staticmethod
+    def _validate_content(content: dict[str, str], name: str):
+        if not isinstance(content, dict):
+            raise StateValidationError(
+                f'Secret.{name} should be a dict, not {type(content)}',
+            )
+        if not content:
+            raise StateValidationError(
+                f'Secret.{name} must not be empty; Juju requires at least one key',
+            )
+        bad = {
+            k: v for k, v in content.items() if not isinstance(k, str) or not isinstance(v, str)
+        }
+        if bad:
+            raise StateValidationError(
+                f'Secret.{name} should be dict[str, str]; found non-string key(s)/value(s): {bad}',
+            )
 
     def _set_label(self, label: str):
         # bypass frozen dataclass
@@ -957,20 +978,20 @@ class Notice(_max_posargs(1)):
         )
 
 
-@dataclasses.dataclass(frozen=True)
-class CheckInfo(_max_posargs(1)):
+@dataclasses.dataclass(frozen=True, init=False)
+class CheckInfo:
     """A health check for a Pebble workload container."""
 
     name: str
     """Name of the check."""
 
-    level: pebble.CheckLevel | None = None
+    level: pebble.CheckLevel | None
     """Level of the check."""
 
-    startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED
+    startup: pebble.CheckStartup
     """Startup mode of the check."""
 
-    status: pebble.CheckStatus = pebble.CheckStatus.UP
+    status: pebble.CheckStatus
     """Status of the check.
 
     :attr:`ops.pebble.CheckStatus.UP` means the check is healthy (the number of
@@ -980,36 +1001,56 @@ class CheckInfo(_max_posargs(1)):
     been stopped, so is not currently running.
     """
 
-    successes: int | None = 0
+    successes: int | None
     """Number of times this check has succeeded.
 
     Set this to None to simulate an older version of Pebble which doesn't have
     the ``successes`` field (introduced in Pebble v1.23.0).
     """
 
-    failures: int = 0
+    failures: int
     """Number of failures since the check last succeeded."""
 
-    threshold: int = 3
+    threshold: int
     """Failure threshold.
 
     This is how many consecutive failures for the check to be considered 'down'.
     """
 
-    change_id: pebble.ChangeID | None = None
+    change_id: pebble.ChangeID | None
     """The ID of the Pebble Change associated with this check.
 
     Passing ``None`` will automatically assign a new Change ID if the status is
     :attr:`ops.pebble.CheckStatus.UP` or :attr:`ops.pebble.CheckStatus.DOWN`.
     """
 
-    def __post_init__(self):
-        if self.change_id is None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        level: pebble.CheckLevel | str | None = None,
+        startup: pebble.CheckStartup = pebble.CheckStartup.ENABLED,
+        status: pebble.CheckStatus = pebble.CheckStatus.UP,
+        successes: int | None = 0,
+        failures: int = 0,
+        threshold: int = 3,
+        change_id: pebble.ChangeID | None = None,
+    ):
+        object.__setattr__(self, 'name', name)
+        if level is not None:
+            level = pebble.CheckLevel(level)
+        object.__setattr__(self, 'level', level)
+        object.__setattr__(self, 'startup', startup)
+        object.__setattr__(self, 'status', status)
+        object.__setattr__(self, 'successes', successes)
+        object.__setattr__(self, 'failures', failures)
+        object.__setattr__(self, 'threshold', threshold)
+        if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
                 change_id = ''
             else:
                 change_id = pebble.ChangeID(_generate_new_change_id())
-            object.__setattr__(self, 'change_id', change_id)
+        object.__setattr__(self, 'change_id', change_id)
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -1122,9 +1163,10 @@ class Container(_max_posargs(1)):
         for layer in self.layers.values():
             for name, service in layer.services.items():
                 if name in services and service.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     services[name]._merge(service)
                 else:
-                    services[name] = service
+                    services[name] = copy.deepcopy(service)
         return services
 
     def _render_checks(self) -> dict[str, pebble.Check]:
@@ -1132,9 +1174,10 @@ class Container(_max_posargs(1)):
         for layer in self.layers.values():
             for name, check in layer.checks.items():
                 if name in checks and check.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     checks[name]._merge(check)
                 else:
-                    checks[name] = check
+                    checks[name] = copy.deepcopy(check)
         return checks
 
     def _render_log_targets(self) -> dict[str, pebble.LogTarget]:
@@ -1142,9 +1185,10 @@ class Container(_max_posargs(1)):
         for layer in self.layers.values():
             for name, log_target in layer.log_targets.items():
                 if name in log_targets and log_target.override == 'merge':
+                    # Safe: _merge only mutates the target (already a copy), not the source.
                     log_targets[name]._merge(log_target)
                 else:
-                    log_targets[name] = log_target
+                    log_targets[name] = copy.deepcopy(log_target)
         return log_targets
 
     @property

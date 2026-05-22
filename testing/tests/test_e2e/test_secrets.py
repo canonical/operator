@@ -161,6 +161,7 @@ def test_add(mycharm, app):
     secret = output.get_secret(label='mylabel')
     assert secret.latest_content == secret.tracked_content == {'foo': 'bar'}
     assert secret.label == 'mylabel'
+    assert secret.owner == ('app' if app else 'unit')
 
 
 def test_set_legacy_behaviour(mycharm):
@@ -589,3 +590,33 @@ def test_default_values():
     assert secret.rotate is None
     assert secret.expire is None
     assert secret.remote_grants == {}
+
+
+@pytest.mark.parametrize('owner', ('app', 'unit'))
+def test_secret_get_content_returns_copy(owner: str):
+    """Mutating the dict returned by get_content() must not affect subsequent calls."""
+    ctx = Context(CharmBase, meta={'name': 'local'})
+    secret = Secret(
+        tracked_content={'a': 'b'},
+        latest_content={'a': 'c'},
+        owner=owner,
+    )
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        charm = mgr.charm
+        secret_obj = charm.model.get_secret(id=secret.id)
+
+    # Mutate tracked content returned by get_content().
+    content = secret_obj.get_content()
+    assert content == {'a': 'b'}
+    content['a'] = 'MUTATED'
+    content['extra'] = 'INJECTED'
+
+    # A subsequent call must return the original data, unaffected.
+    assert secret_obj.get_content() == {'a': 'b'}
+
+    # Same check for refresh (latest_content path).
+    refreshed = secret_obj.get_content(refresh=True)
+    assert refreshed == {'a': 'c'}
+    refreshed['a'] = 'MUTATED'
+
+    assert secret_obj.get_content() == {'a': 'c'}

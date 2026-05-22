@@ -9,6 +9,7 @@ to interact with the Juju controller and the Pebble service manager.
 
 from __future__ import annotations
 
+import copy
 import datetime
 import io
 import shutil
@@ -253,6 +254,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
     def relation_get(self, relation_id: int, member_name: str, is_app: bool):
         self._check_app_data_access(is_app)
+        data = self._relation_get(relation_id, member_name=member_name, is_app=is_app)
+        return data.copy()
+
+    def _relation_get(self, relation_id: int, member_name: str, is_app: bool):
         relation = self._get_relation_by_id(relation_id)
         if is_app and member_name == self.app_name:
             return relation.local_app_data
@@ -405,7 +410,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         else:
             tgt = relation.local_unit_data
         for key, value in data.items():
-            tgt[key] = value
+            if value == '':
+                # Match the behavior of Juju, which is that setting the value to an
+                # empty string will remove the key entirely from the relation data.
+                tgt.pop(key, None)
+            else:
+                tgt[key] = value
 
     def secret_add(
         self,
@@ -415,7 +425,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         description: str | None = None,
         expire: datetime.datetime | None = None,
         rotate: SecretRotate | None = None,
-        owner: Literal['unit', 'app'] | None = None,
+        owner: Literal['unit', 'application'] | None = None,
     ) -> str:
         from .state import Secret
 
@@ -425,7 +435,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             description=description,
             expire=expire,
             rotate=rotate,
-            owner=owner,
+            # It's called 'application' in Ops, but 'app' in Scenario.
+            owner='app' if owner == 'application' else owner,
         )
         secrets = set(self._state.secrets)
         secrets.add(secret)
@@ -472,9 +483,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             if refresh:
                 secret._track_latest_revision()
             assert secret.latest_content is not None
-            return secret.latest_content
+            return secret.latest_content.copy()
 
-        return secret.tracked_content
+        return secret.tracked_content.copy()
 
     def secret_info_get(
         self,
@@ -640,7 +651,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-get',
             )
-        return action.params
+        return copy.deepcopy(action.params)
 
     def storage_add(self, name: str, count: int = 1):
         if not isinstance(count, int) or isinstance(count, bool):
@@ -768,6 +779,14 @@ class _MockPebbleClient(_TestingPebbleClient):
 
         # wipe just in case
         if container_root.exists():
+            if any(container_root.iterdir()):
+                logger.warning(
+                    'Container %r has a non-empty filesystem that will be wiped before this run.'
+                    ' If you are trying to mock filesystem contents, use Mounts instead.'
+                    ' If you are reusing a Context instance across multiple ctx.run() calls,'
+                    ' note that the filesystem is cleared between runs.',
+                    container_name,
+                )
             # Path.rmdir will fail if root is nonempty
             shutil.rmtree(container_root)
 

@@ -108,6 +108,35 @@ def test_action_event_outputs(mycharm, res_value):
     assert ctx.action_logs == ['log1', 'log2']
 
 
+def test_action_event_fail(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        ctx.run(ctx.on.action('foo'), State())
+    assert exc_info.value.message == 'action failed!'
+
+
+def test_action_event_fail_context_manager(mycharm):
+    def handle_evt(_: CharmBase, evt: ActionEvent):
+        if not isinstance(evt, ActionEvent):
+            return
+        evt.fail('action failed!')
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(mycharm, meta={'name': 'foo'}, actions={'foo': {}})
+    with pytest.raises(ActionFailed) as exc_info:
+        with ctx(ctx.on.action('foo'), State()):
+            assert False, 'ActionFailed should be raised in the context manager.'
+    assert exc_info.value.message == 'action failed!'
+
+
 def test_action_continues_after_fail():
     class MyCharm(CharmBase):
         def __init__(self, framework):
@@ -202,3 +231,41 @@ def test_default_arguments():
     assert action.name == name
     assert action.params == {}
     assert action.id == expected_id
+
+
+def test_action_get_returns_copy(mycharm):
+    """Mutating the dict returned by action_get() must not affect subsequent calls.
+
+    ActionEvent.params is populated via the backend's action_get() method.
+    Each call to action_get() should return an independent copy so that
+    mutations do not leak into the Scenario state.
+    """
+    results = []
+
+    def handle_evt(_: CharmBase, evt):
+        if not isinstance(evt, ActionEvent):
+            return
+        backend = evt.framework.model._backend
+        first = backend.action_get()
+        first['bar'] = 'MUTATED'
+        first['extra'] = 'INJECTED'
+        second = backend.action_get()
+        results.append((first, second))
+
+    mycharm._evt_handler = handle_evt
+
+    ctx = Context(
+        mycharm,
+        meta={'name': 'foo'},
+        actions={'foo': {'params': {'bar': {'type': 'number'}}}},
+    )
+    ctx.run(ctx.on.action('foo', params={'bar': 10}), State())
+
+    assert len(results) == 1
+    mutated, fresh = results[0]
+    # The mutated copy should have our changes.
+    assert mutated['bar'] == 'MUTATED'
+    assert mutated['extra'] == 'INJECTED'
+    # The fresh copy must reflect the original params, unaffected.
+    assert fresh == {'bar': 10}
+    assert 'extra' not in fresh

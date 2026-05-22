@@ -53,7 +53,7 @@ from ._private.harness import (
     YAMLStringOrFile,
 )
 from .charm import CharmBase, CharmMeta, RelationRole
-from .model import Container, RelationNotFoundError
+from .model import RelationNotFoundError
 from .pebble import ExecProcess
 
 # The Harness unit testing framework.
@@ -75,8 +75,15 @@ __all__ = [
 try:
     _version = importlib.metadata.version('ops-scenario')
 except importlib.metadata.PackageNotFoundError:
-    pass
+    from .model import Container
 else:
+    # ops-scenario 7.x is the first version bundled with ops 2.x; older
+    # versions don't re-export these names, so Container falls back to
+    # .model. The check is split into two separate `if` blocks (rather
+    # than if/else) so the `>= 7` line below stays identical to main,
+    # minimizing merge conflicts on future cherry-picks.
+    if not (_version and int(_version.split('.', 1)[0]) >= 7):
+        from .model import Container
     if _version and int(_version.split('.', 1)[0]) >= 7:
         from scenario import (
             ActiveStatus,

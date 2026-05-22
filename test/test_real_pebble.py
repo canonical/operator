@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import tempfile
 import threading
@@ -347,6 +348,22 @@ class TestRealPebble:
         client.remove_identities({'web', 'alice'})
         identities = client.get_identities()
         assert len(identities) == 0
+
+    def test_temp_files_cleaned_up_on_failed_pull(
+        self,
+        tmp_path: pathlib.Path,
+        client: pebble.Client,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        client.push(f'{tmp_path}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
+        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        # Patch get_response to force a ProtocolError exception.
+        monkeypatch.setattr(pebble._FilesParser, 'get_response', lambda self: None)  # type: ignore
+        # Use our previously created temp dir so we can verify that it gets cleaned up.
+        monkeypatch.setattr(tempfile, 'NamedTemporaryFile', lambda *args, **kwargs: tf)  # type: ignore
+        with pytest.raises(pebble.ProtocolError):
+            client.pull(f'{tmp_path}/test')
+        assert not pathlib.Path(tf.name).exists()
 
 
 @pytest.mark.skipif(

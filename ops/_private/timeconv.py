@@ -20,7 +20,7 @@ import datetime
 import re
 
 # Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
-_TIMESTAMP_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
+_TIMESTAMP_RE = re.compile(r'(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(\.\d+)?(.*)')
 
 # Matches [-+]HH:MM
 _TIMEOFFSET_RE = re.compile(r'([-+])(\d{2}):(\d{2})')
@@ -38,6 +38,9 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     Unfortunately we can't use datetime.fromisoformat(), as that does not
     support more than 6 digits for the fractional second, nor the 'Z' for UTC,
     in Python 3.8 (Python 3.11+ has the required functionality).
+
+    We also handle timestamps produced by Juju's FormatTime method, which is
+    RFC3339 but using a space rather than 'T' to separate the date and time.
     """
     match = _TIMESTAMP_RE.match(s)
     if not match:
