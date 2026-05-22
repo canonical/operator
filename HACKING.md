@@ -365,7 +365,7 @@ Don't commit changes yet. Wait until you've tested the charms that `charmcraft i
 
 ### Testing the profiles
 
-Create a directory ourside your Charmcraft clone, for example `~/generated-charms`, and a script `~/generated-charms/generate.sh`:
+Create a directory outside your Charmcraft clone, for example `~/generated-charms`, and a script `~/generated-charms/generate.sh`:
 
 ```sh
 #!/usr/bin/env bash
