@@ -384,6 +384,7 @@ import pathlib
 import jubilant
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy(charm, app="myworkload")
     juju.wait(jubilant.all_active, timeout=600)

@@ -30,6 +30,7 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
 
@@ -44,6 +45,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_blocked)
 
 
+@pytest.mark.juju_setup
 def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 

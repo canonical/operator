@@ -431,6 +431,7 @@ METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
     resources = {
@@ -468,6 +469,8 @@ The result should be similar to the following output:
 ```{tip}
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
+
+The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs.
 
 ### Run tests with `charmcraft test`
 

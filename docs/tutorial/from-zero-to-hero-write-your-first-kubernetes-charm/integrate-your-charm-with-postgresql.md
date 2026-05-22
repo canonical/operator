@@ -494,6 +494,7 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
 
@@ -513,6 +514,7 @@ Then, let's add another test case to check the integration is successful. For th
 In your `tests/integration/test_charm.py` file add the following test case:
 
 ```python
+@pytest.mark.juju_setup
 def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
