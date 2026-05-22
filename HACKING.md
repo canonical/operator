@@ -391,6 +391,4 @@ Then run `./generate.sh <dir>` where `<dir>` is the location of your Charmcraft 
 
 Use a conventional commit type **for each commit**. For example, `chore(templates):`.
 
-Don't commit the `.charms` directory!
-
 After your PR has merged and Charmcraft has released to `latest/stable`, make sure that the Ops tutorials and example charms are consistent with your profile changes.
