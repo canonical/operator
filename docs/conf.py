@@ -312,6 +312,19 @@ html_js_files = [
 #     :class: vale-ignore
 # """
 
+# Configuration for Intersphinx projects
+#
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "jubilant": ("https://documentation.ubuntu.com/jubilant", None),
+    "juju": ("https://documentation.ubuntu.com/juju/3.6", None),
+    "charmcraft": ("https://documentation.ubuntu.com/charmcraft/latest", None),
+    "charmlibs": ("https://documentation.ubuntu.com/charmlibs/", None),
+    "multipass": ("https://documentation.ubuntu.com/multipass/latest", None),
+    "pebble": ("https://documentation.ubuntu.com/pebble", None),
+    "otel": ("https://opentelemetry-python.readthedocs.io/en/latest/", None),
+}
+
 # -- Options for sphinx.ext.todo ---------------------------------------------
 
 #  If this is True, todo and todolist produce output, else they
@@ -351,21 +364,6 @@ autodoc_default_options = {
 
 # This value stacks args vertically if a signature is too long.
 maximum_signature_line_length = 80
-
-# -- Options for sphinx.ext.intersphinx --------------------------------------
-
-# This config value contains the locations and names of other projects
-# that should be linked to in this documentation.
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "jubilant": ("https://documentation.ubuntu.com/jubilant", None),
-    "juju": ("https://documentation.ubuntu.com/juju/3.6", None),
-    "charmcraft": ("https://documentation.ubuntu.com/charmcraft/latest", None),
-    "charmlibs": ("https://documentation.ubuntu.com/charmlibs/", None),
-    "multipass": ("https://documentation.ubuntu.com/multipass/latest", None),
-    "pebble": ("https://documentation.ubuntu.com/pebble", None),
-    "otel": ("https://opentelemetry-python.readthedocs.io/en/latest/", None),
-}
 
 # -- General configuration ---------------------------------------------------
 
