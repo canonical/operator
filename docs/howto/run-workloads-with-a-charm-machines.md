@@ -382,6 +382,7 @@ Integration tests deploy the packed charm to a real Juju model and check that th
 import pathlib
 
 import jubilant
+import pytest
 
 
 @pytest.mark.juju_setup

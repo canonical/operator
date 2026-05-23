@@ -245,6 +245,7 @@ In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convent
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 

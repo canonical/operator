@@ -22,6 +22,7 @@ import logging
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
