@@ -2276,18 +2276,23 @@ class TestHarness:
 
         assert harness._get_backend_calls() == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_remote_app_name', 0),
+            ('relation_list', rel_id, 'db'),
+            ('relation_remote_app_name', 0, 'db'),
         ]
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
-            ('relation_get', 0, 'test-charm/0', False),
+            ('relation_get', 0, 'test-charm/0', False, 'db'),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': test_charm_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
 
@@ -2300,21 +2305,31 @@ class TestHarness:
 
         assert harness._get_backend_calls(reset=False) == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_get', 0, 'postgresql/0', False),
+            ('relation_list', rel_id, 'db'),
+            ('relation_get', 0, 'postgresql/0', False, 'db'),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': pgql_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_get', 0, 'postgresql/0', False),
+            ('relation_list', rel_id, 'db'),
+            ('relation_get', 0, 'postgresql/0', False, 'db'),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': pgql_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
         # And the calls are gone
