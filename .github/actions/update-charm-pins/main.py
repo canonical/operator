@@ -26,8 +26,12 @@ def update_charm_pins(workflow):
     with open(workflow) as file:
         doc = yaml.load(file)
 
-    # Assume the workflow has a single job or the first job is parameterized with charm repos
-    job_name = next(iter(doc['jobs']))
+    # Find the job parameterized with charm repos (skips helper jobs like build-wheels).
+    job_name = next(
+        name
+        for name, job in doc['jobs'].items()
+        if 'charm-repo' in (job.get('strategy', {}).get('matrix', {}).get('include', [{}])[0])
+    )
 
     for idx, item in enumerate(doc['jobs'][job_name]['strategy']['matrix']['include']):
         charm_repo = item['charm-repo']
