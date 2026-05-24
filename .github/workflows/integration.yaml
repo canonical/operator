@@ -3,7 +3,7 @@ name: ops Integration Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: '42 7 25 * *'
+    - cron: '41 7 25 * *'
 
 permissions: {}
 
