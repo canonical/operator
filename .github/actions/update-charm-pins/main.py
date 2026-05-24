@@ -26,7 +26,7 @@ def update_charm_pins(workflow):
     with open(workflow) as file:
         doc = yaml.load(file)
 
-    # Find the job parameterized with charm repos (skips helper jobs like build-wheels).
+    # Find the job parameterised with charm repos (skips helper jobs like build-wheels).
     job_name = next(
         name
         for name, job in doc['jobs'].items()
