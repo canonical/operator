@@ -179,7 +179,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 ```{tip}
@@ -204,7 +204,7 @@ Now, let's validate that the app is actually running and reachable on the new po
 curl 10.1.157.74:5000/version
 ```
 
-You should see JSON string with the version of the application: `{"version":"1.0.3"}`
+You should see JSON string with the version of the application: `{"version":"1.0.4"}`
 
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
 

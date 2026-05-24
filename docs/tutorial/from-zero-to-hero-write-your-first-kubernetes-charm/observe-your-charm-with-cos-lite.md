@@ -85,12 +85,12 @@ If you open `lib/charms/grafana_k8s/v0/grafana_dashboard.py` and the other libra
 - `loki_push_api.py` specifies `PYDEPS = ["cosl"]`
 - `prometheus_scrape.py` specifies `PYDEPS = ["cosl>=0.0.53"]`
 
-This means that you need to add `cosl>=1.9.1` to your charm's dependencies.
+You should add the latest version of the [cosl package](https://pypi.org/project/cosl/) to your charm's dependencies.
 
 To update your charm's dependencies in `pyproject.toml`, run:
 
 ```text
-uv add 'cosl>=1.9.1'
+uv add 'cosl>=1.9.1,<2'
 ```
 
 ## Integrate with Prometheus
@@ -231,7 +231,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
@@ -467,6 +467,112 @@ The search result should look like:
 ![Application metrics in Prometheus](../../resources/k8s-tutorial-observe-metrics.png)
 
 Which means that `/names` has received 150 requests so far.
+
+## Write integration tests
+
+Let's write some integration tests to check that our application works correctly with COS Lite. The tests will:
+
+1. Deploy COS Lite in a separate Juju model.
+2. Integrate our application with Loki from the COS Lite model.
+3. Ask Loki for logs related to our application.
+
+### Create a model for COS Lite
+
+The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
+
+First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest`, `pytest_jubilant`, and `requests`. Your imports should now look like this:
+
+```python
+import json
+import logging
+import pathlib
+import time
+
+import jubilant
+import pytest
+import pytest_jubilant
+import requests
+import yaml
+```
+
+Next, still in `tests/integration/test_charm.py`, define the new fixture:
+
+```python
+@pytest.fixture(scope="module")
+def cos(juju_factory: pytest_jubilant.JujuFactory):
+    yield juju_factory.get_juju(suffix="cos")
+```
+
+`get_juju` creates a model called `jubilant-<randomhex>-cos`.
+
+We're now ready to write the tests.
+
+### Deploy COS Lite and integrate with Loki
+
+Add two test functions to `tests/integration/test_charm.py`:
+
+```python
+def test_deploy_cos(cos: jubilant.Juju):
+    """Deploy COS Lite in a separate model."""
+    cos.deploy("cos-lite", trust=True)
+    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
+
+
+def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+    """Integrate our app with Loki from COS Lite."""
+    cos.offer("loki", endpoint="logging")
+    juju.integrate(APP_NAME, f"{cos.model}.loki")
+    juju.wait(jubilant.all_active)
+    cos.wait(jubilant.all_active)
+```
+
+### Request logs from Loki
+
+Add a test function to `tests/integration/test_charm.py`:
+
+```python
+def test_loki_data(cos: jubilant.Juju):
+    """Use Loki's HTTP API to verify that Loki has a label for our app.
+
+    COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
+    that tells us the base URL of Loki's API.
+    """
+    task = cos.run("traefik/0", "show-proxied-endpoints")
+    results = json.loads(task.results["proxied-endpoints"])
+    loki_url = results["loki/0"]["url"]
+    loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
+    juju_applications = _get_loki_logs(loki_api_url)
+    assert juju_applications is not None, "No logs available from Loki"
+    assert APP_NAME in juju_applications
+
+
+def _get_loki_logs(loki_api_url: str) -> list[str] | None:
+    """Wait for logs to be available from Loki and return them."""
+    for attempt in range(60):
+        if attempt:  # If not the first attempt, wait before retrying.
+            time.sleep(1)
+        response = requests.get(loki_api_url)
+        if response.status_code == 200:
+            response_decoded = response.json()
+            if "data" in response_decoded:
+                return response_decoded["data"]
+    return None
+```
+
+For more information, see:
+
+- [Traefik actions](https://charmhub.io/traefik-k8s/actions)
+- [Loki HTTP API](https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-label-values)
+
+### Run the tests
+
+Run the following command from anywhere in the `~/fastapi-demo` directory:
+
+```text
+tox -e integration
+```
+
+The tests take 10-15 minutes to run, depending on your computer and network.
 
 ## Review the final code
 

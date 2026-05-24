@@ -117,9 +117,9 @@ assert mgr.output....
 
 # Scenario 7.x
 ctx = Context(MyCharm)
-with ctx(ctx.on.start(), State()) as manager:
-    manager.charm.prepare()
-    out = manager.run()
+with ctx(ctx.on.start(), State()) as mgr:
+    mgr.charm.prepare()
+    out = mgr.run()
     assert out...
 ```
 
