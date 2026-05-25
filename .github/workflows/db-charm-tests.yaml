@@ -57,9 +57,15 @@ jobs:
             # The charm may declare ops with the 'tracing' extra, which pulls in
             # ops-tracing from PyPI. Replacing ops with a local wheel drops the
             # extra, so install the matching ops-tracing wheel explicitly when
-            # the charm asked for it.
-            poetry remove ops --lock
+            # the charm asked for it. Check before `poetry remove`, which
+            # strips the ops line from pyproject.toml.
             if grep -qE 'ops[^a-z]+=.*tracing|ops\[[^]]*tracing' pyproject.toml; then
+              wants_tracing=1
+            else
+              wants_tracing=0
+            fi
+            poetry remove ops --lock
+            if [ "${wants_tracing}" = "1" ]; then
               poetry add "${ops_wheel}" "${ops_tracing_wheel}" --lock
             else
               poetry add "${ops_wheel}" --lock
