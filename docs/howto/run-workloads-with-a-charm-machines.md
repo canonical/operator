@@ -70,6 +70,7 @@ For more guidance, see {ref}`design-your-python-modules`.
 
 Prefer purpose-built Python libraries over subprocess calls to `apt-get` or `snap`. Libraries give you typed errors, idempotent operations, and avoid the pitfalls of parsing CLI output.
 
+(run-workloads-with-a-charm-machines-apt-packages)=
 ### APT packages
 
 Use {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`. Add it to `pyproject.toml`:
@@ -136,6 +137,7 @@ def stop() -> None:
     snap.SnapCache()["my-workload"].stop(disable=True)
 ```
 
+(run-workloads-with-a-charm-machines-when-theres-no-library)=
 ### When there's no library
 
 If no library is available for installing the workload, use `subprocess` to run commands that install and start the workload. Keep these calls isolated in the workload module.
