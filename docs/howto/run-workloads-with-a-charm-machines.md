@@ -145,10 +145,7 @@ If no library is available for installing the workload, use `subprocess` to run 
 ```{admonition} Best practice
 :class: hint
 
-When running subprocesses:
-- Use absolute paths to avoid PATH-based attacks. For example, `/usr/bin/apt` rather than `apt`.
-- Pass arguments as a list, not a shell string, so the shell doesn't interpret them.
-- Use `check=True` so that failures raise. Generally you will want to catch that exception, then log the return code and possibly `stderr`. Use `capture_output=True` so that output from the command doesn't leak into the Juju log.
+When running subprocesses, use absolute paths (for example, `/usr/bin/apt` rather than `apt`) to avoid PATH-based attacks, and pass arguments as a list rather than a shell string so that the shell doesn't interpret them. Use `check=True` so that failures raise — generally you'll want to catch that exception and log the return code and possibly `stderr` — and `capture_output=True` so that output from the command doesn't leak into the Juju log.
 ```
 
 ### Uninstall with care on shared machines
