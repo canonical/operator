@@ -471,7 +471,7 @@ The result should be similar to the following output:
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
 
-The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs.
+The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
 
 ### Run tests with `charmcraft test`
 
