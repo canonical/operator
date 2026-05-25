@@ -70,6 +70,7 @@ For more guidance, see {ref}`design-your-python-modules`.
 
 Prefer purpose-built Python libraries over subprocess calls to `apt-get` or `snap`. Libraries give you typed errors, idempotent operations, and avoid the pitfalls of parsing CLI output.
 
+(run-workloads-with-a-charm-machines-apt-packages)=
 ### APT packages
 
 Use {external+charmlibs:ref}`charmlibs-apt <charmlibs-apt>`. Add it to `pyproject.toml`:
@@ -136,6 +137,7 @@ def stop() -> None:
     snap.SnapCache()["my-workload"].stop(disable=True)
 ```
 
+(run-workloads-with-a-charm-machines-when-theres-no-library)=
 ### When there's no library
 
 If no library is available for installing the workload, use `subprocess` to run commands that install and start the workload. Keep these calls isolated in the workload module.
@@ -143,10 +145,7 @@ If no library is available for installing the workload, use `subprocess` to run 
 ```{admonition} Best practice
 :class: hint
 
-When running subprocesses:
-- Use absolute paths to avoid PATH-based attacks. For example, `/usr/bin/apt` rather than `apt`.
-- Pass arguments as a list, not a shell string, so the shell doesn't interpret them.
-- Use `check=True` so that failures raise. Generally you will want to catch that exception, then log the return code and possibly `stderr`. Use `capture_output=True` so that output from the command doesn't leak into the Juju log.
+When running subprocesses, use absolute paths (for example, `/usr/bin/apt` rather than `apt`) to avoid PATH-based attacks, and pass arguments as a list rather than a shell string so that the shell doesn't interpret them. Use `check=True` so that failures raise — generally you'll want to catch that exception and log the return code and possibly `stderr` — and `capture_output=True` so that output from the command doesn't leak into the Juju log.
 ```
 
 ### Uninstall with care on shared machines
