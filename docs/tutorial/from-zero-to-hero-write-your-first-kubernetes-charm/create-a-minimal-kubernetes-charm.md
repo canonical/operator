@@ -81,7 +81,7 @@ resources:
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.3
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 ### Define the charm class
@@ -229,7 +229,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.3
+     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 
@@ -270,7 +270,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.3"}
+{"version":"1.0.4"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!

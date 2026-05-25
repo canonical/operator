@@ -28,38 +28,38 @@ def ctx() -> Context[Charm]:
 
 
 def test_manager(ctx: Context[Charm]):
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        assert isinstance(manager.charm, Charm)
-        state_out = manager.run()
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        assert isinstance(mgr.charm, Charm)
+        state_out = mgr.run()
 
     assert isinstance(state_out, State)
 
 
 def test_manager_implicit(ctx: Context[Charm]):
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        assert isinstance(manager.charm, Charm)
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        assert isinstance(mgr.charm, Charm)
         # do not call .run()
 
     # run is called automatically
-    assert manager._emitted
+    assert mgr._emitted
 
 
 def test_manager_reemit_fails(ctx: Context[Charm]):
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        manager.run()
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        mgr.run()
         with pytest.raises(AlreadyEmittedError):
-            manager.run()
+            mgr.run()
 
 
 def test_context_manager(ctx: Context[Charm]):
-    with ctx(ctx.on.start(), State()) as manager:
-        state_out = manager.run()
+    with ctx(ctx.on.start(), State()) as mgr:
+        state_out = mgr.run()
         assert isinstance(state_out, State)
     assert ctx.emitted_events[0].handle.kind == 'start'
 
 
 def test_context_action_manager(ctx: Context[Charm]):
-    with ctx(ctx.on.action('do-x'), State()) as manager:
-        state_out = manager.run()
+    with ctx(ctx.on.action('do-x'), State()) as mgr:
+        state_out = mgr.run()
         assert isinstance(state_out, State)
     assert ctx.emitted_events[0].handle.kind == 'do_x_action'
