@@ -179,15 +179,11 @@ def my_charm_type(endpoint: str):
     return MyTestCharm
 
 
-@pytest.fixture
-def context(my_charm_type):
-    return testing.Context(my_charm_type, meta=my_charm_type.META)
-
-
-def test_charm_runs(context):
+def test_charm_runs(my_charm_type):
     """Verify that the charm executes regardless of how we name the requirer endpoint."""
     state_in = testing.State()
-    with context(context.on.start(), state_in) as mgr:
+    ctx = testing.Context(my_charm_type, meta=my_charm_type.META)
+    with ctx(ctx.on.start(), state_in) as mgr:
         mgr.run()
         assert mgr.charm.saw_start
 ```
