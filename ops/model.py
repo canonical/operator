@@ -3624,7 +3624,7 @@ class _ModelBackend:
             return hookcmds.relation_list(relation_id, endpoint=relation_name)
 
     def relation_remote_app_name(
-        self, relation_id: int, relation_name: str | None = None
+        self, relation_id: int, *, relation_name: str | None = None
     ) -> str | None:
         """Return remote app name for given relation ID, or None if not known."""
         if (
