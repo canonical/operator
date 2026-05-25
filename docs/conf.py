@@ -211,7 +211,7 @@ linkcheck_ignore = []
 # A regex list of URLs where anchors are ignored by 'make linkcheck'
 linkcheck_anchors_ignore_for_url = [
     r"https://github\.com/.*",
-    r"https://matrix.to/.*",
+    r"https://matrix\.to/.*",
     r"https://documentation\.ubuntu\.com/pebble/reference/api/.*",
     r"https://documentation\.ubuntu\.com/juju/3\.6/reference/hook-command/list-of-hook-commands/.*",
 ]
