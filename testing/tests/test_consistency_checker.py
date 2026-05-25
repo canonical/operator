@@ -219,19 +219,17 @@ def test_evt_bad_container_name():
     ],
 )
 def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
-    layer = ops.pebble.Layer(
-        {
-            'checks': {
-                'chk1': {
-                    'override': 'replace',
-                    'level': 'ready',
-                    'startup': 'disabled',
-                    'threshold': 42,
-                    'http': {'url': 'http://localhost:5000/version'},
-                }
+    layer = ops.pebble.Layer({
+        'checks': {
+            'chk1': {
+                'override': 'replace',
+                'level': 'ready',
+                'startup': 'disabled',
+                'threshold': 42,
+                'http': {'url': 'http://localhost:5000/version'},
             }
         }
-    )
+    })
     state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
     asserter = assert_consistent if consistent else assert_inconsistent
     asserter(
