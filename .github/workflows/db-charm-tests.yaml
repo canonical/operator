@@ -26,9 +26,9 @@ jobs:
           - charm-repo: canonical/postgresql-k8s-operator
             commit: 9dedb77f20c390656ccc7c12271015fef2f7b68f  # 2026-05-19T21:37:22Z
           - charm-repo: canonical/mysql-operator
-            commit: f2e0fda4129a9466d204e55702fb4c16c54e4d94  # 2026-01-23T10:54:25Z
+            commit: 8b73ff31c76ab3234acd4e4172b0347073def2fa  # 2026-01-20T15:34:11Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: e669bb8042003a958529723209ed6a043a47160b  # 2026-01-23T10:56:26Z
+            commit: 0088c9583f63999ff37d982948e47b9e3e3fba2a  # 2026-01-20T15:48:23Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v6
@@ -49,12 +49,16 @@ jobs:
       - name: Update 'ops' dependency in test charm to latest
         run: |
           ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+          ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\n${ops_wheel}" >> requirements.txt
           else
+            # The charm may declare ops with the 'tracing' extra, which pulls in
+            # ops-tracing from PyPI. Replacing ops with a local wheel drops the
+            # extra, so install the matching ops-tracing wheel explicitly.
             poetry remove ops --lock
-            poetry add "${ops_wheel}" --lock
+            poetry add "${ops_wheel}" "${ops_tracing_wheel}" --lock
           fi
 
       - name: Install dependencies
