@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+import gc
 import grp
 import importlib
 import inspect
@@ -33,6 +34,7 @@ import time
 import typing
 import unittest
 import uuid
+import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -3808,11 +3810,42 @@ class TestTestingModelBackend:
         request.addfinalizer(harness.cleanup)
         harness.populate_oci_resources()
         backend = harness._backend
-        assert backend._resource_dir is None
+        assert backend._resource_dir_path is None
         path = backend.resource_get('image')
-        assert backend._resource_dir is not None
-        assert str(path).startswith(str(backend._resource_dir.name)), (
-            f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
+        assert backend._resource_dir_path is not None
+        assert str(path).startswith(str(backend._resource_dir_path)), (
+            f'expected {path} to be a subdirectory of {backend._resource_dir_path}'
+        )
+
+    def test_cleanup_releases_tempdir_and_storage(self, request: pytest.FixtureRequest):
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
+        request.addfinalizer(harness.cleanup)
+        harness.begin()
+        backend = harness._backend
+        tmp_path = backend._harness_tmp_path
+        assert tmp_path.exists()
+        harness.cleanup()
+        assert not tmp_path.exists()
+        # Cleanup is idempotent.
+        harness.cleanup()
+
+    def test_no_resource_warning_when_cleanup_is_missed(self):
+        # Regression test: dropping a Harness without calling cleanup() must not
+        # emit ResourceWarning (from TemporaryDirectory's GC-time fallback) or
+        # leave the SQLiteStorage connection to warn at GC time. Under -W error
+        # — including downstream charm suites on Python 3.14 — either warning
+        # would fail the test.
+        with warnings.catch_warnings(record=True) as records:
+            warnings.simplefilter('always')
+            harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
+            harness.begin()
+            # Touch _get_resource_dir to exercise the lazy-resource-dir finalizer too.
+            harness._backend._get_resource_dir()
+            del harness
+            gc.collect()
+        leaked = [r for r in records if issubclass(r.category, ResourceWarning)]
+        assert not leaked, (
+            f'ResourceWarning emitted during Harness teardown: {[str(r.message) for r in leaked]}'
         )
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):

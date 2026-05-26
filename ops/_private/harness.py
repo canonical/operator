@@ -33,6 +33,7 @@ import tempfile
 import typing
 import uuid
 import warnings
+import weakref
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
@@ -315,6 +316,10 @@ class Harness(Generic[CharmType]):
             # should be used instead.
             skip_duplicate_events=False,
         )
+        # Silent fallback so the SQLite connection inside self._storage is closed
+        # at GC time even if a caller forgot harness.cleanup(); otherwise the
+        # connection's destructor emits a ResourceWarning under -W error.
+        self._framework_finalizer = weakref.finalize(self, self._framework.close)
 
         warnings.warn(
             'Harness is deprecated. For the recommended approach, see: '
@@ -550,6 +555,8 @@ class Harness(Generic[CharmType]):
         Always call ``self.addCleanup(harness.cleanup)`` after creating a :class:`Harness`.
         """
         self._backend._cleanup()
+        if self._framework_finalizer.alive:
+            self._framework_finalizer()
 
     def _create_meta(
         self,
@@ -2353,11 +2360,19 @@ class _TestingModelBackend:
         self.model_name = None
         self.model_uuid = str(uuid.uuid4())
 
-        self._harness_tmp_dir = tempfile.TemporaryDirectory(prefix='ops-harness-')
-        self._harness_storage_path = pathlib.Path(self._harness_tmp_dir.name) / 'storages'
-        self._harness_container_path = pathlib.Path(self._harness_tmp_dir.name) / 'containers'
+        # mkdtemp + weakref.finalize rather than TemporaryDirectory: the latter's
+        # GC-time fallback cleanup emits a ResourceWarning that surfaces as a
+        # test failure under -W error (e.g. on Python 3.14). Callers should still
+        # invoke harness.cleanup() — or use the harness as a context manager — to
+        # release the tempdir eagerly; the finalizer is a silent safety net.
+        self._harness_tmp_path = pathlib.Path(tempfile.mkdtemp(prefix='ops-harness-'))
+        self._harness_storage_path = self._harness_tmp_path / 'storages'
+        self._harness_container_path = self._harness_tmp_path / 'containers'
         self._harness_storage_path.mkdir()
         self._harness_container_path.mkdir()
+        self._harness_tmp_finalizer = weakref.finalize(
+            self, shutil.rmtree, str(self._harness_tmp_path), True
+        )
         # this is used by the _record_calls decorator
         self._calls: list[tuple[Any, ...]] = []
         self._meta = meta
@@ -2381,7 +2396,8 @@ class _TestingModelBackend:
         self._app_status: _RawStatus = {'status': 'unknown', 'message': ''}
         self._unit_status: _RawStatus = {'status': 'maintenance', 'message': ''}
         self._workload_version: str | None = None
-        self._resource_dir: tempfile.TemporaryDirectory[Any] | None = None
+        self._resource_dir_path: pathlib.Path | None = None
+        self._resource_dir_finalizer: weakref.finalize[..., Any] | None = None
         # Format:
         # { "storage_name": {"<ID1>": { <other-properties> }, ... }
         # <ID1>: device id that is key for given storage_name
@@ -2415,19 +2431,25 @@ class _TestingModelBackend:
         self._pebble_clients_can_connect[pebble_client] = val
 
     def _cleanup(self):
-        if self._resource_dir is not None:
-            self._resource_dir.cleanup()
-            self._resource_dir = None
-        self._harness_tmp_dir.cleanup()
+        if self._resource_dir_finalizer is not None and self._resource_dir_finalizer.alive:
+            self._resource_dir_finalizer()
+        self._resource_dir_path = None
+        self._resource_dir_finalizer = None
+        if self._harness_tmp_finalizer.alive:
+            self._harness_tmp_finalizer()
 
     def _get_resource_dir(self) -> pathlib.Path:
-        if self._resource_dir is None:
+        if self._resource_dir_path is None:
             # In actual Juju, the resource path for a charm's resource is
             # $AGENT_DIR/resources/$RESOURCE_NAME/$RESOURCE_FILENAME
             # However, charms shouldn't depend on this.
-            self._resource_dir = tempfile.TemporaryDirectory(prefix='tmp-ops-test-resource-')
-        res_dir_name = cast('str', self._resource_dir.name)
-        return pathlib.Path(res_dir_name)
+            self._resource_dir_path = pathlib.Path(
+                tempfile.mkdtemp(prefix='tmp-ops-test-resource-')
+            )
+            self._resource_dir_finalizer = weakref.finalize(
+                self, shutil.rmtree, str(self._resource_dir_path), True
+            )
+        return self._resource_dir_path
 
     def relation_ids(self, relation_name: str) -> list[int]:
         try:
