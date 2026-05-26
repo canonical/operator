@@ -2764,9 +2764,7 @@ class Container:
 
         The returned object is a context manager; use ``with`` so the
         underlying file is closed promptly, rather than relying on garbage
-        collection (which can warn about unclosed files and, with
-        ``encoding=None``, leak a file descriptor on the local end of the
-        Pebble HTTP connection until the next collection cycle)::
+        collection::
 
             with container.pull('/etc/config.yaml') as f:
                 content = f.read()

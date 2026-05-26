@@ -21,7 +21,7 @@ There are many additional features, including the ability to send raw bytes (by 
 
 ## Pull
 
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`. Use it as a context manager (`with` block) so the underlying file is closed promptly — leaving it for the garbage collector emits an `unclosed file` `ResourceWarning` (and, with `encoding=None`, can pin a connection-side file descriptor until the next collection).
+To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`. Use it as a context manager (`with` block) so the underlying file is closed promptly.
 
 The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
 
