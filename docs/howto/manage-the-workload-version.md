@@ -85,7 +85,14 @@ that `charmcraft init` provides, and add a new test that verifies the workload
 version is set. For example:
 
 ```python
-def test_deploy(charm: Path, juju: jubilant.Juju):
+import pathlib
+
+import jubilant
+import pytest
+
+
+@pytest.mark.juju_setup
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
     juju.deploy(f'./{charm}')
     juju.wait(jubilant.all_active)
