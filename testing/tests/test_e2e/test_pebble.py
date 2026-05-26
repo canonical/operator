@@ -145,7 +145,7 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
         assert file == base / 'bar' / 'baz.txt'
 
         # but that is actually a symlink to the context's root tmp folder:
-        base = pathlib.Path(ctx._tmp.name)
+        base = ctx._tmp_path
         assert (base / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt').read_text() == text
         assert file.read_text() == text
 
