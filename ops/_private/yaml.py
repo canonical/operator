@@ -20,16 +20,11 @@ from typing import Any, TextIO
 
 import yaml
 
-# Use C speedups if available
-_safe_loader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
-_safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
-
-
 def safe_load(stream: str | TextIO) -> Any:
     """Same as yaml.safe_load, but use fast C loader if available."""
-    return yaml.load(stream, Loader=_safe_loader)  # noqa: S506
+    return yaml.safe_load(stream)
 
 
 def safe_dump(data: Any, stream: TextIO | None = None) -> str:
     """Same as yaml.safe_dump, but use fast C dumper if available."""
-    return yaml.dump(data, stream=stream, Dumper=_safe_dumper)  # type: ignore
+    return yaml.safe_dump(data, stream=stream)
