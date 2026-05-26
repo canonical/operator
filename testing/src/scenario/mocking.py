@@ -261,6 +261,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation_id: int,
         member_name: str,
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ):
         self._check_app_data_access(is_app)
@@ -292,7 +293,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         return relation._get_databag_for_remote(unit_id)
 
     def relation_model_get(
-        self, relation_id: int, relation_name: str | None = None
+        self, relation_id: int, *, relation_name: str | None = None
     ) -> dict[str, Any]:
         if JujuVersion(self._context.juju_version) < '3.6.2':
             raise ModelError('Relation.remote_model is only available on Juju >= 3.6.2')
@@ -315,7 +316,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_ids(self, relation_name: str):
         return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
-    def relation_list(self, relation_id: int, relation_name: str | None = None) -> tuple[str, ...]:
+    def relation_list(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> tuple[str, ...]:
         relation = self._get_relation_by_id(relation_id, relation_name)
 
         if isinstance(relation, PeerRelation):
@@ -328,7 +331,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 for unit_id in relation.peers_data
                 if unit_id != this_unit
             )
-        remote_name = self.relation_remote_app_name(relation_id, relation_name)
+        remote_name = self.relation_remote_app_name(relation_id, relation_name=relation_name)
         return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
     def config_get(self):
@@ -417,6 +420,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         relation_id: int,
         data: Mapping[str, str],
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ) -> None:
         self._check_app_data_access(is_app)
@@ -627,6 +631,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_remote_app_name(
         self,
         relation_id: int,
+        *,
         relation_name: str | None = None,
         _raise_on_error: bool = False,
     ) -> str | None:

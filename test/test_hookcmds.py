@@ -542,8 +542,9 @@ def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, a
 
 # Regression tests for https://github.com/canonical/operator/issues/2327:
 # when an ``endpoint`` is provided together with an ``id``, the relation
-# reference passed to Juju is ``endpoint:id`` so that Juju errors out if the
-# given id doesn't actually belong to that endpoint.
+# reference passed to Juju is ``endpoint:id`` rather than just ``id``. Juju
+# uses the endpoint portion to verify the id belongs to that endpoint; here
+# we only check that ops sends the combined form.
 def test_relation_get_with_endpoint(run: Run):
     run.handle(
         ['relation-get', '--format=json', '-r', 'db:123'],

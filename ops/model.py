@@ -1706,7 +1706,7 @@ class Relation:
         app = our_unit.app if is_peer else None
 
         try:
-            for unit_name in backend.relation_list(self.id, relation_name):
+            for unit_name in backend.relation_list(self.id, relation_name=relation_name):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if app is None:
@@ -1759,7 +1759,7 @@ class Relation:
                 "relation-model-get" hook command.
         """
         if self._remote_model is None:
-            d = self._backend.relation_model_get(self.id, self.name)
+            d = self._backend.relation_model_get(self.id, relation_name=self.name)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
@@ -2003,7 +2003,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         """Load the data from the current entity / relation."""
         try:
             return self._backend.relation_get(
-                self.relation.id, self._entity.name, self._is_app, self.relation.name
+                self.relation.id,
+                self._entity.name,
+                self._is_app,
+                relation_name=self.relation.name,
             )
         except RelationNotFoundError:
             # Dead relations tell no tales (and have no data).
@@ -3619,7 +3622,9 @@ class _ModelBackend:
             relation_ids = hookcmds.relation_ids(relation_name)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
-    def relation_list(self, relation_id: int, relation_name: str | None = None) -> list[str]:
+    def relation_list(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> list[str]:
         with self._wrap_hookcmd('relation-list', relation_id=relation_id, endpoint=relation_name):
             return hookcmds.relation_list(relation_id, endpoint=relation_name)
 
@@ -3651,6 +3656,7 @@ class _ModelBackend:
         relation_id: int,
         member_name: str,
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ) -> _RelationDataContent_Raw:
         if not isinstance(is_app, bool):
@@ -3678,6 +3684,7 @@ class _ModelBackend:
         relation_id: int,
         data: Mapping[str, str],
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ) -> None:
         if not data:
@@ -3701,7 +3708,7 @@ class _ModelBackend:
             hookcmds.relation_set(data, relation_id, endpoint=relation_name, app=is_app)
 
     def relation_model_get(
-        self, relation_id: int, relation_name: str | None = None
+        self, relation_id: int, *, relation_name: str | None = None
     ) -> dict[str, Any]:
         with self._wrap_hookcmd(
             'relation-model-get', relation_id=relation_id, endpoint=relation_name
@@ -3947,6 +3954,7 @@ class _ModelBackend:
         relation_id: int,
         entity: Unit | Application,
         data: Mapping[str, str],
+        *,
         relation_name: str | None = None,
     ):
         self.relation_set(

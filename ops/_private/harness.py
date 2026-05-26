@@ -2446,7 +2446,7 @@ class _TestingModelBackend:
         if actual is None or actual != relation_name:
             raise model.RelationNotFoundError()
 
-    def relation_list(self, relation_id: int, relation_name: str | None = None):
+    def relation_list(self, relation_id: int, *, relation_name: str | None = None):
         self._check_relation_name(relation_id, relation_name)
         try:
             return self._relation_list_map[relation_id]
@@ -2454,7 +2454,7 @@ class _TestingModelBackend:
             raise model.RelationNotFoundError from None
 
     def relation_remote_app_name(
-        self, relation_id: int, relation_name: str | None = None
+        self, relation_id: int, *, relation_name: str | None = None
     ) -> str | None:
         if relation_name is not None and self._relation_names.get(relation_id) != relation_name:
             # Mismatched endpoint:id -- treat as if the relation does not exist.
@@ -2469,6 +2469,7 @@ class _TestingModelBackend:
         relation_id: int,
         member_name: str,
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ):
         self._check_relation_name(relation_id, relation_name)
@@ -2483,6 +2484,7 @@ class _TestingModelBackend:
         relation_id: int,
         entity: model.Unit | model.Application,
         data: Mapping[str, str],
+        *,
         relation_name: str | None = None,
     ):
         # this is where the 'real' backend would call relation-set.
@@ -2499,6 +2501,7 @@ class _TestingModelBackend:
         relation_id: int,
         data: Mapping[str, str],
         is_app: bool,
+        *,
         relation_name: str | None = None,
     ) -> None:
         if not isinstance(is_app, bool):
@@ -2520,7 +2523,7 @@ class _TestingModelBackend:
                 bucket[key] = value
 
     def relation_model_get(
-        self, relation_id: int, relation_name: str | None = None
+        self, relation_id: int, *, relation_name: str | None = None
     ) -> dict[str, Any]:
         # For Harness, ignore relation_id and assume relation is never cross-model.
         self._check_relation_name(relation_id, relation_name)
