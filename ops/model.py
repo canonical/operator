@@ -3622,9 +3622,7 @@ class _ModelBackend:
             relation_ids = hookcmds.relation_ids(relation_name)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
-    def relation_list(
-        self, relation_id: int, *, relation_name: str | None = None
-    ) -> list[str]:
+    def relation_list(self, relation_id: int, *, relation_name: str | None = None) -> list[str]:
         with self._wrap_hookcmd('relation-list', relation_id=relation_id, endpoint=relation_name):
             return hookcmds.relation_list(relation_id, endpoint=relation_name)
 
