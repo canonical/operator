@@ -1898,9 +1898,11 @@ def _reader_to_websocket(
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
-            # Wait for either a read to be ready or the caller to cancel stdin
+            # Wait for either a read to be ready or the caller to cancel stdin.
+            # If the reader is also ready, drain it first so a cancel that
+            # arrives before this thread runs doesn't drop pending input.
             result = select.select([cancel_reader, reader], [], [])
-            if cancel_reader in result[0]:
+            if reader not in result[0]:
                 break
 
         chunk = reader.read(bufsize)
