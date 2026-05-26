@@ -82,8 +82,8 @@ def test_fs_push(tmp_path: pathlib.Path):
 
     def callback(self: ops.CharmBase):
         container = self.unit.get_container('foo')
-        baz = container.pull('/bar/baz.txt')
-        assert baz.read() == text
+        with container.pull('/bar/baz.txt') as baz:
+            assert baz.read() == text
 
     trigger(
         State(
@@ -111,8 +111,8 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
         if make_dirs:
             container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
             # check that pulling immediately 'works'
-            baz = container.pull('/foo/bar/baz.txt')
-            assert baz.read() == text
+            with container.pull('/foo/bar/baz.txt') as baz:
+                assert baz.read() == text
         else:
             with pytest.raises(ops.pebble.PathError):
                 container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
