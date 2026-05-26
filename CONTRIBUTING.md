@@ -14,19 +14,12 @@ Please do not use tools (such as GitHub Copilot) to provide PR reviews. The Char
 
 Changes are proposed as [pull requests on GitHub](https://github.com/canonical/operator/pulls).
 
-Pull requests should have a short title that follows the [conventional commit style](https://www.conventionalcommits.org/en/) using one of these types:
+- Work on a branch in your own fork.
+- Sequence your commits logically if possible. But don't worry too much -- we'll squash to `main` after review.
+- Don't force-push after review has started.
+- Follow [conventional commit style](https://www.conventionalcommits.org/en/) for the PR title (not required for individual commits).
 
-- chore
-- ci
-- docs
-- feat
-- fix
-- perf
-- refactor
-- revert
-- test
-
-Some examples:
+Examples of PR titles:
 
 - feat: add the ability to observe change-updated events
 - fix!: correct the type hinting for config data
@@ -35,9 +28,11 @@ Some examples:
 
 We consider Ops too small a project to use scopes, so we don't use them.
 
-Note that the commit messages to the PR's branch do not need to follow the conventional commit format, as these will be squashed into a single commit to `main` using the PR title as the commit message.
+## Branch updates
 
-To help us review your changes, please rebase your pull request onto the `main` branch before you request a review. If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
+Before you ask for review, please rebase your branch onto `main` so that your changes will merge cleanly.
+
+If you need to bring in the latest changes from `main` after the review has started, please use a merge commit.
 
 # Tests
 

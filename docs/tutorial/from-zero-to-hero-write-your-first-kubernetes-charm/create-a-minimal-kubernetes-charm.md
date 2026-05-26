@@ -31,12 +31,11 @@ In your virtual machine, go into your project directory and create the initial v
 
 ```text
 cd ~/fastapi-demo
-uvx git+https://github.com/canonical/charmcraft@fae9862 init --profile kubernetes
+uvx git+https://github.com/canonical/charmcraft@74d12bc init --profile kubernetes
 ```
 
 <!--
-  When charmcraft stable is up-to-date, comment out this info and switch to 'charmcraft init --profile kubernetes' above.
-  If needed again later, restore the info and switch to 'uvx git+https://github.com/canonical/charmcraft@<hash> init --profile kubernetes'.
+  When charmcraft stable is up-to-date, remove this info and switch to 'charmcraft init --profile kubernetes' above.
 -->
 The `uvx ...` command runs Charmcraft directly from GitHub. We recommend doing this because the installed version of Charmcraft may come with an older version of the profile used in the tutorial. You should use the installed version of Charmcraft for everything else (as we'll do later in the tutorial).
 
@@ -424,6 +423,7 @@ import logging
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -432,12 +432,13 @@ METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
     resources = {
         "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
-    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
 ```
 
@@ -469,6 +470,8 @@ The result should be similar to the following output:
 ```{tip}
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
+
+The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
 
 ### Run tests with `charmcraft test`
 
