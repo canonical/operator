@@ -14,4 +14,4 @@ build:
       - asdf global uv latest
     build:
       html:
-        - make -C docs BUILDDIR=$READTHEDOCS_OUTPUT/html html
+        - make -C docs DOCS_BUILDDIR=$READTHEDOCS_OUTPUT/html html
