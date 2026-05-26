@@ -512,12 +512,14 @@ We're now ready to write the tests.
 Add two test functions to `tests/integration/test_charm.py`:
 
 ```python
+@pytest.mark.juju_setup
 def test_deploy_cos(cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
+@pytest.mark.juju_setup
 def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
