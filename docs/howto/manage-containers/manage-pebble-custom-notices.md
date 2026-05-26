@@ -31,8 +31,8 @@ class PostgresCharm(ops.CharmBase):
         if event.notice.key == "canonical.com/postgresql/backup-done":
             path = event.notice.last_data["path"]
             logger.info("Backup finished, copying %s to the cloud", path)
-            f = event.workload.pull(path, encoding=None)
-            s3_bucket.upload_fileobj(f, "db-backup.sql")
+            with event.workload.pull(path, encoding=None) as f:
+                s3_bucket.upload_fileobj(f, "db-backup.sql")
 
         elif event.notice.key == "canonical.com/postgresql/other-thing":
             logger.info("Handling other thing")

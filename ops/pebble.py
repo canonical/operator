@@ -2602,6 +2602,10 @@ class Client:
     ) -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
+        The returned object is a context manager; use ``with`` so the
+        underlying file is closed promptly rather than relying on garbage
+        collection.
+
         Args:
             path: Path of the file to read from the remote system.
             encoding: Encoding to use for decoding the file's bytes to str,
@@ -2610,7 +2614,8 @@ class Client:
         Returns:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
-            encoding is ``None``.
+            encoding is ``None``. Close it when done, or use it as a context
+            manager.
 
         Raises:
             PathError: If there was an error reading the file at path, for
