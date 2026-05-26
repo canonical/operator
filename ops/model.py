@@ -1719,7 +1719,7 @@ class Relation:
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
         if app is None:
-            app_name = backend.relation_remote_app_name(relation_id, relation_name)
+            app_name = backend.relation_remote_app_name(self.id, relation_name=relation_name)
             if app_name is not None:
                 app = cache.get(Application, app_name)
 
