@@ -22,10 +22,23 @@ from ._types import RelationModel, RelationModelDict
 from ._utils import run
 
 
+def _format_relation_ref(id: int, endpoint: str | None) -> str:
+    """Build the ``-r`` argument for relation hook commands.
+
+    Including the endpoint name lets Juju validate that ``id`` actually belongs
+    to ``endpoint``, rather than silently operating on whichever relation has
+    that ID.
+    """
+    if endpoint is None:
+        return str(id)
+    return f'{endpoint}:{id}'
+
+
 @overload
 def relation_get(
     id: int | None = None,
     *,
+    endpoint: str | None = None,
     unit: str | None = None,
     app: bool = False,
 ) -> dict[str, str]: ...
@@ -33,6 +46,7 @@ def relation_get(
 def relation_get(
     id: int | None = None,
     *,
+    endpoint: str | None = None,
     key: str,
     unit: str | None = None,
     app: bool = False,
@@ -40,6 +54,7 @@ def relation_get(
 def relation_get(
     id: int | None = None,
     *,
+    endpoint: str | None = None,
     key: str | None = None,
     unit: str | None = None,
     app: bool = False,
@@ -55,6 +70,9 @@ def relation_get(
 
     Args:
         app: Get the relation data for the overall application, not just a unit
+        endpoint: If provided together with ``id``, the relation is identified
+            to Juju as ``endpoint:id``, so that Juju errors if ``id`` does not
+            belong to that endpoint.
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
         key: The specific key to get data for, or ``None`` to get all data.
@@ -65,7 +83,7 @@ def relation_get(
         raise ValueError('To get all keys, pass None for the key argument; "-" is not supported.')
     args = ['--format=json']
     if id is not None:
-        args.extend(['-r', str(id)])
+        args.extend(['-r', _format_relation_ref(id, endpoint)])
     if app:
         args.append('--app')
     if unit and key:
@@ -101,10 +119,16 @@ def relation_ids(name: str) -> list[str]:
 
 
 @overload
-def relation_list(id: int | None = None, *, app: Literal[True]) -> str: ...
+def relation_list(
+    id: int | None = None, *, endpoint: str | None = None, app: Literal[True]
+) -> str: ...
 @overload
-def relation_list(id: int | None = None, *, app: Literal[False] = False) -> list[str]: ...
-def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str]:
+def relation_list(
+    id: int | None = None, *, endpoint: str | None = None, app: Literal[False] = False
+) -> list[str]: ...
+def relation_list(
+    id: int | None = None, *, endpoint: str | None = None, app: bool = False
+) -> str | list[str]:
     """List relation units.
 
     Note that ``id`` can only be ``None`` if the current hook is a relation
@@ -117,13 +141,16 @@ def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str
     Args:
         id: The ID of the relation to list units for, or ``None`` to list units
             for the relation that triggered the current hook.
+        endpoint: If provided together with ``id``, the relation is identified
+            to Juju as ``endpoint:id``, so that Juju errors if ``id`` does not
+            belong to that endpoint.
         app: List remote application instead of participating units.
     """
     args = ['--format=json']
     if app:
         args.append('--app')
     if id is not None:
-        args.extend(['-r', str(id)])
+        args.extend(['-r', _format_relation_ref(id, endpoint)])
     stdout = run('relation-list', *args)
     if app:
         app_result: list[str] = json.loads(stdout)
@@ -132,7 +159,7 @@ def relation_list(id: int | None = None, *, app: bool = False) -> str | list[str
     return result
 
 
-def relation_model_get(id: int | None = None) -> RelationModel:
+def relation_model_get(id: int | None = None, *, endpoint: str | None = None) -> RelationModel:
     """Get details about the model hosting a related application.
 
     Note that ``id`` can only be ``None`` if the current hook is a relation
@@ -145,10 +172,13 @@ def relation_model_get(id: int | None = None) -> RelationModel:
     Args:
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
+        endpoint: If provided together with ``id``, the relation is identified
+            to Juju as ``endpoint:id``, so that Juju errors if ``id`` does not
+            belong to that endpoint.
     """
     args = ['--format=json']
     if id is not None:
-        args.extend(['-r', str(id)])
+        args.extend(['-r', _format_relation_ref(id, endpoint)])
     stdout = run('relation-model-get', *args)
     result: RelationModelDict = json.loads(stdout)
     return RelationModel._from_dict(result)
@@ -161,6 +191,7 @@ def relation_set(
     data: Mapping[str, str],
     id: int | None = None,
     *,
+    endpoint: str | None = None,
     app: bool = False,
 ):
     """Set relation settings.
@@ -180,11 +211,14 @@ def relation_set(
         data: The relation data to set.
         id: The ID of the relation to set data for, or ``None`` to set data for
             the relation that triggered the current hook.
+        endpoint: If provided together with ``id``, the relation is identified
+            to Juju as ``endpoint:id``, so that Juju errors if ``id`` does not
+            belong to that endpoint.
         app: Set data for the overall application, not just a unit.
     """
     args: list[str] = []
     if id is not None:
-        args.extend(['-r', str(id)])
+        args.extend(['-r', _format_relation_ref(id, endpoint)])
     if app:
         args.append('--app')
     args.extend(['--file', '-'])
