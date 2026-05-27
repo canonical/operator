@@ -21,14 +21,13 @@ There are many additional features, including the ability to send raw bytes (by 
 
 ## Pull
 
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`. Use it as a context manager (`with` block) so the underlying file is closed promptly.
+To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
 
 The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
 
 ```python
 # Update port to 8888 and restart service
-with container.pull('/etc/pg/postgresql.conf') as f:
-    config = f.read()
+config = container.pull('/etc/pg/postgresql.conf').read()
 if 'port =' not in config:
     config += '\nport = 8888\n'
 container.push('/etc/pg/postgresql.conf', config)
@@ -138,8 +137,7 @@ In this case, if the charm were to:
 ```python
 def _on_start(self, _):
     foo = self.unit.get_container('foo')
-    with foo.pull('/local/share/config.yaml') as f:
-        content = f.read()
+    content = foo.pull('/local/share/config.yaml').read()
 ```
 
 then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempfile` for
