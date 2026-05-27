@@ -1706,7 +1706,7 @@ class Relation:
         app = our_unit.app if is_peer else None
 
         try:
-            for unit_name in backend.relation_list(self.id):
+            for unit_name in backend.relation_list(self.id, relation_name=relation_name):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if app is None:
@@ -1719,7 +1719,7 @@ class Relation:
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
         if app is None:
-            app_name = backend.relation_remote_app_name(relation_id)
+            app_name = backend.relation_remote_app_name(self.id, relation_name=relation_name)
             if app_name is not None:
                 app = cache.get(Application, app_name)
 
@@ -1759,7 +1759,7 @@ class Relation:
                 "relation-model-get" hook command.
         """
         if self._remote_model is None:
-            d = self._backend.relation_model_get(self.id)
+            d = self._backend.relation_model_get(self.id, relation_name=self.name)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
@@ -2002,7 +2002,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
         try:
-            return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
+            return self._backend.relation_get(
+                self.relation.id,
+                self._entity.name,
+                self._is_app,
+                relation_name=self.relation.name,
+            )
         except RelationNotFoundError:
             # Dead relations tell no tales (and have no data).
             return {}
@@ -2104,7 +2109,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _commit(self, data: Mapping[str, str]) -> None:
         self._backend.update_relation_data(
-            relation_id=self.relation.id, entity=self._entity, data=data
+            relation_id=self.relation.id,
+            entity=self._entity,
+            data=data,
+            relation_name=self.relation.name,
         )
 
     def _update_cache(self, data: Mapping[str, str]) -> None:
@@ -3614,11 +3622,13 @@ class _ModelBackend:
             relation_ids = hookcmds.relation_ids(relation_name)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
-    def relation_list(self, relation_id: int) -> list[str]:
-        with self._wrap_hookcmd('relation-list', relation_id=relation_id):
-            return hookcmds.relation_list(relation_id)
+    def relation_list(self, relation_id: int, *, relation_name: str | None = None) -> list[str]:
+        with self._wrap_hookcmd('relation-list', relation_id=relation_id, endpoint=relation_name):
+            return hookcmds.relation_list(relation_id, endpoint=relation_name)
 
-    def relation_remote_app_name(self, relation_id: int) -> str | None:
+    def relation_remote_app_name(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> str | None:
         """Return remote app name for given relation ID, or None if not known."""
         if (
             self._juju_context.relation_id is not None
@@ -3632,13 +3642,20 @@ class _ModelBackend:
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
         try:
-            with self._wrap_hookcmd('relation-list', relation_id=relation_id, app=True):
-                return hookcmds.relation_list(relation_id, app=True)
+            with self._wrap_hookcmd(
+                'relation-list', relation_id=relation_id, endpoint=relation_name, app=True
+            ):
+                return hookcmds.relation_list(relation_id, endpoint=relation_name, app=True)
         except RelationNotFoundError:
             return None
 
     def relation_get(
-        self, relation_id: int, member_name: str, is_app: bool
+        self,
+        relation_id: int,
+        member_name: str,
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
     ) -> _RelationDataContent_Raw:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
@@ -3650,11 +3667,24 @@ class _ModelBackend:
             )
 
         with self._wrap_hookcmd(
-            'relation-get', relation_id=relation_id, unit=member_name, app=is_app
+            'relation-get',
+            relation_id=relation_id,
+            endpoint=relation_name,
+            unit=member_name,
+            app=is_app,
         ):
-            return hookcmds.relation_get(relation_id, unit=member_name, app=is_app)
+            return hookcmds.relation_get(
+                relation_id, endpoint=relation_name, unit=member_name, app=is_app
+            )
 
-    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+    def relation_set(
+        self,
+        relation_id: int,
+        data: Mapping[str, str],
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
+    ) -> None:
         if not data:
             raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
@@ -3666,12 +3696,22 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        with self._wrap_hookcmd('relation-set', relation_id=relation_id, data=data, app=is_app):
-            hookcmds.relation_set(data, relation_id, app=is_app)
+        with self._wrap_hookcmd(
+            'relation-set',
+            relation_id=relation_id,
+            endpoint=relation_name,
+            data=data,
+            app=is_app,
+        ):
+            hookcmds.relation_set(data, relation_id, endpoint=relation_name, app=is_app)
 
-    def relation_model_get(self, relation_id: int) -> dict[str, Any]:
-        with self._wrap_hookcmd('relation-model-get', relation_id=relation_id):
-            raw = hookcmds.relation_model_get(relation_id)
+    def relation_model_get(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> dict[str, Any]:
+        with self._wrap_hookcmd(
+            'relation-model-get', relation_id=relation_id, endpoint=relation_name
+        ):
+            raw = hookcmds.relation_model_get(relation_id, endpoint=relation_name)
         return {'uuid': raw.uuid}
 
     def config_get(self) -> dict[str, bool | int | float | str]:
@@ -3908,10 +3948,18 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, entity: Unit | Application, data: Mapping[str, str]
+        self,
+        relation_id: int,
+        entity: Unit | Application,
+        data: Mapping[str, str],
+        *,
+        relation_name: str | None = None,
     ):
         self.relation_set(
-            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+            relation_id=relation_id,
+            data=data,
+            is_app=isinstance(entity, Application),
+            relation_name=relation_name,
         )
 
     def secret_get(

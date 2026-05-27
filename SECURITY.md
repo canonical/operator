@@ -21,9 +21,8 @@ to determine whether the issue qualifies as a security issue and, if so, in
 which component. We will then figure out a fix, get a CVE
 assigned, and coordinate the release of the fix.
 
-You may also send email to security@ubuntu.com. Email may optionally be
-encrypted to OpenPGP key
-[`75E1 451E 529B 51E1 9006 CD5E 91EC 85F1 DA9A 776D`](https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75e1451e529b51e19006cd5e91ec85f1da9a776d)
+You may also send email to security@ubuntu.com. If you want to encrypt your email,
+follow [Canonical's reporting instructions](https://ubuntu.com/security/disclosure-policy#contact-us).
 
 If you have a deadline for public disclosure, please let us know.
 Our vulnerability management team intends to respond within 3 working

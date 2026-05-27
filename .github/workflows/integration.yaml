@@ -3,7 +3,7 @@ name: ops Integration Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: '42 7 25 * *'
+    - cron: '41 7 25 * *'
 
 permissions: {}
 
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
 
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57  # v8.0.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s test/integration/test_secrets.py
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the model

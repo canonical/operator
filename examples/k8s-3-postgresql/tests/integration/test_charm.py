@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
-# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
+# The integration tests use the Jubilant library and the pytest-jubilant plugin.
+# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+#
+# pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
+# The `charm` fixture is defined in conftest.py.
 
 import logging
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -27,6 +31,7 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
 
@@ -37,11 +42,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 
 
-def test_database_integration(juju: jubilant.Juju):
+@pytest.mark.juju_setup
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.

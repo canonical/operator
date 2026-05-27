@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# The integration tests use the Jubilant library. See https://documentation.ubuntu.com/jubilant/
-# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
+# The integration tests use the Jubilant library and the pytest-jubilant plugin.
+# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+#
+# pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
+# The `charm` fixture is defined in conftest.py.
 
 import json
 import logging
@@ -32,6 +35,7 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
 
@@ -42,11 +46,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 
 
-def test_database_integration(juju: jubilant.Juju):
+@pytest.mark.juju_setup
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
@@ -61,13 +66,15 @@ def cos(juju_factory: pytest_jubilant.JujuFactory):
     yield juju_factory.get_juju(suffix="cos")
 
 
-def test_deploy_cos(cos: jubilant.Juju):
+@pytest.mark.juju_setup
+def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
-def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+@pytest.mark.juju_setup
+def test_integrate_loki(charm: pathlib.Path, juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
@@ -75,7 +82,7 @@ def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
     cos.wait(jubilant.all_active)
 
 
-def test_loki_data(cos: jubilant.Juju):
+def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
     """Use Loki's HTTP API to verify that Loki has a label for our app.
 
     COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action

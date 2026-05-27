@@ -51,14 +51,14 @@ Or for a machine charm:
 charmcraft init --name mega-calendar --profile machine
 ```
 
-<!-- Comment out this tip when the charmcraft stable version is up-to-date. Restore it and update the hash as needed. -->
+<!-- Remove this tip when the charmcraft stable version is up-to-date. -->
 ````{tip}
 The `charmcraft` version that you have installed may come with older versions of the profiles.
 
 To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
 
 ```text
-uvx git+https://github.com/canonical/charmcraft@fae9862 init --name <name> --profile <profile>
+uvx git+https://github.com/canonical/charmcraft@74d12bc init --name <name> --profile <profile>
 ```
 ````
 

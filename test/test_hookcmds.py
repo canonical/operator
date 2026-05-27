@@ -540,6 +540,42 @@ def test_relation_set(run: Run, mock_file: NamedTemporaryFile, id: int | None, a
     assert run.calls[0].stdin == '{"foo": "bar"}'
 
 
+# Regression tests for https://github.com/canonical/operator/issues/2327:
+# when an ``endpoint`` is provided together with an ``id``, the relation
+# reference passed to Juju is ``endpoint:id`` rather than just ``id``. Juju
+# uses the endpoint portion to verify the id belongs to that endpoint; here
+# we only check that ops sends the combined form.
+def test_relation_get_with_endpoint(run: Run):
+    run.handle(
+        ['relation-get', '--format=json', '-r', 'db:123'],
+        stdout='{"foo": "bar"}',
+    )
+    assert hookcmds.relation_get(id=123, endpoint='db') == {'foo': 'bar'}
+
+
+def test_relation_list_with_endpoint(run: Run):
+    run.handle(
+        ['relation-list', '--format=json', '-r', 'db:123'],
+        stdout='["unit/0"]',
+    )
+    assert hookcmds.relation_list(id=123, endpoint='db') == ['unit/0']
+
+
+def test_relation_model_get_with_endpoint(run: Run):
+    data = {'uuid': str(uuid.uuid4())}
+    run.handle(
+        ['relation-model-get', '--format=json', '-r', 'db:123'],
+        stdout=json.dumps(data),
+    )
+    assert str(hookcmds.relation_model_get(id=123, endpoint='db').uuid) == data['uuid']
+
+
+def test_relation_set_with_endpoint(run: Run):
+    run.handle(['relation-set', '-r', 'db:123', '--file', '-'])
+    hookcmds.relation_set({'foo': 'bar'}, id=123, endpoint='db')
+    assert run.calls[0].stdin == '{"foo": "bar"}'
+
+
 def test_resource_get(run: Run):
     run.handle(['resource-get', 'res'], stdout='/path/to/resource')
     result = hookcmds.resource_get('res')
