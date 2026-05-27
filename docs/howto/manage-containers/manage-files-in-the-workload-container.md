@@ -1,209 +1,213 @@
+---
+myst:
+  html_meta:
+    description: Use the pathops library and ops.Container methods to manage files in a charm's workload container.
+---
+
 (files-in-containers)=
 # How to manage files in the workload container
 
-Pebble's files API allows charm authors to read and write files on the workload container. You can write files ("push"), read files ("pull"), list files in a directory, make directories, and delete files or directories.
+The [](ops.Container) class provides methods for managing files in a container.
 
-## Push
+Instead of using `ops.Container` directly, we recommend using the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library. `pathops` provides a `ContainerPath` class that uses a {external+python:mod}`pathlib`-like approach for managing files in a container.
 
-Probably the most useful operation is [`Container.push`](ops.Container.push), which allows you to write a file to the workload, for example, a PostgreSQL configuration file. You can use `push` as follows (note that this code would be inside a charm event handler):
+This guide demonstrates how to use `ContainerPath` methods where possible, and `ops.Container` methods for operations that `ContainerPath` doesn't support.
 
-```python
-config = """
-port = 7777
-max_connections = 1000
-"""
-container.push('/etc/pg/postgresql.conf', config, make_dirs=True)
+## Prepare your charm code
+
+Add {external+charmlibs:ref}`pathops <charmlibs-pathops>` to `pyproject.toml`:
+
+```toml
+dependencies = [
+    "charmlibs-pathops>=1,<2",
+    # ...
+]
 ```
 
-The `make_dirs=True` flag tells `push` to create the intermediate directories if they don't already exist (`/etc/pg` in this case).
-
-There are many additional features, including the ability to send raw bytes (by providing a Python `bytes` object as the second argument) and write data from a file-like object. You can also specify permissions and the user and group for the file. See the [API documentation](ops.Container.push) for details.
-
-## Pull
-
-To read a file from the workload, use [`Container.pull`](ops.Container.pull), which returns a file-like object that you can `read()`.
-
-The files API doesn't currently support update, so to update a file you can use `pull` to perform a read-modify-write operation, for example:
+Then import the library in your charm code:
 
 ```python
-# Update port to 8888 and restart service
-config = container.pull('/etc/pg/postgresql.conf').read()
-if 'port =' not in config:
-    config += '\nport = 8888\n'
-container.push('/etc/pg/postgresql.conf', config)
-container.restart('postgresql')
+from charmlibs import pathops
 ```
 
-If you specify the keyword argument `encoding=None` on the `pull()` call, reads from the returned file-like object will return `bytes`. The default is `encoding='utf-8'`, which will decode the file's bytes from UTF-8 so that reads return a Python `str`.
+It's common to define an attribute on the charm class for the workload container. We recommend that you also define an attribute for the root directory that your charm will operate in. For example:
 
-## Push recursive
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.container = self.unit.get_container('myapp')
+        self.myapp_root = pathops.ContainerPath('/etc/myapp', container=self.container)
+        # ...
+```
 
-To copy several files to the workload, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+## Create a directory
+
+To create a directory in the workload container, use {external+charmlibs:meth}`ContainerPath.mkdir <pathops.ContainerPath.mkdir>`:
+
+```python
+self.myapp_root.mkdir(parents=True)  # Creates parent directories if needed.
+(self.myapp_root / 'private').mkdir(user='myapp', group='myapp')
+```
+
+## Write a file
+
+To write a file to the workload container, use {external+charmlibs:meth}`ContainerPath.write_text <pathops.ContainerPath.write_text>` or {external+charmlibs:meth}`ContainerPath.write_bytes <pathops.ContainerPath.write_bytes>`:
+
+```python
+config = '...'
+(self.myapp_root / 'config.yaml').write_text(config)
+```
+
+`pathops` also has a function {external+charmlibs:func}`ensure_contents <pathops.ensure_contents>` that ensures a file exists with the given contents, ownership, and permissions:
+
+```python
+changed = pathops.ensure_contents(self.myapp_root / 'config.yaml', config)
+```
+
+`ensure_contents` makes no changes if the conditions are already satisfied.
+
+## Read a file
+
+To read a file from the workload container, use {external+charmlibs:meth}`ContainerPath.read_text <pathops.ContainerPath.read_text>` or {external+charmlibs:meth}`ContainerPath.read_bytes <pathops.ContainerPath.read_bytes>`:
+
+```python
+backup = (self.myapp_root / 'backup.yaml').read_text()
+```
+
+## Copy a directory tree
+
+`pathops` doesn't currently have a way to copy a directory tree. Instead, use `ops.Container` methods that are similar to {external+python:func}`shutil.copytree`.
+
+### To the container
+
+To copy several files to the workload container, use [`Container.push_path`](ops.Container.push_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.push_path('/source/dir', '/destination')
+self.container.push_path('/source/dir', '/destination')
 
 # copy "/source/dir/[files]" into "/destination/[files]"
-container.push_path('/source/dir/*', '/destination')
+self.container.push_path('/source/dir/*', '/destination')
 ```
 
 A trailing "/*" on the source directory is the only supported globbing/matching.
 
-## Pull recursive
+### From the container
 
-To copy several files to the workload, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory.  The API docs contain detailed examples of source and destination semantics and path handling.
+To copy several files from the workload container, use [`Container.pull_path`](ops.Container.pull_path), which copies files recursively into a specified destination directory. The API docs contain detailed examples of source and destination semantics and path handling.
 
 ```python
 # copy "/source/dir/[files]" into "/destination/dir/[files]"
-container.pull_path('/source/dir', '/destination')
+self.container.pull_path('/source/dir', '/destination')
 
 # copy "/source/dir/[files]" into "/destination/[files]"
-container.pull_path('/source/dir/*', '/destination')
+self.container.pull_path('/source/dir/*', '/destination')
 ```
 
 A trailing "/*" on the source directory is the only supported globbing/matching.
 
 ## List files
 
-To list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). It returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
+To iterate over a directory, use {external+charmlibs:meth}`ContainerPath.iterdir <pathops.ContainerPath.iterdir>` or {external+charmlibs:meth}`ContainerPath.glob <pathops.ContainerPath.glob>`:
 
 ```python
-infos = container.list_files('/etc', pattern='*.conf')
+paths = list(self.myapp_root.iterdir())
+for yaml_path in self.myapp_root.glob('*.yaml'):
+    # ...
+```
+
+Alternatively, to list the contents of a directory or return stat-like information about one or more files, use [`Container.list_files`](ops.Container.list_files). This method returns a list of [`pebble.FileInfo`](ops.pebble.FileInfo) objects for each entry (file or directory) in the given path, optionally filtered by a glob pattern. For example:
+
+```python
+infos = self.container.list_files('/etc/myapp', pattern='*.yaml')
 total_size = sum(f.size for f in infos)
-logger.info('total size of config files: %d', total_size)
+logger.info('total size of files: %d', total_size)
 names = set(f.name for f in infos)
-if 'host.conf' not in names:
-    raise Exception('This charm requires /etc/host.conf!')
 ```
 
 If you want information about the directory itself (instead of its contents), call `list_files(path, itself=True)`.
 
-## Create directory
+## Delete a file or directory
 
-To create a directory, use [`Container.make_dir`](ops.Container.make_dir). It takes an optional `make_parents=True` argument (like `mkdir -p`), as well as optional permissions and user/group arguments. Some examples:
+To delete a file, use {external+charmlibs:meth}`ContainerPath.unlink <pathops.ContainerPath.unlink>`:
 
 ```python
-container.make_dir('/etc/pg', user='postgres', group='postgres')
-container.make_dir('/some/other/nested/dir', make_parents=True)
+(self.myapp_root / 'access.log').unlink()
 ```
 
-## Remove path
-
-To delete a file or directory, use [`Container.remove_path`](ops.Container.remove_path). If a directory is specified, it must be empty unless `recursive=True` is specified, in which case the entire directory tree is deleted, recursively (like `rm -r`). For example:
+To delete an empty directory, use {external+charmlibs:meth}`ContainerPath.rmdir <pathops.ContainerPath.rmdir>`:
 
 ```python
-# Delete Apache access log
-container.remove_path('/var/log/apache/access.log')
-# Blow away /tmp/mysubdir and all files under it
-container.remove_path('/tmp/mysubdir', recursive=True)
+(self.myapp_root / 'cachedir').rmdir()
 ```
 
-## Check file and directory existence
-
-To check if a path exists you can use [`Container.exists`](ops.Container.exists) for directories or files and [`Container.isdir`](ops.Container.isdir) for directories.  These functions are analogous to python's `os.path.isdir` and `os.path.exists` functions.  For example:
+To delete a directory tree, use [`Container.remove_path`](ops.Container.remove_path):
 
 ```python
-# if /tmp/myfile exists
-container.exists('/tmp/myfile') # True
-container.isdir('/tmp/myfile') # False
+self.container.remove_path('/etc/myapp/cachedir', recursive=True)
+```
 
-# if /tmp/mydir exists
-container.exists('/tmp/mydir') # True
-container.isdir('/tmp/mydir') # True
+## Check existence
+
+To check whether a file exists, use {external+charmlibs:meth}`ContainerPath.exists <pathops.ContainerPath.exists>` or {external+charmlibs:meth}`ContainerPath.is_file <pathops.ContainerPath.is_file>`:
+
+```python
+(self.myapp_root / 'backup.yaml').exists()
+(self.myapp_root / 'backup.yaml').is_file()
+```
+
+To check whether a directory exists, use {external+charmlibs:meth}`ContainerPath.exists <pathops.ContainerPath.exists>` or {external+charmlibs:meth}`ContainerPath.is_dir <pathops.ContainerPath.is_dir>`:
+
+```python
+(self.myapp_root / 'cachedir').exists()
+(self.myapp_root / 'cachedir').is_dir()
 ```
 
 ## Write unit tests
 
-### Mount files in the container
-
-You can configure a container to have some files in it:
+To inspect the workload container's filesystem in a unit test, use [`Container.get_filesystem`](ops.testing.Container.get_filesystem):
 
 ```python
-import pathlib
-
-local_file = pathlib.Path('/path/to/local/real/file.txt')
-
-container = testing.Container(
-    name='foo',
-    can_connect=True,
-    mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file)},
-    )
-state = testing.State(containers={container})
-```
-
-In this case, if the charm were to:
-
-```python
-def _on_start(self, _):
-    foo = self.unit.get_container('foo')
-    content = foo.pull('/local/share/config.yaml').read()
-```
-
-then `content` would be the contents of our locally-supplied `file.txt`. You can use `tempfile` for
-nicely wrapping data and passing it to the charm via the container.
-
-### Check files written in the container
-
-`container.push` works similarly to `container.pull`. To check that the charm has pushed the expected data to the container, write a test like:
-
-```python
-import tempfile
-
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-def test_pebble_push():
-    with tempfile.NamedTemporaryFile() as local_file:
-        container = testing.Container(
-            name='foo',
-            can_connect=True,
-            mounts={'local': testing.Mount(location='/local/share/config.yaml', source=local_file.name)}
-        )
-        state_in = testing.State(containers={container})
-        ctx = testing.Context(
-            MyCharm,
-            meta={'name': 'foo', 'containers': {'foo': {}}}
-        )
-        ctx.run(
-            ctx.on.pebble_ready(container),
-            state_in,
-        )
-        assert local_file.read().decode() == 'TEST'
-```
-
-If the charm writes files to a container (to a location you didn't mount as a temporary folder you
-have access to), you will be able to inspect them using `get_filesystem`.
-
-```python
-class MyCharm(ops.CharmBase):
-    def __init__(self, framework):
-        super().__init__(framework)
-        framework.observe(self.on.foo_pebble_ready, self._on_pebble_ready)
-
-    def _on_pebble_ready(self, _):
-        foo = self.unit.get_container('foo')
-        foo.push('/local/share/config.yaml', 'TEST', make_dirs=True)
-
-
-def test_pebble_push():
-    container = testing.Container(name='foo', can_connect=True)
+def test_pebble_ready():
+    ctx = testing.Context(MyCharm)
+    container = testing.Container('myapp', can_connect=True)
     state_in = testing.State(containers={container})
-    ctx = testing.Context(
-        MyCharm,
-        meta={'name': 'foo', 'containers': {'foo': {}}}
-    )
+    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
 
-    state_out = ctx.run(ctx.on.start(), state_in)
-
-    # This is the root of the simulated container filesystem. Any mounts will be symlinks in it.
-    container_root_fs = state_out.get_container(container.name).get_filesystem(ctx)
-    cfg_file = container_root_fs / 'local' / 'share' / 'config.yaml'
-    assert cfg_file.read_text() == 'TEST'
+    # Check that the workload container has the expected config file
+    # after our charm handles the pebble-ready event.
+    container_root = state_out.get_container('myapp').get_filesystem(ctx)
+    config_file = container_root / 'etc' / 'myapp' / 'config.yaml'
+    assert config_file.exists()
+    assert my_custom_checks(config_file)
 ```
+
+`get_filesystem` returns a temporary directory that simulates the container's filesystem.
+
+Don't write to the filesystem that `get_filesystem` returns. If a unit test needs to ensure that particular data exists in the container, use [`Container.mounts`](ops.testing.Container.mounts):
+
+```python
+def test_get_backup_action(tmp_path):
+    # Create a temporary file with placeholder data, then mount the file
+    # in the workload container so that our charm can see it.
+    backup_file = tmp_path / 'backup.yaml'
+    backup_file.write_text(my_custom_data())
+    ctx = testing.Context(MyCharm)
+    container = testing.Container(
+        'myapp',
+        can_connect=True,
+        mounts={
+            'backup': testing.Mount(
+                location='/etc/myapp/backup.yaml', source=backup_file
+            )
+        },
+    )
+    state_in = testing.State(containers={container})
+    state_out = ctx.run(ctx.on.action('get-backup'), state_in)
+
+    # Check that the action returned the contents of backup_file.
+    assert ctx.action_results == {'data': my_custom_data()}
+```
+
+If the charm writes to `/etc/myapp/backup.yaml` in the container while handling the event, `backup_file.read_text()` will return the data that the charm wrote.
