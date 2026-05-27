@@ -2770,6 +2770,12 @@ class Container:
     def pull(self, path: str | PurePath, *, encoding: str | None = 'utf-8') -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
+        The returned object is a context manager; use ``with`` so the
+        underlying file is closed promptly and avoids memory leaks::
+
+            with container.pull('/etc/config.yaml') as f:
+                content = f.read()
+
         Args:
             path: Path of the file to read from the remote system.
             encoding: Encoding to use for decoding the file's bytes to string,
@@ -2778,7 +2784,7 @@ class Container:
         Returns:
             A readable file-like object, whose ``read()`` method will return
             strings decoded according to the specified encoding, or bytes if
-            encoding is ``None``.
+            encoding is ``None``. Use as a context manager, or call ``close()`` when done.
 
         Raises:
             pebble.PathError: If there was an error reading the file at path,
