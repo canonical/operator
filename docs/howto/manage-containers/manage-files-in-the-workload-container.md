@@ -9,7 +9,7 @@ myst:
 
 The [](ops.Container) class provides methods for managing files in a container.
 
-Instead of using `ops.Container` directly, we recommend using the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library. `pathops` provides a `ContainerPath` class that uses a `pathlib`-like approach for managing files in a container.
+Instead of using `ops.Container` directly, we recommend using the {external+charmlibs:ref}`pathops <charmlibs-pathops>` library. `pathops` provides a `ContainerPath` class that uses a {external+python:mod}`pathlib`-like approach for managing files in a container.
 
 This guide demonstrates how to use `ContainerPath` methods where possible, and `ops.Container` methods for operations that `ContainerPath` doesn't support.
 
