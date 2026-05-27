@@ -2603,7 +2603,7 @@ class Client:
         """Read a file's content from the remote system.
 
         Use the returned object as a context manager, otherwise ``close()``
-        must be called manually to avoid memory leaks::
+        must be called manually to avoid memory leaks.
 
         Args:
             path: Path of the file to read from the remote system.
