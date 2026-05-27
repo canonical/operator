@@ -478,9 +478,12 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         secret: Secret,
     ):
         if secret.owner is None:
+            # The secret is in State.secrets (otherwise _get_secret would have
+            # raised already), so the charm has read access; it just doesn't
+            # own the secret and so cannot manage it. Set `Secret.owner` to
+            # 'unit' or 'app' in the test setup if the charm is meant to own it.
             raise SecretNotFoundError(
-                'this secret is not owned by this unit/app or granted to it. '
-                'Did you forget passing it to State.secrets?',
+                f'You must own secret {secret.id!r} to perform this operation',
             )
         if secret.owner == 'app' and not self.is_leader():
             understandable_error = SecretNotFoundError(
