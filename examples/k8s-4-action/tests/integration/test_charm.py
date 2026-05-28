@@ -47,11 +47,17 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 
 @pytest.mark.juju_setup
-def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
-    """Verify that the charm integrates with the database.
+def test_database_integration_and_get_db_info_action(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the charm integrates with the database and exposes DB info.
 
-    Assert that the charm is active if the integration is established.
+    The action check goes beyond the tutorial instructions.
     """
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+    task = juju.run(f"{APP_NAME}/0", "get-db-info", {"show-password": False})
+
+    assert task.status == "completed"
+    assert task.results["db-host"]
+    assert task.results["db-port"] == "5432"
