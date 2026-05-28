@@ -140,6 +140,33 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
     assert os.getenv('JUJU_REMOTE_APP', None) is None
 
 
+def test_relation_event_juju_hook_name_uses_hyphens_for_endpoint():
+    meta: dict[str, Any] = {
+        'name': 'foo',
+        'requires': {'receive-ca-cert': {'interface': 'certificates'}},
+    }
+
+    my_charm_type = charm_type()
+    charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
+        my_charm_type,
+        meta=meta,
+    )
+    runtime = Runtime(
+        'foo',
+        charm_spec,
+    )
+
+    rel = Relation('receive-ca-cert')
+    ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
+    with runtime.exec(
+        state=State(relations={rel}),
+        event=_Event('receive-ca-cert_relation_changed', relation=rel),
+        context=ctx,
+    ):
+        assert os.environ['JUJU_HOOK_NAME'] == 'receive-ca-cert-relation-changed'
+        assert os.environ['JUJU_DISPATCH_PATH'] == 'hooks/receive-ca-cert-relation-changed'
+
+
 def test_juju_version_is_set_in_environ():
     version = '2.9'
 
