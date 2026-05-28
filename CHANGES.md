@@ -35,8 +35,7 @@
 
 ## Tests
 
-* Extend the type checking of the ops-scenario tests (#2234)
-* Extend the type checking of the ops-scenario tests (#2235)
+* Extend the type checking of the ops-scenario tests (#2234, #2235)
 * Wait on ExecProcess after expected TypeError (#2509)
 
 ## CI
