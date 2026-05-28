@@ -2245,12 +2245,41 @@ class _Event:  # type: ignore
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
 
+    # The event name as Juju provides it. Set in __post_init__ via
+    # object.__setattr__ (frozen dataclass), so it's excluded from init.
+    _juju_name: str = dataclasses.field(init=False)
+
     def __post_init__(self):
+        # The original (un-normalised) name, so that we can recover the exact
+        # spelling of the entity the event refers to (see _juju_name below).
+        original_name = str(self.path).split('.')[-1]
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
-        # This is the event name as Juju provides it, with dashes not underscores.
-        object.__setattr__(self, '_juju_name', path.name.replace('_', '-'))
+        # This is the event name as Juju provides it. Juju keeps the entity
+        # name (a relation endpoint, storage name, or container name) exactly
+        # as it is declared in the charm metadata -- which may contain dashes
+        # *or* underscores -- and only ever uses dashes in the event-type
+        # suffix. For events that are not tied to such an entity, the whole
+        # name uses dashes. See #2511.
+        object.__setattr__(self, '_juju_name', self._build_juju_name(original_name, path))
+
+    @staticmethod
+    def _build_juju_name(original_name: str, path: _EventPath) -> str:
+        suffix = path.suffix
+        if suffix and path.type in (
+            _EventType.RELATION,
+            _EventType.STORAGE,
+            _EventType.WORKLOAD,
+        ):
+            # Preserve the entity name (the prefix) verbatim; only the suffix
+            # is normalised to dashes. ``original_name`` and the normalised
+            # ``path.name`` have the same length (``_normalise_name`` only
+            # swaps dashes for underscores), so the suffix can be stripped by
+            # length to recover the original prefix spelling.
+            prefix = original_name[: len(original_name) - len(suffix)]
+            return f'{prefix}{suffix.replace("_", "-")}'
+        return path.name.replace('_', '-')
 
     @property
     def _path(self) -> _EventPath:
