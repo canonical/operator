@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 permissions: {}
 
@@ -21,13 +22,13 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: 1c379314d5c2e44d2cf9a2d6986656fef5310daf  # 2025-12-19T13:24:29Z
+            commit: cdaffd23a2a50efb7ff0c7e1ffb70d85da526505  # 2026-05-24T21:43:47Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: 1ebe7272293fcc5cd88cd630d3f48041011f0c0e  # 2025-12-19T01:11:29Z
+            commit: 9dedb77f20c390656ccc7c12271015fef2f7b68f  # 2026-05-19T21:37:22Z
           - charm-repo: canonical/mysql-operator
-            commit: bd8b3ddabe24d6bcb1b181c4ecedf8515cd98ce0  # 2025-12-15T20:38:04Z
+            commit: 8b73ff31c76ab3234acd4e4172b0347073def2fa  # 2026-01-20T15:34:11Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 2bce272828c2462df6ee4f11f677019ecbf982f8  # 2025-12-15T20:17:50Z
+            commit: 0088c9583f63999ff37d982948e47b9e3e3fba2a  # 2026-01-20T15:48:23Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v6
@@ -48,12 +49,27 @@ jobs:
       - name: Update 'ops' dependency in test charm to latest
         run: |
           ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+          ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
             echo -e "\n${ops_wheel}" >> requirements.txt
           else
+            # The charm may declare ops with the 'tracing' extra, which pulls in
+            # ops-tracing from PyPI. Replacing ops with a local wheel drops the
+            # extra, so install the matching ops-tracing wheel explicitly when
+            # the charm asked for it. Check before `poetry remove`, which
+            # strips the ops line from pyproject.toml.
+            if grep -qE 'ops[^a-z]+=.*tracing|ops\[[^]]*tracing' pyproject.toml; then
+              wants_tracing=1
+            else
+              wants_tracing=0
+            fi
             poetry remove ops --lock
-            poetry add "${ops_wheel}" --lock
+            if [ "${wants_tracing}" = "1" ]; then
+              poetry add "${ops_wheel}" "${ops_tracing_wheel}" --lock
+            else
+              poetry add "${ops_wheel}" --lock
+            fi
           fi
 
       - name: Install dependencies

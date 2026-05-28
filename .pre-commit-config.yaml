@@ -25,13 +25,13 @@ repos:
         entry: uv run --group lint -- ruff check --preview --force-exclude
         language: system
         types_or: [python, pyi]
-        exclude: '^(examples/|docs/conf\.py|docs/\.sphinx/|tracing/ops_tracing/vendor/)'
+        exclude: '^(examples/|docs/conf\.py|docs/\_dev/|tracing/ops_tracing/vendor/)'
       - id: ruff-format
         name: ruff-format (uv)
         entry: uv run --group lint -- ruff format --preview --force-exclude
         language: system
         types_or: [python, pyi]
-        exclude: '^(examples/|docs/conf\.py|docs/\.sphinx/|tracing/ops_tracing/vendor/)'
+        exclude: '^(examples/|docs/conf\.py|docs/\_dev/|tracing/ops_tracing/vendor/)'
       - id: codespell
         name: codespell (uv)
         entry: uv run --group lint -- codespell
