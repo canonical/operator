@@ -40,6 +40,9 @@ done
 
 get_relation_data() {
     local rel_id="$1"
+    # Strip the optional ``endpoint:`` prefix so the case-statement keeps working.
+    # For example, db:1 -> 1.
+    rel_id="${rel_id##*:}"
     case $rel_id in
         1) echo "remote/0" ;;
         2) echo "remote/0" ;;
