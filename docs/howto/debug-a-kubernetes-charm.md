@@ -174,9 +174,3 @@ The `Events` section of `describe pod` is where you'll find `ImagePullBackOff`, 
 ```{note}
 Reach for `kubectl` when the problem is the *container or pod* not coming up. Once the workload container is running and Pebble is responding, switch back to the Pebble CLI and `juju debug-log`, which give you a workload- and charm-aware view that raw `kubectl logs` does not.
 ```
-
-## Reproduce workload behaviour without deploying
-
-You don't always need a live model. [State-transition tests](/explanation/state-transition-testing) let you simulate a workload container, its Pebble plan, services, and `can_connect` state, and assert on what your charm does -- including the Pebble API calls it makes. This is the fastest loop for charm-side container logic, and it runs in CI. Use a live deployment and the tools above to confirm behaviour against the real workload image.
-
-> See more: {ref}`write-unit-tests-for-a-charm`, {external+pebble:doc}`Pebble | CLI commands <reference/cli-commands>`
