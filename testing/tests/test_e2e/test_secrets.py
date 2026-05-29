@@ -332,10 +332,18 @@ def test_secret_permission_model(leader: bool, owner: Literal['app', 'unit'] | N
         else:  # cannot manage
             # nothing else to do directly if you can't get a hold of the Secret instance
             # but we can try some raw backend calls
-            with pytest.raises(ops.ModelError):
+            if owner is None:
+                # The secret has been granted to this charm but it is not the
+                # owner, so management operations should explain that.
+                expected_message = f'You must own secret {secret_id!r}'
+            else:
+                # app-owned secret + non-leader: ops surfaces Juju's
+                # "permission denied" message.
+                expected_message = 'permission denied'
+            with pytest.raises(ops.ModelError, match=expected_message):
                 secret_obj.get_info()
 
-            with pytest.raises(ops.ModelError):
+            with pytest.raises(ops.ModelError, match=expected_message):
                 secret_obj.set_content(content={'boo': 'foo'})
 
 

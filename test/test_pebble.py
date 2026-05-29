@@ -3746,6 +3746,7 @@ class TestExec:
         process = client.exec(['echo', 'FOOBAR'], stdout=stdout_buffer, encoding=None)
         with pytest.raises(TypeError):
             process.wait_output()
+        process.wait()
 
     def test_wait_output_bad_command(self, caplog: pytest.LogCaptureFixture, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)

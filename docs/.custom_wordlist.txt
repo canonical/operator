@@ -20,6 +20,7 @@ lightkube
 liveness
 manpages
 misconfiguration
+pathops
 Parca
 protobuf
 pydantic

@@ -1898,9 +1898,11 @@ def _reader_to_websocket(
     """Read reader through to EOF and send each chunk read to the websocket."""
     while True:
         if cancel_reader is not None:
-            # Wait for either a read to be ready or the caller to cancel stdin
+            # Wait for either a read to be ready or the caller to cancel stdin.
+            # If the reader is also ready, drain it first so a cancel that
+            # arrives before this thread runs doesn't drop pending input.
             result = select.select([cancel_reader, reader], [], [])
-            if cancel_reader in result[0]:
+            if reader not in result[0]:
                 break
 
         chunk = reader.read(bufsize)
@@ -2602,6 +2604,9 @@ class Client:
     ) -> BinaryIO | TextIO:
         """Read a file's content from the remote system.
 
+        Use the returned object as a context manager, otherwise ``close()``
+        must be called manually to avoid memory leaks.
+
         Args:
             path: Path of the file to read from the remote system.
             encoding: Encoding to use for decoding the file's bytes to str,
@@ -2610,7 +2615,7 @@ class Client:
         Returns:
             A readable file-like object, whose read() method will return str
             objects decoded according to the specified encoding, or bytes if
-            encoding is ``None``.
+            encoding is ``None``. Use as a context manager, or call ``close()`` when done.
 
         Raises:
             PathError: If there was an error reading the file at path, for
