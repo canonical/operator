@@ -29,9 +29,20 @@ The charm and workload containers each have their own filesystem and process spa
 - In the **workload container**, the socket is at `/var/lib/pebble/default/pebble.sock`.
 - In the **charm container**, the same socket is mounted at `/charm/<container>/pebble.sock`, and the Pebble CLI binary is at `/charm/bin/pebble`.
 
-```{tip}
-If [`Container.can_connect()`](ops.Container.can_connect) returns `False` or your charm raises [`ops.pebble.ConnectionError`](ops.pebble.ConnectionError), the charm container cannot reach the workload's Pebble over that socket. This usually means the workload container hasn't started yet (no [`PebbleReadyEvent`](ops.PebbleReadyEvent) has fired) -- look at the pod first (see [](#k8s-inspect-the-pod)), not at your charm code.
-```
+(k8s-common-failure-modes)=
+## Common failure modes
+
+If you're not sure where to start, find your symptom here and jump to the section that covers it:
+
+| Symptom | Where to look |
+| --- | --- |
+| Charm stuck in `maintenance`/`waiting`; `can_connect()` is `False` (or a Pebble call raises `ConnectionError`) at startup | The charm container can't reach the workload's Pebble -- usually the workload container hasn't started yet (no [`PebbleReadyEvent`](ops.PebbleReadyEvent) has fired). Look at the pod, not your charm code -- `kubectl describe pod` for image-pull or scheduling errors ([](#k8s-inspect-the-pod)). |
+| Service shows `backoff` or `error` | `pebble logs` for the crash output, then `pebble changes` / `pebble tasks` for the start failure ([](#k8s-pebble-cli)). |
+| Config change has no effect on the running process | The charm added a layer but didn't [`replan`](#run-workloads-with-a-charm-kubernetes-replan); confirm with `pebble plan` and `pebble services`. |
+| Charm raises `ConnectionError` mid-handler | The workload's Pebble became unreachable -- guard Pebble calls with `try`/`except` rather than `can_connect()` ([](ops.Container.can_connect)). |
+| `pebble_custom_notice` never fires | Confirm the notice was recorded with `pebble notices`; check the `key` your handler matches on ([](#k8s-pebble-cli)). |
+| Workload won't go ready despite running | A health check is failing -- `pebble checks` and `pebble check <name> --refresh` ([](#k8s-pebble-cli)). |
+| `juju ssh --container` lands in an image with no shell or tools | The workload image is stripped down -- run Pebble against it from the charm container instead, where the socket is mounted ([](#k8s-debug-from-charm-container)). |
 
 (k8s-pebble-cli)=
 ## Inspect the workload with the Pebble CLI
@@ -109,7 +120,7 @@ If you change a service's configuration but the running process doesn't change, 
 
 ### Check health checks
 
-If your charm configures {ref}`Pebble health checks <pebble-health-checks>`, a check that has failed its threshold can be the hidden cause of a problem you're chasing. Depending on how the check is configured, going "down" can restart the service (via `on-check-failure`), and a `level: alive` or `level: ready` check is wired to the container's Kubernetes liveness or readiness probe -- so a failing `alive` check makes Kubernetes restart the container, while a failing `ready` check marks the pod not-ready and removes it from its Service's endpoints. Inspect checks with:
+A failed {ref}`Pebble health check <pebble-health-checks>` behaves differently depending on how it's configured: going "down" can restart the service (via `on-check-failure`), and a `level: alive` or `level: ready` check is wired to the container's Kubernetes liveness or readiness probe -- so a failing `alive` check makes Kubernetes restart the container, while a failing `ready` check marks the pod not-ready and removes it from its Service's endpoints. Inspect checks with:
 
 ```shell
 pebble checks                 # status of all checks
@@ -133,7 +144,7 @@ pebble warnings --all         # Pebble's own warnings (deprecations, config issu
 (k8s-debug-from-charm-container)=
 ## Debug from the charm container
 
-Many production workload images are stripped down to just the application -- with no shell or utilities -- so `juju ssh --container` lands you nowhere useful. You can still run Pebble commands against that workload from the charm container, because the workload's socket is mounted there:
+Run Pebble commands against a workload from the charm container, where the workload's socket is mounted:
 
 ```shell
 juju ssh myapp/0   # connects to the charm container by default
@@ -148,7 +159,7 @@ This is also the most faithful way to reproduce what your charm sees, since your
 (k8s-inspect-the-pod)=
 ## Inspect the pod at the Kubernetes layer
 
-When a unit is stuck before Pebble is even reachable -- the container is `waiting`, the image won't pull, or the pod won't schedule -- the answer is below Juju, at the Kubernetes layer. Juju puts each model in its own namespace, and names each unit's pod `<app>-<unit-number>`.
+When a unit is stuck before Pebble is even reachable, drop below Juju to the Kubernetes layer. Juju puts each model in its own namespace, and names each unit's pod `<app>-<unit-number>`.
 
 ```shell
 kubectl -n <model> get pods
@@ -163,18 +174,6 @@ The `Events` section of `describe pod` is where you'll find `ImagePullBackOff`, 
 ```{note}
 Reach for `kubectl` when the problem is the *container or pod* not coming up. Once the workload container is running and Pebble is responding, switch back to the Pebble CLI and `juju debug-log`, which give you a workload- and charm-aware view that raw `kubectl logs` does not.
 ```
-
-(k8s-common-failure-modes)=
-## Common failure modes
-
-| Symptom | Where to look |
-| --- | --- |
-| Charm stuck in `maintenance`/`waiting`; `can_connect()` is `False` | The workload container hasn't started -- `kubectl describe pod` for image-pull or scheduling errors ([](#k8s-inspect-the-pod)). |
-| Service shows `backoff` or `error` | `pebble logs` for the crash output, then `pebble changes` / `pebble tasks` for the start failure ([](#k8s-pebble-cli)). |
-| Config change has no effect on the running process | The charm added a layer but didn't [`replan`](#run-workloads-with-a-charm-kubernetes-replan); confirm with `pebble plan` and `pebble services`. |
-| Charm raises `ConnectionError` mid-handler | The workload's Pebble became unreachable -- guard Pebble calls with `try`/`except` rather than `can_connect()` ([](ops.Container.can_connect)). |
-| `pebble_custom_notice` never fires | Confirm the notice was recorded with `pebble notices`; check the `key` your handler matches on ([](#k8s-pebble-cli)). |
-| Workload won't go ready despite running | A health check is failing -- `pebble checks` and `pebble check <name> --refresh` ([](#k8s-pebble-cli)). |
 
 ## Reproduce workload behaviour without deploying
 
