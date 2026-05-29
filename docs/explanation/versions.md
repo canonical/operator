@@ -39,7 +39,7 @@ Juju releases new minor versions approximately every 3 months, which are support
 
 > See more: {external+juju:ref}`Juju support timeframes <releasenotes>`
 
-Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version.
+Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version. Long Term Support (LTS) releases are supported for 15 years from their initial release: 5 years of regular support, followed by 5 years of critical bug fixes, and a further 5 years of security fixes.
 
 > See more: [Ops support timeframes](https://github.com/canonical/operator/blob/main/SECURITY.md)
 
@@ -62,7 +62,7 @@ Ops releases new minor versions approximately once per month. Major versions are
 | Version | Status | Release Date | End of Life |
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
-| Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2027-02-11 |
+| Ops 2.23 (LTS) | <span style="color:green">●</span> Active | 2023-01-25 | 2038-01-25 |
 | Ops 3.7 | <span style="color:green">●</span> Active | 2026-03-30 | 2027-05-28 |
 
 **Legend:**
