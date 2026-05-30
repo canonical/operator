@@ -203,7 +203,7 @@ Just like when the owner granted the secret, we need to pass a relation to the `
 
 ## Secret observer charm
 
-> This applies to both charm and user secrets, though for user secrets the story starts with the charm defining a configuration option of type `secret`, and the secret is not acquired through relation data but rather by the configuration option being set to the secret's URI.
+> This section covers the **charm-secret observer** path, where the secret ID is shared via relation data. For **user secrets** (secrets created by a Juju user and shared via a `secret`-typed config option), see [](#manage-secrets-user-secret-observer) below.
 >
 > A secret owner charm is also an observer of the secret, so this applies to it too.
 
@@ -357,6 +357,66 @@ class MyWebserverCharm(ops.CharmBase):
 
 > See more: [](ops.Secret.get_content)
 
+
+(manage-secrets-user-secret-observer)=
+## User-secret observer charm
+
+> See also: {external+ops:ref}`Ops | Manage configuration <manage-configuration>`
+
+A **user secret** is a secret created by a Juju user (via `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret — which a charm creates and owns — the user-secret lifecycle is controlled entirely by the user.
+
+### Prerequisites
+
+Before the charm can read a user secret, the following must be done by the Juju user:
+
+1. Create the secret: `juju add-secret my-secret key=value`
+2. Grant it to the application: `juju grant-secret my-secret <app-name>`
+3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
+
+The charm must also declare a configuration option of `type: secret` in its `charmcraft.yaml`:
+
+```yaml
+config:
+  options:
+    my-secret-option:
+      type: secret
+      description: URI of the user-provided secret.
+```
+
+> See more: {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
+
+### Read a user secret
+
+Resolve the secret URI from the configuration and fetch the content via the model:
+
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, *args, **kwargs):
+        ...  # other setup
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        secret_uri = self.config.get('my-secret-option')
+        if not secret_uri:
+            return
+        secret = self.model.get_secret(id=secret_uri, label='user-provided-secret')
+        content = secret.get_content()
+        self._configure_with_secret(content)
+
+    def _on_secret_changed(self, event: ops.SecretChangedEvent):
+        if event.secret.label == 'user-provided-secret':
+            content = event.secret.get_content(refresh=True)
+            self._configure_with_secret(content)
+```
+
+### User-secret event contract
+
+The **only event** a user-secret observer receives is `secret-changed`, fired when the user updates the secret content (for example, via `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle.
+
+```{important}
+`juju grant-secret` does **not** fire a hook. The charm is not notified when access is granted; it only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`).
+```
 
 ## Write tests for your charm
 
