@@ -54,7 +54,7 @@ def state_get(key: str | None) -> dict[str, str] | str:
     if key is not None:
         key_result: str = json.loads(stdout)
         return key_result
-    result: dict[str, str] = json.loads(stdout)
+    result: dict[str, str] = json.loads(stdout) or {}
     return result
 
 

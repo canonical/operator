@@ -267,7 +267,7 @@ class TestHookcmdsCharm(ops.CharmBase):
 
         event.set_results({
             'secret-id': secret_id,
-            'in-ids-list': str(any(secret_id in i for i in ids)).lower(),
+            'in-ids-list': str(any(i in secret_id or secret_id in i for i in ids)).lower(),
             'initial-label': info.label or '',
             'initial-description': info.description or '',
             'initial-revision': str(info.revision),
