@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 import pathlib
+import re
 import subprocess
 from collections.abc import Callable, Generator
 
