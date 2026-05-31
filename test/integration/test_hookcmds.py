@@ -48,10 +48,15 @@ def _juju_major(juju: jubilant.Juju) -> int:
 # queued changes at the end of the hook. Observed on both machine (LXD) and
 # Kubernetes with Juju 4.0.5:
 #   - state-delete  -> "runtime error: index out of range [0] with length 0"
+#     (https://github.com/juju/juju/issues/22523)
 #   - secret-remove -> "removing secrets: secret not found"
-# These pass on Juju 3.6. Tracked upstream at <JUJU BUG LINK — TODO>; remove
-# the guards in the affected tests once the fix lands.
-_JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (see <JUJU BUG LINK>)'
+#     (https://github.com/juju/juju/issues/22524)
+# These pass on Juju 3.6. Remove the guards in the affected tests once the
+# fixes land.
+_JUJU4_COMMIT_BUG = (
+    'Juju 4.0 uniter commit-phase regression '
+    '(juju/juju#22523, juju/juju#22524)'
+)
 
 
 # Deployment
