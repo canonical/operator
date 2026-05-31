@@ -53,10 +53,7 @@ def _juju_major(juju: jubilant.Juju) -> int:
 #     (https://github.com/juju/juju/issues/22524)
 # These pass on Juju 3.6. Remove the guards in the affected tests once the
 # fixes land.
-_JUJU4_COMMIT_BUG = (
-    'Juju 4.0 uniter commit-phase regression '
-    '(juju/juju#22523, juju/juju#22524)'
-)
+_JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (juju/juju#22523, juju/juju#22524)'
 
 
 # Deployment
