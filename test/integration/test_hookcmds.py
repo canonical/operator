@@ -407,28 +407,10 @@ def test_action_fail_via_hookcmds(juju: jubilant.Juju, any_unit: str):
 
 
 def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
-    """Calling relation_get with a nonexistent relation ID raises hookcmds.Error.
-
-    The charm wraps the call in a try/except and surfaces the error type as an
-    action result so the test can verify that hookcmds.Error is raised rather
-    than a raw subprocess.CalledProcessError.
-    """
-    # We run an inline check: if the error-surface action doesn't exist we
-    # need to use a different approach.  The charm exposes no dedicated action
-    # for this; instead we rely on test-relation-data failing gracefully when
-    # there is no peer relation (1 unit scenario) - but we already have 2
-    # units, so we can't use that path here.
-    #
-    # Instead, verify the negative: the action should fail cleanly when we
-    # have no nonexistent ID path available.  This test is therefore a
-    # _documentation test_ that notes the error path is confirmed via the
-    # unit-test suite (test_run_error) where subprocess is mocked to return
-    # non-zero.
-    pytest.skip(
-        'hookcmds.Error path is covered by unit tests (test_run_error); '
-        'triggering it inside a deployed charm action would require a '
-        'dedicated "trigger-error" action not present in this charm.'
-    )
+    """relation_list on a nonexistent relation id raises hookcmds.Error."""
+    task = juju.run(any_unit, 'trigger-relation-error', params={'relation-id': 9999})
+    assert task.success
+    assert task.results['raised'] == 'Error'
 
 
 # Fixtures

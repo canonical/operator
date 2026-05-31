@@ -49,6 +49,9 @@ class TestHookcmdsCharm(ops.CharmBase):
         framework.observe(self.on['test-storage'].action, self._on_test_storage)
         framework.observe(self.on['test-action-params'].action, self._on_test_action_params)
         framework.observe(self.on['fail-action'].action, self._on_fail_action)
+        framework.observe(
+            self.on['trigger-relation-error'].action, self._on_trigger_relation_error
+        )
 
     # Lifecycle
 
@@ -357,6 +360,21 @@ class TestHookcmdsCharm(ops.CharmBase):
         """Call hookcmds.action_fail to deliberately fail the action."""
         msg = event.params.get('message', 'deliberate failure from hookcmds test')
         hookcmds.action_fail(msg)
+
+    # Error path
+
+    def _on_trigger_relation_error(self, event: ops.ActionEvent):
+        """relation_list on a bogus id should raise hookcmds.Error."""
+        relation_id = int(event.params['relation-id'])
+        try:
+            hookcmds.relation_list(relation_id)
+        except hookcmds.Error as exc:
+            event.set_results({
+                'raised': type(exc).__name__,
+                'message': str(exc),
+            })
+        else:
+            event.set_results({'raised': 'none'})
 
 
 if __name__ == '__main__':

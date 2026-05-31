@@ -139,3 +139,12 @@ actions:
                 type: string
                 description: Failure message.
                 default: deliberate failure from hookcmds test
+    trigger-relation-error:
+        description: |
+            Call hookcmds.relation_list with the given (invalid) relation id and
+            report the exception class name, exercising the hookcmds.Error path.
+        params:
+            relation-id:
+                type: integer
+                description: A relation id that does not exist.
+                default: 9999
