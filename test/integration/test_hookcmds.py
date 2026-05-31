@@ -54,9 +54,7 @@ def _juju_major(juju: jubilant.Juju) -> int:
 _JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (see <JUJU BUG LINK>)'
 
 
-# ---------------------------------------------------------------------------
 # Deployment
-# ---------------------------------------------------------------------------
 
 
 def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
@@ -67,9 +65,7 @@ def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
-# ---------------------------------------------------------------------------
 # Status (status_get / status_set)
-# ---------------------------------------------------------------------------
 
 
 def test_status_get_unit(juju: jubilant.Juju, any_unit: str):
@@ -118,9 +114,7 @@ def test_status_set_all_settable_values(juju: jubilant.Juju, any_unit: str, stat
     assert task.results['status'] == status
 
 
-# ---------------------------------------------------------------------------
 # Config (config_get)
-# ---------------------------------------------------------------------------
 
 
 def test_config_get_all(juju: jubilant.Juju, any_unit: str):
@@ -150,9 +144,7 @@ def test_config_get_int_key(juju: jubilant.Juju, any_unit: str):
     assert task.results['type'] == 'int'
 
 
-# ---------------------------------------------------------------------------
 # Leadership (is_leader)
-# ---------------------------------------------------------------------------
 
 
 def test_is_leader_true_for_leader(juju: jubilant.Juju, leader: str):
@@ -169,9 +161,7 @@ def test_is_leader_false_for_nonleader(juju: jubilant.Juju, nonleader: str):
     assert task.results['is-leader'] == 'false'
 
 
-# ---------------------------------------------------------------------------
 # Logging (juju_log)
-# ---------------------------------------------------------------------------
 
 
 def test_juju_log_all_levels(juju: jubilant.Juju, any_unit: str):
@@ -182,9 +172,7 @@ def test_juju_log_all_levels(juju: jubilant.Juju, any_unit: str):
     assert task.results['levels-logged'] == '5'
 
 
-# ---------------------------------------------------------------------------
 # Application version (app_version_set)
-# ---------------------------------------------------------------------------
 
 
 def test_app_version_set(juju: jubilant.Juju, leader: str):
@@ -197,9 +185,7 @@ def test_app_version_set(juju: jubilant.Juju, leader: str):
     assert status.apps['test-hookcmds'].version == '3.14.15'
 
 
-# ---------------------------------------------------------------------------
 # Network (network_get)
-# ---------------------------------------------------------------------------
 
 
 def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
@@ -220,9 +206,7 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
     assert results['first-address']  # non-empty
 
 
-# ---------------------------------------------------------------------------
 # Ports (open_port / close_port / opened_ports)
-# ---------------------------------------------------------------------------
 
 
 def test_ports_open_close_cycle(juju: jubilant.Juju, any_unit: str):
@@ -256,9 +240,7 @@ def test_ports_multiple_values(juju: jubilant.Juju, any_unit: str, port: int):
     assert task.results['back-to-initial'] == 'true'
 
 
-# ---------------------------------------------------------------------------
 # Server-side state (state_set / state_get / state_delete)
-# ---------------------------------------------------------------------------
 
 
 def test_state_roundtrip(juju: jubilant.Juju, any_unit: str):
@@ -300,10 +282,8 @@ def test_state_special_chars(juju: jubilant.Juju, any_unit: str):
     assert task.results['key-deleted'] == 'true'
 
 
-# ---------------------------------------------------------------------------
 # Secrets (secret_add / secret_ids / secret_info_get / secret_get /
 #          secret_set / secret_remove)
-# ---------------------------------------------------------------------------
 
 
 def test_secret_full_lifecycle(juju: jubilant.Juju, leader: str):
@@ -333,9 +313,7 @@ def test_secret_full_lifecycle(juju: jubilant.Juju, leader: str):
     assert len(owned) == 0, f'Expected no secrets owned by test-hookcmds, found: {owned}'
 
 
-# ---------------------------------------------------------------------------
 # Goal state (goal_state)
-# ---------------------------------------------------------------------------
 
 
 def test_goal_state_reports_units(juju: jubilant.Juju, any_unit: str):
@@ -355,9 +333,7 @@ def test_goal_state_reports_units(juju: jubilant.Juju, any_unit: str):
         )
 
 
-# ---------------------------------------------------------------------------
 # Relations (relation_ids / relation_list / relation_set / relation_get)
-# ---------------------------------------------------------------------------
 
 
 def test_relation_data_roundtrip(juju: jubilant.Juju, leader: str):
@@ -380,9 +356,7 @@ def test_relation_data_roundtrip(juju: jubilant.Juju, leader: str):
     assert r['key-in-all-data'] == 'true'
 
 
-# ---------------------------------------------------------------------------
 # Storage (storage_list / storage_get)
-# ---------------------------------------------------------------------------
 
 
 def test_storage_list_and_get(juju: jubilant.Juju, any_unit: str):
@@ -400,9 +374,7 @@ def test_storage_list_and_get(juju: jubilant.Juju, any_unit: str):
     assert r['storage-kind'] in ('filesystem', 'block')
 
 
-# ---------------------------------------------------------------------------
 # Action commands (action_get / action_log / action_set)
-# ---------------------------------------------------------------------------
 
 
 def test_action_get_and_set_via_hookcmds(juju: jubilant.Juju, any_unit: str):
@@ -431,9 +403,7 @@ def test_action_fail_via_hookcmds(juju: jubilant.Juju, any_unit: str):
     assert not exc_info.value.task.success
 
 
-# ---------------------------------------------------------------------------
 # Error path (hookcmds.Error)
-# ---------------------------------------------------------------------------
 
 
 def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
@@ -461,9 +431,7 @@ def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
     )
 
 
-# ---------------------------------------------------------------------------
 # Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture

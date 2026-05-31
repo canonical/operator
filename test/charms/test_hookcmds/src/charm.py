@@ -50,16 +50,12 @@ class TestHookcmdsCharm(ops.CharmBase):
         framework.observe(self.on['test-action-params'].action, self._on_test_action_params)
         framework.observe(self.on['fail-action'].action, self._on_fail_action)
 
-    # -------------------------------------------------------------------------
     # Lifecycle
-    # -------------------------------------------------------------------------
 
     def _on_start(self, event: ops.StartEvent):
         self.unit.status = ops.ActiveStatus()
 
-    # -------------------------------------------------------------------------
     # Status
-    # -------------------------------------------------------------------------
 
     def _on_get_status(self, event: ops.ActionEvent):
         """Return unit and (if leader) app status via hookcmds."""
@@ -88,9 +84,7 @@ class TestHookcmdsCharm(ops.CharmBase):
         # Restore active so the unit does not stay in a non-active state.
         hookcmds.status_set('active')
 
-    # -------------------------------------------------------------------------
     # Config
-    # -------------------------------------------------------------------------
 
     def _on_get_all_config(self, event: ops.ActionEvent):
         """Return all config as a JSON string."""
@@ -103,17 +97,13 @@ class TestHookcmdsCharm(ops.CharmBase):
         value = hookcmds.config_get(key)
         event.set_results({'value': str(value), 'type': type(value).__name__})
 
-    # -------------------------------------------------------------------------
     # Leadership
-    # -------------------------------------------------------------------------
 
     def _on_check_leadership(self, event: ops.ActionEvent):
         leader = hookcmds.is_leader()
         event.set_results({'is-leader': str(leader).lower()})
 
-    # -------------------------------------------------------------------------
     # Logging
-    # -------------------------------------------------------------------------
 
     def _on_test_logging(self, event: ops.ActionEvent):
         """Call juju_log at every supported level; return ok on success."""
@@ -122,18 +112,14 @@ class TestHookcmdsCharm(ops.CharmBase):
             hookcmds.juju_log(f'[{level}] {message}', level=level)  # type: ignore[arg-type]
         event.set_results({'ok': 'true', 'levels-logged': '5'})
 
-    # -------------------------------------------------------------------------
     # Application version
-    # -------------------------------------------------------------------------
 
     def _on_set_app_version(self, event: ops.ActionEvent):
         version = event.params['version']
         hookcmds.app_version_set(version)
         event.set_results({'ok': 'true', 'version': version})
 
-    # -------------------------------------------------------------------------
     # Network
-    # -------------------------------------------------------------------------
 
     def _on_get_network_info(self, event: ops.ActionEvent):
         """Return network info for the 'peer' binding."""
@@ -152,9 +138,7 @@ class TestHookcmdsCharm(ops.CharmBase):
                 results['first-address'] = first.addresses[0].value
         event.set_results(results)
 
-    # -------------------------------------------------------------------------
     # Ports
-    # -------------------------------------------------------------------------
 
     def _on_test_ports(self, event: ops.ActionEvent):
         """Open TCP+UDP ports, verify via opened_ports, then close and verify."""
@@ -198,9 +182,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'back-to-initial': str(back_to_initial).lower(),
         })
 
-    # -------------------------------------------------------------------------
     # Server-side state
-    # -------------------------------------------------------------------------
 
     def _on_test_unit_state(self, event: ops.ActionEvent):
         """Full state lifecycle: set → get(key) → get(all) → delete → verify."""
@@ -224,9 +206,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'key-deleted': str(key not in after_delete).lower(),
         })
 
-    # -------------------------------------------------------------------------
     # Secrets
-    # -------------------------------------------------------------------------
 
     def _on_test_secret_crud(self, event: ops.ActionEvent):
         """Full secret lifecycle: add → ids → info_get → get → set → remove."""
@@ -277,9 +257,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'label-lookup-password': by_label.get('password', ''),
         })
 
-    # -------------------------------------------------------------------------
     # Goal state
-    # -------------------------------------------------------------------------
 
     def _on_test_goal_state(self, event: ops.ActionEvent):
         gs = hookcmds.goal_state()
@@ -293,9 +271,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'relation-endpoint-count': str(len(gs.relations)),
         })
 
-    # -------------------------------------------------------------------------
     # Relations
-    # -------------------------------------------------------------------------
 
     def _on_test_relation_data(self, event: ops.ActionEvent):
         """relation_ids → relation_list → relation_set → relation_get."""
@@ -332,9 +308,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'key-in-all-data': str(test_key in all_data).lower(),
         })
 
-    # -------------------------------------------------------------------------
     # Storage
-    # -------------------------------------------------------------------------
 
     def _on_test_storage(self, event: ops.ActionEvent):
         """storage_list → storage_list(name) → storage_get."""
@@ -358,9 +332,7 @@ class TestHookcmdsCharm(ops.CharmBase):
                 'note': 'no data storage found',
             })
 
-    # -------------------------------------------------------------------------
     # Action commands (action_get / action_log / action_set)
-    # -------------------------------------------------------------------------
 
     def _on_test_action_params(self, event: ops.ActionEvent):
         """Use hookcmds action_get / action_log / action_set directly."""
@@ -379,9 +351,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'param-count': str(len(all_params)),
         })
 
-    # -------------------------------------------------------------------------
     # Action failure path
-    # -------------------------------------------------------------------------
 
     def _on_fail_action(self, event: ops.ActionEvent):
         """Call hookcmds.action_fail to deliberately fail the action."""
