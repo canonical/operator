@@ -363,7 +363,7 @@ class MyWebserverCharm(ops.CharmBase):
 
 > See also: {external+ops:ref}`Ops | Manage configuration <manage-configuration>`
 
-A **user secret** is a secret created by a Juju user (via `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret — which a charm creates and owns — the user-secret lifecycle is controlled entirely by the user.
+A **user secret** is a secret created by a Juju user (via `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
 
 ### Prerequisites
 
@@ -373,7 +373,6 @@ Before the charm can read a user secret, the following must be done by the Juju 
 2. Grant it to the application: `juju grant-secret my-secret <app-name>`
 3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
 
-The charm must also declare a configuration option of `type: secret` in its `charmcraft.yaml`:
 
 ```yaml
 config:
@@ -412,11 +411,7 @@ class MyCharm(ops.CharmBase):
 
 ### User-secret event contract
 
-The **only event** a user-secret observer receives is `secret-changed`, fired when the user updates the secret content (for example, via `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle.
-
-```{important}
-`juju grant-secret` does **not** fire a hook. The charm is not notified when access is granted; it only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`).
-```
+The **only event** a user-secret observer receives is `secret-changed`, fired when the user updates the secret content (for example, via `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle. The Juju user is responsible for managing the secret lifecycle.
 
 ## Write tests for your charm
 
