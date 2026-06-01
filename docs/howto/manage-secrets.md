@@ -373,6 +373,11 @@ Before the charm can read a user secret, the following must be done by the Juju 
 2. Grant it to the application: `juju grant-secret my-secret <app-name>`
 3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
 
+```{important}
+`juju grant-secret` does **not** fire a hook. The charm is not notified when access is granted; it only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
+```
+
+The charm must also declare a configuration option of `type: secret` in its `charmcraft.yaml`:
 
 ```yaml
 config:
