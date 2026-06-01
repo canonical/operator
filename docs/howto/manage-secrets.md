@@ -361,7 +361,7 @@ class MyWebserverCharm(ops.CharmBase):
 (manage-secrets-user-secret-observer)=
 ## User-secret observer charm
 
-> See also: {external+ops:ref}`Ops | Manage configuration <manage-configuration>`
+> See also: {ref}`manage-configuration`
 
 A **user secret** is a secret created by a Juju user (via `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
 
