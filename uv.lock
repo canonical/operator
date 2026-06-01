@@ -1939,8 +1939,6 @@ wheels = [
 name = "ops"
 source = { editable = "." }
 dependencies = [
-    { name = "importlib-metadata", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
-    { name = "importlib-metadata", version = "8.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "opentelemetry-api", version = "1.33.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "opentelemetry-api", version = "1.34.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pyyaml" },
@@ -2020,7 +2018,6 @@ xdist = [
 
 [package.metadata]
 requires-dist = [
-    { name = "importlib-metadata" },
     { name = "opentelemetry-api", specifier = "~=1.0" },
     { name = "ops-scenario", marker = "extra == 'testing'", editable = "testing" },
     { name = "ops-tracing", marker = "extra == 'tracing'", editable = "tracing" },
