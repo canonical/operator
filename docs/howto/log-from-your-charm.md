@@ -45,6 +45,7 @@ juju debug-log --debug --include-module juju.worker.uniter.operation --include-m
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-use-logging-not-print
 
 Capture output to `stdout` and `stderr` in your charm and use the logging and
 warning functionality to send messages to the charm user, rather than rely on
@@ -70,12 +71,14 @@ logger.info(f"Got some more information {more_info}")
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-meaningful-log-messages
 
 Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 ```
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-no-sensitive-data-in-logs
 
 Never log credentials or other sensitive information.
 ```

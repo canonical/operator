@@ -103,6 +103,7 @@ def uninstall() -> None:
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-pin-workload-versions
 
 Pin workload versions rather than installing the latest available package. A charm that silently upgrades between reconciliations is hard to debug, and can break if upstream introduces a breaking change.
 ```
@@ -144,6 +145,7 @@ If no library is available for installing the workload, use `subprocess` to run 
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-safe-subprocess
 
 When running subprocesses, use absolute paths (for example, `/usr/bin/apt` rather than `apt`) to avoid PATH-based attacks, and pass arguments as a list rather than a shell string so that the shell doesn't interpret them. Use `check=True` so that failures raise — generally you'll want to catch that exception and log the return code and possibly `stderr` — and `capture_output=True` so that output from the command doesn't leak into the Juju log.
 ```

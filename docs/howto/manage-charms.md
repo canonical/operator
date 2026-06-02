@@ -44,6 +44,7 @@ The Charmcraft profile has configured some commands to help you develop your cha
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-charmcraft-profile-commands
 
 All charms should provide the commands configured by the Charmcraft profile, to
 allow easy testing across the charm ecosystem. It's fine to tweak the

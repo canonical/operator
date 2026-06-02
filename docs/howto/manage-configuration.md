@@ -12,6 +12,7 @@ In the `charmcraft.yaml` file of the charm, under `config.options`, add a config
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-no-duplicate-model-config
 
 Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`.
 ```
