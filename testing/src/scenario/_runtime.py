@@ -263,18 +263,22 @@ class Runtime(Generic[CharmType]):
         config_yaml.write_text(yaml.safe_dump(spec.config or {}))
         actions_yaml.write_text(yaml.safe_dump(spec.actions or {}))
 
-        yield virtual_charm_root
+        try:
+            yield virtual_charm_root
+        finally:
+            if charm_virtual_root_is_custom:
+                for file, previous_content in metadata_files_present.items():
+                    if previous_content is None:  # None == file did not exist before
+                        file.unlink()
+                    else:
+                        file.write_text(previous_content)
 
-        if charm_virtual_root_is_custom:
-            for file, previous_content in metadata_files_present.items():
-                if previous_content is None:  # None == file did not exist before
-                    file.unlink()
-                else:
-                    file.write_text(previous_content)
-
-        else:
-            # charm_virtual_root is a tempdir
-            typing.cast('tempfile.TemporaryDirectory', charm_virtual_root).cleanup()  # type: ignore
+            else:
+                # charm_virtual_root is a tempdir
+                typing.cast(
+                    'tempfile.TemporaryDirectory',
+                    charm_virtual_root,
+                ).cleanup()  # type: ignore
 
     @contextmanager
     def exec(
