@@ -799,12 +799,13 @@ class Context(Generic[CharmType]):
             self.unit_status_history.append(state.unit_status)
 
     def close(self) -> None:
-        """Release the per-context tempdir used for simulated container/storage roots.
+        """Delete the temporary directory used for simulated container and storage roots.
 
-        Calling ``close()`` (or using the Context as a context manager) is optional;
-        the tempdir is cleaned up at garbage-collection time either way. Eager
-        cleanup is recommended when running tests with ``-W error``, where the
-        non-deterministic GC-time cleanup can interleave with pytest's finalisers.
+        Prefer using the Context as a context manager (``with Context(...) as ctx:``),
+        or call ``close()`` when you're done with it. This is especially important
+        when running tests with ``-W error``, where leaving cleanup to the garbage
+        collector can clash with pytest's teardown. If you do neither, the
+        temporary directory is still removed when the Context is garbage-collected.
         """
         if self._tmp_finalizer.alive:
             self._tmp_finalizer()
