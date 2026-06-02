@@ -554,6 +554,7 @@ class Harness(Generic[CharmType]):
         Always call ``self.addCleanup(harness.cleanup)`` after creating a :class:`Harness`.
         """
         self._backend._cleanup()
+        self._framework.close()
 
     def _create_meta(
         self,

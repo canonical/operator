@@ -26,6 +26,7 @@ import pathlib
 import platform
 import pwd
 import shutil
+import sqlite3
 import sys
 import tempfile
 import textwrap
@@ -3815,6 +3816,19 @@ class TestTestingModelBackend:
         assert str(path).startswith(str(backend._resource_dir.name)), (
             f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
         )
+
+    def test_cleanup_closes_framework_storage(self):
+        # Regression test: harness.cleanup() must close the SQLiteStorage
+        # connection. Otherwise the connection's destructor emits a
+        # ResourceWarning at GC, which surfaces as a test failure for callers
+        # running under -W error (such as downstream charm suites on
+        # Python 3.14).
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
+        harness.begin()
+        storage = harness._storage
+        harness.cleanup()
+        with pytest.raises(sqlite3.ProgrammingError):
+            storage._db.execute('SELECT 1')
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
