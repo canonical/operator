@@ -33,6 +33,10 @@ peers:
     peer:
         interface: test-hookcmds-peer
 
+requires:
+    anycharm:
+        interface: db
+
 storage:
     data:
         type: filesystem
@@ -170,17 +174,27 @@ actions:
             the cached file path.
     test-secret-grant:
         description: |
-            Create a secret and grant it to the peer relation via
-            hookcmds.secret_grant. Returns the secret ID.
+            Add a secret owned by this unit and grant it to the related any-charm
+            application via the anycharm relation.  Returns the secret ID and the
+            relation ID used for the grant.
     test-secret-revoke:
         description: |
-            Revoke access to a secret from the peer relation via
-            hookcmds.secret_revoke. Does NOT remove the secret.
+            Revoke the grant on a previously granted secret (from test-secret-grant)
+            and remove the secret entirely.
         params:
             secret-id:
                 type: string
-                description: The secret URI to revoke.
+                description: The ID of the secret whose grant should be revoked.
     test-storage-add:
         description: |
             Queue one additional 'data' storage instance via
             hookcmds.storage_add and return the current count before adding.
+    test-ports-endpoint-scoped:
+        description: |
+            Open a TCP port scoped to the peer endpoint, verify it appears with
+            the correct endpoint via opened_ports(endpoints=True), then close it.
+        params:
+            port:
+                type: integer
+                description: Port number to open/close, scoped to the peer endpoint.
+                default: 7766

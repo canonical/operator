@@ -61,6 +61,10 @@ class TestHookcmdsCharm(ops.CharmBase):
         framework.observe(self.on['test-secret-grant'].action, self._on_test_secret_grant)
         framework.observe(self.on['test-secret-revoke'].action, self._on_test_secret_revoke)
         framework.observe(self.on['test-storage-add'].action, self._on_test_storage_add)
+        framework.observe(
+            self.on['test-ports-endpoint-scoped'].action,
+            self._on_test_ports_endpoint_scoped,
+        )
 
     # Lifecycle
 
@@ -368,28 +372,42 @@ class TestHookcmdsCharm(ops.CharmBase):
         path = hookcmds.resource_get('test-file')
         event.set_results({'path': str(path)})
 
-    # Secret grant / revoke
+    # Cross-app secret grant / revoke
 
     def _on_test_secret_grant(self, event: ops.ActionEvent):
-        """Create a secret and grant it to the peer relation."""
-        ids = hookcmds.relation_ids('peer')
+        """Add a secret and grant it to the related any-charm app."""
+        ids = hookcmds.relation_ids('anycharm')
         if not ids:
-            event.fail('No peer relation - deploy 2+ units')
+            event.fail('No anycharm relation IDs - is any-charm deployed and integrated?')
             return
         rel_id = int(ids[0].split(':')[-1])
-        secret_id = hookcmds.secret_add({'key': 'grant-test-value'}, label='grant-test')
+
+        secret_id = hookcmds.secret_add(
+            {'token': 'grant-test-token'},
+            label='hookcmds-grant-test',
+            description='Created for grant/revoke integration test',
+        )
         hookcmds.secret_grant(secret_id, rel_id)
-        event.set_results({'secret-id': secret_id})
+
+        event.set_results({
+            'secret-id': secret_id,
+            'relation-id': str(rel_id),
+            'granted': 'true',
+        })
 
     def _on_test_secret_revoke(self, event: ops.ActionEvent):
-        """Revoke access to a secret from the peer relation."""
+        """Revoke the grant on a secret, then remove it entirely."""
         secret_id = event.params['secret-id']
-        ids = hookcmds.relation_ids('peer')
+        ids = hookcmds.relation_ids('anycharm')
         if not ids:
-            event.fail('No peer relation - deploy 2+ units')
+            event.fail('No anycharm relation IDs - is any-charm deployed and integrated?')
             return
         rel_id = int(ids[0].split(':')[-1])
+
         hookcmds.secret_revoke(secret_id, relation_id=rel_id)
+        hookcmds.secret_remove(secret_id)
+
+        event.set_results({'revoked': 'true'})
 
     # Storage add
 
@@ -398,6 +416,37 @@ class TestHookcmdsCharm(ops.CharmBase):
         current = hookcmds.storage_list('data')
         hookcmds.storage_add({'data': 1})
         event.set_results({'count-before-add': str(len(current))})
+
+    # Endpoint-scoped ports
+
+    def _on_test_ports_endpoint_scoped(self, event: ops.ActionEvent):
+        """Open a port scoped to the peer endpoint, verify, then close it."""
+        port = int(event.params.get('port', 7766))
+        endpoint = 'peer'
+
+        hookcmds.open_port('tcp', port, endpoints=endpoint)
+
+        all_ports = hookcmds.opened_ports(endpoints=True)
+        our_port = next(
+            (p for p in all_ports if p.port == port and p.protocol == 'tcp'),
+            None,
+        )
+
+        port_found = our_port is not None
+        ep_list = (our_port.endpoints or []) if our_port else []
+        endpoint_matches = port_found and endpoint in ep_list
+
+        hookcmds.close_port('tcp', port, endpoints=endpoint)
+
+        final = hookcmds.opened_ports(endpoints=True)
+        still_open = any(p.port == port and p.protocol == 'tcp' for p in final)
+
+        event.set_results({
+            'port-found-with-endpoint': str(port_found).lower(),
+            'endpoints-list': ','.join(ep_list),
+            'endpoint-matches': str(endpoint_matches).lower(),
+            'closed-after': str(not still_open).lower(),
+        })
 
 
 if __name__ == '__main__':

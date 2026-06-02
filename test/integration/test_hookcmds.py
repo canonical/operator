@@ -78,13 +78,19 @@ def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | Non
 
 
 def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
-    """Deploy the test-hookcmds charm with 2 units so that the peer relation
-    is active for relation-data tests."""
+    """Deploy the test-hookcmds charm (2 units) plus any-charm for cross-app tests.
+
+    Two units give an active peer relation for relation-data and goal-state tests.
+    any-charm (latest/beta) is deployed and integrated via the anycharm endpoint
+    so that secret_grant / secret_revoke have a real cross-app relation to work with.
+    """
     charm_path = build_hookcmds_charm()
     charm_dir = pathlib.Path(charm_path).parent
     resource_file = charm_dir / 'test-file.txt'
     resource_file.write_text('hello from the integration test resource')
     juju.deploy(charm_path, num_units=2, resources={'test-file': str(resource_file)})
+    juju.deploy('any-charm', channel='latest/beta')
+    juju.integrate('test-hookcmds:anycharm', 'any-charm')
     juju.wait(jubilant.all_active)
 
 
@@ -473,29 +479,33 @@ def test_resource_get(juju: jubilant.Juju, any_unit: str):
     assert pathlib.Path(path).name == 'test-file.txt'
 
 
-# Secret grant / revoke (secret_grant / secret_revoke)
+# Secrets (secret_grant / secret_revoke) — Follow-up 3
 
 
-def test_secret_grant_and_revoke(juju: jubilant.Juju, leader: str):
-    """secret_grant adds access; secret_revoke removes it — both observable via juju."""
+def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
+    """secret_grant gives access to a related app; secret_revoke removes it."""
     task = juju.run(leader, 'test-secret-grant')
     assert task.success
-    secret_id = task.results['secret-id']
+    r = task.results
+    assert r['granted'] == 'true'
+    secret_id = r['secret-id']
+    assert secret_id
 
-    # Juju-side effect: access entry must exist after grant.
-    secret = juju.show_secret(secret_id)
-    assert secret.access  # non-None, non-empty
-
-    # Revoke.
-    task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
+    # secret_revoke + secret_remove share the same Juju 4.0 commit-phase bug as
+    # secret_remove in test_secret_full_lifecycle.
+    try:
+        task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
+    except jubilant.TaskError:
+        if _juju_major(juju) >= 4:
+            pytest.xfail(_JUJU4_COMMIT_BUG)
+        raise
     assert task.success
+    assert task.results['revoked'] == 'true'
 
-    # Juju-side effect: access list is empty after revoke.
-    secret = juju.show_secret(secret_id)
-    assert not secret.access
-
-    # Clean up the secret.
-    juju.remove_secret(secret_id)
+    # Verify the secret is fully gone from Juju's perspective.
+    secrets = juju.secrets()
+    owned = [s for s in secrets if s.owner == 'test-hookcmds']
+    assert not owned, f'Expected no owned secrets after revoke, found: {owned}'
 
 
 # Storage add (storage_add) — placed late because it mutates model state
@@ -514,6 +524,23 @@ def test_storage_add(juju: jubilant.Juju, any_unit: str):
     assert new_task.success
     count_after = int(new_task.results['data-storage-count'])
     assert count_after == count_before + 1
+
+
+# Ports — endpoint-scoped variant (Follow-up 4)
+
+
+def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
+    """open_port with endpoints='peer' appears scoped in opened_ports(endpoints=True)."""
+    task = juju.run(any_unit, 'test-ports-endpoint-scoped', params={'port': 7766})
+    assert task.success
+    r = task.results
+    assert r['port-found-with-endpoint'] == 'true', (
+        f"Port 7766/tcp not found with endpoint info; endpoints-list={r.get('endpoints-list')}"
+    )
+    assert r['endpoint-matches'] == 'true', (
+        f"Expected endpoint 'peer' in endpoints-list, got: {r.get('endpoints-list')}"
+    )
+    assert r['closed-after'] == 'true'
 
 
 # Reboot (juju_reboot) — placed last because it reboots the unit
