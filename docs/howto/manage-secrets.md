@@ -203,9 +203,9 @@ Just like when the owner granted the secret, we need to pass a relation to the `
 
 ## Secret observer charm
 
-> This section covers the **charm-secret observer** path, where the secret ID is shared via relation data. For **user secrets** (secrets created by a Juju user and shared via a `secret`-typed config option), see [](#manage-secrets-user-secret-observer) below.
->
-> A secret owner charm is also an observer of the secret, so this applies to it too.
+This section covers the **charm-secret observer** path, where the secret ID is shared in relation data. A secret owner charm is also an observer of the secret, so this section applies to secret owner charms too.
+
+For **user secrets**, which are created by a Juju user and shared through configuration options of type `secret`, see [](#manage-secrets-user-secret-observer).
 
 ### Start tracking the latest secret revision
 
@@ -363,7 +363,7 @@ class MyWebserverCharm(ops.CharmBase):
 
 > See also: {ref}`manage-configuration`
 
-A **user secret** is a secret created by a Juju user (via `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
+A **user secret** is a secret created by a Juju user (with `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
 
 ### Prerequisites
 
@@ -374,7 +374,7 @@ Before the charm can read a user secret, the following must be done by the Juju 
 3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
 
 ```{important}
-`juju grant-secret` does **not** fire a hook. The charm is not notified when access is granted; it only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
+`juju grant-secret` does **not** trigger an event to notify the charm. The charm only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
 ```
 
 The charm must also declare a configuration option of `type: secret` in its `charmcraft.yaml`:
@@ -391,7 +391,6 @@ config:
 
 ### Read a user secret
 
-Resolve the secret URI from the configuration and fetch the content via the model:
 
 ```python
 class MyCharm(ops.CharmBase):
@@ -404,19 +403,23 @@ class MyCharm(ops.CharmBase):
         secret_uri = self.config.get('my-secret-option')
         if not secret_uri:
             return
+        # Read the secret.
         secret = self.model.get_secret(id=secret_uri, label='user-provided-secret')
         content = secret.get_content()
+        # Do something with the secret content.
         self._configure_with_secret(content)
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent):
         if event.secret.label == 'user-provided-secret':
+            # Read the secret.
             content = event.secret.get_content(refresh=True)
+            # Do something with the secret content.
             self._configure_with_secret(content)
 ```
 
 ### User-secret event contract
 
-The **only event** a user-secret observer receives is `secret-changed`, fired when the user updates the secret content (for example, via `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle. The Juju user is responsible for managing the secret lifecycle.
+The only event a user-secret observer receives is `secret-changed`, triggered when the user updates the secret content (for example, with `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle. The Juju user is responsible for managing the secret lifecycle.
 
 ## Write tests for your charm
 
