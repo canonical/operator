@@ -74,7 +74,7 @@ requires:
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.
 
-Import the database interface library and define database event handlers
+## Import the database interface library and define database event handlers
 
 We now need to implement the logic that wires our application to a database. When a relation between our application and the data platform is formed, the provider side (that is: the data platform) will create a database for us and it will provide us with all the information we need to connect to it over the relation -- for example, username, password, host, port, and so on. On our side, we nevertheless still need to set the relevant environment variables to point to the database and restart the service.
 
