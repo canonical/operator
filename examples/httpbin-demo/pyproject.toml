@@ -42,7 +42,7 @@ unit = [
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant>=1.8,<2",
+    "jubilant>=1.9.0,<2",
     "pytest-jubilant>=2.0.1,<3",
     "pyyaml",
 ]
