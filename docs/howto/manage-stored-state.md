@@ -68,7 +68,7 @@ def _on_start(self, event: ops.StartEvent):
 def _on_install(self, event: ops.InstallEvent):
     # We can use self._stored.expensive_value here, and it will have the value
     # set in the start event.
-    logger.info('Current value: %s', self._stored.expensive_value)
+    logger.info("Current value: %s", self._stored.expensive_value)
 ```
 
 > Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
@@ -96,8 +96,8 @@ def test_charm_sets_stored_state():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
     state_out = ctx.run(ctx.on.start(), state_in)
-    ss = state_out.get_stored_state('_stored', owner_path='MyCharm')
-    assert ss.content['expensive_value'] == 42
+    ss = state_out.get_stored_state("_stored", owner_path="MyCharm")
+    assert ss.content["expensive_value"] == 42
 
 
 def test_charm_logs_stored_state():
@@ -105,8 +105,8 @@ def test_charm_logs_stored_state():
     state_in = testing.State(
         stored_states={
             testing.StoredState(
-                '_stored',
-                owner_path='MyCharm',
+                "_stored",
+                owner_path="MyCharm",
                 content={
                     'expensive_value': 42,
                 },
@@ -114,7 +114,7 @@ def test_charm_logs_stored_state():
         }
     )
     state_out = ctx.run(ctx.on.install(), state_in)
-    assert ctx.juju_log[0].message == 'Current value: 42'
+    assert ctx.juju_log[0].message == "Current value: 42"
 ```
 
 ## Storing state for the lifetime of the application
@@ -180,5 +180,5 @@ def test_charm_sets_stored_state():
     state_in = testing.State(relations={peer})
     state_out = ctx.run(ctx.on.start(), state_in)
     rel = state_out.get_relation(peer.id)
-    assert rel.local_app_data['expensive_value'] == '42'
+    assert rel.local_app_data["expensive_value"] == "42"
 ```

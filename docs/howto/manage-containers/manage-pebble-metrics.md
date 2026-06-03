@@ -62,27 +62,27 @@ class MyCharm(ops.CharmBase):
         # - Stored the secret ID in the 'metrics-secret-id' configuration option
         if not self.config.get('metrics-secret-id'):
             return
-        secret_id = str(self.config['metrics-secret-id'])
+        secret_id = str(self.config["metrics-secret-id"])
         secret = self.model.get_secret(id=secret_id)
         content = secret.get_content()
-        self._replace_identities(content['username'], content['password'])
+        self._replace_identities(content["username"], content["password"])
 
     def _on_secret_changed(self, event: ops.SecretChangedEvent) -> None:
         if not self.config.get('metrics-secret-id'):
             return
         if event.secret.id == self.config['metrics-secret-id']:
             content = event.secret.peek_content()
-            self._replace_identities(content['username'], content['password'])
+            self._replace_identities(content["username"], content["password"])
 
     def _replace_identities(self, username: str, password: str) -> None:
         identities = {
             username: ops.pebble.Identity(
-                access='metrics',
+                access="metrics",
                 basic=ops.pebble.BasicIdentity(password=sha512_crypt.hash(password)),
             ),
         }
         self.container.pebble.replace_identities(identities)
-        logger.debug('New metrics username: %s', username)
+        logger.debug("New metrics username: %s", username)
 
     ...
 ```

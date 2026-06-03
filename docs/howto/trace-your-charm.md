@@ -188,11 +188,11 @@ You can disambiguate spans using their [`instrumentation_scope`](opentelemetry.s
 
 ```py
 # Spans from Ops
-ops_span.instrumentation_scope.name == 'ops'
+ops_span.instrumentation_scope.name == "ops"
 ops_span.name == ...
 
 # tracer = opentelemetry.trace.get_tracer("my-charm")
-my_span.instrumentation_scope.name == 'my-charm'
+my_span.instrumentation_scope.name == "my-charm"
 my_span.name == ...
 ```
 

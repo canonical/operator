@@ -133,6 +133,10 @@ extend-exclude = ["docs/conf.py", "docs/_dev/"]
 # Ruff formatter configuration
 [tool.ruff.format]
 quote-style = "single"
+# Skip markdown in the default pass; markdown is formatted in a second tox
+# step with `quote-style = "preserve"` so doc examples keep their double
+# quotes while .py files still use single quotes.
+exclude = ["**/*.md"]
 
 [tool.ruff.lint]
 select = [

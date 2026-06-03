@@ -45,7 +45,7 @@ class WikiConfig(pydantic.BaseModel):
     def validate_name(cls, value):
         if len(value) < 4:
             raise ValueError('Name must be at least 4 characters long')
-        if ' ' in value:
+        if " " in value:
             raise ValueError('Name must not contain spaces')
         return value
 ```

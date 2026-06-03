@@ -111,8 +111,8 @@ Arrange the methods of this class in the following order:
    ```python
    def __init__(self, framework: ops.Framework):
        super().__init__(framework)
-       framework.observe(self.on['workload_container'].pebble_ready, self._on_pebble_ready)
-       self.container = self.unit.get_container('workload-container')
+       framework.observe(self.on["workload_container"].pebble_ready, self._on_pebble_ready)
+       self.container = self.unit.get_container("workload-container")
    ```
 2. Event handlers, in the order that they're observed in `__init__`.
    Make the event handlers private.
@@ -165,7 +165,7 @@ class DemoServerCharm(ops.CharmBase):
 
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
-        self.unit.status = ops.MaintenanceStatus('starting server')
+        self.unit.status = ops.MaintenanceStatus("starting server")
         demo_server.start()
         version = demo_server.get_version()
         self.unit.set_workload_version(version)
@@ -175,7 +175,7 @@ class DemoServerCharm(ops.CharmBase):
     # If a method doesn't depend on Ops, put it in src/demo_server.py instead.
 
 
-if __name__ == '__main__':  # pragma: nocover
+if __name__ == "__main__":  # pragma: nocover
     ops.main(DemoServerCharm)
 ```
 
@@ -197,17 +197,17 @@ logger = logging.getLogger(__name__)
 
 def install() -> None:
     """Install the server from a snap."""
-    subprocess.run(['snap', 'install', 'demo-server'], capture_output=True, check=True)
+    subprocess.run(["snap", "install", "demo-server"], capture_output=True, check=True)
 
 
 def start() -> None:
     """Start the server."""
-    subprocess.run(['demo-server', 'start'], capture_output=True, check=True)
+    subprocess.run(["demo-server", "start"], capture_output=True, check=True)
 
 
 def get_version() -> str:
     """Get the running version of the server."""
-    response = requests.get('http://localhost:5000/version', timeout=5)
+    response = requests.get("http://localhost:5000/version", timeout=5)
     return response.text
 ```
 
@@ -232,8 +232,8 @@ class DemoServerCharm(ops.CharmBase):
         # Observe other events...
 
     def _on_collect_status(self, event: ops.CollectStatusEvent):
-        if 'port' not in self.config:
-            event.add_status(ops.BlockedStatus('no port specified'))
+        if "port" not in self.config:
+            event.add_status(ops.BlockedStatus("no port specified"))
             return
         event.add_status(ops.ActiveStatus())
 ```
@@ -245,11 +245,11 @@ Your handler for `collect_unit_status` won't have access to data about the main 
 To report the unit status while handling an event, set [`self.unit.status`](ops.Unit.status). When your charm code sets `self.unit.status`, Ops immediately sends the unit status to Juju. For example:
 
 ```python
-def _on_start(self, event: ops.StartEvent):
-    """Handle start event."""
-    self.unit.status = ops.MaintenanceStatus('starting server')
-    demo_server.start()
-    # At the end of the handler, Ops triggers collect_unit_status.
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        self.unit.status = ops.MaintenanceStatus("starting server")
+        demo_server.start()
+        # At the end of the handler, Ops triggers collect_unit_status.
 ```
 
 ### Application status
@@ -272,14 +272,14 @@ class DemoServerCharm(ops.CharmBase):
         # This is triggered for the leader unit only.
         num_degraded = ...  # Inspect peer unit databags to find degraded units.
         if num_degraded:
-            event.add_status(ops.ActiveStatus(f'degraded units: {num_degraded}'))
+            event.add_status(ops.ActiveStatus(f"degraded units: {num_degraded}"))
             return
         event.add_status(ops.ActiveStatus())
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
         # This is triggered for each unit.
         if self.is_degraded():  # Use a custom helper method to determine status.
-            event.add_status(ops.ActiveStatus('degraded'))
+            event.add_status(ops.ActiveStatus("degraded"))
             return
         event.add_status(ops.ActiveStatus())
 ```

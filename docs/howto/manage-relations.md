@@ -95,7 +95,7 @@ For example:
 
 ```python
 class DatabaseProviderAppData(pydantic.BaseModel):
-    credentials: str | None = pydantic.Field(default=None, description='A Juju secret ID')
+    credentials: str | None = pydantic.Field(default=None, description="A Juju secret ID")
 ```
 
 Now, in the body of the charm definition, define the event handler. In this example, if we are the leader unit, then we create a database and pass the credentials to use it to the charm on the other side via the relation data:
@@ -126,7 +126,7 @@ For example:
 
 ```python
 class SMTPProviderUnitData(pydantic.BaseMode):
-    smtp_credentials: str = pydantic.Field(description='A Juju secret ID')
+    smtp_credentials: str = pydantic.Field(description="A Juju secret ID")
 ```
 
 Now, in the body of the charm definition, define the event handler. In this example, a `smtp_credentials` key is set in the unit data with the ID of a secret:
@@ -199,7 +199,7 @@ To add data to the relation databag, use the [`.data` attribute](ops.Relation.da
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     if relation := self.model.get_relation('ingress'):
-        relation.data[self.app]['domain'] = self.config['domain']
+        relation.data[self.app]["domain"] = self.config["domain"]
 ```
 
 To read data from the relation databag, again use the `.data` attribute, selecting the appropriate databag, and then using it as if it were a regular dictionary.
@@ -357,8 +357,8 @@ To verify that charm behaves correctly when integrated with another in a real Ju
 
 
 def test_active_with_another_app(juju: jubilant.Juju):
-    juju.deploy('another-app')
-    juju.integrate('your-app:endpoint', 'another-app:endpoint')
+    juju.deploy("another-app")
+    juju.integrate("your-app:endpoint", "another-app:endpoint")
 
     juju.wait(jubilant.all_active)
 ```

@@ -108,7 +108,7 @@ class PauseCharm(ops.CharmBase):
         # Set a friendly name for your charm. This can be used with the Operator
         # framework to reference the container, add layers, or interact with
         # providers/consumers easily.
-        self.name = 'pause'
+        self.name = "pause"
         # This event is dynamically determined from the service name
         # in ops.pebble.Layer
         #
@@ -134,14 +134,14 @@ class PauseCharm(ops.CharmBase):
     def _pause_layer(self) -> ops.pebble.Layer:
         """Returns Pebble configuration layer for google/pause"""
         return ops.pebble.Layer({
-            'summary': 'pause layer',
-            'description': 'pebble config layer for google/pause',
-            'services': {
+            "summary": "pause layer",
+            "description": "pebble config layer for google/pause",
+            "services": {
                 self.name: {
-                    'override': 'replace',
-                    'summary': 'pause service',
-                    'command': '/pause',
-                    'startup': 'enabled',
+                    "override": "replace",
+                    "summary": "pause service",
+                    "command": "/pause",
+                    "startup": "enabled",
                 }
             },
         })
@@ -226,7 +226,7 @@ class MyCharm(ops.CharmBase):
     ...
 
     def _on_config_changed(self, event):
-        container = self.unit.get_container('main')
+        container = self.unit.get_container("main")
         container.replan()
         plan = container.get_plan()
         for service in plan.services:
@@ -256,18 +256,18 @@ class SnappassTestCharm(ops.CharmBase):
     ...
 
     def _start_snappass(self):
-        container = self.unit.containers['snappass']
+        container = self.unit.containers["snappass"]
         snappass_layer = {
-            'services': {
-                'snappass': {
-                    'override': 'replace',
-                    'summary': 'snappass service',
-                    'command': 'snappass',
-                    'startup': 'enabled',
+            "services": {
+                "snappass": {
+                    "override": "replace",
+                    "summary": "snappass service",
+                    "command": "snappass",
+                    "startup": "enabled",
                 }
             },
         }
-        container.add_layer('snappass', snappass_layer, combine=True)
+        container.add_layer("snappass", snappass_layer, combine=True)
         container.replan()
         self.unit.status = ops.ActiveStatus()
 ```

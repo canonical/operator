@@ -125,12 +125,12 @@ Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider`
 try:
     config = self.load_config(FastAPIConfig)
 except ValueError as e:
-    logger.warning('Unable to add metrics: invalid configuration: %s', e)
+    logger.warning("Unable to add metrics: invalid configuration: %s", e)
 else:
     self._prometheus_scraping = MetricsEndpointProvider(
         self,
-        relation_name='metrics-endpoint',
-        jobs=[{'static_configs': [{'targets': [f'*:{config.server_port}']}]}],
+        relation_name="metrics-endpoint",
+        jobs=[{"static_configs": [{"targets": [f"*:{config.server_port}"]}]}],
         refresh_event=self.on.config_changed,
     )
 ```
@@ -170,7 +170,7 @@ Then, in your charm's `__init__` method, initialise the `LogForwarder` instance 
 
 ```python
 # Enable pushing application logs to Loki.
-self._logging = LogForwarder(self, relation_name='logging')
+self._logging = LogForwarder(self, relation_name="logging")
 ```
 
 Congratulations, your charm can now also integrate with Loki!
@@ -207,7 +207,7 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 
 ```python
 # Provide grafana dashboards over a relation interface.
-self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name='grafana-dashboard')
+self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
 ```
 
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
@@ -496,9 +496,9 @@ import yaml
 Next, still in `tests/integration/test_charm.py`, define the new fixture:
 
 ```python
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cos(juju_factory: pytest_jubilant.JujuFactory):
-    yield juju_factory.get_juju(suffix='cos')
+    yield juju_factory.get_juju(suffix="cos")
 ```
 
 `get_juju` creates a model called `jubilant-<randomhex>-cos`.
@@ -513,15 +513,15 @@ Add two test functions to `tests/integration/test_charm.py`:
 @pytest.mark.juju_setup
 def test_deploy_cos(cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
-    cos.deploy('cos-lite', trust=True)
+    cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
 @pytest.mark.juju_setup
 def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
-    cos.offer('loki', endpoint='logging')
-    juju.integrate(APP_NAME, f'{cos.model}.loki')
+    cos.offer("loki", endpoint="logging")
+    juju.integrate(APP_NAME, f"{cos.model}.loki")
     juju.wait(jubilant.all_active)
     cos.wait(jubilant.all_active)
 ```
@@ -537,12 +537,12 @@ def test_loki_data(cos: jubilant.Juju):
     COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
     that tells us the base URL of Loki's API.
     """
-    task = cos.run('traefik/0', 'show-proxied-endpoints')
-    results = json.loads(task.results['proxied-endpoints'])
-    loki_url = results['loki/0']['url']
-    loki_api_url = f'{loki_url}/loki/api/v1/label/juju_application/values'
+    task = cos.run("traefik/0", "show-proxied-endpoints")
+    results = json.loads(task.results["proxied-endpoints"])
+    loki_url = results["loki/0"]["url"]
+    loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
     juju_applications = _get_loki_logs(loki_api_url)
-    assert juju_applications is not None, 'No logs available from Loki'
+    assert juju_applications is not None, "No logs available from Loki"
     assert APP_NAME in juju_applications
 
 
@@ -554,8 +554,8 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
         response = requests.get(loki_api_url)
         if response.status_code == 200:
             response_decoded = response.json()
-            if 'data' in response_decoded:
-                return response_decoded['data']
+            if "data" in response_decoded:
+                return response_decoded["data"]
     return None
 ```
 

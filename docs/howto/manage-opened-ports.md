@@ -76,17 +76,17 @@ def test_open_ports(juju: jubilant.Juju):
     Assert blocked status in case of port 22 and active status for others.
     """
     # Get the public address of the app:
-    address = juju.status().apps['your-app'].units['your-app/0'].public_address
+    address = juju.status().apps["your-app"].units["your-app/0"].public_address
     # Validate that initial port is opened:
     assert is_port_open(address, 8000)
 
     # Set the port to 22 and validate the app goes to blocked status with the port not opened:
-    juju.config('your-app', {'server-port': '22'})
+    juju.config("your-app", {"server-port": "22"})
     juju.wait(jubilant.all_blocked)
     assert not is_port_open(address, 22)
 
     # Set the port to 6789 and validate the app goes to active status with the port opened.
-    juju.config('your-app', {'server-port': '6789'})
+    juju.config("your-app", {"server-port": "6789"})
     juju.wait(jubuilant.all_active)
     assert is_port_open(address, 6789)
 ```
