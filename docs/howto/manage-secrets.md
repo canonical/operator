@@ -6,15 +6,22 @@ myst:
 
 (manage-secrets)=
 # How to manage secrets
-> See first: {external+juju:ref}`Juju | Secret <secret>`, {external+juju:ref}`Juju | Manage secrets <manage-secrets>`, {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
+See first:
+- {external+juju:ref}`Juju | Secret <secret>`
+- {external+juju:ref}`Juju | Manage secrets <manage-secrets>`
+- {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
 
-> Added in `Juju 3.0.2`
+```{note}
+Added in Juju 3.0.2.
+```
 
 This document shows how to use secrets in a charm -- both when the charm is the secret owner as well as when it is merely an observer.
 
 ## Secret owner charm
 
-> By its nature, the content in this section only applies to *charm* secrets.
+```{note}
+By its nature, the content in this section only applies to *charm* secrets.
+```
 
 ### Add and grant access to a secret
 
@@ -62,7 +69,7 @@ Note that:
 
 If the relation is a cross-model relation, Juju only allows the offering application to grant access to secrets.
 
-> See more: [](ops.Application.add_secret)
+See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
 
@@ -254,7 +261,7 @@ Note that:
 - The observer charm gets a secret via the model (not its app/unit). Because it's the owner who decides who the secret is granted to, the ownership of a secret is not an observer concern. The observer code can rightfully assume that, so long as a secret ID is  shared with it, the owner has taken care to grant and scope the secret in such a way that the observer has the rights to inspect its contents.
 - The charm first gets the secret object from the model, then gets the secret's content (a dict) and accesses individual attributes via the dict's items.
 
-> See more: [](ops.Secret.get_content)
+See more: [](ops.Secret.get_content)
 
 ### Label the secrets you're observing
 
@@ -315,7 +322,7 @@ So, having labelled the secret on creation, the database charm could add a new r
         secret.set_content(...)  # pass a new revision payload, as before
 ```
 
-> See more: [](ops.Model.get_secret)
+See more: [](ops.Model.get_secret)
 
 #### When to use labels
 
@@ -341,7 +348,7 @@ Sometimes, before reconfiguring to use a new credential revision, the observer c
         ...
 ```
 
-> See more: [](ops.Secret.peek_content)
+See more: [](ops.Secret.peek_content)
 
 ### Start tracking a different secret revision
 
@@ -361,13 +368,13 @@ class MyWebserverCharm(ops.CharmBase):
         self._configure_db_credentials(content['username'], content['password'])
 ```
 
-> See more: [](ops.Secret.get_content)
+See more: [](ops.Secret.get_content)
 
 
 (manage-secrets-user-secret-observer)=
 ## User-secret observer charm
 
-> See also: {ref}`manage-configuration`
+See also: {ref}`manage-configuration`
 
 A **user secret** is a secret created by a Juju user (with `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
 
@@ -383,7 +390,7 @@ config:
       description: URI of the user-provided secret.
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | config <charmcraft-yaml-key-config>`
+See more: {external+charmcraft:ref}`Charmcraft | config <charmcraft-yaml-key-config>`
 
 Once that's in place, the Juju user must:
 
