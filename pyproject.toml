@@ -37,7 +37,7 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.11.2",
+    "ruff==0.15.14",
     "codespell==2.4.1",
     "zizmor==1.11.0",
     "ops[testing,tracing]",
