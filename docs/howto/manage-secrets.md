@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Manage Juju secrets in a charm as the secret owner, as an observer of charm secrets, and as an observer of user secrets shared via configuration.
+---
+
 (manage-secrets)=
 # How to manage secrets
 > See first: {external+juju:ref}`Juju | Secret <secret>`, {external+juju:ref}`Juju | Manage secrets <manage-secrets>`, {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
@@ -367,17 +373,7 @@ A **user secret** is a secret created by a Juju user (with `juju add-secret`) an
 
 ### Prerequisites
 
-Before the charm can read a user secret, the following must be done by the Juju user:
-
-1. Create the secret: `juju add-secret my-secret key=value`
-2. Grant it to the application: `juju grant-secret my-secret <app-name>`
-3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
-
-```{important}
-`juju grant-secret` does **not** trigger an event to notify the charm. The charm only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
-```
-
-The charm must also declare a configuration option of `type: secret` in its `charmcraft.yaml`:
+The charm must declare a configuration option of `type: secret` in its `charmcraft.yaml`:
 
 ```yaml
 config:
@@ -387,7 +383,17 @@ config:
       description: URI of the user-provided secret.
 ```
 
-> See more: {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
+> See more: {external+charmcraft:ref}`Charmcraft | config <charmcraft-yaml-key-config>`
+
+Once that's in place, the Juju user must:
+
+1. Create the secret: `juju add-secret my-secret key=value`
+2. Grant it to the application: `juju grant-secret my-secret <app-name>`
+3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
+
+```{important}
+`juju grant-secret` does **not** trigger an event to notify the charm. The charm only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
+```
 
 ### Read a user secret
 
