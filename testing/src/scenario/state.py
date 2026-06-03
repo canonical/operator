@@ -2014,14 +2014,14 @@ class _CharmSpec(Generic[CharmType]):
         # files for charm metadata.
         metadata_path = charm_root / 'metadata.yaml'
         meta: dict[str, Any] = (
-            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+            yaml.safe_load(metadata_path.read_text()) if metadata_path.exists() else {}
         )
 
         config_path = charm_root / 'config.yaml'
-        config = yaml.safe_load(config_path.open()) if config_path.exists() else None
+        config = yaml.safe_load(config_path.read_text()) if config_path.exists() else None
 
         actions_path = charm_root / 'actions.yaml'
-        actions = yaml.safe_load(actions_path.open()) if actions_path.exists() else None
+        actions = yaml.safe_load(actions_path.read_text()) if actions_path.exists() else None
         return meta, config, actions
 
     @staticmethod
@@ -2035,7 +2035,7 @@ class _CharmSpec(Generic[CharmType]):
         """
         metadata_path = charm_root / 'charmcraft.yaml'
         meta: dict[str, Any] = (
-            yaml.safe_load(metadata_path.open()) if metadata_path.exists() else {}
+            yaml.safe_load(metadata_path.read_text()) if metadata_path.exists() else {}
         )
         if not _is_valid_charmcraft_25_metadata(meta):
             meta = {}
