@@ -3111,10 +3111,10 @@ class Container:
         # /src/* --> /dst/*
         # /src --> /dst/src
         file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
-        prefix = source_path.parent
-        if str(prefix) != '.' and not file_path.is_relative_to(prefix):
+        prefix = str(source_path.parent)
+        if prefix != '.' and os.path.commonpath([prefix, str(file_path)]) != prefix:
             raise RuntimeError(f'file "{file_path}" does not have specified prefix "{prefix}"')
-        path_suffix = file_path.relative_to(prefix)
+        path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
 
     def exists(self, path: str | PurePath) -> bool:
