@@ -293,7 +293,8 @@ class TestSQLiteStorage(StoragePermutations):
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
             open(filename, 'w').close()
-            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            with pytest.raises(RuntimeError):
+                ops.storage.SQLiteStorage(filename)
 
     @unittest.mock.patch('os.chmod')
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
@@ -301,7 +302,8 @@ class TestSQLiteStorage(StoragePermutations):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, '.unit-state.db')
             open(filename, 'w').close()
-            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            with pytest.raises(RuntimeError):
+                ops.storage.SQLiteStorage(filename)
 
 
 def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):

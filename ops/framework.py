@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import collections
 import collections.abc
 import inspect
 import keyword
@@ -871,10 +870,10 @@ class Framework(Object):
         self._validate_snapshot_data(event, this_event_data)
         # TODO Track observers by (parent_path, event_kind) rather than as a list of
         # all observers. Avoiding linear search through all observers for every event
-        for observer_path, method_name, _parent_path, _event_kind in self._observers:
-            if _parent_path != parent_path:
+        for observer_path, method_name, parent_path_, event_kind_ in self._observers:
+            if parent_path_ != parent_path:
                 continue
-            if _event_kind and _event_kind != event_kind:
+            if event_kind_ and event_kind_ != event_kind:
                 continue
             if self.skip_duplicate_events and self._event_is_in_storage(
                 observer_path, method_name, event_path, this_event_data
@@ -950,10 +949,11 @@ class Framework(Object):
 
         old_hook_is_running = backend._hook_is_running
         backend._hook_is_running = event_name
-        yield
-        backend._hook_is_running = old_hook_is_running
-
-        self._event_name = old_event_name
+        try:
+            yield
+        finally:
+            backend._hook_is_running = old_hook_is_running
+            self._event_name = old_event_name
 
     def _reemit(self, single_event_path: str | None = None):
         last_event_path = None

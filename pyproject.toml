@@ -37,7 +37,7 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.11.2",
+    "ruff==0.15.14",
     "codespell==2.4.1",
     "zizmor==1.11.0",
     "ops[testing,tracing]",
@@ -206,6 +206,12 @@ ignore = [
     # Manual dict comprehension.
     "PERF403",
 
+    # `__init__` module should only contain docstrings and re-exports.
+    # ops/__init__.py wraps main() and imports ops_tracing at the bottom;
+    # ops/_private/__init__.py exposes a module-level tracer; ops/lib/__init__.py
+    # is the legacy library loader. All intentional.
+    "RUF067",
+
     # Convert {} from `TypedDict` functional to class syntax
     # Note that since we have some `TypedDict`s that cannot use the class
     # syntax, we're currently choosing to be consistent in syntax even though
@@ -230,7 +236,11 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "S106",
 
     # "Useless" expression.
-    "B018"
+    "B018",
+
+    # Unreliable floating point equality comparison. Tests check round-tripped
+    # exact-literal config values; pytest.approx isn't appropriate here.
+    "RUF069",
 ]
 "testing/tests/*" = [
     # All documentation linting.

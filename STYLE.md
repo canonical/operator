@@ -31,6 +31,7 @@ An exception is names from `typing` -- type annotations get too verbose if these
 from ops import CharmBase, PebbleReadyEvent
 from subprocess import run
 
+
 class MyCharm(CharmBase):
     def _pebble_ready(self, event: PebbleReadyEvent):
         run(['echo', 'foo'])
@@ -42,12 +43,15 @@ class MyCharm(CharmBase):
 import ops
 import subprocess
 
+
 class MyCharm(ops.CharmBase):
     def _pebble_ready(self, event: ops.PebbleReadyEvent):
         subprocess.run(['echo', 'foo'])
 
+
 # However, "from typing import Foo" is okay to avoid verbosity
 from typing import Optional, Tuple
+
 counts: Optional[Tuple[str, int]]
 ```
 
@@ -135,16 +139,17 @@ Function and method signatures should include a type annotation for the returned
 **Do:**
 
 ```python
-def method1(arg1: type1, arg2: type2) -> None:
-    ...
+def method1(arg1: type1, arg2: type2) -> None: ...
+
 
 def method2() -> str:
     ...
     return 'Hello world!'
 
+
 class C:
-    def __init__(self, x: type1):
-        ...
+    def __init__(self, x: type1): ...
+
 
 def test_method1():
     assert ...

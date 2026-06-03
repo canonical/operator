@@ -263,11 +263,7 @@ class MyCharmType(ops.CharmBase):
 
 
 td = tempfile.TemporaryDirectory()
-ctx = testing.Context(
-    charm_type=MyCharmType,
-    meta={'name': 'my-charm-name'},
-    charm_root=td.name
-)
+ctx = testing.Context(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, charm_root=td.name)
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 

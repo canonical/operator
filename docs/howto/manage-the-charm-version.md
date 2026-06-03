@@ -66,7 +66,7 @@ in your `tests/integration/test_charm.py` file, add a new test:
 ```py
 def test_charm_version_is_set(juju: jubilant.Juju):
     """Verify that the charm version has been set."""
-    version = juju.status().apps["your-app"].charm_version
-    expected_version = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8")
+    version = juju.status().apps['your-app'].charm_version
+    expected_version = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('utf8')
     assert version == expected_version
 ```

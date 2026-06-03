@@ -197,11 +197,7 @@ def test_get_backup_action(tmp_path):
     container = testing.Container(
         'myapp',
         can_connect=True,
-        mounts={
-            'backup': testing.Mount(
-                location='/etc/myapp/backup.yaml', source=backup_file
-            )
-        },
+        mounts={'backup': testing.Mount(location='/etc/myapp/backup.yaml', source=backup_file)},
     )
     state_in = testing.State(containers={container})
     state_out = ctx.run(ctx.on.action('get-backup'), state_in)

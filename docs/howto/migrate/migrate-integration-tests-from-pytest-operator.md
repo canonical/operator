@@ -75,11 +75,11 @@ import os
 import pathlib
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope='session')
 def charm():
     """Return the path of the charm under test."""
     # Assume the current working directory is the charm root.
-    yield get_charm_path(env_var="CHARM_PATH", default_dir=pathlib.Path())
+    yield get_charm_path(env_var='CHARM_PATH', default_dir=pathlib.Path())
 
 
 def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
@@ -120,6 +120,7 @@ In your tests, use the fixture like this:
 ```python
 # tests/integration/test_charm.py
 
+
 def test_active(juju: jubilant.Juju, charm_path: pathlib.Path):
     juju.deploy(charm_path)
     juju.wait(jubilant.all_active)
@@ -143,13 +144,12 @@ import pytest
 import pytest_jubilant
 
 
-@pytest.mark.fixture(scope="module")
+@pytest.mark.fixture(scope='module')
 def other_model(juju_factory: pytest_jubilant.JujuFactory):
-    yield juju_factory.get_juju("other")
+    yield juju_factory.get_juju('other')
 
 
-def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju):
-    ...
+def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju): ...
 ```
 
 (how_to_migrate_an_application_fixture)=
@@ -196,9 +196,10 @@ import pathlib
 import jubilant
 import pytest
 
+
 @pytest.fixture(scope='module')
 def app(juju: jubilant.Juju, charm_path: pathlib.Path):
-    my_app_name = "mycharm"
+    my_app_name = 'mycharm'
     juju.deploy(
         charm_path,
         my_app_name,
@@ -220,6 +221,7 @@ In your tests, you'll need to specify that the test depends on `juju` as well as
 
 ```python
 # tests/integration/test_charm.py
+
 
 def test_active(juju: jubilant.Juju, app: str):
     status = juju.status()
@@ -276,6 +278,7 @@ A python-libjuju model is updated in the background using websockets. In Jubilan
 async def test_active(app: Application):
     assert app.units[0].workload_status == ActiveStatus.name
 
+
 # jubilant
 def test_active(juju: jubilant.Juju, app: str):
     status = juju.status()
@@ -300,6 +303,7 @@ async def test_active(model: Model):
     await model.deploy('mycharm')
     await model.wait_for_idle(status='active')  # implies raise_on_error=True
 
+
 # jubilant
 def test_active(juju: jubilant.Juju):
     juju.deploy('mycharm')
@@ -314,6 +318,7 @@ async def test_idle(model: Model):
     await model.deploy('mycharm')
     await model.wait_for_idle()
 
+
 # jubilant
 def test_active(juju: jubilant.Juju):
     juju.deploy('mycharm')
@@ -325,8 +330,7 @@ It's common to use a `lambda` function to customize the callable or compose mult
 ```python
 juju.wait(
     lambda status: (
-        jubilant.all_active(status, 'mysql', 'redis') and
-        jubilant.all_blocked(status, 'logger'),
+        jubilant.all_active(status, 'mysql', 'redis') and jubilant.all_blocked(status, 'logger'),
     ),
 )
 ```
@@ -338,8 +342,8 @@ juju.deploy('mycharm')
 juju.wait(
     ready=lambda status: jubilant.all_active(status, 'mycharm'),
     error=jubilant.any_error,
-    delay=0.2,    # poll "juju status" every 200ms (default 1s)
-    timeout=60,   # set overall timeout to 60s (default juju.wait_timeout)
+    delay=0.2,  # poll "juju status" every 200ms (default 1s)
+    timeout=60,  # set overall timeout to 60s (default juju.wait_timeout)
     successes=7,  # require ready to return success 7x in a row (default 3)
 )
 ```

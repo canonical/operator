@@ -83,22 +83,20 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
     """
-    params = event.load_params(GetDbInfoAction, errors="fail")
+    params = event.load_params(GetDbInfoAction, errors='fail')
     db_data = self.fetch_database_relation_data()
     if not db_data:
-        event.fail("No database connected")
+        event.fail('No database connected')
         return
     output = {
-        "db-host": db_data.get("db_host", None),
-        "db-port": db_data.get("db_port", None),
+        'db-host': db_data.get('db_host', None),
+        'db-port': db_data.get('db_port', None),
     }
     if params.show_password:
-        output.update(
-            {
-                "db-username": db_data.get("db_username", None),
-                "db-password": db_data.get("db_password", None),
-            }
-        )
+        output.update({
+            'db-username': db_data.get('db_username', None),
+            'db-password': db_data.get('db_password', None),
+        })
     event.set_results(output)
 ```
 
@@ -159,27 +157,27 @@ Let's add a test to check the behaviour of the `get_db_info` action that we just
 def test_get_db_info_action():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
+        endpoint='database',
+        interface='postgresql_client',
+        remote_app_name='postgresql-k8s',
         remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
+            'endpoints': 'example.com:5432',
+            'username': 'foo',
+            'password': 'bar',
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
         leader=True,
     )
 
-    ctx.run(ctx.on.action("get-db-info", params={"show-password": False}), state_in)
+    ctx.run(ctx.on.action('get-db-info', params={'show-password': False}), state_in)
 
     assert ctx.action_results == {
-        "db-host": "example.com",
-        "db-port": "5432",
+        'db-host': 'example.com',
+        'db-port': '5432',
     }
 ```
 
@@ -189,29 +187,29 @@ Since the `get_db_info` action has a parameter `show-password`, let's also add a
 def test_get_db_info_action_show_password():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
+        endpoint='database',
+        interface='postgresql_client',
+        remote_app_name='postgresql-k8s',
         remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
+            'endpoints': 'example.com:5432',
+            'username': 'foo',
+            'password': 'bar',
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         relations={relation},
         leader=True,
     )
 
-    ctx.run(ctx.on.action("get-db-info", params={"show-password": True}), state_in)
+    ctx.run(ctx.on.action('get-db-info', params={'show-password': True}), state_in)
 
     assert ctx.action_results == {
-        "db-host": "example.com",
-        "db-port": "5432",
-        "db-username": "foo",
-        "db-password": "bar",
+        'db-host': 'example.com',
+        'db-port': '5432',
+        'db-username': 'foo',
+        'db-password': 'bar',
     }
 ```
 

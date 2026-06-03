@@ -58,9 +58,9 @@ class MyCharm(ops.CharmBase):
 
     def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
         if not myworkload.is_installed():
-            event.add_status(ops.MaintenanceStatus("Installing workload"))
+            event.add_status(ops.MaintenanceStatus('Installing workload'))
         if not myworkload.is_running():
-            event.add_status(ops.MaintenanceStatus("Starting workload"))
+            event.add_status(ops.MaintenanceStatus('Starting workload'))
         event.add_status(ops.ActiveStatus())
 ```
 
@@ -92,13 +92,13 @@ from charmlibs import apt
 def install() -> None:
     apt.update()
     # Pin to a specific version so deployments are reproducible.
-    apt.add_package("tinyproxy-bin", "1.11.1-3")
+    apt.add_package('tinyproxy-bin', '1.11.1-3')
     # On failure, apt raises charmlibs.apt.PackageError, which puts the
     # charm into error status with a clear message in the Juju logs.
 
 
 def uninstall() -> None:
-    apt.remove_package("tinyproxy-bin")
+    apt.remove_package('tinyproxy-bin')
 ```
 
 ```{admonition} Best practice
@@ -125,16 +125,16 @@ from charmlibs import snap
 
 def install() -> None:
     cache = snap.SnapCache()
-    workload = cache["my-workload"]
-    workload.ensure(snap.SnapState.Latest, channel="stable")
+    workload = cache['my-workload']
+    workload.ensure(snap.SnapState.Latest, channel='stable')
 
 
 def start() -> None:
-    snap.SnapCache()["my-workload"].start(enable=True)
+    snap.SnapCache()['my-workload'].start(enable=True)
 
 
 def stop() -> None:
-    snap.SnapCache()["my-workload"].stop(disable=True)
+    snap.SnapCache()['my-workload'].stop(disable=True)
 ```
 
 (run-workloads-with-a-charm-machines-when-theres-no-library)=
@@ -176,7 +176,7 @@ import signal
 
 from charmlibs import pathops
 
-PID_FILE = pathops.LocalPath("/var/run/myworkload.pid")
+PID_FILE = pathops.LocalPath('/var/run/myworkload.pid')
 
 
 def reload_config() -> None:
@@ -238,16 +238,16 @@ class MockWorkload:
         return self.running
 
     def reload_config(self) -> None:
-        self.signals.append("SIGUSR1")
+        self.signals.append('SIGUSR1')
 
     def get_version(self) -> str:
-        return "1.0.0"
+        return '1.0.0'
 
 
 @pytest.fixture
 def workload(monkeypatch: pytest.MonkeyPatch) -> MockWorkload:
     mock = MockWorkload()
-    monkeypatch.setattr("charm.myworkload", mock)
+    monkeypatch.setattr('charm.myworkload', mock)
     return mock
 
 
@@ -258,7 +258,7 @@ def test_install(workload: MockWorkload):
     state_out = ctx.run(ctx.on.install(), testing.State())
     # Assert
     assert workload.is_installed()
-    assert state_out.workload_version == "1.0.0"
+    assert state_out.workload_version == '1.0.0'
 
 
 def test_start(workload: MockWorkload):
@@ -293,25 +293,27 @@ from charm import myworkload
 def test_install_calls_apt(monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, str]] = []
     monkeypatch.setattr(
-        "charm.myworkload.apt.update", lambda: calls.append(("update", "")),
+        'charm.myworkload.apt.update',
+        lambda: calls.append(('update', '')),
     )
     monkeypatch.setattr(
-        "charm.myworkload.apt.add_package",
+        'charm.myworkload.apt.add_package',
         lambda name, version: calls.append((name, version)),
     )
     myworkload.install()
-    assert calls == [("update", ""), ("tinyproxy-bin", "1.11.1-3")]
+    assert calls == [('update', ''), ('tinyproxy-bin', '1.11.1-3')]
 
 
 def test_reload_config_sends_sigusr1(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ):
-    pid_file = tmp_path / "myworkload.pid"
-    pid_file.write_text("1234")
-    monkeypatch.setattr("charm.myworkload.PID_FILE", pid_file)
+    pid_file = tmp_path / 'myworkload.pid'
+    pid_file.write_text('1234')
+    monkeypatch.setattr('charm.myworkload.PID_FILE', pid_file)
 
     sent: list[tuple[int, int]] = []
-    monkeypatch.setattr("os.kill", lambda pid, sig: sent.append((pid, sig)))
+    monkeypatch.setattr('os.kill', lambda pid, sig: sent.append((pid, sig)))
 
     myworkload.reload_config()
     assert sent == [(1234, signal.SIGUSR1)]
@@ -320,11 +322,11 @@ def test_reload_config_sends_sigusr1(
 def test_start_runs_subprocess(monkeypatch: pytest.MonkeyPatch):
     commands: list[list[str]] = []
     monkeypatch.setattr(
-        "subprocess.run",
+        'subprocess.run',
         lambda cmd, **kwargs: commands.append(cmd) or None,
     )
     myworkload.start()
-    assert commands == [["myworkload"]]
+    assert commands == [['myworkload']]
 ```
 
 ### Run the tests
@@ -354,17 +356,18 @@ def test_install_and_start():
     assert not myworkload.is_installed()
     myworkload.install()
     assert myworkload.is_installed()
-    assert myworkload.get_version() == "1.11.1"
+    assert myworkload.get_version() == '1.11.1'
 
     myworkload.start()
     assert myworkload.is_running()
 
     # The real systemd unit should be active.
     result = subprocess.run(
-        ["/usr/bin/systemctl", "is-active", "tinyproxy"],
-        capture_output=True, text=True,
+        ['/usr/bin/systemctl', 'is-active', 'tinyproxy'],
+        capture_output=True,
+        text=True,
     )
-    assert result.stdout.strip() == "active"
+    assert result.stdout.strip() == 'active'
 
     myworkload.stop()
     assert not myworkload.is_running()
@@ -386,19 +389,19 @@ import pytest
 
 @pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    juju.deploy(charm, app="myworkload")
+    juju.deploy(charm, app='myworkload')
     juju.wait(jubilant.all_active, timeout=600)
 
 
 def test_workload_version(juju: jubilant.Juju):
-    version = juju.status().apps["myworkload"].version
-    assert version == "1.11.1"  # The version we pinned in install(), as reported by the workload.
+    version = juju.status().apps['myworkload'].version
+    assert version == '1.11.1'  # The version we pinned in install(), as reported by the workload.
 
 
 def test_blocks_on_invalid_config(juju: jubilant.Juju):
-    juju.config("myworkload", {"slug": "not/valid"})
+    juju.config('myworkload', {'slug': 'not/valid'})
     juju.wait(jubilant.all_blocked)
-    juju.config("myworkload", reset="slug")
+    juju.config('myworkload', reset='slug')
 ```
 
 The `juju` fixture from `pytest-jubilant` creates a temporary model per test file and tears it down afterwards. You supply a `charm` fixture that locates the packed `.charm` file. For an example, see [`conftest.py` in machine-tinyproxy's integration tests](https://github.com/canonical/operator/blob/main/examples/machine-tinyproxy/tests/integration/conftest.py).

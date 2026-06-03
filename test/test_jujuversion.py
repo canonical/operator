@@ -45,7 +45,7 @@ def test_parsing(vs: str, major: int, minor: int, tag: str, patch: int, build: i
     assert v.build == build
 
 
-@unittest.mock.patch('os.environ', new={})
+@unittest.mock.patch.dict(os.environ, clear=True)
 def test_from_environ():
     # JUJU_VERSION is not set
     with pytest.deprecated_call():

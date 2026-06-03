@@ -120,18 +120,18 @@ import pathlib
 import pytest
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope='session')
 def charm():
     """Return the path of the charm under test."""
-    charm = os.environ.get("CHARM_PATH")
+    charm = os.environ.get('CHARM_PATH')
     if not charm:
         charm_dir = pathlib.Path()  # Assume the current working directory is the charm root.
-        charms = list(charm_dir.glob("*.charm"))
-        assert charms, f"No charms were found in {charm_dir.absolute()}"
-        assert len(charms) == 1, f"Found more than one charm {charms}"
+        charms = list(charm_dir.glob('*.charm'))
+        assert charms, f'No charms were found in {charm_dir.absolute()}'
+        assert len(charms) == 1, f'Found more than one charm {charms}'
         charm = charms[0]
     path = pathlib.Path(charm).resolve()
-    assert path.is_file(), f"{path} is not a file"
+    assert path.is_file(), f'{path} is not a file'
     return path
 ```
 
@@ -208,17 +208,17 @@ After `test_deploy`, add more tests to check that your charm operates correctly.
 ```python
 def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy some other charm from Charmhub:
-    juju.deploy("other-app")
+    juju.deploy('other-app')
 
     # Integrate the charms:
-    juju.integrate("your-app:endpoint1", "other-app:endpoint2")
+    juju.integrate('your-app:endpoint1', 'other-app:endpoint2')
 
     # Ensure that both applications and all units reach a good state:
     juju.wait(jubilant.all_active)
 
     # Run an action on a unit:
-    result = juju.run("your-app/0", "some-action")
-    assert result.results["key"] == "value"
+    result = juju.run('your-app/0', 'some-action')
+    assert result.results['key'] == 'value'
 
     # What this means depends on the workload:
     assert charm_operates_correctly()
@@ -233,10 +233,10 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
 A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
 
 ```python
-    ...
-    resources = {"resource_name": "localhost:32000/image_name:latest"}
-    juju.deploy(charm, resources=resources)
-    ...
+...
+resources = {'resource_name': 'localhost:32000/image_name:latest'}
+juju.deploy(charm, resources=resources)
+...
 ```
 
 In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
@@ -249,15 +249,12 @@ import pytest
 import yaml
 
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 
 
 @pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    resources = {
-        name: res["upstream-source"]
-        for name, res in METADATA["resources"].items()
-    }
+    resources = {name: res['upstream-source'] for name, res in METADATA['resources'].items()}
 
     juju.deploy(charm, resources=resources)
     juju.wait(jubilant.all_active)
@@ -273,7 +270,7 @@ def test_my_integration(charm: pathlib.Path, juju: jubilant.Juju):
     ...
     # Both applications have to be deployed at this point.
     # This could be done above in the current test or in a previous one.
-    juju.integrate("your-app:endpoint1", "another:relation_name_2")
+    juju.integrate('your-app:endpoint1', 'another:relation_name_2')
     juju.wait(jubilant.all_active)
     # check any assertion here
     ...
@@ -292,7 +289,7 @@ You can set a configuration option in your application and check its results.
 ```python
 def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
     ...
-    juju.config("your-app", {"server_name": "invalid_name"})
+    juju.config('your-app', {'server_name': 'invalid_name'})
     # In this case, when setting server_name to "invalid_name"
     # we could for example expect a blocked status.
     juju.wait(jubilant.all_blocked, timeout=60)
@@ -309,9 +306,9 @@ You can execute an action on a unit and get its results.
 
 ```python
 def test_run_action(charm: pathlib.Path, juju: jubilant.Juju):
-    action_register_user = juju.run("your-app/0", "register-user", {"username": "ubuntu"})
-    assert action_register_user.status == "completed"
-    password = action_register_user.results["user-password"]
+    action_register_user = juju.run('your-app/0', 'register-user', {'username': 'ubuntu'})
+    assert action_register_user.status == 'completed'
+    password = action_register_user.results['user-password']
     # We could for example check here that we can login with the new user
 ```
 
@@ -326,11 +323,11 @@ You can get information from your application or unit addresses using `juju.stat
 ```python
 def test_workload_connectivity(charm: pathlib.Path, juju: jubilant.Juju):
     status = juju.status()
-    app_address = status.applications["my_app"].address
+    app_address = status.applications['my_app'].address
     # Or you can try to connect to a concrete unit
     # address = status.apps["my_app"].units["my_app/0"].public_address
     # address = status.apps["my_app"].units["my_app/0"].address
-    r = requests.get(f"http://{address}/")
+    r = requests.get(f'http://{address}/')
     assert r.status_code == 200
 ```
 
@@ -345,13 +342,13 @@ How you can connect to a private or public address is dependent on your configur
 Jubilant provides an escape hatch to invoke the Juju CLI. This can be useful for cases where some feature is not covered. Some commands are global and others only make sense within a model scope:
 
 ```python
-    ...
-    command = ["add-credential", "some-cloud", "-f", "your-creds-file.yaml"]
-    stdout = juju.cli(*command)
-    ...
-    command = ["unexpose", "some-application"]
-    stdout = juju.cli(*command, include_model=True)
-    ...
+...
+command = ['add-credential', 'some-cloud', '-f', 'your-creds-file.yaml']
+stdout = juju.cli(*command)
+...
+command = ['unexpose', 'some-application']
+stdout = juju.cli(*command, include_model=True)
+...
 ```
 
 > See more:
@@ -367,9 +364,9 @@ import pytest
 import pytest_jubilant
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope='module')
 def other_model(juju_factory: pytest_jubilant.JujuFactory):
-    return juju_factory.get_juju(suffix="other")
+    return juju_factory.get_juju(suffix='other')
 ```
 
 Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios. For example integrating machine charms with Kubernetes charms, or integrating with the [Canonical Observability Stack](https://charmhub.io/cos-lite).
@@ -403,7 +400,7 @@ relations:
     """.strip()
 
     # Note that Juju from a snap doesn't have access to /tmp.
-    with NamedTemporaryFile(dir=".") as f:
+    with NamedTemporaryFile(dir='.') as f:
         f.write(bundle_yaml)
         f.flush()
         juju.deploy(f.name)

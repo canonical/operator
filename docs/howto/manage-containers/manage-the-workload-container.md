@@ -100,6 +100,7 @@ When using an OCI-image that is not built specifically for use with Pebble, laye
 import ops
 # ...
 
+
 class PauseCharm(ops.CharmBase):
     # ...
     def __init__(self, framework):
@@ -107,7 +108,7 @@ class PauseCharm(ops.CharmBase):
         # Set a friendly name for your charm. This can be used with the Operator
         # framework to reference the container, add layers, or interact with
         # providers/consumers easily.
-        self.name = "pause"
+        self.name = 'pause'
         # This event is dynamically determined from the service name
         # in ops.pebble.Layer
         #
@@ -132,20 +133,20 @@ class PauseCharm(ops.CharmBase):
 
     def _pause_layer(self) -> ops.pebble.Layer:
         """Returns Pebble configuration layer for google/pause"""
-        return ops.pebble.Layer(
-            {
-                "summary": "pause layer",
-                "description": "pebble config layer for google/pause",
-                "services": {
-                    self.name: {
-                        "override": "replace",
-                        "summary": "pause service",
-                        "command": "/pause",
-                        "startup": "enabled",
-                    }
-                },
-            }
-        )
+        return ops.pebble.Layer({
+            'summary': 'pause layer',
+            'description': 'pebble config layer for google/pause',
+            'services': {
+                self.name: {
+                    'override': 'replace',
+                    'summary': 'pause service',
+                    'command': '/pause',
+                    'startup': 'enabled',
+                }
+            },
+        })
+
+
 # ...
 ```
 
@@ -225,7 +226,7 @@ class MyCharm(ops.CharmBase):
     ...
 
     def _on_config_changed(self, event):
-        container = self.unit.get_container("main")
+        container = self.unit.get_container('main')
         container.replan()
         plan = container.get_plan()
         for service in plan.services:
@@ -255,18 +256,18 @@ class SnappassTestCharm(ops.CharmBase):
     ...
 
     def _start_snappass(self):
-        container = self.unit.containers["snappass"]
+        container = self.unit.containers['snappass']
         snappass_layer = {
-            "services": {
-                "snappass": {
-                    "override": "replace",
-                    "summary": "snappass service",
-                    "command": "snappass",
-                    "startup": "enabled",
+            'services': {
+                'snappass': {
+                    'override': 'replace',
+                    'summary': 'snappass service',
+                    'command': 'snappass',
+                    'startup': 'enabled',
                 }
             },
         }
-        container.add_layer("snappass", snappass_layer, combine=True)
+        container.add_layer('snappass', snappass_layer, combine=True)
         container.replan()
         self.unit.status = ops.ActiveStatus()
 ```
@@ -391,7 +392,7 @@ To run simple commands and receive their output, call `Container.exec` to start 
 For example, to back up a PostgreSQL database, you might use `pg_dump`:
 
 ```python
-process = container.exec(['pg_dump', 'mydb'], timeout=5*60)
+process = container.exec(['pg_dump', 'mydb'], timeout=5 * 60)
 sql, warnings = process.wait_output()
 if warnings:
     for line in warnings.splitlines():
@@ -470,8 +471,7 @@ process.wait_output()
 The simplest way of receiving standard output and standard error is by using the [`ExecProcess.wait_output`](ops.pebble.ExecProcess.wait_output) method as shown below. The simplest way of sending standard input to the program is as a string, using the `stdin` parameter to `exec`. For example:
 
 ```python
-process = container.exec(['tr', 'a-z', 'A-Z'],
-                         stdin='This is\na test\n')
+process = container.exec(['tr', 'a-z', 'A-Z'], stdin='This is\na test\n')
 stdout, _ = process.wait_output()
 logger.info('Output: %r', stdout)
 ```
@@ -481,8 +481,7 @@ By default, input is sent and output is received as Unicode using the UTF-8 enco
 For example, the following will log `Output: b'\x01\x02'`:
 
 ```python
-process = container.exec(['cat'], stdin=b'\x01\x02',
-                         encoding=None)
+process = container.exec(['cat'], stdin=b'\x01\x02', encoding=None)
 stdout, _ = process.wait_output()
 logger.info('Output: %r', stdout)
 ```
@@ -509,6 +508,7 @@ For advanced uses, you can also perform streaming I/O by reading from and writin
 ```python
 process = container.exec(['cat'])
 
+
 # Thread that sends data to process's stdin
 def stdin_thread():
     try:
@@ -518,6 +518,8 @@ def stdin_thread():
             time.sleep(1)
     finally:
         process.stdin.close()
+
+
 threading.Thread(target=stdin_thread).start()
 
 # Log from stdout stream as output is received
@@ -570,6 +572,7 @@ LS_LL = """
 drwxrwxr-x    - ubuntu ubuntu 18 jan 12:06 -- lib
 """
 
+
 class MyCharm(ops.CharmBase):
     def _on_start(self, _):
         foo = self.unit.get_container('foo')
@@ -577,6 +580,7 @@ class MyCharm(ops.CharmBase):
         proc.stdin.write('...')
         stdout, _ = proc.wait_output()
         assert stdout == LS_LL
+
 
 def test_pebble_exec():
     container = testing.Container(
@@ -620,10 +624,12 @@ containers, so if the charm were to execute `self.unit.containers`, it would get
 To give the charm access to some containers, you need to pass them to the input state, like so:
 
 ```python
-state = testing.State(containers={
-    testing.Container(name='foo', can_connect=True),
-    testing.Container(name='bar', can_connect=False),
-})
+state = testing.State(
+    containers={
+        testing.Container(name='foo', can_connect=True),
+        testing.Container(name='bar', can_connect=False),
+    }
+)
 ```
 
 In this case, `self.unit.get_container('foo').can_connect()` would return `True`, while for 'bar' it

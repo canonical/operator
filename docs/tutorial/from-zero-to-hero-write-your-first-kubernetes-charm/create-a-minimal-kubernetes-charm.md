@@ -104,7 +104,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         super().__init__(framework)
 
 
-if __name__ == "__main__":  # pragma: nocover
+if __name__ == '__main__':  # pragma: nocover
     ops.main(FastAPIDemoCharm)
 ```
 
@@ -115,7 +115,7 @@ As you can see, a charm is a pure Python class that inherits from the [`CharmBas
 In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
 
 ```python
-framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
+framework.observe(self.on['demo-server'].pebble_ready, self._on_demo_server_pebble_ready)
 ```
 
 
@@ -144,7 +144,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload
     # Add initial Pebble config layer using the Pebble API
-    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
+    container.add_layer('fastapi_demo', self._get_pebble_layer(), combine=True)
     # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
     container.replan()
     # Learn more about statuses at
@@ -157,7 +157,7 @@ The custom Pebble layer that you just added is defined in the  `self._get_pebble
 In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute:
 
 ```python
-self.pebble_service_name = "fastapi-service"
+self.pebble_service_name = 'fastapi-service'
 ```
 
 Finally, define  the `_get_pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
@@ -165,23 +165,21 @@ Finally, define  the `_get_pebble_layer` function as below. The `command` variab
 ```python
 def _get_pebble_layer(self) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            "--port=8000",
-        ]
-    )
+    command = ' '.join([
+        'uvicorn',
+        'api_demo_server.app:app',
+        '--host=0.0.0.0',
+        '--port=8000',
+    ])
     pebble_layer: ops.pebble.LayerDict = {
-        "summary": "FastAPI demo service",
-        "description": "pebble config layer for FastAPI demo server",
-        "services": {
+        'summary': 'FastAPI demo service',
+        'description': 'pebble config layer for FastAPI demo server',
+        'services': {
             self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': command,
+                'startup': 'enabled',
             }
         },
     }
@@ -332,7 +330,7 @@ from charm import FastAPIDemoCharm
 
 def test_pebble_layer():
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(name='demo-server', can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -340,12 +338,12 @@ def test_pebble_layer():
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {
-        "services": {
-            "fastapi-service": {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
-                "startup": "enabled",
+        'services': {
+            'fastapi-service': {
+                'override': 'replace',
+                'summary': 'fastapi demo',
+                'command': 'uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000',
+                'startup': 'enabled',
                 # Since the environment is empty, Layer.to_dict() will not
                 # include it.
             }
@@ -358,7 +356,7 @@ def test_pebble_layer():
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
-        state_out.get_container(container.name).service_statuses["fastapi-service"]
+        state_out.get_container(container.name).service_statuses['fastapi-service']
         == ops.pebble.ServiceStatus.ACTIVE
     )
 ```
@@ -428,15 +426,15 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
+METADATA = yaml.safe_load(pathlib.Path('charmcraft.yaml').read_text())
+APP_NAME = METADATA['name']
 
 
 @pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
     resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+        'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
