@@ -1215,7 +1215,12 @@ class TestModel:
 
     @mock.patch('grp.getgrgid')
     @mock.patch('pwd.getpwuid')
-    def test_push_path_unnamed(self, getpwuid: mock.MagicMock, getgrgid: mock.MagicMock):
+    def test_push_path_unnamed(
+        self,
+        getpwuid: mock.MagicMock,
+        getgrgid: mock.MagicMock,
+        request: pytest.FixtureRequest,
+    ):
         getpwuid.side_effect = KeyError
         getgrgid.side_effect = KeyError
         harness = ops.testing.Harness(
@@ -1227,6 +1232,7 @@ class TestModel:
                 resource: foo-image
             """,
         )
+        request.addfinalizer(harness.cleanup)
         harness.begin()
         harness.set_can_connect('foo', True)
         container = harness.model.unit.containers['foo']
@@ -1478,7 +1484,7 @@ recursive_push_pull_cases = [
 
 
 @pytest.mark.parametrize('case', recursive_push_pull_cases)
-def test_recursive_push_and_pull(case: PushPullCase):
+def test_recursive_push_and_pull(case: PushPullCase, request: pytest.FixtureRequest):
     # full "integration" test of push+pull
     harness = ops.testing.Harness(
         ops.CharmBase,
@@ -1489,77 +1495,78 @@ def test_recursive_push_and_pull(case: PushPullCase):
             resource: foo-image
         """,
     )
+    request.addfinalizer(harness.cleanup)
     harness.begin()
     harness.set_can_connect('foo', True)
     c = harness.model.unit.containers['foo']
 
-    # create push test case filesystem structure
-    push_src = tempfile.TemporaryDirectory()
-    for file in case.files:
-        fpath = os.path.join(push_src.name, file[1:])
-        os.makedirs(os.path.dirname(fpath), exist_ok=True)
-        with open(fpath, 'wb') as f:
-            f.write(b'push \xc3\x28')  # invalid UTF-8 to ensure binary works
-    if case.dirs:
-        for directory in case.dirs:
-            fpath = os.path.join(push_src.name, directory[1:])
-            os.makedirs(fpath, exist_ok=True)
+    with tempfile.TemporaryDirectory() as push_src, tempfile.TemporaryDirectory() as pull_dst:
+        # create push test case filesystem structure
+        for file in case.files:
+            fpath = os.path.join(push_src, file[1:])
+            os.makedirs(os.path.dirname(fpath), exist_ok=True)
+            with open(fpath, 'wb') as f:
+                f.write(b'push \xc3\x28')  # invalid UTF-8 to ensure binary works
+        if case.dirs:
+            for directory in case.dirs:
+                fpath = os.path.join(push_src, directory[1:])
+                os.makedirs(fpath, exist_ok=True)
 
-    # test push
-    if isinstance(case.path, list):
-        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
-        # otherwise remove leading slash so we can do the path join properly.
-        push_path = [
-            os.path.join(push_src.name, p[1:] if len(p) > 1 else 'foo') for p in case.path
-        ]
-    else:
-        # swap slash for dummy dir on root dir so Path.parent doesn't return tmpdir path component
-        # otherwise remove leading slash so we can do the path join properly.
-        push_path = os.path.join(push_src.name, case.path[1:] if len(case.path) > 1 else 'foo')
+        # test push
+        if isinstance(case.path, list):
+            # swap slash for dummy dir on root dir so Path.parent doesn't
+            # return tmpdir path component; otherwise remove leading slash
+            # so we can do the path join properly.
+            push_path = [os.path.join(push_src, p[1:] if len(p) > 1 else 'foo') for p in case.path]
+        else:
+            # swap slash for dummy dir on root dir so Path.parent doesn't
+            # return tmpdir path component; otherwise remove leading slash
+            # so we can do the path join properly.
+            push_path = os.path.join(push_src, case.path[1:] if len(case.path) > 1 else 'foo')
 
-    errors: set[str] = set()
-    assert case.dst is not None
-    try:
-        c.push_path(push_path, case.dst)
-    except ops.MultiPushPullError as err:
-        if not case.errors:
-            raise
-        errors = {src[len(push_src.name) :] for src, _ in err.errors}
+        errors: set[str] = set()
+        assert case.dst is not None
+        try:
+            c.push_path(push_path, case.dst)
+        except ops.MultiPushPullError as err:
+            if not case.errors:
+                raise
+            errors = {src[len(push_src) :] for src, _ in err.errors}
 
-    assert case.errors == errors, (
-        f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
-    )
-    for fpath in case.want:
-        assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
-        content = c.pull(fpath, encoding=None).read()
-        assert content == b'push \xc3\x28'
-    for fdir in case.want_dirs:
-        assert c.isdir(fdir), f'push_path failed: dir {fdir} missing at destination'
+        assert case.errors == errors, (
+            f'push_path gave wrong expected errors: want {case.errors}, got {errors}'
+        )
+        for fpath in case.want:
+            assert c.exists(fpath), f'push_path failed: file {fpath} missing at destination'
+            with c.pull(fpath, encoding=None) as f:
+                content = f.read()
+            assert content == b'push \xc3\x28'
+        for fdir in case.want_dirs:
+            assert c.isdir(fdir), f'push_path failed: dir {fdir} missing at destination'
 
-    # create pull test case filesystem structure
-    pull_dst = tempfile.TemporaryDirectory()
-    for fpath in case.files:
-        c.push(fpath, 'hello', make_dirs=True)
-    if case.dirs:
-        for directory in case.dirs:
-            c.make_dir(directory, make_parents=True)
+        # create pull test case filesystem structure
+        for fpath in case.files:
+            c.push(fpath, 'hello', make_dirs=True)
+        if case.dirs:
+            for directory in case.dirs:
+                c.make_dir(directory, make_parents=True)
 
-    # test pull
-    errors: set[str] = set()
-    try:
-        c.pull_path(case.path, os.path.join(pull_dst.name, case.dst[1:]))
-    except ops.MultiPushPullError as err:
-        if not case.errors:
-            raise
-        errors = {src for src, _ in err.errors}
+        # test pull
+        errors = set()
+        try:
+            c.pull_path(case.path, os.path.join(pull_dst, case.dst[1:]))
+        except ops.MultiPushPullError as err:
+            if not case.errors:
+                raise
+            errors = {src for src, _ in err.errors}
 
-    assert case.errors == errors, (
-        f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
-    )
-    for fpath in case.want:
-        assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
-    for fdir in case.want_dirs:
-        assert c.isdir(fdir), f'pull_path failed: dir {fdir} missing at destination'
+        assert case.errors == errors, (
+            f'pull_path gave wrong expected errors: want {case.errors}, got {errors}'
+        )
+        for fpath in case.want:
+            assert c.exists(fpath), f'pull_path failed: file {fpath} missing at destination'
+        for fdir in case.want_dirs:
+            assert c.isdir(fdir), f'pull_path failed: dir {fdir} missing at destination'
 
 
 @pytest.mark.parametrize(
@@ -1588,7 +1595,7 @@ def test_recursive_push_and_pull(case: PushPullCase):
         ),
     ],
 )
-def test_push_path_relative(case: PushPullCase):
+def test_push_path_relative(case: PushPullCase, request: pytest.FixtureRequest):
     harness = ops.testing.Harness(
         ops.CharmBase,
         meta="""
@@ -1598,6 +1605,7 @@ def test_push_path_relative(case: PushPullCase):
             resource: foo-image
         """,
     )
+    request.addfinalizer(harness.cleanup)
     harness.begin()
     harness.set_can_connect('foo', True)
     container = harness.model.unit.containers['foo']
@@ -1621,7 +1629,8 @@ def test_push_path_relative(case: PushPullCase):
 
             # test
             for want_path in case.want:
-                content = container.pull(want_path).read()
+                with container.pull(want_path) as f:
+                    content = f.read()
                 assert content == 'test'
         finally:
             os.chdir(cwd)
