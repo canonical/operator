@@ -80,8 +80,10 @@ jobs:
       matrix:
         preset: ['k8s', 'machine']
         juju-channel:
-          - 3.6/stable
+          - 3/stable
           - 4.0/stable
+          - 4.0/beta
+          - 4.1/beta
 
     steps:
       - run: sudo snap install --classic concierge
