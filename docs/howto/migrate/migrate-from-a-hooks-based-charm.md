@@ -102,19 +102,29 @@ import ops
 
 
 class Microsample(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.framework.observe(
-            self.on.config_changed, lambda _: os.popen('../hooks/config-changed')
-        )
-        self.framework.observe(self.on.install, lambda _: os.popen('../hooks/install'))
-        self.framework.observe(self.on.start, lambda _: os.popen('../hooks/start'))
-        self.framework.observe(self.on.stop, lambda _: os.popen('../hooks/stop'))
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.stop, self._on_stop)
         # etc...
+
+    def _on_config_changed(self, _event):
+        os.popen('../hooks/config-changed')
+
+    def _on_install(self, _event):
+        os.popen('../hooks/install')
+
+    def _on_start(self, _event):
+        os.popen('../hooks/start')
+
+    def _on_stop(self, _event):
+        os.popen('../hooks/stop')
 
 
 if __name__ == "__main__":
-    main(ops.Microsample)
+    ops.main(Microsample)
 ```
 Relying on `popen` is _not_ how Ops is supposed to be used. However, this code will work, and it demonstrates the core principle of mapping hook names to handler code.
 
@@ -124,7 +134,6 @@ Relying on `popen` is _not_ how Ops is supposed to be used. However, this code w
 We need a few preparatory steps:\
   • Add a `requirements.txt` file to ensure that the charm's Python environment will install for us the `ops` package.\
 • Modify the install hook to install `snap` for us, which is used in the script.\
-• In practice we cannot bind lambdas to `observe`, we need to write dedicated _methods_ for that.\
 • We need to figure out the required environment variables for the commands to work, which is not trivial.\
 \
 A more detailed explanation of this process is worthy of its own how-to guide, so we'll skip to the punchline here: it works. Check out [this branch](https://github.com/PietroPasotti/hooks-to-ops/tree/1-sh-charm) and see for yourself.
