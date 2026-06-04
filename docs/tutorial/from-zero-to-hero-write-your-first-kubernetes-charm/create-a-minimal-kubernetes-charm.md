@@ -214,7 +214,22 @@ charmcraft pack
 
 The first time you run `charmcraft pack`, Charmcraft takes several minutes to pack your charm. Packing will be faster the next time because Charmcraft has cached the packing environment.
 
-If you run into inexplicable issues when running `charmcraft pack`, this may be because some of the cached information is out of date. Run `charmcraft clean` to fix this.
+If you run into inexplicable issues when running `charmcraft pack`, this may be because some of the cached information is out of date.
+
+Run `charmcraft clean` to fix this.
+
+If you encounter a `Too many levels of symbolic links` error when running
+`charmcraft pack`, this can occur when `.venv` or `.tox` directories are
+present in your project directory. Remove them before packing:
+
+```text
+rm -rf .venv .tox
+charmcraft pack
+```
+
+If the error persists after removing these directories, consider reporting
+it to the [Charmcraft issue tracker](https://github.com/canonical/charmcraft/issues/2661)
+to help the team identify the root cause.
 
 ```{important}
 
