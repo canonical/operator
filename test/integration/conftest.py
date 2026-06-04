@@ -15,10 +15,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import pathlib
-import re
 import subprocess
 from collections.abc import Callable, Generator
 
@@ -189,19 +187,6 @@ def _prepare_generic_charm_dir(
             check=True,
             capture_output=True,
         )
-        # Patch uv.lock with the raw sha256 of ops.tar.gz so charmcraft's
-        # bundled uv (which uses raw sha256) agrees with the lock file.
-        ops_sdist = charm_dir / 'ops.tar.gz'
-        ops_hash = hashlib.sha256(ops_sdist.read_bytes()).hexdigest()
-        lock_path = charm_dir / 'uv.lock'
-        lock_text = lock_path.read_text()
-        lock_text = re.sub(
-            r'(name = "ops".*?sdist = \{ hash = "sha256:)[0-9a-f]+("\s*\})',
-            rf'\g<1>{ops_hash}\g<2>',
-            lock_text,
-            flags=re.DOTALL,
-        )
-        lock_path.write_text(lock_text)
     except subprocess.CalledProcessError as e:
         logging.error('%s stderr:\n%s', e.cmd, e.stderr)
         raise
