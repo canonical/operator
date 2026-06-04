@@ -78,7 +78,7 @@ We now need to implement the logic that wires our application to a database. Whe
 
 To do so, we need to update our charm `src/charm.py` to do all of the following:
 
-* Import the `DataRequires` class from the interface library; this class represents the relation data exchanged in the client-server communication.
+* Import the `DatabaseRequires` class from the interface library; this class represents the relation data exchanged in the client-server communication.
 * Define the event handlers that will be called during the relation lifecycle.
 * Bind the event handlers to the observed relation events.
 
