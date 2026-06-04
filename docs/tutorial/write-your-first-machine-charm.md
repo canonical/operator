@@ -190,11 +190,10 @@ These files currently contain placeholder code and configuration. It would be po
 
 Open `~/tinyproxy-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
 
-```yaml
-title: Reverse Proxy Demo
-summary: A demo charm that configures tinyproxy as a reverse proxy.
-description: |
-  This charm demonstrates how to write a machine charm with Ops.
+```{literalinclude} ../../examples/machine-tinyproxy/charmcraft.yaml
+:language: yaml
+:start-at: 'title: Reverse Proxy Demo'
+:end-at: how to write a machine charm with Ops.
 ```
 
 ### Write a helper module
@@ -219,104 +218,9 @@ This adds the following Python packages to the `dependencies` list in `pyproject
 
 Next, replace the contents of `src/tinyproxy.py` with:
 
-```python
-"""Functions for interacting with tinyproxy."""
-
-import logging
-import os
-import shutil
-import signal
-import subprocess
-
-from charmlibs import apt, pathops
-
-logger = logging.getLogger(__name__)
-
-CONFIG_FILE = pathops.LocalPath("/etc/tinyproxy/tinyproxy.conf")
-PID_FILE = pathops.LocalPath("/var/run/tinyproxy.pid")
-
-
-def ensure_config(port: int, slug: str) -> bool:
-    """Ensure that tinyproxy is configured. Return True if any changes were made."""
-    # For the config file format, see https://manpages.ubuntu.com/manpages/noble/en/man5/tinyproxy.conf.5.html
-    config = f"""\
-PidFile "{PID_FILE}"
-Port {port}
-Timeout 600
-ReverseOnly Yes
-ReversePath "/{slug}/" "http://www.example.com/"
-"""
-    return pathops.ensure_contents(CONFIG_FILE, config)
-
-
-def get_version() -> str:
-    """Get the version of tinyproxy that is installed."""
-    result = subprocess.run(["tinyproxy", "-v"], check=True, capture_output=True, text=True)
-    return result.stdout.removeprefix("tinyproxy").strip()
-
-
-def install() -> None:
-    """Use APT to install the tinyproxy executable."""
-    apt.update()
-    # Install a specific package from ubuntu@24.04
-    # See https://packages.ubuntu.com/noble/tinyproxy-bin
-    # In general, it's good practice for charms to pin workload versions.
-    apt.add_package("tinyproxy-bin", "1.11.1-3")
-    # If this call fails, the charm will go into error status. The Juju logs will show the error:
-    # charmlibs.apt.PackageError: Failed to install packages: tinyproxy-bin
-
-
-def is_installed() -> bool:
-    """Return whether the tinyproxy executable is available."""
-    return shutil.which("tinyproxy") is not None
-
-
-def is_running() -> bool:
-    """Return whether tinyproxy is running."""
-    return bool(_get_pid())
-
-
-def reload_config() -> None:
-    """Ask tinyproxy to reload config."""
-    pid = _get_pid()
-    if not pid:
-        raise RuntimeError("tinyproxy is not running")
-    # Sending signal SIGUSR1 doesn't terminate the process. It asks the process to reload config.
-    # See https://manpages.ubuntu.com/manpages/noble/en/man8/tinyproxy.8.html#signals
-    os.kill(pid, signal.SIGUSR1)
-
-
-def start() -> None:
-    """Start tinyproxy."""
-    subprocess.run(["tinyproxy"], check=True, capture_output=True, text=True)
-
-
-def stop() -> None:
-    """Stop tinyproxy."""
-    pid = _get_pid()
-    if pid:
-        os.kill(pid, signal.SIGTERM)
-
-
-def uninstall() -> None:
-    """Uninstall the tinyproxy executable and remove files."""
-    apt.remove_package("tinyproxy-bin")
-    PID_FILE.unlink(missing_ok=True)
-    CONFIG_FILE.unlink(missing_ok=True)
-    CONFIG_FILE.parent.rmdir()
-
-
-def _get_pid() -> int | None:
-    """Return the PID of the tinyproxy process, or None if the process can't be found."""
-    if not PID_FILE.exists():
-        return None
-    pid = int(PID_FILE.read_text())
-    try:
-        # Sending signal 0 doesn't terminate the process. It just checks whether the PID exists.
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return None
-    return pid
+```{literalinclude} ../../examples/machine-tinyproxy/src/tinyproxy.py
+:language: python
+:start-at: '"""Functions for interacting with tinyproxy."""'
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
@@ -337,13 +241,9 @@ We'll now write the charm code that handles events from Juju. Charmcraft created
 
 In `src/charm.py`, replace the `_on_install` method of the charm class with:
 
-```python
-    def _on_install(self, event: ops.InstallEvent) -> None:
-        """Install tinyproxy on the machine."""
-        if not tinyproxy.is_installed():
-            tinyproxy.install()
-            version = tinyproxy.get_version()
-            self.unit.set_workload_version(version)
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_install
 ```
 
 When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
@@ -363,32 +263,25 @@ After deploying your charm, you'll use the `juju config` command to change the p
 
 In `charmcraft.yaml`, replace the `config` block with:
 
-```yaml
-config:
-  options:
-    slug:
-      description: "Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+"
-      default: example
-      type: string
+```{literalinclude} ../../examples/machine-tinyproxy/charmcraft.yaml
+:language: yaml
+:start-at: 'config:'
+:end-at: 'type: string'
 ```
 
 Then add the following class to `src/charm.py`:
 
-```python
-class TinyproxyConfig(pydantic.BaseModel):
-    """Schema for the charm's config options."""
-
-    slug: str = pydantic.Field(
-        "example",
-        pattern=r"^[a-z0-9-]+$",
-        description="Configures the path of the reverse proxy. Must match the regex [a-z0-9-]+",
-    )
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyConfig
 ```
 
 Also add the following line at the beginning of `src/charm.py`:
 
-```python
-import pydantic
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: import pydantic
+:end-at: import pydantic
 ```
 
 The `TinyproxyConfig` class uses [Pydantic](https://docs.pydantic.dev) to specify how to validate values of `slug`. The class doesn't actually load the configured value of `slug`; we'll do that elsewhere in the charm code.
@@ -409,65 +302,53 @@ Your charm now needs a way to load the value of the `slug` configuration option,
 
 In `src/charm.py`, add the following methods to the charm class:
 
-```python
-    def configure_and_run(self) -> None:
-        """Ensure that tinyproxy is running with the correct config."""
-        try:
-            config = self.load_config(TinyproxyConfig)
-        except pydantic.ValidationError:
-            # The collect-status handler will run next and will set status for the user to see.
-            return
-        if not tinyproxy.is_installed():
-            return
-        changed = tinyproxy.ensure_config(PORT, config.slug)
-        if not tinyproxy.is_running():
-            tinyproxy.start()
-            self.wait_for_running()
-        elif changed:
-            logger.info("Config changed while tinyproxy is running. Updating tinyproxy config")
-            tinyproxy.reload_config()
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm.configure_and_run
+```
 
-    def wait_for_running(self) -> None:
-        """Wait for tinyproxy to be running."""
-        for _ in range(3):
-            if tinyproxy.is_running():
-                return
-            time.sleep(1)
-        raise RuntimeError("tinyproxy was not running within the expected time")
-        # Raising a runtime error will put the charm into error status.
-        # The Juju logs will show the error message, to help you debug the error.
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm.wait_for_running
 ```
 
 Then add the following lines at the beginning of `src/charm.py`:
 
-```python
-import time
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: import time
+:end-at: import time
+```
 
-PORT = 8000
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: PORT = 8000
+:end-at: PORT = 8000
 ```
 
 The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
 
 Replace the `_on_start` method of the charm class with:
 
-```python
-    def _on_start(self, event: ops.StartEvent) -> None:
-        """Handle start event."""
-        self.configure_and_run()
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_start
 ```
 
 Next, add the following line to the `__init__` method of the charm class:
 
-```python
-        framework.observe(self.on.config_changed, self._on_config_changed)
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: framework.observe(self.on.config_changed
+:end-at: framework.observe(self.on.config_changed
+:dedent:
 ```
 
 Then add the following method to the charm class:
 
-```python
-    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
-        """Handle config-changed event."""
-        self.configure_and_run()
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_config_changed
 ```
 
 ### Report status to Juju
@@ -478,27 +359,18 @@ One option would be to modify each method in the charm class to report an approp
 
 Add the following line to the `__init__` method of the charm class:
 
-```python
-        framework.observe(self.on.collect_unit_status, self._on_collect_status)
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: framework.observe(self.on.collect_unit_status
+:end-at: framework.observe(self.on.collect_unit_status
+:dedent:
 ```
 
 Then add the following method to the charm class:
 
-```python
-    def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-        """Report the status of tinyproxy (runs after each event)."""
-        try:
-            self.load_config(TinyproxyConfig)
-        except pydantic.ValidationError as e:
-            (slug_error,) = e.errors()  # 'slug' is the first and only option validated.
-            slug_value = slug_error["input"]
-            message = f"Invalid slug: '{slug_value}'. Slug must match the regex [a-z0-9-]+"
-            event.add_status(ops.BlockedStatus(message))
-        if not tinyproxy.is_installed():
-            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to be installed"))
-        if not tinyproxy.is_running():
-            event.add_status(ops.MaintenanceStatus("Waiting for tinyproxy to start"))
-        event.add_status(ops.ActiveStatus())
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_collect_status
 ```
 
 Ops runs this method after each Juju event, regardless of whether the charm code handles the event. After running the method, Ops decides which status to report to Juju, choosing the highest priority status that was proposed with `event.add_status`.
@@ -511,30 +383,28 @@ If Juju wants to remove a unit of the application, your charm (on that unit) rec
 
 To handle these events, add the following lines to the `__init__` method of the charm class:
 
-```python
-        framework.observe(self.on.stop, self._on_stop)
-        framework.observe(self.on.remove, self._on_remove)
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:start-at: framework.observe(self.on.stop
+:end-at: framework.observe(self.on.remove
+:dedent:
 ```
 
 Then add the following methods to the charm class:
 
-```python
-    def _on_stop(self, event: ops.StopEvent) -> None:
-        """Handle stop event."""
-        tinyproxy.stop()
-        self.wait_for_not_running()
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_stop
+```
 
-    def _on_remove(self, event: ops.RemoveEvent) -> None:
-        """Handle remove event."""
-        tinyproxy.uninstall()
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_remove
+```
 
-    def wait_for_not_running(self) -> None:
-        """Wait for tinyproxy to not be running."""
-        for _ in range(3):
-            if not tinyproxy.is_running():
-                return
-            time.sleep(1)
-        raise RuntimeError("tinyproxy was still running after the expected time")
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm.wait_for_not_running
 ```
 
 That's all the charm code! If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).
@@ -684,24 +554,9 @@ When writing a charm, it's good practice to write unit tests for the charm code 
 
 Create a file `tests/unit/test_tinyproxy.py` containing:
 
-```python
-import pytest
-
-from charm import tinyproxy
-
-
-class MockVersionProcess:
-    """Mock object that represents the result of calling 'tinyproxy -v'."""
-
-    def __init__(self, version: str):
-        self.stdout = f"tinyproxy {version}"
-
-
-def test_version(monkeypatch: pytest.MonkeyPatch):
-    """Test that the helper module correctly returns the version of tinyproxy."""
-    version_process = MockVersionProcess("1.0.0")
-    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: version_process)
-    assert tinyproxy.get_version() == "1.0.0"
+```{literalinclude} ../../examples/machine-tinyproxy/tests/unit/test_tinyproxy.py
+:language: python
+:start-at: import pytest
 ```
 
 We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
@@ -724,154 +579,9 @@ It's helpful to think of each test this way:
 
 Replace the contents of `tests/unit/test_charm.py` with:
 
-```python
-import pytest
-from ops import testing
-
-from charm import PORT, TinyproxyCharm
-
-
-class MockTinyproxy:
-    """Mock object that represents tinyproxy."""
-
-    def __init__(
-        self,
-        config: None | tuple[int, str] = None,
-        installed: bool = False,
-        reloaded_config: bool = False,
-        running: bool = False,
-    ):
-        self.config = config
-        self.installed = installed
-        self.reloaded_config = reloaded_config
-        self.running = running
-
-    def ensure_config(self, port: int, slug: str) -> bool:
-        old_config = self.config
-        self.config = (port, slug)
-        return self.config != old_config
-
-    def get_version(self) -> str:
-        return "1.0.0"
-
-    def install(self) -> None:
-        self.installed = True
-
-    def is_installed(self) -> bool:
-        return self.installed
-
-    def is_running(self) -> bool:
-        return self.running
-
-    def start(self) -> None:
-        self.running = True
-
-    def stop(self) -> None:
-        self.running = False
-
-    def reload_config(self) -> None:
-        self.reloaded_config = True
-
-    def uninstall(self) -> None:
-        self.installed = False
-
-
-def test_install(monkeypatch: pytest.MonkeyPatch):
-    """Test that the charm correctly handles the install event."""
-    # A state-transition test has three broad steps:
-    # Step 1. Arrange the input state.
-    tinyproxy = MockTinyproxy()
-    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
-    ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State()
-    # Step 2. Simulate an event, in this case an install event.
-    state_out = ctx.run(ctx.on.install(), state_in)
-    # Step 3. Check the output state.
-    assert state_out.workload_version is not None
-    assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
-    assert tinyproxy.is_installed()
-
-
-# For convenience, define a reusable fixture that provides a MockTinyproxy object
-# and patches the helper module in the charm.
-@pytest.fixture
-def tinyproxy_installed(monkeypatch: pytest.MonkeyPatch):
-    tinyproxy = MockTinyproxy(installed=True)
-    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
-    return tinyproxy
-
-
-def test_start(tinyproxy_installed: MockTinyproxy):
-    """Test that the charm correctly handles the start event."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_out = ctx.run(ctx.on.start(), testing.State())
-    assert state_out.unit_status == testing.ActiveStatus()
-    assert tinyproxy_installed.is_running()
-    assert tinyproxy_installed.config == (PORT, "example")
-
-
-# Define another fixture, this time representing an installed, configured, and running tinyproxy.
-@pytest.fixture
-def tinyproxy_configured(monkeypatch: pytest.MonkeyPatch):
-    tinyproxy = MockTinyproxy(config=(PORT, "example"), installed=True, running=True)
-    monkeypatch.setattr("charm.tinyproxy", tinyproxy)
-    return tinyproxy
-
-
-def test_config_changed(tinyproxy_configured: MockTinyproxy):
-    """Test that the charm correctly handles the config-changed event."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State(config={"slug": "foo"})
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert state_out.unit_status == testing.ActiveStatus()
-    assert tinyproxy_configured.is_running()
-    assert tinyproxy_configured.config == (PORT, "foo")
-    assert tinyproxy_configured.reloaded_config
-
-
-@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
-def test_start_invalid_config(tinyproxy_installed: MockTinyproxy, invalid_slug: str):
-    """Test that the charm fails to start if the config is invalid."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State(config={"slug": invalid_slug})
-    state_out = ctx.run(ctx.on.start(), state_in)
-    assert state_out.unit_status == testing.BlockedStatus(
-        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
-    )
-    assert not tinyproxy_installed.is_running()
-    assert tinyproxy_installed.config is None
-
-
-@pytest.mark.parametrize("invalid_slug", ["", "foo_bar", "foo/bar"])
-def test_config_changed_invalid_config(tinyproxy_configured: MockTinyproxy, invalid_slug: str):
-    """Test that the charm fails to change config if the config is invalid."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_in = testing.State(config={"slug": invalid_slug})
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert state_out.unit_status == testing.BlockedStatus(
-        f"Invalid slug: '{invalid_slug}'. Slug must match the regex [a-z0-9-]+"
-    )
-    assert tinyproxy_configured.is_running()  # tinyproxy should still be running...
-    assert tinyproxy_configured.config == (PORT, "example")  # ...with the original config.
-    assert not tinyproxy_configured.reloaded_config
-
-
-def test_stop(tinyproxy_configured: MockTinyproxy):
-    """Test that the charm correctly handles the stop event."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_out = ctx.run(ctx.on.stop(), testing.State())
-    assert state_out.unit_status == testing.MaintenanceStatus("Waiting for tinyproxy to start")
-    assert not tinyproxy_configured.is_running()
-
-
-def test_remove(tinyproxy_installed: MockTinyproxy):
-    """Test that the charm correctly handles the remove event."""
-    ctx = testing.Context(TinyproxyCharm)
-    state_out = ctx.run(ctx.on.remove(), testing.State())
-    assert state_out.unit_status == testing.MaintenanceStatus(
-        "Waiting for tinyproxy to be installed"
-    )
-    assert not tinyproxy_installed.is_installed()
+```{literalinclude} ../../examples/machine-tinyproxy/tests/unit/test_charm.py
+:language: python
+:start-at: import pytest
 ```
 
 ### Run the tests
@@ -907,16 +617,22 @@ When you created the initial version of your charm, Charmcraft included integrat
 
 In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
 
-```python
-    juju.wait(jubilant.all_active, timeout=600)
+```{literalinclude} ../../examples/machine-tinyproxy/tests/integration/test_charm.py
+:language: python
+:start-at: juju.wait(jubilant.all_active, timeout=600)
+:end-at: juju.wait(jubilant.all_active, timeout=600)
+:dedent:
 ```
 
 This extends the duration that Jubilant waits for your charm to deploy, in case the integration tests run slowly in your virtual machine. The default duration would be sufficient if the integration tests were running in a continuous integration environment.
 
 Next, remove the `@pytest.mark.skip` decorator from `test_workload_version_is_set`. Then change `assert version == ...` to:
 
-```python
-    assert version == "1.11.1"  # The version installed by tinyproxy.install.
+```{literalinclude} ../../examples/machine-tinyproxy/tests/integration/test_charm.py
+:language: python
+:start-at: 'assert version == "1.11.1"'
+:end-at: 'assert version == "1.11.1"'
+:dedent:
 ```
 
 You should now have the following tests:
@@ -928,12 +644,9 @@ Before running the tests, let's add a test to check that an invalid value of `sl
 
 Add the following function at the end of `tests/integration/test_charm.py`:
 
-```python
-def test_block_on_invalid_config(charm: pathlib.Path, juju: jubilant.Juju):
-    """Check that the charm goes into blocked status if slug is invalid."""
-    juju.config("tinyproxy", {"slug": "foo/bar"})
-    juju.wait(jubilant.all_blocked)
-    juju.config("tinyproxy", reset="slug")
+```{literalinclude} ../../examples/machine-tinyproxy/tests/integration/test_charm.py
+:language: python
+:pyobject: test_block_on_invalid_config
 ```
 
 Each test depends on two fixtures:

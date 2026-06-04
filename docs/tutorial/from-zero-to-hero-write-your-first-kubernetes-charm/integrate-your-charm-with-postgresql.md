@@ -22,10 +22,10 @@ A charm often requires or supports relations to other charms. For example, to ma
 
 In `charmcraft.yaml`, add a `charm-libs` section before the `containers` section:
 
-```yaml
-charm-libs:
-  - lib: data_platform_libs.data_interfaces
-    version: "0"
+```{literalinclude} ../../../examples/k8s-3-postgresql/charmcraft.yaml
+:language: yaml
+:start-at: 'charm-libs:'
+:end-at: 'version: "0"'
 ```
 
 This tells Charmcraft that your charm requires the [`data_interfaces`](https://charmhub.io/data-platform-libs/libraries/data_interfaces) charm library from Charmhub.
@@ -64,12 +64,10 @@ First, find out the name of the interface that PostgreSQL offers for other charm
 
 Next, open the `charmcraft.yaml` file of your charm and, before the `charm-libs` section, define a relation endpoint using a `requires` block, as below. This endpoint says that our charm is requesting a relation called `database` over an interface called `postgresql_client` with a maximum number of supported connections of 1. (Note: Here, `database` is a custom relation name, though in general we recommend sticking to default recommended names for each charm.)
 
-```yaml
-requires:
-  database:
-    interface: postgresql_client
-    limit: 1
-    optional: false
+```{literalinclude} ../../../examples/k8s-3-postgresql/charmcraft.yaml
+:language: yaml
+:start-at: 'requires:'
+:end-at: 'optional: false'
 ```
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.
@@ -88,15 +86,10 @@ To do so, we need to update our charm `src/charm.py` to do all of the following:
 
 At the top of `src/charm.py`, import the database interfaces library:
 
-```python
-# Import the 'data_interfaces' library.
-# The import statement omits the top-level 'lib' directory
-# because 'charmcraft pack' copies its contents to the project root.
-from charms.data_platform_libs.v0.data_interfaces import (
-    DatabaseCreatedEvent,
-    DatabaseEndpointsChangedEvent,
-    DatabaseRequires,
-)
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:start-at: "# Import the 'data_interfaces' library."
+:end-at: ')'
 ```
 
 ````{important}
@@ -131,28 +124,28 @@ export PYTHONPATH=lib:$PYTHONPATH
 In the `__init__` method, define a new instance of the 'DatabaseRequires' class. This is required to set the right permissions scope for the PostgreSQL charm. It will create a new user with a password and a database with the required name (below, `names_db`), and limit the user permissions to only this particular database (that is, below, `names_db`).
 
 
-```python
-# The 'relation_name' comes from the 'charmcraft.yaml file'.
-# The 'database_name' is the name of the database that our application requires.
-self.database = DatabaseRequires(self, relation_name="database", database_name="names_db")
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:start-at: "# The 'relation_name' comes from the 'charmcraft.yaml file'."
+:end-at: self.database = DatabaseRequires(
+:dedent:
 ```
 
 Next, add event observers for all the database events:
 
-```python
-# See https://charmhub.io/data-platform-libs/libraries/data_interfaces
-framework.observe(self.database.on.database_created, self._on_database_endpoint)
-framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint)
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:start-at: "# See https://charmhub.io/data-platform-libs/libraries/data_interfaces"
+:end-at: framework.observe(self.database.on.endpoints_changed
+:dedent:
 ```
 
 Finally, define the method that is called on the database events:
 
-```python
-def _on_database_endpoint(
-    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
-) -> None:
-    """Event is fired when the database is created or its endpoint is changed."""
-    self._replan_workload()
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._on_database_endpoint
+:dedent:
 ```
 
 We now need to make sure that our application knows how to access the database.
@@ -161,40 +154,18 @@ We now need to make sure that our application knows how to access the database.
 
 Our application consumes database authentication data in the form of environment variables. Let's define a method that prepares database authentication data in that form:
 
-```python
-def get_app_environment(self) -> dict[str, str]:
-    """Return a dictionary of environment variables for the application."""
-    db_data = self.fetch_database_relation_data()
-    if not db_data:
-        return {}
-    return {
-        "DEMO_SERVER_DB_HOST": db_data["db_host"],
-        "DEMO_SERVER_DB_PORT": db_data["db_port"],
-        "DEMO_SERVER_DB_USER": db_data["db_username"],
-        "DEMO_SERVER_DB_PASSWORD": db_data["db_password"],
-    }
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm.get_app_environment
+:dedent:
 ```
 
 This method depends on the following method, which extracts the database authentication data:
 
-```python
-def fetch_database_relation_data(self) -> dict[str, str]:
-    """Retrieve relation data from a database."""
-    relations = self.database.fetch_relation_data()
-    logger.debug("Got following database data: %s", relations)
-    for data in relations.values():
-        if not data:
-            continue
-        logger.info("New database endpoint is %s", data["endpoints"])
-        host, port = data["endpoints"].split(":")
-        db_data = {
-            "db_host": host,
-            "db_port": port,
-            "db_username": data["username"],
-            "db_password": data["password"],
-        }
-        return db_data
-    return {}
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm.fetch_database_relation_data
+:dedent:
 ```
 
 ### Share the authentication data with your application
@@ -203,72 +174,20 @@ Let's change the Pebble service definition to include a dynamic `environment` ke
 
 First, update `_replan_workload()` to provide environment variables when creating the Pebble layer:
 
-```python
-def _replan_workload(self) -> None:
-    """Define and start a workload using the Pebble API.
-
-    You'll need to specify the right entrypoint and environment
-    configuration for your specific workload. Tip: you can see the
-    standard entrypoint of an existing container using docker inspect
-    Learn more about interacting with Pebble at
-        https://documentation.ubuntu.com/ops/latest/reference/pebble/
-    Learn more about Pebble layers at
-        https://documentation.ubuntu.com/pebble/how-to/use-layers/
-    """
-    # Learn more about statuses at
-    # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
-    try:
-        config = self.load_config(FastAPIConfig)
-    except ValueError as e:
-        logger.error("Configuration error: %s", e)
-        return
-    env = self.get_app_environment()
-    try:
-        self.container.add_layer(
-            "fastapi_demo",
-            self._get_pebble_layer(config.server_port, env),
-            combine=True,
-        )
-        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
-
-        # Tell Pebble to incorporate the changes, including restarting the
-        # service if required.
-        self.container.replan()
-        logger.info(f"Replanned with '{self.pebble_service_name}' service")
-    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-        logger.info("Unable to connect to Pebble: %s", e)
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._replan_workload
+:dedent:
 ```
 
 We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
 
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
-```python
-def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
-    """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
-        "summary": "FastAPI demo service",
-        "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
-                "environment": environment,
-            }
-        },
-    }
-    return ops.pebble.Layer(pebble_layer)
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._get_pebble_layer
+:dedent:
 ```
 
 With these changes, we've made sure that our application knows how to access the database.
@@ -289,34 +208,19 @@ Now that the charm is getting more complex, there are many more cases where the 
 
 In your charm's `__init__` add a new observer:
 
-```python
-# Report the unit status after each event.
-framework.observe(self.on.collect_unit_status, self._on_collect_status)
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:start-at: "# Report the unit status after each event."
+:end-at: framework.observe(self.on.collect_unit_status
+:dedent:
 ```
 
 And define a method that does the various checks, adding appropriate statuses. The library will take care of selecting the 'most significant' status for you.
 
-```python
-def _on_collect_status(self, event: ops.CollectStatusEvent) -> None:
-    try:
-        self.load_config(FastAPIConfig)
-    except ValueError as e:
-        event.add_status(ops.BlockedStatus(str(e)))
-    if not self.model.get_relation("database"):
-        # We need the user to do 'juju integrate'.
-        event.add_status(ops.BlockedStatus("Waiting for database relation"))
-    elif not self.database.fetch_relation_data():
-        # We need the charms to finish integrating.
-        event.add_status(ops.WaitingStatus("Waiting for database relation"))
-    try:
-        status = self.container.get_service(self.pebble_service_name)
-    except (ops.pebble.APIError, ops.pebble.ConnectionError, ops.ModelError):
-        event.add_status(ops.MaintenanceStatus("Waiting for Pebble in workload container"))
-    else:
-        if not status.is_running():
-            event.add_status(ops.MaintenanceStatus("Waiting for the service to start up"))
-    # If nothing is wrong, then the status is active.
-    event.add_status(ops.ActiveStatus())
+```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._on_collect_status
+:dedent:
 ```
 
 We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_replan_workload`, remove the lines:
@@ -420,59 +324,25 @@ Congratulations, your relation with PostgreSQL is functional!
 
 Now that our charm uses `fetch_database_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_database_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
 
-```python
-def test_relation_data():
-    ctx = testing.Context(FastAPIDemoCharm)
-    relation = testing.Relation(
-        endpoint="database",
-        interface="postgresql_client",
-        remote_app_name="postgresql-k8s",
-        remote_app_data={
-            "endpoints": "example.com:5432",
-            "username": "foo",
-            "password": "bar",
-        },
-    )
-    container = testing.Container(name="demo-server", can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        relations={relation},
-        leader=True,
-    )
-
-    state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
-
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
-        "fastapi-service"
-    ].environment == {
-        "DEMO_SERVER_DB_HOST": "example.com",
-        "DEMO_SERVER_DB_PORT": "5432",
-        "DEMO_SERVER_DB_USER": "foo",
-        "DEMO_SERVER_DB_PASSWORD": "bar",
-    }
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/unit/test_charm.py
+:language: python
+:pyobject: test_relation_data
 ```
 
 In this chapter, we also defined a new method `_on_collect_status` that checks various things, including whether the required database relation exists. If the relation doesn't exist, we wait and set the unit status to `blocked`. We can also add a test to cover this behaviour:
 
-```python
-def test_no_database_blocked():
-    ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        leader=True,
-    )  # We've omitted relation data from the input state.
-
-    state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
-
-    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/unit/test_charm.py
+:language: python
+:pyobject: test_no_database_blocked
 ```
 
 Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a database relation, the unit will be in `blocked` status instead of `active`. Replace the `assert state_out.unit_status` line by:
 
-```python
-    # Check the unit is blocked:
-    assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/unit/test_charm.py
+:language: python
+:start-at: "# Check the unit is blocked:"
+:end-at: 'assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")'
+:dedent:
 ```
 
 Now run `tox -e unit` to make sure all test cases pass.
@@ -481,49 +351,19 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, to expect blocked status in `juju.wait`. Replace the contents of `tests/integration/test_charm.py` with:
 
-```python
-import logging
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
-    resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
-    }
-
-    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(charm, app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_blocked)
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/integration/test_charm.py
+:language: python
+:start-at: import logging
+:end-at: juju.wait(jubilant.all_blocked)
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
 
 In your `tests/integration/test_charm.py` file add the following test case:
 
-```python
-@pytest.mark.juju_setup
-def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
-    """Verify that the charm integrates with the database.
-
-    Assert that the charm is active if the integration is established.
-    """
-    juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
-    juju.integrate(APP_NAME, "postgresql-k8s")
-    juju.wait(jubilant.all_active)
+```{literalinclude} ../../../examples/k8s-3-postgresql/tests/integration/test_charm.py
+:language: python
+:pyobject: test_database_integration
 ```
 
 This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.

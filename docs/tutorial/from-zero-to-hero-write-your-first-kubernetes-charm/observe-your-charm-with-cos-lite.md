@@ -31,18 +31,10 @@ Your charm will need several more libraries from Charmhub.
 
 Ensure you're in your Multipass Ubuntu VM, in your charm project directory. Then, in `charmcraft.yaml`, extend the `charm-libs` section:
 
-```yaml
-charm-libs:
-  - lib: data_platform_libs.data_interfaces
-    version: "0"
-  - lib: grafana_k8s.grafana_dashboard
-    version: "0"
-  - lib: loki_k8s.loki_push_api
-    version: "1"
-  - lib: observability_libs.juju_topology
-    version: "0"
-  - lib: prometheus_k8s.prometheus_scrape
-    version: "0"
+```{literalinclude} ../../../examples/k8s-5-observe/charmcraft.yaml
+:language: yaml
+:start-at: 'charm-libs:'
+:end-before: 'actions:'
 ```
 
 Next, run the following command to download the libraries:
@@ -101,11 +93,10 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 In your `charmcraft.yaml` file, after the `requires` block, add a `provides` endpoint with relation name `metrics-endpoint` and interface name `prometheus_scrape`, as below. This declares that your charm can offer services to other charms over the `prometheus-scrape` interface. In short, that your charm is open to integrating with, for example, the official Prometheus charm. (Note: `metrics-endpoint` is the default relation name recommended by the `prometheus_scrape` interface library.)
 
-```yaml
-provides:
-  metrics-endpoint:
-    interface: prometheus_scrape
-    optional: true
+```{literalinclude} ../../../examples/k8s-5-observe/charmcraft.yaml
+:language: yaml
+:start-at: 'provides:'
+:end-before: '  grafana-dashboard:'
 ```
 
 ## Import the Prometheus interface libraries and set up Prometheus scraping
@@ -114,25 +105,19 @@ In your `src/charm.py` file, do the following:
 
 First, at the top of the file, import the `prometheus_scrape` library:
 
-```python
-from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: from charms.prometheus_k8s.v0.prometheus_scrape
+:end-at: from charms.prometheus_k8s.v0.prometheus_scrape
 ```
 
 Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider` instance with the desired scrape target, as below. Note that this uses the relation name that you specified earlier in the `charmcraft.yaml` file. Also, reflecting the fact that you've made your charm's port configurable (see previous chapter {ref}`Make the charm configurable <make-your-charm-configurable>`), the target job is set to be consumed from config. The URL path is not included because it is predictable (defaults to /metrics), so the Prometheus library uses it automatically. The last line, which sets the `refresh_event` to the `config_change` event, ensures that the Prometheus charm will change its scraping target every time someone changes the port configuration. Overall, this code will allow your application to be scraped by Prometheus once they've been integrated.
 
-```python
-# Provide a metrics endpoint for Prometheus to scrape.
-try:
-    config = self.load_config(FastAPIConfig)
-except ValueError as e:
-    logger.warning("Unable to add metrics: invalid configuration: %s", e)
-else:
-    self._prometheus_scraping = MetricsEndpointProvider(
-        self,
-        relation_name="metrics-endpoint",
-        jobs=[{"static_configs": [{"targets": [f"*:{config.server_port}"]}]}],
-        refresh_event=self.on.config_changed,
-    )
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: "# Provide a metrics endpoint for Prometheus to scrape."
+:end-before: "# Provide grafana dashboards"
+:dedent:
 ```
 
 Congratulations, your charm is ready to be integrated with Prometheus!
@@ -145,15 +130,10 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 In your `charmcraft.yaml` file, beneath your existing `requires` endpoint, add another `requires` endpoint with relation name `logging` and interface name `loki_push_api`. This declares that your charm can optionally make use of services from other charms over the `loki_push_api` interface. In short, that your charm is open to integrating with, for example, the official Loki charm. (Note: `logging` is the default relation name recommended by the `loki_push_api` interface library.)
 
-```yaml
-requires:
-  database:
-    interface: postgresql_client
-    limit: 1
-    optional: false
-  logging:
-    interface: loki_push_api
-    optional: true
+```{literalinclude} ../../../examples/k8s-5-observe/charmcraft.yaml
+:language: yaml
+:start-at: 'requires:'
+:end-before: 'provides:'
 ```
 
 ## Import the Loki interface libraries and set up the Loki API
@@ -162,15 +142,19 @@ In your `src/charm.py` file, do the following:
 
 First, import the `loki_push_api` lib:
 
-```python
-from charms.loki_k8s.v1.loki_push_api import LogForwarder
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: from charms.loki_k8s.v1.loki_push_api
+:end-at: from charms.loki_k8s.v1.loki_push_api
 ```
 
 Then, in your charm's `__init__` method, initialise the `LogForwarder` instance as shown below. The `logging` relation name comes from the `charmcraft.yaml` file. Overall this code ensures that your application can push logs to Loki (or any other charms that implement the `loki_push_api` interface).
 
-```python
-# Enable pushing application logs to Loki.
-self._logging = LogForwarder(self, relation_name="logging")
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: "# Enable pushing application logs to Loki."
+:end-at: self._logging = LogForwarder
+:dedent:
 ```
 
 Congratulations, your charm can now also integrate with Loki!
@@ -183,14 +167,10 @@ Follow the steps below to make your charm capable of integrating with the existi
 
 In your `charmcraft.yaml` file, add another `provides` endpoint with relation name `grafana-dashboard` and interface name `grafana_dashboard`, as below. This declares that your charm can offer services to other charms over the `grafana-dashboard` interface. In short, that your charm is open to integrations with, for example, the official Grafana charm. (Note: Here `grafana-dashboard` endpoint is the default relation name recommended by the `grafana_dashboard` library.)
 
-```yaml
-provides:
-  metrics-endpoint:
-    interface: prometheus_scrape
-    optional: true
-  grafana-dashboard:
-    interface: grafana_dashboard
-    optional: true
+```{literalinclude} ../../../examples/k8s-5-observe/charmcraft.yaml
+:language: yaml
+:start-at: 'provides:'
+:end-before: 'charm-libs:'
 ```
 
 ### Import the Grafana interface libraries and set up the Grafana dashboards
@@ -199,17 +179,19 @@ In your `src/charm.py` file, do the following:
 
 First, at the top of the file, import the `grafana_dashboard` lib:
 
-```python
-from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: from charms.grafana_k8s.v0.grafana_dashboard
+:end-at: from charms.grafana_k8s.v0.grafana_dashboard
 ```
 
 Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider` instance, as below. The `grafana-dashboard` is the relation name you defined earlier in your `charmcraft.yaml` file. Overall, this code states that your application supports the Grafana interface.
 
-```python
-# Provide grafana dashboards over a relation interface.
-self._grafana_dashboards = GrafanaDashboardProvider(
-    self, relation_name="grafana-dashboard"
-)
+```{literalinclude} ../../../examples/k8s-5-observe/src/charm.py
+:language: python
+:start-at: "# Provide grafana dashboards over a relation interface."
+:end-at: ')'
+:dedent:
 ```
 
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
@@ -482,25 +464,18 @@ The existing integration tests use a model that is created by the `juju` fixture
 
 First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest`, `pytest_jubilant`, and `requests`. Your imports should now look like this:
 
-```python
-import json
-import logging
-import pathlib
-import time
-
-import jubilant
-import pytest
-import pytest_jubilant
-import requests
-import yaml
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:start-at: import json
+:end-at: import yaml
 ```
 
 Next, still in `tests/integration/test_charm.py`, define the new fixture:
 
-```python
-@pytest.fixture(scope="module")
-def cos(juju_factory: pytest_jubilant.JujuFactory):
-    yield juju_factory.get_juju(suffix="cos")
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:start-at: '@pytest.fixture(scope="module")'
+:end-at: yield juju_factory.get_juju
 ```
 
 `get_juju` creates a model called `jubilant-<randomhex>-cos`.
@@ -511,54 +486,28 @@ We're now ready to write the tests.
 
 Add two test functions to `tests/integration/test_charm.py`:
 
-```python
-@pytest.mark.juju_setup
-def test_deploy_cos(cos: jubilant.Juju):
-    """Deploy COS Lite in a separate model."""
-    cos.deploy("cos-lite", trust=True)
-    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:pyobject: test_deploy_cos
+```
 
-
-@pytest.mark.juju_setup
-def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
-    """Integrate our app with Loki from COS Lite."""
-    cos.offer("loki", endpoint="logging")
-    juju.integrate(APP_NAME, f"{cos.model}.loki")
-    juju.wait(jubilant.all_active)
-    cos.wait(jubilant.all_active)
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:pyobject: test_integrate_loki
 ```
 
 ### Request logs from Loki
 
 Add a test function to `tests/integration/test_charm.py`:
 
-```python
-def test_loki_data(cos: jubilant.Juju):
-    """Use Loki's HTTP API to verify that Loki has a label for our app.
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:pyobject: test_loki_data
+```
 
-    COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
-    that tells us the base URL of Loki's API.
-    """
-    task = cos.run("traefik/0", "show-proxied-endpoints")
-    results = json.loads(task.results["proxied-endpoints"])
-    loki_url = results["loki/0"]["url"]
-    loki_api_url = f"{loki_url}/loki/api/v1/label/juju_application/values"
-    juju_applications = _get_loki_logs(loki_api_url)
-    assert juju_applications is not None, "No logs available from Loki"
-    assert APP_NAME in juju_applications
-
-
-def _get_loki_logs(loki_api_url: str) -> list[str] | None:
-    """Wait for logs to be available from Loki and return them."""
-    for attempt in range(60):
-        if attempt:  # If not the first attempt, wait before retrying.
-            time.sleep(1)
-        response = requests.get(loki_api_url)
-        if response.status_code == 200:
-            response_decoded = response.json()
-            if "data" in response_decoded:
-                return response_decoded["data"]
-    return None
+```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
+:language: python
+:pyobject: _get_loki_logs
 ```
 
 For more information, see:
