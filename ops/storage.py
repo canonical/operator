@@ -31,6 +31,7 @@ from typing import Any, cast
 import yaml
 
 from ._private import tracer
+from ._private import yaml as _yaml
 from ._private.yaml import _SafeLoader
 
 logger = logging.getLogger()
@@ -412,13 +413,7 @@ class _JujuStorageBackend:
         p = _run(['state-get', key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
-        # Instantiate the loader directly rather than via yaml.load() to avoid
-        # false-positive "unsafe deserialization" warnings from pattern-based scanners.
-        loader = cast('_SafeLoader', _SimpleLoader(p.stdout))
-        try:
-            return loader.get_single_data()
-        finally:
-            loader.dispose()
+        return _yaml.safe_load(p.stdout, safe_loader=_SimpleLoader)
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.

@@ -32,11 +32,11 @@ _safe_loader: type[_SafeLoader] = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 _safe_dumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
 
 
-def safe_load(stream: str | TextIO) -> Any:
+def safe_load(stream: str | TextIO, safe_loader: type[_SafeLoader] = _safe_loader) -> Any:
     """Same as yaml.safe_load, but use fast C loader if available."""
     # Instantiate the loader directly rather than via yaml.load() to avoid
     # false-positive "unsafe deserialization" warnings from pattern-based scanners.
-    loader = _safe_loader(stream)
+    loader = safe_loader(stream)
     try:
         return loader.get_single_data()
     finally:
