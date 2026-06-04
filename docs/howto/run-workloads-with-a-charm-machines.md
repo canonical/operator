@@ -306,7 +306,7 @@ def test_install_calls_apt(monkeypatch: pytest.MonkeyPatch):
 
 def test_reload_config_sends_sigusr1(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: pathlib.Path,
 ):
     pid_file = tmp_path / "myworkload.pid"
     pid_file.write_text("1234")

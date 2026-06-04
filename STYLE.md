@@ -139,7 +139,8 @@ Function and method signatures should include a type annotation for the returned
 **Do:**
 
 ```python
-def method1(arg1: type1, arg2: type2) -> None: ...
+def method1(arg1: type1, arg2: type2) -> None:
+    return
 
 
 def method2() -> str:
@@ -148,7 +149,8 @@ def method2() -> str:
 
 
 class C:
-    def __init__(self, x: type1): ...
+    def __init__(self, x: type1):
+        pass
 
 
 def test_method1():
