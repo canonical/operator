@@ -39,6 +39,11 @@ storage:
         minimum-size: 1M
         description: Filesystem storage for testing storage hook commands.
 
+resources:
+    test-file:
+        type: file
+        description: Small file used by integration tests of resource_get.
+
 actions:
     get-status:
         description: |
@@ -148,3 +153,34 @@ actions:
                 type: integer
                 description: A relation id that does not exist.
                 default: 9999
+    test-credential-get:
+        description: |
+            Call hookcmds.credential_get and return the cloud type and name.
+    test-juju-reboot:
+        description: |
+            Queue a reboot via hookcmds.juju_reboot(now=False). The unit
+            reboots after the action context exits.
+    test-relation-model-get:
+        description: |
+            Call hookcmds.relation_model_get for the peer relation and return
+            the model UUID.
+    test-resource-get:
+        description: |
+            Call hookcmds.resource_get for the test-file resource and return
+            the cached file path.
+    test-secret-grant:
+        description: |
+            Create a secret and grant it to the peer relation via
+            hookcmds.secret_grant. Returns the secret ID.
+    test-secret-revoke:
+        description: |
+            Revoke access to a secret from the peer relation via
+            hookcmds.secret_revoke. Does NOT remove the secret.
+        params:
+            secret-id:
+                type: string
+                description: The secret URI to revoke.
+    test-storage-add:
+        description: |
+            Queue one additional 'data' storage instance via
+            hookcmds.storage_add and return the current count before adding.
