@@ -57,7 +57,8 @@ copyright = f"{datetime.date.today().year}"
 html_title = project + " documentation"
 
 # Documentation website URL
-ogp_site_url = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
+version_slug = f"{os.environ.get('READTHEDOCS_VERSION', 'local')}"
+ogp_site_url = f"https://canonical.com/juju/docs/ops/{version_slug}/"
 
 # Preview name of the documentation website
 # TODO: To use a different name for the project in previews, update the next line.
@@ -134,17 +135,18 @@ html_context = {
 # Project slug
 # TODO: If your documentation is hosted on https://documentation.ubuntu.com/,
 #       uncomment and set to the RTD slug.
-slug = "ops"
+slug = "juju/docs/ops/"
 
 #######################
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
 #######################
 
 # Use RTD canonical URL to ensure duplicate pages have a specific canonical URL
-html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
+html_baseurl = f"https://canonical.com/juju/docs/ops/{version_slug}/"
 
 # sphinx-sitemap uses html_baseurl to generate the full URL for each page:
 sitemap_url_scheme = "{link}"
+sitemap_filename = "doc-sitemap.xml"
 
 # Include `lastmod` dates in the sitemap:
 sitemap_show_lastmod = True
@@ -279,6 +281,7 @@ html_css_files = [
 # Adds custom JavaScript files, located remotely or in 'html_static_path'.
 html_js_files = [
     "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
+    "overwrite_links.js",
 ]
 
 # Appends extra markup to the end of every document written in reST
