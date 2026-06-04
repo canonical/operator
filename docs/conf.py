@@ -135,7 +135,7 @@ html_context = {
 # Project slug
 # TODO: If your documentation is hosted on https://documentation.ubuntu.com/,
 #       uncomment and set to the RTD slug.
-slug = "juju/docs/ops/"
+slug = "juju/docs/ops"
 
 #######################
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
