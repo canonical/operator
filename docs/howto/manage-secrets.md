@@ -19,9 +19,7 @@ This document shows how to use secrets in a charm -- both when the charm is the 
 
 ## Secret owner charm
 
-```{note}
-By its nature, the content in this section only applies to *charm* secrets.
-```
+This section only applies when the charm is the secret owner.
 
 ### Add and grant access to a secret
 
