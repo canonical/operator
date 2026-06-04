@@ -52,6 +52,15 @@ class TestHookcmdsCharm(ops.CharmBase):
         framework.observe(
             self.on['trigger-relation-error'].action, self._on_trigger_relation_error
         )
+        framework.observe(self.on['test-credential-get'].action, self._on_test_credential_get)
+        framework.observe(self.on['test-juju-reboot'].action, self._on_test_juju_reboot)
+        framework.observe(
+            self.on['test-relation-model-get'].action, self._on_test_relation_model_get
+        )
+        framework.observe(self.on['test-resource-get'].action, self._on_test_resource_get)
+        framework.observe(self.on['test-secret-grant'].action, self._on_test_secret_grant)
+        framework.observe(self.on['test-secret-revoke'].action, self._on_test_secret_revoke)
+        framework.observe(self.on['test-storage-add'].action, self._on_test_storage_add)
 
     # Lifecycle
 
@@ -109,80 +118,64 @@ class TestHookcmdsCharm(ops.CharmBase):
     # Logging
 
     def _on_test_logging(self, event: ops.ActionEvent):
-        """Call juju_log at every supported level; return ok on success."""
+        """Call juju_log at every supported level; running without error is the check."""
         message = event.params.get('message', 'integration test log message')
         for level in ('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'):
             hookcmds.juju_log(f'[{level}] {message}', level=level)  # type: ignore[arg-type]
-        event.set_results({'ok': 'true', 'levels-logged': '5'})
 
     # Application version
 
     def _on_set_app_version(self, event: ops.ActionEvent):
         version = event.params['version']
         hookcmds.app_version_set(version)
-        event.set_results({'ok': 'true', 'version': version})
 
     # Network
 
     def _on_get_network_info(self, event: ops.ActionEvent):
-        """Return network info for the 'peer' binding."""
+        """Return raw network data for the 'peer' binding."""
         network = hookcmds.network_get('peer')
-        bind_addrs = network.bind_addresses
-        results: dict[str, Any] = {
-            'bind-addresses-count': str(len(bind_addrs)),
-            'egress-subnets': ','.join(str(s) for s in network.egress_subnets),
-            'ingress-addresses': ','.join(str(a) for a in network.ingress_addresses),
-            'has-bind-addresses': str(len(bind_addrs) > 0).lower(),
-        }
-        if bind_addrs:
-            first = bind_addrs[0]
-            results['interface-name'] = first.interface_name
-            if first.addresses:
-                results['first-address'] = first.addresses[0].value
-        event.set_results(results)
+        bind_addresses = [
+            {
+                'interface-name': ba.interface_name,
+                'mac-address': ba.mac_address,
+                'addresses': [
+                    {'value': a.value, 'cidr': a.cidr, 'hostname': a.hostname}
+                    for a in ba.addresses
+                ],
+            }
+            for ba in network.bind_addresses
+        ]
+        event.set_results({
+            'bind-addresses': json.dumps(bind_addresses),
+            'egress-subnets': json.dumps(list(network.egress_subnets)),
+            'ingress-addresses': json.dumps(list(network.ingress_addresses)),
+        })
 
     # Ports
 
     def _on_test_ports(self, event: ops.ActionEvent):
-        """Open TCP+UDP ports, verify via opened_ports, then close and verify."""
+        """Open TCP+UDP ports, capture port lists at each step, then close both."""
         port = int(event.params.get('port', 8877))
 
-        before = hookcmds.opened_ports()
-        initial_count = len(before)
+        def _ports_json(ports: list) -> str:
+            return json.dumps([{'protocol': p.protocol, 'port': p.port} for p in ports])
 
-        # Open TCP
+        before = hookcmds.opened_ports()
         hookcmds.open_port('tcp', port)
         after_tcp = hookcmds.opened_ports()
-
-        # Open UDP same port
         hookcmds.open_port('udp', port)
         after_both = hookcmds.opened_ports()
-
-        # Close TCP
         hookcmds.close_port('tcp', port)
         after_close_tcp = hookcmds.opened_ports()
-
-        # Close UDP
         hookcmds.close_port('udp', port)
         final = hookcmds.opened_ports()
 
-        tcp_opened = any(p.port == port and p.protocol == 'tcp' for p in after_tcp)
-        udp_opened = any(p.port == port and p.protocol == 'udp' for p in after_both)
-        tcp_closed = not any(p.port == port and p.protocol == 'tcp' for p in after_close_tcp)
-        udp_still_open = any(p.port == port and p.protocol == 'udp' for p in after_close_tcp)
-        back_to_initial = len(final) == initial_count
-
         event.set_results({
-            'initial-count': str(initial_count),
-            'after-open-tcp-count': str(len(after_tcp)),
-            'after-open-both-count': str(len(after_both)),
-            'after-close-tcp-count': str(len(after_close_tcp)),
-            'final-count': str(len(final)),
-            'tcp-was-opened': str(tcp_opened).lower(),
-            'udp-was-opened': str(udp_opened).lower(),
-            'tcp-was-closed': str(tcp_closed).lower(),
-            'udp-still-open-after-tcp-close': str(udp_still_open).lower(),
-            'back-to-initial': str(back_to_initial).lower(),
+            'before': _ports_json(before),
+            'after-open-tcp': _ports_json(after_tcp),
+            'after-open-both': _ports_json(after_both),
+            'after-close-tcp': _ports_json(after_close_tcp),
+            'final': _ports_json(final),
         })
 
     # Server-side state
@@ -193,20 +186,15 @@ class TestHookcmdsCharm(ops.CharmBase):
         value = event.params['value']
 
         hookcmds.state_set({key: value})
-
         retrieved = hookcmds.state_get(key)
         all_state = hookcmds.state_get(None)
-
         hookcmds.state_delete(key)
-
         after_delete = hookcmds.state_get(None)
 
         event.set_results({
             'retrieved': retrieved,
-            'types-match': str(retrieved == value).lower(),
-            'key-in-all': str(key in all_state).lower(),
-            'all-value-matches': str(all_state.get(key) == value).lower(),
-            'key-deleted': str(key not in after_delete).lower(),
+            'all-state': json.dumps(all_state),
+            'after-delete': json.dumps(after_delete),
         })
 
     # Secrets
@@ -250,7 +238,7 @@ class TestHookcmdsCharm(ops.CharmBase):
 
         event.set_results({
             'secret-id': secret_id,
-            'in-ids-list': str(any(i in secret_id or secret_id in i for i in ids)).lower(),
+            'secret-ids': json.dumps(ids),
             'initial-label': info.label or '',
             'initial-description': info.description or '',
             'initial-revision': str(info.revision),
@@ -305,10 +293,8 @@ class TestHookcmdsCharm(ops.CharmBase):
             'relation-id-str': ids[0],
             'relation-id-int': str(rel_id),
             'member-count': str(len(members)),
-            'set-value': test_value,
             'retrieved-value': retrieved_key,
-            'values-match': str(retrieved_key == test_value).lower(),
-            'key-in-all-data': str(test_key in all_data).lower(),
+            'all-data': json.dumps(all_data),
         })
 
     # Storage
@@ -326,7 +312,6 @@ class TestHookcmdsCharm(ops.CharmBase):
                 'storage-id': data_storage[0],
                 'storage-kind': info.kind,
                 'storage-location': str(info.location),
-                'has-location': str(bool(info.location)).lower(),
             })
         else:
             event.set_results({
@@ -375,6 +360,69 @@ class TestHookcmdsCharm(ops.CharmBase):
             })
         else:
             event.set_results({'raised': 'none'})
+
+    # Credentials
+
+    def _on_test_credential_get(self, event: ops.ActionEvent):
+        """Call credential_get and return cloud type and name."""
+        cloud = hookcmds.credential_get()
+        event.set_results({'cloud-type': cloud.type, 'cloud-name': cloud.name})
+
+    # Reboot
+
+    def _on_test_juju_reboot(self, event: ops.ActionEvent):
+        """Queue a machine reboot via juju_reboot(now=False)."""
+        hookcmds.juju_reboot(now=False)
+
+    # Relation model
+
+    def _on_test_relation_model_get(self, event: ops.ActionEvent):
+        """Return the model UUID for the peer relation."""
+        ids = hookcmds.relation_ids('peer')
+        if not ids:
+            event.fail('No peer relation IDs - deploy 2+ units')
+            return
+        rel_id = int(ids[0].split(':')[-1])
+        model = hookcmds.relation_model_get(id=rel_id, endpoint='peer')
+        event.set_results({'uuid': model.uuid})
+
+    # Resource
+
+    def _on_test_resource_get(self, event: ops.ActionEvent):
+        """Return the cached path for the test-file resource."""
+        path = hookcmds.resource_get('test-file')
+        event.set_results({'path': str(path)})
+
+    # Secret grant / revoke
+
+    def _on_test_secret_grant(self, event: ops.ActionEvent):
+        """Create a secret and grant it to the peer relation."""
+        ids = hookcmds.relation_ids('peer')
+        if not ids:
+            event.fail('No peer relation - deploy 2+ units')
+            return
+        rel_id = int(ids[0].split(':')[-1])
+        secret_id = hookcmds.secret_add({'key': 'grant-test-value'}, label='grant-test')
+        hookcmds.secret_grant(secret_id, rel_id)
+        event.set_results({'secret-id': secret_id})
+
+    def _on_test_secret_revoke(self, event: ops.ActionEvent):
+        """Revoke access to a secret from the peer relation."""
+        secret_id = event.params['secret-id']
+        ids = hookcmds.relation_ids('peer')
+        if not ids:
+            event.fail('No peer relation - deploy 2+ units')
+            return
+        rel_id = int(ids[0].split(':')[-1])
+        hookcmds.secret_revoke(secret_id, relation_id=rel_id)
+
+    # Storage add
+
+    def _on_test_storage_add(self, event: ops.ActionEvent):
+        """Queue one additional data storage and return the current count."""
+        current = hookcmds.storage_list('data')
+        hookcmds.storage_add({'data': 1})
+        event.set_results({'count-before-add': str(len(current))})
 
 
 if __name__ == '__main__':

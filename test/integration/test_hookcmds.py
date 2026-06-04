@@ -32,6 +32,7 @@ mocked subprocess return values) is deliberately not duplicated here.
 from __future__ import annotations
 
 import json
+import pathlib
 from collections.abc import Callable
 
 import jubilant
@@ -63,7 +64,10 @@ def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
     """Deploy the test-hookcmds charm with 2 units so that the peer relation
     is active for relation-data tests."""
     charm_path = build_hookcmds_charm()
-    juju.deploy(charm_path, num_units=2)
+    charm_dir = pathlib.Path(charm_path).parent
+    resource_file = charm_dir / 'test-file.txt'
+    resource_file.write_text('hello from the integration test resource')
+    juju.deploy(charm_path, num_units=2, resources={'test-file': str(resource_file)})
     juju.wait(jubilant.all_active)
 
 
@@ -167,11 +171,9 @@ def test_is_leader_false_for_nonleader(juju: jubilant.Juju, nonleader: str):
 
 
 def test_juju_log_all_levels(juju: jubilant.Juju, any_unit: str):
-    """juju_log at all five levels does not raise an error."""
+    """juju_log at all five log levels does not raise; running without error is the check."""
     task = juju.run(any_unit, 'test-logging', params={'message': 'hookcmds integration test'})
     assert task.success
-    assert task.results['ok'] == 'true'
-    assert task.results['levels-logged'] == '5'
 
 
 # Application version (app_version_set)
@@ -181,7 +183,6 @@ def test_app_version_set(juju: jubilant.Juju, leader: str):
     """app_version_set publishes the version string to Juju."""
     task = juju.run(leader, 'set-app-version', params={'version': '3.14.15'})
     assert task.success
-    assert task.results['ok'] == 'true'
     # Verify Juju actually recorded the version.
     status = juju.status()
     assert status.apps['test-hookcmds'].version == '3.14.15'
@@ -194,18 +195,18 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
     """network_get for the peer binding returns at least one bind address."""
     task = juju.run(any_unit, 'get-network-info')
     assert task.success
-    results = task.results
-    assert results['has-bind-addresses'] == 'true'
-    bind_count = int(results['bind-addresses-count'])
-    assert bind_count > 0
-    # At least one of egress_subnets or ingress_addresses should be populated.
-    has_network_info = bool(results.get('egress-subnets')) or bool(
-        results.get('ingress-addresses')
-    )
-    assert has_network_info
-    # The bind address itself should be present.
-    assert 'first-address' in results
-    assert results['first-address']  # non-empty
+    bind_addresses = json.loads(task.results['bind-addresses'])
+    egress_subnets = json.loads(task.results['egress-subnets'])
+    ingress_addresses = json.loads(task.results['ingress-addresses'])
+
+    assert len(bind_addresses) > 0
+    first = bind_addresses[0]
+    assert first['interface-name']  # non-empty
+    assert len(first['addresses']) > 0
+    first_addr = first['addresses'][0]
+    assert first_addr['value']  # non-empty IP or hostname
+    # At least one network path should be populated.
+    assert egress_subnets or ingress_addresses
 
 
 # Ports (open_port / close_port / opened_ports)
@@ -213,24 +214,26 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
 
 def test_ports_open_close_cycle(juju: jubilant.Juju, any_unit: str):
     """open_port then close_port restores the original port count."""
-    task = juju.run(any_unit, 'test-ports', params={'port': 9988})
+    port = 9988
+    task = juju.run(any_unit, 'test-ports', params={'port': port})
     assert task.success
     r = task.results
-    assert r['tcp-was-opened'] == 'true'
-    assert r['udp-was-opened'] == 'true'
-    assert r['tcp-was-closed'] == 'true'
-    assert r['udp-still-open-after-tcp-close'] == 'true'
-    assert r['back-to-initial'] == 'true'
-    # Counts should be monotonically increasing then decreasing.
-    initial = int(r['initial-count'])
-    after_tcp = int(r['after-open-tcp-count'])
-    after_both = int(r['after-open-both-count'])
-    after_close_tcp = int(r['after-close-tcp-count'])
-    final = int(r['final-count'])
-    assert after_tcp == initial + 1
-    assert after_both == initial + 2
-    assert after_close_tcp == initial + 1
-    assert final == initial
+
+    before = json.loads(r['before'])
+    after_tcp = json.loads(r['after-open-tcp'])
+    after_both = json.loads(r['after-open-both'])
+    after_close_tcp = json.loads(r['after-close-tcp'])
+    final = json.loads(r['final'])
+
+    def has_port(ports: list, proto: str) -> bool:
+        return any(p['protocol'] == proto and p['port'] == port for p in ports)
+
+    assert has_port(after_tcp, 'tcp')
+    assert not has_port(before, 'tcp')
+    assert has_port(after_both, 'udp')
+    assert not has_port(after_close_tcp, 'tcp')
+    assert has_port(after_close_tcp, 'udp')
+    assert len(final) == len(before)
 
 
 @pytest.mark.parametrize('port', [80, 443, 8080])
@@ -238,8 +241,12 @@ def test_ports_multiple_values(juju: jubilant.Juju, any_unit: str, port: int):
     """Port open/close cycle works across several common port values."""
     task = juju.run(any_unit, 'test-ports', params={'port': port})
     assert task.success
-    assert task.results['tcp-was-opened'] == 'true'
-    assert task.results['back-to-initial'] == 'true'
+    r = task.results
+    before = json.loads(r['before'])
+    after_tcp = json.loads(r['after-open-tcp'])
+    final = json.loads(r['final'])
+    assert any(p['protocol'] == 'tcp' and p['port'] == port for p in after_tcp)
+    assert len(final) == len(before)
 
 
 # Server-side state (state_set / state_get / state_delete)
@@ -260,10 +267,11 @@ def test_state_roundtrip(juju: jubilant.Juju, any_unit: str):
     assert task.success
     r = task.results
     assert r['retrieved'] == 'testvalue'
-    assert r['types-match'] == 'true'
-    assert r['key-in-all'] == 'true'
-    assert r['all-value-matches'] == 'true'
-    assert r['key-deleted'] == 'true'
+    all_state = json.loads(r['all-state'])
+    assert 'testkey' in all_state
+    assert all_state['testkey'] == 'testvalue'
+    after_delete = json.loads(r['after-delete'])
+    assert 'testkey' not in after_delete
 
 
 def test_state_special_chars(juju: jubilant.Juju, any_unit: str):
@@ -279,9 +287,10 @@ def test_state_special_chars(juju: jubilant.Juju, any_unit: str):
             pytest.xfail(_JUJU4_COMMIT_BUG)
         raise
     assert task.success
-    assert task.results['retrieved'] == 'hello world!'
-    assert task.results['types-match'] == 'true'
-    assert task.results['key-deleted'] == 'true'
+    r = task.results
+    assert r['retrieved'] == 'hello world!'
+    after_delete = json.loads(r['after-delete'])
+    assert 'mykey' not in after_delete
 
 
 # Secrets (secret_add / secret_ids / secret_info_get / secret_get /
@@ -299,14 +308,15 @@ def test_secret_full_lifecycle(juju: jubilant.Juju, leader: str):
     assert task.success
     r = task.results
 
-    assert r['in-ids-list'] == 'true'
+    secret_id = r['secret-id']
+    ids = json.loads(r['secret-ids'])
+    assert any(i in secret_id or secret_id in i for i in ids)
     assert r['initial-label'] == 'hookcmds-inttest'
     assert r['initial-description'] == 'Created by ops.hookcmds integration test'
     assert r['initial-revision'] == '1'
     assert r['initial-password'] == 'initial-secret'
     assert r['updated-password'] == 'updated-secret'
     assert r['updated-description'] == 'Updated by hookcmds test'
-    # secret_get(label=...) should return the password too.
     assert r['label-lookup-password']  # non-empty
 
     # After the action the secret is fully removed; verify via juju.
@@ -344,18 +354,13 @@ def test_relation_data_roundtrip(juju: jubilant.Juju, leader: str):
     assert task.success
     r = task.results
 
-    # The relation ID string should have the format "peer:N".
     assert r['relation-id-str'].startswith('peer:')
     assert r['relation-id-int'].isdigit()
-
-    # With 2 units, the leader should see 1 member in the peer relation.
     assert int(r['member-count']) == 1
-
-    # Data we wrote should be readable back.
-    assert r['set-value'] == 'verified-by-integration-test'
     assert r['retrieved-value'] == 'verified-by-integration-test'
-    assert r['values-match'] == 'true'
-    assert r['key-in-all-data'] == 'true'
+    all_data = json.loads(r['all-data'])
+    assert 'hookcmds-inttest' in all_data
+    assert all_data['hookcmds-inttest'] == 'verified-by-integration-test'
 
 
 # Storage (storage_list / storage_get)
@@ -368,10 +373,8 @@ def test_storage_list_and_get(juju: jubilant.Juju, any_unit: str):
     r = task.results
     data_count = int(r['data-storage-count'])
     assert data_count >= 1, 'Expected at least one data storage instance'
-    # The storage ID should follow the name/N pattern.
     storage_id = r['storage-id']
     assert storage_id.startswith('data/')
-    assert r['has-location'] == 'true'
     assert r['storage-location']  # non-empty path
     assert r['storage-kind'] in ('filesystem', 'block')
 
@@ -413,6 +416,96 @@ def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
     task = juju.run(any_unit, 'trigger-relation-error', params={'relation-id': 9999})
     assert task.success
     assert task.results['raised'] == 'Error'
+
+
+# Credentials (credential_get)
+
+
+def test_credential_get(juju: jubilant.Juju, any_unit: str):
+    """credential_get returns cloud credentials with a non-empty type and name."""
+    task = juju.run(any_unit, 'test-credential-get')
+    assert task.success
+    assert task.results['cloud-type']  # non-empty cloud type (e.g. 'lxd', 'microk8s')
+    assert task.results['cloud-name']  # non-empty cloud name
+
+
+# Relation model (relation_model_get)
+
+
+def test_relation_model_get(juju: jubilant.Juju, leader: str):
+    """relation_model_get returns the model UUID for the peer relation."""
+    task = juju.run(leader, 'test-relation-model-get')
+    assert task.success
+    uuid = task.results['uuid']
+    assert uuid  # non-empty
+    # For a peer relation the remote model is the same model.
+    model_info = juju.show_model()
+    assert uuid == model_info.model_uuid
+
+
+# Resources (resource_get)
+
+
+def test_resource_get(juju: jubilant.Juju, any_unit: str):
+    """resource_get returns a non-empty path to the cached resource file."""
+    task = juju.run(any_unit, 'test-resource-get')
+    assert task.success
+    path = task.results['path']
+    assert path  # non-empty path string
+
+
+# Secret grant / revoke (secret_grant / secret_revoke)
+
+
+def test_secret_grant_and_revoke(juju: jubilant.Juju, leader: str):
+    """secret_grant adds access; secret_revoke removes it — both observable via juju."""
+    task = juju.run(leader, 'test-secret-grant')
+    assert task.success
+    secret_id = task.results['secret-id']
+
+    # Juju-side effect: access entry must exist after grant.
+    secret = juju.show_secret(secret_id)
+    assert secret.access  # non-None, non-empty
+
+    # Revoke.
+    task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
+    assert task.success
+
+    # Juju-side effect: access list is empty after revoke.
+    secret = juju.show_secret(secret_id)
+    assert not secret.access
+
+    # Clean up the secret.
+    juju.remove_secret(secret_id)
+
+
+# Storage add (storage_add) — placed late because it mutates model state
+
+
+def test_storage_add(juju: jubilant.Juju, any_unit: str):
+    """storage_add queues a new storage instance; count increases after the hook."""
+    task = juju.run(any_unit, 'test-storage-add')
+    assert task.success
+    count_before = int(task.results['count-before-add'])
+
+    # storage_add is asynchronous; wait for the storage-attached hook to complete.
+    juju.wait(jubilant.all_active)
+
+    new_task = juju.run(any_unit, 'test-storage')
+    assert new_task.success
+    count_after = int(new_task.results['data-storage-count'])
+    assert count_after == count_before + 1
+
+
+# Reboot (juju_reboot) — placed last because it reboots the unit
+
+
+def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
+    """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
+    task = juju.run(any_unit, 'test-juju-reboot')
+    assert task.success
+    # After the action, Juju queues a reboot. Wait for the unit to recover.
+    juju.wait(jubilant.all_active)
 
 
 # Fixtures
