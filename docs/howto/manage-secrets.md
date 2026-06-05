@@ -394,7 +394,7 @@ Once that's in place, the Juju user must:
 
 1. Create the secret: `juju add-secret my-secret key=value`
 2. Grant it to the application: `juju grant-secret my-secret <app-name>`
-3. Set the configuration option to the secret URI: `juju config <app-name> <secret-option>=<secret-uri>`
+3. Set the configuration option to the secret URI that `secret-add` returned: `juju config <app-name> <secret-option>=<secret-uri>`
 
 ```{important}
 `juju grant-secret` does **not** trigger an event to notify the charm. The charm only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
