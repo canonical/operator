@@ -24,18 +24,37 @@ To check that your preferred name isn't already in use, visit the (future) Charm
 ```text
 https://charmhub.io/mega-calendar-k8s
 ```
-(create-a-repository-and-initialise-it)=
-## Create a repository and initialise it
+
+There also exists charms that do operate a workload, such as integrators and configurators charms. These two categories serve two different purposes:
+
+* An integrator charm provides the possibility to integrate a service that is not managed via Juju into the Juju model. This can both apply to server side integrations (e.g. `s3-integrator`, that integrates an externally managed s3 object storage) or to client side integration (e.g. `data-integrator`, representing the integration of external client applications that needs a database).
+
+* A configurator charm provides better scalability and centralized logic to further configure for a particular charm or relation that is already in Juju. Examples for this could be `cos-configuration` when it applies to a single charm (e.g. providing more fine-grained configuration the prometheus scraping) or for relation/integration (e.g. `ingress-configurator` as to provide futher configuration of ingresses requests)
+
+Since workload-less charms can equally work on machines and on Kubernetes, when naming integrator charms and configurator charms, avoid using the `k8s` suffix, unless the charm is only relevant for Kubernetes, e.g. managing K8s resources within the charm logic. Use the `integrator` and `configurator` suffix to signal the category of the charm, e.g. `foo-integrator` or `bar-configurator`.
+
+(create-a-repository)=
+## Create a repository
 
 Create a repository with your source control of choice.
 
 ```{admonition} Best practice
 :class: hint
 
-Name the repository using the pattern ``<charm name>-operator`` for a single charm managing a workload. Workloadless charms managing integration with another charm should use the suffix ``integrator`` instead. Charms managing configuration for another charm should use ``configurator``. Monorepos containing multiple related charms should instead use a plural suffix, like ``operators``. For the charm name, see [](#decide-your-charms-name).
+If your charm operates a workload, name the repository `<charm name>-operator`. If your charm doesn't operate a workload (as in the case of integrator charms and configurator charms), the `-operator` suffix is not needed and the repository can be named with the same name of the charm, e.g. `foo-integrator` and `bar-configurator`. Use the plural when `s` the repository contains multiple charms or artefacts (such as rocks).
 ```
 
-For example, name the repository `mega-calendar-k8s-operator` if your charm will be called `mega-calendar-k8s`.
+Examples:
+
+- [kafka-operator](https://github.com/canonical/kafka-operator) - Contains a single charm that operates a workload on machine.
+- [kafka-k8s-operator](https://github.com/canonical/kafka-k8s-operator) - Contains a single charm that operates a workload on K8s.
+- [katib-operators](https://github.com/canonical/katib-operators) - Contains multiple charms.
+- [data-integrator](https://github.com/canonical/data-integrator) - Contains a charm that integrates an externally managed service (e.g. client application).
+- [s3-integrator](https://github.com/canonical/object-storage-integrators) - Contains multiple charm that integrates externally managed service (e.g. different kind of object storage backends).
+- [request-authentication-configurator](https://github.com/canonical/request-authentication-configurator) - Contains a charm that configure Gateway to perform request authentication
+
+(initialise-the-repository)=
+## Initialise the repository
 
 Next, use {external+charmcraft:doc}`Charmcraft <index>` to generate the recommended project structure in the repository:
 
