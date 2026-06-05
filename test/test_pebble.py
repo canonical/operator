@@ -3952,6 +3952,35 @@ class TestExec:
             ('TXT', '{"command":"end"}'),
         ]
 
+    def test_writer_close_after_shutdown(self):
+        """Closing the writer after the websocket is shut down must not raise.
+
+        Regression test for canonical/operator#2547. In the normal exec
+        lifecycle ``ExecProcess._wait`` shuts the stdio websocket down
+        before the ``_WebsocketWriter`` (or the ``TextIOWrapper`` wrapping
+        it) is finalised by the garbage collector. On Python 3.13+ a raised
+        ``WebSocketConnectionClosedException`` from ``IOBase.__del__`` is
+        surfaced as an "Exception ignored while finalizing file" warning.
+        """
+        ws = MockWebsocket()
+
+        def send(_s: str):
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.send = send
+        writer = pebble._WebsocketWriter(ws)
+        writer.close()  # must not raise
+        assert writer.closed
+        assert ws.sends == []
+
+    def test_writer_close_is_idempotent(self):
+        """A second close() must be a no-op (no duplicate "end" sent)."""
+        ws = MockWebsocket()
+        writer = pebble._WebsocketWriter(ws)
+        writer.close()
+        writer.close()
+        assert ws.sends == [('TXT', '{"command":"end"}')]
+
     def test_connect_websocket_error(self):
         class Client(MockClient):
             def _connect_websocket(self, change_id: str, websocket_id: str):
