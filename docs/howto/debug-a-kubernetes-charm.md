@@ -22,7 +22,7 @@ Each piece of the system lives in a specific place. Reaching for the wrong one i
 
 | What | Where it runs | How to reach it |
 | --- | --- | --- |
-| Your charm code (`src/charm.py`), logs, hooks | charm container (named `charm`) | `juju ssh <unit>`, `juju debug-log`, `juju debug-hooks` |
+| Your charm code (`src/charm.py`), logs, hooks | charm container | `juju ssh <unit>`, `juju debug-log`, `juju debug-hooks` |
 | Pebble and the workload process | workload container (named after the `containers` entry in `charmcraft.yaml`) | `juju ssh --container <name> <unit>`, the Pebble CLI |
 | The pod, image pulls, scheduling | Kubernetes | `kubectl` |
 
