@@ -47,7 +47,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(charm, app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_blocked)
+    juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME))
 
 
 @pytest.mark.juju_setup
@@ -58,7 +58,25 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
-    juju.wait(jubilant.all_active)
+    juju.wait(jubilant.all_active, timeout=10 * 60)
+
+
+def test_invalid_server_port_blocks_unit(juju: jubilant.Juju):
+    """Verify that invalid config blocks the charm."""
+    juju.config(APP_NAME, {"server-port": "22"})
+    juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME))
+
+    juju.config(APP_NAME, reset="server-port")
+    juju.wait(jubilant.all_active, timeout=10 * 60)
+
+
+def test_get_db_info_action(juju: jubilant.Juju):
+    """Verify that the get-db-info action exposes database connection info."""
+    task = juju.run(f"{APP_NAME}/0", "get-db-info", {"show-password": False})
+
+    assert task.status == "completed"
+    assert task.results["db-host"]
+    assert task.results["db-port"] == "5432"
 
 
 @pytest.fixture(scope="module")
@@ -78,7 +96,7 @@ def test_integrate_loki(charm: pathlib.Path, juju: jubilant.Juju, cos: jubilant.
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
-    juju.wait(jubilant.all_active)
+    juju.wait(jubilant.all_active, timeout=10 * 60)
     cos.wait(jubilant.all_active)
 
 

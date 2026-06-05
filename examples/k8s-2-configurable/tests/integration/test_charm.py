@@ -41,12 +41,8 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
-@pytest.mark.juju_setup
 def test_invalid_server_port_blocks_unit(juju: jubilant.Juju):
-    """Verify that invalid config blocks the charm.
-
-    This integration test goes beyond the tutorial instructions.
-    """
+    """Verify that invalid config blocks the charm."""
     juju.config(APP_NAME, {"server-port": "22"})
     juju.wait(jubilant.all_blocked)
 
