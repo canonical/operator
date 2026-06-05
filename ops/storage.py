@@ -31,6 +31,8 @@ from typing import Any, cast
 import yaml
 
 from ._private import tracer
+from ._private import yaml as _yaml
+from ._private.yaml import _SafeLoader
 
 logger = logging.getLogger()
 
@@ -148,6 +150,10 @@ class SQLiteStorage:
         c.execute('SELECT data FROM snapshot WHERE handle=?', (handle_path,))
         row = c.fetchone()
         if row:
+            # pickle is used here intentionally: StoredState snapshots are written
+            # by the charm itself into its own SQLite database, so the data source
+            # is trusted. Switching to a different serialisation format would be a
+            # breaking change for existing charms with persisted state.
             return pickle.loads(row[0])  # noqa: S301
         raise NoSnapshotError(handle_path)
 
@@ -330,7 +336,7 @@ class JujuStorage:
 
 # we load yaml.CSafeX if available, falling back to slower yaml.SafeX.
 _BaseDumper = getattr(yaml, 'CSafeDumper', yaml.SafeDumper)
-_BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+_BaseLoader: type[_SafeLoader] = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 
 class _SimpleLoader(_BaseLoader):  # type: ignore
@@ -407,7 +413,7 @@ class _JujuStorageBackend:
         p = _run(['state-get', key], stdout=subprocess.PIPE, check=True)
         if p.stdout == '' or p.stdout == '\n':
             raise KeyError(key)
-        return yaml.load(p.stdout, Loader=_SimpleLoader)  # noqa: S506
+        return _yaml.safe_load(p.stdout, safe_loader=_SimpleLoader)
 
     def delete(self, key: str) -> None:
         """Remove a key from being tracked.
