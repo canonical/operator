@@ -428,7 +428,7 @@ class MyCharm(ops.CharmBase):
             self._configure_with_secret(content)
 ```
 
-### User-secret event contract
+### User-secret events
 
 The only event a user-secret observer receives is `secret-changed`, triggered when the user updates the secret content (for example, with `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle. The Juju user is responsible for managing the secret lifecycle.
 
