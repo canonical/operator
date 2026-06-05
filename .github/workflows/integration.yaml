@@ -72,8 +72,8 @@ jobs:
         juju-channel:
           - 3/stable
           - 4.0/stable
-          - 4.0/beta
-          - 4.1/beta
+          - 4.0/edge
+          - 4.1/edge
 
     steps:
       - run: sudo snap install --classic concierge
