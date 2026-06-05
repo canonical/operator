@@ -25,13 +25,13 @@ To check that your preferred name isn't already in use, visit the (future) Charm
 https://charmhub.io/mega-calendar-k8s
 ```
 
-There also exists charms that do operate a workload, such as integrators and configurators charms. These two categories serve two different purposes:
+There also exist charms that do not operate a workload, such as integrators and configurators charms. These two categories serve two different purposes:
 
 * An integrator charm provides the possibility to integrate a service that is not managed via Juju into the Juju model. This can both apply to server side integrations (e.g. `s3-integrator`, that integrates an externally managed s3 object storage) or to client side integration (e.g. `data-integrator`, representing the integration of external client applications that needs a database).
 
 * A configurator charm provides better scalability and centralized logic to further configure for a particular charm or relation that is already in Juju. Examples for this could be `cos-configuration` when it applies to a single charm (e.g. providing more fine-grained configuration the prometheus scraping) or for relation/integration (e.g. `ingress-configurator` as to provide further configuration of ingresses requests)
 
-Since workload-less charms can equally work on machines and on Kubernetes, when naming integrator charms and configurator charms, avoid using the `k8s` suffix, unless the charm is only relevant for Kubernetes, e.g. managing K8s resources within the charm logic. Use the `integrator` and `configurator` suffix to signal the category of the charm, e.g. `foo-integrator` or `bar-configurator`.
+Since workload-less charms can work both on machines and on Kubernetes, when naming integrator charms and configurator charms, avoid using the `k8s` suffix, unless the charm is only relevant for Kubernetes, e.g. managing K8s resources within the charm logic using `lightkube`. When naming the charm, use the `integrator` and `configurator` suffix to signal the category of the charm, e.g. `foo-integrator` or `bar-configurator`.
 
 (create-a-repository)=
 ## Create a repository
