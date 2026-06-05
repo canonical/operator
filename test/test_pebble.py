@@ -3964,11 +3964,11 @@ class TestExec:
         """
         ws = MockWebsocket()
 
-        def send(_s: str):
+        def send(s: str):
             raise websocket.WebSocketConnectionClosedException('socket is already closed.')
 
         ws.send = send
-        writer = pebble._WebsocketWriter(ws)
+        writer = pebble._WebsocketWriter(typing.cast('pebble._WebSocket', ws))
         writer.close()  # must not raise
         assert writer.closed
         assert ws.sends == []
@@ -3976,7 +3976,7 @@ class TestExec:
     def test_writer_close_is_idempotent(self):
         """A second close() must be a no-op (no duplicate "end" sent)."""
         ws = MockWebsocket()
-        writer = pebble._WebsocketWriter(ws)
+        writer = pebble._WebsocketWriter(typing.cast('pebble._WebSocket', ws))
         writer.close()
         writer.close()
         assert ws.sends == [('TXT', '{"command":"end"}')]
