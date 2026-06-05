@@ -185,6 +185,6 @@ kubectl -n <model> logs myapp-0 -c myapp --previous   # output from the last cra
 
 The `Events` section of `describe pod` is where you'll find `ImagePullBackOff`, `CreateContainerConfigError`, failed liveness probes, and out-of-memory kills -- none of which appear in `juju debug-log` or the Pebble logs.
 
-```{note}
+```{tip}
 Reach for `kubectl` when the problem is the *container or pod* not coming up. Once the workload container is running and Pebble is responding, switch back to the Pebble CLI and `juju debug-log`, which give you a workload- and charm-aware view that raw `kubectl logs` does not.
 ```
