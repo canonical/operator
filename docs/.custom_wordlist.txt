@@ -4,6 +4,8 @@ balancer's
 breakpoint
 callables
 Canonical's
+configurator
+configurators
 cosl
 databag
 databags
