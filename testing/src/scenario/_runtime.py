@@ -321,6 +321,13 @@ class Runtime(Generic[CharmType]):
             previous_env = os.environ.copy()
             os.environ.update(env)
 
+            # In Juju, the current working directory is the charm root when a
+            # hook starts. Charms (and libraries) rely on this, e.g. to read
+            # files relative to it. Match that behaviour, restoring the
+            # original working directory once the event has been handled.
+            previous_cwd = os.getcwd()
+            os.chdir(temporary_charm_root)
+
             logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops
 
@@ -364,6 +371,7 @@ class Runtime(Generic[CharmType]):
                     if key not in previous_env:
                         del os.environ[key]
                 os.environ.update(previous_env)
+                os.chdir(previous_cwd)
                 logger.info(' - exited ops.main')
 
         logger.info('event dispatched. done.')

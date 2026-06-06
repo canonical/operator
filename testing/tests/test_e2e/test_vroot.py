@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Generator, Mapping
 from pathlib import Path
@@ -56,6 +57,26 @@ def test_charm_virtual_root(charm_virtual_root: Path):
         charm_root=charm_virtual_root,
     )
     assert out.unit_status == ActiveStatus('hello world')
+
+
+class CwdCharm(CharmBase):
+    META: Mapping[str, Any] = {'name': 'my-charm'}
+
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        # Charms may read files relative to the cwd, which Juju sets to the
+        # charm root. The cwd should match charm_dir during event handling.
+        self.unit.status = ActiveStatus(os.getcwd())
+
+
+def test_cwd_is_charm_root_during_event():
+    cwd_before = os.getcwd()
+    ctx = Context(CwdCharm, meta=dict(CwdCharm.META))
+    with ctx(ctx.on.start(), State()) as mgr:
+        mgr.run()
+        assert mgr.charm.unit.status.message == str(mgr.charm.framework.charm_dir)
+    # The original working directory is restored after the event is handled.
+    assert os.getcwd() == cwd_before
 
 
 def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path):
