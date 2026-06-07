@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import yaml
 from scenario.context import Context
+from scenario.errors import StateValidationError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
     Address,
@@ -446,6 +447,25 @@ def test_immutable_content_list(
     object.__setattr__(obj1, attribute, ['baz', 'qux'])
     assert getattr(obj1, attribute) == ['baz', 'qux']
     assert getattr(obj2, attribute) == ['foo', 'bar']
+
+
+@pytest.mark.parametrize(
+    'component,required_args,attribute',
+    [
+        (CloudCredential, {'auth_type': 'foo'}, 'redacted'),
+        (CloudSpec, {'type': 'foo'}, 'ca_certificates'),
+        (Network, {'binding_name': 'foo'}, 'ingress_addresses'),
+        (Network, {'binding_name': 'foo'}, 'egress_subnets'),
+    ],
+)
+def test_bare_str_rejected(component: type[object], required_args: dict[str, Any], attribute: str):
+    with pytest.raises(StateValidationError):
+        component(**required_args, **{attribute: 'oops'})
+
+
+def test_bare_str_rejected_in_remote_grants():
+    with pytest.raises(StateValidationError):
+        Secret(tracked_content={'k': 'v'}, remote_grants={0: 'app'})
 
 
 @pytest.mark.parametrize(

@@ -127,6 +127,21 @@ _SECRET_EVENTS = {
 }
 
 
+def _list_of_str(value: Iterable[str], name: str) -> list[str]:
+    """Convert an iterable of strings to a list, rejecting a bare ``str``.
+
+    The type hints say ``Iterable[str]``, but a bare string also satisfies that,
+    and silently iterating it character-by-character is never what the caller
+    intended.
+    """
+    if isinstance(value, str):
+        raise StateValidationError(
+            f'{name} must be an iterable of strings, not a single string; '
+            f'did you mean [{value!r}]?',
+        )
+    return list(value)
+
+
 # A lot of JujuLogLine objects are created, so we want them to be fast and light.
 # Dataclasses define __slots__, so are small, and a namedtuple is actually
 # slower to create than a dataclass. A plain dictionary (or TypedDict) would be
@@ -168,7 +183,7 @@ class CloudCredential:  # noqa: D101
     ):
         object.__setattr__(self, 'auth_type', auth_type)
         object.__setattr__(self, 'attributes', dict(attributes))
-        object.__setattr__(self, 'redacted', list(redacted))
+        object.__setattr__(self, 'redacted', _list_of_str(redacted, 'redacted'))
 
     def _to_ops(self) -> CloudCredential_Ops:
         return CloudCredential_Ops(
@@ -233,7 +248,9 @@ class CloudSpec:  # noqa: D101
         object.__setattr__(self, 'identity_endpoint', identity_endpoint)
         object.__setattr__(self, 'storage_endpoint', storage_endpoint)
         object.__setattr__(self, 'credential', credential)
-        object.__setattr__(self, 'ca_certificates', list(ca_certificates))
+        object.__setattr__(
+            self, 'ca_certificates', _list_of_str(ca_certificates, 'ca_certificates')
+        )
         object.__setattr__(self, 'skip_tls_verify', skip_tls_verify)
         object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
 
@@ -339,7 +356,12 @@ class Secret:
         object.__setattr__(self, 'id', id if id is not None else _generate_secret_id())
         object.__setattr__(self, 'owner', owner)
         object.__setattr__(
-            self, 'remote_grants', {k: frozenset(v) for k, v in remote_grants.items()}
+            self,
+            'remote_grants',
+            {
+                k: frozenset(_list_of_str(v, f'remote_grants[{k!r}]'))
+                for k, v in remote_grants.items()
+            },
         )
         object.__setattr__(self, 'label', label)
         object.__setattr__(self, 'description', description)
@@ -505,8 +527,10 @@ class Network:
     ):
         object.__setattr__(self, 'binding_name', binding_name)
         object.__setattr__(self, 'bind_addresses', list(bind_addresses))
-        object.__setattr__(self, 'ingress_addresses', list(ingress_addresses))
-        object.__setattr__(self, 'egress_subnets', list(egress_subnets))
+        object.__setattr__(
+            self, 'ingress_addresses', _list_of_str(ingress_addresses, 'ingress_addresses')
+        )
+        object.__setattr__(self, 'egress_subnets', _list_of_str(egress_subnets, 'egress_subnets'))
 
     def __hash__(self) -> int:
         return hash(self.binding_name)
