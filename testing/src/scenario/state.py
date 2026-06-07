@@ -128,13 +128,13 @@ _SECRET_EVENTS = {
 
 
 def _list_of_str(value: Iterable[str], name: str) -> list[str]:
-    """Convert an iterable of strings to a list, rejecting a bare ``str``.
+    """Convert an iterable of strings to a list, rejecting a bare ``str`` or ``bytes``.
 
-    The type hints say ``Iterable[str]``, but a bare string also satisfies that,
-    and silently iterating it character-by-character is never what the caller
-    intended.
+    The type hints say ``Iterable[str]``, but a bare string also satisfies
+    that. Iterating a ``str`` character-by-character (or ``bytes`` byte-by-byte)
+    is never what the caller intended, so reject both up front.
     """
-    if isinstance(value, str):
+    if isinstance(value, (str, bytes)):
         raise StateValidationError(
             f'{name} must be an iterable of strings, not a single string; '
             f'did you mean [{value!r}]?',
@@ -324,6 +324,11 @@ class Secret:
     """The time at which the secret will expire."""
     rotate: SecretRotate | None
     """The rotation policy for the secret."""
+
+    # These are deliberately class attributes (no annotation) rather than
+    # dataclass fields, so that they're not part of the generated ``__eq__`` and
+    # users cannot pass them to ``__init__``. They're mutated in place by
+    # internal code via ``object.__setattr__``.
 
     # what revision is currently tracked by this charm. Only meaningful if owner=False
     _tracked_revision = 1
@@ -560,6 +565,13 @@ def _next_relation_id(*, update: bool = True):
     return cur
 
 
+# Unlike the other state classes in this module, ``RelationBase`` (and its
+# subclasses) still uses the dataclass-generated ``__init__``. This means the
+# init signature and the attribute type are the same annotation, so we can't
+# advertise "accepts ``Mapping``, attribute is ``dict``" the way the other
+# classes do. Rewriting these by hand would be a larger change for limited gain,
+# so the asymmetry is deliberate; revisit if the maintenance burden of these
+# classes ever changes.
 @dataclasses.dataclass(frozen=True)
 class RelationBase:
     """Base class for the various types of relation.
@@ -888,6 +900,9 @@ class Exec:
         return_code: int = 0,
         stdout: str = '',
         stderr: str = '',
+        # ``_change_id`` is private: users are not expected to pass it, but it
+        # stays in ``__init__`` so internal code can construct an Exec with a
+        # specific change ID (for example, when round-tripping through pebble).
         _change_id: int | None = None,
     ):
         # Stored as tuple (rather than list) for hashability.
@@ -1202,6 +1217,10 @@ class Container:
         name: str,
         *,
         can_connect: bool = False,
+        # ``_base_plan`` is private: users should normally configure the
+        # container through ``layers``. It stays in ``__init__`` so internal
+        # code can seed a base plan when building a Container from a live
+        # charm.
         _base_plan: Mapping[str, Any] = {},
         layers: Mapping[str, pebble.Layer] = {},
         service_statuses: Mapping[str, pebble.ServiceStatus] = {},
@@ -1212,8 +1231,12 @@ class Container:
     ):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'can_connect', can_connect)
+        # _base_plan values are arbitrary JSON-ish data, and pebble.Layer is not
+        # frozen, so deepcopy to disassociate from the caller's objects.
         object.__setattr__(self, '_base_plan', copy.deepcopy(dict(_base_plan)))
         object.__setattr__(self, 'layers', copy.deepcopy(dict(layers)))
+        # ServiceStatus is an enum and Mount is a frozen dataclass, so a shallow
+        # copy of the mapping is enough.
         object.__setattr__(self, 'service_statuses', dict(service_statuses))
         object.__setattr__(self, 'mounts', dict(mounts))
         object.__setattr__(self, 'execs', frozenset(execs))
@@ -1515,6 +1538,10 @@ class StoredState:
         *,
         owner_path: str | None = None,
         content: Mapping[str, Any] = {},
+        # ``_data_type_name`` is private: users should leave it at the default,
+        # which matches the name ops uses for ``StoredStateData``. It stays in
+        # ``__init__`` so charms that subclass ``StoredStateData`` can pass the
+        # subclass name.
         _data_type_name: str = 'StoredStateData',
     ):
         object.__setattr__(self, 'name', name)
@@ -1772,7 +1799,7 @@ class State:
         unit_status: _EntityStatus | StatusBase | None = None,
         workload_version: str = '',
     ):
-        object.__setattr__(self, 'config', config if config is not None else {})
+        object.__setattr__(self, 'config', dict(config) if config is not None else {})
         object.__setattr__(self, 'leader', leader)
         object.__setattr__(self, 'model', model if model is not None else Model())
         object.__setattr__(self, 'planned_units', planned_units)
