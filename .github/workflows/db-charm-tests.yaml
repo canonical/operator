@@ -35,7 +35,7 @@ jobs:
             commit: 5f41a556c5252468c7f720343c0bd72e4385ef8b  # 2026-06-02T07:35:20Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           repository: ${{ matrix.charm-repo }}
           path: charm-repo
