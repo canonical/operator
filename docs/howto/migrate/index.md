@@ -14,7 +14,7 @@ Migrate unit tests from Harness <migrate-unit-tests-from-harness>
 
 ## pytest-operator
 
-pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant.
+pytest-operator and python-libjuju are deprecated. You should migrate integration tests to Jubilant and `pytest-jubilant`.
 
 ```{toctree}
 :maxdepth: 1

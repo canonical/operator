@@ -12,7 +12,9 @@ from __future__ import annotations
 import copy
 import functools
 import pathlib
+import shutil
 import tempfile
+import weakref
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generic
@@ -67,9 +69,9 @@ class Manager(Generic[CharmType]):
     in a ``with`` statement instead, for example::
 
         ctx = Context(MyCharm)
-        with ctx(ctx.on.start(), State()) as manager:
-            manager.charm.setup()
-            manager.run()
+        with ctx(ctx.on.start(), State()) as mgr:
+            mgr.charm.setup()
+            mgr.run()
     """
 
     def __init__(
@@ -728,7 +730,13 @@ class Context(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
         self.app_trusted = app_trusted
-        self._tmp = tempfile.TemporaryDirectory()
+        # Allocate the per-context tempdir for simulated container/storage roots.
+        # We use mkdtemp + weakref.finalize rather than tempfile.TemporaryDirectory
+        # so that fallback GC-time cleanup doesn't emit a ResourceWarning when a
+        # Context isn't used as a context manager. Callers should still prefer
+        # `with Context(...) as ctx:` (or call ctx.close()) for eager cleanup.
+        self._tmp_path = pathlib.Path(tempfile.mkdtemp(prefix='scenario-'))
+        self._tmp_finalizer = weakref.finalize(self, shutil.rmtree, str(self._tmp_path), True)
 
         # config for what events to be captured in emitted_events.
         self.capture_deferred_events = capture_deferred_events
@@ -774,11 +782,11 @@ class Context(Generic[CharmType]):
 
     def _get_container_root(self, container_name: str):
         """Get the path to a tempdir where this container's simulated root will live."""
-        return pathlib.Path(self._tmp.name) / 'containers' / container_name
+        return self._tmp_path / 'containers' / container_name
 
     def _get_storage_root(self, name: str, index: int) -> pathlib.Path:
         """Get the path to a tempdir where this storage's simulated root will live."""
-        storage_root = pathlib.Path(self._tmp.name) / 'storages' / f'{name}-{index}'
+        storage_root = self._tmp_path / 'storages' / f'{name}-{index}'
         # in the case of _get_container_root, _MockPebbleClient will ensure the dir exists.
         storage_root.mkdir(parents=True, exist_ok=True)
         return storage_root
@@ -790,16 +798,34 @@ class Context(Generic[CharmType]):
         else:
             self.unit_status_history.append(state.unit_status)
 
+    def close(self) -> None:
+        """Delete the temporary directory used for simulated container and storage roots.
+
+        Prefer using the Context as a context manager (``with Context(...) as ctx:``),
+        or call ``close()`` when you're done with it. This is especially important
+        when running tests with ``-W error``, where leaving cleanup to the garbage
+        collector can clash with pytest's teardown. If you do neither, the
+        temporary directory is still removed when the Context is garbage-collected.
+        """
+        if self._tmp_finalizer.alive:
+            self._tmp_finalizer()
+
+    def __enter__(self) -> Context[CharmType]:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
     def __call__(self, event: _Event, state: State) -> Manager[CharmType]:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage::
 
             ctx = Context(MyCharm)
-            with ctx(ctx.on.start(), State()) as manager:
-                manager.charm._some_private_setup()
-                manager.run()  # this will fire the event
-                assert manager.charm._some_private_attribute == "bar"  # noqa
+            with ctx(ctx.on.start(), State()) as mgr:
+                mgr.charm._some_private_setup()
+                mgr.run()  # this will fire the event
+                assert mgr.charm._some_private_attribute == "bar"  # noqa
 
         Args:
             event: the event that the charm will respond to.

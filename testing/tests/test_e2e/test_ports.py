@@ -3,19 +3,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
-
 import pytest
-from scenario import Context, State
-from scenario.state import Port, StateValidationError, TCPPort, UDPPort
+from scenario import Context, Port, State, TCPPort, UDPPort
+from scenario.errors import StateValidationError
 
 from ops import CharmBase, Framework, StartEvent, StopEvent
 
 
-class MyCharm(CharmBase):
-    META: Mapping[str, Any] = {'name': 'edgar'}
-
+class Charm(CharmBase):
     def __init__(self, framework: Framework):
         super().__init__(framework)
         framework.observe(self.on.start, self._open_port)
@@ -30,20 +25,21 @@ class MyCharm(CharmBase):
 
 
 @pytest.fixture
-def ctx():
-    return Context(MyCharm, meta=MyCharm.META)
+def ctx() -> Context[Charm]:
+    return Context(Charm, meta={'name': 'edgar'})
 
 
-def test_open_port(ctx):
+def test_open_port(ctx: Context[Charm]):
     out = ctx.run(ctx.on.start(), State())
-    assert len(out.opened_ports) == 1
-    port = next(iter(out.opened_ports))
+    ports = tuple(out.opened_ports)
+    assert len(ports) == 1
+    port = ports[0]
 
     assert port.protocol == 'tcp'
     assert port.port == 12
 
 
-def test_close_port(ctx):
+def test_close_port(ctx: Context[Charm]):
     out = ctx.run(ctx.on.stop(), State(opened_ports={TCPPort(42)}))
     assert not out.opened_ports
 
@@ -54,7 +50,7 @@ def test_port_no_arguments():
 
 
 @pytest.mark.parametrize('klass', (TCPPort, UDPPort))
-def test_port_port(klass):
+def test_port_port(klass: type[Port]):
     with pytest.raises(StateValidationError):
         klass(port=0)
     with pytest.raises(StateValidationError):

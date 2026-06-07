@@ -3,6 +3,9 @@
 
 This tutorial will guide you through the steps of writing a Kubernetes charm for an application.
 
+Kubernetes charms manage their workload application from a separate 'sidecar' container, with Juju and Ops providing functionality to help with this.
+This contrasts with machine charms, which run in the same machine as their workload.
+
 By the end of the tutorial, you'll have equipped the application with operational logic and used Juju to deploy the application to a local Kubernetes cluster.
 You'll also have learned how to implement typical functionality of a charm, including configuration, relations, and actions.
 
@@ -43,7 +46,7 @@ Writing a charm is also known as "charming", and you are now a charmer!
 
 As you write your own charm, use [](#write-and-structure-charm-code) as a guide to best practices. For an overview of the whole charm development process, see [](#manage-charms).
 
-As you prepare for other people to use your charm, you'll publish your charm on Charmhub. See {external+charmcraft:ref}`Charmcraft | Publish a charm on Charmhub <publish-a-charm>`. At this stage, make sure to also review [](#charm-maturity) and [](#make-your-charm-discoverable).
+As you prepare for other people to use your charm, you'll publish your charm on Charmhub. See [](#publish-your-charm). At this stage, make sure to also review [](#charm-maturity) and [](#make-your-charm-discoverable).
 
 There's plenty more to explore:
 

@@ -31,8 +31,14 @@ In your virtual machine, go into your project directory and create the initial v
 
 ```text
 cd ~/fastapi-demo
-charmcraft init --profile kubernetes
+uvx git+https://github.com/canonical/charmcraft@74d12bc init --profile kubernetes
 ```
+
+<!--
+  When charmcraft stable is up-to-date, remove this info and switch to 'charmcraft init --profile kubernetes' above.
+-->
+The `uvx ...` command runs Charmcraft directly from GitHub. We recommend doing this because the installed version of Charmcraft may come with an older version of the profile used in the tutorial. You should use the installed version of Charmcraft for everything else (as we'll do later in the tutorial).
+
 
 Charmcraft created several files, including:
 
@@ -74,7 +80,7 @@ resources:
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.2
+    upstream-source: ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 ### Define the charm class
@@ -222,7 +228,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+     demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 
@@ -263,7 +269,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"1.0.2"}
+{"version":"1.0.4"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
@@ -402,7 +408,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`jubilant`](https://documentation.ubuntu.com/jubilant/) library.
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with {external+jubilant:doc}`Jubilant <reference/jubilant>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
@@ -417,6 +423,7 @@ import logging
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -425,19 +432,20 @@ METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test."""
     resources = {
         "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
-    juju.deploy(charm.resolve(), app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
 ```
 
-This test depends on two fixtures, which are defined in `tests/integration/conftest.py`:
+This test depends on two fixtures:
 
-- `charm` - The `.charm` file to deploy.
-- `juju` - A Jubilant object for interacting with a temporary Juju model.
+- `charm` - The `.charm` file to deploy. This fixture is defined in `tests/integration/conftest.py`.
+- `juju` - A Jubilant object for interacting with a temporary Juju model. This fixture is provided by the `pytest-jubilant` plugin.
 
 ### Run the test
 
@@ -447,7 +455,7 @@ Run the following command from anywhere in the `~/fastapi-demo` directory:
 tox -e integration
 ```
 
-The test takes some time to run as Jubilant adds a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
+The test takes some time to run as a new Juju model is created and your charm is deployed. If successful, it'll verify that your packed charm can be deployed as expected.
 
 The result should be similar to the following output:
 
@@ -462,6 +470,27 @@ The result should be similar to the following output:
 ```{tip}
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
+
+The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
+
+### Run tests with `charmcraft test`
+
+Charmcraft has an experimental command `charmcraft test` that uses [spread](https://github.com/canonical/spread) to run tests.
+
+If you're interested in trying `charmcraft test`, run the following command in your project directory:
+
+```text
+charmcraft init --profile test-kubernetes --force
+```
+
+This creates the scaffolding of a spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
+
+- `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
+- The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
+
+When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
+
+It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-charmcraft-test`.
 
 ## Review the final code
 

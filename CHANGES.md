@@ -1,3 +1,96 @@
+# 3.7.1 - 28 May 2026
+
+## Fixes
+
+* Pass the endpoint name through to relation-get (#2499)
+
+## Documentation
+
+* Add a how-to guide focused on debugging charms (#2386)
+* Add metadata descriptions to the debug and public listing how-to guides (#2415)
+* Update tutorials and how-tos to use pytest-jubilant (#2406)
+* Add how-to guide about CI (#2405)
+* Test COS Lite integration with the k8s-5-observe charm (#2411)
+* Update tutorials and example charms to match Charmcraft 4.2 (#2407)
+* Update api_demo_server version to support non-amd64 architectures (#2448)
+* Pin to 24.04 when launching VMs (#2457)
+* Explain how to remove errored apps in k8s tutorial (#2445)
+* Align example charms with pre-release Charmcraft (#2444)
+* Add how-to guide for naming and initialising a charm (#2449)
+* Add a how-to guide about publishing a charm (#2420)
+* In the tutorials, recommend initing from GitHub (#2459)
+* Fix integration tests of K8s tutorial charms (#2471)
+* Replace the PGP key with the upstream page in SECURITY.md (#2474)
+* Bump api_demo_server to 1.0.4 in docs and example charms (#2473)
+* Refresh the machine workloads how-to (#2443)
+* Add COS Lite integration tests to K8s tutorial (#2478)
+* Add git workflow guidance for contributors (#2453)
+* Update profile guidance in HACKING.md (#2486)
+* Explain how to add an icon to a charm (#2451)
+* Adopt latest Charmcraft profiles, incl juju_setup marker on integration tests (#2497)
+* Improve support for agents, with Sphinx Stack upgrade (#2495)
+* Improve how-to about managing files in containers (#2470)
+* Improve Container.pull docs to avoid leaky files (#2508)
+* Clarify Secret manage-permission error in testing.State (#2510)
+
+## Tests
+
+* Extend the type checking of the ops-scenario tests (#2234, #2235)
+* Wait on ExecProcess after expected TypeError (#2509)
+
+## CI
+
+* Drop external action for checking PR title format (#2388)
+* Add a dependabot cooldown (#2413)
+* Sort the directory entries when updating the best practices list (#2422)
+* Configure dependabot for the example charms (#2426)
+* Pin zizmor and TIOBE tool versions in pyproject.toml rather than the workflow (#2437)
+* Add 26.04 to smoke tests and remove outdated metadata.yaml (#2450)
+* Use charmcraft test for example charm (#2440)
+* Add workflow_dispatch trigger to workflows where it is useful (#2468)
+* Ensure the correct job is selected in updating charm pins (#2500)
+
+# 3.7.0 - 30 March 2026
+
+## Features
+
+* Enable interactive debugging via `breakpoint` in testing (#2363)
+* ops.testing autoload support for charmcraft extensions (#2367)
+* Allow testing.State.get_relation to accept relation objects (#2359)
+* Support charmcraft.yaml format as meta for testing.Context (#2296)
+
+## Fixes
+
+* Correct type annotation for StorageMeta.properties (#2348)
+* Move the testing.Container compatibility import so that mypy style checkers understand it (#2343)
+* Hold only copies of user provided meta/config/actions in testing.Context (#2349)
+* Deep-copy layer objects during testing.State plan rendering (#2380)
+* Return copies from testing.State secret_get and action_get (#2379)
+* Use timezone-aware datetimes in expiry calculation (#2378)
+* Warn before clearing non-empty container in testing (#2365)
+
+## Documentation
+
+* Replace links to juju.is by canonical.com/juju (#2368)
+* Refactor homepage to better put Ops in context (#2370)
+* Add pytest-operator migration guide from Jubilant docs (#2381)
+* Add a tip about AI help in the Jubilant migration guide (#2382)
+* Mention jhack scenario snapshot (#2351)
+* Update integration testing how-to guide (#2390)
+* Explain K8s charms briefly at the start of the tutorial (#2392)
+* Juju secrets identifier is now an opaque string (#2387)
+
+## Tests
+
+* Extend the type checking of the ops-scenario tests (#2230)
+
+## CI
+
+* Run ruff check --fix in tox -e format (#2369)
+* Check example charms with mypy in CI (#2360)
+* Update the list of published charms in the compatibility tests (#2384)
+* Adjust minimum Python version in broad charm compatibility tests (#2317)
+
 # 3.6.0 - 26 February 2026
 
 ## Features

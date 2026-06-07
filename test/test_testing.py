@@ -26,6 +26,7 @@ import pathlib
 import platform
 import pwd
 import shutil
+import sqlite3
 import sys
 import tempfile
 import textwrap
@@ -2276,18 +2277,23 @@ class TestHarness:
 
         assert harness._get_backend_calls() == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_remote_app_name', 0),
+            ('relation_list', rel_id, {'relation_name': 'db'}),
+            ('relation_remote_app_name', 0, {'relation_name': 'db'}),
         ]
 
         # update_relation_data ensures the cached data for the relation is wiped
         harness.update_relation_data(rel_id, 'test-charm/0', {'foo': 'bar'})
         test_charm_unit = harness.model.get_unit('test-charm/0')
         assert harness._get_backend_calls(reset=True) == [
-            ('relation_get', 0, 'test-charm/0', False),
+            ('relation_get', 0, 'test-charm/0', False, {'relation_name': 'db'}),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': test_charm_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': test_charm_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
 
@@ -2300,21 +2306,31 @@ class TestHarness:
 
         assert harness._get_backend_calls(reset=False) == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_get', 0, 'postgresql/0', False),
+            ('relation_list', rel_id, {'relation_name': 'db'}),
+            ('relation_get', 0, 'postgresql/0', False, {'relation_name': 'db'}),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': pgql_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
         # If we check again, they are still there, but now we reset it
         assert harness._get_backend_calls(reset=True) == [
             ('relation_ids', 'db'),
-            ('relation_list', rel_id),
-            ('relation_get', 0, 'postgresql/0', False),
+            ('relation_list', rel_id, {'relation_name': 'db'}),
+            ('relation_get', 0, 'postgresql/0', False, {'relation_name': 'db'}),
             (
                 'update_relation_data',
-                {'relation_id': 0, 'entity': pgql_unit, 'data': {'foo': 'bar'}},
+                {
+                    'relation_id': 0,
+                    'entity': pgql_unit,
+                    'data': {'foo': 'bar'},
+                    'relation_name': 'db',
+                },
             ),
         ]
         # And the calls are gone
@@ -3814,6 +3830,19 @@ class TestTestingModelBackend:
         assert str(path).startswith(str(backend._resource_dir.name)), (
             f'expected {path} to be a subdirectory of {backend._resource_dir.name}'
         )
+
+    def test_cleanup_closes_framework_storage(self):
+        # Regression test: harness.cleanup() must close the SQLiteStorage
+        # connection. Otherwise the connection's destructor emits a
+        # ResourceWarning at GC, which surfaces as a test failure for callers
+        # running under -W error (such as downstream charm suites on
+        # Python 3.14).
+        harness = ops.testing.Harness(ops.CharmBase, meta='name: test-app')
+        harness.begin()
+        storage = harness._storage
+        harness.cleanup()
+        with pytest.raises(sqlite3.ProgrammingError):
+            storage._db.execute('SELECT 1')
 
     def test_resource_get_no_resource(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(

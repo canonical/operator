@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import pathlib
+import ssl
 from unittest.mock import ANY, patch
 
 import pytest
@@ -22,6 +24,7 @@ from opentelemetry.trace import get_tracer_provider
 import ops_tracing
 from ops_tracing import _backend
 from ops_tracing._buffer import Destination
+from ops_tracing._export import BufferingSpanExporter
 
 
 def test_unset_destination(setup_tracing: None):
@@ -74,3 +77,11 @@ def test_juju_topology_labels(setup_tracing: None):
         'juju_application': 'testapp',
         'juju_unit': 'testapp/42',
     }
+
+
+def test_exporter_ssl_context(tmp_path: pathlib.Path):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    context = exporter.ssl_context(None)
+    assert context.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert context.verify_flags & ssl.VERIFY_X509_PARTIAL_CHAIN
+    assert not (context.verify_flags & ssl.VERIFY_X509_STRICT)

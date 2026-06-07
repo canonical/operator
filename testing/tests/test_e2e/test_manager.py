@@ -3,75 +3,63 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
-
 import pytest
-from scenario import Context, State
-from scenario.context import AlreadyEmittedError, Manager
+from scenario import Context, Manager, State
+from scenario.errors import AlreadyEmittedError
 
-from ops import ActiveStatus
-from ops.charm import CharmBase, CollectStatusEvent
-
-
-@pytest.fixture(scope='function')
-def mycharm():
-    class MyCharm(CharmBase):
-        META: Mapping[str, Any] = {'name': 'mycharm'}
-        ACTIONS: Mapping[str, Any] = {'do-x': {}}
-
-        def __init__(self, framework):
-            super().__init__(framework)
-            for evt in self.on.events().values():
-                self.framework.observe(evt, self._on_event)
-
-        def _on_event(self, e):
-            if isinstance(e, CollectStatusEvent):
-                return
-
-            self.unit.status = ActiveStatus(e.handle.kind)
-
-    return MyCharm
+import ops
 
 
-def test_manager(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        assert isinstance(manager.charm, mycharm)
-        state_out = manager.run()
+class Charm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        for evt in self.on.events().values():
+            framework.observe(evt, self._on_event)
+
+    def _on_event(self, e: ops.EventBase):
+        if isinstance(e, ops.CollectStatusEvent):
+            return
+        self.unit.status = ops.ActiveStatus(e.handle.kind)
+
+
+@pytest.fixture
+def ctx() -> Context[Charm]:
+    return Context(Charm, meta={'name': 'foo'}, actions={'do-x': {}})
+
+
+def test_manager(ctx: Context[Charm]):
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        assert isinstance(mgr.charm, Charm)
+        state_out = mgr.run()
 
     assert isinstance(state_out, State)
 
 
-def test_manager_implicit(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        assert isinstance(manager.charm, mycharm)
+def test_manager_implicit(ctx: Context[Charm]):
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        assert isinstance(mgr.charm, Charm)
         # do not call .run()
 
     # run is called automatically
-    assert manager._emitted
+    assert mgr._emitted
 
 
-def test_manager_reemit_fails(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
-    with Manager(ctx, ctx.on.start(), State()) as manager:
-        manager.run()
+def test_manager_reemit_fails(ctx: Context[Charm]):
+    with Manager(ctx, ctx.on.start(), State()) as mgr:
+        mgr.run()
         with pytest.raises(AlreadyEmittedError):
-            manager.run()
+            mgr.run()
 
 
-def test_context_manager(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META)
-    with ctx(ctx.on.start(), State()) as manager:
-        state_out = manager.run()
+def test_context_manager(ctx: Context[Charm]):
+    with ctx(ctx.on.start(), State()) as mgr:
+        state_out = mgr.run()
         assert isinstance(state_out, State)
     assert ctx.emitted_events[0].handle.kind == 'start'
 
 
-def test_context_action_manager(mycharm):
-    ctx = Context(mycharm, meta=mycharm.META, actions=mycharm.ACTIONS)
-    with ctx(ctx.on.action('do-x'), State()) as manager:
-        state_out = manager.run()
+def test_context_action_manager(ctx: Context[Charm]):
+    with ctx(ctx.on.action('do-x'), State()) as mgr:
+        state_out = mgr.run()
         assert isinstance(state_out, State)
     assert ctx.emitted_events[0].handle.kind == 'do_x_action'

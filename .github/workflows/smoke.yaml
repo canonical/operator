@@ -3,7 +3,7 @@ name: ops Smoke Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 7 25 * *'
+    - cron: '1 7 25 * *'
 
 permissions: {}
 
@@ -26,11 +26,11 @@ jobs:
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - name: Checkout the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
 
       - run: uv tool install tox --with tox-uv
 

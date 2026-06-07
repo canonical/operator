@@ -175,8 +175,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', rel_app1),
-                ('relation_list', rel_app2),
+                ('relation_list', rel_app1, {'relation_name': 'db1'}),
+                ('relation_list', rel_app2, {'relation_name': 'db1'}),
             ],
         )
 
@@ -205,7 +205,7 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id_db1),
+                ('relation_list', relation_id_db1, {'relation_name': 'db1'}),
             ],
         )
         dead_rel = self.ensure_relation(harness, 'db1', 7)
@@ -215,9 +215,9 @@ class TestModel:
         self.assertBackendCalls(
             harness,
             [
-                ('relation_list', 7),
-                ('relation_remote_app_name', 7),
-                ('relation_get', 7, 'myapp/0', False),
+                ('relation_list', 7, {'relation_name': 'db1'}),
+                ('relation_remote_app_name', 7, {'relation_name': 'db1'}),
+                ('relation_get', 7, 'myapp/0', False, {'relation_name': 'db1'}),
             ],
         )
 
@@ -236,12 +236,28 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db0'),
-                ('relation_list', relation_id_db0),
-                ('relation_remote_app_name', 0),
-                ('relation_list', relation_id_db0_b),
-                ('relation_remote_app_name', 2),
+                ('relation_list', relation_id_db0, {'relation_name': 'db0'}),
+                ('relation_remote_app_name', 0, {'relation_name': 'db0'}),
+                ('relation_list', relation_id_db0_b, {'relation_name': 'db0'}),
+                ('relation_remote_app_name', 2, {'relation_name': 'db0'}),
             ],
         )
+
+    def test_get_relation_wrong_endpoint(self, harness: ops.testing.Harness[ops.CharmBase]):
+        # Regression test for https://github.com/canonical/operator/issues/2327
+        # When the endpoint name doesn't match the relation_id, Juju treats the
+        # relation as if it doesn't exist; ops should model that cleanly.
+        rel_id = harness.add_relation('db1', 'remoteapp1')
+        harness.add_relation_unit(rel_id, 'remoteapp1/0')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(rel_id, 'remoteapp1', {'host': 'remoteapp1-0'})
+
+        wrong = harness.model.get_relation('db0', rel_id)
+        assert isinstance(wrong, ops.Relation)
+        # The relation looks dead from the charm's point of view.
+        assert wrong.active is False
+        assert wrong.data[harness.model.unit] == {}
+        assert wrong.data[harness.model.app] == {}
 
     def test_peer_relation_app(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.add_relation('db2', 'myapp')
@@ -262,7 +278,7 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
             ],
         )
 
@@ -335,8 +351,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'remoteapp1/0', False),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'remoteapp1/0', False, {'relation_name': 'db1'}),
             ],
         )
 
@@ -363,8 +379,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'remoteapp1', True),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'remoteapp1', True, {'relation_name': 'db1'}),
             ],
         )
 
@@ -394,8 +410,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'remoteapp1/0', False),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'remoteapp1/0', False, {'relation_name': 'db1'}),
             ],
         )
 
@@ -427,13 +443,14 @@ class TestModel:
         self.assertBackendCalls(
             harness,
             [
-                ('relation_get', relation_id, 'myapp/0', False),
+                ('relation_get', relation_id, 'myapp/0', False, {'relation_name': 'db1'}),
                 (
                     'update_relation_data',
                     {
                         'relation_id': relation_id,
                         'entity': harness.model.unit,
                         'data': {'host': 'bar'},
+                        'relation_name': 'db1',
                     },
                 ),
             ],
@@ -461,11 +478,16 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', 0),
-                ('relation_get', 0, 'myapp', True),
+                ('relation_list', 0, {'relation_name': 'db1'}),
+                ('relation_get', 0, 'myapp', True, {'relation_name': 'db1'}),
                 (
                     'update_relation_data',
-                    {'relation_id': 0, 'entity': harness.model.app, 'data': {'password': 'foo'}},
+                    {
+                        'relation_id': 0,
+                        'entity': harness.model.app,
+                        'data': {'password': 'foo'},
+                        'relation_name': 'db1',
+                    },
                 ),
             ],
         )
@@ -494,8 +516,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', 0),
-                ('relation_get', 0, 'myapp', True),
+                ('relation_list', 0, {'relation_name': 'db1'}),
+                ('relation_get', 0, 'myapp', True, {'relation_name': 'db1'}),
                 ('is_leader',),
             ],
         )
@@ -540,14 +562,15 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'myapp/0', False),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'myapp/0', False, {'relation_name': 'db1'}),
                 (
                     'update_relation_data',
                     {
                         'relation_id': relation_id,
                         'entity': harness.model.unit,
                         'data': {'host': ''},
+                        'relation_name': 'db1',
                     },
                 ),
             ],
@@ -573,8 +596,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'myapp/0', False),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'myapp/0', False, {'relation_name': 'db1'}),
             ],
         )
 
@@ -595,8 +618,15 @@ class TestModel:
             relation_id: int,
             entity: ops.Unit | ops.Application,
             data: Mapping[str, str],
+            relation_name: str | None = None,
         ):
-            backend._calls.append(('update_relation_data', relation_id, entity, data))
+            backend._calls.append((
+                'update_relation_data',
+                relation_id,
+                entity,
+                data,
+                relation_name,
+            ))
             raise ops.ModelError()
 
         backend.update_relation_data = broken_update_relation_data
@@ -617,10 +647,10 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'myapp/0', False),
-                ('update_relation_data', relation_id, harness.model.unit, {'host': 'bar'}),
-                ('update_relation_data', relation_id, harness.model.unit, {'host': ''}),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'myapp/0', False, {'relation_name': 'db1'}),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': 'bar'}, 'db1'),
+                ('update_relation_data', relation_id, harness.model.unit, {'host': ''}, 'db1'),
             ],
         )
 
@@ -652,8 +682,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
-                ('relation_get', relation_id, 'myapp/0', False),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
+                ('relation_get', relation_id, 'myapp/0', False, {'relation_name': 'db1'}),
             ],
         )
 
@@ -692,7 +722,7 @@ class TestModel:
                 harness,
                 [
                     ('is_leader',),
-                    ('relation_get', 0, 'myapp', True),
+                    ('relation_get', 0, 'myapp', True, {'relation_name': 'db1'}),
                 ],
             )
 
@@ -747,11 +777,11 @@ class TestModel:
             assert isinstance(repr(rel_db1.data), str)
 
             expected_backend_calls = [
-                ('relation_get', 0, 'myapp/0', False),
+                ('relation_get', 0, 'myapp/0', False, {'relation_name': 'db1'}),
                 ('is_leader',),
-                ('relation_get', 0, 'remoteapp1/0', False),
+                ('relation_get', 0, 'remoteapp1/0', False, {'relation_name': 'db1'}),
                 ('is_leader',),
-                ('relation_get', 0, 'remoteapp1', True),
+                ('relation_get', 0, 'remoteapp1', True, {'relation_name': 'db1'}),
             ]
             self.assertBackendCalls(harness, expected_backend_calls)
 
@@ -764,8 +794,8 @@ class TestModel:
             harness,
             [
                 ('relation_ids', 'db1'),
-                ('relation_list', 0),
-                ('relation_remote_app_name', 0),
+                ('relation_list', 0, {'relation_name': 'db1'}),
+                ('relation_remote_app_name', 0, {'relation_name': 'db1'}),
             ],
         )
 
@@ -822,7 +852,7 @@ class TestModel:
             [
                 ('is_leader',),
                 ('relation_ids', 'db1'),
-                ('relation_list', relation_id),
+                ('relation_list', relation_id, {'relation_name': 'db1'}),
                 ('is_leader',),
             ],
         )
@@ -1241,8 +1271,8 @@ class TestModel:
 
         assert fake_script.calls() == [
             ['relation-ids', 'db', '--format=json'],
-            ['relation-list', '--format=json', '-r', '1'],
-            ['relation-model-get', '--format=json', '-r', '1'],
+            ['relation-list', '--format=json', '-r', 'db:1'],
+            ['relation-model-get', '--format=json', '-r', 'db:1'],
         ]
 
 
@@ -2514,7 +2544,9 @@ class TestModelBindings:
         model = ops.Model(meta, backend)
 
         fake_script.write('relation-ids', """([ "$1" = db0 ] && echo '["db0:4"]') || echo '[]'""")
-        fake_script.write('relation-list', """[ "$3" = 4 ] && echo '["remoteapp1/0"]' || exit 2""")
+        fake_script.write(
+            'relation-list', """[ "$3" = db0:4 ] && echo '["remoteapp1/0"]' || exit 2"""
+        )
         self.network_get_out = """{
   "bind-addresses": [
     {
@@ -2695,7 +2727,7 @@ class TestModelBindings:
         expected_calls = [
             ['relation-ids', 'db0', '--format=json'],
             # The two invocations below are due to the get_relation call.
-            ['relation-list', '--format=json', '-r', '4'],
+            ['relation-list', '--format=json', '-r', 'db0:4'],
             ['network-get', '--format=json', '-r', '4', 'db0'],
         ]
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
@@ -3498,6 +3530,17 @@ class TestSecrets:
         ]
         assert fake_script.secrets() == {'foo': 'x', 'bar': 'y'}
 
+    def test_app_add_secret_timedelta_expire_is_utc(
+        self, fake_script: FakeScript, model: ops.Model
+    ):
+        fake_script.write('secret-add', 'echo secret:234')
+
+        model.app.add_secret({'foo': 'x'}, expire=datetime.timedelta(hours=1))
+
+        calls = fake_script.calls(clear=True)
+        expire_arg = calls[0][calls[0].index('--expire') + 1]
+        assert expire_arg.endswith('Z'), f'Expected UTC timezone suffix Z, got {expire_arg!r}'
+
     def test_unit_add_secret_simple(self, fake_script: FakeScript, model: ops.Model):
         fake_script.write('secret-add', 'echo secret:345')
 
@@ -4172,8 +4215,8 @@ class TestSecretClass:
         assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '--format=json', '-r', '123'],
-            ['relation-list', '--format=json', '-r', '234'],
+            ['relation-list', '--format=json', '-r', 'test:123'],
+            ['relation-list', '--format=json', '-r', 'test:234'],
             ['secret-grant', '--relation', '123', f'secret://{model._backend.model_uuid}/x'],
             [
                 'secret-grant',
@@ -4183,7 +4226,7 @@ class TestSecretClass:
                 'app/0',
                 f'secret://{model._backend.model_uuid}/x',
             ],
-            ['relation-list', '--format=json', '-r', '345'],
+            ['relation-list', '--format=json', '-r', 'test:345'],
             ['secret-info-get', '--format=json', '--label', 'y'],
             ['secret-grant', '--relation', '345', f'secret://{model._backend.model_uuid}/z'],
         ]
@@ -4209,8 +4252,8 @@ class TestSecretClass:
         assert secret.id == f'secret://{model._backend.model_uuid}/z'
 
         assert fake_script.calls(clear=True) == [
-            ['relation-list', '--format=json', '-r', '123'],
-            ['relation-list', '--format=json', '-r', '234'],
+            ['relation-list', '--format=json', '-r', 'test:123'],
+            ['relation-list', '--format=json', '-r', 'test:234'],
             ['secret-revoke', '--relation', '123', f'secret://{model._backend.model_uuid}/x'],
             [
                 'secret-revoke',
@@ -4220,7 +4263,7 @@ class TestSecretClass:
                 'app/0',
                 f'secret://{model._backend.model_uuid}/x',
             ],
-            ['relation-list', '--format=json', '-r', '345'],
+            ['relation-list', '--format=json', '-r', 'test:345'],
             ['secret-info-get', '--format=json', '--label', 'y'],
             ['secret-revoke', '--relation', '345', f'secret://{model._backend.model_uuid}/z'],
         ]
@@ -4771,10 +4814,10 @@ def test_departing_unit_data_available(fake_script: FakeScript):
     calls = fake_script.calls(clear=True)
     assert calls[:2] == [
         ['relation-ids', 'db', '--format=json'],
-        ['relation-list', '--format=json', '-r', '1'],
+        ['relation-list', '--format=json', '-r', 'db:1'],
     ]
-    assert ['relation-get', '--format=json', '-r', '1', '-', 'db/0'] in calls
-    assert ['relation-get', '--format=json', '-r', '1', '-', 'db/1'] in calls
+    assert ['relation-get', '--format=json', '-r', 'db:1', '-', 'db/0'] in calls
+    assert ['relation-get', '--format=json', '-r', 'db:1', '-', 'db/1'] in calls
 
 
 if __name__ == '__main__':

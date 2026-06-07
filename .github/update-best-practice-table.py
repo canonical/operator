@@ -168,7 +168,7 @@ def main():
             '{external+charmcraft:ref}',
         ),
     ):
-        for file_path in directory.rglob('*'):
+        for file_path in sorted(directory.rglob('*')):
             if file_path.suffix not in ('.md', '.rst'):
                 continue
             text = file_path.read_text()

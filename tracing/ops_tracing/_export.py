@@ -106,25 +106,18 @@ class BufferingSpanExporter(SpanExporter):
         return context
 
     def _ssl_context(self, ca: str | None) -> ssl.SSLContext:
-        # Note that ssl.create_default_context() doesn't allow setting the context.protocol in a
-        # way that's the same across Python 3.8 and 3.10 onwards. Whip the context up by hand.
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context = ssl.create_default_context(cadata=ca)
         context.minimum_version = ssl.TLSVersion.TLSv1_2  # See comment at the top of module
         context.set_alpn_protocols(['http/1.1'])
+        # The partial chain flag allows trusting intermediate CAs in the CA list
+        # without the matching root CA.
+        # Enabled by default in Python 3.13+, needed explicitly before that.
+        context.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
         # Can't use strict certificate chain validation until our self-signed ca is fixed
         # https://github.com/canonical/self-signed-certificates-operator/issues/330
         # https://github.com/canonical/tls-certificates-interface/pull/333
-        # context.verify_flags |= ssl.VERIFY_X509_STRICT
-        if partial_chain := getattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN', None):
-            # Available starting from Python 3.10. The partial chain flag allows trusting an
-            # intermediate CAs in the CA list without the matching root CA.
-            context.verify_flags |= partial_chain
-
-        if ca is not None:
-            context.load_verify_locations(cadata=ca)
-        else:
-            context.load_default_certs()
-
+        # Enabled by default in Python 3.13+, so must be explicitly cleared.
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         return context
 
     def do_export(self, buffered_id: int, data: bytes, mime: str) -> None:

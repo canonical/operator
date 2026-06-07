@@ -74,13 +74,11 @@ requires:
 
 That will tell `juju` that our charm can be integrated with charms that provide the same `postgresql_client` interface, for example, the official PostgreSQL charm.
 
-Import the database interface library and define database event handlers
-
 We now need to implement the logic that wires our application to a database. When a relation between our application and the data platform is formed, the provider side (that is: the data platform) will create a database for us and it will provide us with all the information we need to connect to it over the relation -- for example, username, password, host, port, and so on. On our side, we nevertheless still need to set the relevant environment variables to point to the database and restart the service.
 
 To do so, we need to update our charm `src/charm.py` to do all of the following:
 
-* Import the `DataRequires` class from the interface library; this class represents the relation data exchanged in the client-server communication.
+* Import the `DatabaseRequires` class from the interface library; this class represents the relation data exchanged in the client-server communication.
 * Define the event handlers that will be called during the relation lifecycle.
 * Bind the event handlers to the observed relation events.
 
@@ -341,10 +339,9 @@ First, repack and refresh your charm:
 
 ```text
 charmcraft pack
-juju refresh \
-  --path="./fastapi-demo_amd64.charm" \
-  fastapi-demo --force-units --resource \
-  demo-server-image=ghcr.io/canonical/api_demo_server:1.0.2
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -480,13 +477,14 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, setting the expected status as `blocked` in `juju.wait`:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, to expect blocked status in `juju.wait`. Replace the contents of `tests/integration/test_charm.py` with:
 
 ```python
 import logging
 import pathlib
 
 import jubilant
+import pytest
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -495,6 +493,7 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
 
@@ -505,7 +504,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
 
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(f"./{charm}", app=APP_NAME, resources=resources)
+    juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 ```
 
@@ -514,7 +513,8 @@ Then, let's add another test case to check the integration is successful. For th
 In your `tests/integration/test_charm.py` file add the following test case:
 
 ```python
-def test_database_integration(juju: jubilant.Juju):
+@pytest.mark.juju_setup
+def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
 
     Assert that the charm is active if the integration is established.
@@ -524,15 +524,25 @@ def test_database_integration(juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-In your Multipass Ubuntu VM, run the test again:
+This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
+
+In your Multipass Ubuntu VM, run the tests again:
 
 ```text
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
 ```
 
-The test may again take some time to run.
+The tests may take some time to run, depending on your computer and network.
 
-When it's done, the output should show two passing tests:
+If the tests fail with a timeout error, override the default timeout in `test_database_integration`:
+
+```python
+    juju.wait(jubilant.all_active, timeout=10 * 60)
+```
+
+Then run `tox -e integration` again. If the tests still fail, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
+
+When the tests are done, the output should show two passing tests:
 
 ```text
 tests/integration/test_charm.py::test_deploy

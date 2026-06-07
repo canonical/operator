@@ -3,6 +3,8 @@
 
 Charms should have tests to verify that they are functioning correctly. This page describes the types of testing that you should consider.
 
+> See also: [](#set-up-ci)
+
 ## Unit testing
 
 Unit tests isolate and validate individual code units (functions, methods, and so on) by mocking Juju APIs and workloads without external interactions. Unit tests are intended to be isolated and fast to complete. These are the tests you would run before committing any code changes.
@@ -18,7 +20,7 @@ A charm acts like a function, taking event context (always present), configurati
 
 Unit tests focus on mapping these inputs to expected outputs. For example, a unit test could verify a system call, the contents of a file, or the contents of a relation databag.
 
-> See also: {ref}`write-unit-tests-for-a-charm`.
+> See also: {ref}`write-unit-tests-for-a-charm`
 
 ### Coverage
 
@@ -53,7 +55,7 @@ Interface tests validate charm library behavior against mock Juju APIs, ensuring
 
 Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface. For information about how to create an interface, see {ref}`register-an-interface`.
 
-> See also: {ref}`write-tests-for-an-interface`.
+> See also: {ref}`write-tests-for-an-interface`
 
 ### Coverage
 
@@ -91,7 +93,7 @@ Integration tests should be focused on a single charm. Sometimes an integration 
 
 Integration tests typically take significantly longer to run than unit tests.
 
-> See also: {ref}`write-integration-tests-for-a-charm`.
+> See also: {ref}`write-integration-tests-for-a-charm`
 
 ### Coverage
 
@@ -111,8 +113,9 @@ When writing an integration test, it is not sufficient to simply check that Juju
 
 ### Tools
 
-- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html) and
-- [Jubilant](https://documentation.ubuntu.com/jubilant/)
+- [`pytest`](https://pytest.org/) or [`unittest`](https://docs.python.org/3/library/unittest.html)
+- [Jubilant](https://documentation.ubuntu.com/jubilant/), which wraps the Juju CLI
+- [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant), a pytest plugin that manages Juju models during tests
 
 Integration tests and unit tests should run using the minor version of Python that is shipped with the OS specified in `charmcraft.yaml` (the `base.run-on` key). For example, if Ubuntu 22.04 is specified in `charmcraft.yaml`, you can use the following tox configuration:
 
@@ -124,61 +127,3 @@ basepython = python3.10
 ### Examples
 
 - [Tempo worker integration tests](https://github.com/canonical/tempo-operators/blob/main/worker/tests/integration/test_deploy.py)
-
-## Continuous integration
-
-Typically, you want the tests to be run automatically against any PR into your repository's main branch, and potentially trigger a new release whenever the tests succeed. Continuous deployment is out of scope for this page, but we will look at how to set up basic continuous integration.
-
-Create a file called `.github/workflows/ci.yaml`. For example, to include a `lint` job that runs the `tox` `unit` environment:
-
-```yaml
-name: Tests
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
-  unit-test:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@7
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Run tests
-        run: tox -e unit
-```
-
-Integration tests are a bit more complex, because these tests require a Juju controller and a cloud in which to deploy it. The following example uses the [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator) workflow provided by `charmed-kubernetes` to set up `microk8s` and Juju:
-
-```yaml
-  integration-test-microk8s:
-    name: Integration tests (microk8s)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: microk8s
-          channel: 1.32-strict/stable
-      - name: Run integration tests
-        # Set a predictable model name so it can be consumed by charm-logdump-action
-        run: tox -e integration -- --model testing
-      - name: Dump logs
-        uses: canonical/charm-logdump-action@main
-        if: failure()
-        with:
-          app: my-app-name
-          model: testing
-```
-
-For more actions, documentation, and use cases, see [charming-actions](https://github.com/canonical/charming-actions).

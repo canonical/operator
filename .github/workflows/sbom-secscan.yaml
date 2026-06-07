@@ -17,7 +17,7 @@ jobs:
         runs-on: [self-hosted, self-hosted-linux-amd64-jammy-private-endpoint-medium]
         steps:
           - name: Checkout repository
-            uses: actions/checkout@v6
+            uses: actions/checkout@v6.0.2
             with:
               persist-credentials: false
           - name: Install dependencies
@@ -26,13 +26,13 @@ jobs:
               sudo apt-get install -y libapt-pkg-dev
               sudo apt install -y python3-apt
           - name: Checkout security scanner
-            uses: actions/checkout@v6
+            uses: actions/checkout@v6.0.2
             with:
               repository: canonical/sbomber
               path: scanner
               persist-credentials: false
           - name: Install uv
-            uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+            uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
           - name: Install secscan cli
             run: |
               sudo snap install canonical-secscan-client

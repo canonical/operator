@@ -3,31 +3,32 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from scenario.state import State
 
-from ops.charm import CharmBase
-from ops.framework import Framework
+import ops
 
 from ..helpers import trigger
 
 
 @pytest.fixture(scope='function')
-def mycharm():
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def mycharm() -> type[ops.CharmBase]:
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             pass
 
     return MyCharm
 
 
-def test_config_get(mycharm):
-    def check_cfg(charm: CharmBase):
+def test_config_get(mycharm: type[ops.CharmBase]):
+    def check_cfg(charm: ops.CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 1
 
@@ -43,8 +44,8 @@ def test_config_get(mycharm):
     )
 
 
-def test_config_get_default_from_meta(mycharm):
-    def check_cfg(charm: CharmBase):
+def test_config_get_default_from_meta(mycharm: type[ops.CharmBase]):
+    def check_cfg(charm: ops.CharmBase):
         assert charm.config['foo'] == 'bar'
         assert charm.config['baz'] == 2
         assert charm.config['qux'] is False
@@ -75,18 +76,18 @@ def test_config_get_default_from_meta(mycharm):
         {'baz': 4, 'foo': 'bar', 'qux': True},
     ),
 )
-def test_config_in_not_mutated(mycharm, cfg_in):
-    class MyCharm(CharmBase):
-        def __init__(self, framework: Framework):
+def test_config_in_not_mutated(mycharm: type[ops.CharmBase], cfg_in: dict[str, Any]):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             for evt in self.on.events().values():
                 self.framework.observe(evt, self._on_event)
 
-        def _on_event(self, event):
+        def _on_event(self, event: ops.EventBase):
             # access the config to trigger a config-get
-            foo_cfg = self.config['foo']  # noqa: F841
-            baz_cfg = self.config['baz']  # noqa: F841
-            qux_cfg = self.config['qux']  # noqa: F841
+            _foo_cfg = self.config['foo']
+            _baz_cfg = self.config['baz']
+            _qux_cfg = self.config['qux']
 
     state_out = trigger(
         State(

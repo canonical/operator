@@ -32,7 +32,7 @@ import ops
         ('kaboozle_bar_baz', _EventType.CUSTOM),
     ),
 )
-def test_event_type(evt, expected_type):
+def test_event_type(evt: str, expected_type: _EventType):
     event = _Event(evt)
     assert event._path.type is expected_type
 
@@ -45,7 +45,7 @@ def test_event_type(evt, expected_type):
     class MyCharm(ops.CharmBase):
         pass
 
-    spec = _CharmSpec(
+    spec = _CharmSpec[MyCharm](
         MyCharm,
         meta={
             'requires': {

@@ -614,7 +614,7 @@ def check_relation_consistency(
     # with data.
     if (
         event.name.endswith(('_relation_joined', '_relation_changed', '_relation_departed'))
-        and not event.relation_remote_unit_id
+        and event.relation_remote_unit_id is None
         and event.relation is not None  # Another check will have complained if it is None.
     ):
         try:
