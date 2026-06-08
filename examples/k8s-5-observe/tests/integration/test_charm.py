@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # The integration tests use the Jubilant library and the pytest-jubilant plugin.
-# See https:///latest/howto/write-integration-tests-for-a-charm/
+# See https://canonical.com/juju/docs/ops/latest/howto/write-integration-tests-for-a-charm/
 #
 # pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
 # The `charm` fixture is defined in conftest.py.

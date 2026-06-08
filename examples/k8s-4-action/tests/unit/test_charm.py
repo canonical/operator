@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# To learn more about testing, see https:///latest/explanation/testing/
+# To learn more about testing, see https://canonical.com/juju/docs/ops/latest/explanation/testing/
 
 import ops
 from ops import testing
