@@ -133,8 +133,7 @@ html_context = {
 # }
 
 # Project slug
-# TODO: If your documentation is hosted on https://documentation.ubuntu.com/,
-#       uncomment and set to the RTD slug.
+# Set to the path after https://canonical.com/
 slug = "juju/docs/ops"
 
 #######################
