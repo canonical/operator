@@ -268,6 +268,8 @@ class _Manager:
       - graceful teardown of the storage
     """
 
+    _saved_breakpointhook: Any = None
+
     def __init__(
         self,
         charm_class: type[_charm.CharmBase],
@@ -402,7 +404,12 @@ class _Manager:
             event_name=dispatcher.event_name,
             juju_debug_at=self._juju_context.debug_at,
         )
-        framework.set_breakpointhook()
+        # set_breakpointhook() returns the old sys.breakpointhook; capture it
+        # so destroy() can put the global state back rather than leaving the
+        # framework's bound method dangling. In production this is moot (the
+        # process is exiting anyway), but tests and other long-running
+        # ops.main() callers inherit the polluted hook otherwise.
+        self._saved_breakpointhook = framework.set_breakpointhook()
         return framework
 
     def _emit(self):
@@ -476,6 +483,8 @@ class _Manager:
         """Finalise the manager."""
         from . import tracing  # break circular import
 
+        if self._saved_breakpointhook is not None:
+            sys.breakpointhook = self._saved_breakpointhook
         self._tracing_context.__exit__(*sys.exc_info())
         if tracing:
             tracing._shutdown()
