@@ -62,7 +62,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         configuration for your specific workload. Tip: you can see the
         standard entrypoint of an existing container using docker inspect
         Learn more about interacting with Pebble at
-            https://documentation.ubuntu.com/ops/latest/reference/pebble/
+            https:///latest/reference/pebble/
         Learn more about Pebble layers at
             https://documentation.ubuntu.com/pebble/how-to/use-layers/
         """

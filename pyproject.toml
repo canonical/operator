@@ -82,10 +82,10 @@ tiobe = [
 ]
 
 [project.urls]
-"Homepage" = "https://documentation.ubuntu.com/ops/latest/"
+"Homepage" = "https://canonical.com/juju/docs/ops/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
+"Documentation" = "https://canonical.com/juju/docs/ops/latest/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
