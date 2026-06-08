@@ -410,33 +410,32 @@ Your charm now needs a way to load the value of the `slug` configuration option,
 In `src/charm.py`, add the following methods to the charm class:
 
 ```python
-def configure_and_run(self) -> None:
-    """Ensure that tinyproxy is running with the correct config."""
-    try:
-        config = self.load_config(TinyproxyConfig)
-    except pydantic.ValidationError:
-        # The collect-status handler will run next and will set status for the user to see.
-        return
-    if not tinyproxy.is_installed():
-        return
-    changed = tinyproxy.ensure_config(PORT, config.slug)
-    if not tinyproxy.is_running():
-        tinyproxy.start()
-        self.wait_for_running()
-    elif changed:
-        logger.info("Config changed while tinyproxy is running. Updating tinyproxy config")
-        tinyproxy.reload_config()
-
-
-def wait_for_running(self) -> None:
-    """Wait for tinyproxy to be running."""
-    for _ in range(3):
-        if tinyproxy.is_running():
+    def configure_and_run(self) -> None:
+        """Ensure that tinyproxy is running with the correct config."""
+        try:
+            config = self.load_config(TinyproxyConfig)
+        except pydantic.ValidationError:
+            # The collect-status handler will run next and will set status for the user to see.
             return
-        time.sleep(1)
-    raise RuntimeError("tinyproxy was not running within the expected time")
-    # Raising a runtime error will put the charm into error status.
-    # The Juju logs will show the error message, to help you debug the error.
+        if not tinyproxy.is_installed():
+            return
+        changed = tinyproxy.ensure_config(PORT, config.slug)
+        if not tinyproxy.is_running():
+            tinyproxy.start()
+            self.wait_for_running()
+        elif changed:
+            logger.info("Config changed while tinyproxy is running. Updating tinyproxy config")
+            tinyproxy.reload_config()
+
+    def wait_for_running(self) -> None:
+        """Wait for tinyproxy to be running."""
+        for _ in range(3):
+            if tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was not running within the expected time")
+        # Raising a runtime error will put the charm into error status.
+        # The Juju logs will show the error message, to help you debug the error.
 ```
 
 Then add the following lines at the beginning of `src/charm.py`:
@@ -520,24 +519,22 @@ To handle these events, add the following lines to the `__init__` method of the 
 Then add the following methods to the charm class:
 
 ```python
-def _on_stop(self, event: ops.StopEvent) -> None:
-    """Handle stop event."""
-    tinyproxy.stop()
-    self.wait_for_not_running()
+    def _on_stop(self, event: ops.StopEvent) -> None:
+        """Handle stop event."""
+        tinyproxy.stop()
+        self.wait_for_not_running()
 
+    def _on_remove(self, event: ops.RemoveEvent) -> None:
+        """Handle remove event."""
+        tinyproxy.uninstall()
 
-def _on_remove(self, event: ops.RemoveEvent) -> None:
-    """Handle remove event."""
-    tinyproxy.uninstall()
-
-
-def wait_for_not_running(self) -> None:
-    """Wait for tinyproxy to not be running."""
-    for _ in range(3):
-        if not tinyproxy.is_running():
-            return
-        time.sleep(1)
-    raise RuntimeError("tinyproxy was still running after the expected time")
+    def wait_for_not_running(self) -> None:
+        """Wait for tinyproxy to not be running."""
+        for _ in range(3):
+            if not tinyproxy.is_running():
+                return
+            time.sleep(1)
+        raise RuntimeError("tinyproxy was still running after the expected time")
 ```
 
 That's all the charm code! If you'd like, you can [inspect the full code in GitHub](https://github.com/canonical/operator/tree/main/examples/machine-tinyproxy).

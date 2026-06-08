@@ -207,7 +207,9 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 
 ```python
 # Provide grafana dashboards over a relation interface.
-self._grafana_dashboards = GrafanaDashboardProvider(self, relation_name="grafana-dashboard")
+self._grafana_dashboards = GrafanaDashboardProvider(
+    self, relation_name="grafana-dashboard"
+)
 ```
 
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:

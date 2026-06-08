@@ -45,7 +45,7 @@ class WikiConfig(pydantic.BaseModel):
     def validate_name(cls, value):
         if len(value) < 4:
             raise ValueError('Name must be at least 4 characters long')
-        if " " in value:
+        if ' ' in value:
             raise ValueError('Name must not contain spaces')
         return value
 ```
@@ -103,7 +103,9 @@ from ops import testing
 def test_short_wiki_name():
     ctx = testing.Context(MyCharm)
 
-    state_out = ctx.run(ctx.on.config_changed(), testing.State(config={'name': 'ww'}))
+    state_out = ctx.run(
+        ctx.on.config_changed(), testing.State(config={'name': 'ww'})
+    )
 
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
 ```

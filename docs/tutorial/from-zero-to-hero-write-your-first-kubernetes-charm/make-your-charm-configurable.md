@@ -141,12 +141,14 @@ Now, crucially, update the `_get_pebble_layer` method to make the layer definiti
 ```python
 def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join([
-        "uvicorn",
-        "api_demo_server.app:app",
-        "--host=0.0.0.0",
-        f"--port={port}",
-    ])
+    command = " ".join(
+        [
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            f"--port={port}",
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         "summary": "FastAPI demo service",
         "description": "pebble config layer for FastAPI demo server",
@@ -250,8 +252,7 @@ def test_config_changed():
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     command = (
-        state_out
-        .get_container(container.name)
+        state_out.get_container(container.name)
         .layers["fastapi_demo"]
         .services["fastapi-service"]
         .command

@@ -75,11 +75,11 @@ import os
 import pathlib
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope='session')
 def charm():
     """Return the path of the charm under test."""
     # Assume the current working directory is the charm root.
-    yield get_charm_path(env_var="CHARM_PATH", default_dir=pathlib.Path())
+    yield get_charm_path(env_var='CHARM_PATH', default_dir=pathlib.Path())
 
 
 def get_charm_path(env_var: str, default_dir: pathlib.Path) -> pathlib.Path:
@@ -144,9 +144,9 @@ import pytest
 import pytest_jubilant
 
 
-@pytest.mark.fixture(scope="module")
+@pytest.mark.fixture(scope='module')
 def other_model(juju_factory: pytest_jubilant.JujuFactory):
-    yield juju_factory.get_juju("other")
+    yield juju_factory.get_juju('other')
 
 
 def test_cross_model(juju: jubilant.Juju, other_model: jubilant.Juju): ...
@@ -199,7 +199,7 @@ import pytest
 
 @pytest.fixture(scope='module')
 def app(juju: jubilant.Juju, charm_path: pathlib.Path):
-    my_app_name = "mycharm"
+    my_app_name = 'mycharm'
     juju.deploy(
         charm_path,
         my_app_name,
@@ -330,7 +330,8 @@ It's common to use a `lambda` function to customize the callable or compose mult
 ```python
 juju.wait(
     lambda status: (
-        jubilant.all_active(status, 'mysql', 'redis') and jubilant.all_blocked(status, 'logger'),
+        jubilant.all_active(status, 'mysql', 'redis')
+        and jubilant.all_blocked(status, 'logger'),
     ),
 )
 ```

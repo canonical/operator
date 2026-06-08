@@ -148,7 +148,9 @@ framework.observe(self.database.on.endpoints_changed, self._on_database_endpoint
 Finally, define the method that is called on the database events:
 
 ```python
-def _on_database_endpoint(self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent) -> None:
+def _on_database_endpoint(
+    self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+) -> None:
     """Event is fired when the database is created or its endpoint is changed."""
     self._replan_workload()
 ```
@@ -245,12 +247,14 @@ Next, update `_get_pebble_layer()` to put the environment variables in the Pebbl
 ```python
 def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join([
-        "uvicorn",
-        "api_demo_server.app:app",
-        "--host=0.0.0.0",
-        f"--port={port}",
-    ])
+    command = " ".join(
+        [
+            "uvicorn",
+            "api_demo_server.app:app",
+            "--host=0.0.0.0",
+            f"--port={port}",
+        ]
+    )
     pebble_layer: ops.pebble.LayerDict = {
         "summary": "FastAPI demo service",
         "description": "pebble config layer for FastAPI demo server",

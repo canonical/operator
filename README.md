@@ -79,7 +79,7 @@ class OpsExampleCharm(ops.CharmBase):
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer("httpbin", self._pebble_layer, combine=True)
+        container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         # Learn more about statuses at
@@ -101,7 +101,7 @@ from charm import OpsExampleCharm
 def test_httpbin_pebble_ready():
     # Arrange:
     ctx = testing.Context(OpsExampleCharm)
-    container = testing.Container("httpbin", can_connect=True)
+    container = testing.Container('httpbin', can_connect=True)
     state_in = testing.State(containers={container})
 
     # Act:
@@ -110,19 +110,19 @@ def test_httpbin_pebble_ready():
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     expected_plan = {
-        "services": {
-            "httpbin": {
-                "override": "replace",
-                "summary": "httpbin",
-                "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                "startup": "enabled",
-                "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
+        'services': {
+            'httpbin': {
+                'override': 'replace',
+                'summary': 'httpbin',
+                'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
+                'startup': 'enabled',
+                'environment': {'GUNICORN_CMD_ARGS': '--log-level info'},
             }
         },
     }
     assert expected_plan == updated_plan
     assert (
-        state_out.get_container(container.name).service_statuses["httpbin"]
+        state_out.get_container(container.name).service_statuses['httpbin']
         == ops.pebble.ServiceStatus.ACTIVE
     )
     assert state_out.unit_status == testing.ActiveStatus()

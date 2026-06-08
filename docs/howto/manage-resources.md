@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 def _on_config_changed(self, event):
     # Get the path to the file resource named 'my-resource'
     try:
-        resource_path = self.model.resources.fetch("my-resource")
+        resource_path = self.model.resources.fetch('my-resource')
     except ops.ModelError as e:
         self.unit.status = ops.BlockedStatus(
             "Something went wrong when claiming resource 'my-resource; "
@@ -53,7 +53,7 @@ def _on_config_changed(self, event):
         return
 
     # Open the file and read it
-    with open(resource_path, "r") as f:
+    with open(resource_path, 'r') as f:
         content = f.read()
     # do something
 ```
@@ -81,7 +81,9 @@ import pathlib
 
 from ops import testing
 
-ctx = testing.Context(MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}})
+ctx = testing.Context(
+    MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}}
+)
 resource = testing.Resource(name='foo', path='/path/to/resource.tar')
 with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')

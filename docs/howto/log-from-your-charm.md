@@ -23,10 +23,10 @@ class HelloOperatorCharm(ops.CharmBase):
     ...
 
     def _on_config_changed(self, _):
-        current = self.config["thing"]
+        current = self.config['thing']
         if current not in self._stored.things:
             # Note the use of the logger here:
-            logger.info("Found a new thing: %r", current)
+            logger.info('Found a new thing: %r', current)
             self._stored.things.append(current)
 ```
 

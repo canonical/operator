@@ -95,7 +95,9 @@ For example:
 
 ```python
 class DatabaseProviderAppData(pydantic.BaseModel):
-    credentials: str | None = pydantic.Field(default=None, description="A Juju secret ID")
+    credentials: str | None = pydantic.Field(
+        default=None, description='A Juju secret ID'
+    )
 ```
 
 Now, in the body of the charm definition, define the event handler. In this example, if we are the leader unit, then we create a database and pass the credentials to use it to the charm on the other side via the relation data:
@@ -126,7 +128,7 @@ For example:
 
 ```python
 class SMTPProviderUnitData(pydantic.BaseMode):
-    smtp_credentials: str = pydantic.Field(description="A Juju secret ID")
+    smtp_credentials: str = pydantic.Field(description='A Juju secret ID')
 ```
 
 Now, in the body of the charm definition, define the event handler. In this example, a `smtp_credentials` key is set in the unit data with the ID of a secret:
@@ -185,7 +187,9 @@ def _update_configuration(self, _: ops.Eventbase):
     if not secret_id:
         # The credentials haven't been added to the relation by the remote app yet.
         return
-    secret_contents = self.model.get_secret(id=secret_id).get_contents(refresh=True)
+    secret_contents = self.model.get_secret(id=secret_id).get_contents(
+        refresh=True
+    )
     self.push_configuration(
         username=secret['username'],
         password=secret['password'],
@@ -199,7 +203,7 @@ To add data to the relation databag, use the [`.data` attribute](ops.Relation.da
 ```python
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     if relation := self.model.get_relation('ingress'):
-        relation.data[self.app]["domain"] = self.config["domain"]
+        relation.data[self.app]['domain'] = self.config['domain']
 ```
 
 To read data from the relation databag, again use the `.data` attribute, selecting the appropriate databag, and then using it as if it were a regular dictionary.
@@ -209,7 +213,9 @@ The charm can inspect the contents of the remote unit databags:
 ```python
 def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
     remote_units_databags = {
-        event.relation.data[unit] for unit in event.relation.units if unit.app is not self.app
+        event.relation.data[unit]
+        for unit in event.relation.units
+        if unit.app is not self.app
     }
 ```
 
@@ -218,7 +224,9 @@ Or the peer unit databags:
 ```python
 def _on_database_relation_changed(self, e: ops.RelationChangedEvent):
     peer_units_databags = {
-        event.relation.data[unit] for unit in event.relation.units if unit.app is self.app
+        event.relation.data[unit]
+        for unit in event.relation.units
+        if unit.app is self.app
     }
 ```
 
@@ -250,7 +258,9 @@ If the charm does not have permission to do an operation (e.g. because it is not
 To do clean-up work when a unit in the relation is removed (for example, removing per-unit credentials), have your charm observe the `relation-departed` event. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-departed` event observers for the relevant relations and pair those with an event handler. For example:
 
 ```python
-framework.observe(self.on.smtp_relation_departed, self._on_smtp_relation_departed)
+framework.observe(
+    self.on.smtp_relation_departed, self._on_smtp_relation_departed
+)
 ```
 
 Now, in the body of the charm definition, define the event handler. For example:
@@ -296,8 +306,13 @@ from ops import testing
 ctx = testing.Context(MyCharm)
 relation = testing.Relation(endpoint='smtp', remote_units_data={1: {}})
 state_in = testing.State(relations={relation})
-state_out = ctx.run(ctx.on.relation_joined(relation, remote_unit=1), state=state_in)
-assert 'smtp_credentials' in state_out.get_relation(relation.id).remote_units_data[1]
+state_out = ctx.run(
+    ctx.on.relation_joined(relation, remote_unit=1), state=state_in
+)
+assert (
+    'smtp_credentials'
+    in state_out.get_relation(relation.id).remote_units_data[1]
+)
 ```
 
 > See more: [](ops.testing.RelationBase)
@@ -357,8 +372,8 @@ To verify that charm behaves correctly when integrated with another in a real Ju
 
 
 def test_active_with_another_app(juju: jubilant.Juju):
-    juju.deploy("another-app")
-    juju.integrate("your-app:endpoint", "another-app:endpoint")
+    juju.deploy('another-app')
+    juju.integrate('your-app:endpoint', 'another-app:endpoint')
 
     juju.wait(jubilant.all_active)
 ```

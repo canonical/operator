@@ -9,7 +9,10 @@ In your `src/charm.py` file, observe the custom events that the library provides
 
 ```python
 import ops
-from charms.charm_with_lib.v0.database_lib import DatabaseReadyEvent, DatabaseRequirer
+from charms.charm_with_lib.v0.database_lib import (
+    DatabaseReadyEvent,
+    DatabaseRequirer,
+)
 
 
 class MyCharm(ops.CharmBase):
@@ -35,7 +38,9 @@ def test_ready_event():
     secret = testing.Secret({'username': 'admin', 'password': 'admin'})
     state_in = testing.State(secrets={secret})
 
-    state_out = ctx.run(ctx.on.custom(DatabaseRequirer, credential_secret=secret), state_in)
+    state_out = ctx.run(
+        ctx.on.custom(DatabaseRequirer, credential_secret=secret), state_in
+    )
 
     assert ...
 ```
@@ -75,7 +80,9 @@ class DatabaseReadyEvent(ops.EventBase):
     def restore(self, snapshot: dict[str, Any]):
         super().restore(snapshot)
         credential_secret_id = snapshot['credential_secret_id']
-        self.credential_secret = self.framework.model.get_secret(id=credential_secret_id)
+        self.credential_secret = self.framework.model.get_secret(
+            id=credential_secret_id
+        )
 
 
 class DatabaseRequirerEvents(ops.ObjectEvents):
@@ -89,7 +96,9 @@ class DatabaseRequirer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
-        self.framework.observe(charm.on['database'].relation_changed, self._on_db_changed)
+        self.framework.observe(
+            charm.on['database'].relation_changed, self._on_db_changed
+        )
 
     def _on_db_changed(self, event: ops.RelationChangedEvent):
         if remote_data_is_valid(event.relation):
@@ -118,7 +127,7 @@ from lib.charms.my_Charm.v0.my_lib import DatabaseRequirer
 
 
 class MyTestCharm(ops.CharmBase):
-    META = {"name": "my-charm"}
+    META = {'name': 'my-charm'}
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -161,7 +170,7 @@ from ops import testing
 from lib.charms.my_charm.v0.my_lib import DatabaseRequirer
 
 
-@pytest.fixture(params=["foo", "bar"])
+@pytest.fixture(params=['foo', 'bar'])
 def endpoint(request):
     return request.param
 
@@ -169,7 +178,10 @@ def endpoint(request):
 @pytest.fixture
 def my_charm_type(endpoint: str):
     class MyTestCharm(ops.CharmBase):
-        META = {"name": "my-charm", "requires": {endpoint: {"interface": "my_interface"}}}
+        META = {
+            'name': 'my-charm',
+            'requires': {endpoint: {'interface': 'my_interface'}},
+        }
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
@@ -253,45 +265,52 @@ with the `tracing` example:
 class TransportProtocolType(enum.Enum):
     """Receiver Type."""
 
-    HTTP = "http"
-    GRPC = "grpc"
+    HTTP = 'http'
+    GRPC = 'grpc'
 
 
 class ProtocolType(pydantic.BaseModel):
     """Protocol Type."""
 
     name: str = pydantic.Field(
-        description="Receiver protocol name. What protocols are supported (and what they are called) "
-        "may differ per provider.",
-        examples=["otlp_grpc", "otlp_http", "tempo_http", "jaeger_thrift_compact"],
+        description='Receiver protocol name. What protocols are supported (and what they are called) '
+        'may differ per provider.',
+        examples=[
+            'otlp_grpc',
+            'otlp_http',
+            'tempo_http',
+            'jaeger_thrift_compact',
+        ],
     )
     type: TransportProtocolType = pydantic.Field(
-        description="The transport protocol used by this receiver.",
-        examples=["http", "grpc"],
+        description='The transport protocol used by this receiver.',
+        examples=['http', 'grpc'],
     )
 
 
 class Receiver(pydantic.BaseModel):
     """Specification of an active receiver."""
 
-    protocol: ProtocolType = pydantic.Field(description="Receiver protocol name and type.")
+    protocol: ProtocolType = pydantic.Field(
+        description='Receiver protocol name and type.'
+    )
     url: str = pydantic.Field(
         description="""URL at which the receiver is reachable. If there's an ingress, it would be the external URL.
         Otherwise, it would be the service's fqdn or internal IP.
         If the protocol type is grpc, the url will not contain a scheme.""",
         examples=[
-            "http://traefik_address:2331",
-            "https://traefik_address:2331",
-            "http://tempo_public_ip:2331",
-            "https://tempo_public_ip:2331",
-            "tempo_public_ip:2331",
+            'http://traefik_address:2331',
+            'https://traefik_address:2331',
+            'http://tempo_public_ip:2331',
+            'https://tempo_public_ip:2331',
+            'tempo_public_ip:2331',
         ],
     )
 
 
 class TracingProviderAppData(pydantic.BaseModel):
     receivers: list[Receiver] = pydantic.Field(
-        description="A list of enabled receivers in the form of the protocol they use and their resolvable server url.",
+        description='A list of enabled receivers in the form of the protocol they use and their resolvable server url.',
     )
 ```
 
@@ -305,15 +324,17 @@ relation:
 
 ```python
 receiver_protocol_to_transport_protocol: dict[str, TransportProtocolType] = {
-    "zipkin": TransportProtocolType.HTTP,
-    "otlp_grpc": TransportProtocolType.GRPC,
-    "otlp_http": TransportProtocolType.HTTP,
-    "jaeger_thrift_http": TransportProtocolType.HTTP,
-    "jaeger_grpc": TransportProtocolType.GRPC,
+    'zipkin': TransportProtocolType.HTTP,
+    'otlp_grpc': TransportProtocolType.GRPC,
+    'otlp_http': TransportProtocolType.HTTP,
+    'jaeger_thrift_http': TransportProtocolType.HTTP,
+    'jaeger_grpc': TransportProtocolType.GRPC,
 }
 
 
-def _publish_provider(self, relation: ops.Relation, receivers: Iterable[tuple[str, str]]):
+def _publish_provider(
+    self, relation: ops.Relation, receivers: Iterable[tuple[str, str]]
+):
     data = TracingProviderAppData(
         receivers=[
             Receiver(

@@ -159,13 +159,13 @@ def __init__(self, framework: ops.Framework):
     self.framework.observe(self.on.start, self._on_start)
 
     hostname = socket.getfqdn()
-    self.foo_requirer = FooRequirer(self, "foo-relation", address=hostname)
+    self.foo_requirer = FooRequirer(self, 'foo-relation', address=hostname)
     self.framework.observe(
         self.foo_requirer.on.data_available,
         self._on_data_available,
     )
 
-    self.bar_provider = BarProvider(self, "bar-relation")
+    self.bar_provider = BarProvider(self, 'bar-relation')
     self.framework.observe(
         self.bar_provider.on.create_bar,
         self._on_create_bar,

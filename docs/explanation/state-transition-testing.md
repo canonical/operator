@@ -135,7 +135,9 @@ class MyCharm(ops.CharmBase):
 def test_status_leader(leader):
     ctx = testing.Context(MyCharm, meta={'name': 'foo'})
     state_out = ctx.run(ctx.on.start(), testing.State(leader=leader))
-    assert state_out.unit_status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
+    assert state_out.unit_status == testing.ActiveStatus(
+        'I rule' if leader else 'I am ruled'
+    )
 ```
 
 By defining the right state we can programmatically define what answers will the
@@ -263,7 +265,11 @@ class MyCharmType(ops.CharmBase):
 
 
 td = tempfile.TemporaryDirectory()
-ctx = testing.Context(charm_type=MyCharmType, meta={'name': 'my-charm-name'}, charm_root=td.name)
+ctx = testing.Context(
+    charm_type=MyCharmType,
+    meta={'name': 'my-charm-name'},
+    charm_root=td.name,
+)
 state = ctx.run(ctx.on.start(), testing.State())
 ```
 
@@ -285,7 +291,9 @@ to manually specify all the metadata the extension adds:
 
 ctx = testing.Context(MyFlaskCharm)
 # The 'ingress' relation is provided by the flask-framework extension.
-state = ctx.run(ctx.on.start(), testing.State(relations={testing.Relation('ingress')}))
+state = ctx.run(
+    ctx.on.start(), testing.State(relations={testing.Relation('ingress')})
+)
 ```
 
 If your `charmcraft.yaml` defines keys that overlap with what the extension

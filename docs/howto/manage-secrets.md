@@ -18,13 +18,17 @@ Before secrets, the owner charm might have looked as below:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined, self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
         event.relation.data[self.app]['username'] = 'admin'
-        event.relation.data[self.app]['password'] = 'admin'  # don't do this at home
+        event.relation.data[self.app]['password'] = (
+            'admin'  # don't do this at home
+        )
 ```
 
 With secrets, this can be rewritten as:
@@ -33,7 +37,9 @@ With secrets, this can be rewritten as:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined, self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
@@ -128,7 +134,9 @@ class MyDatabaseCharm(ops.CharmBase):
             'password': 'admin',
         }
         secret = self.app.add_secret(
-            content, label='secret-for-webserver-app', expire=datetime.timedelta(days=42)
+            content,
+            label='secret-for-webserver-app',
+            expire=datetime.timedelta(days=42),
         )  # this can also be an absolute datetime
 
     def _on_secret_expired(self, event: ops.SecretExpiredEvent):
@@ -208,7 +216,8 @@ class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
         self.framework.observe(
-            self.on.database_relation_changed, self._on_database_relation_changed
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
         )
 
     ...  # other methods and event handlers
@@ -226,7 +235,8 @@ class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
         self.framework.observe(
-            self.on.database_relation_changed, self._on_database_relation_changed
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
         )
 
     ...  # other methods and event handlers
@@ -262,7 +272,9 @@ class MyWebserverCharm(ops.CharmBase):
     def _on_secret_changed(self, event: ops.SecretChangedEvent):
         if event.secret.label == 'database-secret':
             content = event.secret.get_content(refresh=True)
-            self._configure_db_credentials(content['username'], content['password'])
+            self._configure_db_credentials(
+                content['username'], content['password']
+            )
         elif event.secret.label == 'my-other-secret':
             self._handle_other_secret_changed(event.secret)
         else:

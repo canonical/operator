@@ -68,7 +68,7 @@ def test_pebble_ready_writes_config_file():
     """Test that on pebble-ready, a config file is written."""
     # Arrange: setting up the inputs
     ctx = testing.Context(MyCharm)
-    container = testing.Container(name="some-container", can_connect=True)
+    container = testing.Container(name='some-container', can_connect=True)
     state_in = testing.State(
         containers=[container],
         leader=True,
@@ -78,10 +78,10 @@ def test_pebble_ready_writes_config_file():
     state_out = ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
-    container_fs = state_out.get_container("some-container").get_filesystem(ctx)
-    cfg_file = container_fs / "etc" / "config.yaml"
+    container_fs = state_out.get_container('some-container').get_filesystem(ctx)
+    cfg_file = container_fs / 'etc' / 'config.yaml'
     config = yaml.safe_load(cfg_file.read_text())
-    assert config["message"] == "Hello, world!"
+    assert config['message'] == 'Hello, world!'
 ```
 
 ```{note}
@@ -157,7 +157,7 @@ from charm import MyCharm
 
 @pytest.fixture
 def my_charm():
-    with patch("charm.lightkube.Client"):
+    with patch('charm.lightkube.Client'):
         yield MyCharm
 ```
 
@@ -188,7 +188,7 @@ relation = state_out.get_relation(...)  # A relation we want to modify.
 
 # Copy and modify the relation data.
 new_local_app_data = relation.local_app_data.copy()
-new_local_app_data["foo"] = "bar"
+new_local_app_data['foo'] = 'bar'
 
 # Create a new State.
 new_relation = dataclasses.replace(relation, local_app_data=new_local_app_data)
