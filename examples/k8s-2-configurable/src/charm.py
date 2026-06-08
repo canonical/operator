@@ -64,7 +64,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         Learn more about interacting with Pebble at
             https:///latest/reference/pebble/
         Learn more about Pebble layers at
-            https://documentation.ubuntu.com/pebble/how-to/use-layers/
+            https://ubuntu.com/docs/pebble/how-to/use-layers/
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
