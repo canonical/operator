@@ -201,39 +201,25 @@ class TestHookcmdsCharm(ops.CharmBase):
 
     def _on_test_secret_crud(self, event: ops.ActionEvent):
         """Full secret lifecycle: add → ids → info_get → get → set → remove."""
-        # --- Create ---
         secret_id = hookcmds.secret_add(
             {'password': 'initial-secret', 'username': 'admin'},
             label='hookcmds-inttest',
             description='Created by ops.hookcmds integration test',
         )
-
-        # --- List ---
         ids = hookcmds.secret_ids()
-
-        # --- Metadata ---
         info = hookcmds.secret_info_get(id=secret_id)
-
-        # --- Read initial content (tracked revision) ---
         content = hookcmds.secret_get(id=secret_id)
 
-        # --- Update content → new revision ---
         hookcmds.secret_set(secret_id, content={'password': 'updated-secret', 'username': 'admin'})
-
-        # --- Peek at latest revision without updating tracking ---
+        # Peek at the latest revision without updating the tracked revision.
         latest = hookcmds.secret_get(id=secret_id, peek=True)
 
-        # --- Update metadata only ---
         hookcmds.secret_set(secret_id, description='Updated by hookcmds test')
         updated_info = hookcmds.secret_info_get(id=secret_id)
 
-        # --- Look up by label ---
         by_label = hookcmds.secret_get(label='hookcmds-inttest')
 
-        # --- Remove first revision only ---
         hookcmds.secret_remove(secret_id, revision=1)
-
-        # --- Remove all remaining revisions ---
         hookcmds.secret_remove(secret_id)
 
         event.set_results({
@@ -323,17 +309,10 @@ class TestHookcmdsCharm(ops.CharmBase):
     # Action commands (action_get / action_log / action_set)
 
     def _on_test_action_params(self, event: ops.ActionEvent):
-        """Use hookcmds action_get / action_log / action_set directly."""
-        # Read all params via hookcmds (bypasses event.params).
+        """Use hookcmds action_get / action_log / action_set directly, bypassing the event API."""
         all_params = hookcmds.action_get()
-
-        # Read a specific param.
         message = hookcmds.action_get('message')
-
-        # Log progress via hookcmds.
         hookcmds.action_log(f'Echoing message: {message}')
-
-        # Write results via hookcmds (bypasses event.set_results).
         hookcmds.action_set({
             'received': str(message),
             'param-count': str(len(all_params)),
