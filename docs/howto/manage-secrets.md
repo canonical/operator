@@ -418,7 +418,9 @@ class MyCharm(ops.CharmBase):
         if not secret_uri:
             return
         # Read the secret.
-        secret = self.model.get_secret(id=secret_uri, label='user-provided-secret')
+        secret = self.model.get_secret(
+            id=secret_uri, label='user-provided-secret'
+        )
         content = secret.get_content()
         # Do something with the secret content.
         self._configure_with_secret(content)
