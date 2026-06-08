@@ -89,27 +89,40 @@ class EventSpec:
 class TestCharmInit:
     @patch('sys.stderr', new_callable=io.StringIO)
     def test_breakpoint(self, fake_stderr: io.StringIO):
+        pdb_set_trace_calls: list[int] = []
+
         class MyCharm(ops.CharmBase):
-            pass
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                # breakpoint() must be exercised inside the charm: ops.main()
+                # installs framework.breakpoint as sys.breakpointhook for the
+                # duration of the event and restores the previous hook on
+                # teardown, so calling breakpoint() after _check() returns
+                # would not exercise the framework's hook at all.
+                with patch('pdb.Pdb.set_trace') as mock:
+                    breakpoint()
+                pdb_set_trace_calls.append(mock.call_count)
 
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': 'all'})
 
-        with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
-
-        assert mock.call_count == 1
+        assert pdb_set_trace_calls == [1]
         assert 'Starting pdb to debug charm operator' in fake_stderr.getvalue()
 
     def test_no_debug_breakpoint(self):
+        pdb_set_trace_calls: list[int] = []
+
         class MyCharm(ops.CharmBase):
-            pass
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                # See note in test_breakpoint about why this runs inside the
+                # charm.
+                with patch('pdb.Pdb.set_trace') as mock:
+                    breakpoint()
+                pdb_set_trace_calls.append(mock.call_count)
 
         self._check(MyCharm, extra_environ={'JUJU_DEBUG_AT': ''})
 
-        with patch('pdb.Pdb.set_trace') as mock:
-            breakpoint()
-
-        assert mock.call_count == 0
+        assert pdb_set_trace_calls == [0]
 
     def _check(
         self,
