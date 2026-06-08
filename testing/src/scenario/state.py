@@ -2140,10 +2140,12 @@ class _EventPath(str):
         owner_path: list[str]
         suffix: str
         prefix: str
+        original_prefix: str
         is_custom: bool
         type: _EventType
 
     def __new__(cls, string: str):
+        original_string = string
         string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
@@ -2152,6 +2154,10 @@ class _EventPath(str):
 
         instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
         instance.prefix = string.removesuffix(instance.suffix)
+        # The original (un-normalised) prefix, preserving the exact spelling
+        # of the entity name as declared in the charm metadata. _normalise_name
+        # only swaps dashes for underscores, so lengths match.
+        instance.original_prefix = original_string[: len(instance.prefix)]
         instance._is_custom = instance.suffix == ''
 
         return instance
@@ -2250,9 +2256,6 @@ class _Event:  # type: ignore
     _juju_name: str = dataclasses.field(init=False)
 
     def __post_init__(self):
-        # The original (un-normalised) name, so that we can recover the exact
-        # spelling of the entity the event refers to (see _juju_name below).
-        original_name = str(self.path).split('.')[-1]
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
@@ -2262,10 +2265,10 @@ class _Event:  # type: ignore
         # *or* underscores -- and only ever uses dashes in the event-type
         # suffix. For events that are not tied to such an entity, the whole
         # name uses dashes. See #2511.
-        object.__setattr__(self, '_juju_name', self._build_juju_name(original_name, path))
+        object.__setattr__(self, '_juju_name', self._build_juju_name(path))
 
     @staticmethod
-    def _build_juju_name(original_name: str, path: _EventPath) -> str:
+    def _build_juju_name(path: _EventPath) -> str:
         suffix = path.suffix
         if suffix and path.type in (
             _EventType.RELATION,
@@ -2273,12 +2276,8 @@ class _Event:  # type: ignore
             _EventType.WORKLOAD,
         ):
             # Preserve the entity name (the prefix) verbatim; only the suffix
-            # is normalised to dashes. ``original_name`` and the normalised
-            # ``path.name`` have the same length (``_normalise_name`` only
-            # swaps dashes for underscores), so the suffix can be stripped by
-            # length to recover the original prefix spelling.
-            prefix = original_name[: len(original_name) - len(suffix)]
-            return f'{prefix}{suffix.replace("_", "-")}'
+            # is normalised to dashes.
+            return f'{path.original_prefix}{suffix.replace("_", "-")}'
         return path.name.replace('_', '-')
 
     @property
