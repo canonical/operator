@@ -46,8 +46,9 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     juju.integrate('tempo:tempo-cluster', 'tempo-worker')
 
     juju.wait(
-        lambda status: jubilant.all_active(status, 'minio')
-        and jubilant.all_blocked(status, 's3-integrator')
+        lambda status: (
+            jubilant.all_active(status, 'minio') and jubilant.all_blocked(status, 's3-integrator')
+        )
     )
 
     address = juju.status().apps['minio'].address

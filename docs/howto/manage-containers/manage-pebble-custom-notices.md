@@ -25,17 +25,21 @@ class PostgresCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_custom_notice, self._on_pebble_custom_notice)
+        framework.observe(
+            self.on['db'].pebble_custom_notice, self._on_pebble_custom_notice
+        )
 
-    def _on_pebble_custom_notice(self, event: ops.PebbleCustomNoticeEvent) -> None:
-        if event.notice.key == "canonical.com/postgresql/backup-done":
-            path = event.notice.last_data["path"]
-            logger.info("Backup finished, copying %s to the cloud", path)
+    def _on_pebble_custom_notice(
+        self, event: ops.PebbleCustomNoticeEvent
+    ) -> None:
+        if event.notice.key == 'canonical.com/postgresql/backup-done':
+            path = event.notice.last_data['path']
+            logger.info('Backup finished, copying %s to the cloud', path)
             f = event.workload.pull(path, encoding=None)
-            s3_bucket.upload_fileobj(f, "db-backup.sql")
+            s3_bucket.upload_fileobj(f, 'db-backup.sql')
 
-        elif event.notice.key == "canonical.com/postgresql/other-thing":
-            logger.info("Handling other thing")
+        elif event.notice.key == 'canonical.com/postgresql/other-thing':
+            logger.info('Handling other thing')
 ```
 
 All notice events have a [`notice`](ops.PebbleNoticeEvent.notice) property with the details of the notice recorded. That is used in the example above to switch on the notice `key` and look at its `last_data` (to determine the backup's path).
@@ -55,6 +59,7 @@ charm tests could do the following:
 ```python
 from ops import testing
 
+
 @patch('charm.s3_bucket.upload_fileobj')
 def test_backup_done(upload_fileobj):
     # Arrange:
@@ -64,22 +69,28 @@ def test_backup_done(upload_fileobj):
         'canonical.com/postgresql/backup-done',
         last_data={'path': '/tmp/mydb.sql'},
     )
-    container = testing.Container('db', can_connect=True, notices=[
-        testing.Notice(key='example.com/a', occurrences=10),
-        testing.Notice(key='example.com/b'),
-        notice,
-    ])
+    container = testing.Container(
+        'db',
+        can_connect=True,
+        notices=[
+            testing.Notice(key='example.com/a', occurrences=10),
+            testing.Notice(key='example.com/b'),
+            notice,
+        ],
+    )
     root = container.get_filesystem()
-    (root / "tmp").mkdir()
-    (root / "tmp" / "mydb.sql").write_text("BACKUP")
+    (root / 'tmp').mkdir()
+    (root / 'tmp' / 'mydb.sql').write_text('BACKUP')
     state_in = testing.State(containers={container})
 
     # Act:
-    state_out = ctx.run(ctx.on.pebble_custom_notice(container, notice), state_in)
+    state_out = ctx.run(
+        ctx.on.pebble_custom_notice(container, notice), state_in
+    )
 
     # Assert:
     upload_fileobj.assert_called_once()
     upload_f, upload_key = upload_fileobj.call_args.args
-    self.assertEqual(upload_f.read(), b"BACKUP")
-    self.assertEqual(upload_key, "db-backup.sql")
+    self.assertEqual(upload_f.read(), b'BACKUP')
+    self.assertEqual(upload_key, 'db-backup.sql')
 ```

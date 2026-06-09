@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+import gc
 import grp
 import importlib
 import inspect
@@ -34,6 +35,7 @@ import time
 import typing
 import unittest
 import uuid
+import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -412,7 +414,8 @@ class TestHarness:
         harness.remove_relation(rel_id)
         # Check relation no longer exists
         assert backend.relation_ids('db') == []
-        pytest.raises(ops.RelationNotFoundError, backend.relation_list, rel_id)
+        with pytest.raises(ops.RelationNotFoundError):
+            backend.relation_list(rel_id)
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
         assert changes[0] == {
@@ -470,7 +473,8 @@ class TestHarness:
         harness.remove_relation(rel_id_2)
         # Check second relation no longer exists but first does
         assert backend.relation_ids('db') == [rel_id_1]
-        pytest.raises(ops.RelationNotFoundError, backend.relation_list, rel_id_2)
+        with pytest.raises(ops.RelationNotFoundError):
+            backend.relation_list(rel_id_2)
 
         # Check relation broken event is raised with correct data
         changes = harness.charm.get_changes()
@@ -603,9 +607,8 @@ class TestHarness:
         # Check relation and app data are removed
         assert backend.relation_ids('db') == []
         with harness._event_context('foo'):
-            pytest.raises(
-                ops.RelationNotFoundError, backend.relation_get, rel_id, remote_app, is_app=True
-            )
+            with pytest.raises(ops.RelationNotFoundError):
+                backend.relation_get(rel_id, remote_app, is_app=True)
 
     def test_removing_relation_refreshes_charm_model(self, request: pytest.FixtureRequest):
         # language=YAML
@@ -703,7 +706,8 @@ class TestHarness:
         # Check relation exists but unit and data are removed
         assert backend.relation_ids('db') == [rel_id]
         assert backend.relation_list(rel_id) == []
-        pytest.raises(KeyError, backend.relation_get, rel_id, 'postgresql/0', is_app=False)
+        with pytest.raises(KeyError):
+            backend.relation_get(rel_id, 'postgresql/0', is_app=False)
         # Check relation departed was raised with correct data
         assert harness.charm.get_changes()[0] == {
             'name': 'relation-departed',
@@ -1214,17 +1218,24 @@ class TestHarness:
         harness.update_config(key_values={'a': False})
 
     def test_bad_config_option_type(self):
-        with pytest.raises(RuntimeError):
-            ops.testing.Harness(
-                RecordingCharm,
-                config="""
-                options:
-                    a:
-                        description: a config option
-                        type: gibberish
-                        default: False
-                """,
-            )
+        # Harness.__init__ allocates a tempdir before config validation, so
+        # when validation raises the half-built backend becomes unreachable
+        # and its tempdir is finalised by GC. Force the collection inside an
+        # ignore filter to suppress the ResourceWarning under -Werror.
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', ResourceWarning)
+            with pytest.raises(RuntimeError):
+                ops.testing.Harness(
+                    RecordingCharm,
+                    config="""
+                    options:
+                        a:
+                            description: a config option
+                            type: gibberish
+                            default: False
+                    """,
+                )
+            gc.collect()
 
     def test_config_secret_option(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -1256,17 +1267,21 @@ class TestHarness:
             )
 
     def test_uncastable_config_option_type(self):
-        with pytest.raises(RuntimeError):
-            ops.testing.Harness(
-                RecordingCharm,
-                config="""
-                options:
-                    a:
-                        description: a config option
-                        type: boolean
-                        default: peek-a-bool!
-                """,
-            )
+        # See test_bad_config_option_type for why the GC + filter is needed.
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', ResourceWarning)
+            with pytest.raises(RuntimeError):
+                ops.testing.Harness(
+                    RecordingCharm,
+                    config="""
+                    options:
+                        a:
+                            description: a config option
+                            type: boolean
+                            default: peek-a-bool!
+                    """,
+                )
+            gc.collect()
 
     def test_update_config_unset_boolean(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
@@ -2139,7 +2154,7 @@ class TestHarness:
         request.addfinalizer(harness.cleanup)
         assert list(harness.framework.meta.actions) == ['test-action']
 
-    def test_event_context(self):
+    def test_event_context(self, request: pytest.FixtureRequest):
         class MyCharm(ops.CharmBase):
             def event_handler(self, evt: ops.RelationEvent):
                 rel = evt.relation
@@ -2155,6 +2170,7 @@ class TestHarness:
                     interface: pgsql
             """,
         )
+        request.addfinalizer(harness.cleanup)
         harness.begin()
         rel_id = harness.add_relation('db', 'postgresql')
         rel = harness.charm.model.get_relation('db', rel_id)
@@ -2166,7 +2182,7 @@ class TestHarness:
             with pytest.raises(ops.RelationDataError):
                 harness.charm.event_handler(event)
 
-    def test_event_context_inverse(self):
+    def test_event_context_inverse(self, request: pytest.FixtureRequest):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
@@ -2185,6 +2201,7 @@ class TestHarness:
                     interface: pgsql
             """,
         )
+        request.addfinalizer(harness.cleanup)
         harness.begin()
 
         def mock_join_db(event: ops.EventBase):
@@ -3180,7 +3197,7 @@ class TestHarness:
         harness_plan = harness.get_container_pebble_plan('foo')
         assert harness_plan.to_yaml() == plan.to_yaml()
 
-    def test_add_layer_with_log_targets_to_plan(self):
+    def test_add_layer_with_log_targets_to_plan(self, request: pytest.FixtureRequest):
         layer_yaml = """\
         services:
          foo:
@@ -3205,6 +3222,7 @@ class TestHarness:
                 'containers': {'consumer': {'type': 'oci-image'}},
             }),
         )
+        request.addfinalizer(harness.cleanup)
         harness.begin()
         harness.set_can_connect('consumer', True)
 
@@ -3259,7 +3277,7 @@ class TestHarness:
             },
         ]
 
-    def test_get_filesystem_root(self):
+    def test_get_filesystem_root(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,
             meta="""
@@ -3269,6 +3287,7 @@ class TestHarness:
                 resource: foo-image
         """,
         )
+        request.addfinalizer(harness.cleanup)
         foo_root = harness.get_filesystem_root('foo')
         assert foo_root.exists()
         assert foo_root.is_dir()
@@ -3276,7 +3295,7 @@ class TestHarness:
         container = harness.charm.unit.get_container('foo')
         assert foo_root == harness.get_filesystem_root(container)
 
-    def test_evaluate_status(self):
+    def test_evaluate_status(self, request: pytest.FixtureRequest):
         class TestCharm(ops.CharmBase):
             app_status_to_add: ops.StatusBase
             unit_status_to_add: ops.StatusBase
@@ -3295,6 +3314,7 @@ class TestHarness:
                 event.add_status(self.unit_status_to_add)
 
         harness = ops.testing.Harness(TestCharm)
+        request.addfinalizer(harness.cleanup)
         harness.set_leader(True)
         harness.begin()
         # Tests for the behaviour of status evaluation are in test_charm.py
@@ -3308,8 +3328,9 @@ class TestHarness:
         assert harness.model.app.status == ops.ActiveStatus('active app')
         assert harness.model.unit.status == ops.ActiveStatus('active unit')
 
-    def test_invalid_status_set(self):
+    def test_invalid_status_set(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(ops.CharmBase)
+        request.addfinalizer(harness.cleanup)
         harness.set_leader(True)
         harness.begin()
 
@@ -5650,7 +5671,8 @@ class TestFilesystem:
 
     def test_pull(self, container: ops.Container, container_fs_root: pathlib.Path):
         (container_fs_root / 'foo').write_text('foo')
-        assert container.pull('/foo').read() == 'foo'
+        with container.pull('/foo') as f:
+            assert f.read() == 'foo'
 
     def test_pull_path(self, container: ops.Container, container_fs_root: pathlib.Path):
         (container_fs_root / 'foo').mkdir()
@@ -5693,7 +5715,8 @@ class TestFilesystem:
         storage_id = harness.add_storage('test-storage', 1, attach=True)[0]
         assert (container_fs_root / 'mounts/foo').exists()
         (container_fs_root / 'mounts/foo/bar').write_text('foobar')
-        assert container.pull('/mounts/foo/bar').read() == 'foobar'
+        with container.pull('/mounts/foo/bar') as f:
+            assert f.read() == 'foobar'
         harness.detach_storage(storage_id)
         assert not (container_fs_root / 'mounts/foo/bar').is_file()
         harness.attach_storage(storage_id)
@@ -6717,13 +6740,14 @@ class TestActions:
         yield harness
         harness.cleanup()
 
-    def test_before_begin(self):
+    def test_before_begin(self, request: pytest.FixtureRequest):
         harness = ops.testing.Harness(
             ops.CharmBase,
             meta="""
             name: test
             """,
         )
+        request.addfinalizer(harness.cleanup)
         with pytest.raises(RuntimeError):
             harness.run_action('fail')
 

@@ -1456,13 +1456,13 @@ class Secret:
         subsequent calls do not require querying the secret storage again,
         unless ``refresh=True`` is used, or :meth:`set_content` is called.
 
-        Returns:
-            A copy of the secret's content dictionary.
-
         Args:
             refresh: If true, fetch the latest revision's content and tell
                 Juju to update to tracking that revision. The default is to
                 get the content of the currently-tracked revision.
+
+        Returns:
+            A copy of the secret's content dictionary.
 
         Raises:
             SecretNotFoundError: if the secret no longer exists.
@@ -3112,7 +3112,7 @@ class Container:
         # /src --> /dst/src
         file_path, source_path, dest_dir = Path(file_path), Path(source_path), Path(dest_dir)
         prefix = str(source_path.parent)
-        if prefix != '.' and os.path.commonprefix([prefix, str(file_path)]) != prefix:
+        if prefix != '.' and os.path.commonpath([prefix, str(file_path)]) != prefix:
             raise RuntimeError(f'file "{file_path}" does not have specified prefix "{prefix}"')
         path_suffix = os.path.relpath(str(file_path), prefix)
         return dest_dir / path_suffix
