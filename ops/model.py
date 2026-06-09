@@ -2564,7 +2564,7 @@ class Container:
 
         if pebble_client is None:
             socket_path = f'/charm/containers/{name}/pebble.socket'
-            pebble_client = backend.get_pebble(socket_path)
+            pebble_client = backend.get_pebble(socket_path, name=name)
         self._pebble: pebble.Client = pebble_client
 
     def can_connect(self) -> bool:
@@ -3931,9 +3931,9 @@ class _ModelBackend:
         with self._wrap_hookcmd(*cmd):
             hookcmds._utils.run(*cmd)
 
-    def get_pebble(self, socket_path: str) -> pebble.Client:
+    def get_pebble(self, socket_path: str, *, name: str | None = None) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
-        return pebble.Client(socket_path=socket_path)
+        return pebble.Client(socket_path=socket_path, name=name)
 
     def planned_units(self) -> int:
         """Count of "planned" units that will run this application.

@@ -175,7 +175,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if ports != self._state.opened_ports:
             self._state._update_opened_ports(frozenset(ports))
 
-    def get_pebble(self, socket_path: str) -> Client:
+    def get_pebble(self, socket_path: str, *, name: str | None = None) -> Client:
         container_name = socket_path.split('/')[
             3
         ]  # /charm/containers/<container_name>/pebble.socket

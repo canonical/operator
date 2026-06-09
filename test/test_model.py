@@ -2397,7 +2397,7 @@ containers:
 
 
 class MockPebbleBackend(_ModelBackend):
-    def get_pebble(self, socket_path: str):
+    def get_pebble(self, socket_path: str, *, name: str | None = None):
         return MockPebbleClient(socket_path)
 
 
