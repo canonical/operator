@@ -143,7 +143,8 @@ class BufferingSpanExporter(SpanExporter):
             ):
                 pass
         except urllib.error.HTTPError as e:
-            resp = e.fp.read()[:1000]
+            with e.fp:
+                resp = e.fp.read()[:1000]
             logger.exception(f'Tracing collector rejected our data, {e.code=} {resp=}')
         except OSError:
             # URLError, TimeoutError, SSLError, socket.error

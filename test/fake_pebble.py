@@ -108,10 +108,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         self.respond(d, 500)
 
-    def do_GET(self):  # noqa: N802 ("should be lowercase")
+    def do_GET(self):
         self.do_request('GET')
 
-    def do_POST(self):  # noqa: N802 ("should be lowercase")
+    def do_POST(self):
         self.do_request('POST')
 
     def do_request(self, request_method: typing.Literal['GET', 'POST']):

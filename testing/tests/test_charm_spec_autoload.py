@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import importlib
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -26,14 +26,16 @@ class MyCharm(CharmBase): pass
 
 
 @contextmanager
-def import_name(name: str, source: Path) -> Iterator[type[CharmBase]]:
+def import_name(name: str, source: Path) -> Generator[type[CharmBase]]:
     pkg_path = str(source.parent)
     sys.path.append(pkg_path)
     charm = importlib.import_module('mycharm')
     obj: type[CharmBase] = getattr(charm, name)
     sys.path.remove(pkg_path)
-    yield obj
-    del sys.modules['mycharm']
+    try:
+        yield obj
+    finally:
+        del sys.modules['mycharm']
 
 
 @contextmanager
@@ -45,7 +47,7 @@ def create_tempcharm(
     config: dict[str, Any] | None = None,
     name: str = 'MyCharm',
     legacy: bool = False,
-) -> Iterator[type[CharmBase]]:
+) -> Generator[type[CharmBase]]:
     src = root / 'src'
     src.mkdir(parents=True)
     charmpy = src / 'mycharm.py'

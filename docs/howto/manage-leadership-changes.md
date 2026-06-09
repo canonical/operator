@@ -37,8 +37,8 @@ leadership are needed to guard against non-leaders. For example:
 
 ```python
 if self.unit.is_leader():
-    secret = self.model.get_secret(label="my-label")
-    secret.set_content({"username": "user", "password": "pass"})
+    secret = self.model.get_secret(label='my-label')
+    secret.set_content({'username': 'user', 'password': 'pass'})
 ```
 
 Note that Juju guarantees leadership for only 30 seconds after a `leader-elected`
@@ -66,9 +66,11 @@ class MyCharm(ops.CharmBase):
 
 @pytest.mark.parametrize('leader', (True, False))
 def test_status_leader(leader):
-    ctx = testing.Context(MyCharm, meta={"name": "foo"})
+    ctx = testing.Context(MyCharm, meta={'name': 'foo'})
     out = ctx.run(ctx.on.start(), testing.State(leader=leader))
-    assert out.unit_status == testing.ActiveStatus('I rule' if leader else 'I am ruled')
+    assert out.unit_status == testing.ActiveStatus(
+        'I rule' if leader else 'I am ruled'
+    )
 ```
 
 ## Write integration tests
@@ -87,7 +89,7 @@ as expected. For example:
 ```python
 def get_leader_unit(juju: jubilant.Juju) -> str | None:
     """Utility method to get the name of the current leader."""
-    for unit_name, unit in juju.status().apps["your-app"].units.items():
+    for unit_name, unit in juju.status().apps['your-app'].units.items():
         if unit.leader:
             return unit_name
     # It's possible that no leader has been elected,

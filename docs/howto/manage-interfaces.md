@@ -66,17 +66,17 @@ import typing
 
 class ProviderUnitData(BaseModel):
     secret_id: str = Field(
-        description="Secret ID for the key you need in order to query this unit.",
-        title="Query key secret ID",
-        examples=["secret:12312323112313123213"],
+        description='Secret ID for the key you need in order to query this unit.',
+        title='Query key secret ID',
+        examples=['secret:12312323112313123213'],
     )
 
 
 class ProviderAppData(BaseModel):
     api_endpoint: AnyHttpUrl = Field(
         description="URL to the database's endpoint.",
-        title="Endpoint API address",
-        examples=["https://example.com/v1/query"],
+        title='Endpoint API address',
+        examples=['https://example.com/v1/query'],
     )
 
 
@@ -87,9 +87,9 @@ class ProviderSchema(DataBagSchema):
 
 class RequirerAppData(BaseModel):
     tables: Json[typing.List[str]] = Field(
-        description="Tables that the requirer application needs.",
-        title="Requested tables.",
-        examples=[["users", "passwords"]],
+        description='Tables that the requirer application needs.',
+        title='Requested tables.',
+        examples=[['users', 'passwords']],
     )
 
 
@@ -254,14 +254,14 @@ def test_nothing_happens_if_remote_empty():
             leader=True,
             relations={
                 Relation(
-                    endpoint="my-fancy-database",  # the name doesn't matter
-                    interface="my_fancy_database",
+                    endpoint='my-fancy-database',  # the name doesn't matter
+                    interface='my_fancy_database',
                 )
             },
         )
     )
     # WHEN the database charm receives a relation-joined event
-    state_out = t.run("my-fancy-database-relation-joined")
+    state_out = t.run('my-fancy-database-relation-joined')
     # THEN no data is published to the (local) databags
     t.assert_relation_data_empty()
 ```
@@ -281,21 +281,21 @@ from scenario import State, Relation
 
 def test_contract_happy_path():
     # GIVEN that the remote end has requested tables in the right format
-    tables_json = json.dumps(["users", "passwords"])
+    tables_json = json.dumps(['users', 'passwords'])
     t = Tester(
         State(
             leader=True,
             relations=[
                 Relation(
-                    endpoint="my-fancy-database",  # the name doesn't matter
-                    interface="my_fancy_database",
-                    remote_app_data={"tables": tables_json},
+                    endpoint='my-fancy-database',  # the name doesn't matter
+                    interface='my_fancy_database',
+                    remote_app_data={'tables': tables_json},
                 )
             ],
         )
     )
     # WHEN the database charm receives a relation-changed event
-    state_out = t.run("my-fancy-database-relation-changed")
+    state_out = t.run('my-fancy-database-relation-changed')
     # THEN the schema is satisfied (the database charm published all required fields)
     t.assert_schema_valid()
 ```

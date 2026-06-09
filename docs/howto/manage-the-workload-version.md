@@ -43,7 +43,7 @@ example:
 ```python
 def _on_start(self, event: ops.StartEvent):
     # The workload exposes the version via HTTP at /version
-    version = requests.get("http://localhost:8000/version").text
+    version = requests.get('http://localhost:8000/version').text
     self.unit.set_workload_version(version)
 ```
 
@@ -62,16 +62,17 @@ new test that verifies the workload version is set. For example:
 ```python
 from ops import testing
 
+
 def test_workload_version_is_set():
     ctx = testing.Context(MyCharm)
     # Suppose that the charm gets the workload version by running the command
     # `/bin/server --version` in the container. Firstly, we mock that out:
     container = testing.Container(
-        "webserver",
-        execs={testing.Exec(["/bin/server", "--version"], stdout="1.2\n")},
+        'webserver',
+        execs={testing.Exec(['/bin/server', '--version'], stdout='1.2\n')},
     )
     out = ctx.run(ctx.on.start(), testing.State(containers={container}))
-    assert out.workload_version == "1.2"
+    assert out.workload_version == '1.2'
 ```
 
 ### Write integration tests
@@ -100,12 +101,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
-    version = juju.status().apps["your-app"].version
+    version = juju.status().apps['your-app'].version
     # We'll need to update this version every time we upgrade to a new workload
     # version. If the workload has an API or some other way of getting the
     # version, the test should get it from there and use that to compare to the
     # unit setting.
-    assert version == "3.14"
+    assert version == '3.14'
 ```
 
 > See more: [](jubilant.Juju.status)
