@@ -165,13 +165,15 @@ def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirecto
     dir_mock = TemporaryDirectory()
     monkeypatch.setattr('tempfile.TemporaryDirectory', dir_mock)
 
-    def mock_open(path: str, *args: Any, **kwargs: Any) -> Any:
-        if path.startswith(f'{dir_mock.name}/'):
+    real_open = open
+
+    def mock_open(path: Any, *args: Any, **kwargs: Any) -> Any:
+        if str(path).startswith(f'{dir_mock.name}/'):
             file_mock = NamedTemporaryFile()
             file_mock.name = f'{dir_mock.name}/{file_mock.name}'
             dir_mock.files.append(file_mock)
             return file_mock
-        return open(path, *args, **kwargs)  # type: ignore
+        return real_open(path, *args, **kwargs)  # type: ignore
 
     monkeypatch.setattr('builtins.open', mock_open)
 

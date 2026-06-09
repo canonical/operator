@@ -51,13 +51,15 @@ class StoragePermutations(abc.ABC):
     ) -> ops.Framework:
         """Create a Framework that we can use to test the backend storage."""
         storage = self.create_storage(request, fake_script)
-        return ops.Framework(
+        framework = ops.Framework(
             storage,
             None,  # type: ignore
             None,  # type: ignore
             None,  # type: ignore
             juju_debug_at=set(),
         )
+        request.addfinalizer(framework.close)
+        return framework
 
     @abc.abstractmethod
     def create_storage(
@@ -266,7 +268,9 @@ class StoragePermutations(abc.ABC):
 
 class TestSQLiteStorage(StoragePermutations):
     def create_storage(self, request: pytest.FixtureRequest, fake_script: FakeScript):
-        return ops.storage.SQLiteStorage(':memory:')
+        storage = ops.storage.SQLiteStorage(':memory:')
+        request.addfinalizer(storage.close)
+        return storage
 
     def test_permissions_new(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -293,7 +297,8 @@ class TestSQLiteStorage(StoragePermutations):
             # Create an existing file, but the mock will simulate a race condition saying that it
             # does not exist.
             open(filename, 'w').close()
-            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            with pytest.raises(RuntimeError):
+                ops.storage.SQLiteStorage(filename)
 
     @unittest.mock.patch('os.chmod')
     def test_permissions_failure(self, chmod: unittest.mock.MagicMock):
@@ -301,7 +306,8 @@ class TestSQLiteStorage(StoragePermutations):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, '.unit-state.db')
             open(filename, 'w').close()
-            pytest.raises(RuntimeError, ops.storage.SQLiteStorage, filename)
+            with pytest.raises(RuntimeError):
+                ops.storage.SQLiteStorage(filename)
 
 
 def setup_juju_backend(fake_script: FakeScript, state_file: pathlib.Path):
