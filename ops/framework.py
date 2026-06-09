@@ -939,6 +939,7 @@ class Framework(Object):
             >>> with harness._event_context(''):
             ...     # Harness thinks it is not running an event hook.
             ...     pass
+            >>> harness.cleanup()
         """
         backend: _ModelBackend | None = self.model._backend if self.model else None
         if not backend:

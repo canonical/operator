@@ -2237,15 +2237,16 @@ class Client:
         try:
             response = self.opener.open(request, timeout=self.timeout)
         except urllib.error.HTTPError as e:
-            code = e.code
-            status = e.reason
-            try:
-                body: dict[str, Any] = json.loads(e.read())
-                message: str = body['result']['message']
-            except (OSError, ValueError, KeyError) as e2:
-                # Will only happen on read error or if Pebble sends invalid JSON.
-                body: dict[str, Any] = {}
-                message = f'{type(e2).__name__} - {e2}'
+            with e:  # close the underlying tempfile so it doesn't leak
+                code = e.code
+                status = e.reason
+                try:
+                    body: dict[str, Any] = json.loads(e.read())
+                    message: str = body['result']['message']
+                except (OSError, ValueError, KeyError) as e2:
+                    # Will only happen on read error or if Pebble sends invalid JSON.
+                    body: dict[str, Any] = {}
+                    message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
             if e.args and isinstance(e.args[0], FileNotFoundError):

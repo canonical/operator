@@ -110,10 +110,17 @@ class TestFramework:
                 None,  # type: ignore
                 juju_debug_at=set(),
             )
-        assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
-            f'{record.levelname}:{record.name}:{record.message}' for record in caplog.records
-        ]
-        assert isinstance(framework._storage, SQLiteStorage)
+        try:
+            assert (
+                'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path'
+                in [
+                    f'{record.levelname}:{record.name}:{record.message}'
+                    for record in caplog.records
+                ]
+            )
+            assert isinstance(framework._storage, SQLiteStorage)
+        finally:
+            framework.close()
 
     def test_handle_path(self):
         cases = [

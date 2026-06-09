@@ -315,8 +315,15 @@ class _Manager:
         self.dispatcher.run_any_legacy_hook()
 
         self.framework = self._make_framework(self.dispatcher)
-        with self.framework._event_context('__init__'):
-            self.charm = self._charm_class(self.framework)
+        try:
+            with self.framework._event_context('__init__'):
+                self.charm = self._charm_class(self.framework)
+        except BaseException:
+            # If charm construction fails, close the framework so that the
+            # underlying storage (SQLite) is released; main() only reaches
+            # the run()/destroy() path when __init__ completes successfully.
+            self.framework.close()
+            raise
 
     def _load_charm_meta(self):
         return _charm.CharmMeta.from_charm_root(self._charm_root)

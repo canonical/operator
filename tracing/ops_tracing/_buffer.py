@@ -150,7 +150,13 @@ class Buffer:
     @contextlib.contextmanager
     def tx(self, *, timeout: float = DB_TIMEOUT, readonly: bool = False):
         """Thread-safe transaction context manager."""
-        with sqlite3.connect(self.path, isolation_level=None, timeout=timeout) as conn:
+        # sqlite3.Connection as a context manager only commits/rolls back —
+        # it does not close. Use contextlib.closing so the connection is
+        # released; with isolation_level=None we manage BEGIN/COMMIT/ROLLBACK
+        # explicitly below.
+        with contextlib.closing(
+            sqlite3.connect(self.path, isolation_level=None, timeout=timeout)
+        ) as conn:
             mode = 'DEFERRED' if readonly else 'IMMEDIATE'
             conn.execute(f'BEGIN {mode}')
             try:
