@@ -34,22 +34,6 @@ If you're migrating from the ``charm-tracing`` charm lib, you most likely alread
 have relations like these. If the names of the relations differ from this recipe, please
 adjust the code on the rest of this page to your relation names.
 
-.. hint::
-    Make sure to include the Rust build packages in your ``charmcraft.yaml``, because
-    this library depends on ``pydantic-core`` via ``pydantic``.
-
-    .. code-block:: yaml
-
-        parts:
-            charm:
-                plugin: charm
-                source: .
-                build-packages:
-                    - cargo
-
-    If you're migrating from the ``charm-tracing`` charm lib, this configuration is
-    likely already in place.
-
 In your charm, add and initialise the ``Tracing`` object.::
 
     import ops
