@@ -336,6 +336,8 @@ From the previous, we know that our workload server is deployed at `0.0.0.0:8000
 
 In our charm, the workload is available after we tell Pebble to reevaluate its plan, which contain the command to run the server. We can expose the workload version to Juju after that step.
 
+Then, in `src/charm.py`, add `import fastapi_demo` in the imports at the top of the file.
+
 Modify the `_on_demo_server_pebble_ready` function:
 
 ```python
