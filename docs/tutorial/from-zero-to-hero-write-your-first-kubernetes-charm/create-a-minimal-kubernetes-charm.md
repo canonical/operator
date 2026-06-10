@@ -376,7 +376,7 @@ Monitor your deployment:
 juju status --watch 1s
 ```
 
-When all units are settled down, you can see the workload version in the `Version` colunm:
+When all units are settled down, you can see the workload version in the `Version` column:
 
 ```text
 ...
