@@ -307,7 +307,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
-    'pebble': ('https://documentation.ubuntu.com/pebble', None),
+    'pebble': ('https://ubuntu.com/docs/pebble', None),
     'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
 }
 

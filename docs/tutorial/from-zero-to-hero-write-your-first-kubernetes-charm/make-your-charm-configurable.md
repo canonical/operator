@@ -89,7 +89,7 @@ def _update_layer_and_restart(self) -> None:
     Learn more about interacting with Pebble at
         https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
-        https://documentation.ubuntu.com/pebble/how-to/use-layers/
+        https://ubuntu.com/docs/pebble/how-to/use-layers/
     """
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
