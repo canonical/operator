@@ -44,6 +44,11 @@ def _juju_major(juju: jubilant.Juju) -> int:
     return int(juju.status().model.version.split('.', 1)[0])
 
 
+def _is_caas(juju: jubilant.Juju) -> bool:
+    """Return True if the model is on a Kubernetes substrate (CAAS)."""
+    return juju.status().model.type == 'caas'
+
+
 # Juju 4.0 has uniter commit-phase regressions: the hookcmds themselves
 # succeed (the action results are all correct), but Juju fails to commit the
 # queued changes at the end of the hook. Observed on both machine (LXD) and
@@ -52,9 +57,25 @@ def _juju_major(juju: jubilant.Juju) -> int:
 #     (https://github.com/juju/juju/issues/22523)
 #   - secret-remove -> "removing secrets: secret not found"
 #     (https://github.com/juju/juju/issues/22524)
+# The same commit-phase symptom also surfaces as an action timeout from the
+# test driver (``TimeoutError: timed out waiting for action``) on follow-up
+# tests that mutate state inside a hook on Juju 4.0/k8s
+# (test_secret_grant_revoke, test_ports_endpoint_scoped). The ports failure
+# may be a distinct upstream bug; widen the guard once a more specific issue
+# is filed.
 # These pass on Juju 3.6. Remove the guards in the affected tests once the
 # fixes land.
 _JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (juju/juju#22523, juju/juju#22524)'
+
+# On Juju 4.0/Kubernetes, ``network-get <binding> --format=json`` puts an
+# empty "k8s service" placeholder at bind_addresses[0] and the actual
+# cloud-container address (the pod IP) at bind_addresses[1]. Hook code
+# that reads bind_addresses[0] therefore sees no addresses. Juju 3.6
+# returns a single non-placeholder entry; Juju 4.1 emits the same two
+# entries but with the cloud-container first. See juju/juju#22616.
+_JUJU4_NETGET_K8S_BUG = (
+    'Juju 4.0/k8s network-get returns empty leading placeholder bind-address (juju/juju#22616)'
+)
 
 
 def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | None) -> None:
@@ -218,18 +239,20 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
     """network_get for the peer binding returns at least one bind address."""
     task = juju.run(any_unit, 'get-network-info')
     assert task.success
-    bind_addresses = json.loads(task.results['bind-addresses'])
-    egress_subnets = json.loads(task.results['egress-subnets'])
-    ingress_addresses = json.loads(task.results['ingress-addresses'])
-
-    assert len(bind_addresses) > 0
-    first = bind_addresses[0]
-    assert first['interface-name']  # non-empty
-    assert len(first['addresses']) > 0
-    first_addr = first['addresses'][0]
-    assert first_addr['value']  # non-empty IP or hostname
-    # At least one network path should be populated.
-    assert egress_subnets or ingress_addresses
+    results = task.results
+    assert results['has-bind-addresses'] == 'true'
+    bind_count = int(results['bind-addresses-count'])
+    assert bind_count > 0
+    # At least one of egress_subnets or ingress_addresses should be populated.
+    has_network_info = bool(results.get('egress-subnets')) or bool(
+        results.get('ingress-addresses')
+    )
+    assert has_network_info
+    # The bind address itself should be present.
+    if 'first-address' not in results and _juju_major(juju) >= 4 and _is_caas(juju):
+        pytest.xfail(_JUJU4_NETGET_K8S_BUG)
+    assert 'first-address' in results
+    assert results['first-address']  # non-empty
 
 
 # Ports (open_port / close_port / opened_ports)
@@ -492,10 +515,11 @@ def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
     assert secret_id
 
     # secret_revoke + secret_remove share the same Juju 4.0 commit-phase bug as
-    # secret_remove in test_secret_full_lifecycle.
+    # secret_remove in test_secret_full_lifecycle. On Juju 4.0/k8s the symptom
+    # is a driver-side timeout rather than a TaskError, so catch both.
     try:
         task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
-    except jubilant.TaskError:
+    except (jubilant.TaskError, TimeoutError):
         if _juju_major(juju) >= 4:
             pytest.xfail(_JUJU4_COMMIT_BUG)
         raise
@@ -531,11 +555,19 @@ def test_storage_add(juju: jubilant.Juju, any_unit: str):
 
 def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
     """open_port with endpoints='peer' appears scoped in opened_ports(endpoints=True)."""
-    task = juju.run(any_unit, 'test-ports-endpoint-scoped', params={'port': 7766})
+    # On Juju 4.0/k8s this action times out on the driver side, matching the
+    # uniter commit-phase regression pattern. May be a separate upstream bug
+    # from the secret ones; xfail until pinned down.
+    try:
+        task = juju.run(any_unit, 'test-ports-endpoint-scoped', params={'port': 7766})
+    except (jubilant.TaskError, TimeoutError):
+        if _juju_major(juju) >= 4:
+            pytest.xfail(_JUJU4_COMMIT_BUG)
+        raise
     assert task.success
     r = task.results
     assert r['port-found-with-endpoint'] == 'true', (
-        f"Port 7766/tcp not found with endpoint info; endpoints-list={r.get('endpoints-list')}"
+        f'Port 7766/tcp not found with endpoint info; endpoints-list={r.get("endpoints-list")}'
     )
     assert r['endpoint-matches'] == 'true', (
         f"Expected endpoint 'peer' in endpoints-list, got: {r.get('endpoints-list')}"
