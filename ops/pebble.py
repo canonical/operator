@@ -431,6 +431,10 @@ def _force_close_websocket(ws: _WebSocket):
     closing a socket doesn't wake up other threads that are blocked in
     ``recv()`` on the same socket; an OS-level shutdown of the connection
     does.
+
+    This reaches into websocket-client's ``WebSocket.sock`` (the underlying
+    ``socket.socket``) because the library exposes no public way to shut the
+    connection down without first closing the fd.
     """
     sock = ws.sock
     if sock is not None:
@@ -1828,15 +1832,19 @@ class ExecProcess(Generic[AnyStr]):
         # If stdin reader thread is running, stop it
         if self._cancel_stdin is not None:
             self._cancel_stdin()
+            self._cancel_stdin = None
 
         # Wait for all threads to finish (e.g., message barrier sent)
         for thread in self._threads:
             thread.join()
 
         # If we opened a cancel_reader pipe, close the read side now (write
-        # side was already closed by _cancel_stdin().
+        # side was already closed by _cancel_stdin()). Clear it afterwards so
+        # that a second call to _wait() (e.g. wait() then wait_output()) can't
+        # close the same fd again, matching _teardown_after_error().
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
+            self._cancel_reader = None
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
         self._control_ws.shutdown()

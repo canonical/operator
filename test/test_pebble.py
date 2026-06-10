@@ -4177,6 +4177,30 @@ class TestExec:
         assert process._threads
         assert all(thread.daemon for thread in process._threads)
 
+    def test_wait_twice_does_not_double_close_cancel_pipe(self, client: MockClient):
+        """A successful _wait() must clear the cancel pipe so a second call is safe.
+
+        wait() and wait_output() both call _wait(); calling them in turn (or
+        wait() twice) used to os.close() the already-closed cancel_reader fd
+        and re-run _cancel_stdin(), raising OSError on the second call.
+        """
+        self.add_responses(client, '123', 0)
+        # A second wait_change response for the second _wait() call.
+        change = build_mock_change_dict('123')
+        assert 'tasks' in change and change['tasks'] is not None
+        change['tasks'][0]['data'] = {'exit-code': 0}
+        client.responses.append({'result': change})
+
+        with tempfile.TemporaryFile() as stdin:
+            stdin.write(b'foo\n')
+            stdin.seek(0)
+            process = client.exec(['foo'], stdin=stdin, encoding=None)
+            process.wait()
+            assert process._cancel_stdin is None
+            assert process._cancel_reader is None
+            # Must not raise (e.g. OSError from closing the fd a second time).
+            process._wait()
+
     def test_connect_websocket_error_closes_connected_websockets(self):
         """If a websocket fails to connect, the connected ones must be closed."""
 
