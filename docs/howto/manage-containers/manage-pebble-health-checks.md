@@ -53,24 +53,29 @@ class PostgresCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_check_failed, self._on_pebble_check_failed)
-        framework.observe(self.on["db"].pebble_check_recovered, self._on_pebble_check_recovered)
+        framework.observe(
+            self.on['db'].pebble_check_failed, self._on_pebble_check_failed
+        )
+        framework.observe(
+            self.on['db'].pebble_check_recovered,
+            self._on_pebble_check_recovered,
+        )
 
     def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
-        if event.info.name == "http-test":
-            logger.warning("The http-test has started failing!")
-            self.unit.status = ops.ActiveStatus("Degraded functionality ...")
+        if event.info.name == 'http-test':
+            logger.warning('The http-test has started failing!')
+            self.unit.status = ops.ActiveStatus('Degraded functionality ...')
 
-        elif event.info == "online":
-            logger.error("The service is no longer online!")
+        elif event.info == 'online':
+            logger.error('The service is no longer online!')
 
     def _on_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
-        if event.info.name == "http-test":
-            logger.warning("The http-test has stopped failing!")
+        if event.info.name == 'http-test':
+            logger.warning('The http-test has stopped failing!')
             self.unit.status = ops.ActiveStatus()
 
-        elif event.info == "online":
-            logger.error("The service is online again!")
+        elif event.info == 'online':
+            logger.error('The service is online again!')
 ```
 
 All check events have an `info` property with the details of the check's current status. Note that, by the time that the charm receives the event, the status of the check may have changed (for example, passed again after failing). If the response to the check failing is light (such as changing the status), then it's fine to rely on the status of the check at the time the event was triggered — there will be a subsequent check-recovered event, and the status will quickly flick back to the correct one. If the response is heavier (such as restarting a service with an adjusted configuration), then the two events should share a common handler and check the current status via the `info` property; for example:
@@ -80,11 +85,16 @@ class PostgresCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         # Note that "db" is the workload container's name
-        framework.observe(self.on["db"].pebble_check_failed, self._on_pebble_check_failed)
-        framework.observe(self.on["db"].pebble_check_recovered, self._on_pebble_check_recovered)
+        framework.observe(
+            self.on['db'].pebble_check_failed, self._on_pebble_check_failed
+        )
+        framework.observe(
+            self.on['db'].pebble_check_recovered,
+            self._on_pebble_check_recovered,
+        )
 
     def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
-        if event.info.name != "up":
+        if event.info.name != 'up':
             # For now, we ignore the other tests.
             return
         if event.info.status == ops.pebble.CheckStatus.DOWN:

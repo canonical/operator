@@ -1,14 +1,25 @@
+---
+myst:
+  html_meta:
+    description: Manage Juju secrets in a charm as the secret owner, as an observer of charm secrets, and as an observer of user secrets shared via configuration.
+---
+
 (manage-secrets)=
 # How to manage secrets
-> See first: {external+juju:ref}`Juju | Secret <secret>`, {external+juju:ref}`Juju | Manage secrets <manage-secrets>`, {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
+See first:
+- {external+juju:ref}`Juju | Secret <secret>`
+- {external+juju:ref}`Juju | Manage secrets <manage-secrets>`
+- {external+charmcraft:ref}`Charmcraft | Manage secrets <manage-secrets>`
 
-> Added in `Juju 3.0.2`
+```{note}
+Added in Juju 3.0.2.
+```
 
 This document shows how to use secrets in a charm -- both when the charm is the secret owner as well as when it is merely an observer.
 
 ## Secret owner charm
 
-> By its nature, the content in this section only applies to *charm* secrets.
+This section only applies when the charm is the secret owner.
 
 ### Add and grant access to a secret
 
@@ -18,14 +29,17 @@ Before secrets, the owner charm might have looked as below:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined,
-                               self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
         event.relation.data[self.app]['username'] = 'admin'
-        event.relation.data[self.app]['password'] = 'admin'  # don't do this at home
+        event.relation.data[self.app]['password'] = (
+            'admin'  # don't do this at home
+        )
 ```
 
 With secrets, this can be rewritten as:
@@ -34,8 +48,9 @@ With secrets, this can be rewritten as:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined,
-                               self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
@@ -56,7 +71,7 @@ Note that:
 
 If the relation is a cross-model relation, Juju only allows the offering application to grant access to secrets.
 
-> See more: [](ops.Application.add_secret)
+See more: [](ops.Application.add_secret)
 
 ### Create a new secret revision
 
@@ -64,13 +79,12 @@ To create a new secret revision, the owner charm must call `secret.set_content()
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
-    ... # as before
+    ...  # as before
 
     def _rotate_webserver_secret(self, secret):
         content = secret.get_content()
         secret.set_content({
-            'username': content['username'],              # keep the same username
+            'username': content['username'],  # keep the same username
             'password': _generate_new_secure_password(),  # something stronger than 'admin'
         })
 ```
@@ -78,7 +92,7 @@ class MyDatabaseCharm(ops.CharmBase):
 This will inform Juju that a new revision is available, and Juju will inform all observers tracking older revisions that a new one is available, by means of a `secret-changed` hook.
 
 ```{caution}
-If your charm creates new revisions, it **must** also add a handler for the `secret-remove` event, and call `remove_revision` in it. If not, old revisions will continually build up in the secret backend. See more: {ref}`howto-remove-a-secret`
+If your charm creates new revisions, it **must** also add a handler for the `secret-remove` event, and call `remove_revision` in it. If not, old revisions will continually build up in the secret backend. See {ref}`howto-remove-a-secret`
 ```
 
 ### Change the rotation policy or the expiration date of a secret
@@ -96,8 +110,7 @@ Here is what the code would look like:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_rotate,
-                               self._on_secret_rotate)
+        self.framework.observe(self.on.secret_rotate, self._on_secret_rotate)
 
     ...  # as before
 
@@ -106,9 +119,9 @@ class MyDatabaseCharm(ops.CharmBase):
             'username': 'admin',
             'password': 'admin',
         }
-        secret = self.app.add_secret(content,
-            label='secret-for-webserver-app',
-            rotate=SecretRotate.DAILY)
+        secret = self.app.add_secret(
+            content, label='secret-for-webserver-app', rotate=SecretRotate.DAILY
+        )
 
     def _on_secret_rotate(self, event: ops.SecretRotateEvent):
         # this will be called once per day.
@@ -122,8 +135,7 @@ Or, for secret expiration:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_expired,
-                               self._on_secret_expired)
+        self.framework.observe(self.on.secret_expired, self._on_secret_expired)
 
     ...  # as before
 
@@ -132,9 +144,11 @@ class MyDatabaseCharm(ops.CharmBase):
             'username': 'admin',
             'password': 'admin',
         }
-        secret = self.app.add_secret(content,
+        secret = self.app.add_secret(
+            content,
             label='secret-for-webserver-app',
-            expire=datetime.timedelta(days=42))  # this can also be an absolute datetime
+            expire=datetime.timedelta(days=42),
+        )  # this can also be an absolute datetime
 
     def _on_secret_expired(self, event: ops.SecretExpiredEvent):
         # this will be called only once, 42 days after the relation-joined event.
@@ -169,13 +183,11 @@ A typical implementation of the `secret-remove` event would look like:
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_remove,
-                               self._on_secret_remove)
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
     def _on_secret_remove(self, event: ops.SecretRemoveEvent):
         # All observers are done with this revision, remove it:
@@ -190,7 +202,6 @@ An example of usage might look like:
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     # called from an event handler
@@ -203,9 +214,9 @@ Just like when the owner granted the secret, we need to pass a relation to the `
 
 ## Secret observer charm
 
-> This applies to both charm and user secrets, though for user secrets the story starts with the charm defining a configuration option of type `secret`, and the secret is not acquired through relation data but rather by the configuration option being set to the secret's URI.
->
-> A secret owner charm is also an observer of the secret, so this applies to it too.
+This section covers the **charm-secret observer** path, where the secret ID is shared in relation data. A secret owner charm is also an observer of the secret, so this section applies to secret owner charms too.
+
+For **user secrets**, which are created by a Juju user and shared through configuration options of type `secret`, see [](#manage-secrets-user-secret-observer).
 
 ### Start tracking the latest secret revision
 
@@ -215,8 +226,10 @@ Before secrets, the code in the secret observer charm may have looked something 
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_changed,
-                               self._on_database_relation_changed)
+        self.framework.observe(
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
+        )
 
     ...  # other methods and event handlers
 
@@ -232,8 +245,10 @@ With secrets, the code would become:
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_changed,
-                               self._on_database_relation_changed)
+        self.framework.observe(
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
+        )
 
     ...  # other methods and event handlers
 
@@ -248,7 +263,7 @@ Note that:
 - The observer charm gets a secret via the model (not its app/unit). Because it's the owner who decides who the secret is granted to, the ownership of a secret is not an observer concern. The observer code can rightfully assume that, so long as a secret ID is  shared with it, the owner has taken care to grant and scope the secret in such a way that the observer has the rights to inspect its contents.
 - The charm first gets the secret object from the model, then gets the secret's content (a dict) and accesses individual attributes via the dict's items.
 
-> See more: [](ops.Secret.get_content)
+See more: [](ops.Secret.get_content)
 
 ### Label the secrets you're observing
 
@@ -257,7 +272,6 @@ The answer lies with **secret labels**: you can assign a charm-local label to a 
 
 ```python
 class MyWebserverCharm(ops.CharmBase):
-
     ...  # as before
 
     def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
@@ -269,7 +283,9 @@ class MyWebserverCharm(ops.CharmBase):
     def _on_secret_changed(self, event: ops.SecretChangedEvent):
         if event.secret.label == 'database-secret':
             content = event.secret.get_content(refresh=True)
-            self._configure_db_credentials(content['username'], content['password'])
+            self._configure_db_credentials(
+                content['username'], content['password']
+            )
         elif event.secret.label == 'my-other-secret':
             self._handle_other_secret_changed(event.secret)
         else:
@@ -286,7 +302,6 @@ The owner of the secret can do the same. When a secret is added, you can specify
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
@@ -309,7 +324,7 @@ So, having labelled the secret on creation, the database charm could add a new r
         secret.set_content(...)  # pass a new revision payload, as before
 ```
 
-> See more: [](ops.Model.get_secret)
+See more: [](ops.Model.get_secret)
 
 #### When to use labels
 
@@ -326,16 +341,16 @@ Note that [`Secret.id`](ops.Secret.id), despite the name, is not really a unique
 Sometimes, before reconfiguring to use a new credential revision, the observer charm may want to peek at its contents (for example, to ensure that they are valid). Use `peek_content` for that:
 
 ```python
-    def _on_secret_changed(self, event: ops.SecretChangedEvent):
-        content = event.secret.peek_content()
-        if not self._valid_password(content.get('password')):
-           logger.warning('Invalid credentials! Not updating to new revision.')
-           return
-        content = event.secret.get_content(refresh=True)
-        ...
+def _on_secret_changed(self, event: ops.SecretChangedEvent):
+    content = event.secret.peek_content()
+    if not self._valid_password(content.get('password')):
+        logger.warning('Invalid credentials! Not updating to new revision.')
+        return
+    content = event.secret.get_content(refresh=True)
+    ...
 ```
 
-> See more: [](ops.Secret.peek_content)
+See more: [](ops.Secret.peek_content)
 
 ### Start tracking a different secret revision
 
@@ -345,8 +360,7 @@ To update to a new revision, the web server charm will typically subscribe to th
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_changed,
-                               self._on_secret_changed)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
 
     ...  # as before
 
@@ -355,8 +369,73 @@ class MyWebserverCharm(ops.CharmBase):
         self._configure_db_credentials(content['username'], content['password'])
 ```
 
-> See more: [](ops.Secret.get_content)
+See more: [](ops.Secret.get_content)
 
+
+(manage-secrets-user-secret-observer)=
+## User-secret observer charm
+
+See also: {ref}`manage-configuration`
+
+A **user secret** is a secret created by a Juju user (with `juju add-secret`) and shared with a charm through a configuration option of type `secret`. Unlike a charm secret, which a charm creates and owns, the user-secret lifecycle is controlled entirely by the user.
+
+### Prerequisites
+
+The charm must declare a configuration option of `type: secret` in its `charmcraft.yaml`:
+
+```yaml
+config:
+  options:
+    my-secret-option:
+      type: secret
+      description: URI of the user-provided secret.
+```
+
+See more: {external+charmcraft:ref}`Charmcraft | config <charmcraft-yaml-key-config>`
+
+Once that's in place, the Juju user must:
+
+1. Create the secret: `juju add-secret my-secret key=value`
+2. Grant it to the application: `juju grant-secret my-secret <app-name>`
+3. Set the configuration option to the secret URI that `secret-add` returned: `juju config <app-name> <secret-option>=<secret-uri>`
+
+```{important}
+`juju grant-secret` does **not** trigger an event to notify the charm. The charm only learns about the secret when the user sets the configuration option (which triggers `config-changed`) or when the user updates the secret content (which triggers `secret-changed`). Make sure you grant access **before** changing the configuration, or the charm will fail to access it on config-changed, and will not know to retry.
+```
+
+### Read a user secret
+
+
+```python
+class MyCharm(ops.CharmBase):
+    def __init__(self, *args, **kwargs):
+        ...  # other setup
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        secret_uri = self.config.get('my-secret-option')
+        if not secret_uri:
+            return
+        # Read the secret.
+        secret = self.model.get_secret(
+            id=secret_uri, label='user-provided-secret'
+        )
+        content = secret.get_content()
+        # Do something with the secret content.
+        self._configure_with_secret(content)
+
+    def _on_secret_changed(self, event: ops.SecretChangedEvent):
+        if event.secret.label == 'user-provided-secret':
+            # Read the secret.
+            content = event.secret.get_content(refresh=True)
+            # Do something with the secret content.
+            self._configure_with_secret(content)
+```
+
+### User-secret events
+
+The only event a user-secret observer receives is `secret-changed`, triggered when the user updates the secret content (for example, with `juju update-secret`). Unlike charm secrets, user secrets have no rotate, expire, or remove lifecycle. The Juju user is responsible for managing the secret lifecycle.
 
 ## Write tests for your charm
 
@@ -413,7 +492,7 @@ state_in = testing.State(
             {'key': 'private'},
             owner='unit',  # or 'app'
             # The secret owner has granted access to the "remote" app over some relation:
-            remote_grants={rel.id: {'remote'}}
+            remote_grants={rel.id: {'remote'}},
         )
     }
 )
@@ -440,7 +519,7 @@ secret = testing.Secret({'password': 'xxxxxxxx'}, owner='app')
 old_revision = 42
 state_out = ctx.run(
     ctx.on.secret_remove(secret, revision=old_revision),
-    testing.State(leader=True, secrets={secret})
+    testing.State(leader=True, secrets={secret}),
 )
 assert ctx.removed_secret_revisions == [old_revision]
 ```
