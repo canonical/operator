@@ -242,8 +242,16 @@ def main():
             if len(practices):
                 print(f'**[{title}]({link})**')
             for heading, ref, practice, name in practices:
-                ref = make_ref(heading, ref) if ref and heading else ref
-                see_more = f' See {ref}.' if heading and ref else ''
+                # Link directly to the practice's own :name: anchor when it has
+                # one, rather than to the enclosing section. Practices that
+                # aren't under a section heading use the page title as the
+                # link text.
+                if name:
+                    see_more = f' See {make_ref(heading or title, name)}.'
+                elif heading and ref:
+                    see_more = f' See {make_ref(heading, ref)}.'
+                else:
+                    see_more = ''
                 practice = re.sub(r'\s+', ' ', practice).strip()
                 if ref_sub:
                     practice = re.sub(r':ref:', ref_sub, practice)
