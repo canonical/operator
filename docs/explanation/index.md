@@ -5,7 +5,7 @@ These guides explain how Ops works.
 
 ## Interface definitions
 
-The `charm-relation-interfaces` repository contains specifications, schemas, and tests for Juju interfaces.
+The [`charmlibs` monorepo](https://github.com/canonical/charmlibs/tree/main/interfaces) contains specifications, schemas, and tests for Juju interfaces.
 
 ```{toctree}
 :maxdepth: 1

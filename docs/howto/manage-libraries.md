@@ -254,12 +254,11 @@ See more: {ref}`manage-interfaces`
 
 If the library is implementing an existing interface, find the interface documentation by following links from the Integrations tab on Charmhub, or by navigating to `https://charmhub.io/integrations/{integration-name}`.
 Alternatively, the interface documentation can be found in the
-[charm-relation-interfaces](https://github.com/canonical/charm-relation-interfaces)
-repository.
+[`interfaces` directory of the `charmlibs` monorepo](https://github.com/canonical/charmlibs/tree/main/interfaces).
 
 In the interface documentation, find the description of the various
 databags. For example, for
-[v2 of the `tracing` interface](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/tracing/v2/README.md):
+[v2 of the `tracing` interface](https://github.com/canonical/charmlibs/blob/main/interfaces/tracing/interface/v2/README.md):
 
 ```yaml
 # unit_data: <empty>
