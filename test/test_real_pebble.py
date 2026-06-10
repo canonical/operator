@@ -268,6 +268,20 @@ class TestRealPebble:
             process.wait()
         assert 'timed out' in excinfo.value.err
 
+    def test_exec_wait_timeout_reaps_io_threads(self, client: pebble.Client):
+        # Regression test for canonical/operator#2556. The orphaned grandchild
+        # keeps the exec's stdio pipe open, so the change can't finish even
+        # after Pebble kills the command at the 0.1s timeout, and the wait
+        # then times out client-side. The I/O threads were left blocked on the
+        # websockets, and being non-daemon they then hung interpreter
+        # shutdown.
+        process = client.exec(['/bin/sh', '-c', 'setsid sleep 3 & sleep 3'], timeout=0.1)
+        with pytest.raises(pebble.TimeoutError):
+            process.wait_output()
+        for thread in process._threads:
+            thread.join(timeout=2)
+        assert [t.name for t in process._threads if t.is_alive()] == []
+
     def test_exec_working_dir(self, client: pebble.Client):
         with tempfile.TemporaryDirectory() as temp_dir:
             process = client.exec(['pwd'], working_dir=temp_dir)
