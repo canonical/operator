@@ -507,16 +507,23 @@ def test_resource_get(juju: jubilant.Juju, any_unit: str):
 
 def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
     """secret_grant gives access to a related app; secret_revoke removes it."""
-    task = juju.run(leader, 'test-secret-grant')
+    # Both steps queue secret changes that hit the same Juju 4.0 uniter
+    # commit-phase bug as secret_remove in test_secret_full_lifecycle. On
+    # Juju 4.0/k8s the symptom is a driver-side timeout rather than a
+    # TaskError, so catch both. The grant step (secret_add + secret_grant)
+    # times out at least as often as revoke does.
+    try:
+        task = juju.run(leader, 'test-secret-grant')
+    except (jubilant.TaskError, TimeoutError):
+        if _juju_major(juju) >= 4:
+            pytest.xfail(_JUJU4_COMMIT_BUG)
+        raise
     assert task.success
     r = task.results
     assert r['granted'] == 'true'
     secret_id = r['secret-id']
     assert secret_id
 
-    # secret_revoke + secret_remove share the same Juju 4.0 commit-phase bug as
-    # secret_remove in test_secret_full_lifecycle. On Juju 4.0/k8s the symptom
-    # is a driver-side timeout rather than a TaskError, so catch both.
     try:
         task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
     except (jubilant.TaskError, TimeoutError):
