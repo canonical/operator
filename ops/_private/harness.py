@@ -323,7 +323,7 @@ class Harness(Generic[CharmType]):
 
         warnings.warn(
             'Harness is deprecated. For the recommended approach, see: '
-            'https://documentation.ubuntu.com/ops/2.x/howto/write-unit-tests-for-a-charm.html',
+            'https://canonical.com/juju/docs/ops/2.x/howto/write-unit-tests-for-a-charm.html',
             PendingDeprecationWarning,
             stacklevel=2,
         )
