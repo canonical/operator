@@ -22,7 +22,7 @@ All subsequent workload management happens in the same way -- the Juju controlle
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
 
- - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
+- descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
 - executable files (like the `src/charm.py` file that we will see shortly) where you will use Ops-enriched Python to write all the logic of your charm.
 
 ## Create a charm project
@@ -45,6 +45,7 @@ Charmcraft created several files, including:
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
 - `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
 - `src/charm.py` - The Python file that will contain the logic of your charm.
+- `src/fastapi_demo.py` - A helper module that will contain functions for interacting with fastapi_demo server.
 
 These files currently contain placeholder code and configuration.
 
@@ -260,7 +261,7 @@ fastapi-demo/0*  active    idle   10.1.157.73
 
 ### Try the web server
 
-Validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
+Validate that the app is running and reachable by sending an HTTP request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
 
 ```
 curl 10.1.157.73:8000/version
@@ -306,6 +307,84 @@ kubectl -n testing describe pod fastapi-demo-0
 
 In the output you should see the definition for both containers. You'll be able to verify that the default command and arguments for our application container (`demo-server`) have been displaced by the Pebble service. You should be able to verify the same for the charm container (`charm`).
 
+### Set your workload version
+
+The workload version is the version of the application which our charm manages. In our case, it is the version of `fastapi_demo`, which is available at `10.1.157.73:8000/version`. To make things easier for Juju admins, our charm should expose the workload version to Juju. It will be visible in `juju status`. For more information, see {ref}`how-to-set-the-workload-version`.
+
+We first define a function to obtain `fastapi_demo` version. Replace the content of `src/fastapi_demo.py` with:
+
+```python
+import json
+import logging
+import urllib.request
+
+logger = logging.getLogger(__name__)
+
+
+def get_version(port: int) -> str:
+    """Get the version of fastapi_demo installed.
+
+    Args:
+        port: The port where fastapi_demo web server is listening.
+    """
+    response = urllib.request.urlopen(f"http://0.0.0.0:{port}/version")
+    data = json.loads(response.read())
+    return data["version"]
+```
+
+From the previous, we know that our workload server is deployed at `0.0.0.0:8000`. Because the charm container is in the same pod as the workload, the charm can reach `0.0.0.0:8000`. The rest of `get_version` function takes the HTTP response, decodes the JSON payload, and extracts the version string.
+
+In our charm, the workload is available after we tell Pebble to reevaluate its plan, which contain the command to run the server. We can expose the workload version to Juju after that step.
+
+Modify the `_on_demo_server_pebble_ready` function:
+
+```python
+def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
+    """Define and start a workload using the Pebble API."""
+    # Get a reference the container attribute on the PebbleReadyEvent
+    container = event.workload
+    # Add initial Pebble config layer using the Pebble API
+    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
+    # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
+    container.replan()
+    # Set the workload version of this charm.
+    version = fastapi_demo.get_version(port=8000)
+    self.unit.set_workload_version(version)
+    # Learn more about statuses at
+    # https://documentation.ubuntu.com/juju/3.6/reference/status/
+    self.unit.status = ops.ActiveStatus()
+```
+
+You can then pack and refresh your charm
+
+```
+charmcraft pack
+juju refresh fastapi-demo --force-units \
+  --path ./fastapi-demo_amd64.charm \
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+```
+
+```{tip}
+`--force-units` ensures that the refresh succeeds even if the application is in an error state. This option is useful during development, when your charm code might be the cause of the error. You should avoid using `--force-units` when refreshing applications in production.
+```
+
+Monitor your deployment:
+
+```text
+juju status --watch 1s
+```
+
+When all units are settled down, you can see the workload version in the `Version` colunm:
+
+```text
+...
+
+App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
+fastapi-demo  1.0.4    active      1  fastapi-demo             0  10.152.183.215  no
+
+...
+```
+
 (write-unit-tests-for-your-charm)=
 ## Write unit tests for your charm
 
@@ -325,18 +404,25 @@ Replace the contents of `tests/unit/test_charm.py` with:
 
 ```python
 import ops
+import pytest
 from ops import testing
 
 from charm import FastAPIDemoCharm
 
 
-def test_pebble_layer():
+def mock_get_version(port: int):
+    """Get a mock version string without executing the workload code."""
+    return "1.0.4"
+
+
+def test_pebble_layer(monkeypatch: pytest.MonkeyPatch):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
     )
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {
@@ -361,6 +447,8 @@ def test_pebble_layer():
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
+    # Check the workload version is set
+    assert state_out.workload_version is not None
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
@@ -390,10 +478,10 @@ tests/unit/test_charm.py::test_pebble_layer PASSED
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             17      0      0      0   100%
-src/fastapi_demo.py       4      4      0      0     0%   9-20
+src/charm.py             20      0      0      0   100%
+src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    21      4      0      0    81%
+TOTAL                    28      3      0      0    89%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```
@@ -440,6 +528,16 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+
+
+def test_workload_version_is_set(juju: jubilant.Juju):
+    # Verify that the workload version has been set.
+    version = juju.status().apps["fastapi-demo"].version
+    # We'll need to update this version every time we upgrade to a new workload
+    # version. If the workload has an API or some other way of getting the
+    # version, the test should get it from there and use that to compare to the
+    # unit setting.
+    assert version == "1.0.4"
 ```
 
 This test depends on two fixtures:
