@@ -227,6 +227,27 @@ Run all your tests with:
 tox -e unit
 ```
 
+## Treat warnings as errors
+
+Configure pytest to treat warnings as errors, so that your tests fail when code raises a warning. Warnings tell you about problems before they bite in production: a deprecation warning means an API your charm relies on is going away, and a resource warning often points to a real cleanup bug. With the default settings, these only appear in the test output, where they're easy to miss. In `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+]
+```
+
+If a dependency raises a warning that you can't do anything about, add an ignore filter for that specific warning, keeping `"error"` for everything else. For example:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+]
+```
+
 ## Examples
 
 Machine charms:
