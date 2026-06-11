@@ -506,7 +506,7 @@ def test_resource_get(juju: jubilant.Juju, any_unit: str):
     assert pathlib.Path(path).name == 'test-file.txt'
 
 
-# Secrets (secret_grant / secret_revoke) — Follow-up 3
+# Secrets (secret_grant / secret_revoke)
 
 
 def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
