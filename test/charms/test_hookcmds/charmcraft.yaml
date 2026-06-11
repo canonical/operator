@@ -1,0 +1,186 @@
+---
+name: test-hookcmds
+type: charm
+title: Test hookcmds
+summary: Test hookcmds
+description: |
+    A charm that exercises the ops.hookcmds module against a real Juju controller,
+    covering the low-level hook command wrappers.
+
+base: ubuntu@24.04
+build-base: ubuntu@24.04
+platforms:
+    amd64:
+
+parts:
+    test-hookcmds:
+        source: .
+        plugin: uv
+        build-snaps: [astral-uv]
+
+config:
+    options:
+        string-opt:
+            type: string
+            default: hello
+            description: A string config option for testing config-get.
+        int-opt:
+            type: int
+            default: 42
+            description: An integer config option for testing config-get.
+
+peers:
+    peer:
+        interface: test-hookcmds-peer
+
+storage:
+    data:
+        type: filesystem
+        minimum-size: 1M
+        description: Filesystem storage for testing storage hook commands.
+
+resources:
+    test-file:
+        type: file
+        description: Small file used by integration tests of resource_get.
+
+actions:
+    get-status:
+        description: |
+            Get unit and (if leader) app status via hookcmds.status_get.
+    set-and-check-status:
+        description: |
+            Set unit status via hookcmds.status_set, then read it back.
+            Resets to active at the end.
+        params:
+            status:
+                type: string
+                description: The status to set (active, blocked, maintenance, waiting).
+            message:
+                type: string
+                description: Optional status message.
+                default: ''
+    get-all-config:
+        description: Return all config values via hookcmds.config_get (no key).
+    get-config-value:
+        description: Return a single config value via hookcmds.config_get(key).
+        params:
+            key:
+                type: string
+                description: The config key to retrieve.
+    check-leadership:
+        description: Return is_leader() result via hookcmds.is_leader.
+    test-logging:
+        description: |
+            Exercise hookcmds.juju_log at all log levels. Returns ok if no
+            exception was raised.
+        params:
+            message:
+                type: string
+                description: Message text to log (logged at every level).
+                default: integration test log message
+    set-app-version:
+        description: Call hookcmds.app_version_set with the given version string.
+        params:
+            version:
+                type: string
+                description: The application version string to set.
+    get-network-info:
+        description: |
+            Call hookcmds.network_get for the peer binding and return
+            bind-address counts and egress subnets.
+    test-ports:
+        description: |
+            Open a TCP and UDP port, verify via opened_ports, then close both
+            and verify the count returns to the initial value.
+        params:
+            port:
+                type: integer
+                description: The port number to open/close.
+                default: 8877
+    test-unit-state:
+        description: |
+            Full server-side state lifecycle: state_set → state_get(key) →
+            state_get(None) → state_delete → verify deletion.
+        params:
+            key:
+                type: string
+                description: State key to use for the test.
+            value:
+                type: string
+                description: State value to set.
+    test-secret-crud:
+        description: |
+            Full secret lifecycle: secret_add → secret_ids → secret_info_get →
+            secret_get → secret_set (content update) → secret_get(peek) →
+            secret_set (metadata update) → secret_info_get → secret_get(label) →
+            secret_remove(revision) → secret_remove.
+    test-goal-state:
+        description: |
+            Call hookcmds.goal_state and return the unit names and statuses.
+    test-relation-data:
+        description: |
+            Exercise relation hookcmds: relation_ids → relation_list →
+            relation_set → relation_get(key) → relation_get(all).
+            Requires a peer relation (deploy ≥ 2 units).
+    test-storage:
+        description: |
+            Call hookcmds.storage_list and hookcmds.storage_get, return
+            storage kind and location info.
+    test-action-params:
+        description: |
+            Use hookcmds.action_get / action_log / action_set (bypassing the
+            ops event API) to read params and write results.
+        params:
+            message:
+                type: string
+                description: Message to echo back via action_get / action_set.
+    fail-action:
+        description: |
+            Call hookcmds.action_fail to mark the action as failed, verifying
+            that the Error is surfaced to Juju.
+        params:
+            message:
+                type: string
+                description: Failure message.
+                default: deliberate failure from hookcmds test
+    trigger-relation-error:
+        description: |
+            Call hookcmds.relation_list with the given (invalid) relation id and
+            report the exception class name, exercising the hookcmds.Error path.
+        params:
+            relation-id:
+                type: integer
+                description: A relation id that does not exist.
+                default: 9999
+    test-credential-get:
+        description: |
+            Call hookcmds.credential_get and return the cloud type and name.
+    test-juju-reboot:
+        description: |
+            Queue a reboot via hookcmds.juju_reboot(now=False). The unit
+            reboots after the action context exits.
+    test-relation-model-get:
+        description: |
+            Call hookcmds.relation_model_get for the peer relation and return
+            the model UUID.
+    test-resource-get:
+        description: |
+            Call hookcmds.resource_get for the test-file resource and return
+            the cached file path.
+    test-secret-grant:
+        description: |
+            Create a secret and grant it to the peer relation via
+            hookcmds.secret_grant. Returns the secret ID.
+    test-secret-revoke:
+        description: |
+            Revoke access to a secret from the peer relation via
+            hookcmds.secret_revoke. Does NOT remove the secret.
+        params:
+            secret-id:
+                type: string
+                description: The secret URI to revoke.
+    test-storage-add:
+        description: |
+            Queue one additional 'data' storage instance via
+            hookcmds.storage_add and return the current count before adding.
