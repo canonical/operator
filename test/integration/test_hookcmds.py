@@ -57,6 +57,23 @@ def _juju_major(juju: jubilant.Juju) -> int:
 _JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (juju/juju#22523, juju/juju#22524)'
 
 
+def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | None) -> None:
+    """Apply strict xfail semantics for the Juju 4.0 commit-phase regression.
+
+    Imperative `pytest.xfail()` doesn't support `strict=True`. Call this from
+    both branches of a try/except so we get the equivalent: on Juju 4 the test
+    must fail (xfail), and if it ever passes the suite fails loudly so we
+    remember to remove the guard. On Juju <4 the original error propagates.
+    """
+    if _juju_major(juju) < 4:
+        if error is not None:
+            raise error
+        return
+    if error is not None:
+        pytest.xfail(_JUJU4_COMMIT_BUG)
+    pytest.fail(f'Juju 4 no longer hits {_JUJU4_COMMIT_BUG} — remove the guard.')
+
+
 # Deployment
 
 
@@ -260,10 +277,9 @@ def test_state_roundtrip(juju: jubilant.Juju, any_unit: str):
             'test-unit-state',
             params={'key': 'testkey', 'value': 'testvalue'},
         )
-    except jubilant.TaskError:
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except jubilant.TaskError as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     r = task.results
     assert r['retrieved'] == 'testvalue'
@@ -282,10 +298,9 @@ def test_state_special_chars(juju: jubilant.Juju, any_unit: str):
             'test-unit-state',
             params={'key': 'mykey', 'value': 'hello world!'},
         )
-    except jubilant.TaskError:
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except jubilant.TaskError as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     r = task.results
     assert r['retrieved'] == 'hello world!'
@@ -301,10 +316,9 @@ def test_secret_full_lifecycle(juju: jubilant.Juju, leader: str):
     """Full secret CRUD lifecycle exercises all secret hookcmds."""
     try:
         task = juju.run(leader, 'test-secret-crud')
-    except jubilant.TaskError:
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except jubilant.TaskError as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     r = task.results
 
