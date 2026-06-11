@@ -241,15 +241,17 @@ def main():
             link = f'{base_url}{file_path.relative_to(directory).with_suffix("")}/'
             if len(practices):
                 print(f'**[{title}]({link})**')
+            # Practices with no enclosing section link fall back to linking to
+            # their own :name: anchor, but only when the link text (the
+            # heading, or the page title) appears once on this page:
+            # identically-named links with different destinations are
+            # confusing.
+            fallback_texts = [p[0] or title for p in practices if p[3] and not (p[0] and p[1])]
             for heading, ref, practice, name in practices:
-                # Link directly to the practice's own :name: anchor when it has
-                # one, rather than to the enclosing section. Practices that
-                # aren't under a section heading use the page title as the
-                # link text.
-                if name:
-                    see_more = f' See {make_ref(heading or title, name)}.'
-                elif heading and ref:
+                if heading and ref:
                     see_more = f' See {make_ref(heading, ref)}.'
+                elif name and fallback_texts.count(heading or title) == 1:
+                    see_more = f' See {make_ref(heading or title, name)}.'
                 else:
                     see_more = ''
                 practice = re.sub(r'\s+', ' ', practice).strip()
