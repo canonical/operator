@@ -343,6 +343,10 @@ def test_goal_state_reports_units(juju: jubilant.Juju, any_unit: str):
         assert status in ('alive', 'waiting', 'dying', 'active'), (
             f'Unexpected goal status: {status}'
         )
+    assert len(unit_names) == unit_count
+    assert len(statuses) == unit_count
+    # The peer relation is always present in this deployment.
+    assert int(r['relation-endpoint-count']) >= 1
 
 
 # Relations (relation_ids / relation_list / relation_set / relation_get)
