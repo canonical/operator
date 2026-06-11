@@ -41,7 +41,13 @@ storage:
     data:
         type: filesystem
         minimum-size: 1M
-        description: Filesystem storage for testing storage hook commands.
+        multiple:
+            range: 1-2
+        description: |
+            Filesystem storage for testing storage hook commands. Declared
+            with range 1-2 so test_storage_add can attach a second instance;
+            without `multiple:` Juju treats it as singular and rejects the
+            second attach.
 
 resources:
     test-file:
