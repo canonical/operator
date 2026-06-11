@@ -629,13 +629,29 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     if _is_caas(juju):
         pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
 
-    juju.config('test-hookcmds', {'reboot-trigger': 'reboot-please'})
+    # Baseline uptime + confirm the marker hasn't been set yet.
+    task = juju.run(any_unit, 'test-reboot-marker')
+    assert task.success
+    assert task.results['marker-exists'] == 'false'
+    uptime_before = float(task.results['uptime-seconds'])
+
     # config-changed → marker write → juju_reboot. Wait for the unit to
-    # recover after reboot.
+    # recover after the reboot.
+    juju.config('test-hookcmds', {'reboot-trigger': 'reboot-please'})
     juju.wait(jubilant.all_active)
+
     task = juju.run(any_unit, 'test-reboot-marker')
     assert task.success
     assert task.results['marker-exists'] == 'true'
+    uptime_after = float(task.results['uptime-seconds'])
+    # If a reboot actually happened the container's uptime resets — the new
+    # value must be smaller than the value we captured before the trigger.
+    # The marker alone only proves config-changed ran our handler; the
+    # uptime check is what proves juju-reboot took effect.
+    assert uptime_after < uptime_before, (
+        f'uptime did not reset (before={uptime_before}, after={uptime_after}); '
+        'the config-changed path ran but juju-reboot did not actually reboot the unit.'
+    )
 
 
 # Fixtures

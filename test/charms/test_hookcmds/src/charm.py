@@ -30,9 +30,9 @@ from typing import Any
 import ops
 import ops.hookcmds as hookcmds
 
-_REBOOT_MARKER = pathlib.Path(
-    os.environ.get('JUJU_CHARM_DIR', '.')
-) / '.test-hookcmds.reboot-triggered'
+_REBOOT_MARKER = (
+    pathlib.Path(os.environ.get('JUJU_CHARM_DIR', '.')) / '.test-hookcmds.reboot-triggered'
+)
 
 
 class TestHookcmdsCharm(ops.CharmBase):
@@ -367,7 +367,16 @@ class TestHookcmdsCharm(ops.CharmBase):
         hookcmds.juju_reboot(now=False)
 
     def _on_test_reboot_marker(self, event: ops.ActionEvent):
-        event.set_results({'marker-exists': str(_REBOOT_MARKER.exists()).lower()})
+        # First field of /proc/uptime is seconds since boot. After a real
+        # juju-reboot the container restarts and uptime resets, so the test
+        # can compare before/after to verify the reboot actually happened
+        # (the marker alone only proves config-changed ran the path).
+        with open('/proc/uptime') as f:
+            uptime_seconds = float(f.read().split()[0])
+        event.set_results({
+            'marker-exists': str(_REBOOT_MARKER.exists()).lower(),
+            'uptime-seconds': str(uptime_seconds),
+        })
 
     # Relation model
 
