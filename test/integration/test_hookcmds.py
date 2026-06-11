@@ -615,15 +615,17 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
 
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
-    # juju-reboot only works on substrates where the unit can actually reboot.
-    # Kubernetes pods can't reboot themselves, and LXD/localhost containers
-    # don't have the privileges to reboot either — both of which cover every
-    # cell of our CI matrix. Skip up front so the test surfaces as 'skipped'
-    # rather than 'failed' with a status-1 from juju-reboot.
-    if _is_caas(juju):
-        pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
-    if juju.status().model.cloud == 'localhost':
-        pytest.skip('juju-reboot is not supported in LXD/localhost containers')
+    # Juju explicitly forbids juju-reboot inside an action context with
+    # 'ERROR juju-reboot is not supported when running an action.' (verified
+    # on Juju 3.6 LXD). The hookcmds.juju_reboot() plumbing has to be
+    # exercised from a regular hook (e.g. install / config-changed), not an
+    # action — wiring that up needs a config-driven test hook in the charm
+    # plus a controlled juju-run-on-config-change harness; out of scope for
+    # this integration suite for now.
+    pytest.skip(
+        'juju-reboot cannot be invoked from an action hook; needs a regular-hook '
+        'test harness which this charm does not yet expose.'
+    )
     task = juju.run(any_unit, 'test-juju-reboot')
     assert task.success
     # After the action, Juju queues a reboot. Wait for the unit to recover.
