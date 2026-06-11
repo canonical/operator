@@ -505,18 +505,15 @@ def test_credential_get(juju: jubilant.Juju, any_unit: str):
 
 
 def test_relation_model_get(juju: jubilant.Juju, leader: str):
-    """relation_model_get returns a non-empty UUID for the peer relation."""
+    """relation_model_get returns the local model UUID for a peer relation."""
     task = juju.run(leader, 'test-relation-model-get')
     assert task.success
-    uuid = task.results['uuid']
-    # For now, just confirm the call returns a UUID-shaped string. We
-    # previously asserted equality with `juju show-model`'s model-uuid,
-    # but observed mismatches on Juju 4 and on k8s 3.x. Whether that's a
-    # real semantic difference or a test-environment artefact is being
-    # validated locally; tighten this back to an equality check once that
-    # investigation lands.
-    assert uuid
-    assert len(uuid.split('-')) == 5, f'Not a UUID: {uuid!r}'
+    # For a peer relation the relation isn't cross-model, so the server-side
+    # implementation (apiserver/facades/agent/uniter/uniter.go) returns the
+    # local model UUID — same as JUJU_MODEL_UUID inside the hook. Validated
+    # live against Juju 3.6.23 and 4.0.5 LXD.
+    assert task.results['uuid'] == task.results['env-model-uuid']
+    assert task.results['uuid']  # non-empty
 
 
 # Resources (resource_get)

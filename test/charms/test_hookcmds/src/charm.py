@@ -23,6 +23,7 @@ hookcmds wrapper functions.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 import ops
@@ -356,14 +357,19 @@ class TestHookcmdsCharm(ops.CharmBase):
     # Relation model
 
     def _on_test_relation_model_get(self, event: ops.ActionEvent):
-        """Return the model UUID for the peer relation."""
+        """Return the model UUID for the peer relation, plus JUJU_MODEL_UUID."""
         ids = hookcmds.relation_ids('peer')
         if not ids:
             event.fail('No peer relation IDs - deploy 2+ units')
             return
         rel_id = int(ids[0].split(':')[-1])
         model = hookcmds.relation_model_get(id=rel_id, endpoint='peer')
-        event.set_results({'uuid': model.uuid})
+        event.set_results({
+            'uuid': model.uuid,
+            # Emit the env-side model UUID alongside so the test can verify
+            # the two match without doing its own juju show-model dance.
+            'env-model-uuid': os.environ.get('JUJU_MODEL_UUID', ''),
+        })
 
     # Resource
 
