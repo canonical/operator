@@ -25,6 +25,7 @@ def mock_get_version(port: int):
     """Get a mock version string without executing the workload code."""
     return "1.0.4"
 
+
 @pytest.fixture(autouse=True)
 def patch_get_version(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
