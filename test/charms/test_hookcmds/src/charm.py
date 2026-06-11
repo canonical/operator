@@ -24,10 +24,15 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 from typing import Any
 
 import ops
 import ops.hookcmds as hookcmds
+
+_REBOOT_MARKER = pathlib.Path(
+    os.environ.get('JUJU_CHARM_DIR', '.')
+) / '.test-hookcmds.reboot-triggered'
 
 
 class TestHookcmdsCharm(ops.CharmBase):
@@ -54,7 +59,8 @@ class TestHookcmdsCharm(ops.CharmBase):
             self.on['trigger-relation-error'].action, self._on_trigger_relation_error
         )
         framework.observe(self.on['test-credential-get'].action, self._on_test_credential_get)
-        framework.observe(self.on['test-juju-reboot'].action, self._on_test_juju_reboot)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on['test-reboot-marker'].action, self._on_test_reboot_marker)
         framework.observe(
             self.on['test-relation-model-get'].action, self._on_test_relation_model_get
         )
@@ -348,11 +354,20 @@ class TestHookcmdsCharm(ops.CharmBase):
         cloud = hookcmds.credential_get()
         event.set_results({'cloud-type': cloud.type, 'cloud-name': cloud.name})
 
-    # Reboot
+    # Reboot — driven by config-changed because juju forbids juju-reboot
+    # from an action context (see jujuc/reboot.go).
 
-    def _on_test_juju_reboot(self, event: ops.ActionEvent):
-        """Queue a machine reboot via juju_reboot(now=False)."""
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        if self.config.get('reboot-trigger') != 'reboot-please':
+            return
+        if _REBOOT_MARKER.exists():
+            # Already triggered this deployment; don't reboot again.
+            return
+        _REBOOT_MARKER.write_text('triggered')
         hookcmds.juju_reboot(now=False)
+
+    def _on_test_reboot_marker(self, event: ops.ActionEvent):
+        event.set_results({'marker-exists': str(_REBOOT_MARKER.exists()).lower()})
 
     # Relation model
 

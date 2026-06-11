@@ -28,6 +28,16 @@ config:
             type: int
             default: 42
             description: An integer config option for testing config-get.
+        reboot-trigger:
+            type: string
+            default: ''
+            description: |
+                When set to 'reboot-please', the config-changed handler
+                writes a marker file and calls hookcmds.juju_reboot(). The
+                marker prevents the next config-changed (which fires
+                automatically after the post-reboot hook re-run) from
+                re-triggering, so there's no infinite reboot loop. Used
+                by the integration test for hookcmds.juju_reboot.
 
 peers:
     peer:
@@ -167,10 +177,13 @@ actions:
     test-credential-get:
         description: |
             Call hookcmds.credential_get and return the cloud type and name.
-    test-juju-reboot:
+    test-reboot-marker:
         description: |
-            Queue a reboot via hookcmds.juju_reboot(now=False). The unit
-            reboots after the action context exits.
+            Return whether the marker file written by the reboot-trigger
+            config-changed handler exists. The integration test runs this
+            after setting `reboot-trigger=reboot-please` and waiting for
+            the unit to recover, to confirm the config-changed →
+            juju_reboot path actually ran.
     test-relation-model-get:
         description: |
             Call hookcmds.relation_model_get for the peer relation and return

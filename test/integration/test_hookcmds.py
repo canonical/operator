@@ -614,22 +614,28 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
 
 
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
-    """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
-    # Juju explicitly forbids juju-reboot inside an action context with
-    # 'ERROR juju-reboot is not supported when running an action.' (verified
-    # on Juju 3.6 LXD). The hookcmds.juju_reboot() plumbing has to be
-    # exercised from a regular hook (e.g. install / config-changed), not an
-    # action — wiring that up needs a config-driven test hook in the charm
-    # plus a controlled juju-run-on-config-change harness; out of scope for
-    # this integration suite for now.
-    pytest.skip(
-        'juju-reboot cannot be invoked from an action hook; needs a regular-hook '
-        'test harness which this charm does not yet expose.'
-    )
-    task = juju.run(any_unit, 'test-juju-reboot')
-    assert task.success
-    # After the action, Juju queues a reboot. Wait for the unit to recover.
+    """juju_reboot(now=False) queues a reboot; the unit recovers to active.
+
+    juju explicitly forbids juju-reboot inside an action context
+    (jujuc/reboot.go), so the trigger has to come from a regular hook.
+    The charm's config-changed handler watches for
+    `reboot-trigger=reboot-please` and, on the first such config-changed,
+    writes a marker file and calls hookcmds.juju_reboot(). The marker
+    prevents the post-reboot config-changed re-run from looping. The
+    test then verifies the marker exists via a read-only action.
+    """
+    # k8s pods can't reboot themselves and the hookcmd surfaces as a
+    # NotImplementedError; only exercise on machine substrates.
+    if _is_caas(juju):
+        pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
+
+    juju.config('test-hookcmds', {'reboot-trigger': 'reboot-please'})
+    # config-changed → marker write → juju_reboot. Wait for the unit to
+    # recover after reboot.
     juju.wait(jubilant.all_active)
+    task = juju.run(any_unit, 'test-reboot-marker')
+    assert task.success
+    assert task.results['marker-exists'] == 'true'
 
 
 # Fixtures
