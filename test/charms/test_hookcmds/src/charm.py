@@ -290,21 +290,17 @@ class TestHookcmdsCharm(ops.CharmBase):
         all_storage = hookcmds.storage_list()
         data_storage = hookcmds.storage_list('data')
 
-        if data_storage:
-            info = hookcmds.storage_get(data_storage[0])
-            event.set_results({
-                'total-storage-count': str(len(all_storage)),
-                'data-storage-count': str(len(data_storage)),
-                'storage-id': data_storage[0],
-                'storage-kind': info.kind,
-                'storage-location': str(info.location),
-            })
-        else:
-            event.set_results({
-                'total-storage-count': str(len(all_storage)),
-                'data-storage-count': '0',
-                'note': 'no data storage found',
-            })
+        if not data_storage:
+            event.fail('no data storage found')
+            return
+        info = hookcmds.storage_get(data_storage[0])
+        event.set_results({
+            'total-storage-count': str(len(all_storage)),
+            'data-storage-count': str(len(data_storage)),
+            'storage-id': data_storage[0],
+            'storage-kind': info.kind,
+            'storage-location': str(info.location),
+        })
 
     # Action commands (action_get / action_log / action_set)
 

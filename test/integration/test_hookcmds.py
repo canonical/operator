@@ -377,6 +377,7 @@ def test_storage_list_and_get(juju: jubilant.Juju, any_unit: str):
     r = task.results
     data_count = int(r['data-storage-count'])
     assert data_count >= 1, 'Expected at least one data storage instance'
+    assert int(r['total-storage-count']) >= data_count
     storage_id = r['storage-id']
     assert storage_id.startswith('data/')
     assert r['storage-location']  # non-empty path
