@@ -295,3 +295,44 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
     with pytest.raises(ValueError, match='actions'):
         Context(MyCharm, charmcraft_yaml, actions=actions)
+
+
+def test_framework_closed_exactly_once_per_run():
+    # Charm libraries (for example tempo's charm_tracing) replace the
+    # framework's close with a wrapper that is not safe to invoke twice, so
+    # a run must close the framework exactly once.
+    close_calls: list[int] = []
+
+    class WrappingCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            original_close = framework.close
+
+            def wrap_close():
+                close_calls.append(1)
+                if len(close_calls) > 1:
+                    raise RuntimeError('framework.close() called twice')
+                original_close()
+
+            framework.close = wrap_close
+
+    ctx = Context(WrappingCharm, meta={'name': 'foo'})
+    ctx.run(ctx.on.start(), State())
+    assert len(close_calls) == 1
+
+
+def test_framework_closed_when_manager_scope_raises():
+    # If the test body raises before the event is emitted, the framework
+    # (and so the SQLite storage) must still be released on the way out.
+    captured: dict[str, ops.Framework] = {}
+
+    class CapturingCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            captured['framework'] = framework
+
+    ctx = Context(CapturingCharm, meta={'name': 'foo'})
+    with pytest.raises(RuntimeError, match='boom'):
+        with ctx(ctx.on.start(), State()):
+            raise RuntimeError('boom')
+    assert captured['framework']._closed
