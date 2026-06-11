@@ -27,32 +27,33 @@ In your charm's `src/charm.py` you can now use [`Model.resources.fetch(<resource
 # ...
 import logging
 import ops
+
 # ...
 logger = logging.getLogger(__name__)
+
 
 def _on_config_changed(self, event):
     # Get the path to the file resource named 'my-resource'
     try:
-        resource_path = self.model.resources.fetch("my-resource")
+        resource_path = self.model.resources.fetch('my-resource')
     except ops.ModelError as e:
         self.unit.status = ops.BlockedStatus(
             "Something went wrong when claiming resource 'my-resource; "
             "run `juju debug-log` for more info'"
         )
-       # might actually be worth it to just reraise this exception and let the charm error out;
-       # depends on whether we can recover from this.
+        # might actually be worth it to just reraise this exception and let the charm error out;
+        # depends on whether we can recover from this.
         logger.error(e)
         return
     except NameError as e:
         self.unit.status = ops.BlockedStatus(
-            "Resource 'my-resource' not found; "
-            "did you forget to declare it in charmcraft.yaml?"
+            "Resource 'my-resource' not found; did you forget to declare it in charmcraft.yaml?"
         )
         logger.error(e)
         return
 
     # Open the file and read it
-    with open(resource_path, "r") as f:
+    with open(resource_path, 'r') as f:
         content = f.read()
     # do something
 ```
@@ -80,7 +81,9 @@ import pathlib
 
 from ops import testing
 
-ctx = testing.Context(MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}})
+ctx = testing.Context(
+    MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}}
+)
 resource = testing.Resource(name='foo', path='/path/to/resource.tar')
 with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')

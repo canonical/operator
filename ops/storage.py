@@ -74,7 +74,15 @@ class SQLiteStorage:
         self._db = sqlite3.connect(
             str(filename), isolation_level=None, timeout=self.DB_LOCK_TIMEOUT.total_seconds()
         )
-        self._setup()
+        try:
+            self._setup()
+        except BaseException:
+            # _setup acquires the exclusive lock; if it fails (e.g. the DB
+            # is already held by another connection) the connection must
+            # still be closed so it doesn't leak as an unraisable
+            # ResourceWarning.
+            self._db.close()
+            raise
 
     def _ensure_db_permissions(self, filename: str):
         """Make sure that the DB file has appropriately secure permissions."""

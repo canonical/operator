@@ -59,9 +59,11 @@ import ops
 import subprocess
 from typing import Generator  # typing is an exception
 
+
 class MyCharm(ops.CharmBase):
     def handler(self, event: ops.PebbleReadyEvent):
         subprocess.run(['echo', 'hello'])
+
 
 # DON'T: Import objects directly
 from ops import CharmBase, PebbleReadyEvent  # Avoid this

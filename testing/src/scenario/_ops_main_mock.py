@@ -269,6 +269,13 @@ class Ops(_Manager, Generic[CharmType]):
     def destroy(self):
         # Must be run first, so that ops._main trace span is finished and can be read back.
         super().destroy()
+        # _Manager.run() closes the framework in its finally block, but tests
+        # often use `with runtime.exec(...) as mgr:` without calling
+        # `mgr.run()`. Close defensively so the SQLite storage is released;
+        # framework.close() is idempotent.
+        framework = getattr(self, 'framework', None)
+        if framework is not None:
+            framework.close()
         if self._tracing_mock:
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()

@@ -100,18 +100,31 @@ The minimal-effort solution in this case could be to create a file `/src/charm.p
 import os
 import ops
 
+
 class Microsample(ops.CharmBase):
-  def __init__(self, *args):
-    super().__init__(*args)
-    self.framework.observe(self.on.config_changed, lambda _: os.popen('../hooks/config-changed'))
-    self.framework.observe(self.on.install, lambda _: os.popen('../hooks/install'))
-    self.framework.observe(self.on.start, lambda _: os.popen('../hooks/start'))
-    self.framework.observe(self.on.stop, lambda _: os.popen('../hooks/stop'))
-    # etc...
+    def __init__(self, framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.stop, self._on_stop)
+        # etc...
 
-if __name__ == "__main__":
-    main(ops.Microsample)
+    def _on_config_changed(self, _event):
+        os.popen('../hooks/config-changed')
 
+    def _on_install(self, _event):
+        os.popen('../hooks/install')
+
+    def _on_start(self, _event):
+        os.popen('../hooks/start')
+
+    def _on_stop(self, _event):
+        os.popen('../hooks/stop')
+
+
+if __name__ == '__main__':
+    ops.main(Microsample)
 ```
 Relying on `popen` is _not_ how Ops is supposed to be used. However, this code will work, and it demonstrates the core principle of mapping hook names to handler code.
 
@@ -121,7 +134,6 @@ Relying on `popen` is _not_ how Ops is supposed to be used. However, this code w
 We need a few preparatory steps:\
   • Add a `requirements.txt` file to ensure that the charm's Python environment will install for us the `ops` package.\
 • Modify the install hook to install `snap` for us, which is used in the script.\
-• In practice we cannot bind lambdas to `observe`, we need to write dedicated _methods_ for that.\
 • We need to figure out the required environment variables for the commands to work, which is not trivial.\
 \
 A more detailed explanation of this process is worthy of its own how-to guide, so we'll skip to the punchline here: it works. Check out [this branch](https://github.com/PietroPasotti/hooks-to-ops/tree/1-sh-charm) and see for yourself.
@@ -155,28 +167,33 @@ Let's begin with `install`.
 The `/hooks/install` script checks if a snap package is installed; if not, it installs it. We need to still reach out to a shell to grab the `snap` package info and install the package, but we can have the logic and the status management in Python, which is nice. We use `subprocessing.check_call` to reach out to the OS. And yes, there is a better way to do this, we'll get to that later.
 
 ```python
-    def _on_install(self, _event):
-        snapinfo_cmd = Popen("snap info microsample".split(" "),
-                             stdout=subprocess.PIPE)
-        output = check_output("grep -c 'installed'".split(" "),
-                              stdin=snapinfo_cmd.stdout)
-        is_microsample_installed = bool(output.decode("ascii").strip())
+def _on_install(self, _event):
+    snapinfo_cmd = Popen(
+        'snap info microsample'.split(' '), stdout=subprocess.PIPE
+    )
+    output = check_output(
+        "grep -c 'installed'".split(' '), stdin=snapinfo_cmd.stdout
+    )
+    is_microsample_installed = bool(output.decode('ascii').strip())
 
-        if not is_microsample_installed:
-            self.unit.status = ops.MaintenanceStatus("installing microsample")
-            out = check_call("snap install microsample --edge")
+    if not is_microsample_installed:
+        self.unit.status = ops.MaintenanceStatus('installing microsample')
+        out = check_call('snap install microsample --edge')
 
-        self.unit.status = ops.ActiveStatus()
+    self.unit.status = ops.ActiveStatus()
 ```
 
 For `on-start` and `on-stop`, which are simple instructions to `systemctl` to start/stop the `microsample` service, we can copy over the commands as they are:
 
 ```python
-    def _on_start(self, _event):  # noqa
-        check_call("systemctl start snap.microsample.microsample.service".split(' '))
+def _on_start(self, _event):  # noqa
+    check_call(
+        'systemctl start snap.microsample.microsample.service'.split(' ')
+    )
 
-    def _on_stop(self, _event):  # noqa
-        check_call("systemctl stop snap.microsample.microsample.service".split(' '))
+
+def _on_stop(self, _event):  # noqa
+    check_call('systemctl stop snap.microsample.microsample.service'.split(' '))
 ```
 In a couple of places in the scripts, `sleep 3` calls ensure that the service has some time to come up; however, this might get the charm stuck in the waiting loop if for whatever reason the service does NOT come up, so it is quite risky and we are not going to do that. Instead, we are going to rely on the fact that if other event handlers were to fail because of the service not being up, they would handle that case appropriately (e.g., defer the event if necessary).
 
@@ -188,19 +205,19 @@ The rest of the translation is pretty straightforward. However, it is still usef
 We are going to add a helper method:
 
 ```python
-    def _get_website_relation(self) -> ops.Relation:
-        # WARNING: would return None if called too early, e.g. during install
-        return self.model.get_relation("website")
+def _get_website_relation(self) -> ops.Relation:
+    # WARNING: would return None if called too early, e.g. during install
+    return self.model.get_relation('website')
 ```
 
 That allows us to fetch the Relation wherever we need it and access its contents or mutate them in a natural way:
 ```python
-    def _on_website_relation_joined(self, _event):
-        relation = self._get_website_relation()
-        relation.data[self.unit].update(
-            {"hostname": self.private_address,
-             "port": self.port}
-        )
+def _on_website_relation_joined(self, _event):
+    relation = self._get_website_relation()
+    relation.data[self.unit].update({
+        'hostname': self.private_address,
+        'port': self.port,
+    })
 ```
 
 Note how `relation.data` provides an interface to the relation databag (see [](#set-up-a-relation)) and we need to select which part of that bag to access by passing an `ops.Unit` instance.
@@ -209,8 +226,8 @@ Note how `relation.data` provides an interface to the relation databag (see [](#
 
 Every maintainable charm will have some form of logging integrated; in a few places in the Bash scripts we see calls to a `juju-log` command; we can replace them with simple `logger.log` calls; such as in
 ```python
-    def _on_website_relation_departed(self, _event):  # noqa
-        logger.debug("%s departed website relation", self.unit.name)
+def _on_website_relation_departed(self, _event):  # noqa
+    logger.debug('%s departed website relation', self.unit.name)
 ```
 Where `logger = logging.getLogger(__name__)`.
 
@@ -219,7 +236,7 @@ Where `logger = logging.getLogger(__name__)`.
 Some of the Bash scripts read environment variables such as `$JUJU_REMOTE_UNIT`, `$JUJU_UNIT_NAME` ; of course we could do
 
 ```python
-JUJU_UNIT_NAME = os.environ["JUJU_UNIT_NAME"]
+JUJU_UNIT_NAME = os.environ['JUJU_UNIT_NAME']
 ```
 
 but `CharmBase` exposes a `.unit` attribute we can read this information from, instead of grabbing it off the environment; this makes for more readable code.
@@ -235,33 +252,33 @@ In the `_on_install` method we had translated one-to-one the calls to `snap info
 
 Then we can replace all that `Popen` piping with simpler calls into the lib's API; `_on_install `becomes:
 ```python
-    def _on_install(self, _event):
-        microsample_snap = snap.SnapCache()["microsample"]
-        if not microsample_snap.present:
-            self.unit.status = ops.MaintenanceStatus("installing microsample")
-            microsample_snap.ensure(snap.SnapState.Latest, channel="edge")
+def _on_install(self, _event):
+    microsample_snap = snap.SnapCache()['microsample']
+    if not microsample_snap.present:
+        self.unit.status = ops.MaintenanceStatus('installing microsample')
+        microsample_snap.ensure(snap.SnapState.Latest, channel='edge')
 
-        self.wait_service_active()
-        self.unit.status = ops.ActiveStatus()
-
+    self.wait_service_active()
+    self.unit.status = ops.ActiveStatus()
 ```
 
 Similarly all that string parsing we were doing to get a hold of the snap version, can be simplified by grabbing the `microsample_snap.channel` (not quite the same, but for the purposes of this charm, it is close enough).
 
 ```python
-    def _get_microsample_version(self):
-        microsample_snap = snap.SnapCache()["microsample"]
-        return microsample_snap.channel
+def _get_microsample_version(self):
+    microsample_snap = snap.SnapCache()['microsample']
+    return microsample_snap.channel
 ```
 
 Also, we can interact with the `microsample` service via the `operator_libs_linux.v0` charm library, which wraps `systemd` and allows us to write simply:
 
 ```python
-    def _on_start(self, _event):  # noqa
-        systemd.service_start("snap.microsample.microsample.service")
+def _on_start(self, _event):  # noqa
+    systemd.service_start('snap.microsample.microsample.service')
 
-    def _on_stop(self, _event):  # noqa
-        systemd.service_stop("snap.microsample.microsample.service")
+
+def _on_stop(self, _event):  # noqa
+    systemd.service_stop('snap.microsample.microsample.service')
 ```
 
 ```{note}

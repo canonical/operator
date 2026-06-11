@@ -35,11 +35,11 @@ The same applies to action events:
 
 ```python
 # Older Scenario code.
-action = Action("backup", params={...})
+action = Action('backup', params={...})
 ctx.run_action(action, state)
 
 # Scenario 7.x
-ctx.run(ctx.on.action("backup", params={...}), state)
+ctx.run(ctx.on.action('backup', params={...}), state)
 ```
 
 ### Provide State components as (frozen) sets
@@ -79,19 +79,19 @@ object, and if the charm calls `event.fail()`, an exception will be raised.
 
 ```python
 # Older Scenario Code
-action = Action("backup", params={...})
+action = Action('backup', params={...})
 out = ctx.run_action(action, state)
-assert out.logs == ["baz", "qux"]
+assert out.logs == ['baz', 'qux']
 assert not out.success
-assert out.results == {"foo": "bar"}
-assert out.failure == "boo-hoo"
+assert out.results == {'foo': 'bar'}
+assert out.failure == 'boo-hoo'
 
 # Scenario 7.x
 with pytest.raises(ActionFailure) as exc_info:
-    ctx.run(ctx.on.action("backup", params={...}), State())
+    ctx.run(ctx.on.action('backup', params={...}), State())
 assert ctx.action_logs == ['baz', 'qux']
-assert ctx.action_results == {"foo": "bar"}
-assert exc_info.value.message == "boo-hoo"
+assert ctx.action_results == {'foo': 'bar'}
+assert exc_info.value.message == 'boo-hoo'
 ```
 
 ### Use the Context object as a context manager
@@ -159,17 +159,14 @@ pass in an ID.
 # Older Scenario code.
 state = State(
     secrets=[
-        scenario.Secret(
-            id='foo',
-            contents={0: {'certificate': 'xxxx'}}
-        ),
+        scenario.Secret(id='foo', contents={0: {'certificate': 'xxxx'}}),
         scenario.Secret(
             id='foo',
             contents={
                 0: {'password': '1234'},
                 1: {'password': 'abcd'},
                 2: {'password': 'admin'},
-            }
+            },
         ),
     ]
 )
@@ -195,7 +192,7 @@ if you have a charm lib that will emit a `database-created` event on
 
 ```python
 # Older Scenario code.
-ctx.run("my_charm_lib.on.database_created", state)
+ctx.run('my_charm_lib.on.database_created', state)
 
 # Scenario 7.x
 ctx.run(ctx.on.relation_created(relation=relation), state)
@@ -226,10 +223,10 @@ The resources in State objects were previously plain dictionaries, and are now
 
 ```python
 # Older Scenario code
-state = State(resources={"/path/to/foo", pathlib.Path("/mock/foo")})
+state = State(resources={'/path/to/foo', pathlib.Path('/mock/foo')})
 
 # Scenario 7.x
-resource = Resource(location="/path/to/foo", source=pathlib.Path("/mock/foo"))
+resource = Resource(location='/path/to/foo', source=pathlib.Path('/mock/foo'))
 state = State(resources={resource})
 ```
 
@@ -242,10 +239,10 @@ requires a binding name to be passed in when it is created.
 
 ```python
 # Older Scenario code
-state = State(networks={"foo": Network.default()})
+state = State(networks={'foo': Network.default()})
 
 # Scenario 7.x
-state = State(networks={Network.default("foo")})
+state = State(networks={Network.default('foo')})
 ```
 
 ### Use the .deferred() method to populate State.deferred
@@ -260,16 +257,18 @@ and so on).
 ```python
 # Older Scenario code
 deferred_start = scenario.deferred('start', handler=MyCharm._on_start)
-deferred_relation_created = Relation('foo').changed_event.deferred(handler=MyCharm._on_foo_relation_changed)
+deferred_relation_created = Relation('foo').changed_event.deferred(
+    handler=MyCharm._on_foo_relation_changed
+)
 deferred_config_changed = DeferredEvent(
-    handle_path='MyCharm/on/config_changed[1]',
-    owner='MyCharm',
-    observer='_on_config_changed'
+    handle_path='MyCharm/on/config_changed[1]', owner='MyCharm', observer='_on_config_changed'
 )
 
 # Scenario 7.x
 deferred_start = ctx.on.start().deferred(handler=MyCharm._on_start)
-deferred_relation_changed = ctx.on.relation_changed(Relation('foo')).deferred(handler=MyCharm._on_foo_relation_changed)
+deferred_relation_changed = ctx.on.relation_changed(Relation('foo')).deferred(
+    handler=MyCharm._on_foo_relation_changed
+)
 deferred_config_changed = ctx.on.config_changed().deferred(handler=MyCharm._on_config_changed)
 ```
 

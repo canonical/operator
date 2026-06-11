@@ -96,11 +96,12 @@ def __init__(self, framework: ops.Framework):
         self.on.config_changed,
         self.on['foo-relation'].relation_changed,
         self.on['bar-relation'].relation_changed,
-        ...
+        ...,
     ]
 
     for event in events:
         framework.observe(event, self._reconcile)
+
 
 def _reconcile(self, _: ops.EventBase):
     # Early checks
@@ -158,20 +159,22 @@ def __init__(self, framework: ops.Framework):
     self.framework.observe(self.on.start, self._on_start)
 
     hostname = socket.getfqdn()
-    self.foo_requirer = FooRequirer(self, "foo-relation", address=hostname)
+    self.foo_requirer = FooRequirer(self, 'foo-relation', address=hostname)
     self.framework.observe(
         self.foo_requirer.on.data_available,
         self._on_data_available,
     )
 
-    self.bar_provider = BarProvider(self, "bar-relation")
+    self.bar_provider = BarProvider(self, 'bar-relation')
     self.framework.observe(
         self.bar_provider.on.create_bar,
         self._on_create_bar,
     )
 
+
 def _on_install(self, event: ops.InstallEvent):
     self.workload.install_binaries()
+
 
 def _on_start(self, event: ops.StartEvent):
     self.workload.start_service()
@@ -179,9 +182,11 @@ def _on_start(self, event: ops.StartEvent):
     if self.unit.is_leader():
         ...
 
+
 def _on_data_available(self, event: DataAvailableEvent):
     # Update the workload with event's data
     self.workload.reconfigure(some_key=event.some_value)
+
 
 def _on_create_bar(self, event: CreateBarEvent):
     # Provision a `Bar` resource in the workload
