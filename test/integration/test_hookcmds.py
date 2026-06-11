@@ -119,7 +119,12 @@ def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
     charm_dir = pathlib.Path(charm_path).parent
     resource_file = charm_dir / 'test-file.txt'
     resource_file.write_text('hello from the integration test resource')
-    juju.deploy(charm_path, num_units=2, resources={'test-file': str(resource_file)})
+    juju.deploy(
+        charm_path,
+        num_units=2,
+        resources={'test-file': str(resource_file)},
+        trust=True,
+    )
     juju.deploy('any-charm', channel='latest/beta')
     juju.integrate('test-hookcmds:anycharm', 'any-charm')
     juju.wait(jubilant.all_active)
@@ -489,16 +494,8 @@ def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
 
 def test_credential_get(juju: jubilant.Juju, any_unit: str):
     """credential_get returns cloud credentials with a non-empty type and name."""
-    # credential-get requires the application to have been deployed with
-    # --trust; the integration test_setup deploys without trust, so the
-    # hookcmd exits non-zero. Skip rather than fail — this is a substrate /
-    # deploy-time configuration, not a hookcmds bug. Passes on substrates
-    # where the default credential is implicitly trusted (e.g. LXD on Juju
-    # 3.6 in earlier matrix cells).
-    try:
-        task = juju.run(any_unit, 'test-credential-get')
-    except jubilant.TaskError as exc:
-        pytest.skip(f'credential-get not available without --trust on this substrate: {exc}')
+    # test_setup deploys with trust=True so credential-get is permitted.
+    task = juju.run(any_unit, 'test-credential-get')
     assert task.success
     assert task.results['cloud-type']  # non-empty cloud type (e.g. 'lxd', 'microk8s')
     assert task.results['cloud-name']  # non-empty cloud name
@@ -512,12 +509,12 @@ def test_relation_model_get(juju: jubilant.Juju, leader: str):
     task = juju.run(leader, 'test-relation-model-get')
     assert task.success
     uuid = task.results['uuid']
-    # `relation_model_get` is designed for cross-model relations; on a peer
-    # relation it succeeds but returns a UUID whose relationship to the local
-    # model isn't guaranteed across Juju versions or substrates (observed
-    # different from `juju show-model`'s model-uuid on Juju 4 and on k8s
-    # 3.x). A meaningful equality assertion needs a real cross-model
-    # scenario; for now, just confirm the call returns a non-empty UUID.
+    # For now, just confirm the call returns a UUID-shaped string. We
+    # previously asserted equality with `juju show-model`'s model-uuid,
+    # but observed mismatches on Juju 4 and on k8s 3.x. Whether that's a
+    # real semantic difference or a test-environment artefact is being
+    # validated locally; tighten this back to an equality check once that
+    # investigation lands.
     assert uuid
     assert len(uuid.split('-')) == 5, f'Not a UUID: {uuid!r}'
 
@@ -621,14 +618,12 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
 
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
-    # juju-reboot exits non-zero on substrates that can't actually reboot the
-    # unit (Kubernetes pods, LXD containers on newer Juju). The hookcmd
-    # plumbing is identical to the supported case, so skip rather than fail
-    # on those substrates.
-    try:
-        task = juju.run(any_unit, 'test-juju-reboot')
-    except jubilant.TaskError as exc:
-        pytest.skip(f'juju-reboot not supported on this substrate: {exc}')
+    # juju-reboot doesn't apply on Kubernetes — pods can't reboot themselves
+    # and the hookcmd is not supported on a CAAS substrate. Skip rather than
+    # try and fail at runtime.
+    if _is_caas(juju):
+        pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
+    task = juju.run(any_unit, 'test-juju-reboot')
     assert task.success
     # After the action, Juju queues a reboot. Wait for the unit to recover.
     juju.wait(jubilant.all_active)
