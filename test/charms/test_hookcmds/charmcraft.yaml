@@ -46,6 +46,7 @@ storage:
 resources:
     test-file:
         type: file
+        filename: test-file.txt
         description: Small file used by integration tests of resource_get.
 
 actions:
