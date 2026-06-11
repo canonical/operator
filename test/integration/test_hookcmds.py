@@ -78,13 +78,17 @@ _JUJU4_NETGET_K8S_BUG = (
 )
 
 
-def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | None) -> None:
+def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> None:
     """Apply strict xfail semantics for the Juju 4.0 commit-phase regression.
 
     Imperative `pytest.xfail()` doesn't support `strict=True`. Call this from
     both branches of a try/except so we get the equivalent: on Juju 4 the test
     must fail (xfail), and if it ever passes the suite fails loudly so we
     remember to remove the guard. On Juju <4 the original error propagates.
+
+    Accepts any `Exception` because the bug surfaces as either a
+    `jubilant.TaskError` (action returned non-zero) or a `TimeoutError`
+    (driver gave up waiting) depending on the failure path.
     """
     if _juju_major(juju) < 4:
         if error is not None:
@@ -514,10 +518,9 @@ def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
     # times out at least as often as revoke does.
     try:
         task = juju.run(leader, 'test-secret-grant')
-    except (jubilant.TaskError, TimeoutError):
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     r = task.results
     assert r['granted'] == 'true'
@@ -526,10 +529,9 @@ def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
 
     try:
         task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
-    except (jubilant.TaskError, TimeoutError):
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     assert task.results['revoked'] == 'true'
 
@@ -567,10 +569,9 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
     # from the secret ones; xfail until pinned down.
     try:
         task = juju.run(any_unit, 'test-ports-endpoint-scoped', params={'port': 7766})
-    except (jubilant.TaskError, TimeoutError):
-        if _juju_major(juju) >= 4:
-            pytest.xfail(_JUJU4_COMMIT_BUG)
-        raise
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     r = task.results
     assert r['port-found-with-endpoint'] == 'true', (
