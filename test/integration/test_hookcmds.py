@@ -456,7 +456,7 @@ def test_resource_get(juju: jubilant.Juju, any_unit: str):
     task = juju.run(any_unit, 'test-resource-get')
     assert task.success
     path = task.results['path']
-    assert path  # non-empty path string
+    assert pathlib.Path(path).name == 'test-file.txt'
 
 
 # Secret grant / revoke (secret_grant / secret_revoke)
