@@ -79,22 +79,23 @@ _JUJU4_NETGET_K8S_BUG = (
 
 
 def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> None:
-    """Apply strict xfail semantics for the Juju 4.0 commit-phase regression.
+    """Apply xfail semantics for the Juju 4.0 commit-phase regression.
 
-    Imperative `pytest.xfail()` doesn't support `strict=True`. Call this from
-    both branches of a try/except to approximate the equivalent:
-
-    * Juju <4, error → re-raise (real failure).
-    * Juju <4, success → just continue.
-    * Juju >=4, error → xfail (the bug is observed on both machine and k8s).
-    * Juju >=4 k8s, success → strict pytest.fail (the bug consistently hits
-      on k8s, so success means it's been fixed — drop the guard).
-    * Juju >=4 machine, success → just continue (the bug surfaces less
-      reliably on machine; don't strict-fail and force a chase).
+    Call this from the except branch (passing the caught exception) and from
+    the success path (passing None). On Juju >=4 a caught error is treated as
+    expected. On Juju <4 the error propagates.
 
     Accepts any `Exception` because the bug surfaces as either a
     `jubilant.TaskError` (action returned non-zero) or a `TimeoutError`
     (driver gave up waiting) depending on the failure path.
+
+    Note: a previous version of this helper attempted strict-style
+    semantics (pytest.fail on Juju 4 success, mimicking `xfail(strict=True)`)
+    so we'd notice when to drop the guard. That doesn't work in a multi-
+    channel matrix — when the upstream fix lands in 4.0/edge or 4.1/edge
+    but 4.0/stable still ships the bug, the guard must stay. The cells
+    where the bug is fixed are the signal; nothing to do at test-author
+    time.
     """
     if _juju_major(juju) < 4:
         if error is not None:
@@ -102,8 +103,6 @@ def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> Non
         return
     if error is not None:
         pytest.xfail(_JUJU4_COMMIT_BUG)
-    if _is_caas(juju):
-        pytest.fail(f'Juju 4/k8s no longer hits {_JUJU4_COMMIT_BUG} — remove the guard.')
 
 
 # Deployment
