@@ -15,9 +15,20 @@
 # To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 import ops
+import pytest
 from ops import testing
 
 from charm import FastAPIDemoCharm
+
+
+def mock_get_version(port: int):
+    """Get a mock version string without executing the workload code."""
+    return "1.0.4"
+
+
+@pytest.fixture(autouse=True)
+def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
 
 
 def test_pebble_layer():
@@ -51,6 +62,8 @@ def test_pebble_layer():
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
+    # Check the workload version is set
+    assert state_out.workload_version is not None
 
 
 def test_config_changed():

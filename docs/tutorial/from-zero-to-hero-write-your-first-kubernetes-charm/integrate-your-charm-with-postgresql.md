@@ -236,9 +236,21 @@ def _replan_workload(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
+        return
+
+    try:
+        version = fastapi_demo.get_version(config.server_port)
+    except (urllib.error.URLError, json.JSONDecodeError) as version_e:
+        logger.error(
+            "Failed to get version from the server: %s. Please double check your port config",
+            version_e,
+        )
+        return
+
+    self.unit.set_workload_version(version)
 ```
 
-We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
+We removed four `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
 
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
@@ -329,6 +341,10 @@ self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload contain
 
 ```python
 self.unit.status = ops.BlockedStatus(str(e))
+```
+
+```python
+self.unit.status = ops.BlockedStatus(str(version_e))
 ```
 
 ## Validate your charm
@@ -522,6 +538,13 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+    version = juju.status().apps["fastapi-demo"].version
+    # We'll need to update this version every time we upgrade to a new workload
+    # version. If the workload has an API or some other way of getting the
+    # version, the test should get it from there and use that to compare to the
+    # unit setting.
+    assert version == "1.0.4"
 ```
 
 This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.

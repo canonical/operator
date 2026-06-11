@@ -39,3 +39,13 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+
+
+def test_workload_version_is_set(juju: jubilant.Juju):
+    # Verify that the workload version has been set.
+    version = juju.status().apps["fastapi-demo"].version
+    # We'll need to update this version every time we upgrade to a new workload
+    # version. If the workload has an API or some other way of getting the
+    # version, the test should get it from there and use that to compare to the
+    # unit setting.
+    assert version == "1.0.4"

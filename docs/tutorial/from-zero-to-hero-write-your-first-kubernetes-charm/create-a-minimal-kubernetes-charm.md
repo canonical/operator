@@ -406,14 +406,18 @@ def mock_get_version(port: int):
     return "1.0.4"
 
 
-def test_pebble_layer(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture(autouse=True)
+def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
+
+
+def test_pebble_layer():
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
     )
-    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {

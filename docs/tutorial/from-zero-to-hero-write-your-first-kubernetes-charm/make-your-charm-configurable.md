@@ -59,7 +59,7 @@ class FastAPIConfig:
             raise ValueError("Invalid port number, 22 is reserved for SSH")
 ```
 
-Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
+Then, still in `src/charm.py`, add `import dataclasses`, `import json`, and `import urllib.error` in the imports at the top of the file.
 
 We'll use [](CharmBase.load_config) to create an instance of your config class from the Juju config data. This allows IDEs to provide hints when we are accessing the configuration, and static type checkers are able to validate that we are using the config option correctly.
 
@@ -127,14 +127,28 @@ def _replan_workload(self) -> None:
         # service if required.
         self.container.replan()
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
-
-        self.unit.status = ops.ActiveStatus()
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
         self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
+        return
+
+    try:
+        version = fastapi_demo.get_version(config.server_port)
+    except (urllib.error.URLError, json.JSONDecodeError) as version_e:
+        logger.error(
+            "Failed to get version from the server: %s. Please double check your port config",
+            version_e,
+        )
+        self.unit.status = ops.BlockedStatus(str(version_e))
+        return
+
+    self.unit.set_workload_version(version)
+    self.unit.status = ops.ActiveStatus()
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+
+We also add error handling for getting the workload version. If the charm fails to obtain a valid version number, we set the unit status to blocked. This lets the Juju user know that either the charm code or the workload application behaved unexpectedly.
 
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 

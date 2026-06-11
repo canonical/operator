@@ -17,9 +17,13 @@
 """Kubernetes charm for a demo app."""
 
 import dataclasses
+import json
 import logging
+import urllib.error
 
 import ops
+
+import fastapi_demo
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -85,11 +89,23 @@ class FastAPIDemoCharm(ops.CharmBase):
             # service if required.
             self.container.replan()
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
-
-            self.unit.status = ops.ActiveStatus()
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info("Unable to connect to Pebble: %s", e)
             self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
+            return
+
+        try:
+            version = fastapi_demo.get_version(config.server_port)
+        except (urllib.error.URLError, json.JSONDecodeError) as version_e:
+            logger.error(
+                "Failed to get version from the server: %s. Please double check your port config",
+                version_e,
+            )
+            self.unit.status = ops.BlockedStatus(str(version_e))
+            return
+
+        self.unit.set_workload_version(version)
+        self.unit.status = ops.ActiveStatus()
 
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""

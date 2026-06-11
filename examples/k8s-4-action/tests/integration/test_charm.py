@@ -55,3 +55,10 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+    version = juju.status().apps["fastapi-demo"].version
+    # We'll need to update this version every time we upgrade to a new workload
+    # version. If the workload has an API or some other way of getting the
+    # version, the test should get it from there and use that to compare to the
+    # unit setting.
+    assert version == "1.0.4"
