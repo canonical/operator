@@ -559,7 +559,7 @@ def test_storage_add(juju: jubilant.Juju, any_unit: str):
     assert count_after == count_before + 1
 
 
-# Ports — endpoint-scoped variant (Follow-up 4)
+# Ports — endpoint-scoped variant
 
 
 def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
