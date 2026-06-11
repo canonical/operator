@@ -615,11 +615,15 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
 
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
-    # juju-reboot doesn't apply on Kubernetes — pods can't reboot themselves
-    # and the hookcmd is not supported on a CAAS substrate. Skip rather than
-    # try and fail at runtime.
+    # juju-reboot only works on substrates where the unit can actually reboot.
+    # Kubernetes pods can't reboot themselves, and LXD/localhost containers
+    # don't have the privileges to reboot either — both of which cover every
+    # cell of our CI matrix. Skip up front so the test surfaces as 'skipped'
+    # rather than 'failed' with a status-1 from juju-reboot.
     if _is_caas(juju):
         pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
+    if juju.status().model.cloud == 'localhost':
+        pytest.skip('juju-reboot is not supported in LXD/localhost containers')
     task = juju.run(any_unit, 'test-juju-reboot')
     assert task.success
     # After the action, Juju queues a reboot. Wait for the unit to recover.
