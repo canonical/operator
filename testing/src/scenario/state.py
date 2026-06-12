@@ -2140,10 +2140,12 @@ class _EventPath(str):
         owner_path: list[str]
         suffix: str
         prefix: str
+        original_prefix: str
         is_custom: bool
         type: _EventType
 
     def __new__(cls, string: str):
+        original_string = string
         string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
@@ -2152,6 +2154,10 @@ class _EventPath(str):
 
         instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
         instance.prefix = string.removesuffix(instance.suffix)
+        # The original (un-normalised) prefix, preserving the exact spelling
+        # of the entity name as declared in the charm metadata. _normalise_name
+        # only swaps dashes for underscores, so lengths match.
+        instance.original_prefix = original_string[: len(instance.prefix)]
         instance._is_custom = instance.suffix == ''
 
         return instance
@@ -2245,12 +2251,34 @@ class _Event:  # type: ignore
 
     _owner_path: list[str] = dataclasses.field(default_factory=list)
 
+    # The event name as Juju provides it. Set in __post_init__ via
+    # object.__setattr__ (frozen dataclass), so it's excluded from init.
+    _juju_name: str = dataclasses.field(init=False)
+
     def __post_init__(self):
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
-        # This is the event name as Juju provides it, with dashes not underscores.
-        object.__setattr__(self, '_juju_name', f'{path.prefix}{path.suffix.replace("_", "-")}')
+        # This is the event name as Juju provides it. Juju keeps the entity
+        # name (a relation endpoint, storage name, or container name) exactly
+        # as it is declared in the charm metadata -- which may contain dashes
+        # *or* underscores -- and only ever uses dashes in the event-type
+        # suffix. For events that are not tied to such an entity, the whole
+        # name uses dashes. See #2511.
+        object.__setattr__(self, '_juju_name', self._build_juju_name(path))
+
+    @staticmethod
+    def _build_juju_name(path: _EventPath) -> str:
+        suffix = path.suffix
+        if suffix and path.type in (
+            _EventType.RELATION,
+            _EventType.STORAGE,
+            _EventType.WORKLOAD,
+        ):
+            # Preserve the entity name (the prefix) verbatim; only the suffix
+            # is normalised to dashes.
+            return f'{path.original_prefix}{suffix.replace("_", "-")}'
+        return path.name.replace('_', '-')
 
     @property
     def _path(self) -> _EventPath:
