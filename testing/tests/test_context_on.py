@@ -685,11 +685,7 @@ def test_workload_event_juju_name_preserves_container_name(
     event_attr: str,
     expected_suffix: str,
 ):
-    """Juju preserves the container name verbatim in JUJU_HOOK_NAME.
-
-    Regression test: scenario was emitting hook names with the container
-    name's dashes mangled to underscores (see gh-2511, gh-2565).
-    """
+    """Juju preserves the container name verbatim in JUJU_HOOK_NAME."""
     meta: dict[str, Any] = {'name': 'foo', 'containers': {container_name: {}}}
     ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
     on_attr = getattr(ctx.on, event_attr)
@@ -717,7 +713,7 @@ def test_relation_event_juju_name_preserves_endpoint(
     event_attr: str,
     expected_suffix: str,
 ):
-    """Juju preserves the relation endpoint verbatim in JUJU_HOOK_NAME (gh-2511)."""
+    """Juju preserves the relation endpoint verbatim in JUJU_HOOK_NAME."""
     meta: dict[str, Any] = {'name': 'foo', 'requires': {endpoint: {'interface': 'whatever'}}}
     ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
     relation = scenario.Relation(endpoint)

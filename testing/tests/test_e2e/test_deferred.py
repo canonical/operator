@@ -169,7 +169,7 @@ def test_deferred_workload_event_dashed_container_name():
 
     Regression test: the deferred handle path must use the Python-attribute
     form of the event name (``workload_a_pebble_ready``), not the verbatim
-    container name, or ops silently drops the notice (gh-2565).
+    container name, or ops silently drops the notice.
     """
     captured: list[ops.EventBase] = []
 

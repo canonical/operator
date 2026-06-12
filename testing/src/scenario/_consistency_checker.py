@@ -210,7 +210,7 @@ def _check_relation_event(
             errors.append(
                 f'relation event prefix {event._path.prefix!r} does not match the relation '
                 f'endpoint name {event.relation.endpoint!r} (the endpoint name must appear '
-                f'verbatim, as declared in the charm metadata).',
+                exactly as declared in the charm metadata).',
             )
         if event.relation not in state.relations:
             errors.append(
@@ -235,14 +235,14 @@ def _check_workload_event(
         if event._path.prefix != event.container.name:
             errors.append(
                 f'workload event prefix {event._path.prefix!r} does not match the container '
-                f'name {event.container.name!r} (the container name must appear verbatim, '
+                f'name {event.container.name!r} (the container name must appear exactly '
                 f'as declared in the charm metadata).',
             )
         if event.container not in state.containers:
             errors.append(
                 f'cannot emit {event.name} because container {event.container.name} '
                 f'is not in the state (a container with the same name is not '
-                f'sufficient - you must pass the object in the state to the event).',
+                f'sufficient. You must pass the object in the state to the event).',
             )
         if not event.container.can_connect:
             warnings.append(
@@ -302,7 +302,7 @@ def _check_storage_event(
     elif event._path.prefix != storage.name:
         errors.append(
             f'storage event prefix {event._path.prefix!r} does not match the storage '
-            f'name {storage.name!r} (the storage name must appear verbatim, as declared '
+            f'name {storage.name!r} (the storage name must appear exactly as declared '
             f'in the charm metadata).',
         )
     elif storage.name not in meta['storage']:

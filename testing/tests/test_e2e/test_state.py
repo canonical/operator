@@ -328,8 +328,6 @@ def test_container_name_valid(name: str):
     ('workload_a', 'Workload', '-workload', 'workload-', '', 'wörkload', 'a' * 64),
 )
 def test_container_name_invalid(name: str):
-    # Juju passes container names verbatim to Kubernetes, which requires
-    # RFC 1123 DNS labels.
     with pytest.raises(StateValidationError):
         Container(name)
 
@@ -340,12 +338,9 @@ def test_storage_name_valid(name: str):
 
 
 @pytest.mark.parametrize(
-    'name',
-    ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
+    'name', ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
 )
 def test_storage_name_invalid(name: str):
-    # Juju storage names cannot contain underscores, must start with a letter,
-    # and each hyphen-separated part must contain at least one letter.
     with pytest.raises(StateValidationError):
         Storage(name)
 
@@ -377,8 +372,6 @@ def test_relation_endpoint_name_valid(
 def test_relation_endpoint_name_invalid(
     klass: type[RelationBase], kwargs: dict[str, Any], endpoint: str
 ):
-    # Juju relation endpoint names may contain underscores or hyphens (singly,
-    # between alphanumeric runs), and must start with a letter.
     with pytest.raises(StateValidationError):
         klass(endpoint, **kwargs)
 

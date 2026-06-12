@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+import pathlib
 from tempfile import TemporaryDirectory
 from typing import Any
 
@@ -12,7 +12,7 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Relation, State, Storage, _Action, _CharmSpec, _Event
+from scenario.state import Container, Relation, Secret, State, Storage, _Action, _CharmSpec, _Event
 
 import ops
 from ops._main import _Abort
@@ -283,13 +283,11 @@ def _env_for(charm_meta: dict[str, Any], event: _Event, state: State) -> dict[st
             charm_root=tmp,
             unit_id=0,
         )
-        return rt._get_event_env(state, event, Path(tmp))
+        return rt._get_event_env(state, event, pathlib.Path(tmp))
 
 
 def test_workload_event_dispatch_path_preserves_container_name():
-    """JUJU_HOOK_NAME/JUJU_DISPATCH_PATH carry the container name verbatim (gh-2565)."""
-    from scenario.state import Container
-
+    """JUJU_HOOK_NAME/JUJU_DISPATCH_PATH carry the container name verbatim."""
     container = Container('temporal-worker')
     meta: dict[str, Any] = {'name': 'dashchk', 'containers': {'temporal-worker': {}}}
     event = _Event('temporal-worker_pebble_ready', container=container)
@@ -345,8 +343,6 @@ def test_action_dispatch_path_uses_actions_prefix():
 )
 def test_builtin_event_dispatch_path_is_hyphenated(path: str, hook_name: str):
     """Juju hook names are hyphenated; scenario used to leak underscores."""
-    from scenario.state import Secret
-
     meta = {'name': 'dashchk'}
     secret = Secret({'key': 'value'}, id='secret:0')
     event = _Event(path, secret=secret if path == 'secret_changed' else None)

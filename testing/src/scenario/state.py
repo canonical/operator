@@ -432,20 +432,19 @@ class Secret:
 
 
 def _to_python_attr(s: str):
-    """Translate a Juju metadata name (which may contain dashes) into Python-attr form.
+    """Translate a Juju metadata name (which may contain dashes) into attribute form.
 
     This is **lossy** — calling it on an already-dash-free name discards no
     information, but a verbatim metadata name like ``foo-bar`` and the
-    Python-attr form ``foo_bar`` are not distinguishable afterwards. Use it
+    Python attribute form ``foo_bar`` are not distinguishable afterwards. Use it
     only for matching/dispatch; never round-trip through it to build outgoing
     Juju env vars, since Juju preserves the metadata name verbatim.
     """
     return s.replace('-', '_')
 
 
-# Real Juju's naming rules for charm metadata entities. Scenario enforces
-# these so that tests cannot pass with names that a real deployment would
-# reject.
+# Juju's naming rules for charm metadata entities. Scenario enforces these
+# these so that tests cannot pass with names that a real deployment would reject.
 #
 # Sources (juju/names and juju/charm, identical in Juju 3.x and 4.x):
 # - relation endpoints: RelationSnippet — underscores ARE allowed.

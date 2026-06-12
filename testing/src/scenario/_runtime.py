@@ -70,9 +70,8 @@ class Runtime(Generic[CharmType]):
     def _get_event_env(self, state: State, event: _Event, charm_root: Path) -> dict[str, str]:
         """Build the simulated environment the operator framework expects."""
         if event._is_action_event and (action := event.action):
-            # Real Juju dispatches actions as `actions/<action-name>` (no
+            # Juju dispatches actions as `actions/<action-name>` (no
             # `_action` suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
-            # action.name cannot contain underscores (Juju rejects them).
             dispatch_path = f'actions/{action.name}'
         else:
             dispatch_path = f'hooks/{event._juju_name}'
