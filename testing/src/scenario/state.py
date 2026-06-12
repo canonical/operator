@@ -431,8 +431,15 @@ class Secret:
             object.__setattr__(self, 'rotate', rotate)
 
 
-def _normalise_name(s: str):
-    """Event names, in Scenario, uniformly use underscores instead of dashes."""
+def _to_python_attr(s: str):
+    """Translate a Juju metadata name (which may contain dashes) into Python-attr form.
+
+    This is **lossy** — calling it on an already-dash-free name discards no
+    information, but a verbatim metadata name like ``foo-bar`` and the
+    Python-attr form ``foo_bar`` are not distinguishable afterwards. Use it
+    only for matching/dispatch; never round-trip through it to build outgoing
+    Juju env vars, since Juju preserves the metadata name verbatim.
+    """
     return s.replace('-', '_')
 
 
@@ -1968,16 +1975,13 @@ class State:
         raise KeyError(f'relation: id={rel_id} not found in the State')
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
-        """Get all relations on this endpoint from the current state."""
-        # we rather normalize the endpoint than worry about cursed metadata situations such as:
-        # requires:
-        #   foo-bar: ...
-        #   foo_bar: ...
+        """Get all relations on this endpoint from the current state.
 
-        normalized_endpoint = _normalise_name(endpoint)
-        return tuple(
-            r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
-        )
+        The endpoint is matched verbatim against the names declared in the
+        charm's metadata — pass ``foo-bar`` to find a relation declared as
+        ``foo-bar``, not ``foo_bar``.
+        """
+        return tuple(r for r in self.relations if r.endpoint == endpoint)
 
     @classmethod
     def from_context(
@@ -2308,25 +2312,24 @@ class _EventPath(str):
         owner_path: list[str]
         suffix: str
         prefix: str
-        original_prefix: str
-        is_custom: bool
         type: _EventType
 
     def __new__(cls, string: str):
-        original_string = string
-        string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
-        instance.name = name = string.split('.')[-1]
+        raw_name = string.split('.')[-1]
         instance.owner_path = string.split('.')[:-1] or ['on']
 
-        instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
-        instance.prefix = string.removesuffix(instance.suffix)
-        # The original (un-normalised) prefix, preserving the exact spelling
-        # of the entity name as declared in the charm metadata. _normalise_name
-        # only swaps dashes for underscores, so lengths match.
-        instance.original_prefix = original_string[: len(instance.prefix)]
-        instance._is_custom = instance.suffix == ''
+        # `name` is the Python-attribute form: what the event is called on
+        # `charm.on`, and the event kind ops uses in handle paths (for
+        # example ``foo_bar_pebble_ready`` for container ``foo-bar``).
+        instance.name = _to_python_attr(raw_name)
+        instance.suffix, instance.type = _EventPath._get_suffix_and_type(instance.name)
+        # The prefix is sliced from the raw string by length so the entity
+        # name is preserved verbatim (e.g. ``foo-bar`` in
+        # ``foo-bar_pebble_ready``): Juju hook names keep the metadata name
+        # exactly as declared, and only the suffix is known to be hyphenated.
+        instance.prefix = raw_name[: len(raw_name) - len(instance.suffix)]
 
         return instance
 
@@ -2361,7 +2364,9 @@ class _EventPath(str):
             return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.WORKLOAD
 
         if s in _BUILTIN_EVENTS:
-            return '', _EventType.BUILTIN
+            # The whole name is the suffix, so that the Juju hook name gets
+            # hyphenated (for example ``update_status`` -> ``update-status``).
+            return s, _EventType.BUILTIN
 
         return '', _EventType.CUSTOM
 
@@ -2427,26 +2432,11 @@ class _Event:  # type: ignore
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
-        # This is the event name as Juju provides it. Juju keeps the entity
-        # name (a relation endpoint, storage name, or container name) exactly
-        # as it is declared in the charm metadata -- which may contain dashes
-        # *or* underscores -- and only ever uses dashes in the event-type
-        # suffix. For events that are not tied to such an entity, the whole
-        # name uses dashes. See #2511.
-        object.__setattr__(self, '_juju_name', self._build_juju_name(path))
-
-    @staticmethod
-    def _build_juju_name(path: _EventPath) -> str:
-        suffix = path.suffix
-        if suffix and path.type in (
-            _EventType.RELATION,
-            _EventType.STORAGE,
-            _EventType.WORKLOAD,
-        ):
-            # Preserve the entity name (the prefix) verbatim; only the suffix
-            # is normalised to dashes.
-            return f'{path.original_prefix}{suffix.replace("_", "-")}'
-        return path.name.replace('_', '-')
+        # This is the hook name as Juju provides it: the entity name
+        # (container/relation/storage) carries verbatim from the path; only
+        # the event-type suffix is hyphenated. (Not meaningful for action or
+        # custom events, which have no Juju hook name.)
+        object.__setattr__(self, '_juju_name', f'{path.prefix}{path.suffix.replace("_", "-")}')
 
     @property
     def _path(self) -> _EventPath:
@@ -2455,14 +2445,18 @@ class _Event:  # type: ignore
 
     @property
     def name(self) -> str:
-        """Full event name.
+        """Full event name, in Python-attribute form (as ops names the event).
 
         Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of the event, the
         prefix the name of the entity the event is about.
 
-        "foo-relation-changed":
+        "foo_relation_changed":
          - "foo"=prefix (name of a relation),
-         - "-relation-changed"=suffix (relation event)
+         - "_relation_changed"=suffix (relation event)
+
+        Dashes in the entity name are translated to underscores, so an event
+        for relation endpoint "foo-bar" has the name "foo_bar_relation_changed"
+        (the verbatim endpoint name is preserved in ``self._path.prefix``).
         """
         return self._path.name
 

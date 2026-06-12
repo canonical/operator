@@ -67,13 +67,20 @@ class Runtime(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
 
-    def _get_event_env(self, state: State, event: _Event, charm_root: Path):
+    def _get_event_env(self, state: State, event: _Event, charm_root: Path) -> dict[str, str]:
         """Build the simulated environment the operator framework expects."""
+        if event._is_action_event and (action := event.action):
+            # Real Juju dispatches actions as `actions/<action-name>` (no
+            # `_action` suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
+            # action.name cannot contain underscores (Juju rejects them).
+            dispatch_path = f'actions/{action.name}'
+        else:
+            dispatch_path = f'hooks/{event._juju_name}'
         env = {
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
+            'JUJU_DISPATCH_PATH': dispatch_path,
             'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
@@ -92,8 +99,9 @@ class Runtime(Generic[CharmType]):
         if event._is_action_event and (action := event.action):
             env.update(
                 {
-                    'JUJU_ACTION_NAME': action.name.replace('_', '-'),
+                    'JUJU_ACTION_NAME': action.name,
                     'JUJU_ACTION_UUID': action.id,
+                    'JUJU_ACTION_TAG': f'action-{action.id}',
                 },
             )
 
@@ -107,7 +115,7 @@ class Runtime(Generic[CharmType]):
             env.update(
                 {
                     'JUJU_RELATION': relation.endpoint,
-                    'JUJU_RELATION_ID': str(relation.id),
+                    'JUJU_RELATION_ID': f'{relation.endpoint}:{relation.id}',
                     'JUJU_REMOTE_APP': remote_app_name,
                 },
             )
