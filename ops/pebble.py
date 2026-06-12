@@ -1958,8 +1958,23 @@ class _WebsocketWriter(io.BufferedIOBase):
         return len(chunk)
 
     def close(self):
-        """Send end-of-file message to websocket."""
-        self.ws.send('{"command":"end"}')
+        """Send end-of-file message to websocket.
+
+        Idempotent and tolerant of the underlying websocket already being
+        closed: ``ExecProcess._wait`` shuts the stdio websocket down before
+        the writer (or the ``TextIOWrapper`` wrapping it) is finalised, so
+        ``IOBase.__del__`` would otherwise surface a
+        ``WebSocketConnectionClosedException`` as an "Exception ignored
+        while finalizing file" warning on Python 3.13+ (see CPython
+        gh-62948).
+        """
+        if self.closed:
+            return
+        try:
+            self.ws.send('{"command":"end"}')
+        except websocket.WebSocketConnectionClosedException:
+            pass
+        super().close()
 
 
 class _WebsocketReader(io.BufferedIOBase):
@@ -2222,15 +2237,16 @@ class Client:
         try:
             response = self.opener.open(request, timeout=self.timeout)
         except urllib.error.HTTPError as e:
-            code = e.code
-            status = e.reason
-            try:
-                body: dict[str, Any] = json.loads(e.read())
-                message: str = body['result']['message']
-            except (OSError, ValueError, KeyError) as e2:
-                # Will only happen on read error or if Pebble sends invalid JSON.
-                body: dict[str, Any] = {}
-                message = f'{type(e2).__name__} - {e2}'
+            with e:  # close the underlying tempfile so it doesn't leak
+                code = e.code
+                status = e.reason
+                try:
+                    body: dict[str, Any] = json.loads(e.read())
+                    message: str = body['result']['message']
+                except (OSError, ValueError, KeyError) as e2:
+                    # Will only happen on read error or if Pebble sends invalid JSON.
+                    body: dict[str, Any] = {}
+                    message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
             if e.args and isinstance(e.args[0], FileNotFoundError):

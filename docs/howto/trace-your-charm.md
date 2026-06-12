@@ -104,8 +104,10 @@ import opentelemetry.trace
 
 tracer = opentelemetry.trace.get_tracer(__name__)
 
+
 class Workload:
     ...
+
     def migrate_db(self):
         with tracer.start_as_current_span('migrate-db') as span:
             for attempt in range(3):
@@ -113,7 +115,7 @@ class Workload:
                     subprocess.check_output('/path/to/migrate.sh')
                 except subprocess.CalledProcessError:
                     span.add_event('db-migrate-failed', {'attempt': attempt})
-                    time.sleep(10 ** attempt)
+                    time.sleep(10**attempt)
                 else:
                     break
             else:
@@ -172,10 +174,12 @@ Or that span A is an ancestor of span C, which allows you to validate that an im
 ```py
 spans_by_id = {s.context.span_id: s for s in ctx.trace_data}
 
+
 def ancestors(span: ReadableSpan) -> Generator[ReadableSpan]:
     while span.parent:
         span = spans_by_id[span.parent.span_id]
         yield span
+
 
 assert span_a in list(ancestors(span_c))
 ```
@@ -184,11 +188,11 @@ You can disambiguate spans using their [`instrumentation_scope`](opentelemetry.s
 
 ```py
 # Spans from Ops
-ops_span.instrumentation_scope.name == "ops"
+ops_span.instrumentation_scope.name == 'ops'
 ops_span.name == ...
 
 # tracer = opentelemetry.trace.get_tracer("my-charm")
-my_span.instrumentation_scope.name == "my-charm"
+my_span.instrumentation_scope.name == 'my-charm'
 my_span.name == ...
 ```
 

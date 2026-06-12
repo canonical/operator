@@ -29,14 +29,17 @@ Before secrets, the owner charm might have looked as below:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined,
-                               self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
         event.relation.data[self.app]['username'] = 'admin'
-        event.relation.data[self.app]['password'] = 'admin'  # don't do this at home
+        event.relation.data[self.app]['password'] = (
+            'admin'  # don't do this at home
+        )
 ```
 
 With secrets, this can be rewritten as:
@@ -45,8 +48,9 @@ With secrets, this can be rewritten as:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_joined,
-                               self._on_database_relation_joined)
+        self.framework.observe(
+            self.on.database_relation_joined, self._on_database_relation_joined
+        )
 
     ...  # other methods and event handlers
 
@@ -75,13 +79,12 @@ To create a new secret revision, the owner charm must call `secret.set_content()
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
-    ... # as before
+    ...  # as before
 
     def _rotate_webserver_secret(self, secret):
         content = secret.get_content()
         secret.set_content({
-            'username': content['username'],              # keep the same username
+            'username': content['username'],  # keep the same username
             'password': _generate_new_secure_password(),  # something stronger than 'admin'
         })
 ```
@@ -107,8 +110,7 @@ Here is what the code would look like:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_rotate,
-                               self._on_secret_rotate)
+        self.framework.observe(self.on.secret_rotate, self._on_secret_rotate)
 
     ...  # as before
 
@@ -117,9 +119,9 @@ class MyDatabaseCharm(ops.CharmBase):
             'username': 'admin',
             'password': 'admin',
         }
-        secret = self.app.add_secret(content,
-            label='secret-for-webserver-app',
-            rotate=SecretRotate.DAILY)
+        secret = self.app.add_secret(
+            content, label='secret-for-webserver-app', rotate=SecretRotate.DAILY
+        )
 
     def _on_secret_rotate(self, event: ops.SecretRotateEvent):
         # this will be called once per day.
@@ -133,8 +135,7 @@ Or, for secret expiration:
 class MyDatabaseCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_expired,
-                               self._on_secret_expired)
+        self.framework.observe(self.on.secret_expired, self._on_secret_expired)
 
     ...  # as before
 
@@ -143,9 +144,11 @@ class MyDatabaseCharm(ops.CharmBase):
             'username': 'admin',
             'password': 'admin',
         }
-        secret = self.app.add_secret(content,
+        secret = self.app.add_secret(
+            content,
             label='secret-for-webserver-app',
-            expire=datetime.timedelta(days=42))  # this can also be an absolute datetime
+            expire=datetime.timedelta(days=42),
+        )  # this can also be an absolute datetime
 
     def _on_secret_expired(self, event: ops.SecretExpiredEvent):
         # this will be called only once, 42 days after the relation-joined event.
@@ -180,13 +183,11 @@ A typical implementation of the `secret-remove` event would look like:
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_remove,
-                               self._on_secret_remove)
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
 
     def _on_secret_remove(self, event: ops.SecretRemoveEvent):
         # All observers are done with this revision, remove it:
@@ -201,7 +202,6 @@ An example of usage might look like:
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     # called from an event handler
@@ -226,8 +226,10 @@ Before secrets, the code in the secret observer charm may have looked something 
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_changed,
-                               self._on_database_relation_changed)
+        self.framework.observe(
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
+        )
 
     ...  # other methods and event handlers
 
@@ -243,8 +245,10 @@ With secrets, the code would become:
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.database_relation_changed,
-                               self._on_database_relation_changed)
+        self.framework.observe(
+            self.on.database_relation_changed,
+            self._on_database_relation_changed,
+        )
 
     ...  # other methods and event handlers
 
@@ -268,7 +272,6 @@ The answer lies with **secret labels**: you can assign a charm-local label to a 
 
 ```python
 class MyWebserverCharm(ops.CharmBase):
-
     ...  # as before
 
     def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
@@ -280,7 +283,9 @@ class MyWebserverCharm(ops.CharmBase):
     def _on_secret_changed(self, event: ops.SecretChangedEvent):
         if event.secret.label == 'database-secret':
             content = event.secret.get_content(refresh=True)
-            self._configure_db_credentials(content['username'], content['password'])
+            self._configure_db_credentials(
+                content['username'], content['password']
+            )
         elif event.secret.label == 'my-other-secret':
             self._handle_other_secret_changed(event.secret)
         else:
@@ -297,7 +302,6 @@ The owner of the secret can do the same. When a secret is added, you can specify
 
 ```python
 class MyDatabaseCharm(ops.CharmBase):
-
     ...  # as before
 
     def _on_database_relation_joined(self, event: ops.RelationJoinedEvent):
@@ -337,13 +341,13 @@ Note that [`Secret.id`](ops.Secret.id), despite the name, is not really a unique
 Sometimes, before reconfiguring to use a new credential revision, the observer charm may want to peek at its contents (for example, to ensure that they are valid). Use `peek_content` for that:
 
 ```python
-    def _on_secret_changed(self, event: ops.SecretChangedEvent):
-        content = event.secret.peek_content()
-        if not self._valid_password(content.get('password')):
-           logger.warning('Invalid credentials! Not updating to new revision.')
-           return
-        content = event.secret.get_content(refresh=True)
-        ...
+def _on_secret_changed(self, event: ops.SecretChangedEvent):
+    content = event.secret.peek_content()
+    if not self._valid_password(content.get('password')):
+        logger.warning('Invalid credentials! Not updating to new revision.')
+        return
+    content = event.secret.get_content(refresh=True)
+    ...
 ```
 
 See more: [](ops.Secret.peek_content)
@@ -356,8 +360,7 @@ To update to a new revision, the web server charm will typically subscribe to th
 class MyWebserverCharm(ops.CharmBase):
     def __init__(self, *args, **kwargs):
         ...  # other setup
-        self.framework.observe(self.on.secret_changed,
-                               self._on_secret_changed)
+        self.framework.observe(self.on.secret_changed, self._on_secret_changed)
 
     ...  # as before
 
@@ -415,7 +418,9 @@ class MyCharm(ops.CharmBase):
         if not secret_uri:
             return
         # Read the secret.
-        secret = self.model.get_secret(id=secret_uri, label='user-provided-secret')
+        secret = self.model.get_secret(
+            id=secret_uri, label='user-provided-secret'
+        )
         content = secret.get_content()
         # Do something with the secret content.
         self._configure_with_secret(content)
@@ -487,7 +492,7 @@ state_in = testing.State(
             {'key': 'private'},
             owner='unit',  # or 'app'
             # The secret owner has granted access to the "remote" app over some relation:
-            remote_grants={rel.id: {'remote'}}
+            remote_grants={rel.id: {'remote'}},
         )
     }
 )
@@ -514,7 +519,7 @@ secret = testing.Secret({'password': 'xxxxxxxx'}, owner='app')
 old_revision = 42
 state_out = ctx.run(
     ctx.on.secret_remove(secret, revision=old_revision),
-    testing.State(leader=True, secrets={secret})
+    testing.State(leader=True, secrets={secret}),
 )
 assert ctx.removed_secret_revisions == [old_revision]
 ```
