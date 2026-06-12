@@ -170,7 +170,7 @@ This section applies to both machine and Kubernetes charms.
 
 For a machine charm, Juju emits a storage-detaching event whenever attached storage is being released: when a user runs `juju detach-storage` (or `juju remove-storage --force`), and during unit teardown. Observing the event lets the charm release resources cleanly before the storage goes away.
 
-For a Kubernetes charm, `juju detach-storage` isn't supported (it returns `ERROR Juju command "detach-storage" not supported on container models`), so storage is only detached during unit teardown. Observing the event is still useful: it gives the charm a chance to clean up workload state that references the storage before the unit terminates.
+For a Kubernetes charm, `juju detach-storage` isn't supported (it returns `ERROR Juju command "detach-storage" not supported on container models`), so storage is only detached during unit teardown, and cleanup can be done in the `stop` or `remove` events.
 
 In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the detaching event associated with your storage and pair that with an event handler. For example:
 
