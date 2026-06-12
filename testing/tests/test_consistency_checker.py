@@ -239,6 +239,27 @@ def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
     )
 
 
+def test_checkinfo_matches_layer_with_default_threshold():
+    # Pebble fills in default values for attributes the plan omits, so a
+    # CheckInfo reporting the Pebble defaults must be considered consistent
+    # with a layer that does not specify them. See #2566.
+    layer = ops.pebble.Layer({
+        'checks': {'chk1': {'override': 'replace', 'exec': {'command': 'echo'}}}
+    })
+    check = CheckInfo(
+        'chk1',
+        level=ops.pebble.CheckLevel.UNSET,
+        startup=ops.pebble.CheckStartup.ENABLED,
+        threshold=3,
+    )
+    state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
+    assert_consistent(
+        state,
+        _Event('foo-pebble-ready', container=Container('foo')),
+        _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
+    )
+
+
 @pytest.mark.parametrize('suffix', sorted(_RELATION_EVENTS_SUFFIX))
 def test_evt_bad_relation_name(suffix: str):
     assert_inconsistent(
