@@ -231,7 +231,7 @@ filterwarnings = [
 ]
 ```
 
-This catches warnings raised in the test process: from your charm code, from Ops, and from your dependencies. Ops uses `DeprecationWarning` when an API is scheduled for removal, and `ResourceWarning` for cleanup bugs (for example, leaked Pebble connections), so failing on those gives you early notice. The same `filterwarnings` setting is used for unit and integration tests (and any others you might have), since pytest (or anything else driving the tests in-process, like Jubilant) can also surface warnings. Note that warnings raised by the charm code, Ops, or dependencies when the charm is run by Juju in integration tests will go to the Juju log, and not be test errors.
+This catches warnings raised in the test process: from your charm code, from Ops, and from your dependencies. Ops uses `DeprecationWarning` when an API is scheduled for removal, and `ResourceWarning` for cleanup bugs (for example, leaked Pebble connections), so failing on those gives you early notice. The same `filterwarnings` setting is used for unit and integration tests (and any others you might have), since pytest (or anything else driving the tests in-process, like Jubilant) can also surface warnings. Note that, when Juju is executing the charm in an integration test, warnings raised (from your charm code, Ops, and your non-test dependencies) will go to the Juju log, and not be test errors.
 
 If a dependency raises a warning that you can't do anything about, add an ignore filter for that specific warning, keeping `"error"` for everything else. For example:
 
