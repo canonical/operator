@@ -276,9 +276,8 @@ class Ops(_Manager, Generic[CharmType]):
         # is idempotent, but charm libraries (for example tempo's
         # charm_tracing) replace the instance's close with a wrapper that is
         # not safe to invoke twice.
-        framework = getattr(self, 'framework', None)
-        if framework is not None and not getattr(framework, '_closed', False):
-            framework.close()
+        if not self.framework._closed:
+            self.framework.close()
         if self._tracing_mock:
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()
