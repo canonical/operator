@@ -81,6 +81,16 @@ _JUJU4_NETGET_K8S_BUG = (
     'Juju 4.0/k8s network-get returns empty leading placeholder bind-address (juju/juju#22616)'
 )
 
+# On Juju 4 machine substrates, a `juju-reboot` queued during a hook is
+# accepted (the hook commits its other side-effects) but the queued reboot
+# is silently dropped — the container's PID 1 never restarts. Likely the
+# same commit-phase regression family as #22523 / #22524; tracked separately
+# because the symptom (no error, no log) and reproducer (hooks-only, no
+# hookcmds) are distinct. See juju/juju#22639.
+_JUJU4_REBOOT_DROPPED_BUG = (
+    'Juju 4 silently drops juju-reboot queued from config-changed (juju/juju#22639)'
+)
+
 
 def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> None:
     """Apply xfail semantics for the Juju 4.0 commit-phase regression.
@@ -645,6 +655,10 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     # and only if the unit actually rebooted, so a strict inequality proves
     # juju-reboot took effect. The marker alone only proves config-changed
     # ran our handler.
+    if boot_time_after == boot_time_before and _juju_major(juju) >= 4:
+        # On Juju 4 the marker write commits but the queued juju-reboot is
+        # dropped: see juju/juju#22639.
+        pytest.xfail(_JUJU4_REBOOT_DROPPED_BUG)
     assert boot_time_after > boot_time_before, (
         f'boot time unchanged (before={boot_time_before}, after={boot_time_after}); '
         'the config-changed path ran but juju-reboot did not actually reboot the unit.'
