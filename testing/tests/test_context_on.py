@@ -672,6 +672,79 @@ class TwoLibraryCharm(ContextCharm):
         framework.observe(self.consumer2.on.foo_changed, self._on_event)
 
 
+@pytest.mark.parametrize(
+    ('container_name', 'event_attr', 'expected_suffix'),
+    [
+        ('temporal-worker', 'pebble_ready', '-pebble-ready'),
+        ('temporal-worker', 'pebble_check_failed', '-pebble-check-failed'),
+        ('temporal-worker', 'pebble_check_recovered', '-pebble-check-recovered'),
+    ],
+)
+def test_workload_event_juju_name_preserves_container_name(
+    container_name: str,
+    event_attr: str,
+    expected_suffix: str,
+):
+    """Juju preserves the container name verbatim in JUJU_HOOK_NAME.
+
+    Regression test: scenario was emitting hook names with the container
+    name's dashes mangled to underscores (see gh-2511, gh-2565).
+    """
+    meta: dict[str, Any] = {'name': 'foo', 'containers': {container_name: {}}}
+    ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
+    on_attr = getattr(ctx.on, event_attr)
+    if event_attr in ('pebble_check_failed', 'pebble_check_recovered'):
+        check = scenario.CheckInfo('my-check', failures=3, status=ops.pebble.CheckStatus.DOWN)
+        container = scenario.Container(container_name, check_infos={check})
+        event = on_attr(container, check)
+    else:
+        container = scenario.Container(container_name)
+        event = on_attr(container)
+    assert event._juju_name == f'{container_name}{expected_suffix}'
+
+
+@pytest.mark.parametrize(
+    ('endpoint', 'event_attr', 'expected_suffix'),
+    [
+        ('receive-ca-cert', 'relation_created', '-relation-created'),
+        ('receive-ca-cert', 'relation_joined', '-relation-joined'),
+        ('receive-ca-cert', 'relation_changed', '-relation-changed'),
+        ('receive_ca_cert', 'relation_changed', '-relation-changed'),
+    ],
+)
+def test_relation_event_juju_name_preserves_endpoint(
+    endpoint: str,
+    event_attr: str,
+    expected_suffix: str,
+):
+    """Juju preserves the relation endpoint verbatim in JUJU_HOOK_NAME (gh-2511)."""
+    meta: dict[str, Any] = {'name': 'foo', 'requires': {endpoint: {'interface': 'whatever'}}}
+    ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
+    relation = scenario.Relation(endpoint)
+    event = getattr(ctx.on, event_attr)(relation)
+    assert event._juju_name == f'{endpoint}{expected_suffix}'
+
+
+@pytest.mark.parametrize(
+    ('storage_name', 'event_attr', 'expected_suffix'),
+    [
+        ('my-store', 'storage_attached', '-storage-attached'),
+        ('my-store', 'storage_detaching', '-storage-detaching'),
+    ],
+)
+def test_storage_event_juju_name_preserves_storage_name(
+    storage_name: str,
+    event_attr: str,
+    expected_suffix: str,
+):
+    """Juju preserves the storage name verbatim in JUJU_HOOK_NAME."""
+    meta: dict[str, Any] = {'name': 'foo', 'storage': {storage_name: {'type': 'filesystem'}}}
+    ctx = scenario.Context(ContextCharm, meta=meta, actions=ACTIONS)
+    storage = scenario.Storage(storage_name)
+    event = getattr(ctx.on, event_attr)(storage)
+    assert event._juju_name == f'{storage_name}{expected_suffix}'
+
+
 def test_custom_event_two_libraries():
     ctx = scenario.Context(TwoLibraryCharm, meta=META, actions=ACTIONS)
 

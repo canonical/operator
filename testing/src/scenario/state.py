@@ -443,6 +443,31 @@ def _to_python_attr(s: str):
     return s.replace('-', '_')
 
 
+# Real Juju's naming rules for charm metadata entities. Scenario enforces
+# these so that tests cannot pass with names that a real deployment would
+# reject.
+#
+# Sources (juju/names and juju/charm, identical in Juju 3.x and 4.x):
+# - relation endpoints: RelationSnippet — underscores ARE allowed.
+# - storage: StorageNameSnippet — dash-separated, each segment needs a letter.
+# - actions: actionNameRule from actions.yaml parsing.
+# - containers: Juju passes the name verbatim as the Kubernetes container
+#   name, so the RFC 1123 DNS-label rule applies (max 63 characters).
+_JUJU_RELATION_NAME_PATTERN = re.compile(r'^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$')
+_JUJU_STORAGE_NAME_PATTERN = re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]*[a-z][a-z0-9]*)*$')
+_JUJU_ACTION_NAME_PATTERN = re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$')
+_K8S_CONTAINER_NAME_PATTERN = re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$')
+_K8S_CONTAINER_NAME_MAX_LENGTH = 63
+
+
+def _check_name(name: str, pattern: re.Pattern[str], kind: str, requirements: str):
+    if not pattern.match(name):
+        raise StateValidationError(
+            f'invalid {kind} name {name!r}: Juju requires {kind} names to '
+            f'consist of {requirements}',
+        )
+
+
 @dataclasses.dataclass(frozen=True)
 class Address:
     """An address in a Juju network space."""
@@ -645,6 +670,14 @@ class RelationBase:
                 'RelationBase cannot be instantiated directly; '
                 'please use Relation, PeerRelation, or SubordinateRelation',
             )
+
+        _check_name(
+            self.endpoint,
+            _JUJU_RELATION_NAME_PATTERN,
+            'relation endpoint',
+            'lowercase alphanumeric characters separated by single hyphens or '
+            'underscores, starting with a letter',
+        )
 
         for databag in self._databags:
             self._validate_databag(databag)
@@ -1236,6 +1269,20 @@ class Container:
         notices: Iterable[Notice] = (),
         check_infos: Iterable[CheckInfo] = (),
     ):
+        # Juju passes the charm container name verbatim through to Kubernetes,
+        # so the Kubernetes naming rules (RFC 1123 DNS label) apply.
+        _check_name(
+            name,
+            _K8S_CONTAINER_NAME_PATTERN,
+            'container',
+            'lowercase alphanumeric characters and hyphens, starting and '
+            'ending with an alphanumeric character',
+        )
+        if len(name) > _K8S_CONTAINER_NAME_MAX_LENGTH:
+            raise StateValidationError(
+                f'invalid container name {name!r}: must be at most '
+                f'{_K8S_CONTAINER_NAME_MAX_LENGTH} characters long',
+            )
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'can_connect', can_connect)
         # _base_plan values are arbitrary JSON-ish data, and pebble.Layer is not
@@ -1691,6 +1738,16 @@ class Storage:
 
     For Kubernetes charms, this will always be 1. For machine charms, each new
     Storage instance gets a new index."""
+
+    def __post_init__(self):
+        _check_name(
+            self.name,
+            _JUJU_STORAGE_NAME_PATTERN,
+            'storage',
+            'lowercase alphanumeric characters separated by single hyphens, '
+            'starting with a letter, with each hyphen-separated part '
+            'containing at least one letter',
+        )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Storage, ops.Storage)):
@@ -2673,7 +2730,7 @@ class _Action:
         def test_backup_action():
             ctx = Context(MyCharm)
             state = ctx.run(
-                ctx.on.action('do_backup', params={'filename': 'foo'}),
+                ctx.on.action('do-backup', params={'filename': 'foo'}),
                 State(),
             )
             assert ctx.action_results == ...
@@ -2692,3 +2749,12 @@ class _Action:
 
     Every action invocation is automatically assigned a new one. Override in
     the rare cases where a specific ID is required."""
+
+    def __post_init__(self):
+        _check_name(
+            self.name,
+            _JUJU_ACTION_NAME_PATTERN,
+            'action',
+            'lowercase alphanumeric characters and hyphens, starting and '
+            'ending with an alphanumeric character',
+        )
