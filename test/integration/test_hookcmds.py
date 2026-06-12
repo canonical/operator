@@ -89,13 +89,8 @@ def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> Non
     `jubilant.TaskError` (action returned non-zero) or a `TimeoutError`
     (driver gave up waiting) depending on the failure path.
 
-    Note: a previous version of this helper attempted strict-style
-    semantics (pytest.fail on Juju 4 success, mimicking `xfail(strict=True)`)
-    so we'd notice when to drop the guard. That doesn't work in a multi-
-    channel matrix — when the upstream fix lands in 4.0/edge or 4.1/edge
-    but 4.0/stable still ships the bug, the guard must stay. The cells
-    where the bug is fixed are the signal; nothing to do at test-author
-    time.
+    Note: We can't strictly require failure; our CI matrix might run
+    against a fixed 4.0/edge and a broken 4.0/stable (for example).
     """
     if _juju_major(juju) < 4:
         if error is not None:
@@ -508,10 +503,8 @@ def test_relation_model_get(juju: jubilant.Juju, leader: str):
     """relation_model_get returns the local model UUID for a peer relation."""
     task = juju.run(leader, 'test-relation-model-get')
     assert task.success
-    # For a peer relation the relation isn't cross-model, so the server-side
-    # implementation (apiserver/facades/agent/uniter/uniter.go) returns the
-    # local model UUID — same as JUJU_MODEL_UUID inside the hook. Validated
-    # live against Juju 3.6.23 and 4.0.5 LXD.
+    # Peer relations aren't cross-model, so the server-side implementation
+    # returns the local model UUID — same as JUJU_MODEL_UUID inside the hook.
     assert task.results['uuid'] == task.results['env-model-uuid']
     assert task.results['uuid']  # non-empty
 
@@ -616,8 +609,8 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     """juju_reboot(now=False) queues a reboot; the unit recovers to active.
 
-    juju explicitly forbids juju-reboot inside an action context
-    (jujuc/reboot.go), so the trigger has to come from a regular hook.
+    juju explicitly forbids juju-reboot inside an action context,
+    so the trigger has to come from a regular hook.
     The charm's config-changed handler watches for
     `reboot-trigger=reboot-please` and, on the first such config-changed,
     writes a marker file and calls hookcmds.juju_reboot(). The marker
@@ -627,7 +620,7 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     # k8s pods can't reboot themselves and the hookcmd surfaces as a
     # NotImplementedError; only exercise on machine substrates.
     if _is_caas(juju):
-        pytest.skip('juju-reboot is not supported on Kubernetes / CAAS substrates')
+        pytest.skip('juju-reboot is not supported on Kubernetes substrates')
 
     # Baseline uptime + confirm the marker hasn't been set yet.
     task = juju.run(any_unit, 'test-reboot-marker')
