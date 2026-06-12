@@ -28,6 +28,8 @@ from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from ops import pebble
+
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
 from .state import (
@@ -708,8 +710,23 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            for attr in ('level', 'startup', 'threshold'):
-                if getattr(check, attr) != getattr(plan_check, attr):
+            # Pebble fills in defaults for attributes the plan does not set,
+            # so treat the plan's unset value (None or an UNSET enum member) as
+            # equivalent to the Pebble default for that attribute, and treat
+            # an absent value on the check info as also matching the default.
+            unset_defaults = {
+                'level': ({None, pebble.CheckLevel.UNSET}, pebble.CheckLevel.UNSET),
+                'startup': ({None, pebble.CheckStartup.UNSET}, pebble.CheckStartup.ENABLED),
+                'threshold': ({None}, 3),
+            }
+
+            def _normalise(value: Any, unset: set[Any], default: Any) -> Any:
+                return default if value in unset else value
+
+            for attr, (unset, default) in unset_defaults.items():
+                check_value = _normalise(getattr(check, attr), unset, default)
+                plan_value = _normalise(getattr(plan_check, attr), unset, default)
+                if check_value != plan_value:
                     errors.append(
                         f'container {container.name!r} has a check {check.name!r} with a '
                         f'different {attr!r} ({getattr(check, attr)}) '
