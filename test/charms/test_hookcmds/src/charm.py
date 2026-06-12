@@ -355,7 +355,7 @@ class TestHookcmdsCharm(ops.CharmBase):
         event.set_results({'cloud-type': cloud.type, 'cloud-name': cloud.name})
 
     # Reboot — driven by config-changed because juju forbids juju-reboot
-    # from an action context (see jujuc/reboot.go).
+    # from an action context.
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
         if self.config.get('reboot-trigger') != 'reboot-please':
