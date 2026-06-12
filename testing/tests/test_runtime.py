@@ -140,6 +140,49 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
     assert os.getenv('JUJU_REMOTE_APP', None) is None
 
 
+@pytest.mark.parametrize(
+    'endpoint, expected_hook_name',
+    (
+        # Juju keeps the endpoint name exactly as declared in the metadata and
+        # only uses dashes in the event-type suffix, so an endpoint declared
+        # with dashes produces an all-dashes hook name, while one declared with
+        # underscores keeps those underscores in the prefix. See #2511.
+        ('receive-ca-cert', 'receive-ca-cert-relation-changed'),
+        ('receive_ca_cert', 'receive_ca_cert-relation-changed'),
+    ),
+)
+def test_relation_event_juju_hook_name_preserves_endpoint_spelling(
+    endpoint: str,
+    expected_hook_name: str,
+):
+    meta: dict[str, Any] = {
+        'name': 'foo',
+        'requires': {endpoint: {'interface': 'certificates'}},
+    }
+
+    my_charm_type = charm_type()
+    charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
+        my_charm_type,
+        meta=meta,
+    )
+    runtime = Runtime(
+        'foo',
+        charm_spec,
+    )
+
+    rel = Relation(endpoint)
+    ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
+    with runtime.exec(
+        state=State(relations={rel}),
+        event=_Event(f'{endpoint}_relation_changed', relation=rel),
+        context=ctx,
+    ):
+        assert os.environ['JUJU_HOOK_NAME'] == expected_hook_name
+        assert os.environ['JUJU_DISPATCH_PATH'] == f'hooks/{expected_hook_name}'
+        # Juju echoes the endpoint name verbatim in JUJU_RELATION.
+        assert os.environ['JUJU_RELATION'] == endpoint
+
+
 def test_juju_version_is_set_in_environ():
     version = '2.9'
 
