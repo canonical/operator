@@ -92,7 +92,9 @@ class Runtime(Generic[CharmType]):
         if event._is_action_event and (action := event.action):
             env.update(
                 {
-                    'JUJU_ACTION_NAME': action.name.replace('_', '-'),
+                    # Juju action names cannot contain underscores; _Action
+                    # rejects them, so action.name is already in dash form.
+                    'JUJU_ACTION_NAME': action.name,
                     'JUJU_ACTION_UUID': action.id,
                 },
             )

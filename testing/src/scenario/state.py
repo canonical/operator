@@ -2483,7 +2483,7 @@ class _Action:
         def test_backup_action():
             ctx = Context(MyCharm)
             state = ctx.run(
-                ctx.on.action('do_backup', params={'filename': 'foo'}),
+                ctx.on.action('do-backup', params={'filename': 'foo'}),
                 State(),
             )
             assert ctx.action_results == ...
@@ -2502,3 +2502,12 @@ class _Action:
 
     Every action invocation is automatically assigned a new one. Override in
     the rare cases where a specific ID is required."""
+
+    def __post_init__(self):
+        # Juju action names cannot contain underscores; they use dashes,
+        # matching the name as declared in actions.yaml.
+        if '_' in self.name:
+            raise StateValidationError(
+                f'invalid action name {self.name!r}: Juju action names cannot '
+                f'contain underscores; use dashes instead.',
+            )
