@@ -44,8 +44,12 @@ def _juju_major(juju: jubilant.Juju) -> int:
     return int(juju.status().model.version.split('.', 1)[0])
 
 
-def _is_caas(juju: jubilant.Juju) -> bool:
-    """Return True if the model is on a Kubernetes substrate (CAAS)."""
+def _is_k8s(juju: jubilant.Juju) -> bool:
+    """Return True if the model is on a Kubernetes substrate.
+
+    Juju's model type for Kubernetes is ``caas`` (paired with ``iaas`` for
+    machine substrates).
+    """
     return juju.status().model.type == 'caas'
 
 
@@ -258,13 +262,13 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
     # On k8s, network-get may return an empty interface-name for the bind
     # address (no host NIC behind it — it's a service / pod-network entry).
     # Only insist on a non-empty value on machine substrates.
-    if not _is_caas(juju):
+    if not _is_k8s(juju):
         assert first['interface-name']  # non-empty
     # On Juju 4.0/k8s the first bind-address is an empty "k8s service"
     # placeholder with no addresses; the cloud-container address (the pod IP)
     # is at bind_addresses[1] instead. Juju 3.6 returns a single
     # non-placeholder entry. See juju/juju#22616.
-    if not first['addresses'] and _juju_major(juju) >= 4 and _is_caas(juju):
+    if not first['addresses'] and _juju_major(juju) >= 4 and _is_k8s(juju):
         pytest.xfail(_JUJU4_NETGET_K8S_BUG)
     assert len(first['addresses']) > 0
     first_addr = first['addresses'][0]
@@ -619,14 +623,14 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     """
     # k8s pods can't reboot themselves and the hookcmd surfaces as a
     # NotImplementedError; only exercise on machine substrates.
-    if _is_caas(juju):
+    if _is_k8s(juju):
         pytest.skip('juju-reboot is not supported on Kubernetes substrates')
 
-    # Baseline uptime + confirm the marker hasn't been set yet.
+    # Baseline boot time + confirm the marker hasn't been set yet.
     task = juju.run(any_unit, 'test-reboot-marker')
     assert task.success
     assert task.results['marker-exists'] == 'false'
-    uptime_before = float(task.results['uptime-seconds'])
+    boot_time_before = int(task.results['boot-time'])
 
     # config-changed → marker write → juju_reboot. Wait for the unit to
     # recover after the reboot.
@@ -636,13 +640,12 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     task = juju.run(any_unit, 'test-reboot-marker')
     assert task.success
     assert task.results['marker-exists'] == 'true'
-    uptime_after = float(task.results['uptime-seconds'])
-    # If a reboot actually happened the container's uptime resets — the new
-    # value must be smaller than the value we captured before the trigger.
-    # The marker alone only proves config-changed ran our handler; the
-    # uptime check is what proves juju-reboot took effect.
-    assert uptime_after < uptime_before, (
-        f'uptime did not reset (before={uptime_before}, after={uptime_after}); '
+    boot_time_after = int(task.results['boot-time'])
+    # btime in /proc/stat changes if and only if the kernel rebooted, so a
+    # strict inequality proves juju-reboot took effect. The marker alone
+    # only proves config-changed ran our handler.
+    assert boot_time_after > boot_time_before, (
+        f'boot time unchanged (before={boot_time_before}, after={boot_time_after}); '
         'the config-changed path ran but juju-reboot did not actually reboot the unit.'
     )
 

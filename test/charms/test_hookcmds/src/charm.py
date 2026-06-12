@@ -367,15 +367,19 @@ class TestHookcmdsCharm(ops.CharmBase):
         hookcmds.juju_reboot(now=False)
 
     def _on_test_reboot_marker(self, event: ops.ActionEvent):
-        # First field of /proc/uptime is seconds since boot. After a real
-        # juju-reboot the container restarts and uptime resets, so the test
-        # can compare before/after to verify the reboot actually happened
+        # `btime` in /proc/stat is the epoch second the system booted.
+        # It changes if and only if the kernel actually rebooted, so the
+        # test can compare before/after to verify juju-reboot took effect
         # (the marker alone only proves config-changed ran the path).
-        with open('/proc/uptime') as f:
-            uptime_seconds = float(f.read().split()[0])
+        boot_time = 0
+        with open('/proc/stat') as f:
+            for line in f:
+                if line.startswith('btime '):
+                    boot_time = int(line.split()[1])
+                    break
         event.set_results({
             'marker-exists': str(_REBOOT_MARKER.exists()).lower(),
-            'uptime-seconds': str(uptime_seconds),
+            'boot-time': str(boot_time),
         })
 
     # Relation model
