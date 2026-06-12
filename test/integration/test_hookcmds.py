@@ -641,9 +641,10 @@ def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
     assert task.success
     assert task.results['marker-exists'] == 'true'
     boot_time_after = int(task.results['boot-time'])
-    # btime in /proc/stat changes if and only if the kernel rebooted, so a
-    # strict inequality proves juju-reboot took effect. The marker alone
-    # only proves config-changed ran our handler.
+    # The action computes the boot epoch as `now - uptime`; it changes if
+    # and only if the unit actually rebooted, so a strict inequality proves
+    # juju-reboot took effect. The marker alone only proves config-changed
+    # ran our handler.
     assert boot_time_after > boot_time_before, (
         f'boot time unchanged (before={boot_time_before}, after={boot_time_after}); '
         'the config-changed path ran but juju-reboot did not actually reboot the unit.'

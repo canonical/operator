@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import time
 from typing import Any
 
 import ops
@@ -367,16 +368,15 @@ class TestHookcmdsCharm(ops.CharmBase):
         hookcmds.juju_reboot(now=False)
 
     def _on_test_reboot_marker(self, event: ops.ActionEvent):
-        # `btime` in /proc/stat is the epoch second the system booted.
-        # It changes if and only if the kernel actually rebooted, so the
-        # test can compare before/after to verify juju-reboot took effect
-        # (the marker alone only proves config-changed ran the path).
-        boot_time = 0
-        with open('/proc/stat') as f:
-            for line in f:
-                if line.startswith('btime '):
-                    boot_time = int(line.split()[1])
-                    break
+        # Compute the boot epoch as `now - uptime`. /proc/stat's `btime` is
+        # the host kernel boot time and doesn't change in LXD containers, so
+        # we can't use it directly; /proc/uptime, however, is virtualised
+        # per-container by lxcfs and resets on juju-reboot. Comparing the
+        # derived boot epoch before/after proves the reboot took effect (the
+        # marker alone only proves config-changed ran the path).
+        with open('/proc/uptime') as f:
+            uptime_seconds = float(f.read().split()[0])
+        boot_time = int(time.time() - uptime_seconds)
         event.set_results({
             'marker-exists': str(_REBOOT_MARKER.exists()).lower(),
             'boot-time': str(boot_time),
