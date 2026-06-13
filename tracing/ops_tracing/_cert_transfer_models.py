@@ -17,7 +17,7 @@
 
 """Library for the certificate_transfer relation (requirer side only).
 
-This vendored copy contains just the ``CertificateTransferRequires`` class and
+This private copy contains just the ``CertificateTransferRequires`` class and
 the data model it needs, for handling the requirer side of the
 certificate-transfer interface.
 
