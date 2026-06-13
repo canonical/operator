@@ -452,14 +452,34 @@ def _to_python_attr(s: str):
 # - actions: actionNameRule from actions.yaml parsing.
 # - containers: Juju passes the name verbatim as the Kubernetes container
 #   name, so the RFC 1123 DNS-label rule applies (max 63 characters).
-_JUJU_RELATION_NAME_PATTERN = re.compile(r'^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$')
-_JUJU_STORAGE_NAME_PATTERN = re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]*[a-z][a-z0-9]*)*$')
-_JUJU_ACTION_NAME_PATTERN = re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$')
-_K8S_CONTAINER_NAME_PATTERN = re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$')
+_NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
+    'relation endpoint': (
+        re.compile(r'^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$'),
+        'lowercase alphanumeric characters separated by single hyphens or '
+        'underscores, starting with a letter',
+    ),
+    'storage': (
+        re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]*[a-z][a-z0-9]*)*$'),
+        'lowercase alphanumeric characters separated by single hyphens, '
+        'starting with a letter, with each hyphen-separated part '
+        'containing at least one letter',
+    ),
+    'action': (
+        re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'),
+        'lowercase alphanumeric characters and hyphens, starting and '
+        'ending with an alphanumeric character',
+    ),
+    'container': (
+        re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'),
+        'lowercase alphanumeric characters and hyphens, starting and '
+        'ending with an alphanumeric character',
+    ),
+}
 _K8S_CONTAINER_NAME_MAX_LENGTH = 63
 
 
-def _check_name(name: str, pattern: re.Pattern[str], kind: str, requirements: str):
+def _check_name(name: str, kind: str):
+    pattern, requirements = _NAME_RULES[kind]
     if not pattern.match(name):
         raise StateValidationError(
             f'invalid {kind} name {name!r}: Juju requires {kind} names to '
@@ -670,13 +690,7 @@ class RelationBase:
                 'please use Relation, PeerRelation, or SubordinateRelation',
             )
 
-        _check_name(
-            self.endpoint,
-            _JUJU_RELATION_NAME_PATTERN,
-            'relation endpoint',
-            'lowercase alphanumeric characters separated by single hyphens or '
-            'underscores, starting with a letter',
-        )
+        _check_name(self.endpoint, 'relation endpoint')
 
         for databag in self._databags:
             self._validate_databag(databag)
@@ -1270,13 +1284,7 @@ class Container:
     ):
         # Juju passes the charm container name verbatim through to Kubernetes,
         # so the Kubernetes naming rules (RFC 1123 DNS label) apply.
-        _check_name(
-            name,
-            _K8S_CONTAINER_NAME_PATTERN,
-            'container',
-            'lowercase alphanumeric characters and hyphens, starting and '
-            'ending with an alphanumeric character',
-        )
+        _check_name(name, 'container')
         if len(name) > _K8S_CONTAINER_NAME_MAX_LENGTH:
             raise StateValidationError(
                 f'invalid container name {name!r}: must be at most '
@@ -1739,14 +1747,7 @@ class Storage:
     Storage instance gets a new index."""
 
     def __post_init__(self):
-        _check_name(
-            self.name,
-            _JUJU_STORAGE_NAME_PATTERN,
-            'storage',
-            'lowercase alphanumeric characters separated by single hyphens, '
-            'starting with a letter, with each hyphen-separated part '
-            'containing at least one letter',
-        )
+        _check_name(self.name, 'storage')
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Storage, ops.Storage)):
@@ -2750,10 +2751,4 @@ class _Action:
     the rare cases where a specific ID is required."""
 
     def __post_init__(self):
-        _check_name(
-            self.name,
-            _JUJU_ACTION_NAME_PATTERN,
-            'action',
-            'lowercase alphanumeric characters and hyphens, starting and '
-            'ending with an alphanumeric character',
-        )
+        _check_name(self.name, 'action')
