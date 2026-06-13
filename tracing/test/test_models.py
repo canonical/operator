@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Round-trip and validation tests for the de-pydantic'd vendored databag models.
+"""Round-trip and validation tests for the de-pydantic'd databag models.
 
 These exercise the load/dump validation paths that the dataclass replacements
 now own (previously provided by pydantic). They must pass without pydantic
@@ -25,16 +25,16 @@ import json
 
 import pytest
 
-from ops_tracing.vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
+from ops_tracing._cert_transfer_models import (
     DataValidationError as CertDataValidationError,
 )
-from ops_tracing.vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
+from ops_tracing._cert_transfer_models import (
     ProviderApplicationData,
 )
-from ops_tracing.vendor.charms.tempo_coordinator_k8s.v0.tracing import (
+from ops_tracing._tracing_models import (
     DataValidationError as TracingDataValidationError,
 )
-from ops_tracing.vendor.charms.tempo_coordinator_k8s.v0.tracing import (
+from ops_tracing._tracing_models import (
     ProtocolType,
     Receiver,
     TracingProviderAppData,

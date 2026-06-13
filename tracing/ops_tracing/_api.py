@@ -22,10 +22,10 @@ import opentelemetry.trace
 import ops
 
 from ._buffer import Destination
-from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
+from ._cert_transfer_models import (
     CertificateTransferRequires,
 )
-from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
+from ._tracing_models import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
     TracingEndpointRequirer,
