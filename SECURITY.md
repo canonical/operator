@@ -4,7 +4,7 @@
 
 Security updates will be released for all major versions that have had releases in the last year.
 
-Long Term Support (LTS) releases receive 5 years of normal support and up to 10 additional years of extended support.
+Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm).
 
 - Ops 1.x is no longer supported.
 - Ops 2.23 is the current LTS release.

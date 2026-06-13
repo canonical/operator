@@ -14,7 +14,7 @@ When you're deciding which version of tools to use within the charming ecosystem
 | 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
 | 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [3.x](https://documentation.ubuntu.com/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)¹ |
 
-¹ On 26.04, current stable Charmcraft (4.2.x) supports `base: ubuntu@26.04` but requires `build-base: ubuntu@devel`.
+¹ `base: ubuntu@26.04` is supported by Charmcraft >= 4.3. On Charmcraft 4.2.x, build with `build-base: ubuntu@devel` instead (unstable).
 
 ## Pebble provided by Juju
 
@@ -37,7 +37,7 @@ Juju releases new minor versions approximately every 3 months, which are support
 
 > See more: {external+juju:ref}`Juju support timeframes <releasenotes>`
 
-Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version. Long Term Support (LTS) releases receive 5 years of normal support and up to 10 additional years of extended support.
+Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm).
 
 > See more: [Ops support timeframes](https://github.com/canonical/operator/blob/main/SECURITY.md)
 
