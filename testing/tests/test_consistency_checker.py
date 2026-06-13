@@ -239,7 +239,7 @@ def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
     )
 
 
-def test_checkinfo_matches_layer_with_default_threshold():
+def test_checkinfo_matches_layer_with_defaults():
     # Pebble fills in default values for attributes the plan omits, so a
     # CheckInfo reporting the Pebble defaults must be considered consistent
     # with a layer that does not specify them. See #2566.
