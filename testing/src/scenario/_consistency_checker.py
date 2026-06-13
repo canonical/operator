@@ -210,7 +210,7 @@ def _check_relation_event(
             errors.append(
                 f'relation event prefix {event._path.prefix!r} does not match the relation '
                 f'endpoint name {event.relation.endpoint!r} (the endpoint name must appear '
-                exactly as declared in the charm metadata).',
+                'exactly as declared in the charm metadata).',
             )
         if event.relation not in state.relations:
             errors.append(

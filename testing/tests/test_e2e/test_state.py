@@ -338,7 +338,8 @@ def test_storage_name_valid(name: str):
 
 
 @pytest.mark.parametrize(
-    'name', ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
+    'name',
+    ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
 )
 def test_storage_name_invalid(name: str):
     with pytest.raises(StateValidationError):
