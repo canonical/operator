@@ -12,11 +12,9 @@ When you're deciding which version of tools to use within the charming ecosystem
 | 20.04 (Focal Fossa) | [3.8](https://docs.python.org/3/whatsnew/3.8.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/) | 2.x |
 | 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
 | 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
-| 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/)¹ | [3.x](https://documentation.ubuntu.com/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)² |
+| 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [3.x](https://documentation.ubuntu.com/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)¹ |
 
-¹ On 26.04, Juju 4.0 support requires Juju >= 4.0.6. Juju 3.6 already supports 26.04.
-
-² On 26.04, Charmcraft supports `base: ubuntu@26.04` as a stable base from Charmcraft >= 4.3. On Charmcraft 4.2.x, build with `build-base: ubuntu@devel`.
+¹ On 26.04, current stable Charmcraft (4.2.x) supports `base: ubuntu@26.04` but requires `build-base: ubuntu@devel`.
 
 ## Pebble provided by Juju
 
