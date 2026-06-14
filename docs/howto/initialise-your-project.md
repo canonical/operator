@@ -31,6 +31,7 @@ Create a repository with your source control of choice.
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-repository-naming
 
 Name the repository using the pattern ``<charm name>-operator`` for a single
 charm, or ``<base charm name>-operators`` when the repository will hold

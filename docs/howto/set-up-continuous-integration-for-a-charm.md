@@ -9,6 +9,7 @@ myst:
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-automated-ci
 
 The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system.
 ```
