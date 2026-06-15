@@ -306,7 +306,7 @@ Monitor your deployment:
 juju status --watch 1s
 ```
 
-When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod. The workload version is `1.0.4`, as seen in the `Version` column.
+When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod. The workload version is located in the `Version` column.
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
