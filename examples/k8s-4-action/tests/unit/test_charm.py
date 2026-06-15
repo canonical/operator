@@ -26,19 +26,18 @@ def mock_get_version(port: int):
     return "1.0.4"
 
 
-@pytest.fixture(autouse=True)
-def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
 
 
-def test_pebble_layer(monkeypatch: pytest.MonkeyPatch):
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
         containers={container},
         leader=True,
     )
-    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
     expected_plan = {
@@ -67,7 +66,7 @@ def test_pebble_layer(monkeypatch: pytest.MonkeyPatch):
     assert state_out.workload_version is not None
 
 
-def test_config_changed(monkeypatch: pytest.MonkeyPatch):
+def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -75,7 +74,6 @@ def test_config_changed(monkeypatch: pytest.MonkeyPatch):
         config={"server-port": 8080},
         leader=True,
     )
-    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
     state_out = ctx.run(ctx.on.config_changed(), state_in)
     command = (
         state_out.get_container(container.name)
@@ -86,7 +84,7 @@ def test_config_changed(monkeypatch: pytest.MonkeyPatch):
     assert "--port=8080" in command
 
 
-def test_config_changed_invalid_port():
+def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -100,7 +98,7 @@ def test_config_changed_invalid_port():
     )
 
 
-def test_relation_data():
+def test_relation_data(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -131,7 +129,7 @@ def test_relation_data():
     }
 
 
-def test_no_database_blocked():
+def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -144,7 +142,7 @@ def test_no_database_blocked():
     assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 
 
-def test_get_db_info_action():
+def test_get_db_info_action(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -171,7 +169,7 @@ def test_get_db_info_action():
     }
 
 
-def test_get_db_info_action_show_password():
+def test_get_db_info_action_show_password(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",

@@ -156,7 +156,7 @@ Congratulations, you now know how to expose operational tasks via actions!
 Let's add a test to check the behaviour of the `get_db_info` action that we just set up. Our test sets up the context, defines the input state with a relation, then runs the action and checks whether the results match the expected values:
 
 ```python
-def test_get_db_info_action():
+def test_get_db_info_action(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -186,7 +186,7 @@ def test_get_db_info_action():
 Since the `get_db_info` action has a parameter `show-password`, let's also add a test to cover the case where the user wants to show the password:
 
 ```python
-def test_get_db_info_action_show_password():
+def test_get_db_info_action_show_password(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",

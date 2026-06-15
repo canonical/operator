@@ -61,11 +61,11 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
     version = juju.status().apps["fastapi-demo"].version
-    # We'll need to update this version every time we upgrade to a new workload
-    # version. If the workload has an API or some other way of getting the
-    # version, the test should get it from there and use that to compare to the
-    # unit setting.
-    assert version == "1.0.4"
+    # Ideally, the test should get the version directly from the workload application
+    # (for example, through an API call) and use that in this assertion.
+    # For simplicity, we hardcode the major version here to avoid updates
+    # if api_demo_server is updated with a minor or patch release.
+    assert version.startswith("1.")
 
 
 @pytest.fixture(scope="module")

@@ -237,23 +237,14 @@ def _get_pebble_layer(self) -> ops.pebble.Layer:
 
 The workload version is available after the workload starts, which is after Pebble reevaluates its plan. We will use the `src/fastapi_demo.py` helper module for this step.
 
-In `src/charm.py`, add `import fastapi_demo` in the imports at the top of the file. Then modify the `_on_demo_server_pebble_ready` function:
+In `src/charm.py`, add `import fastapi_demo` in the imports at the top of the file. Then append the following lines to the `_on_demo_server_pebble_ready` function:
 
 ```python
 def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
-    """Define and start a workload using the Pebble API."""
-    # Get a reference the container attribute on the PebbleReadyEvent
-    container = event.workload
-    # Add initial Pebble config layer using the Pebble API
-    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
-    # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
-    container.replan()
+    # ... previous lines ...
     # Set the workload version of this charm.
     version = fastapi_demo.get_version(port=8000)
     self.unit.set_workload_version(version)
-    # Learn more about statuses at
-    # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.ActiveStatus()
 ```
 
 We invoke `fastapi_demo.get_version` to get the workload version, and expose it to Juju with `self.unit.set_workload_version`. We use port 8000 as the app is deployed on this port, as seen in `_get_pebble_layer`.
@@ -406,12 +397,12 @@ def mock_get_version(port: int):
     return "1.0.4"
 
 
-@pytest.fixture(autouse=True)
-def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
 
 
-def test_pebble_layer():
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -447,6 +438,8 @@ def test_pebble_layer():
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
+
+In unit tests, we avoid any interaction with the outside world to keep the unit tests deterministic. The `get_version` method performs a HTTP call, which must be patched. We use the fixture `mock_version` to achieve this. From now on, any unit test on the charm needs to use fixture.
 
 ### Run the test
 
@@ -528,11 +521,11 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
     version = juju.status().apps["fastapi-demo"].version
-    # We'll need to update this version every time we upgrade to a new workload
-    # version. If the workload has an API or some other way of getting the
-    # version, the test should get it from there and use that to compare to the
-    # unit setting.
-    assert version == "1.0.4"
+    # Ideally, the test should get the version directly from the workload application
+    # (for example, through an API call) and use that in this assertion.
+    # For simplicity, we hardcode the major version here to avoid updates
+    # if api_demo_server is updated with a minor or patch release.
+    assert version.startswith("1.")
 ```
 
 This test depends on two fixtures:

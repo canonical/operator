@@ -142,8 +142,8 @@ def _replan_workload(self) -> None:
         self.unit.status = ops.BlockedStatus(str(version_e))
         return
 
-    self.unit.set_workload_version(version)
     self.unit.status = ops.ActiveStatus()
+    self.unit.set_workload_version(version)
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
@@ -256,7 +256,7 @@ Since we added a new feature to configure `server-port` and use it in the Pebble
 First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
 
 ```python
-def test_config_changed():
+def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -277,7 +277,7 @@ def test_config_changed():
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
 
 ```python
-def test_config_changed_invalid_port():
+def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(

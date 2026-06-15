@@ -26,12 +26,12 @@ def mock_get_version(port: int):
     return "1.0.4"
 
 
-@pytest.fixture(autouse=True)
-def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
 
 
-def test_pebble_layer():
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -64,7 +64,7 @@ def test_pebble_layer():
     )
 
 
-def test_config_changed():
+def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -82,7 +82,7 @@ def test_config_changed():
     assert "--port=8080" in command
 
 
-def test_config_changed_invalid_port():
+def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -96,7 +96,7 @@ def test_config_changed_invalid_port():
     )
 
 
-def test_relation_data():
+def test_relation_data(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -127,7 +127,7 @@ def test_relation_data():
     }
 
 
-def test_no_database_blocked():
+def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -140,7 +140,7 @@ def test_no_database_blocked():
     assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 
 
-def test_get_db_info_action():
+def test_get_db_info_action(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -167,7 +167,7 @@ def test_get_db_info_action():
     }
 
 
-def test_get_db_info_action_show_password():
+def test_get_db_info_action_show_password(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",

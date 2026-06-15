@@ -26,12 +26,12 @@ def mock_get_version(port: int):
     return "1.0.4"
 
 
-@pytest.fixture(autouse=True)
-def patch_get_version(monkeypatch: pytest.MonkeyPatch):
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
 
 
-def test_pebble_layer():
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
