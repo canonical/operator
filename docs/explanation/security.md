@@ -63,13 +63,13 @@ When testing an event with [](ops.testing.Context), the mocked unit state databa
 
 ## Logging and monitoring
 
-Charms log through the Python standard library `logging` module. Ops installs a handler that forwards log records to Juju by running the `juju-log` hook command, so charm and framework log messages are collected and surfaced by Juju (for example, through `juju debug-log`) using Juju's own log levels and storage. Ops does not currently emit a separate stream of structured security events using a standardised vocabulary such as the OWASP security-logging vocabulary; the application logs described here are the charm's own messages together with Ops's framework messages. As a good practice, never write sensitive data to logs (see the Good practices section).
-
-OWASP-vocabulary security event logging is in scope per the SEC0045 audit; ops will add structured security events when that work lands.
+Charms log through the Python standard library `logging` module. Ops installs a handler that forwards log records to Juju by running the `juju-log` hook command, so charm and framework log messages are collected and surfaced by Juju (for example, through `juju debug-log`) using Juju's own log levels and storage. Ops also emits structured security events that follow the [OWASP security-logging vocabulary](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html), forwarded to Juju through the same `juju-log` channel. These cover framework-level events such as uncaught exceptions in charm code and hook command authorisation failures. As a good practice, never write sensitive data to logs (see the Good practices section).
 
 ## Secure decommissioning
 
-Ops itself is removed by uninstalling the `ops` package, for example with `pip uninstall ops`. The data that Ops writes — the state database (`JUJU_CHARM_DIR/.unit-state.db`) and, when the `tracing` extra is installed, the trace buffer (`.tracing-data.db`) — lives in the charm directory alongside the charm and is removed by Juju when the unit is removed. If a charm is decommissioned outside Juju's normal removal flow, confirm that these files are securely deleted, because `StoredState` and buffered deferred-event payloads can contain sensitive data.
+Ops is a library that runs inside the charm process, so it has no separate lifecycle to decommission. Everything Ops persists lives in the charm directory (`JUJU_CHARM_DIR`): the state database (`.unit-state.db`) and, when the `tracing` extra is installed, the trace buffer (`.tracing-data.db`). Removing the unit through Juju removes the charm directory and so removes Ops's data along with the charm.
+
+If a unit is taken out of service by some means other than `juju remove-unit` (for example, reclaiming the underlying machine or container directly), treat the charm directory the same as any other location that may hold sensitive data, because `StoredState` and buffered deferred-event payloads can contain workload data passed in through events.
 
 ## Security updates
 
@@ -81,7 +81,7 @@ For information about supported versions and how to report security issues, see 
 
 ### Security lifecycle
 
-Ops is distributed as the `ops` package on [PyPI](https://pypi.org/project/ops/), and security updates are delivered as new releases there; charms pick them up by re-locking and rebuilding, as described above. In line with [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md), security updates are released for all major versions that have had a release in the last year. A major version that has had no release for over a year is considered end of life and does not receive further security fixes. To check which version is installed, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'`.
+Ops is distributed as the `ops` package on [PyPI](https://pypi.org/project/ops/), and security updates are delivered as new releases there; charms pick them up by re-locking and rebuilding, as described above. In line with [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md), security updates are released for all major versions that have had a release in the last year, and a major version that has had no release for over a year is considered end of life. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm). See the [tool versions page](#tool-versions) for current release dates and end-of-life dates for each supported version. To check which version is installed, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'`.
 
 ## Risks
 
