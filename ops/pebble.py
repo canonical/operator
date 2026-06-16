@@ -347,6 +347,8 @@ if TYPE_CHECKING:
 
 
 class _WebSocket(Protocol):
+    sock: socket.socket | None
+
     def connect(self, url: str, socket: socket.socket): ...
 
     def shutdown(self): ...
@@ -417,10 +419,37 @@ def _format_timeout(timeout: float) -> str:
 
 
 def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> threading.Thread:
-    """Helper to simplify starting a thread."""
-    thread = threading.Thread(target=target, args=args, kwargs=kwargs)
+    """Helper to simplify starting a thread.
+
+    The thread is marked as daemon so that exec I/O threads can never keep
+    the interpreter alive at exit, even when teardown is missed (for
+    example, if wait() is never called and the server holds the websockets
+    open).
+    """
+    thread = threading.Thread(target=target, args=args, kwargs=kwargs, daemon=True)
     thread.start()
     return thread
+
+
+def _force_close_websocket(ws: _WebSocket):
+    """Close a websocket so that reads and writes blocked on it unblock.
+
+    ``WebSocket.shutdown()`` only closes the socket's file descriptor, and
+    closing a socket doesn't wake up other threads that are blocked in
+    ``recv()`` on the same socket; an OS-level shutdown of the connection
+    does.
+
+    This reaches into websocket-client's ``WebSocket.sock`` (the underlying
+    ``socket.socket``) because the library exposes no public way to shut the
+    connection down without first closing the fd.
+    """
+    sock = ws.sock
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass  # Already disconnected or closed.
+    ws.shutdown()
 
 
 class Error(Exception):
@@ -1794,20 +1823,35 @@ class ExecProcess(Generic[AnyStr]):
         if timeout is not None:
             # A bit more than the command timeout to ensure that happens first
             timeout += 1
-        change = self._client.wait_change(self._change_id, timeout=timeout)
+        try:
+            change = self._client.wait_change(self._change_id, timeout=timeout)
+        except BaseException:
+            # The wait failed or was interrupted, for example because the
+            # change didn't finish before the client-side timeout above. The
+            # I/O threads may still be blocked on their websockets, so tear
+            # the connections down to unblock them, and reap the threads
+            # before propagating the error, otherwise they're left running
+            # and at interpreter shutdown block the join of non-daemon
+            # threads (#2556).
+            self._teardown_after_error()
+            raise
 
         # If stdin reader thread is running, stop it
         if self._cancel_stdin is not None:
             self._cancel_stdin()
+            self._cancel_stdin = None
 
         # Wait for all threads to finish (e.g., message barrier sent)
         for thread in self._threads:
             thread.join()
 
         # If we opened a cancel_reader pipe, close the read side now (write
-        # side was already closed by _cancel_stdin().
+        # side was already closed by _cancel_stdin()). Clear it afterwards so
+        # that a second call to _wait() (e.g. wait() then wait_output()) can't
+        # close the same fd again, matching _teardown_after_error().
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
+            self._cancel_reader = None
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
         self._control_ws.shutdown()
@@ -1822,6 +1866,35 @@ class ExecProcess(Generic[AnyStr]):
         if change.tasks:
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
+
+    def _teardown_after_error(self):
+        # If stdin reader thread is running, stop it.
+        if self._cancel_stdin is not None:
+            self._cancel_stdin()
+            self._cancel_stdin = None
+
+        # Unlike the success path, close the websockets before joining the
+        # I/O threads: the server hasn't finished the exec, so the threads
+        # are still blocked reading from the websockets and would never
+        # finish on their own.
+        _force_close_websocket(self._control_ws)
+        _force_close_websocket(self._stdio_ws)
+        if self._stderr_ws is not None:
+            _force_close_websocket(self._stderr_ws)
+
+        for thread in self._threads:
+            # With the websockets closed the threads exit almost immediately;
+            # the timeout is belt-and-braces (they're daemon threads, so even
+            # a leak here can't block interpreter shutdown).
+            thread.join(timeout=1.0)
+            if thread.is_alive():
+                logger.warning('exec I/O thread did not finish after error in wait')
+
+        # If we opened a cancel_reader pipe, close the read side now (write
+        # side was already closed by _cancel_stdin()).
+        if self._cancel_reader is not None:
+            os.close(self._cancel_reader)
+            self._cancel_reader = None
 
     def wait_output(self) -> tuple[AnyStr, AnyStr | None]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
@@ -1903,27 +1976,41 @@ def _reader_to_websocket(
     bufsize: int = 16 * 1024,
 ):
     """Read reader through to EOF and send each chunk read to the websocket."""
-    while True:
-        if cancel_reader is not None:
-            # Wait for either a read to be ready or the caller to cancel stdin
-            result = select.select([cancel_reader, reader], [], [])
-            if cancel_reader in result[0]:
+    try:
+        while True:
+            if cancel_reader is not None:
+                # Wait for either a read to be ready or the caller to cancel stdin
+                result = select.select([cancel_reader, reader], [], [])
+                if cancel_reader in result[0]:
+                    break
+
+            chunk = reader.read(bufsize)
+            if not chunk:
                 break
+            if isinstance(chunk, str):
+                chunk = chunk.encode(encoding)
+            ws.send_binary(chunk)
 
-        chunk = reader.read(bufsize)
-        if not chunk:
-            break
-        if isinstance(chunk, str):
-            chunk = chunk.encode(encoding)
-        ws.send_binary(chunk)
-
-    ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
+        ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
+    except (websocket.WebSocketException, OSError) as e:
+        # The websocket or cancel pipe was closed underneath us (for example,
+        # because the exec failed and ExecProcess._wait tore the connection
+        # down), so there's nowhere to send the rest of the input to.
+        logger.debug('exec stdin forwarder stopped: %s', e)
 
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk = ws.recv()
+        try:
+            chunk = ws.recv()
+        except (websocket.WebSocketException, OSError) as e:
+            # The websocket was closed underneath us (for example, because
+            # the exec failed and ExecProcess._wait tore the connection
+            # down): treat it as end-of-stream rather than crashing the
+            # thread.
+            logger.debug('exec output forwarder stopped: %s', e)
+            break
 
         if isinstance(chunk, str):
             try:
@@ -2001,7 +2088,16 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk = self.ws.recv()
+            try:
+                chunk = self.ws.recv()
+            except (websocket.WebSocketException, OSError) as e:
+                # The websocket was closed underneath us (for example,
+                # because the exec failed and ExecProcess._wait tore the
+                # connection down): treat it as end-of-file. The error that
+                # caused the teardown is reported by wait()/wait_output().
+                logger.debug('exec output stream closed: %s', e)
+                self.eof = True
+                return b''
 
             if isinstance(chunk, str):
                 try:
@@ -3144,14 +3240,21 @@ class Client:
             task_id = resp['result']['task-id']
 
             stderr_ws: _WebSocket | None = None
+            connected: list[_WebSocket] = []
             try:
                 control_ws = self._connect_websocket(task_id, 'control')
+                connected.append(control_ws)
                 stdio_ws = self._connect_websocket(task_id, 'stdio')
+                connected.append(stdio_ws)
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
+                    connected.append(stderr_ws)
             except websocket.WebSocketException as e:
                 # Error connecting to websockets, probably due to the exec/change
-                # finishing early with an error. Call wait_change to pick that up.
+                # finishing early with an error. Close any websockets that did
+                # connect, then call wait_change to pick up the change error.
+                for ws in connected:
+                    ws.shutdown()
                 change = self.wait_change(ChangeID(change_id))
                 if change.err:
                     raise ChangeError(change.err, change) from e
