@@ -10,8 +10,11 @@ When you're deciding which version of tools to use within the charming ecosystem
 |------|----------------|---------------|--------------|-------------------|
 | 18.04 (Bionic Beaver) | [3.6](https://docs.python.org/3/whatsnew/3.6.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 1.x | 2.x |
 | 20.04 (Focal Fossa) | [3.8](https://docs.python.org/3/whatsnew/3.8.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/) | 2.x |
-| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.0.1/) |
-| 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.0.1/) |
+| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
+| 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
+| 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [3.x](https://documentation.ubuntu.com/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)¹ |
+
+¹ `base: ubuntu@26.04` is supported by Charmcraft >= 4.3. On Charmcraft 4.2.x, build with `build-base: ubuntu@devel` instead (unstable).
 
 ## Pebble provided by Juju
 
@@ -34,7 +37,7 @@ Juju releases new minor versions approximately every 3 months, which are support
 
 > See more: {external+juju:ref}`Juju support timeframes <releasenotes>`
 
-Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version.
+Ops releases new minor versions approximately once per month. Major versions are supported with security fixes for one year from the latest release. To receive bug and security fixes within a major version, charms must update to the latest minor release within that major version. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm).
 
 > See more: [Ops support timeframes](https://github.com/canonical/operator/blob/main/SECURITY.md)
 
@@ -50,15 +53,15 @@ Ops releases new minor versions approximately once per month. Major versions are
 | [Juju 3.4](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2024-02-15 | 2024-06-15 | 2024-08-15 |
 | [Juju 3.5](https://documentation.ubuntu.com/juju/latest/releasenotes/unsupported/juju_3.x.x/) | <span style="color:red">✗</span> EOL | 2024-05-07 | 2024-09-07 | 2024-11-07 |
 | [Juju 3.6 (LTS)](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/) | <span style="color:green">●</span> Active | 2024-12-11 |  | 2039-04-11 |
-| [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | <span style="color:green">●</span> Active | 2025-11-14 | 2026-03-14 | 2026-05-14 |
+| [Juju 4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | <span style="color:green">●</span> Active | 2025-11-14 |  |  |
 
 ### Ops
 
 | Version | Status | Release Date | End of Life |
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
-| Ops 2.23 | <span style="color:orange">⚠</span> Upgrade soon | 2023-01-25 | 2027-02-11 |
-| Ops 3.7 | <span style="color:green">●</span> Active | 2026-05-28 | 2027-05-28 |
+| Ops 2.23 (LTS) | <span style="color:green">●</span> Active | 2023-01-25 | 2038-01-25 |
+| Ops 3.7 | <span style="color:green">●</span> Active | 2026-03-30 | 2027-05-28 |
 
 **Legend:**
 - <span style="color:green">●</span> Active: Currently supported
