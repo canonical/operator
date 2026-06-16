@@ -46,6 +46,7 @@ import ops.testing
 from ops import pebble
 from ops._private.harness import _TestingPebbleClient
 from ops.jujuversion import JujuVersion
+from ops.log import _get_juju_log_and_app_id
 from ops.model import _ModelBackend
 from ops.pebble import FileType
 from ops.testing import ExecResult
@@ -7136,6 +7137,21 @@ class TestCloudSpec:
 
 
 class TestChecks:
+    @pytest.fixture
+    def reset_security_logging(self):
+        """Clear the security-logging cache so the warning fires deterministically.
+
+        Harness does not call setup_root_logging, so the first call to
+        Container.stop_checks in a worker emits a RuntimeWarning. Because
+        _get_juju_log_and_app_id is functools.cached, subsequent calls in
+        the same xdist worker would otherwise silently reuse whatever the
+        first test produced, leading to race-y behaviour where pytest.warns
+        sometimes passes and sometimes fails.
+        """
+        _get_juju_log_and_app_id.cache_clear()
+        yield
+        _get_juju_log_and_app_id.cache_clear()
+
     @staticmethod
     def _container_with_layer(request: pytest.FixtureRequest):
         layer = pebble.Layer({
@@ -7187,7 +7203,7 @@ class TestChecks:
         changed = container.start_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk3']
 
-    def test_stop_checks(self, request: pytest.FixtureRequest):
+    def test_stop_checks(self, request: pytest.FixtureRequest, reset_security_logging: None):
         container = self._container_with_layer(request)
         # This generates a warning because there's a security event
         # logged, but we haven't set up logging for Harness in these tests.
@@ -7195,7 +7211,7 @@ class TestChecks:
             changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
 
-    def test_stop_then_start(self, request: pytest.FixtureRequest):
+    def test_stop_then_start(self, request: pytest.FixtureRequest, reset_security_logging: None):
         container = self._container_with_layer(request)
         # See test_stop_checks: stopping a check logs a security event, but
         # logging is not set up for Harness in these tests.
