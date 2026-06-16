@@ -7197,7 +7197,10 @@ class TestChecks:
 
     def test_stop_then_start(self, request: pytest.FixtureRequest):
         container = self._container_with_layer(request)
-        changed = container.stop_checks('chk1', 'chk2', 'chk3')
+        # See test_stop_checks: stopping a check logs a security event, but
+        # logging is not set up for Harness in these tests.
+        with pytest.warns(RuntimeWarning):
+            changed = container.stop_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2']
         changed = container.start_checks('chk1', 'chk2', 'chk3')
         assert changed == ['chk1', 'chk2', 'chk3']
