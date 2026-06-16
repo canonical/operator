@@ -710,28 +710,33 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            # Pebble fills in defaults for attributes the plan does not set,
-            # so treat the plan's unset value (None or an UNSET enum member) as
-            # equivalent to the Pebble default for that attribute, and treat
-            # an absent value on the check info as also matching the default.
-            unset_defaults = {
-                'level': ({None, pebble.CheckLevel.UNSET}, pebble.CheckLevel.UNSET),
-                'startup': ({None, pebble.CheckStartup.UNSET}, pebble.CheckStartup.ENABLED),
-                'threshold': ({None}, 3),
-            }
-
-            def _normalise(value: Any, unset: set[Any], default: Any) -> Any:
-                return default if value in unset else value
-
-            for attr, (unset, default) in unset_defaults.items():
-                check_value = _normalise(getattr(check, attr), unset, default)
-                plan_value = _normalise(getattr(plan_check, attr), unset, default)
-                if check_value != plan_value:
-                    errors.append(
-                        f'container {container.name!r} has a check {check.name!r} with a '
-                        f'different {attr!r} ({getattr(check, attr)}) '
-                        f'than the plan ({getattr(plan_check, attr)}).',
-                    )
+            # Pebble fills in defaults for attributes the plan does not set, so
+            # for each attribute treat the plan's "unset" representation as
+            # equivalent to whatever Pebble would effectively report. The
+            # scenario CheckInfo uses None for an absent level, while the plan
+            # uses CheckLevel.UNSET, so those two also need to compare equal.
+            check_level = check.level if check.level is not None else pebble.CheckLevel.UNSET
+            if check_level != plan_check.level:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'level' ({check.level}) than the plan ({plan_check.level}).",
+                )
+            plan_startup = (
+                pebble.CheckStartup.ENABLED
+                if plan_check.startup == pebble.CheckStartup.UNSET
+                else plan_check.startup
+            )
+            if check.startup != plan_startup:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'startup' ({check.startup}) than the plan ({plan_check.startup}).",
+                )
+            plan_threshold = 3 if plan_check.threshold is None else plan_check.threshold
+            if check.threshold != plan_threshold:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'threshold' ({check.threshold}) than the plan ({plan_check.threshold}).",
+                )
 
     return Results(errors, [])
 
