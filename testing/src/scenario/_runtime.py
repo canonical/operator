@@ -28,6 +28,7 @@ from .state import (
     PeerRelation,
     Relation,
     SubordinateRelation,
+    _strip_juju4_defaults,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -304,6 +305,7 @@ class Runtime(Generic[CharmType]):
 
         # we make a copy to avoid mutating the input state
         output_state = copy.deepcopy(state)
+        _strip_juju4_defaults(output_state, self._juju_version)
 
         logger.info(' - generating virtual charm root')
         with self._virtual_charm_root() as temporary_charm_root:
