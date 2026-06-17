@@ -98,7 +98,7 @@ framework.observe(
 )
 ```
 
-Now, in the body of the charm definition, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
+Now, in the body of the charm class, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
 
 ```python
 def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
@@ -190,7 +190,7 @@ Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `
 
 ### Clean up storage
 
-On Kubernetes, `juju detach-storage` isn't supported, so storage is only detached during unit teardown. Juju emits a [storage-detaching](ops.StorageDetachingEvent) event during teardown, along with the other teardown events, like `stop` and `remove`.
+On Kubernetes, `juju detach-storage` isn't supported, so storage is only detached during unit teardown. Juju emits a [storage-detaching](ops.StorageDetachingEvent) event during teardown, along with `stop`, `remove`, and other teardown events.
 
 > Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
 
