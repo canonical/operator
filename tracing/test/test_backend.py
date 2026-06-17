@@ -14,8 +14,11 @@
 
 from __future__ import annotations
 
+import io
+import logging
 import pathlib
 import ssl
+import urllib.error
 from unittest.mock import ANY, patch
 
 import pytest
@@ -85,3 +88,37 @@ def test_exporter_ssl_context(tmp_path: pathlib.Path):
     assert context.minimum_version == ssl.TLSVersion.TLSv1_2
     assert context.verify_flags & ssl.VERIFY_X509_PARTIAL_CHAIN
     assert not (context.verify_flags & ssl.VERIFY_X509_STRICT)
+
+
+def test_exporter_http_error_log_format(tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture):
+    """HTTPError responses log the URL, status, and truncated body without a traceback."""
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'http://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, None))
+
+    long_body = b'x' * 5000
+    http_error = urllib.error.HTTPError(
+        url,
+        503,
+        'Service Unavailable',
+        {},
+        io.BytesIO(long_body),  # type: ignore[arg-type]
+    )
+
+    with patch('urllib.request.urlopen', side_effect=http_error), caplog.at_level(
+        logging.ERROR, logger='ops_tracing._export'
+    ):
+        exporter.do_export(buffered_id=0, data=b'\x00', mime='application/x-protobuf')
+
+    rejected = [r for r in caplog.records if 'rejected our data' in r.getMessage()]
+    assert len(rejected) == 1
+    record = rejected[0]
+    assert record.levelno == logging.ERROR
+    # `logger.error(...)` should not attach exception info -- we have the status code.
+    assert record.exc_info is None
+    message = record.getMessage()
+    assert url in message
+    assert 'e.code=503' in message
+    # The body must be capped at 1000 bytes to bound log size.
+    assert repr(b'x' * 1000) in message
+    assert repr(b'x' * 1001) not in message
