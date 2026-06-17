@@ -37,6 +37,7 @@ stdout
 storages
 systemd
 subprocess
+teardown
 tinyproxy
 traceback
 tracebacks
