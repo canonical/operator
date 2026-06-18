@@ -32,7 +32,7 @@ The module includes:
 
 .. note::
     Unit testing is only one aspect of a comprehensive testing strategy. For more
-    on testing charms, see `Testing <https://canonical.com/juju/docs/opslatest/explanation/testing/>`_.
+    on testing charms, see `Testing <https://canonical.com/juju/docs/ops/latest/explanation/testing/>`_.
 """
 
 # ruff: noqa: F401 (unused import)
