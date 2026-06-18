@@ -153,8 +153,8 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['github_version'] = '2.23-maintenance'
     html_context['slug'] = 'ops'
 
-# If your project is on documentation.ubuntu.com, specify the project
-# slug (for example, "lxd") here.
+# Project slug
+# Set to the path after https://canonical.com/
 slug = 'juju/docs/ops'
 
 ############################################################
