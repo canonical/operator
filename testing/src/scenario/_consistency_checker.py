@@ -710,18 +710,14 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            # Pebble fills in defaults for attributes the plan does not set, so
-            # for each attribute treat the "unset" representation on either
-            # side as equivalent to whatever Pebble would effectively report.
-            # The scenario CheckInfo uses None for an absent level, while the
-            # plan uses CheckLevel.UNSET, so those two also need to compare
-            # equal.
+            # Scenario allows None for unset, Pebble defaults to UNSET.
             check_level = check.level if check.level is not None else pebble.CheckLevel.UNSET
             if check_level != plan_check.level:
                 errors.append(
                     f'container {container.name!r} has a check {check.name!r} with a '
                     f"different 'level' ({check.level}) than the plan ({plan_check.level}).",
                 )
+            # Scenario defaults to None, Pebble defaults to UNSET and collapses to ENABLED.
             check_startup = (
                 pebble.CheckStartup.ENABLED
                 if check.startup in (None, pebble.CheckStartup.UNSET)
@@ -737,6 +733,7 @@ def check_containers_consistency(
                     f'container {container.name!r} has a check {check.name!r} with a '
                     f"different 'startup' ({check.startup}) than the plan ({plan_check.startup}).",
                 )
+            # Scenario and Pebble allow None, collapsing to 3.
             check_threshold = 3 if check.threshold is None else check.threshold
             plan_threshold = 3 if plan_check.threshold is None else plan_check.threshold
             if check_threshold != plan_threshold:

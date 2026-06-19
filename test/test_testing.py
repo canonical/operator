@@ -7150,7 +7150,6 @@ class TestChecks:
         """
         _get_juju_log_and_app_id.cache_clear()
         yield
-        _get_juju_log_and_app_id.cache_clear()
 
     @staticmethod
     def _container_with_layer(request: pytest.FixtureRequest):
