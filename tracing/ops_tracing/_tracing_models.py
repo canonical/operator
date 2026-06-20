@@ -41,8 +41,8 @@ tracing endpoint provided by Tempo.
 Charms seeking to push traces to Tempo, must do so using the `TracingEndpointRequirer`
 object from this charm library. For the simplest use cases, using the `TracingEndpointRequirer`
 object only requires instantiating it, typically in the constructor of your charm. The
-`TracingEndpointRequirer` constructor requires the name of the relation over which a tracing endpoint
- is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
+`TracingEndpointRequirer` constructor requires the name of the relation over which a tracing
+endpoint is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
  This relation must use the `tracing` interface.
  The `TracingEndpointRequirer` object may be instantiated as follows
 
@@ -68,7 +68,7 @@ Units of requirer charms obtain the tempo endpoint to which they will push their
 
 If the `protocol` is not in the list of protocols that the charm requested at endpoint set-up time,
 the library will raise an error.
-"""  # noqa: W505
+"""
 import dataclasses
 import enum
 import json
@@ -77,6 +77,7 @@ import typing
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     List,
     Literal,
@@ -306,8 +307,8 @@ class TracingRequirerAppData:
 
 
 class _AutoSnapshotEvent(RelationEvent):
-    __args__: Tuple[str, ...] = ()
-    __optional_kwargs__: Dict[str, Any] = {}
+    __args__: ClassVar[Tuple[str, ...]] = ()
+    __optional_kwargs__: ClassVar[Dict[str, Any]] = {}
 
     @classmethod
     def __attrs__(cls):
@@ -317,7 +318,7 @@ class _AutoSnapshotEvent(RelationEvent):
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
-            raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
+            raise TypeError(f"expected {len(self.__args__)} args, got {len(args)}")
 
         for attr, obj in zip(self.__args__, args):
             setattr(self, attr, obj)
@@ -333,9 +334,9 @@ class _AutoSnapshotEvent(RelationEvent):
                 dct[attr] = obj
             except ValueError as e:
                 raise ValueError(
-                    "cannot automagically serialize {}: "
+                    f"cannot automagically serialize {obj}: "
                     "override this method and do it "
-                    "manually.".format(obj)
+                    "manually."
                 ) from e
 
         return dct
@@ -432,15 +433,14 @@ class TracingEndpointRequirer(Object):
         except ModelError as e:
             # args are bytes
             msg = e.args[0]
-            if isinstance(msg, bytes):
-                if msg.startswith(
-                    b"ERROR cannot read relation application settings: permission denied"
-                ):
-                    logger.error(
-                        f"encountered error {e} while attempting to request_protocols."
-                        f"The relation must be gone."
-                    )
-                    return
+            if isinstance(msg, bytes) and msg.startswith(
+                b"ERROR cannot read relation application settings: permission denied"
+            ):
+                logger.error(
+                    f"encountered error {e} while attempting to request_protocols."
+                    f"The relation must be gone."
+                )
+                return
             raise
 
     @property
@@ -463,7 +463,7 @@ class TracingEndpointRequirer(Object):
         return relations[0] if relations else None
 
     def is_ready(self, relation: Optional[Relation] = None):
-        """Is this endpoint ready?"""
+        """Return whether this endpoint is ready."""
         relation = relation or self._relation
         if not relation:
             logger.debug(f"no relation on {self._relation_name !r}: tracing not ready")
@@ -517,14 +517,17 @@ class TracingEndpointRequirer(Object):
             filter(lambda i: i.protocol.name == protocol, app_data.receivers)
         )
         if not receivers:
-            # it can happen if the charm requests tracing protocols, but the relay (such as grafana-agent) isn't yet
-            # connected to the tracing backend. In this case, it's not an error the charm author can do anything about
+            # It can happen if the charm requests tracing protocols, but the relay (such as
+            # grafana-agent) isn't yet connected to the tracing backend. In this case, it's not
+            # an error the charm author can do anything about.
             logger.warning(f"no receiver found with protocol={protocol!r}.")
             return
         if len(receivers) > 1:
-            # if we have more than 1 receiver that matches, it shouldn't matter which receiver we'll be using.
+            # If we have more than 1 receiver that matches, it shouldn't matter which receiver
+            # we'll be using.
             logger.warning(
-                f"too many receivers with protocol={protocol!r}; using first one. Found: {receivers}"
+                f"too many receivers with protocol={protocol!r}; using first one."
+                f" Found: {receivers}"
             )
 
         receiver = receivers[0]
@@ -535,13 +538,15 @@ class TracingEndpointRequirer(Object):
     ) -> Optional[str]:
         """Receiver endpoint for the given protocol.
 
-        It could happen that this function gets called before the provider publishes the endpoints.
-        In such a scenario, if a non-leader unit calls this function, a permission denied exception will be raised due to
-        restricted access. To prevent this, this function needs to be guarded by the `is_ready` check.
+        It could happen that this function gets called before the provider publishes the
+        endpoints. In such a scenario, if a non-leader unit calls this function, a permission
+        denied exception will be raised due to restricted access. To prevent this, this function
+        needs to be guarded by the `is_ready` check.
 
         Raises:
         ProtocolNotRequestedError:
-            If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol it did not request.
+            If the charm unit is the leader unit and attempts to obtain an endpoint for a
+            protocol it did not request.
         """
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:

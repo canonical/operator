@@ -377,9 +377,8 @@ class CertificateTransferRequires(Object):
 
     def _get_relevant_relations(self, relation_id: Optional[int] = None) -> List[Relation]:
         """Get the relevant relation if relation_id is given, all relations otherwise."""
-        if relation_id is not None:
-            if relation := self.model.get_relation(
-                relation_name=self.relationship_name, relation_id=relation_id
-            ):
-                return [relation]
+        if relation_id is not None and (relation := self.model.get_relation(
+            relation_name=self.relationship_name, relation_id=relation_id
+        )):
+            return [relation]
         return list(self.model.relations[self.relationship_name])
