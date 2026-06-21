@@ -18,14 +18,14 @@ The diagram below shows where Ops sits and the trust boundaries that follow:
 ```{mermaid}
 flowchart LR
     Juju["Juju agent<br/>(trusted control plane)"]
-    subgraph Host["Charm host<br/>(machine or k8s container)"]
+    subgraph Host["Charm host: machine or k8s pod"]
         subgraph Process["Charm process"]
             Ops["Ops library"]
             Charm["Charm code"]
         end
         State[("State DB +<br/>trace buffer<br/>(JUJU_CHARM_DIR)")]
+        Workload["Workload<br/>(same OS on machine,<br/>sibling container on k8s)"]
     end
-    Workload["Workload"]
     Receiver["Tracing receiver"]
 
     Juju <-->|"hook env, hook commands"| Ops
