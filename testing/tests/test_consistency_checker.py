@@ -266,10 +266,11 @@ def test_checkinfo_matches_layer_with_defaults():
         startup=ops.pebble.CheckStartup.ENABLED,
         threshold=3,
     )
-    state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
+    container = Container('foo', check_infos={check}, layers={'base': layer})
+    state = State(containers={container})
     assert_consistent(
         state,
-        _Event('foo-pebble-ready', container=Container('foo')),
+        _Event('foo-pebble-ready', container=container),
         _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
     )
 
