@@ -6,11 +6,19 @@ When producing security documentation for your charm, it's important to consider
 
 ## Product architecture
 
-Ops sits between Juju and your charm code, and its trust boundaries follow from that position. Juju is the trusted control plane: it dispatches hooks, sets the environment variables and hook command results that Ops reads, and owns the machine or Kubernetes container that the charm runs in. Ops is a library running inside the charm process under Juju's control; it parses the data that Juju provides, dispatches events to the charm, and persists a small amount of state on the local filesystem. From the perspective of Ops, your charm code is the least-trusted layer: Ops hands it the event context that Juju supplied and otherwise delegates application logic, secret handling, and workload configuration to the charm. Ops itself opens no network listeners, manages no credentials, and terminates no TLS — those concerns belong to Juju, to the workload, or to the charm author. The Juju-to-Ops boundary is described in the Inter-process communication section, and the state that Ops keeps on the charm side of that boundary is described in the Charm unit databases section.
+Ops sits between Juju and your charm code. Its trust boundaries follow from that position. Juju is the trusted control plane: it provides the hook context that Ops reads, and owns the machine or Kubernetes container where the charm runs.
 
-## Secure by Design
+Ops is a library running inside the charm process under Juju's control. It parses the context that Juju provides, dispatches events to the charm, and persists a small amount of state on the local filesystem. The charm is responsible for application logic, secret handling, and workload configuration.
 
-Ops is designed to keep its security surface small. It adds no daemons or network listeners of its own; the only outbound connection it can make is sending buffered trace data over HTTPS when a charm is integrated with a tracing receiver (see the Cryptographic technology section). It delegates cryptography to Juju and to the Python standard library rather than implementing its own, and it delegates secret storage to Juju secrets. Its persistence is deliberately bounded — a single local state database, plus a local trace buffer when the `tracing` extra is installed — rather than a general-purpose store. As a result, most of a charm's security posture is determined by Juju, by the workload, and by the charm's own code; the Risks and Good practices sections below set out the practical consequences for charm authors.
+Ops itself opens no network listeners, manages no credentials, and terminates no TLS — those concerns belong to Juju, the workload, or the charm author.
+
+## Secure by design
+
+Ops is designed to keep its security surface small.
+
+Ops only persists a single local state database, plus a local trace buffer when the `tracing` extra is installed. As a result, most of a charm's security posture is determined by Juju, by the workload, and by the charm's own code.
+
+Ops adds no daemons or network listeners of its own; the only outbound connection it can make is sending buffered trace data over HTTPS when a charm is integrated with a tracing receiver. It delegates cryptography to Juju and to the Python standard library rather than implementing its own. It delegates secret storage to Juju secrets.
 
 ## Cryptographic technology
 
@@ -18,9 +26,9 @@ The only case where Ops uses cryptography is for sending trace data, when a cert
 
 There is no use of hashing or digital signatures.
 
-The cryptographic functionality is provided entirely by the Python standard library. The tracing support (the `ops[tracing]` extra, packaged as `ops-tracing`) sends trace data using the standard library `ssl` module via `urllib.request`, so the TLS implementation and its cipher suites come from the OpenSSL (or equivalent) library that the running Python interpreter was built against. Ops bundles no separate cryptographic library, and the OpenTelemetry packages that the tracing extra depends on (`opentelemetry-api` and `opentelemetry-sdk`) provide the tracing framework rather than the cryptography.
+The cryptographic functionality is provided entirely by the Python standard library. The `ops[tracing]` extra sends data using `urllib.request`, which relies on `ssl` from the standard library, so the TLS implementation and its cipher suites come from the OpenSSL (or equivalent) library that the running Python interpreter was built against. Neither Ops nor the OpenTelemetry packages that the tracing extra depends on (`opentelemetry-api` and `opentelemetry-sdk`) provide any other cryptography implementation.
 
-Ops does not encrypt the state database or buffered trace data at rest. Confidentiality at rest relies on the filesystem permissions documented in the Charm unit databases section and on the host's at-rest encryption story.
+Ops does not encrypt the state database or buffered trace data at rest. Confidentiality at rest relies on filesystem permissions and the host's at-rest encryption story.
 
 ## Inter-process communication
 
@@ -29,12 +37,6 @@ Ops communicates with Juju by reading environment variables and running processe
 > See also:
 > - {external+juju:ref}`Juju | Hook <hook>`
 > - {external+juju:ref}`Juju | Hook command <list-of-hook-commands>`
-
-## Hardening
-
-Hardening a charm that uses Ops is done in the same way as any other charm: no extra hardening steps are required as a result of using Ops.
-
-> See also: {external+juju:ref}`Juju | Harden your deployment <harden-your-deployment>`
 
 ## Charm unit databases
 
@@ -61,27 +63,39 @@ For example, the permissions of the databases are:
 
 When testing an event with [](ops.testing.Context), the mocked unit state database and tracing data are stored in memory. Each event creates a new charm directory, which is provided by [](tempfile.TemporaryDirectory).
 
-## Logging and monitoring
+## Configuring and operating
+
+### Hardening
+
+Hardening a charm that uses Ops is done in the same way as any other charm: no extra hardening steps are required as a result of using Ops.
+
+> See also: {external+juju:ref}`Juju | Harden your deployment <harden-your-deployment>`
+
+### Logging and monitoring
 
 Charms log through the Python standard library `logging` module. Ops installs a handler that forwards log records to Juju by running the `juju-log` hook command, so charm and framework log messages are collected and surfaced by Juju (for example, through `juju debug-log`) using Juju's own log levels and storage. Ops also emits structured security events that follow the [OWASP security-logging vocabulary](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Vocabulary_Cheat_Sheet.html), forwarded to Juju through the same `juju-log` channel. These cover framework-level events such as uncaught exceptions in charm code and hook command authorisation failures. As a good practice, never write sensitive data to logs (see the Good practices section).
 
-## Secure decommissioning
+## Decommissioning
 
 Ops is a library that runs inside the charm process, so it has no separate lifecycle to decommission. Everything Ops persists lives in the charm directory (`JUJU_CHARM_DIR`): the state database (`.unit-state.db`) and, when the `tracing` extra is installed, the trace buffer (`.tracing-data.db`). Removing the unit through Juju removes the charm directory and so removes Ops's data along with the charm.
 
 If a unit is taken out of service by some means other than `juju remove-unit` (for example, reclaiming the underlying machine or container directly), treat the charm directory the same as any other location that may hold sensitive data, because `StoredState` and buffered deferred-event payloads can contain workload data passed in through events.
 
-## Security updates
+## Security lifecycle
+
+Ops is distributed as the `ops` package on [PyPI](https://pypi.org/project/ops/) and follows semantic versioning. Security updates are delivered as new releases on PyPI; charms pick them up by re-locking and rebuilding.
+
+### Supported versions
+
+In line with [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md), security updates are released for all major versions that have had a release in the last year. A major version that has had no release for over a year is considered end of life. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm).
+
+See the [tool versions page](#tool-versions) for current release dates and end-of-life dates for each supported version. To check which version is installed, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'`.
+
+### Receiving updates
 
 We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your `dev` dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`, which is a Long Term Support (LTS) release. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
 
-Your charm repository should have tooling configured so that any dependencies with security updates are detected automatically (such as [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/)), prompting to you re-lock so that the charm will be built with the latest version.
-
-For information about supported versions and how to report security issues, see [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md).
-
-### Security lifecycle
-
-Ops is distributed as the `ops` package on [PyPI](https://pypi.org/project/ops/), and security updates are delivered as new releases there; charms pick them up by re-locking and rebuilding, as described above. In line with [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md), security updates are released for all major versions that have had a release in the last year, and a major version that has had no release for over a year is considered end of life. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm). See the [tool versions page](#tool-versions) for current release dates and end-of-life dates for each supported version. To check which version is installed, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'`.
+Your charm repository should have tooling configured so that any dependencies with security updates are detected automatically (such as [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/)), prompting you to re-lock so that the charm will be built with the latest version.
 
 ## Risks
 
