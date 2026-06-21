@@ -21,7 +21,9 @@ import email.parser
 import io
 import json
 import signal
+import socket
 import tempfile
+import threading
 import typing
 import unittest
 import unittest.util
@@ -3383,8 +3385,10 @@ class TestExecError:
 
 class MockWebsocket:
     def __init__(self):
+        self.sock: socket.socket | None = None
         self.sends: list[tuple[str, str | bytes]] = []
         self.receives: list[str | bytes] = []
+        self.shutdown_calls = 0
 
     def send_binary(self, b: bytes):
         self.sends.append(('BIN', b))
@@ -3396,7 +3400,33 @@ class MockWebsocket:
         return self.receives.pop(0)
 
     def shutdown(self):
-        pass
+        self.shutdown_calls += 1
+
+
+class BlockingMockWebsocket(MockWebsocket):
+    """Websocket mock whose recv() blocks on a real socket until it's closed."""
+
+    def __init__(self):
+        super().__init__()
+        self.sock, self._peer = socket.socketpair()
+
+    def recv(self):
+        assert self.sock is not None
+        try:
+            data = self.sock.recv(16)
+        except OSError:
+            data = b''
+        if not data:
+            raise websocket.WebSocketConnectionClosedException(
+                'Connection to remote host was lost.'
+            )
+        return data
+
+    def shutdown(self):
+        super().shutdown()
+        assert self.sock is not None
+        self.sock.close()
+        self._peer.close()
 
 
 class TestExec:
@@ -4061,6 +4091,182 @@ class TestExec:
         test_websocket_recv_raises = pytest.mark.filterwarnings(
             'ignore::pytest.PytestUnhandledThreadExceptionWarning'
         )(test_websocket_recv_raises)
+
+    def add_blocking_responses(self, client: MockClient, change_id: str):
+        """Set up an exec response whose websockets block in recv() until closed."""
+        task_id = f'T{change_id}'
+        client.responses.append({
+            'change': change_id,
+            'result': {'task-id': task_id},
+        })
+        stdio = BlockingMockWebsocket()
+        stderr = BlockingMockWebsocket()
+        control = BlockingMockWebsocket()
+        client.websockets = {
+            (task_id, 'stdio'): stdio,
+            (task_id, 'stderr'): stderr,
+            (task_id, 'control'): control,
+        }
+        return (stdio, stderr, control)
+
+    def test_wait_change_error_reaps_io_threads(
+        self, client: MockClient, time: MockTime, monkeypatch: pytest.MonkeyPatch
+    ):
+        """If wait_change raises, the I/O threads must be unblocked and reaped.
+
+        Regression test for canonical/operator#2556. The exec change didn't
+        finish before the client-side timeout, so wait_change() raises; the
+        I/O threads were left blocked in recv() on the still-open websockets,
+        and being non-daemon they then hung interpreter shutdown.
+        """
+        thread_errors: list[threading.ExceptHookArgs] = []
+        monkeypatch.setattr(threading, 'excepthook', thread_errors.append)
+
+        stdio, stderr, control = self.add_blocking_responses(client, '123')
+
+        def timeout_response():
+            time.sleep(3)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, 'Gateway Timeout', 'timed out')
+
+        client.responses.append(timeout_response)
+
+        process = client.exec(['foo'], timeout=1)
+        with pytest.raises(pebble.TimeoutError):
+            process.wait_output()
+
+        for thread in process._threads:
+            thread.join(timeout=5)
+        assert [t.name for t in process._threads if t.is_alive()] == []
+        assert thread_errors == []
+        for ws in (stdio, stderr, control):
+            assert ws.shutdown_calls > 0
+
+    def test_wait_change_error_with_stdin(self, client: MockClient, time: MockTime):
+        """A failed wait must also stop the stdin thread and close the cancel pipe."""
+        self.add_blocking_responses(client, '123')
+
+        def timeout_response():
+            time.sleep(3)  # simulate passing of time due to wait_change call
+            raise pebble.APIError({}, 504, 'Gateway Timeout', 'timed out')
+
+        client.responses.append(timeout_response)
+
+        with tempfile.TemporaryFile() as stdin:
+            stdin.write(b'foo\n')
+            stdin.seek(0)
+            process = client.exec(['foo'], stdin=stdin, encoding=None, timeout=1)
+            with pytest.raises(pebble.TimeoutError):
+                process.wait()
+
+        for thread in process._threads:
+            thread.join(timeout=5)
+        assert [t.name for t in process._threads if t.is_alive()] == []
+        # The cancel pipe must have been closed (and not be double-closed if
+        # wait() is called again).
+        assert process._cancel_stdin is None
+        assert process._cancel_reader is None
+
+    def test_io_threads_are_daemon(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['true'])
+        process.wait_output()
+
+        assert process._threads
+        assert all(thread.daemon for thread in process._threads)
+
+    def test_wait_twice_does_not_double_close_cancel_pipe(self, client: MockClient):
+        """A successful _wait() must clear the cancel pipe so a second call is safe.
+
+        wait() and wait_output() both call _wait(); calling them in turn (or
+        wait() twice) used to os.close() the already-closed cancel_reader fd
+        and re-run _cancel_stdin(), raising OSError on the second call.
+        """
+        self.add_responses(client, '123', 0)
+        # A second wait_change response for the second _wait() call.
+        change = build_mock_change_dict('123')
+        assert 'tasks' in change and change['tasks'] is not None
+        change['tasks'][0]['data'] = {'exit-code': 0}
+        client.responses.append({'result': change})
+
+        with tempfile.TemporaryFile() as stdin:
+            stdin.write(b'foo\n')
+            stdin.seek(0)
+            process = client.exec(['foo'], stdin=stdin, encoding=None)
+            process.wait()
+            assert process._cancel_stdin is None
+            assert process._cancel_reader is None
+            # Must not raise (e.g. OSError from closing the fd a second time).
+            process._wait()
+
+    def test_connect_websocket_error_closes_connected_websockets(self):
+        """If a websocket fails to connect, the connected ones must be closed."""
+
+        class Client(MockClient):
+            def _connect_websocket(self, task_id: str, websocket_id: str):
+                if websocket_id == 'stderr':
+                    raise websocket.WebSocketException('conn!')
+                return super()._connect_websocket(task_id, websocket_id)
+
+        client = Client()
+        stdio, stderr, control = self.add_responses(client, '123', 0, change_err='change error!')
+        with pytest.raises(pebble.ChangeError):
+            client.exec(['foo'])
+        assert control.shutdown_calls == 1
+        assert stdio.shutdown_calls == 1
+        assert stderr.shutdown_calls == 0
+
+    def test_websocket_reader_eof_on_closed_connection(self):
+        """A websocket closed underneath a reader is EOF, not an error.
+
+        The reader is read from threads (shutil.copyfileobj in wait_output)
+        and from user code streaming process.stdout, and the websocket may be
+        torn down by ExecProcess._wait at any point, most notably when the
+        wait fails (canonical/operator#2556).
+        """
+        ws = MockWebsocket()
+
+        def recv():
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws))
+        assert reader.read() == b''
+        assert reader.read() == b''  # Still EOF when called again.
+
+    def test_websocket_to_writer_stops_on_closed_connection(self):
+        ws = MockWebsocket()
+        chunks: list[bytes] = [b'foo']
+
+        def recv():
+            if chunks:
+                return chunks.pop(0)
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        out = io.BytesIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            None,
+        )  # Must return cleanly rather than raise.
+        assert out.getvalue() == b'foo'
+
+    def test_reader_to_websocket_stops_on_closed_connection(self):
+        ws = MockWebsocket()
+
+        def send_binary(b: bytes):
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.send_binary = send_binary
+        reader = io.BytesIO(b'foo')
+        pebble._reader_to_websocket(
+            typing.cast('pebble._WebsocketReader', reader),
+            typing.cast('pebble._WebSocket', ws),
+            'utf-8',
+        )  # Must return cleanly rather than raise.
 
 
 class TestIdentity:
