@@ -19,6 +19,7 @@ from ops import testing
 # 'src/charm.py' typically contains the charm class.
 from charm import MyCharm
 
+
 def test_start():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
@@ -37,6 +38,7 @@ import pytest
 from ops import testing
 
 from charm import MyCharm
+
 
 @pytest.mark.parametrize(
     'leader',

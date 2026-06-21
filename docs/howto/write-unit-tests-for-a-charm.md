@@ -68,7 +68,7 @@ def test_pebble_ready_writes_config_file():
     """Test that on pebble-ready, a config file is written."""
     # Arrange: setting up the inputs
     ctx = testing.Context(MyCharm)
-    container = testing.Container(name="some-container", can_connect=True)
+    container = testing.Container(name='some-container', can_connect=True)
     state_in = testing.State(
         containers=[container],
         leader=True,
@@ -78,11 +78,10 @@ def test_pebble_ready_writes_config_file():
     state_out = ctx.run(ctx.on.pebble_ready(container=container), state_in)
 
     # Assert:
-    container_fs = state_out.get_container("some-container").get_filesystem(ctx)
-    cfg_file = container_fs / "etc" / "config.yaml"
+    container_fs = state_out.get_container('some-container').get_filesystem(ctx)
+    cfg_file = container_fs / 'etc' / 'config.yaml'
     config = yaml.safe_load(cfg_file.read_text())
-    assert config["message"] == "Hello, world!"
-
+    assert config['message'] == 'Hello, world!'
 ```
 
 ```{note}
@@ -158,7 +157,7 @@ from charm import MyCharm
 
 @pytest.fixture
 def my_charm():
-    with patch("charm.lightkube.Client"):
+    with patch('charm.lightkube.Client'):
         yield MyCharm
 ```
 
@@ -189,7 +188,7 @@ relation = state_out.get_relation(...)  # A relation we want to modify.
 
 # Copy and modify the relation data.
 new_local_app_data = relation.local_app_data.copy()
-new_local_app_data["foo"] = "bar"
+new_local_app_data['foo'] = 'bar'
 
 # Create a new State.
 new_relation = dataclasses.replace(relation, local_app_data=new_local_app_data)
@@ -203,6 +202,7 @@ If you need to access the charm instance in a test, use the `testing.Context` in
 ```python
 # Charm code
 
+
 class Charm(CharmBase):
     def workload_is_ready(self):
         ...  # Some business logic.
@@ -211,12 +211,36 @@ class Charm(CharmBase):
 
 # Testing code
 
+
 def test_charm_reports_workload_ready():
     ctx = testing.Context(Charm)
     state_in = testing.State(...)  # Some state to represent a ready workload.
     with ctx(ctx.on.update_status(), state_in) as mgr:
         assert mgr.charm.workload_is_ready()
         ...
+```
+
+## Treat warnings as errors
+
+Configure pytest to treat warnings as errors, so that your tests fail when code raises a warning. Warnings tell you about problems before they bite in production: a deprecation warning means an API your charm relies on is going away, and a resource warning often points to a real cleanup bug. With the default settings, these only appear in the test output, where they're easy to miss. In `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+]
+```
+
+This catches warnings raised in the test process: from your charm code, from Ops, and from your dependencies. Ops uses `DeprecationWarning` when an API is scheduled for removal, and `ResourceWarning` for cleanup bugs (for example, leaked Pebble connections), so failing on those gives you early notice. The same `filterwarnings` setting is used for unit and integration tests (and any others you might have), since pytest (or anything else driving the tests in-process, like Jubilant) can also surface warnings. Note that, when Juju is executing the charm in an integration test, warnings raised (from your charm code, Ops, and your non-test dependencies) will go to the Juju log, and not be test errors.
+
+If a dependency raises a warning that you can't do anything about, add an ignore filter for that specific warning, keeping `"error"` for everything else. For example:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+]
 ```
 
 ## Run your tests

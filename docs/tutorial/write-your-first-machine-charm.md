@@ -562,7 +562,7 @@ Create a file `tests/unit/test_tinyproxy.py` containing:
 We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
 
 ```text
-tox -e unit -- tests/unit/test_tinyproxy.py
+tox -e unit -- -k test_version
 ```
 
 ### Write state-transition tests

@@ -46,8 +46,9 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     juju.integrate('tempo:tempo-cluster', 'tempo-worker')
 
     juju.wait(
-        lambda status: jubilant.all_active(status, 'minio')
-        and jubilant.all_blocked(status, 's3-integrator')
+        lambda status: (
+            jubilant.all_active(status, 'minio') and jubilant.all_blocked(status, 's3-integrator')
+        )
     )
 
     address = juju.status().apps['minio'].address
@@ -114,6 +115,19 @@ def secrets_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
     dependencies. Cleans up afterwards.
     """
     charm_dir = pytestconfig.rootpath / 'test/charms/test_secrets'
+    yield from _prepare_generic_charm_dir(
+        root_path=pytestconfig.rootpath, charm_dir=charm_dir, build_tracing=False
+    )
+
+
+@pytest.fixture(scope='session')
+def hookcmds_charm_dir(pytestconfig: pytest.Config) -> Generator[pathlib.Path]:
+    """Prepare and return the test_hookcmds charm directory.
+
+    Builds and injects `ops` from the local checkout into the charm's
+    dependencies. Cleans up afterwards.
+    """
+    charm_dir = pytestconfig.rootpath / 'test/charms/test_hookcmds'
     yield from _prepare_generic_charm_dir(
         root_path=pytestconfig.rootpath, charm_dir=charm_dir, build_tracing=False
     )
@@ -211,6 +225,16 @@ def build_secrets_charm(secrets_charm_dir: pathlib.Path) -> Generator[Callable[[
     Call the fixture value to get the built charm file path.
     """
     yield from _build_charm(secrets_charm_dir, 'test-secrets_amd64.charm')
+
+
+@pytest.fixture(scope='session')
+def build_hookcmds_charm(hookcmds_charm_dir: pathlib.Path) -> Generator[Callable[[], str]]:
+    """Build the test_hookcmds charm and provide the artefact path.
+
+    Starts building the test-hookcmds charm early.
+    Call the fixture value to get the built charm file path.
+    """
+    yield from _build_charm(hookcmds_charm_dir, 'test-hookcmds_amd64.charm')
 
 
 def _build_charm(charm_dir: pathlib.Path, expected_artifact: str) -> Generator[Callable[[], str]]:
