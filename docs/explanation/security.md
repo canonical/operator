@@ -15,31 +15,24 @@ Ops itself opens no network listeners, manages no credentials, and terminates no
 
 The diagram below shows where Ops sits and the trust boundaries that follow:
 
-```text
-                  trust boundary
-                        |
-                        v
-                 +--------------------------------------+
-                 | Charm host (machine or k8s container)|
-+--------+       |                                      |
-| Juju   |<----->|  +-------------------------------+   |
-| agent  | hook  |  | Charm process                 |   |
-| (trust |  env, |  |  +---------+   +-----------+  |   |       +----------+
-|  ed    |  hook |  |  |  Ops    |<->|  Charm    |--+---+------>| Workload |
-|  ctrl  |  cmds |  |  | library |   |   code    |  |   |       +----------+
-|  plane)|       |  |  +----+----+   +-----------+  |   |
-+--------+       |  |       |                       |   |
-                 |  |       v                       |   |
-                 |  | .unit-state.db                |   |
-                 |  | .tracing-data.db              |   |
-                 |  +-------------------------------+   |
-                 +-----------|--------------------------+
-                             | HTTPS (only when a tracing
-                             v  receiver is integrated)
-                       +-----------+
-                       | Tracing   |
-                       | receiver  |
-                       +-----------+
+```{mermaid}
+flowchart LR
+    Juju["Juju agent<br/>(trusted control plane)"]
+    subgraph Host["Charm host (machine or k8s container)"]
+        subgraph Process["Charm process"]
+            Ops["Ops library"]
+            Charm["Charm code"]
+        end
+        State[("State DB +<br/>trace buffer<br/>(JUJU_CHARM_DIR)")]
+    end
+    Workload["Workload"]
+    Receiver["Tracing receiver"]
+
+    Juju <-->|"hook env, hook commands"| Ops
+    Ops <--> Charm
+    Charm -->|manages| Workload
+    Ops <--> State
+    Ops -.->|"HTTPS, only when integrated"| Receiver
 ```
 
 Juju, on one side of the trust boundary, is the trusted control plane that owns the charm host and supplies the hook context Ops reads. Inside the charm process, Ops is a library invoked by the charm code; both run as the same unprivileged user and share the same filesystem. The state database and trace buffer live in `JUJU_CHARM_DIR` on that filesystem. The only outbound network connection Ops can make on its own is sending buffered trace data over HTTPS, and only when the charm is integrated with a tracing receiver.
