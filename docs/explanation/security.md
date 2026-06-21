@@ -18,13 +18,14 @@ The diagram below shows where Ops sits and the trust boundaries that follow:
 ```{mermaid}
 flowchart LR
     Juju["Juju agent<br/>(trusted control plane)"]
-    subgraph Host["Charm host: machine or k8s pod"]
+    subgraph Host["Charm host"]
+        direction TB
         subgraph Process["Charm process"]
             Ops["Ops library"]
             Charm["Charm code"]
         end
         State[("State DB +<br/>trace buffer<br/>(JUJU_CHARM_DIR)")]
-        Workload["Workload<br/>(same OS on machine,<br/>sibling container on k8s)"]
+        Workload["Workload"]
     end
     Receiver["Tracing receiver"]
 
@@ -35,7 +36,7 @@ flowchart LR
     Ops -..->|"HTTPS, only when integrated"| Receiver
 ```
 
-Juju, on one side of the trust boundary, is the trusted control plane that owns the charm host and supplies the hook context Ops reads. Inside the charm process, Ops is a library invoked by the charm code; both run as the same unprivileged user and share the same filesystem. The state database and trace buffer live in `JUJU_CHARM_DIR` on that filesystem. The only outbound network connection Ops can make on its own is sending buffered trace data over HTTPS, and only when the charm is integrated with a tracing receiver.
+Juju, on one side of the trust boundary, is the trusted control plane that owns the charm host and supplies the hook context Ops reads. The charm host is the unit's machine for a machine charm, or the unit's pod for a Kubernetes charm; in the Kubernetes case the workload runs in a sibling container in the same pod. Inside the charm process, Ops is a library invoked by the charm code; both run as the same unprivileged user and share the same filesystem. The state database and trace buffer live in `JUJU_CHARM_DIR` on that filesystem. The only outbound network connection Ops can make on its own is sending buffered trace data over HTTPS, and only when the charm is integrated with a tracing receiver.
 
 (ops-secure-by-design)=
 ## Secure by design
