@@ -54,33 +54,20 @@ These files currently contain placeholder code and configuration.
 
 Open `~/k8s-tutorial/charmcraft.yaml` in your usual text editor or IDE, then change the values of `title`, `summary`, and `description` to:
 
-```yaml
-title: Web Server Demo
-summary: A demo charm that operates a small Python FastAPI server.
-description: |
-  This charm demonstrates how to write a Kubernetes charm with Ops.
+```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
+:language: yaml
+:start-at: 'title: Web Server Demo'
+:end-at: how to write a Kubernetes charm with Ops.
 ```
 
 Next, describe the workload container and its OCI image.
 
 In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 
-```yaml
-containers:
-  demo-server:
-    resource: demo-server-image
-
-resources:
-  # An OCI image resource for the container listed above.
-  demo-server-image:
-    type: oci-image
-    description: OCI image from GitHub Container Repository
-    # The upstream-source field is ignored by Charmcraft and Juju, but it can be
-    # useful to developers in identifying the source of the OCI image.  It is also
-    # used by the 'canonical/charming-actions' GitHub action for automated releases.
-    # The test_deploy function in tests/integration/test_charm.py reads upstream-source
-    # to determine which OCI image to use when running the charm's integration tests.
-    upstream-source: ghcr.io/canonical/api_demo_server:1.0.4
+```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
+:language: yaml
+:start-at: 'containers:'
+:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server:1.0.4'
 ```
 
 ### Define the charm class
@@ -114,8 +101,11 @@ As you can see, a charm is a pure Python class that inherits from the [`CharmBas
 
 In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
 
-```python
-framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:start-at: framework.observe(self.on["demo-server"]
+:end-at: framework.observe(self.on["demo-server"]
+:dedent:
 ```
 
 
@@ -138,65 +128,39 @@ We'll use the `ActiveStatus` class to set the charm status to active. Note that 
 Use `ActiveStatus` as well as further Ops constructs to define the event handler, as below. As you can see, what is happening is that, from the `event` argument, you extract the workload container object in which you add a custom layer. Once the layer is set you replan your service and set the charm status to active.
 
 
-```python
-def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
-    """Define and start a workload using the Pebble API."""
-    # Get a reference the container attribute on the PebbleReadyEvent
-    container = event.workload
-    # Add initial Pebble config layer using the Pebble API
-    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
-    # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
-    container.replan()
-    # Learn more about statuses at
-    # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.ActiveStatus()
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._on_demo_server_pebble_ready
+:dedent:
 ```
 
 The custom Pebble layer that you just added is defined in the  `self._get_pebble_layer()` method. We'll now add this method.
 
 In the `__init__` method of your charm class, name your service to `fastapi-service` and add it as a class attribute:
 
-```python
-self.pebble_service_name = "fastapi-service"
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:start-at: self.pebble_service_name = "fastapi-service"
+:end-at: self.pebble_service_name = "fastapi-service"
+:dedent:
 ```
 
 Finally, define  the `_get_pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
 
-```python
-def _get_pebble_layer(self) -> ops.pebble.Layer:
-    """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            "--port=8000",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
-        "summary": "FastAPI demo service",
-        "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
-            }
-        },
-    }
-    return ops.pebble.Layer(pebble_layer)
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._get_pebble_layer
+:dedent:
 ```
 
 ### Add logger functionality
 
 In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
 
-```python
-import logging
-
-# Log messages can be retrieved using juju debug-log
-logger = logging.getLogger(__name__)
+```{literalinclude} ../../../examples/k8s-1-minimal/src/charm.py
+:language: python
+:start-at: import logging
+:end-at: logger = logging.getLogger(__name__)
 ```
 
 ## Try your charm
@@ -323,44 +287,9 @@ In this section we'll write a test to check that Pebble is configured as expecte
 
 Replace the contents of `tests/unit/test_charm.py` with:
 
-```python
-import ops
-from ops import testing
-
-from charm import FastAPIDemoCharm
-
-
-def test_pebble_layer():
-    ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
-    state_in = testing.State(
-        containers={container},
-        leader=True,
-    )
-    state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    # Expected plan after Pebble ready with default config
-    expected_plan = {
-        "services": {
-            "fastapi-service": {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
-                "startup": "enabled",
-                # Since the environment is empty, Layer.to_dict() will not
-                # include it.
-            }
-        }
-    }
-
-    # Check that we have the plan we expected:
-    assert state_out.get_container(container.name).plan == expected_plan
-    # Check the unit is active:
-    assert state_out.unit_status == testing.ActiveStatus()
-    # Check the service was started:
-    assert (
-        state_out.get_container(container.name).service_statuses["fastapi-service"]
-        == ops.pebble.ServiceStatus.ACTIVE
-    )
+```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
+:language: python
+:start-at: import ops
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
@@ -418,28 +347,9 @@ Let's write the simplest possible integration test, a [smoke test](https://en.wi
 
 Replace the contents of `tests/integration/test_charm.py` with:
 
-```python
-import logging
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test."""
-    resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
-    }
-    juju.deploy(charm, app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_active)
+```{literalinclude} ../../../examples/k8s-1-minimal/tests/integration/test_charm.py
+:language: python
+:start-at: import logging
 ```
 
 This test depends on two fixtures:
