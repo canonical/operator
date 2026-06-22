@@ -23,7 +23,7 @@ from charm import FastAPIDemoCharm
 
 def mock_get_version(port: int):
     """Get a mock version string without executing the workload code."""
-    return "1.0.4"
+    return "0.0.1"
 
 
 @pytest.fixture
