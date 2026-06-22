@@ -47,7 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.8", "3.10", "3.12"]
+        python-version: ["3.8", "3.10", "3.12", "3.14"]
         exclude:
         - {python-version: "3.8", os: "macos-latest"}  # macos-14 is arm64, and there's no Python 3.8 build for arm64
 
