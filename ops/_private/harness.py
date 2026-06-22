@@ -2746,7 +2746,7 @@ class _TestingModelBackend:
     def juju_log(self, level, msg):  # type:ignore
         raise NotImplementedError
 
-    def get_pebble(self, socket_path: str, *, name: str | None = None) -> _TestingPebbleClient:
+    def get_pebble(self, socket_path: str) -> _TestingPebbleClient:
         container = socket_path.split('/')[3]  # /charm/containers/<container_name>/pebble.socket
         client = self._pebble_clients.get(container, None)
         if client is None:

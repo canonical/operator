@@ -2243,9 +2243,9 @@ class Client:
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
 
-    The ``name`` parameter is the workload container name this client connects to. When set, it
-    is attached to every tracing span emitted by the client as the ``container.name`` attribute,
-    which is useful for distinguishing spans in charms with more than one container.
+    The ``socket_path`` is attached to every tracing span emitted by the client as the
+    ``pebble.socket_path`` attribute, which is useful for distinguishing spans in charms
+    with more than one container.
     """
 
     _chunk_size = 8192
@@ -2256,8 +2256,6 @@ class Client:
         opener: urllib.request.OpenerDirector | None = None,
         base_url: str = 'http://localhost',
         timeout: float = 5.0,
-        *,
-        name: str | None = None,
     ):
         if not isinstance(socket_path, str):
             raise TypeError(f'`socket_path` should be a string, not: {type(socket_path)}')
@@ -2267,16 +2265,12 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
-        # The container name this client connects to, used to annotate tracing
-        # spans. Optional; not all callers of ``Client`` have a container.
-        self.name = name
 
     @contextlib.contextmanager
     def _start_span(self, span_name: str) -> Generator[Any, None, None]:
-        """Start a tracing span, annotated with the container name when known."""
+        """Start a tracing span, annotated with the Pebble socket path."""
         with tracer.start_as_current_span(span_name) as span:
-            if self.name is not None:
-                span.set_attribute('container.name', self.name)
+            span.set_attribute('pebble.socket_path', self.socket_path)
             yield span
 
     @classmethod
@@ -2846,7 +2840,7 @@ class Client:
             info['path'] = path
             if make_dirs:
                 info['make-dirs'] = True
-            span.set_attributes(info)  # type: ignore
+            span.set_attributes(info)
             metadata = {
                 'action': 'write',
                 'files': [info],
@@ -3007,7 +3001,7 @@ class Client:
             info['path'] = path
             if make_parents:
                 info['make-parents'] = True
-            span.set_attributes(info)  # type: ignore
+            span.set_attributes(info)
             body = {
                 'action': 'make-dirs',
                 'dirs': [info],

@@ -1420,12 +1420,12 @@ _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records requests and returns stored responses."""
 
-    def __init__(self, name: str | None = None):
+    def __init__(self, socket_path: str = '/charm/containers/c1/pebble.socket'):
+        self.socket_path = socket_path
         self.requests: list[typing.Any] = []
         self.responses: list[typing.Any] = []
         self.timeout = 5
         self.websockets: dict[typing.Any, MockWebsocket] = {}
-        self.name = name
 
     def _request(
         self,
@@ -1682,17 +1682,7 @@ class TestClient:
         with pytest.raises(TypeError):
             pebble.Client()  # type: ignore (socket_path arg required)
 
-    def test_client_init_name_defaults_to_none(self):
-        client = pebble.Client(socket_path='foo')
-        assert client.name is None
-
-    def test_client_init_name(self):
-        client = pebble.Client(socket_path='foo', name='postgres')
-        assert client.name == 'postgres'
-
-    def test_span_includes_container_name(
-        self, client: MockClient, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_span_includes_socket_path(self, monkeypatch: pytest.MonkeyPatch):
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
@@ -1704,7 +1694,7 @@ class TestClient:
         provider.add_span_processor(SimpleSpanProcessor(exporter))
         monkeypatch.setattr('ops.pebble.tracer', provider.get_tracer('ops-test'))
 
-        client.name = 'postgres'
+        client = MockClient(socket_path='/charm/containers/postgres/pebble.socket')
         client.responses.append({
             'result': {'version': '1.2.3'},
             'status': 'OK',
@@ -1717,35 +1707,9 @@ class TestClient:
         assert len(spans) == 1
         assert spans[0].name == 'pebble get_system_info'
         assert spans[0].attributes is not None
-        assert spans[0].attributes['container.name'] == 'postgres'
-
-    def test_span_omits_container_name_when_unset(
-        self, client: MockClient, monkeypatch: pytest.MonkeyPatch
-    ):
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-        from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-            InMemorySpanExporter,
+        assert (
+            spans[0].attributes['pebble.socket_path'] == '/charm/containers/postgres/pebble.socket'
         )
-
-        exporter = InMemorySpanExporter()
-        provider = TracerProvider()
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
-        monkeypatch.setattr('ops.pebble.tracer', provider.get_tracer('ops-test'))
-
-        assert client.name is None
-        client.responses.append({
-            'result': {'version': '1.2.3'},
-            'status': 'OK',
-            'status-code': 200,
-            'type': 'sync',
-        })
-        client.get_system_info()
-
-        spans = exporter.get_finished_spans()
-        assert len(spans) == 1
-        assert spans[0].attributes is not None
-        assert 'container.name' not in spans[0].attributes
 
     def test_get_system_info(self, client: MockClient):
         client.responses.append({
