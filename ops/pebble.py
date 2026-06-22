@@ -2244,8 +2244,8 @@ class Client:
     for the command execution timeout defined in method :meth:`Client.exec`.
 
     The ``socket_path`` is attached to every tracing span emitted by the client as the
-    ``pebble.socket_path`` attribute, which is useful for distinguishing spans in charms
-    with more than one container.
+    ``pebble.socket_path`` attribute, which is useful for distinguishing spans where multiple
+    pebble daemons are used.
     """
 
     _chunk_size = 8192
