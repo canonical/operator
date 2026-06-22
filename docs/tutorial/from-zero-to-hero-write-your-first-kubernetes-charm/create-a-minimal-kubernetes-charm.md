@@ -11,7 +11,7 @@ When you deploy a Kubernetes charm, the following things happen:
 1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
 1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble.
 1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations.
-1. Besides Pebble exec, the charm can communicate to the workload using HTTP requests. This is possible because they share the same pod (Kubernetes charms are deployed following sidecar pattern).  
+1. During operations, the charm may need to directly communicate with the workload using HTTP requests. This is possible because the charm container and workload container share the same pod.
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
@@ -87,13 +87,13 @@ resources:
 
 ### Write a helper module
 
-Your charm will interact with our workload application `api_demo_server`. It’s a good idea to write a helper module that wraps `api_demo_server`. Charmcraft created `src/fastapi_demo.py` as a placeholder helper module.
+Your charm will interact with our workload application `api_demo_server`. It's a good idea to write a helper module that wraps `api_demo_server`. Charmcraft created `src/fastapi_demo.py` as a placeholder helper module.
 
-The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. In this tutorial, the helper module only contains the logic to get the version of `api_demo_server`. The server has an endpoint at `/version` that returns a JSON payload containing the version number (see {ref}`study-your-application`).
+The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. In this tutorial, the helper module only contains the logic to get the version of `api_demo_server`. The server has an endpoint at `/version` that returns a JSON payload containing the version number. This is called the workload version.
 
-This is called the workload version. To make things easier for Juju admins, our charm should expose the workload version to Juju. It will be visible in `juju status`. For more information, see {ref}`how-to-set-the-workload-version`.
+To make things easier for Juju users, your charm should expose the workload version to Juju. It will be visible in Juju's status output. For more information, see {ref}`how-to-set-the-workload-version`.
 
-We first define a function to get the workload version. Replace the content of `src/fastapi_demo.py` with:
+Replace the content of `src/fastapi_demo.py` with:
 
 ```python
 import json
@@ -104,7 +104,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_version(port: int) -> str:
-    """Get the version of fastapi_demo installed.
+    """Get the version of fastapi_demo that is running.
 
     Args:
         port: The port where fastapi_demo web server is listening.
@@ -114,12 +114,10 @@ def get_version(port: int) -> str:
     return data["version"]
 ```
 
-The `get_version` function sends a HTTP GET to `api_demo_server` in the workload container, decodes the result JSON payload, and extracts the version string.
-
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
 
 1. Receive an event from Juju.
-2. Use the functions in the helper module to manage `api_demo_server` and check its status.
+2. Use Pebble calls and the helper module to manage `api_demo_server` and check its status.
 3. Report the status back to Juju.
 
 ```{tip}
@@ -235,19 +233,17 @@ def _get_pebble_layer(self) -> ops.pebble.Layer:
 
 ### Set the workload version
 
-The workload version is available after the workload starts, which is after Pebble reevaluates its plan. We will use the `src/fastapi_demo.py` helper module for this step.
+The workload version is available after the workload starts, which happens after Pebble reevaluates its plan. We'll use the `src/fastapi_demo.py` helper module for this step.
 
-In `src/charm.py`, add `import fastapi_demo` in the imports at the top of the file. Then append the following lines to the `_on_demo_server_pebble_ready` function:
+In `src/charm.py`, append the following lines to the `_on_demo_server_pebble_ready` function:
 
 ```python
-def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
-    # ... previous lines ...
-    # Set the workload version of this charm.
-    version = fastapi_demo.get_version(port=8000)
-    self.unit.set_workload_version(version)
+# Set the workload version of this charm.
+version = fastapi_demo.get_version(port=8000)
+self.unit.set_workload_version(version)
 ```
 
-We invoke `fastapi_demo.get_version` to get the workload version, and expose it to Juju with `self.unit.set_workload_version`. We use port 8000 as the app is deployed on this port, as seen in `_get_pebble_layer`.
+We get the workload version over port 8000 because `_get_pebble_layer` deploys the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
 ### Add logger functionality
 
@@ -306,7 +302,7 @@ Monitor your deployment:
 juju status --watch 1s
 ```
 
-When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod. The workload version is located in the `Version` column.
+When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod. The workload version is located in the app's `Version` column.
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
@@ -439,7 +435,7 @@ def test_pebble_layer(mock_version):
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
 
-In unit tests, we avoid any interaction with the outside world to keep the unit tests deterministic. The `get_version` method performs a HTTP call, which must be patched. We use the fixture `mock_version` to achieve this. From now on, any unit test on the charm needs to use fixture.
+In unit tests, we avoid any interaction with the outside world. The `get_version` method performs an HTTP call, which must be patched. We use the `mock_version` fixture to achieve this.
 
 ### Run the test
 
