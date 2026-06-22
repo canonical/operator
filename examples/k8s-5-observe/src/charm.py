@@ -17,9 +17,7 @@
 """Kubernetes charm for a demo app."""
 
 import dataclasses
-import json
 import logging
-import urllib.error
 
 import ops
 
@@ -202,11 +200,8 @@ class FastAPIDemoCharm(ops.CharmBase):
 
         try:
             version = fastapi_demo.get_version(config.server_port)
-        except (urllib.error.URLError, json.JSONDecodeError) as version_e:
-            logger.error(
-                "Failed to get version from the server: %s. Please double check your port config",
-                version_e,
-            )
+        except RuntimeError as version_e:
+            logger.error("Failed to get workload version: %s", version_e)
             return
 
         self.unit.set_workload_version(version)

@@ -59,7 +59,7 @@ class FastAPIConfig:
             raise ValueError("Invalid port number, 22 is reserved for SSH")
 ```
 
-Then, still in `src/charm.py`, add `import dataclasses`, `import json`, and `import urllib.error` in the imports at the top of the file.
+Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
 
 We'll use [](CharmBase.load_config) to create an instance of your config class from the Juju config data. This allows IDEs to provide hints when we are accessing the configuration, and static type checkers are able to validate that we are using the config option correctly.
 
@@ -134,12 +134,11 @@ def _replan_workload(self) -> None:
 
     try:
         version = fastapi_demo.get_version(config.server_port)
-    except (urllib.error.URLError, json.JSONDecodeError) as version_e:
-        logger.error(
-            "Failed to get version from the server: %s. Please double check your port config",
-            version_e,
+    except RuntimeError as version_e:
+        logger.error("Failed to get workload version: %s", version_e)
+        self.unit.status = ops.BlockedStatus(
+            "Failed to get version from server: check port config"
         )
-        self.unit.status = ops.BlockedStatus(str(version_e))
         return
 
     self.unit.status = ops.ActiveStatus()
@@ -148,7 +147,7 @@ def _replan_workload(self) -> None:
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
 
-We also add error handling for getting the workload version. If the charm fails to obtain a valid version number, we set the unit status to blocked. This lets the Juju user know that either the charm code or the workload application behaved unexpectedly.
+We also add error handling for getting the workload version. If we cannot access the workload to get its version, a `RuntimeError` will be raised. The `_replan_workload` method will log the error, and set the unit status to `blocked` with a message. It lets the Juju user know that they need to check the port configuration.
 
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 
@@ -273,6 +272,8 @@ def test_config_changed(mock_version):
     )
     assert "--port=8080" in command
 ```
+
+We needs the `mock_version` fixture because `_on_config_changed` calls `_replan_workload`, which gets the workload version by `get_version`. The fixture patches `get_version` to avoid making a real HTTP call and make this unit test deterministic.
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
 

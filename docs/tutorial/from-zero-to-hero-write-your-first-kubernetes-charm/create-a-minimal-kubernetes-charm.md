@@ -98,6 +98,7 @@ Replace the content of `src/fastapi_demo.py` with:
 ```python
 import json
 import logging
+import urllib.error
 import urllib.request
 
 logger = logging.getLogger(__name__)
@@ -108,8 +109,14 @@ def get_version(port: int) -> str:
 
     Args:
         port: The port where fastapi_demo web server is listening.
+
+    Raises:
+        RuntimeError: If the server can't be reached, for example because of an invalid port.
     """
-    response = urllib.request.urlopen(f"http://0.0.0.0:{port}/version")
+    try:
+        response = urllib.request.urlopen(f"http://0.0.0.0:{port}/version")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Could not connect to the workload server on port {port}") from e
     data = json.loads(response.read())
     return data["version"]
 ```
@@ -138,6 +145,8 @@ Replace the contents of `src/charm.py` with:
 """Kubernetes charm for a demo app."""
 
 import ops
+
+import fastapi_demo
 
 
 class FastAPIDemoCharm(ops.CharmBase):
