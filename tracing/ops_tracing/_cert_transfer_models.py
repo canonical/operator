@@ -149,7 +149,7 @@ def _build(cls: Any, data: MutableMapping[str, Any]) -> Any:
             )
             if has_default:
                 continue
-            raise DataValidationError(f"missing required field {field.name!r}")
+            raise DataValidationError(f'missing required field {field.name!r}')
         kwargs[field.name] = _coerce(hints[field.name], data[field.name])
     return cls(**kwargs)
 
@@ -174,14 +174,14 @@ def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
     try:
         data = {k: json.loads(v) for k, v in databag.items() if k in field_names}
     except json.JSONDecodeError as e:
-        msg = f"invalid databag contents: expecting json. {databag}"
+        msg = f'invalid databag contents: expecting json. {databag}'
         logger.error(msg)
         raise DataValidationError(msg) from e
 
     try:
         return _build(cls, data)
     except (TypeError, ValueError, KeyError) as e:
-        msg = f"failed to validate databag: {databag}"
+        msg = f'failed to validate databag: {databag}'
         logger.debug(msg, exc_info=True)
         raise DataValidationError(msg) from e
 
@@ -248,14 +248,14 @@ class CertificatesAvailableEvent(EventBase):
     def snapshot(self) -> dict:
         """Return snapshot."""
         return {
-            "certificates": self.certificates,
-            "relation_id": self.relation_id,
+            'certificates': self.certificates,
+            'relation_id': self.relation_id,
         }
 
     def restore(self, snapshot: dict):
         """Restores snapshot."""
-        self.certificates = snapshot["certificates"]
-        self.relation_id = snapshot["relation_id"]
+        self.certificates = snapshot['certificates']
+        self.relation_id = snapshot['relation_id']
 
 
 class CertificatesRemovedEvent(EventBase):
@@ -267,11 +267,11 @@ class CertificatesRemovedEvent(EventBase):
 
     def snapshot(self) -> dict:
         """Return snapshot."""
-        return {"relation_id": self.relation_id}
+        return {'relation_id': self.relation_id}
 
     def restore(self, snapshot: dict):
         """Restores snapshot."""
-        self.relation_id = snapshot["relation_id"]
+        self.relation_id = snapshot['relation_id']
 
 
 class CertificateTransferRequirerCharmEvents(CharmEvents):
@@ -297,7 +297,7 @@ class CertificateTransferRequires(Object):
             charm: Charm object
             relationship_name: Juju relation name
         """
-        super().__init__(charm, f"internal: {relationship_name}_v1")
+        super().__init__(charm, f'internal: {relationship_name}_v1')
         self.relationship_name = relationship_name
         self.charm = charm
         self.framework.observe(
@@ -366,10 +366,10 @@ class CertificateTransferRequires(Object):
         except DataValidationError as e:
             logger.error(
                 (
-                    "Error parsing relation databag: %s. ",
-                    "Make sure not to interact with the databags "
-                    "except using the public methods in the provider library "
-                    "and use version V1.",
+                    'Error parsing relation databag: %s. ',
+                    'Make sure not to interact with the databags '
+                    'except using the public methods in the provider library '
+                    'and use version V1.',
                 ),
                 e.args,
             )
@@ -377,8 +377,10 @@ class CertificateTransferRequires(Object):
 
     def _get_relevant_relations(self, relation_id: Optional[int] = None) -> List[Relation]:
         """Get the relevant relation if relation_id is given, all relations otherwise."""
-        if relation_id is not None and (relation := self.model.get_relation(
-            relation_name=self.relationship_name, relation_id=relation_id
-        )):
+        if relation_id is not None and (
+            relation := self.model.get_relation(
+                relation_name=self.relationship_name, relation_id=relation_id
+            )
+        ):
             return [relation]
         return list(self.model.relations[self.relationship_name])

@@ -69,6 +69,7 @@ Units of requirer charms obtain the tempo endpoint to which they will push their
 If the `protocol` is not in the list of protocols that the charm requested at endpoint set-up time,
 the library will raise an error.
 """
+
 import dataclasses
 import enum
 import json
@@ -98,24 +99,24 @@ from ops.model import ModelError, Relation
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RELATION_NAME = "tracing"
-RELATION_INTERFACE_NAME = "tracing"
+DEFAULT_RELATION_NAME = 'tracing'
+RELATION_INTERFACE_NAME = 'tracing'
 
 # Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
-    "zipkin",
-    "otlp_grpc",
-    "otlp_http",
-    "jaeger_grpc",
-    "jaeger_thrift_http",
+    'zipkin',
+    'otlp_grpc',
+    'otlp_http',
+    'jaeger_grpc',
+    'jaeger_thrift_http',
 ]
 
 
 class TransportProtocolType(str, enum.Enum):
     """Receiver Type."""
 
-    http = "http"
-    grpc = "grpc"
+    http = 'http'
+    grpc = 'grpc'
 
 
 class TracingError(Exception):
@@ -188,7 +189,7 @@ def _build(cls: Any, data: MutableMapping[str, Any]) -> Any:
             )
             if has_default:
                 continue
-            raise DataValidationError(f"missing required field {field.name!r}")
+            raise DataValidationError(f'missing required field {field.name!r}')
         kwargs[field.name] = _coerce(hints[field.name], data[field.name])
     return cls(**kwargs)
 
@@ -213,14 +214,14 @@ def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
     try:
         data = {k: json.loads(v) for k, v in databag.items() if k in field_names}
     except json.JSONDecodeError as e:
-        msg = f"invalid databag contents: expecting json. {databag}"
+        msg = f'invalid databag contents: expecting json. {databag}'
         logger.error(msg)
         raise DataValidationError(msg) from e
 
     try:
         return _build(cls, data)
     except (TypeError, ValueError, KeyError) as e:
-        msg = f"failed to validate databag: {databag}"
+        msg = f'failed to validate databag: {databag}'
         logger.debug(msg, exc_info=True)
         raise DataValidationError(msg) from e
 
@@ -318,7 +319,7 @@ class _AutoSnapshotEvent(RelationEvent):
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
-            raise TypeError(f"expected {len(self.__args__)} args, got {len(args)}")
+            raise TypeError(f'expected {len(self.__args__)} args, got {len(args)}')
 
         for attr, obj in zip(self.__args__, args):
             setattr(self, attr, obj)
@@ -334,9 +335,9 @@ class _AutoSnapshotEvent(RelationEvent):
                 dct[attr] = obj
             except ValueError as e:
                 raise ValueError(
-                    f"cannot automagically serialize {obj}: "
-                    "override this method and do it "
-                    "manually."
+                    f'cannot automagically serialize {obj}: '
+                    'override this method and do it '
+                    'manually.'
                 ) from e
 
         return dct
@@ -354,7 +355,7 @@ class EndpointRemovedEvent(RelationBrokenEvent):
 class EndpointChangedEvent(_AutoSnapshotEvent):
     """Event representing a change in one of the receiver endpoints."""
 
-    __args__ = ("_receivers",)
+    __args__ = ('_receivers',)
 
     if TYPE_CHECKING:
         _receivers = []  # type: List[dict]
@@ -396,7 +397,7 @@ class TracingEndpointRequirer(Object):
                 The provider will enable receivers for these and only these protocols,
                 so be sure to enable all protocols the charm or its workload are going to need.
         """
-        super().__init__(charm, f"internal: {relation_name}")
+        super().__init__(charm, f'internal: {relation_name}')
 
         self._is_single_endpoint = charm.meta.relations[relation_name].limit == 1
 
@@ -420,7 +421,7 @@ class TracingEndpointRequirer(Object):
         if not protocols:
             # empty sequence
             raise ValueError(
-                "You need to pass a nonempty sequence of protocols to `request_protocols`."
+                'You need to pass a nonempty sequence of protocols to `request_protocols`.'
             )
 
         try:
@@ -434,11 +435,11 @@ class TracingEndpointRequirer(Object):
             # args are bytes
             msg = e.args[0]
             if isinstance(msg, bytes) and msg.startswith(
-                b"ERROR cannot read relation application settings: permission denied"
+                b'ERROR cannot read relation application settings: permission denied'
             ):
                 logger.error(
-                    f"encountered error {e} while attempting to request_protocols."
-                    f"The relation must be gone."
+                    f'encountered error {e} while attempting to request_protocols.'
+                    f'The relation must be gone.'
                 )
                 return
             raise
@@ -454,10 +455,10 @@ class TracingEndpointRequirer(Object):
         if not self._is_single_endpoint:
             objname = type(self).__name__
             raise AmbiguousRelationUsageError(
-                f"This {objname} wraps a {self._relation_name} endpoint that has "
+                f'This {objname} wraps a {self._relation_name} endpoint that has '
                 "limit != 1. We can't determine what relation, of the possibly many, you are "
-                f"talking about. Please pass a relation instance while calling {objname}, "
-                "or set limit=1 in the charm metadata."
+                f'talking about. Please pass a relation instance while calling {objname}, '
+                'or set limit=1 in the charm metadata.'
             )
         relations = self.relations
         return relations[0] if relations else None
@@ -466,20 +467,20 @@ class TracingEndpointRequirer(Object):
         """Return whether this endpoint is ready."""
         relation = relation or self._relation
         if not relation:
-            logger.debug(f"no relation on {self._relation_name !r}: tracing not ready")
+            logger.debug(f'no relation on {self._relation_name!r}: tracing not ready')
             return False
         if relation.data is None:
-            logger.error(f"relation data is None for {relation}")
+            logger.error(f'relation data is None for {relation}')
             return False
         if not relation.app:
-            logger.error(f"{relation} event received but there is no relation.app")
+            logger.error(f'{relation} event received but there is no relation.app')
             return False
         try:
             databag = dict(relation.data[relation.app])
             TracingProviderAppData.load(databag)
 
         except (json.JSONDecodeError, DataValidationError):
-            logger.info(f"failed validating relation data for {relation}")
+            logger.info(f'failed validating relation data for {relation}')
             return False
         return True
 
@@ -520,14 +521,14 @@ class TracingEndpointRequirer(Object):
             # It can happen if the charm requests tracing protocols, but the relay (such as
             # grafana-agent) isn't yet connected to the tracing backend. In this case, it's not
             # an error the charm author can do anything about.
-            logger.warning(f"no receiver found with protocol={protocol!r}.")
+            logger.warning(f'no receiver found with protocol={protocol!r}.')
             return
         if len(receivers) > 1:
             # If we have more than 1 receiver that matches, it shouldn't matter which receiver
             # we'll be using.
             logger.warning(
-                f"too many receivers with protocol={protocol!r}; using first one."
-                f" Found: {receivers}"
+                f'too many receivers with protocol={protocol!r}; using first one.'
+                f' Found: {receivers}'
             )
 
         receiver = receivers[0]
