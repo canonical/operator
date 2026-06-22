@@ -30,6 +30,9 @@ import unittest.util
 
 import pytest
 import websocket
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import test.fake_pebble as fake_pebble
 from ops import pebble
@@ -1683,12 +1686,6 @@ class TestClient:
             pebble.Client()  # type: ignore (socket_path arg required)
 
     def test_span_includes_socket_path(self, monkeypatch: pytest.MonkeyPatch):
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-        from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-            InMemorySpanExporter,
-        )
-
         exporter = InMemorySpanExporter()
         provider = TracerProvider()
         provider.add_span_processor(SimpleSpanProcessor(exporter))
