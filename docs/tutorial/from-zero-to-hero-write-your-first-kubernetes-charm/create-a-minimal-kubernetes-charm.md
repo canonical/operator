@@ -203,7 +203,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     Learn more about interacting with Pebble at
         https://ops.readthedocs.io/en/latest/reference/pebble.html
     Learn more about Pebble layers at
-        https://documentation.ubuntu.com/pebble/how-to/use-layers/
+        https://ubuntu.com/docs/pebble/how-to/use-layers/
     """
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload

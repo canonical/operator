@@ -26,7 +26,7 @@ This module provides a way to interact with Pebble, including:
 
 For a command-line interface for local testing, see ``test/pebble_cli.py``.
 
-  See more: `Pebble documentation <https://documentation.ubuntu.com/pebble/>`_
+  See more: `Pebble documentation <https://ubuntu.com/docs/pebble/>`_
 """
 
 from __future__ import annotations
@@ -821,7 +821,7 @@ class Plan:
 
     A plan is the combined layer configuration. The layer configuration is
     documented at
-    https://documentation.ubuntu.com/pebble/reference/layer-specification/
+    https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
     def __init__(self, raw: str | PlanDict | None = None):
@@ -900,7 +900,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://documentation.ubuntu.com/pebble/reference/layer-specification/
+    https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1656,7 +1656,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
+    See Pebble's `Notices documentation <https://ubuntu.com/docs/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 

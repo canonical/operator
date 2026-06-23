@@ -93,7 +93,8 @@ copyright = '%s, %s' % (datetime.date.today().year, author)  # noqa: A001
 # don't know yet)
 # NOTE: If no ogp_* variable is defined (e.g. if you remove this section) the
 # sphinxext.opengraph extension will be disabled.
-ogp_site_url = 'https://documentation.ubuntu.com/ops/2.x/'
+version_slug = f'{os.environ.get("READTHEDOCS_VERSION", "local")}'
+ogp_site_url = f'https://canonical.com/juju/docs/ops/{version_slug}/'
 # The documentation website name (usually the same as the product name)
 ogp_site_name = project
 # The URL of an image or logo that is used in the preview
@@ -152,9 +153,9 @@ if os.environ.get('READTHEDOCS', '') == 'True':
     html_context['github_version'] = '2.23-maintenance'
     html_context['slug'] = 'ops'
 
-# If your project is on documentation.ubuntu.com, specify the project
-# slug (for example, "lxd") here.
-slug = 'ops'
+# Project slug
+# Set to the path after https://canonical.com/
+slug = 'juju/docs/ops'
 
 ############################################################
 ### Redirects
@@ -225,7 +226,9 @@ custom_excludes = [
 custom_html_css_files = []
 
 # Add JavaScript files (located in .sphinx/_static/)
-custom_html_js_files = []
+custom_html_js_files = [
+    'overwrite_links.js',
+]
 
 ## The following settings override the default configuration.
 
@@ -304,7 +307,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
-    'pebble': ('https://documentation.ubuntu.com/pebble', None),
+    'pebble': ('https://ubuntu.com/docs/pebble', None),
     'otel': ('https://opentelemetry-python.readthedocs.io/en/latest/', None),
 }
 

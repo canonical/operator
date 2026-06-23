@@ -16,7 +16,7 @@ This is the documentation for version 2.x of Ops, which stopped being actively d
 - If your charm needs to support Python 3.8 (Ubuntu 20.04), use Ops 2.x.
 - Otherwise, use Ops 3.x.
 
-Ops 3.x removed support for Python 3.8, but is otherwise compatible with Ops 2.x. See the [latest documentation](https://documentation.ubuntu.com/ops/latest/).
+Ops 3.x removed support for Python 3.8, but is otherwise compatible with Ops 2.x. See the [latest documentation](https://canonical.com/juju/docs/ops/latest/).
 ```
 
 The Ops library (`ops`) is a Python framework for writing and testing Juju charms.
