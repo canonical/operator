@@ -44,6 +44,15 @@ def _juju_major(juju: jubilant.Juju) -> int:
     return int(juju.status().model.version.split('.', 1)[0])
 
 
+def _is_k8s(juju: jubilant.Juju) -> bool:
+    """Return True if the model is on a Kubernetes substrate.
+
+    Juju's model type for Kubernetes is ``caas`` (paired with ``iaas`` for
+    machine substrates).
+    """
+    return juju.status().model.type == 'caas'
+
+
 # Juju 4.0 has uniter commit-phase regressions: the hookcmds themselves
 # succeed (the action results are all correct), but Juju fails to commit the
 # queued changes at the end of the hook. Observed on both machine (LXD) and
@@ -52,18 +61,50 @@ def _juju_major(juju: jubilant.Juju) -> int:
 #     (https://github.com/juju/juju/issues/22523)
 #   - secret-remove -> "removing secrets: secret not found"
 #     (https://github.com/juju/juju/issues/22524)
+# The same commit-phase symptom also surfaces as an action timeout from the
+# test driver (``TimeoutError: timed out waiting for action``) on follow-up
+# tests that mutate state inside a hook on Juju 4.0/k8s
+# (test_secret_grant_revoke, test_ports_endpoint_scoped). The ports failure
+# may be a distinct upstream bug; widen the guard once a more specific issue
+# is filed.
 # These pass on Juju 3.6. Remove the guards in the affected tests once the
 # fixes land.
 _JUJU4_COMMIT_BUG = 'Juju 4.0 uniter commit-phase regression (juju/juju#22523, juju/juju#22524)'
 
+# On Juju 4.0/Kubernetes, ``network-get <binding> --format=json`` puts an
+# empty "k8s service" placeholder at bind_addresses[0] and the actual
+# cloud-container address (the pod IP) at bind_addresses[1]. Hook code
+# that reads bind_addresses[0] therefore sees no addresses. Juju 3.6
+# returns a single non-placeholder entry; Juju 4.1 emits the same two
+# entries but with the cloud-container first. See juju/juju#22616.
+_JUJU4_NETGET_K8S_BUG = (
+    'Juju 4.0/k8s network-get returns empty leading placeholder bind-address (juju/juju#22616)'
+)
 
-def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | None) -> None:
-    """Apply strict xfail semantics for the Juju 4.0 commit-phase regression.
+# On Juju 4 machine substrates, a `juju-reboot` queued during a hook is
+# accepted (the hook commits its other side-effects) but the queued reboot
+# is silently dropped — the container's PID 1 never restarts. Likely the
+# same commit-phase regression family as #22523 / #22524; tracked separately
+# because the symptom (no error, no log) and reproducer (hooks-only, no
+# hookcmds) are distinct. See juju/juju#22639.
+_JUJU4_REBOOT_DROPPED_BUG = (
+    'Juju 4 silently drops juju-reboot queued from config-changed (juju/juju#22639)'
+)
 
-    Imperative `pytest.xfail()` doesn't support `strict=True`. Call this from
-    both branches of a try/except so we get the equivalent: on Juju 4 the test
-    must fail (xfail), and if it ever passes the suite fails loudly so we
-    remember to remove the guard. On Juju <4 the original error propagates.
+
+def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: Exception | None) -> None:
+    """Apply xfail semantics for the Juju 4.0 commit-phase regression.
+
+    Call this from the except branch (passing the caught exception) and from
+    the success path (passing None). On Juju >=4 a caught error is treated as
+    expected. On Juju <4 the error propagates.
+
+    Accepts any `Exception` because the bug surfaces as either a
+    `jubilant.TaskError` (action returned non-zero) or a `TimeoutError`
+    (driver gave up waiting) depending on the failure path.
+
+    Note: We can't strictly require failure; our CI matrix might run
+    against a fixed 4.0/edge and a broken 4.0/stable (for example).
     """
     if _juju_major(juju) < 4:
         if error is not None:
@@ -71,20 +112,30 @@ def _xfail_juju4_commit_bug(juju: jubilant.Juju, error: jubilant.TaskError | Non
         return
     if error is not None:
         pytest.xfail(_JUJU4_COMMIT_BUG)
-    pytest.fail(f'Juju 4 no longer hits {_JUJU4_COMMIT_BUG} — remove the guard.')
 
 
 # Deployment
 
 
 def test_setup(build_hookcmds_charm: Callable[[], str], juju: jubilant.Juju):
-    """Deploy the test-hookcmds charm with 2 units so that the peer relation
-    is active for relation-data tests."""
+    """Deploy the test-hookcmds charm (2 units) plus any-charm for cross-app tests.
+
+    Two units give an active peer relation for relation-data and goal-state tests.
+    any-charm (latest/beta) is deployed and integrated via the anycharm endpoint
+    so that secret_grant / secret_revoke have a real cross-app relation to work with.
+    """
     charm_path = build_hookcmds_charm()
     charm_dir = pathlib.Path(charm_path).parent
     resource_file = charm_dir / 'test-file.txt'
     resource_file.write_text('hello from the integration test resource')
-    juju.deploy(charm_path, num_units=2, resources={'test-file': str(resource_file)})
+    juju.deploy(
+        charm_path,
+        num_units=2,
+        resources={'test-file': str(resource_file)},
+        trust=True,
+    )
+    juju.deploy('any-charm', channel='latest/beta')
+    juju.integrate('test-hookcmds:anycharm', 'any-charm')
     juju.wait(jubilant.all_active)
 
 
@@ -218,7 +269,17 @@ def test_network_get_returns_addresses(juju: jubilant.Juju, any_unit: str):
 
     assert len(bind_addresses) > 0
     first = bind_addresses[0]
-    assert first['interface-name']  # non-empty
+    # On k8s, network-get may return an empty interface-name for the bind
+    # address (no host NIC behind it — it's a service / pod-network entry).
+    # Only insist on a non-empty value on machine substrates.
+    if not _is_k8s(juju):
+        assert first['interface-name']  # non-empty
+    # On Juju 4.0/k8s the first bind-address is an empty "k8s service"
+    # placeholder with no addresses; the cloud-container address (the pod IP)
+    # is at bind_addresses[1] instead. Juju 3.6 returns a single
+    # non-placeholder entry. See juju/juju#22616.
+    if not first['addresses'] and _juju_major(juju) >= 4 and _is_k8s(juju):
+        pytest.xfail(_JUJU4_NETGET_K8S_BUG)
     assert len(first['addresses']) > 0
     first_addr = first['addresses'][0]
     assert first_addr['value']  # non-empty IP or hostname
@@ -442,6 +503,7 @@ def test_error_on_invalid_relation_id(juju: jubilant.Juju, any_unit: str):
 
 def test_credential_get(juju: jubilant.Juju, any_unit: str):
     """credential_get returns cloud credentials with a non-empty type and name."""
+    # test_setup deploys with trust=True so credential-get is permitted.
     task = juju.run(any_unit, 'test-credential-get')
     assert task.success
     assert task.results['cloud-type']  # non-empty cloud type (e.g. 'lxd', 'microk8s')
@@ -452,14 +514,13 @@ def test_credential_get(juju: jubilant.Juju, any_unit: str):
 
 
 def test_relation_model_get(juju: jubilant.Juju, leader: str):
-    """relation_model_get returns the model UUID for the peer relation."""
+    """relation_model_get returns the local model UUID for a peer relation."""
     task = juju.run(leader, 'test-relation-model-get')
     assert task.success
-    uuid = task.results['uuid']
-    assert uuid  # non-empty
-    # For a peer relation the remote model is the same model.
-    model_info = juju.show_model()
-    assert uuid == model_info.model_uuid
+    # Peer relations aren't cross-model, so the server-side implementation
+    # returns the local model UUID — same as JUJU_MODEL_UUID inside the hook.
+    assert task.results['uuid'] == task.results['env-model-uuid']
+    assert task.results['uuid']  # non-empty
 
 
 # Resources (resource_get)
@@ -473,29 +534,39 @@ def test_resource_get(juju: jubilant.Juju, any_unit: str):
     assert pathlib.Path(path).name == 'test-file.txt'
 
 
-# Secret grant / revoke (secret_grant / secret_revoke)
+# Secrets (secret_grant / secret_revoke)
 
 
-def test_secret_grant_and_revoke(juju: jubilant.Juju, leader: str):
-    """secret_grant adds access; secret_revoke removes it — both observable via juju."""
-    task = juju.run(leader, 'test-secret-grant')
+def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
+    """secret_grant gives access to a related app; secret_revoke removes it."""
+    # Both steps queue secret changes that hit the same Juju 4.0 uniter
+    # commit-phase bug as secret_remove in test_secret_full_lifecycle. On
+    # Juju 4.0/k8s the symptom is a driver-side timeout rather than a
+    # TaskError, so catch both. The grant step (secret_add + secret_grant)
+    # times out at least as often as revoke does.
+    try:
+        task = juju.run(leader, 'test-secret-grant')
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
-    secret_id = task.results['secret-id']
+    r = task.results
+    assert r['granted'] == 'true'
+    secret_id = r['secret-id']
+    assert secret_id
 
-    # Juju-side effect: access entry must exist after grant.
-    secret = juju.show_secret(secret_id)
-    assert secret.access  # non-None, non-empty
-
-    # Revoke.
-    task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
+    try:
+        task = juju.run(leader, 'test-secret-revoke', params={'secret-id': secret_id})
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
+    assert task.results['revoked'] == 'true'
 
-    # Juju-side effect: access list is empty after revoke.
-    secret = juju.show_secret(secret_id)
-    assert not secret.access
-
-    # Clean up the secret.
-    juju.remove_secret(secret_id)
+    # Verify the secret is fully gone from Juju's perspective.
+    secrets = juju.secrets()
+    owned = [s for s in secrets if s.owner == 'test-hookcmds']
+    assert not owned, f'Expected no owned secrets after revoke, found: {owned}'
 
 
 # Storage add (storage_add) — placed late because it mutates model state
@@ -503,7 +574,13 @@ def test_secret_grant_and_revoke(juju: jubilant.Juju, leader: str):
 
 def test_storage_add(juju: jubilant.Juju, any_unit: str):
     """storage_add queues a new storage instance; count increases after the hook."""
-    task = juju.run(any_unit, 'test-storage-add')
+    # storage-add queues a change that the uniter commits at end-of-hook, which
+    # hits the same Juju 4.0/k8s commit-phase regression as the secret tests.
+    try:
+        task = juju.run(any_unit, 'test-storage-add')
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
     assert task.success
     count_before = int(task.results['count-before-add'])
 
@@ -516,15 +593,76 @@ def test_storage_add(juju: jubilant.Juju, any_unit: str):
     assert count_after == count_before + 1
 
 
+# Ports — endpoint-scoped variant
+
+
+def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
+    """open_port with endpoints='peer' appears scoped in opened_ports(endpoints=True)."""
+    # On Juju 4.0/k8s this action times out on the driver side, matching the
+    # uniter commit-phase regression pattern. May be a separate upstream bug
+    # from the secret ones; xfail until pinned down.
+    try:
+        task = juju.run(any_unit, 'test-ports-endpoint-scoped', params={'port': 7766})
+    except (jubilant.TaskError, TimeoutError) as exc:
+        _xfail_juju4_commit_bug(juju, exc)
+    _xfail_juju4_commit_bug(juju, None)
+    assert task.success
+    r = task.results
+    assert r['port-found-with-endpoint'] == 'true', (
+        f'Port 7766/tcp not found with endpoint info; endpoints-list={r.get("endpoints-list")}'
+    )
+    assert r['endpoint-matches'] == 'true', (
+        f"Expected endpoint 'peer' in endpoints-list, got: {r.get('endpoints-list')}"
+    )
+    assert r['closed-after'] == 'true'
+
+
 # Reboot (juju_reboot) — placed last because it reboots the unit
 
 
 def test_juju_reboot_queues_reboot(juju: jubilant.Juju, any_unit: str):
-    """juju_reboot(now=False) queues a reboot; the unit recovers to active."""
-    task = juju.run(any_unit, 'test-juju-reboot')
+    """juju_reboot(now=False) queues a reboot; the unit recovers to active.
+
+    juju explicitly forbids juju-reboot inside an action context,
+    so the trigger has to come from a regular hook.
+    The charm's config-changed handler watches for
+    `reboot-trigger=reboot-please` and, on the first such config-changed,
+    writes a marker file and calls hookcmds.juju_reboot(). The marker
+    prevents the post-reboot config-changed re-run from looping. The
+    test then verifies the marker exists via a read-only action.
+    """
+    # k8s pods can't reboot themselves and the hookcmd surfaces as a
+    # NotImplementedError; only exercise on machine substrates.
+    if _is_k8s(juju):
+        pytest.skip('juju-reboot is not supported on Kubernetes substrates')
+
+    # Baseline boot time + confirm the marker hasn't been set yet.
+    task = juju.run(any_unit, 'test-reboot-marker')
     assert task.success
-    # After the action, Juju queues a reboot. Wait for the unit to recover.
+    assert task.results['marker-exists'] == 'false'
+    boot_time_before = int(task.results['boot-time'])
+
+    # config-changed → marker write → juju_reboot. Wait for the unit to
+    # recover after the reboot.
+    juju.config('test-hookcmds', {'reboot-trigger': 'reboot-please'})
     juju.wait(jubilant.all_active)
+
+    task = juju.run(any_unit, 'test-reboot-marker')
+    assert task.success
+    assert task.results['marker-exists'] == 'true'
+    boot_time_after = int(task.results['boot-time'])
+    # The action computes the boot epoch as `now - uptime`; it changes if
+    # and only if the unit actually rebooted, so a strict inequality proves
+    # juju-reboot took effect. The marker alone only proves config-changed
+    # ran our handler.
+    if boot_time_after == boot_time_before and _juju_major(juju) >= 4:
+        # On Juju 4 the marker write commits but the queued juju-reboot is
+        # dropped: see juju/juju#22639.
+        pytest.xfail(_JUJU4_REBOOT_DROPPED_BUG)
+    assert boot_time_after > boot_time_before, (
+        f'boot time unchanged (before={boot_time_before}, after={boot_time_after}); '
+        'the config-changed path ran but juju-reboot did not actually reboot the unit.'
+    )
 
 
 # Fixtures
