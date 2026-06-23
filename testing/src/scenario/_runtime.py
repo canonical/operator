@@ -71,7 +71,7 @@ class Runtime(Generic[CharmType]):
         """Build the simulated environment the operator framework expects."""
         if event._is_action_event and (action := event.action):
             # Juju dispatches actions as `actions/<action-name>` (no
-            # `_action` suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
+            # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
             dispatch_path = f'actions/{action.name}'
         else:
             dispatch_path = f'hooks/{event._juju_name}'
