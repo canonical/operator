@@ -41,7 +41,7 @@ import ops
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
-from tests.helpers import jsonpatch_delta, trigger
+from tests.helpers import state_delta, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     'relation_created',
@@ -98,7 +98,7 @@ def test_bare_event(state: State, mycharm: type[CharmBase]):
         config={'options': {'foo': {'type': 'string'}}},
     )
     out_purged = replace(out, stored_states=state.stored_states)
-    assert jsonpatch_delta(state, out_purged) == []
+    assert state_delta(state, out_purged) == []
 
 
 def test_leader_get(state: State, mycharm: type[CharmBase]):
@@ -145,7 +145,7 @@ def test_status_setting(state: State, mycharm: type[CharmBase]):
         {'op': 'replace', 'path': '/unit_status/message', 'value': 'foo test'},
         {'op': 'replace', 'path': '/unit_status/name', 'value': 'active'},
     ]
-    assert jsonpatch_delta(out_purged, state) == expected
+    assert state_delta(out_purged, state) == expected
 
 
 @pytest.mark.parametrize('connect', (True, False))
