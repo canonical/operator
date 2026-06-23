@@ -708,7 +708,6 @@ def reset_security_logging():
     """Ensure that we get a fresh juju-log for the security logging."""
     _get_juju_log_and_app_id.cache_clear()
     yield
-    _get_juju_log_and_app_id.cache_clear()
 
 
 class StopCharm(ops.CharmBase):
