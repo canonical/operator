@@ -119,7 +119,7 @@ class FastAPIDemoCharm(ops.CharmBase):
 
         If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
-        Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
+        Learn more about actions at https://canonical.com/juju/docs/ops/latest/howto/manage-actions/
         """
         params = event.load_params(GetDbInfoAction, errors="fail")
         db_data = self.fetch_database_relation_data()
@@ -146,9 +146,9 @@ class FastAPIDemoCharm(ops.CharmBase):
         configuration for your specific workload. Tip: you can see the
         standard entrypoint of an existing container using docker inspect
         Learn more about interacting with Pebble at
-            https://documentation.ubuntu.com/ops/latest/reference/pebble/
+            https://canonical.com/juju/docs/ops/latest/reference/pebble/
         Learn more about Pebble layers at
-            https://documentation.ubuntu.com/pebble/how-to/use-layers/
+            https://ubuntu.com/docs/pebble/how-to/use-layers/
         """
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/

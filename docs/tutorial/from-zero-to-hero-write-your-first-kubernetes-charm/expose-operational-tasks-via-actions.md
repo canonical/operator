@@ -81,7 +81,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
-    Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
+    Learn more about actions at https://canonical.com/juju/docs/ops/latest/howto/manage-actions/
     """
     params = event.load_params(GetDbInfoAction, errors="fail")
     db_data = self.fetch_database_relation_data()
