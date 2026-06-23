@@ -480,7 +480,7 @@ Let's write some integration tests to check that our application works correctly
 
 The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
 
-First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest` and `pytest_jubilant`, which are already dependencies of your charm. We also need a new dependency `requests`. Run the following command to add it:
+First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest` and `pytest_jubilant`, which are already dependencies of your charm. Also import `requests`, which is a new dependency. Run the following command to add `requests` as a dependency:
 
 ```text
 uv add requests
