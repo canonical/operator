@@ -237,13 +237,11 @@ def _replan_workload(self) -> None:
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
         return
-
     try:
         version = fastapi_demo.get_version(config.server_port)
     except RuntimeError as version_e:
         logger.error("Failed to get workload version: %s", version_e)
         return
-
     self.unit.set_workload_version(version)
 ```
 
