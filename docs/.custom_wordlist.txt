@@ -47,7 +47,6 @@ uniter
 untyped
 unpatched
 uv
-virtualenv
 VM
 websockets
 Wordpress

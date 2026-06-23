@@ -13,18 +13,18 @@ Ops is a library running inside the charm process under Juju's control. It parse
 
 Ops itself opens no network listeners, manages no credentials, and terminates no TLS — those concerns belong to Juju, the workload, or the charm author.
 
-The diagram below shows where Ops sits and the trust boundaries that follow:
+This diagram shows where Ops sits and the trust boundaries that follow:
 
 ```{mermaid}
 flowchart LR
-    Juju["Juju agent<br/>(trusted control plane)"]
+    Juju["Juju agent"]
     subgraph Host["Charm host"]
         direction TB
         subgraph Process["Charm process"]
             Ops["Ops library"]
             Charm["Charm code"]
         end
-        State[("State DB +<br/>trace buffer<br/>(JUJU_CHARM_DIR)")]
+        State[("State DB +<br/>trace buffer")]
         Workload["Workload"]
     end
     Receiver["Tracing receiver"]
@@ -36,7 +36,11 @@ flowchart LR
     Ops -..->|"HTTPS, only when integrated"| Receiver
 ```
 
-Juju, on one side of the trust boundary, is the trusted control plane that owns the charm host and supplies the hook context Ops reads. The charm host is the unit's machine for a machine charm, or the unit's pod for a Kubernetes charm; in the Kubernetes case the workload runs in a sibling container in the same pod. Inside the charm process, Ops is a library invoked by the charm code; both run as the same unprivileged user and share the same filesystem. The state database and trace buffer live in `JUJU_CHARM_DIR` on that filesystem. The only outbound network connection Ops can make on its own is sending buffered trace data over HTTPS, and only when the charm is integrated with a tracing receiver.
+More detail:
+
+* The charm host is the unit's machine for a machine charm, or the unit's pod for a Kubernetes charm. In the Kubernetes case, the workload runs in a sidecar container in the same pod.
+* Inside the charm process, Ops is a library invoked by the charm code. Both run as the same unprivileged user and share the same filesystem.
+* The state database and trace buffer live in `JUJU_CHARM_DIR` on that filesystem.
 
 (ops-secure-by-design)=
 ## Secure by design
@@ -125,7 +129,7 @@ Each structured security event is a JSON object with the following fields:
 
 #### Security events emitted by Ops
 
-The following framework-level events are emitted at the OWASP levels shown. They cover the SSDLC stage-1 categories that Ops, as a library, is in a position to detect; access, authentication, and user-management events are the responsibility of Juju and the workload.
+The following events cover the SSDLC stage-1 categories that Ops can detect. Access, authentication, and user-management events are the responsibility of Juju and the workload.
 
 | OWASP event | Level | When Ops emits it | SSDLC category |
 | --- | --- | --- | --- |
@@ -136,7 +140,7 @@ The following framework-level events are emitted at the OWASP levels shown. They
 
 #### Configuring and opting out
 
-Ops itself has no log-stream toggle and no separate monitoring agent: all logging goes through Juju. Verbosity is controlled in Juju, not in Ops or the charm:
+Ops has no built-in logging configuration and no separate monitoring agent: all logging goes through Juju. Verbosity is controlled in Juju, not in Ops or the charm:
 
 * Use `juju model-config logging-config='<root>=WARNING;unit=DEBUG'` (or the equivalent Juju operation) to raise or lower the log level for charm units. Setting a unit log level above `TRACE` filters out the structured security events; this loses the audit trail and is not recommended in production.
 * To forward Juju logs to an external monitoring or alerting system, integrate the model with a Juju logging sink (for example, the COS Lite observability stack) rather than configuring anything inside the charm.
@@ -157,19 +161,21 @@ Ops is distributed as the `ops` package on [PyPI](https://pypi.org/project/ops/)
 
 In line with [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md), security updates are released for all major versions that have had a release in the last year. A major version that has had no release for over a year is considered end of life. Long Term Support (LTS) releases receive 5 years of support and up to 10 additional years of [extended support](https://ubuntu.com/security/esm).
 
-See the [tool versions page](#tool-versions) for current release dates and end-of-life dates for each supported version. To check which version is installed, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'`.
+See the [tool versions page](#tool-versions) for current release dates and end-of-life dates for each supported version. To check which version is installed in a deployed unit, see [](#ops-verifying-update).
+
+### Restricting the version
+
+We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your `dev` dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`, which is a Long Term Support (LTS) release. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
 
 ### Receiving updates
 
 Because Ops is a library, it is updated as part of the charm's normal dependency-management workflow rather than through an in-product auto-update mechanism. The charm author controls when a new version is picked up; the Juju user picks it up by refreshing the charm.
 
-We strongly recommend restricting the version of `ops` (and `ops[harness,testing,tracing]` in your `dev` dependencies) in `pyproject.toml` in a way that allows picking up new compatible releases every time that you re-lock. If your charm needs to support Ubuntu 20.04 (with Python 3.8), then this looks like `ops~=2.23`, which is a Long Term Support (LTS) release. Otherwise, this looks like `ops~=3.0`. Set a minor version that includes all the features that the charm uses.
-
 #### Manually applying an update
 
 To apply a security update by hand:
 
-1. Re-lock dependencies (for example, `uv lock --upgrade-package ops` or `poetry update ops`) to pick up the latest `ops` release that satisfies the version constraint.
+1. Re-lock dependencies to pick up the latest `ops` release that satisfies the version constraint. For example, `uv lock --upgrade-package ops` or `poetry update ops`.
 2. Rebuild the charm with `charmcraft pack`.
 3. Refresh deployed units with `juju refresh <app> --path ./<charm>.charm` (or by uploading the new revision to Charmhub).
 
@@ -179,43 +185,45 @@ Configure the charm repository so that dependency updates are detected and propo
 
 #### Postponing updates and the associated risk
 
-Pinning `ops` to an exact version, or disabling automated dependency proposals, postpones updates indefinitely. This means published security fixes for `ops` will not reach your deployed charms until the pin is lifted, the charm is rebuilt, and the unit is refreshed — potentially leaving units exposed to known issues for the entire delay. If you pin for stability or reproducibility reasons, plan a regular cadence to review the pin against the [supported versions](#ops-supported-versions) and the project's release notes.
+Pinning `ops` to an exact version, or disabling automated dependency proposals, postpones updates indefinitely. This means published security fixes for `ops` will not reach your deployed charms until the pin is lifted, the charm is rebuilt, and the unit is refreshed — potentially leaving units exposed to known issues for the entire delay. If you pin for stability or reproducibility reasons, plan a regular cadence to review the pin against the [supported versions](#ops-supported-versions) and the project's [release notes](https://github.com/canonical/operator/releases).
 
+(ops-verifying-update)=
 #### Verifying an update was applied
 
 To check which version of `ops` is running in a deployed unit:
 
 ```text
-juju ssh <unit> "JUJU_CHARM_DIR=$(ls -d /var/lib/juju/agents/unit-*/charm | head -1); \
-    \$JUJU_CHARM_DIR/venv/bin/python -c 'import ops; print(ops.__version__)'"
+juju exec --unit <unit> -- bash -c '/var/lib/juju/agents/unit-*/charm/venv/bin/python -c "import ops; print(ops.__version__)"'
 ```
 
-Or, in any environment where the charm's virtualenv is on `PATH`, run `pip show ops` or `python -c 'import ops; print(ops.__version__)'` and compare the result to the version on [PyPI](https://pypi.org/project/ops/).
+Compare the result to the version on [PyPI](https://pypi.org/project/ops/).
 
 ## Reporting vulnerabilities
 
-If you believe you have found a security vulnerability in `ops`, please report it privately following the instructions in the [`SECURITY.md`](https://github.com/canonical/operator/blob/main/SECURITY.md) file in the project repository.
+If you believe you have found a security vulnerability in Ops, please report it privately following the instructions in the [`SECURITY.md`](https://github.com/canonical/operator/blob/main/SECURITY.md) file in the project repository.
 
 Reports are handled according to the [Ubuntu Security disclosure and embargo policy](https://ubuntu.com/security/disclosure-policy), which describes how researchers, users, and customers can responsibly disclose issues to Canonical.
 
-Information about known vulnerabilities affecting `ops` is published in:
+Information about known vulnerabilities affecting Ops is published in:
 
-* the [GitHub Security Advisories for `canonical/operator`](https://github.com/canonical/operator/security/advisories);
-* the [release notes for `ops`](https://github.com/canonical/operator/releases) on GitHub;
-* relevant [Ubuntu Security Notices](https://ubuntu.com/security/notices) when a vulnerability also affects an Ubuntu-packaged copy of the library.
+* The [GitHub Security Advisories for `canonical/operator`](https://github.com/canonical/operator/security/advisories).
+* The [Ops release notes](https://github.com/canonical/operator/releases) on GitHub.
+* Relevant [Ubuntu Security Notices](https://ubuntu.com/security/notices) when a vulnerability also affects an Ubuntu-packaged copy of the library.
 
 ## Risks
 
 The risks below follow from the trust boundaries described in [](#ops-product-architecture) and the design choices in [](#ops-secure-by-design); the mitigations are summarised in [](#ops-good-practices).
 
-Ops inherits the risks of Juju executing charms (for example, injecting data into the charm context or through the use of hook commands). Because Juju is the trusted control plane in [](#ops-product-architecture), any compromise of the Juju side propagates into the charm process where Ops runs. Charm authors should be familiar with {external+juju:ref}`Juju security <juju-security>` and {external+pebble:ref}` Pebble security <security>`.
+Ops inherits the risks of Juju executing charms (for example, injecting data into the charm context or through the use of hook commands). Any compromise of Juju propagates into the charm process where Ops runs. Charm authors should be familiar with [](#ops-product-architecture), {external+juju:ref}`Juju security <juju-security>`, and {external+pebble:ref}`Pebble security <security>`.
 
-If a charm is integrated with a tracing receiver, Ops introduces the risk of outgoing traces being intercepted — this is the only outbound network connection Ops makes (see [](#ops-product-architecture)). Traces should not include any sensitive data, but intercepted traces can provide information about the structure of the charm and the events that the charm has processed. In addition, an attacker that blocked trace data could hide malicious activity. Mitigation: integrate a certificate authority provider so traces are sent over HTTPS, as noted in [](#ops-good-practices).
+If a charm is integrated with a tracing receiver, Ops introduces the risk of outgoing traces being intercepted — this is the only outbound network connection Ops makes. Traces should not include any sensitive data, but intercepted traces can provide information about the structure of the charm and the events that the charm has processed. In addition, an attacker that blocked trace data could hide malicious activity. Mitigation: integrate a certificate authority provider so traces are sent over HTTPS, as noted in [](#ops-good-practices).
 
-Otherwise, Ops doesn't introduce any new security risks. Ops does expand the impact of the Juju risk of an attacker gaining access to the filesystem of the charm — the state database and trace buffer described in [](#ops-charm-unit-databases) are not encrypted at rest (see [](#ops-cryptographic-technology) for the at-rest guidance):
+Otherwise, Ops doesn't introduce any new security risks. Ops does expand the impact of the Juju risk of an attacker gaining access to the filesystem of the charm — the state database and trace buffer described in [](#ops-charm-unit-databases) are not encrypted at rest:
 
 * Access to the deferred notice queue provides information about events that could not be immediately processed (this includes the event name and the event context provided in the hook environment at the time).
 * Access to trace data provides detailed information about the implementation of the charm and the events that it has processed. This is particularly the case when tracing has not been configured, as the charm will have a large amount of buffered trace data stored (when tracing is active, this will be regularly sent to the trace receiver and removed from the local database).
+
+See [](#ops-cryptographic-technology) for at-rest guidance.
 
 (ops-good-practices)=
 ## Good practices
