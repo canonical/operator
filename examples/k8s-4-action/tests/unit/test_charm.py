@@ -142,7 +142,7 @@ def test_no_database_blocked(mock_version):
     assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
 
 
-def test_get_db_info_action(mock_version):
+def test_get_db_info_action():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -169,7 +169,7 @@ def test_get_db_info_action(mock_version):
     }
 
 
-def test_get_db_info_action_show_password(mock_version):
+def test_get_db_info_action_show_password():
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
