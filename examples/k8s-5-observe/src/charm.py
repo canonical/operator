@@ -201,6 +201,9 @@ class FastAPIDemoCharm(ops.CharmBase):
             version = fastapi_demo.get_version(config.server_port)
         except RuntimeError as version_e:
             logger.error("Failed to get workload version: %s", version_e)
+            self.unit.status = ops.BlockedStatus(
+                "Failed to get version from server: check port config"
+            )
             return
         self.unit.set_workload_version(version)
 

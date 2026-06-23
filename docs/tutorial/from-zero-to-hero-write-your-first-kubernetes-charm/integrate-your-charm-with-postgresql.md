@@ -241,6 +241,9 @@ def _replan_workload(self) -> None:
         version = fastapi_demo.get_version(config.server_port)
     except RuntimeError as version_e:
         logger.error("Failed to get workload version: %s", version_e)
+        self.unit.status = ops.BlockedStatus(
+            "Failed to get version from server: check port config"
+        )
         return
     self.unit.set_workload_version(version)
 ```
@@ -336,12 +339,6 @@ self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload contain
 
 ```python
 self.unit.status = ops.BlockedStatus(str(e))
-```
-
-```python
-self.unit.status = ops.BlockedStatus(
-    "Failed to get version from server: check port config"
-)
 ```
 
 ## Validate your charm
