@@ -180,7 +180,7 @@ IdentityDict = typing.TypedDict(
     'IdentityDict',
     {
         # NOTE: ensure <IdentityAccessLiterals> are kept up to date in all locations
-        'access': Literal['untrusted', 'metrics', 'read', 'admin'],
+        'access': "IdentityAccess | Literal['untrusted', 'metrics', 'read', 'admin']",
         'local': 'NotRequired[LocalIdentityDict]',
         'basic': 'NotRequired[BasicIdentityDict]',
     },
