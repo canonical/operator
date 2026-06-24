@@ -1,28 +1,28 @@
-**[How to initialise your project](https://documentation.ubuntu.com/ops/latest/howto/initialise-your-project/)**
+**[How to initialise your project](https://canonical.com/juju/docs/ops/latest/howto/initialise-your-project/)**
 - If your charm operates a workload, name the repository `<charm name>-operator`. For advice about the charm name, see [](#decide-your-charms-name). If your charm doesn't operate a workload (as in the case of integrator charms and configurator charms), the `-operator` suffix isn't needed. For example, `foo-integrator` and `bar-configurator`. Repositories that contain multiple charms or one or more charms and other artefacts (like rocks) will need to use other naming patterns. See [Create a repository](#create-a-repository).
 
-**[How to log from your charm](https://documentation.ubuntu.com/ops/latest/howto/log-from-your-charm/)**
+**[How to log from your charm](https://canonical.com/juju/docs/ops/latest/howto/log-from-your-charm/)**
 - Capture output to `stdout` and `stderr` in your charm and use the logging and warning functionality to send messages to the charm user, rather than rely on Juju capturing output. In particular, you should avoid `print()` calls, and ensure that any subprocess calls capture output.
 - Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 - Never log credentials or other sensitive information.
 
-**[How to manage charms](https://documentation.ubuntu.com/ops/latest/howto/manage-charms/)**
+**[How to manage charms](https://canonical.com/juju/docs/ops/latest/howto/manage-charms/)**
 - All charms should provide the commands configured by the Charmcraft profile, to allow easy testing across the charm ecosystem. It's fine to tweak the configuration of individual tools, or to add additional commands, but keep the command names and meanings that the profile provides. See [Develop your charm](#develop-your-charm).
 
-**[How to manage configuration](https://documentation.ubuntu.com/ops/latest/howto/manage-configuration/)**
+**[How to manage configuration](https://canonical.com/juju/docs/ops/latest/howto/manage-configuration/)**
 - Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`. See [Define a configuration option](#define-a-configuration-option).
 
-**[How to manage libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)**
+**[How to manage libraries](https://canonical.com/juju/docs/ops/latest/howto/manage-libraries/)**
 - Libraries should never mutate the status of a unit or application. Instead, use return values, or raise exceptions and let them bubble back up to the charm for the charm author to handle as they see fit. See [Write a library](#manage-libraries-write-a-library).
 
-**[How to run workloads with a machine charm](https://documentation.ubuntu.com/ops/latest/howto/run-workloads-with-a-charm-machines/)**
+**[How to run workloads with a machine charm](https://canonical.com/juju/docs/ops/latest/howto/run-workloads-with-a-charm-machines/)**
 - Pin workload versions rather than installing the latest available package. A charm that silently upgrades between reconciliations is hard to debug, and can break if upstream introduces a breaking change. See [APT packages](#run-workloads-with-a-charm-machines-apt-packages).
 - When running subprocesses, use absolute paths (for example, `/usr/bin/apt` rather than `apt`) to avoid PATH-based attacks, and pass arguments as a list rather than a shell string so that the shell doesn't interpret them. Use `check=True` so that failures raise — generally you'll want to catch that exception and log the return code and possibly `stderr` — and `capture_output=True` so that output from the command doesn't leak into the Juju log. See [When there's no library](#run-workloads-with-a-charm-machines-when-theres-no-library).
 
-**[How to set up continuous integration for a charm](https://documentation.ubuntu.com/ops/latest/howto/set-up-continuous-integration-for-a-charm/)**
+**[How to set up continuous integration for a charm](https://canonical.com/juju/docs/ops/latest/howto/set-up-continuous-integration-for-a-charm/)**
 - The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system.
 
-**[How to write and structure charm code](https://documentation.ubuntu.com/ops/latest/howto/write-and-structure-charm-code/)**
+**[How to write and structure charm code](https://canonical.com/juju/docs/ops/latest/howto/write-and-structure-charm-code/)**
 - Avoid using Charmcraft's `charm` plugin if possible. Instead, {external+charmcraft:ref}`migrate to the uv plugin <howto-migrate-to-uv>` or the {external+charmcraft:ref}`poetry plugin <howto-migrate-to-poetry>`. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Ensure that the `pyproject.toml` *and* the lock file are committed to version control, so that exact versions of charms can be reproduced. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Ensure that tooling is configured to automatically detect new versions, particularly security releases, for all your dependencies. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
