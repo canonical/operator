@@ -2313,7 +2313,7 @@ class _Event:  # type: ignore
 
     @property
     def _is_action_event(self) -> bool:
-        """Whether the event name indicates that this is a relation event."""
+        """Whether the event name indicates that this is an action event."""
         return self._path.type is _EventType.ACTION
 
     @property
