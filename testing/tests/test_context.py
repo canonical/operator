@@ -106,6 +106,42 @@ def test_context_manager():
         assert mgr.charm.meta.name == 'foo'
 
 
+class _RaisingCharm(ops.CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, _: ops.StartEvent):
+        raise RuntimeError('charm went bang')
+
+
+def test_context_manager_does_not_leak_env_when_implicit_run_raises():
+    """Manager.__exit__ must tear down Runtime.exec() even if the implicit run() raises.
+
+    Otherwise OPERATOR_DISPATCH (set during _Dispatcher.__init__) leaks into the
+    process environment and every subsequent test in the same process hits
+    `raise _Abort(0)`.
+    """
+    os.environ.pop('OPERATOR_DISPATCH', None)
+    ctx = Context(_RaisingCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError):
+        with ctx(ctx.on.start(), State()):
+            # Deliberately don't call mgr.run() — let __exit__ trigger it,
+            # then have the charm raise.
+            pass
+    assert 'OPERATOR_DISPATCH' not in os.environ
+
+
+def test_explicit_run_does_not_leak_env_when_charm_raises():
+    """Manager.run() must tear down Runtime.exec() even if ops.run() raises."""
+    os.environ.pop('OPERATOR_DISPATCH', None)
+    ctx = Context(_RaisingCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError):
+        with ctx(ctx.on.start(), State()) as mgr:
+            mgr.run()
+    assert 'OPERATOR_DISPATCH' not in os.environ
+
+
 def test_app_name_and_unit_id_default():
     ctx = Context(MyCharm, meta={'name': 'foo'})
     assert ctx.app_name == 'foo'

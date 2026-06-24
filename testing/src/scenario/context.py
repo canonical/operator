@@ -13,10 +13,12 @@ import copy
 import functools
 import pathlib
 import shutil
+import sys
 import tempfile
 import weakref
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Generic
 
 from typing_extensions import deprecated
@@ -85,6 +87,7 @@ class Manager(Generic[CharmType]):
         self._state_in = state_in
 
         self._emitted: bool = False
+        self._wrapped_ctx_exited: bool = False
 
         self.ops: Ops[CharmType] | None = None
 
@@ -121,23 +124,45 @@ class Manager(Generic[CharmType]):
                 'you should __enter__ this context manager before running it',
             )
         self._emitted = True
-        self.ops.run()
-
-        # wrap up Runtime.exec() so that we can gather the output state
-        self._wrapped_ctx.__exit__(None, None, None)
+        try:
+            self.ops.run()
+        except BaseException:
+            # The charm raised: still tear down Runtime.exec() so the env
+            # snapshot is restored and resources are released, then propagate.
+            self._exit_wrapped_ctx(*sys.exc_info())
+            raise
+        else:
+            # wrap up Runtime.exec() so that we can gather the output state
+            self._exit_wrapped_ctx(None, None, None)
 
         assert self._ctx._output_state is not None
         return self._ctx._output_state
 
+    def _exit_wrapped_ctx(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Close the Runtime.exec() context exactly once."""
+        if self._wrapped_ctx_exited:
+            return
+        self._wrapped_ctx_exited = True
+        self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
-        if not self._emitted:
-            logger.debug(
-                "user didn't emit the event within the context manager scope. "
-                'Doing so implicitly upon exit...',
-            )
-            self.run()
-        if exc_type is not None:
-            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+        try:
+            if not self._emitted:
+                logger.debug(
+                    "user didn't emit the event within the context manager scope. "
+                    'Doing so implicitly upon exit...',
+                )
+                self.run()
+        finally:
+            # Always tear down Runtime.exec(), even if the implicit run() above
+            # raised: leaving it open leaks the env snapshot (including
+            # OPERATOR_DISPATCH) into subsequent tests in the same process.
+            self._exit_wrapped_ctx(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
