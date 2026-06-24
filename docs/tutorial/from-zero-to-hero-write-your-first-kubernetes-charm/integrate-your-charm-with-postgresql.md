@@ -248,7 +248,7 @@ def _replan_workload(self) -> None:
     self.unit.set_workload_version(version)
 ```
 
-We removed four `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
+We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
 
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
