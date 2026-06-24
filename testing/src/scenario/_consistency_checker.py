@@ -28,6 +28,8 @@ from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from ops import pebble
+
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
 from .state import (
@@ -708,13 +710,38 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            for attr in ('level', 'startup', 'threshold'):
-                if getattr(check, attr) != getattr(plan_check, attr):
-                    errors.append(
-                        f'container {container.name!r} has a check {check.name!r} with a '
-                        f'different {attr!r} ({getattr(check, attr)}) '
-                        f'than the plan ({getattr(plan_check, attr)}).',
-                    )
+            # Scenario allows None for unset, Pebble defaults to UNSET.
+            check_level = check.level if check.level is not None else pebble.CheckLevel.UNSET
+            if check_level != plan_check.level:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'level' ({check.level}) than the plan ({plan_check.level}).",
+                )
+            # Scenario defaults to None, Pebble defaults to UNSET and collapses to ENABLED.
+            check_startup = (
+                pebble.CheckStartup.ENABLED
+                if check.startup in (None, pebble.CheckStartup.UNSET)
+                else check.startup
+            )
+            plan_startup = (
+                pebble.CheckStartup.ENABLED
+                if plan_check.startup == pebble.CheckStartup.UNSET
+                else plan_check.startup
+            )
+            if check_startup != plan_startup:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'startup' ({check.startup}) than the plan ({plan_check.startup}).",
+                )
+            # Scenario and Pebble allow None, collapsing to 3.
+            check_threshold = 3 if check.threshold is None else check.threshold
+            plan_threshold = 3 if plan_check.threshold is None else plan_check.threshold
+            if check_threshold != plan_threshold:
+                errors.append(
+                    f'container {container.name!r} has a check {check.name!r} with a '
+                    f"different 'threshold' ({check.threshold}) than the plan "
+                    f'({plan_check.threshold}).',
+                )
 
     return Results(errors, [])
 

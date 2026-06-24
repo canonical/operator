@@ -887,7 +887,7 @@ class Notice:
     last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
+    See Pebble's `Notices documentation <https://ubuntu.com/docs/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
