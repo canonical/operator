@@ -2243,9 +2243,9 @@ class Client:
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
 
-    The ``socket_path`` is attached to every tracing span emitted by the client as the
-    ``pebble.socket_path`` attribute, which is useful for distinguishing spans where multiple
-    pebble daemons are used.
+    ``socket_path`` is available as the ``pebble.socket_path`` attribute in every tracing span
+    emitted by the client. This is useful for distinguishing spans where multiple Pebble daemons
+    are used.
     """
 
     _chunk_size = 8192
