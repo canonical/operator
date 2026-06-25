@@ -23,6 +23,23 @@ import pytest
 
 from test.charms.test_secrets.src.charm import Result
 
+_JUJU4_COMMIT_BUG = (
+    'Juju 4.0 uniter commit-phase regression breaks secret-add (juju/juju#22523, juju/juju#22524)'
+)
+
+
+@pytest.fixture(autouse=True)
+def _skip_on_juju4(juju: jubilant.Juju):
+    """Skip the whole module on Juju >= 4 until the upstream bug is fixed.
+
+    Every `juju run` against an action that touches a secret returns aborted
+    at Juju's default 60-second action-wait, because the uniter never
+    commits the hook. Without this gate the suite spends 20 minutes timing
+    out every scheduled run.
+    """
+    if int(juju.status().model.version.split('.', 1)[0]) >= 4:
+        pytest.skip(_JUJU4_COMMIT_BUG)
+
 
 def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
     charm_path = build_secrets_charm()
