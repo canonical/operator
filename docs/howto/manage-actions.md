@@ -52,19 +52,23 @@ class CompressionKind(enum.Enum):
     BZIP = 'bzip2'
     XZ = 'xz'
 
+
 class Compression(pydantic.BaseModel):
     kind: CompressionKind = pydantic.Field(CompressionKind.BZIP)
 
-    quality: int = pydantic.Field(5, description='Compression quality.', ge=0, le=9)
+    quality: int = pydantic.Field(
+        5, description='Compression quality.', ge=0, le=9
+    )
+
 
 class SnapshotAction(pydantic.BaseModel):
     """Take a snapshot of the database."""
 
-    filename: str = pydantic.Field(description="The name of the snapshot file.")
+    filename: str = pydantic.Field(description='The name of the snapshot file.')
 
     compression: Compression = pydantic.Field(
         default_factory=Compression,
-        description="The type of compression to use.",
+        description='The type of compression to use.',
     )
 ```
 
@@ -83,11 +87,11 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
     """Handle the snapshot action."""
     # Fetch the parameters. If the user passes something invalid, this will
     # fail the action with an appropriate message.
-    params = event.load_params(SnapshotAction, errors="fail")
+    params = event.load_params(SnapshotAction, errors='fail')
     # This might take a while, so let the user know we're working on it.
     # This is sent back to the Juju user in real-time, and appears in the output
     # of the `juju run` command.
-    event.log(f"Generating snapshot into {params.filename}")
+    event.log(f'Generating snapshot into {params.filename}')
     # Do the snapshot.
     success = self.do_snapshot(
         filename=params.filename,
@@ -96,13 +100,15 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
     )
     if not success:
         # Report to the user that the action has failed.
-        event.fail("Failed to generate snapshot.")  # Ideally, include more details than this!
+        event.fail(
+            'Failed to generate snapshot.'
+        )  # Ideally, include more details than this!
         # Note that `fail()` doesn't interrupt code, so is typically followed by a `return`.
         return
     # Set the results of the action.
-    msg = f"Stored snapshot in {params.filename}."
+    msg = f'Stored snapshot in {params.filename}.'
     # These will be displayed in the `juju run` output.
-    event.set_results({"result": msg})
+    event.set_results({'result': msg})
 ```
 
 > See more: [](ops.ActionEvent.load_params), [](ops.ActionEvent.params), [](ops.ActionEvent.fail), [](ops.ActionEvent.set_results), [](ops.ActionEvent.log)
@@ -114,7 +120,11 @@ When a unique ID is needed for the action task - for example, for logging or cre
 ```python
 def _on_snapshot(self, event: ops.ActionEvent):
     temp_filename = f'backup-{event.id}.tar.gz'
-    logger.info("Using %s as the temporary backup filename in task %s", filename, event.id)
+    logger.info(
+        'Using %s as the temporary backup filename in task %s',
+        filename,
+        event.id,
+    )
     self.create_backup(temp_filename)
     ...
 ```
@@ -131,10 +141,18 @@ For example:
 ```python
 from ops import testing
 
+
 def test_backup_action():
     ctx = testing.Context(MyCharm)
-    ctx.run(ctx.on.action('snapshot', params={'filename': 'db-snapshot.tar.gz'}), testing.State())
-    assert ctx.action_logs == ['Starting snapshot', 'Table1 complete', 'Table2 complete']
+    ctx.run(
+        ctx.on.action('snapshot', params={'filename': 'db-snapshot.tar.gz'}),
+        testing.State(),
+    )
+    assert ctx.action_logs == [
+        'Starting snapshot',
+        'Table1 complete',
+        'Table2 complete',
+    ]
     assert 'snapshot-size' in ctx.action_results
 ```
 
@@ -167,7 +185,9 @@ To verify that an action works correctly against a real Juju instance, write an 
 
 ```python
 def test_logger(juju: jubilant.Juju):
-    action = juju.run("your-app/0", "snapshot", {"filename": "db-snapshot.tar.gz"})
-    assert action.status == "completed"
-    assert action.results["snapshot-size"].isdigit()
+    action = juju.run(
+        'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
+    )
+    assert action.status == 'completed'
+    assert action.results['snapshot-size'].isdigit()
 ```

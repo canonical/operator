@@ -4,6 +4,7 @@ balancer's
 breakpoint
 callables
 Canonical's
+configurator
 cosl
 databag
 databags
@@ -20,6 +21,7 @@ lightkube
 liveness
 manpages
 misconfiguration
+mitigations
 pathops
 Parca
 protobuf
@@ -37,6 +39,7 @@ stdout
 storages
 systemd
 subprocess
+teardown
 tinyproxy
 traceback
 tracebacks

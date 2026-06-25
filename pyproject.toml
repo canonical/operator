@@ -37,9 +37,9 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.11.2",
+    "ruff==0.15.14",
     "codespell==2.4.1",
-    "zizmor==1.11.0",
+    "zizmor==1.26.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -51,7 +51,6 @@ mypy = [  # used to type check example charms in CI
 unit = [
     "ops[testing,tracing]",
     "pytest~=9.0",
-    "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
 xdist = [
@@ -82,10 +81,10 @@ tiobe = [
 ]
 
 [project.urls]
-"Homepage" = "https://documentation.ubuntu.com/ops/latest/"
+"Homepage" = "https://canonical.com/juju/docs/ops/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
+"Documentation" = "https://canonical.com/juju/docs/ops/latest/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
@@ -128,7 +127,7 @@ aggressive = 3
 line-length = 99
 exclude = ["examples"]
 target-version = "py310"
-extend-exclude = ["docs/conf.py", "docs/_dev/"]
+extend-exclude = ["docs/conf.py", "docs/_dev/", "docs/tutorial/"]
 
 # Ruff formatter configuration
 [tool.ruff.format]
@@ -230,7 +229,11 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "S106",
 
     # "Useless" expression.
-    "B018"
+    "B018",
+
+    # Unreliable floating point equality comparison. Tests check round-tripped
+    # exact-literal config values; pytest.approx isn't appropriate here.
+    "RUF069",
 ]
 "testing/tests/*" = [
     # All documentation linting.
@@ -245,6 +248,15 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 "ops/_private/timeconv.py" = [
     "RUF001",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
     "RUF002",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+]
+"ops/__init__.py" = [
+    "RUF067",  # Wraps main() and imports ops_tracing at the bottom.
+]
+"ops/_private/__init__.py" = [
+    "RUF067",  # Exposes a module-level tracer.
+]
+"ops/lib/__init__.py" = [
+    "RUF067",  # Legacy library loader.
 ]
 "test/test_helpers.py" = [
     "S605",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
