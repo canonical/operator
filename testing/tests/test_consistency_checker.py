@@ -126,12 +126,12 @@ def test_check_info_container_matches_event():
             _Event(event, container=container, check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo': {}, 'bar': {}}}),
         )
-        # The container name contains a dash.
-        dashed_event = event.replace('foo', 'foo-bar')
+        # The container name contains a hyphen.
+        hyphenated_event = event.replace('foo', 'foo-bar')
         container = Container('foo-bar', check_infos={check}, layers={'base': layer})
         assert_consistent(
             State(containers={container}),
-            _Event(dashed_event, container=container, check_info=check),
+            _Event(hyphenated_event, container=container, check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo-bar': {}}}),
         )
 

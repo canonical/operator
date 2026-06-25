@@ -432,9 +432,9 @@ class Secret:
 
 
 def _to_python_attr(s: str):
-    """Translate a Juju metadata name (which may contain dashes) into attribute form.
+    """Translate a Juju metadata name (which may contain hyphens) into attribute form.
 
-    This is **lossy** — calling it on an already-dash-free name discards no
+    This is **lossy** — calling it on an already-hyphen-free name discards no
     information, but a verbatim metadata name like ``foo-bar`` and the
     Python attribute form ``foo_bar`` are not distinguishable afterwards. Use it
     only for matching/dispatch; never round-trip through it to build outgoing
@@ -446,9 +446,9 @@ def _to_python_attr(s: str):
 # Juju's naming rules for charm metadata entities. Scenario enforces these
 # these so that tests cannot pass with names that a real deployment would reject.
 #
-# Sources (juju/names and juju/charm, identical in Juju 3.x and 4.x):
+# Sources (juju/names and juju/charm, identical in Juju 3.6 and 4.0):
 # - relation endpoints: RelationSnippet — underscores ARE allowed.
-# - storage: StorageNameSnippet — dash-separated, each segment needs a letter.
+# - storage: StorageNameSnippet — hyphen-separated, each segment needs a letter.
 # - actions: actionNameRule from actions.yaml parsing.
 # - containers: Juju passes the name verbatim as the Kubernetes container
 #   name, so the RFC 1123 DNS-label rule applies (max 63 characters).
@@ -2365,9 +2365,9 @@ class _EventType(str, Enum):
 
 class _EventPath(str):
     if TYPE_CHECKING:  # pragma: no cover
-        name: str
+        python_name: str
         owner_path: list[str]
-        suffix: str
+        python_suffix: str
         prefix: str
         type: _EventType
 
@@ -2377,16 +2377,18 @@ class _EventPath(str):
         raw_name = string.split('.')[-1]
         instance.owner_path = string.split('.')[:-1] or ['on']
 
-        # `name` is the Python-attribute form: what the event is called on
-        # `charm.on`, and the event kind ops uses in handle paths (for
+        # `python_name` is the Python-attribute form: what the event is called
+        # on `charm.on`, and the event kind ops uses in handle paths (for
         # example ``foo_bar_pebble_ready`` for container ``foo-bar``).
-        instance.name = _to_python_attr(raw_name)
-        instance.suffix, instance.type = _EventPath._get_suffix_and_type(instance.name)
+        instance.python_name = _to_python_attr(raw_name)
+        instance.python_suffix, instance.type = _EventPath._get_suffix_and_type(
+            instance.python_name,
+        )
         # The prefix is sliced from the raw string by length so the entity
         # name is preserved verbatim (e.g. ``foo-bar`` in
         # ``foo-bar_pebble_ready``): Juju hook names keep the metadata name
         # exactly as declared, and only the suffix is known to be hyphenated.
-        instance.prefix = raw_name[: len(raw_name) - len(instance.suffix)]
+        instance.prefix = raw_name[: len(raw_name) - len(instance.python_suffix)]
 
         return instance
 
@@ -2493,7 +2495,11 @@ class _Event:  # type: ignore
         # (container/relation/storage) carries verbatim from the path; only
         # the event-type suffix is hyphenated. (Not meaningful for action or
         # custom events, which have no Juju hook name.)
-        object.__setattr__(self, '_juju_name', f'{path.prefix}{path.suffix.replace("_", "-")}')
+        object.__setattr__(
+            self,
+            '_juju_name',
+            f'{path.prefix}{path.python_suffix.replace("_", "-")}',
+        )
 
     @property
     def _path(self) -> _EventPath:
@@ -2505,17 +2511,16 @@ class _Event:  # type: ignore
         """Full event name, in Python-attribute form (as ops names the event).
 
         Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of the event, the
-        prefix the name of the entity the event is about.
+        prefix the name of the entity the event is about. Hyphens in the entity name are
+        translated to underscores, so an event for relation endpoint "foo-bar" has the name:
 
-        "foo_relation_changed":
-         - "foo"=prefix (name of a relation),
+        "foo_bar_relation_changed":
+         - "foo_bar"=prefix (name of a relation, hyphens translated to underscores),
          - "_relation_changed"=suffix (relation event)
 
-        Dashes in the entity name are translated to underscores, so an event
-        for relation endpoint "foo-bar" has the name "foo_bar_relation_changed"
-        (the verbatim endpoint name is preserved in ``self._path.prefix``).
+        The verbatim endpoint name is preserved in ``self._path.prefix``.
         """
-        return self._path.name
+        return self._path.python_name
 
     @property
     def owner_path(self) -> list[str]:

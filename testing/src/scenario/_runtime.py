@@ -69,17 +69,11 @@ class Runtime(Generic[CharmType]):
 
     def _get_event_env(self, state: State, event: _Event, charm_root: Path) -> dict[str, str]:
         """Build the simulated environment the operator framework expects."""
-        if event._is_action_event and (action := event.action):
-            # Juju dispatches actions as `actions/<action-name>` (no
-            # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
-            dispatch_path = f'actions/{action.name}'
-        else:
-            dispatch_path = f'hooks/{event._juju_name}'
         env = {
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': dispatch_path,
+            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
             'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
@@ -96,8 +90,11 @@ class Runtime(Generic[CharmType]):
             env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
         if event._is_action_event and (action := event.action):
+            # Juju dispatches actions as `actions/<action-name>` (no
+            # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
             env.update(
                 {
+                    'JUJU_DISPATCH_PATH': f'actions/{action.name}',
                     'JUJU_ACTION_NAME': action.name,
                     'JUJU_ACTION_UUID': action.id,
                     'JUJU_ACTION_TAG': f'action-{action.id}',

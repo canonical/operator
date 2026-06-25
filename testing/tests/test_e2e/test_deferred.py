@@ -164,8 +164,8 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
     assert isinstance(start, ops.StartEvent)
 
 
-def test_deferred_workload_event_dashed_container_name():
-    """A deferred event for a dashed container name must be re-emitted.
+def test_deferred_workload_event_hyphenated_container_name():
+    """A deferred event for a hyphenated container name must be re-emitted.
 
     Regression test: the deferred handle path must use the Python-attribute
     form of the event name (``workload_a_pebble_ready``), not the verbatim
@@ -173,7 +173,7 @@ def test_deferred_workload_event_dashed_container_name():
     """
     captured: list[ops.EventBase] = []
 
-    class DashCharm(ops.CharmBase):
+    class HyphenatedCharm(ops.CharmBase):
         META: typing.ClassVar[dict[str, typing.Any]] = {
             'name': 'dashcharm',
             'containers': {'workload-a': {}},
@@ -189,12 +189,14 @@ def test_deferred_workload_event_dashed_container_name():
         def _on_event(self, event: ops.EventBase):
             captured.append(event)
 
-    ctx = Context(DashCharm, meta=DashCharm.META)
+    ctx = Context(HyphenatedCharm, meta=HyphenatedCharm.META)
     container = Container('workload-a', can_connect=True)
     relation = Relation('foo-bar')
-    deferred_ready = ctx.on.pebble_ready(container).deferred(handler=DashCharm._on_event)
-    assert deferred_ready.handle_path == 'DashCharm/on/workload_a_pebble_ready[1]'
-    deferred_changed = ctx.on.relation_changed(relation).deferred(handler=DashCharm._on_event)
+    deferred_ready = ctx.on.pebble_ready(container).deferred(handler=HyphenatedCharm._on_event)
+    assert deferred_ready.handle_path == 'HyphenatedCharm/on/workload_a_pebble_ready[1]'
+    deferred_changed = ctx.on.relation_changed(relation).deferred(
+        handler=HyphenatedCharm._on_event
+    )
     state_in = State(
         containers={container},
         relations={relation},
