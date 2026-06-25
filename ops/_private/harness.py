@@ -318,7 +318,7 @@ class Harness(Generic[CharmType]):
 
         warnings.warn(
             'Harness is deprecated. For the recommended approach, see: '
-            'https://documentation.ubuntu.com/ops/latest/howto/write-unit-tests-for-a-charm/',
+            'https://canonical.com/juju/docs/ops/latest/howto/write-unit-tests-for-a-charm/',
             PendingDeprecationWarning,
             stacklevel=2,
         )

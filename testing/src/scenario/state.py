@@ -887,7 +887,7 @@ class Notice:
     last_repeated: datetime.datetime = dataclasses.field(default_factory=_now_utc)
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
+    See Pebble's `Notices documentation <https://ubuntu.com/docs/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
@@ -2313,7 +2313,7 @@ class _Event:  # type: ignore
 
     @property
     def _is_action_event(self) -> bool:
-        """Whether the event name indicates that this is a relation event."""
+        """Whether the event name indicates that this is an action event."""
         return self._path.type is _EventType.ACTION
 
     @property
