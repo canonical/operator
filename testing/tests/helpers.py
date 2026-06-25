@@ -57,6 +57,11 @@ def trigger(
     return state_out
 
 
+def _escape(key: str) -> str:
+    # RFC 6902 JSON Pointer escaping: ~ -> ~0, / -> ~1 (order matters).
+    return key.replace('~', '~0').replace('/', '~1')
+
+
 def _dict_diff(a: Any, b: Any, path: str, out: list[dict[str, Any]]) -> None:
     # Emit RFC 6902-shaped patch ops describing how to transform `a` into `b`.
     # Recurses into dicts; treats list / scalar differences as whole-value replaces.
@@ -64,11 +69,11 @@ def _dict_diff(a: Any, b: Any, path: str, out: list[dict[str, Any]]) -> None:
         ad = cast('dict[str, Any]', a)
         bd = cast('dict[str, Any]', b)
         for key in ad.keys() - bd.keys():
-            out.append({'op': 'remove', 'path': f'{path}/{key}'})
+            out.append({'op': 'remove', 'path': f'{path}/{_escape(key)}'})
         for key in bd.keys() - ad.keys():
-            out.append({'op': 'add', 'path': f'{path}/{key}', 'value': bd[key]})
+            out.append({'op': 'add', 'path': f'{path}/{_escape(key)}', 'value': bd[key]})
         for key in ad.keys() & bd.keys():
-            _dict_diff(ad[key], bd[key], f'{path}/{key}', out)
+            _dict_diff(ad[key], bd[key], f'{path}/{_escape(key)}', out)
         return
     if a != b:
         out.append({'op': 'replace', 'path': path, 'value': b})
