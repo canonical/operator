@@ -33,7 +33,7 @@ classifiers = [
 dependencies = [
     "opentelemetry-sdk~=1.30",
     "ops==2.23.3.dev0",
-    "pydantic",
+    "pydantic>=2.0,<3",
 ]
 
 [project.urls]

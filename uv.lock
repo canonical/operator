@@ -2113,7 +2113,7 @@ testing = [
 requires-dist = [
     { name = "opentelemetry-sdk", specifier = "~=1.30" },
     { name = "ops", editable = "." },
-    { name = "pydantic" },
+    { name = "pydantic", specifier = ">=2.0,<3" },
 ]
 
 [package.metadata.requires-dev]
