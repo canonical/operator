@@ -115,14 +115,16 @@ class _RaisingCharm(ops.CharmBase):
         raise RuntimeError('charm went bang')
 
 
-def test_context_manager_does_not_leak_env_when_implicit_run_raises():
+def test_context_manager_does_not_leak_env_when_implicit_run_raises(
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Manager.__exit__ must tear down Runtime.exec() even if the implicit run() raises.
 
     Otherwise OPERATOR_DISPATCH (set during _Dispatcher.__init__) leaks into the
     process environment and every subsequent test in the same process hits
     `raise _Abort(0)`.
     """
-    os.environ.pop('OPERATOR_DISPATCH', None)
+    monkeypatch.delenv('OPERATOR_DISPATCH', raising=False)
     ctx = Context(_RaisingCharm, meta={'name': 'foo'})
     with pytest.raises(UncaughtCharmError):
         with ctx(ctx.on.start(), State()):
@@ -132,14 +134,32 @@ def test_context_manager_does_not_leak_env_when_implicit_run_raises():
     assert 'OPERATOR_DISPATCH' not in os.environ
 
 
-def test_explicit_run_does_not_leak_env_when_charm_raises():
+def test_explicit_run_does_not_leak_env_when_charm_raises(monkeypatch: pytest.MonkeyPatch):
     """Manager.run() must tear down Runtime.exec() even if ops.run() raises."""
-    os.environ.pop('OPERATOR_DISPATCH', None)
+    monkeypatch.delenv('OPERATOR_DISPATCH', raising=False)
     ctx = Context(_RaisingCharm, meta={'name': 'foo'})
     with pytest.raises(UncaughtCharmError):
         with ctx(ctx.on.start(), State()) as mgr:
             mgr.run()
     assert 'OPERATOR_DISPATCH' not in os.environ
+
+
+def test_wrapped_ctx_exit_called_once_on_happy_path():
+    """Runtime.exec()'s __exit__ should fire exactly once when nothing raises."""
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with ctx(ctx.on.start(), State()) as mgr:
+        original_exit = mgr._wrapped_ctx.__exit__
+        call_count = 0
+
+        def counting_exit(*args: Any):
+            nonlocal call_count
+            call_count += 1
+            return original_exit(*args)
+
+        mgr._wrapped_ctx.__exit__ = counting_exit  # type: ignore[method-assign]
+        mgr.run()
+        assert call_count == 1
+    assert call_count == 1
 
 
 def test_app_name_and_unit_id_default():

@@ -127,13 +127,17 @@ class Manager(Generic[CharmType]):
         try:
             self.ops.run()
         except BaseException:
-            # The charm raised: still tear down Runtime.exec() so the env
-            # snapshot is restored and resources are released, then propagate.
+            # On failure, hand the in-flight exception to Runtime.exec()'s
+            # __exit__ so it can tear down the env snapshot, then propagate.
             self._exit_wrapped_ctx(*sys.exc_info())
             raise
-        else:
-            # wrap up Runtime.exec() so that we can gather the output state
-            self._exit_wrapped_ctx(None, None, None)
+        # On success we must pass (None, None, None) explicitly — not
+        # sys.exc_info(). When run() is invoked from Manager.__exit__ (the
+        # implicit-run path), sys.exc_info() reports the *outer* exception
+        # that triggered __exit__, and leaking that into Runtime.exec()'s
+        # happy-path teardown would mask the real result (e.g. ActionFailed
+        # raised on normal exit when the charm called evt.fail()).
+        self._exit_wrapped_ctx(None, None, None)
 
         assert self._ctx._output_state is not None
         return self._ctx._output_state
@@ -159,9 +163,9 @@ class Manager(Generic[CharmType]):
                 )
                 self.run()
         finally:
-            # Always tear down Runtime.exec(), even if the implicit run() above
-            # raised: leaving it open leaks the env snapshot (including
-            # OPERATOR_DISPATCH) into subsequent tests in the same process.
+            # Always tear down Runtime.exec(), even if run() raised. Leaving it
+            # open leaks the env snapshot (including OPERATOR_DISPATCH) into
+            # subsequent tests in the same process.
             self._exit_wrapped_ctx(exc_type, exc_val, exc_tb)
 
 
