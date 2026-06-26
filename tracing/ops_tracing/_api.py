@@ -16,15 +16,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import opentelemetry.trace
 import ops
 
 from ._buffer import Destination
-from ._cert_transfer_models import (
-    CertificateTransferRequires,
-)
 from ._tracing_models import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
@@ -33,6 +31,15 @@ from ._tracing_models import (
 
 logger = logging.getLogger(__name__)
 tracer = opentelemetry.trace.get_tracer('ops.tracing')
+
+
+def _read_certificates(relation: ops.Relation) -> set[str] | None:
+    """Parse the provider's ``certificates`` databag key; ``None`` if it doesn't parse."""
+    raw = relation.data[relation.app].get('certificates', '[]')
+    try:
+        return set(json.loads(raw))
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 class Tracing(ops.Object):
@@ -148,15 +155,9 @@ class Tracing(ops.Object):
                         f" 'certificate_transfer' is expected"
                     )
 
-                self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
-
-                for event in (
-                    self._certificate_transfer.on.certificate_set_updated,
-                    self._certificate_transfer.on.certificates_removed,
-                ):
+                ca_events = self.charm.on[ca_relation_name]
+                for event in (ca_events.relation_changed, ca_events.relation_broken):
                     self.framework.observe(event, self._reconcile)
-            else:
-                self._certificate_transfer = None
 
     def _reconcile(self, _event: ops.EventBase):
         dst = self._get_destination()
@@ -181,7 +182,7 @@ class Tracing(ops.Object):
             if url.startswith('http://'):
                 return Destination(url, None)
 
-            if not self._certificate_transfer:
+            if not self.ca_relation_name:
                 return Destination(url, self.ca_data)
 
             ca = self._get_ca()
@@ -207,13 +208,7 @@ class Tracing(ops.Object):
         if not ca_rel:
             return None
 
-        if not self._certificate_transfer:
-            return None
-
-        if not self._certificate_transfer.is_ready(ca_rel):
-            return None
-
-        ca_list = self._certificate_transfer.get_all_certificates(ca_rel.id)
+        ca_list = _read_certificates(ca_rel)
         if not ca_list:
             return None
 
