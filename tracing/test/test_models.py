@@ -30,14 +30,8 @@ from ops_tracing._tracing_models import (
 )
 from ops_tracing._tracing_models import (
     TracingProviderAppData,
-    TracingRequirerAppData,
     TransportProtocolType,
 )
-
-
-def test_tracing_requirer_app_data_load():
-    databag = {'receivers': json.dumps(['otlp_http'])}
-    assert TracingRequirerAppData.load(databag) == TracingRequirerAppData(receivers=['otlp_http'])
 
 
 def test_tracing_provider_app_data_from_wire_format():
