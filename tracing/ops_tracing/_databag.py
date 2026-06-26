@@ -1,14 +1,14 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Shared dataclass-based databag (de)serialisation helpers.
+"""Shared dataclass-based databag deserialisation helper.
 
-These replace the pydantic ``BaseModel`` ``DatabagModel`` round-trip that the
-upstream tracing and certificate-transfer charm libraries used to rely on, so
-that ``ops_tracing`` does not pull ``pydantic`` into its dependency tree. The
-two requirer-side dataclass modules (``_tracing_models``,
-``_cert_transfer_models``) import from here rather than carrying their own
-copies of these helpers.
+Replaces what pydantic's ``DatabagModel.load`` did for the requirer-side
+reads in ``_tracing_models`` and ``_cert_transfer_models``, recursively
+coercing nested dataclasses, enums, and set/frozenset field types that
+``ops.Relation.load``'s default ``json.loads`` decoder leaves as raw dicts
+and lists. ``ops.Relation.save`` covers the writing side directly, so no
+``dump`` helper lives here.
 """
 
 from __future__ import annotations
@@ -21,27 +21,6 @@ import typing
 from typing import Any, MutableMapping
 
 logger = logging.getLogger(__name__)
-
-
-def json_safe(value: Any) -> Any:
-    """Recursively convert a value into a JSON-serialisable form.
-
-    Replaces what pydantic's ``model_dump(mode="json")`` did for the field
-    types these libraries use: nested dataclasses become dicts, enums become
-    their value, and sets become *sorted* lists so the wire representation is
-    stable across hook invocations.
-    """
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {f.name: json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, (set, frozenset)):
-        return sorted(json_safe(v) for v in value)
-    if isinstance(value, (list, tuple)):
-        return [json_safe(v) for v in value]
-    if isinstance(value, dict):
-        return {k: json_safe(v) for k, v in value.items()}
-    return value
 
 
 def _coerce(tp: Any, value: Any, error_cls: type[Exception]) -> Any:
@@ -84,15 +63,6 @@ def _build(cls: Any, data: MutableMapping[str, Any], error_cls: type[Exception])
     return cls(**kwargs)
 
 
-def _is_default(field: dataclasses.Field[Any], value: Any) -> bool:
-    """Whether ``value`` equals the field's declared default."""
-    if field.default is not dataclasses.MISSING:
-        return value == field.default
-    if field.default_factory is not dataclasses.MISSING:
-        return value == field.default_factory()
-    return False
-
-
 def load(cls: Any, databag: MutableMapping[str, str], error_cls: type[Exception]) -> Any:
     """``DatabagModel.load`` replacement: per-key ``json.loads`` then validate.
 
@@ -114,23 +84,3 @@ def load(cls: Any, databag: MutableMapping[str, str], error_cls: type[Exception]
         msg = f'failed to validate databag: {databag}'
         logger.debug(msg, exc_info=True)
         raise error_cls(msg) from e
-
-
-def dump(
-    obj: Any,
-    databag: MutableMapping[str, str] | None = None,
-    clear: bool = True,
-) -> MutableMapping[str, str]:
-    """``DatabagModel.dump`` replacement: JSON-encode each non-default field."""
-    if clear and databag:
-        databag.clear()
-    if databag is None:
-        databag = {}
-    for field in dataclasses.fields(obj):
-        value = getattr(obj, field.name)
-        # Skip values equal to the field default (matches pydantic's
-        # ``exclude_defaults=True``).
-        if _is_default(field, value):
-            continue
-        databag[field.name] = json.dumps(json_safe(value))
-    return databag

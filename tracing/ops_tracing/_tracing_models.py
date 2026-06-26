@@ -176,12 +176,6 @@ class TracingRequirerAppData:
         """Load this model from a Juju databag."""
         return _databag.load(cls, databag, DataValidationError)
 
-    def dump(
-        self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True
-    ) -> MutableMapping[str, str]:
-        """Write the contents of this model to a Juju databag."""
-        return _databag.dump(self, databag, clear)
-
 
 class EndpointRemovedEvent(RelationBrokenEvent):
     """Event representing a change in one of the receiver endpoints."""
@@ -251,10 +245,9 @@ class TracingEndpointRequirer(Object):
 
         try:
             if self._charm.unit.is_leader():
+                data = TracingRequirerAppData(receivers=list(protocols))
                 for relation in self.relations:
-                    TracingRequirerAppData(
-                        receivers=list(protocols),
-                    ).dump(relation.data[self._charm.app])
+                    relation.save(data, self._charm.app)
 
         except ModelError as e:
             # args are bytes
