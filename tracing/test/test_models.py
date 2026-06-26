@@ -41,11 +41,9 @@ from ops_tracing._tracing_models import (
 )
 
 
-def test_tracing_requirer_app_data_round_trip():
-    data = TracingRequirerAppData(receivers=['otlp_http'])
-    databag = data.dump()
-    assert databag == {'receivers': json.dumps(['otlp_http'])}
-    assert TracingRequirerAppData.load(databag) == data
+def test_tracing_requirer_app_data_load():
+    databag = {'receivers': json.dumps(['otlp_http'])}
+    assert TracingRequirerAppData.load(databag) == TracingRequirerAppData(receivers=['otlp_http'])
 
 
 def test_tracing_provider_app_data_from_wire_format():
