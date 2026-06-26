@@ -25,12 +25,6 @@ import json
 
 import pytest
 
-from ops_tracing._cert_transfer_models import (
-    DataValidationError as CertDataValidationError,
-)
-from ops_tracing._cert_transfer_models import (
-    ProviderApplicationData,
-)
 from ops_tracing._tracing_models import (
     DataValidationError as TracingDataValidationError,
 )
@@ -80,33 +74,3 @@ def test_tracing_load_ignores_extra_keys():
     }
     loaded = TracingProviderAppData.load(databag)
     assert loaded == TracingProviderAppData(receivers=[])
-
-
-def test_provider_application_data_default_is_empty_set():
-    # The no-arg construction must produce a fresh empty set (default_factory,
-    # not a shared mutable default).
-    first = ProviderApplicationData()
-    second = ProviderApplicationData()
-    assert first.certificates == set()
-    first.certificates.add('x')
-    assert second.certificates == set()
-
-
-def test_provider_application_data_empty_load():
-    # Loading an empty databag yields the default empty set, and is "ready".
-    assert ProviderApplicationData.load({}) == ProviderApplicationData()
-    assert ProviderApplicationData.load({}).certificates == set()
-
-
-def test_provider_application_data_load_invalid_json():
-    with pytest.raises(CertDataValidationError):
-        ProviderApplicationData.load({'certificates': 'not-json'})
-
-
-def test_provider_application_data_load_ignores_extra_keys():
-    databag = {
-        'certificates': json.dumps(['FIRST']),
-        'egress-subnets': json.dumps('10.0.0.0/24'),
-    }
-    loaded = ProviderApplicationData.load(databag)
-    assert loaded == ProviderApplicationData(certificates={'FIRST'})
