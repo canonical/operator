@@ -3,7 +3,7 @@
 
 """Requirer-side models for the ``tracing`` relation interface.
 
-Schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing
+Schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/tracing/v2/
 """
 
 import dataclasses

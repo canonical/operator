@@ -3,7 +3,7 @@
 
 """Requirer-side models for the ``certificate_transfer`` relation interface.
 
-Schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/certificate_transfer
+Schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/certificate_transfer/v1/
 """
 
 import dataclasses
