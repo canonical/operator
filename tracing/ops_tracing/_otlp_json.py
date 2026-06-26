@@ -29,10 +29,6 @@ if TYPE_CHECKING:
     from opentelemetry.sdk.util.instrumentation import InstrumentationScope
     from opentelemetry.trace import Link
     from opentelemetry.trace.status import Status
-    from typing_extensions import TypeAlias
-
-    _LEAF_VALUE: TypeAlias = 'str | int | float | bool'  # TODO: confirm
-    _VALUE: TypeAlias = '_LEAF_VALUE | Sequence[_LEAF_VALUE]'
 
 
 __all__ = [
@@ -111,14 +107,14 @@ def _attributes(
     return rv
 
 
-def _ensure_homogeneous(value: Sequence[_LEAF_VALUE]) -> Sequence[_LEAF_VALUE]:
+def _ensure_homogeneous(value: Sequence[Any]) -> Sequence[Any]:
     # TODO: empty lists are allowed, aren't they?
     if len(types := {type(v) for v in value}) > 1:
         raise ValueError(f'Attribute value arrays must be homogeneous, got {types=}')
     return value
 
 
-def _value(v: _VALUE) -> dict[str, Any]:
+def _value(v: Any) -> dict[str, Any]:
     if isinstance(v, bool):
         return {'boolValue': bool(v)}
     if isinstance(v, int):
