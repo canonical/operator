@@ -1,32 +1,50 @@
+# Copyright 2025 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
+# file except in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under
+# the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+# ANY KIND, either express or implied. See the License for the specific language
+# governing permissions and limitations under the License.
+
+"""OTLP/JSON encoder for OpenTelemetry spans.
+
+Originally vendored from https://github.com/dimaqq/otlp-json.
+"""
+
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from opentelemetry._logs import LogRecord
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import Event, ReadableSpan
+    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
+    from opentelemetry.trace import Link
+    from opentelemetry.trace.status import Status
     from typing_extensions import TypeAlias
 
-    from opentelemetry.trace import Link
-    from opentelemetry._logs import LogRecord
-    from opentelemetry.sdk.trace import ReadableSpan, Event
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
-    from opentelemetry.trace.status import Status
-
-    _LEAF_VALUE: TypeAlias = "str | int | float | bool"  # TODO: confirm
-    _VALUE: TypeAlias = "_LEAF_VALUE | Sequence[_LEAF_VALUE]"
+    _LEAF_VALUE: TypeAlias = 'str | int | float | bool'  # TODO: confirm
+    _VALUE: TypeAlias = '_LEAF_VALUE | Sequence[_LEAF_VALUE]'
 
 
 __all__ = [
-    "CONTENT_TYPE",
-    "encode_spans",
+    'CONTENT_TYPE',
+    'encode_spans',
 ]
 
-CONTENT_TYPE = "application/json"
+CONTENT_TYPE = 'application/json'
 
 
 def encode_spans(spans: Sequence[ReadableSpan]) -> bytes:
+    """Encode a sequence of spans into an OTLP/JSON payload."""
     resource_cache: dict[Resource, tuple] = {}
     scope_cache: dict[InstrumentationScope, tuple] = {}
 
@@ -35,8 +53,8 @@ def encode_spans(spans: Sequence[ReadableSpan]) -> bytes:
         if r not in resource_cache:
             resource_cache[r] = (r.schema_url, tuple(r.attributes.items()))
         s = span.instrumentation_scope
-        assert s
-        assert s.attributes is not None
+        assert s  # noqa: S101  # OpenTelemetry SDK invariant: spans have a scope.
+        assert s.attributes is not None  # noqa: S101  # SDK invariant.
         if s not in scope_cache:
             scope_cache[s] = (
                 s.schema_url,
@@ -47,30 +65,26 @@ def encode_spans(spans: Sequence[ReadableSpan]) -> bytes:
         return (resource_cache[r], scope_cache[s])
 
     spans = sorted(spans, key=linearise)
-    rv = {"resourceSpans": []}
+    rv = {'resourceSpans': []}
     last_resource = last_scope = None
     for span in spans:
-        assert span.resource
-        assert span.instrumentation_scope
+        assert span.resource  # noqa: S101  # SDK invariant: spans have a resource.
+        assert span.instrumentation_scope  # noqa: S101  # SDK invariant.
         if span.resource != last_resource:
             last_resource = span.resource
             last_scope = None
-            rv["resourceSpans"].append(
-                {
-                    "resource": _resource(span.resource),
-                    "scopeSpans": [],
-                }
-            )
+            rv['resourceSpans'].append({
+                'resource': _resource(span.resource),
+                'scopeSpans': [],
+            })
         if span.instrumentation_scope != last_scope:
             last_scope = span.instrumentation_scope
-            rv["resourceSpans"][-1]["scopeSpans"].append(
-                {
-                    "scope": _scope(span.instrumentation_scope),
-                    "spans": [],
-                }
-            )
-        rv["resourceSpans"][-1]["scopeSpans"][-1]["spans"].append(_span(span))
-    return json.dumps(rv, separators=(",", ":")).encode("utf-8")
+            rv['resourceSpans'][-1]['scopeSpans'].append({
+                'scope': _scope(span.instrumentation_scope),
+                'spans': [],
+            })
+        rv['resourceSpans'][-1]['scopeSpans'][-1]['spans'].append(_span(span))
+    return json.dumps(rv, separators=(',', ':')).encode('utf-8')
 
 
 def _resource(resource: Resource):
@@ -81,18 +95,16 @@ def _resource(resource: Resource):
 def _attributes(
     thing: Resource | InstrumentationScope | ReadableSpan | Event | Link | LogRecord,
 ) -> dict[str, Any]:
-    rv = {"attributes": [], "dropped_attributes_count": 0}
+    rv = {'attributes': [], 'dropped_attributes_count': 0}
 
-    assert thing.attributes is not None
+    assert thing.attributes is not None  # noqa: S101  # SDK invariant.
     for k, v in thing.attributes.items():
-        try:
-            rv["attributes"].append({"key": k, "value": _value(v)})
-        except ValueError:
-            pass
+        with contextlib.suppress(ValueError):
+            rv['attributes'].append({'key': k, 'value': _value(v)})
 
-    rv["dropped_attributes_count"] = len(thing.attributes) - len(rv["attributes"])  # type: ignore
+    rv['dropped_attributes_count'] = len(thing.attributes) - len(rv['attributes'])  # type: ignore
 
-    for k in ("attributes", "dropped_attributes_count"):
+    for k in ('attributes', 'dropped_attributes_count'):
         if not rv[k]:
             del rv[k]
 
@@ -102,42 +114,42 @@ def _attributes(
 def _ensure_homogeneous(value: Sequence[_LEAF_VALUE]) -> Sequence[_LEAF_VALUE]:
     # TODO: empty lists are allowed, aren't they?
     if len(types := {type(v) for v in value}) > 1:
-        raise ValueError(f"Attribute value arrays must be homogeneous, got {types=}")
+        raise ValueError(f'Attribute value arrays must be homogeneous, got {types=}')
     return value
 
 
 def _value(v: _VALUE) -> dict[str, Any]:
     if isinstance(v, bool):
-        return {"boolValue": bool(v)}
+        return {'boolValue': bool(v)}
     if isinstance(v, int):
-        return {"intValue": str(int(v))}
+        return {'intValue': str(int(v))}
     if isinstance(v, float):
-        return {"doubleValue": float(v)}
+        return {'doubleValue': float(v)}
     if isinstance(v, bytes):
         # FIXME: not reached!
         # The API/SDK coerces bytes to str or drops the attribute, see comment in:
         # https://github.com/open-telemetry/opentelemetry-python/issues/4118
-        return {"bytesValue": bytes(v).hex()}
+        return {'bytesValue': bytes(v).hex()}
     if isinstance(v, str):
-        return {"stringValue": str(v)}
+        return {'stringValue': str(v)}
     if isinstance(v, Sequence):
-        return {"arrayValue": {"values": [_value(e) for e in _ensure_homogeneous(v)]}}
+        return {'arrayValue': {'values': [_value(e) for e in _ensure_homogeneous(v)]}}
     if isinstance(v, Mapping):
-        return {"kvlistValue": {"values": [{k: _value(vv) for k, vv in v.items()}]}}
+        return {'kvlistValue': {'values': [{k: _value(vv) for k, vv in v.items()}]}}
 
-    raise ValueError(f"Cannot convert attribute value of {type(v)=}")
+    raise ValueError(f'Cannot convert attribute value of {type(v)=}')
 
 
 def _scope(scope: InstrumentationScope):
     rv = {
-        "name": scope.name,
+        'name': scope.name,
         # Upstream code for attrs and schema has landed, but wasn't released yet
         # https://github.com/open-telemetry/opentelemetry-python/pull/4359
         # "schema_url": scope.schema_url,  # check if it may be null
         # **_attributes(scope),
     }
     if scope.version:
-        rv["version"] = scope.version
+        rv['version'] = scope.version
     return rv
 
 
@@ -146,54 +158,54 @@ _LOCAL = 0x100
 
 
 def _span(span: ReadableSpan):
-    assert span.context
+    assert span.context  # noqa: S101  # SDK invariant: ReadableSpan has a context.
     rv = {
-        "name": span.name,
-        "kind": span.kind.value or 1,  # unspecified -> internal
-        "traceId": _trace_id(span.context.trace_id),
-        "spanId": _span_id(span.context.span_id),
-        "flags": _REMOTE if span.parent and span.parent.is_remote else _LOCAL,
-        "startTimeUnixNano": str(span.start_time),
-        "endTimeUnixNano": str(span.end_time),  # can this be unset?
-        "status": _status(span.status),
+        'name': span.name,
+        'kind': span.kind.value or 1,  # unspecified -> internal
+        'traceId': _trace_id(span.context.trace_id),
+        'spanId': _span_id(span.context.span_id),
+        'flags': _REMOTE if span.parent and span.parent.is_remote else _LOCAL,
+        'startTimeUnixNano': str(span.start_time),
+        'endTimeUnixNano': str(span.end_time),  # can this be unset?
+        'status': _status(span.status),
         **_attributes(span),
     }
 
     if span.parent:
-        rv["parentSpanId"] = _span_id(span.parent.span_id)
+        rv['parentSpanId'] = _span_id(span.parent.span_id)
 
     # TODO: is this field really nullable?
     if span.events:
-        rv["events"] = [_event(e) for e in span.events]
+        rv['events'] = [_event(e) for e in span.events]
 
     return rv
 
 
 def _trace_id(trace_id: int) -> str:
     if not 0 <= trace_id < 2**128:
-        raise ValueError(f"The {trace_id=} is out of bounds")
-    return hex(trace_id)[2:].rjust(32, "0")
+        raise ValueError(f'The {trace_id=} is out of bounds')
+    return hex(trace_id)[2:].rjust(32, '0')
 
 
 def _span_id(span_id: int) -> str:
     if not 0 <= span_id < 2**64:
-        raise ValueError(f"The {span_id=} is out of bounds")
-    return hex(span_id)[2:].rjust(16, "0")
+        raise ValueError(f'The {span_id=} is out of bounds')
+    return hex(span_id)[2:].rjust(16, '0')
 
 
 def _status(status: Status) -> dict[str, Any]:
     rv = {}
     if status.status_code.value:
-        rv["code"] = status.status_code.value
+        rv['code'] = status.status_code.value
     if status.description:
-        rv["message"] = status.description
+        rv['message'] = status.description
     return rv
 
 
 def _event(event: Event) -> dict[str, Any]:
     rv = {
-        "name": event.name,
-        "timeUnixNano": str(event.timestamp),
+        'name': event.name,
+        'timeUnixNano': str(event.timestamp),
         **_attributes(event),
     }
     # TODO: any optional attributes?

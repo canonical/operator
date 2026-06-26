@@ -26,8 +26,8 @@ from typing import Sequence
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from ._buffer import Buffer
 from . import otlp_json
+from ._buffer import Buffer
 
 EXPORT_TIMEOUT: int | float = 1  # seconds
 """How much time to give OTLP span exporter to push traces to the backend."""
