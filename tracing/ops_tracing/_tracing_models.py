@@ -82,14 +82,7 @@ from typing import (
     Sequence,
 )
 
-from ops.charm import (
-    CharmBase,
-    CharmEvents,
-    RelationBrokenEvent,
-    RelationEvent,
-)
-from ops.framework import EventSource, Object
-from ops.model import ModelError, Relation
+import ops
 
 from . import _databag
 
@@ -177,29 +170,29 @@ class TracingRequirerAppData:
         return _databag.load(cls, databag, DataValidationError)
 
 
-class EndpointRemovedEvent(RelationBrokenEvent):
+class EndpointRemovedEvent(ops.RelationBrokenEvent):
     """Event representing a change in one of the receiver endpoints."""
 
 
-class EndpointChangedEvent(RelationEvent):
+class EndpointChangedEvent(ops.RelationEvent):
     """Event representing a change in one of the receiver endpoints."""
 
 
-class TracingEndpointRequirerEvents(CharmEvents):
+class TracingEndpointRequirerEvents(ops.CharmEvents):
     """TracingEndpointRequirer events."""
 
-    endpoint_changed = EventSource(EndpointChangedEvent)
-    endpoint_removed = EventSource(EndpointRemovedEvent)
+    endpoint_changed = ops.EventSource(EndpointChangedEvent)
+    endpoint_removed = ops.EventSource(EndpointRemovedEvent)
 
 
-class TracingEndpointRequirer(Object):
+class TracingEndpointRequirer(ops.Object):
     """A tracing endpoint for Tempo."""
 
     on = TracingEndpointRequirerEvents()  # type: ignore
 
     def __init__(
         self,
-        charm: CharmBase,
+        charm: ops.CharmBase,
         relation_name: str = 'tracing',
         protocols: Optional[List[ReceiverProtocol]] = None,
     ):
@@ -249,7 +242,7 @@ class TracingEndpointRequirer(Object):
                 for relation in self.relations:
                     relation.save(data, self._charm.app)
 
-        except ModelError as e:
+        except ops.ModelError as e:
             # args are bytes
             msg = e.args[0]
             if isinstance(msg, bytes) and msg.startswith(
@@ -263,12 +256,12 @@ class TracingEndpointRequirer(Object):
             raise
 
     @property
-    def relations(self) -> List[Relation]:
+    def relations(self) -> List[ops.Relation]:
         """The tracing relations associated with this endpoint."""
         return self._charm.model.relations[self._relation_name]
 
     @property
-    def _relation(self) -> Optional[Relation]:
+    def _relation(self) -> Optional[ops.Relation]:
         """If this wraps a single endpoint, the relation bound to it, if any."""
         if not self._is_single_endpoint:
             objname = type(self).__name__
@@ -281,7 +274,7 @@ class TracingEndpointRequirer(Object):
         relations = self.relations
         return relations[0] if relations else None
 
-    def is_ready(self, relation: Optional[Relation] = None):
+    def is_ready(self, relation: Optional[ops.Relation] = None):
         """Return whether this endpoint is ready."""
         relation = relation or self._relation
         if not relation:
@@ -310,13 +303,13 @@ class TracingEndpointRequirer(Object):
             return
         self.on.endpoint_changed.emit(relation)  # type: ignore
 
-    def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
+    def _on_tracing_relation_broken(self, event: ops.RelationBrokenEvent):
         """Notify the providers that the endpoint is broken."""
         relation = event.relation
         self.on.endpoint_removed.emit(relation)  # type: ignore
 
     def _get_all_endpoints(
-        self, relation: Optional[Relation] = None
+        self, relation: Optional[ops.Relation] = None
     ) -> Optional[TracingProviderAppData]:
         """Unmarshalled relation data."""
         relation = relation or self._relation
@@ -325,7 +318,7 @@ class TracingEndpointRequirer(Object):
         return TracingProviderAppData.load(relation.data[relation.app])  # type: ignore
 
     def _get_endpoint(
-        self, relation: Optional[Relation], protocol: ReceiverProtocol
+        self, relation: Optional[ops.Relation], protocol: ReceiverProtocol
     ) -> Optional[str]:
         app_data = self._get_all_endpoints(relation)
         if not app_data:
