@@ -76,16 +76,13 @@ import json
 import logging
 import typing
 from typing import (
-    TYPE_CHECKING,
     Any,
-    ClassVar,
     Dict,
     List,
     Literal,
     MutableMapping,
     Optional,
     Sequence,
-    Tuple,
 )
 
 from ops.charm import (
@@ -98,9 +95,6 @@ from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_RELATION_NAME = 'tracing'
-RELATION_INTERFACE_NAME = 'tracing'
 
 # Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
@@ -145,8 +139,6 @@ def _json_safe(value: Any) -> Any:
         return {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
     if isinstance(value, enum.Enum):
         return value.value
-    if isinstance(value, (set, frozenset)):
-        return sorted(_json_safe(v) for v in value)
     if isinstance(value, (list, tuple)):
         return [_json_safe(v) for v in value]
     if isinstance(value, dict):
@@ -161,8 +153,6 @@ def _coerce(tp: Any, value: Any) -> Any:
         args = typing.get_args(tp)
         if origin in (list, tuple):
             return [_coerce(args[0], v) for v in value]
-        if origin in (set, frozenset):
-            return {_coerce(args[0], v) for v in value}
         # Literal, Union, etc.: accept the value as-is.
         return value
     if isinstance(tp, type):
@@ -281,12 +271,6 @@ class TracingProviderAppData:
         """Load this model from a Juju databag."""
         return _databag_load(cls, databag)
 
-    def dump(
-        self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True
-    ) -> MutableMapping[str, str]:
-        """Write the contents of this model to a Juju databag."""
-        return _databag_dump(self, databag, clear)
-
 
 @dataclasses.dataclass(frozen=True)
 class TracingRequirerAppData:
@@ -307,58 +291,12 @@ class TracingRequirerAppData:
         return _databag_dump(self, databag, clear)
 
 
-class _AutoSnapshotEvent(RelationEvent):
-    __args__: ClassVar[Tuple[str, ...]] = ()
-    __optional_kwargs__: ClassVar[Dict[str, Any]] = {}
-
-    @classmethod
-    def __attrs__(cls):
-        return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
-
-    def __init__(self, handle, relation, *args, **kwargs):
-        super().__init__(handle, relation)
-
-        if not len(self.__args__) == len(args):
-            raise TypeError(f'expected {len(self.__args__)} args, got {len(args)}')
-
-        for attr, obj in zip(self.__args__, args):
-            setattr(self, attr, obj)
-        for attr, default in self.__optional_kwargs__.items():
-            obj = kwargs.get(attr, default)
-            setattr(self, attr, obj)
-
-    def snapshot(self) -> dict:
-        dct = super().snapshot()
-        for attr in self.__attrs__():
-            obj = getattr(self, attr)
-            try:
-                dct[attr] = obj
-            except ValueError as e:
-                raise ValueError(
-                    f'cannot automagically serialize {obj}: '
-                    'override this method and do it '
-                    'manually.'
-                ) from e
-
-        return dct
-
-    def restore(self, snapshot: dict) -> None:
-        super().restore(snapshot)
-        for attr, obj in snapshot.items():
-            setattr(self, attr, obj)
-
-
 class EndpointRemovedEvent(RelationBrokenEvent):
     """Event representing a change in one of the receiver endpoints."""
 
 
-class EndpointChangedEvent(_AutoSnapshotEvent):
+class EndpointChangedEvent(RelationEvent):
     """Event representing a change in one of the receiver endpoints."""
-
-    __args__ = ('_receivers',)
-
-    if TYPE_CHECKING:
-        _receivers = []  # type: List[dict]
 
 
 class TracingEndpointRequirerEvents(CharmEvents):
@@ -376,7 +314,7 @@ class TracingEndpointRequirer(Object):
     def __init__(
         self,
         charm: CharmBase,
-        relation_name: str = DEFAULT_RELATION_NAME,
+        relation_name: str = 'tracing',
         protocols: Optional[List[ReceiverProtocol]] = None,
     ):
         """Construct a tracing requirer for a Tempo charm.
@@ -411,13 +349,8 @@ class TracingEndpointRequirer(Object):
         if protocols:
             self.request_protocols(protocols)
 
-    def request_protocols(
-        self, protocols: Sequence[ReceiverProtocol], relation: Optional[Relation] = None
-    ):
+    def request_protocols(self, protocols: Sequence[ReceiverProtocol]):
         """Publish the list of protocols which the provider should activate."""
-        # todo: should we check if _is_single_endpoint and len(self.relations) > 1 and raise, here?
-        relations = [relation] if relation else self.relations
-
         if not protocols:
             # empty sequence
             raise ValueError(
@@ -426,7 +359,7 @@ class TracingEndpointRequirer(Object):
 
         try:
             if self._charm.unit.is_leader():
-                for relation in relations:
+                for relation in self.relations:
                     TracingRequirerAppData(
                         receivers=list(protocols),
                     ).dump(relation.data[self._charm.app])
@@ -490,16 +423,14 @@ class TracingEndpointRequirer(Object):
         if not self.is_ready(relation):
             self.on.endpoint_removed.emit(relation)  # type: ignore
             return
-
-        data = TracingProviderAppData.load(relation.data[relation.app])
-        self.on.endpoint_changed.emit(relation, [_json_safe(i) for i in data.receivers])  # type: ignore
+        self.on.endpoint_changed.emit(relation)  # type: ignore
 
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
         """Notify the providers that the endpoint is broken."""
         relation = event.relation
         self.on.endpoint_removed.emit(relation)  # type: ignore
 
-    def get_all_endpoints(
+    def _get_all_endpoints(
         self, relation: Optional[Relation] = None
     ) -> Optional[TracingProviderAppData]:
         """Unmarshalled relation data."""
@@ -511,7 +442,7 @@ class TracingEndpointRequirer(Object):
     def _get_endpoint(
         self, relation: Optional[Relation], protocol: ReceiverProtocol
     ) -> Optional[str]:
-        app_data = self.get_all_endpoints(relation)
+        app_data = self._get_all_endpoints(relation)
         if not app_data:
             return None
         receivers: List[Receiver] = list(
@@ -534,9 +465,7 @@ class TracingEndpointRequirer(Object):
         receiver = receivers[0]
         return receiver.url
 
-    def get_endpoint(
-        self, protocol: ReceiverProtocol, relation: Optional[Relation] = None
-    ) -> Optional[str]:
+    def get_endpoint(self, protocol: ReceiverProtocol) -> Optional[str]:
         """Receiver endpoint for the given protocol.
 
         It could happen that this function gets called before the provider publishes the
@@ -549,11 +478,10 @@ class TracingEndpointRequirer(Object):
             If the charm unit is the leader unit and attempts to obtain an endpoint for a
             protocol it did not request.
         """
-        endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
+        endpoint = self._get_endpoint(self._relation, protocol=protocol)
         if not endpoint:
-            requested_protocols = set()
-            relations = [relation] if relation else self.relations
-            for relation in relations:
+            requested_protocols: set[ReceiverProtocol] = set()
+            for relation in self.relations:
                 try:
                     databag = TracingRequirerAppData.load(relation.data[self._charm.app])
                 except DataValidationError:
@@ -562,7 +490,7 @@ class TracingEndpointRequirer(Object):
                 requested_protocols.update(databag.receivers)
 
             if protocol not in requested_protocols:
-                raise ProtocolNotRequestedError(protocol, relation)
+                raise ProtocolNotRequestedError(protocol)
 
             return None
         return endpoint
