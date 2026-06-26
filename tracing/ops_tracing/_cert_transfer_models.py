@@ -93,27 +93,6 @@ class DataValidationError(TLSCertificatesError):
     """Raised when data validation fails."""
 
 
-def _json_safe(value: Any) -> Any:
-    """Recursively convert a value into a JSON-serialisable form.
-
-    Replaces what pydantic's ``model_dump(mode="json")`` did for the field
-    types this library uses: nested dataclasses become dicts, enums become
-    their value, and sets become *sorted* lists so the wire representation is
-    stable across hook invocations.
-    """
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, (set, frozenset)):
-        return sorted(_json_safe(v) for v in value)
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
-    return value
-
-
 def _coerce(tp: Any, value: Any) -> Any:
     """Coerce a JSON-decoded ``value`` into the dataclass field type ``tp``."""
     origin = typing.get_origin(tp)
@@ -154,15 +133,6 @@ def _build(cls: Any, data: MutableMapping[str, Any]) -> Any:
     return cls(**kwargs)
 
 
-def _is_default(field: 'dataclasses.Field[Any]', value: Any) -> bool:
-    """Whether ``value`` equals the field's declared default."""
-    if field.default is not dataclasses.MISSING:
-        return value == field.default
-    if field.default_factory is not dataclasses.MISSING:
-        return value == field.default_factory()
-    return False
-
-
 def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
     """``DatabagModel.load`` replacement: per-key ``json.loads`` then validate.
 
@@ -186,26 +156,6 @@ def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
         raise DataValidationError(msg) from e
 
 
-def _databag_dump(
-    obj: Any,
-    databag: Optional[MutableMapping[str, str]] = None,
-    clear: bool = True,
-) -> MutableMapping[str, str]:
-    """``DatabagModel.dump`` replacement: JSON-encode each non-default field."""
-    if clear and databag:
-        databag.clear()
-    if databag is None:
-        databag = {}
-    for field in dataclasses.fields(obj):
-        value = getattr(obj, field.name)
-        # Skip values equal to the field default (matches pydantic's
-        # ``exclude_defaults=True``).
-        if _is_default(field, value):
-            continue
-        databag[field.name] = json.dumps(_json_safe(value))
-    return databag
-
-
 @dataclasses.dataclass(frozen=True)
 class ProviderApplicationData:
     """App databag model for the certificate-transfer provider."""
@@ -216,20 +166,6 @@ class ProviderApplicationData:
     def load(cls, databag: MutableMapping[str, str]) -> 'ProviderApplicationData':
         """Load this model from a Juju databag."""
         return _databag_load(cls, databag)
-
-    def dump(
-        self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True
-    ) -> MutableMapping[str, str]:
-        """Write the contents of this model to a Juju databag.
-
-        Args:
-            databag: The databag to write to.
-            clear: Whether to clear the databag before writing.
-
-        Returns:
-            MutableMapping: The databag.
-        """
-        return _databag_dump(self, databag, clear)
 
 
 class CertificatesAvailableEvent(EventBase):

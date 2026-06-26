@@ -35,8 +35,6 @@ from ops_tracing._tracing_models import (
     DataValidationError as TracingDataValidationError,
 )
 from ops_tracing._tracing_models import (
-    ProtocolType,
-    Receiver,
     TracingProviderAppData,
     TracingRequirerAppData,
     TransportProtocolType,
@@ -48,31 +46,6 @@ def test_tracing_requirer_app_data_round_trip():
     databag = data.dump()
     assert databag == {'receivers': json.dumps(['otlp_http'])}
     assert TracingRequirerAppData.load(databag) == data
-
-
-def test_tracing_provider_app_data_round_trip():
-    data = TracingProviderAppData(
-        receivers=[
-            Receiver(
-                url='http://tracing.example:4318/',
-                protocol=ProtocolType(name='otlp_http', type=TransportProtocolType.http),
-            ),
-            Receiver(
-                url='tempo.example:4317',
-                protocol=ProtocolType(name='otlp_grpc', type=TransportProtocolType.grpc),
-            ),
-        ]
-    )
-    databag = data.dump()
-    # Enums are serialised by value, nested dataclasses become nested dicts.
-    assert json.loads(databag['receivers']) == [
-        {'protocol': {'name': 'otlp_http', 'type': 'http'}, 'url': 'http://tracing.example:4318/'},
-        {'protocol': {'name': 'otlp_grpc', 'type': 'grpc'}, 'url': 'tempo.example:4317'},
-    ]
-    loaded = TracingProviderAppData.load(databag)
-    assert loaded == data
-    # The enum was coerced back from its string value.
-    assert loaded.receivers[0].protocol.type is TransportProtocolType.http
 
 
 def test_tracing_provider_app_data_from_wire_format():
@@ -111,14 +84,6 @@ def test_tracing_load_ignores_extra_keys():
     assert loaded == TracingProviderAppData(receivers=[])
 
 
-def test_provider_application_data_round_trip_populated():
-    data = ProviderApplicationData(certificates={'SECOND', 'FIRST'})
-    databag = data.dump()
-    # Sets serialise as a *sorted* list so the wire value is stable.
-    assert databag == {'certificates': json.dumps(['FIRST', 'SECOND'])}
-    assert ProviderApplicationData.load(databag) == data
-
-
 def test_provider_application_data_default_is_empty_set():
     # The no-arg construction must produce a fresh empty set (default_factory,
     # not a shared mutable default).
@@ -129,13 +94,9 @@ def test_provider_application_data_default_is_empty_set():
     assert second.certificates == set()
 
 
-def test_provider_application_data_empty_round_trip():
-    data = ProviderApplicationData()
-    databag = data.dump()
-    # The default empty set is excluded from the databag (exclude_defaults).
-    assert databag == {}
+def test_provider_application_data_empty_load():
     # Loading an empty databag yields the default empty set, and is "ready".
-    assert ProviderApplicationData.load({}) == data
+    assert ProviderApplicationData.load({}) == ProviderApplicationData()
     assert ProviderApplicationData.load({}).certificates == set()
 
 
