@@ -6,35 +6,22 @@
 Schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/certificate_transfer/v1/
 """
 
-import dataclasses
+import json
 import logging
-from typing import List, MutableMapping, Optional, Set
+from typing import List, Optional, Set
 
 import ops
-
-from . import _databag
 
 logger = logging.getLogger(__name__)
 
 
-class TLSCertificatesError(Exception):
-    """Base class for custom errors raised by this library."""
-
-
-class DataValidationError(TLSCertificatesError):
-    """Raised when data validation fails."""
-
-
-@dataclasses.dataclass(frozen=True)
-class ProviderApplicationData:
-    """App databag model for the certificate-transfer provider."""
-
-    certificates: Set[str] = dataclasses.field(default_factory=set)
-
-    @classmethod
-    def load(cls, databag: MutableMapping[str, str]) -> 'ProviderApplicationData':
-        """Load this model from a Juju databag."""
-        return _databag.load(cls, databag, DataValidationError)
+def _read_certificates(relation: ops.Relation) -> Optional[Set[str]]:
+    """Parse the provider's ``certificates`` databag key; ``None`` if it doesn't parse."""
+    raw = relation.data[relation.app].get('certificates', '[]')
+    try:
+        return set(json.loads(raw))
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 class CertificatesAvailableEvent(ops.EventBase):
@@ -156,29 +143,20 @@ class CertificateTransferRequires(ops.Object):
 
     def is_ready(self, relation: ops.Relation) -> bool:
         """Check if the relation is ready by checking that it has valid relation data."""
-        databag = relation.data[relation.app]
-        try:
-            ProviderApplicationData.load(databag)
-            return True
-        except DataValidationError:
-            return False
+        return _read_certificates(relation) is not None
 
     def _get_relation_data(self, relation: ops.Relation) -> Set[str]:
         """Get the given relation data."""
-        databag = relation.data[relation.app]
-        try:
-            return ProviderApplicationData.load(databag).certificates
-        except DataValidationError as e:
+        certificates = _read_certificates(relation)
+        if certificates is None:
             logger.error(
-                (
-                    'Error parsing relation databag: %s. ',
-                    'Make sure not to interact with the databags '
-                    'except using the public methods in the provider library '
-                    'and use version V1.',
-                ),
-                e.args,
+                'Failed to parse certificate-transfer databag for relation %s; '
+                'expected a JSON-encoded list of PEM certificates under the '
+                "'certificates' key. Make sure the provider uses the V1 library.",
+                relation,
             )
             return set()
+        return certificates
 
     def _get_relevant_relations(self, relation_id: Optional[int] = None) -> List[ops.Relation]:
         """Get the relevant relation if relation_id is given, all relations otherwise."""
