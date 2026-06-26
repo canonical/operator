@@ -1,73 +1,9 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# Forked from
-# https://github.com/canonical/tempo-coordinator-k8s-operator
-# (lib charms.tempo_coordinator_k8s.v0.tracing, LIBAPI 0 LIBPATCH 6).
-# De-pydantic'd for ops_tracing's use: the pydantic ``BaseModel`` databag
-# models (``DatabagModel``, ``ProtocolType``, ``Receiver``,
-# ``TracingProviderAppData``, ``TracingRequirerAppData``) have been replaced
-# with stdlib ``dataclasses`` plus manual validation, so that ops_tracing no
-# longer pulls ``pydantic`` (and ``pydantic-core`` / ``annotated-types`` /
-# ``typing-inspection``) into its dependency tree.
-#
-# Dropped vs upstream, since ops_tracing only acts as a requirer and never
-# re-publishes this copy:
-#  - the charmhub publish metadata (``LIBID`` / ``LIBAPI`` / ``LIBPATCH`` /
-#    ``PYDEPS``) and unused module constants (``RawReceiver``,
-#    ``BUILTIN_JUJU_KEYS``, ``receiver_protocol_to_transport_protocol``);
-#  - the whole provider side (``TracingEndpointProvider`` and its
-#    ``RequestEvent`` / ``BrokenEvent`` / ``TracingEndpointProviderEvents`` and
-#    ``NotReadyError``);
-#  - the relation-direction validation helper
-#    (``_validate_relation_by_interface_and_direction`` and its
-#    ``Relation*MismatchError`` / ``RelationNotFoundError`` exceptions) —
-#    ops_tracing already validates the relation's existence, role and interface
-#    before constructing the requirer;
-#  - the ``charm_tracing_config`` convenience wrapper;
-#  - the pydantic-v1 compatibility branches.
-#
-# Do NOT re-sync from upstream without re-applying this fork. See
-# ``non-roadmap/depydantic-charm-libs`` in the canonical-work-queue repo for
-# the audit of exactly what was dropped.
+"""Requirer-side models for the ``tracing`` relation interface.
 
-"""## Overview.
-
-This document explains how to integrate with the Tempo charm for the purpose of pushing traces to a
-tracing endpoint provided by Tempo.
-
-## Requirer Library Usage
-
-Charms seeking to push traces to Tempo, must do so using the `TracingEndpointRequirer`
-object from this charm library. For the simplest use cases, using the `TracingEndpointRequirer`
-object only requires instantiating it, typically in the constructor of your charm. The
-`TracingEndpointRequirer` constructor requires the name of the relation over which a tracing
-endpoint is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
- This relation must use the `tracing` interface.
- The `TracingEndpointRequirer` object may be instantiated as follows
-
-    from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        # ...
-        self.tracing = TracingEndpointRequirer(self,
-            protocols=['otlp_grpc', 'otlp_http', 'jaeger_http_thrift']
-        )
-        # ...
-
-Note that the first argument (`self`) to `TracingEndpointRequirer` is always a reference to the
-parent charm.
-
-Units of requirer charms obtain the tempo endpoint to which they will push their traces by calling
-`TracingEndpointRequirer.get_endpoint(protocol: str)`, where `protocol` is, for example:
-- `otlp_grpc`
-- `otlp_http`
-- `zipkin`
-- `tempo`
-
-If the `protocol` is not in the list of protocols that the charm requested at endpoint set-up time,
-the library will raise an error.
+Schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing
 """
 
 import dataclasses
