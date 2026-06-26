@@ -74,10 +74,7 @@ import dataclasses
 import enum
 import json
 import logging
-import typing
 from typing import (
-    Any,
-    Dict,
     List,
     Literal,
     MutableMapping,
@@ -93,6 +90,8 @@ from ops.charm import (
 )
 from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
+
+from . import _databag
 
 logger = logging.getLogger(__name__)
 
@@ -129,113 +128,6 @@ class AmbiguousRelationUsageError(TracingError):
     """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
 
 
-def _json_safe(value: Any) -> Any:
-    """Recursively convert a value into a JSON-serialisable form.
-
-    Replaces what pydantic's ``model_dump()`` did for the field types this
-    library uses: nested dataclasses become dicts and enums become their value.
-    """
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {f.name: _json_safe(getattr(value, f.name)) for f in dataclasses.fields(value)}
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
-    return value
-
-
-def _coerce(tp: Any, value: Any) -> Any:
-    """Coerce a JSON-decoded ``value`` into the dataclass field type ``tp``."""
-    origin = typing.get_origin(tp)
-    if origin is not None:
-        args = typing.get_args(tp)
-        if origin in (list, tuple):
-            return [_coerce(args[0], v) for v in value]
-        # Literal, Union, etc.: accept the value as-is.
-        return value
-    if isinstance(tp, type):
-        if dataclasses.is_dataclass(tp):
-            return _build(tp, value)
-        if issubclass(tp, enum.Enum):
-            return tp(value)
-    return value
-
-
-def _build(cls: Any, data: MutableMapping[str, Any]) -> Any:
-    """Construct a dataclass ``cls`` from a plain ``data`` mapping.
-
-    Required fields (those with no default) must be present; missing ones raise
-    ``DataValidationError`` (mirroring pydantic's required-field behaviour).
-    """
-    hints = typing.get_type_hints(cls)
-    kwargs: Dict[str, Any] = {}
-    for field in dataclasses.fields(cls):
-        if field.name not in data:
-            has_default = (
-                field.default is not dataclasses.MISSING
-                or field.default_factory is not dataclasses.MISSING
-            )
-            if has_default:
-                continue
-            raise DataValidationError(f'missing required field {field.name!r}')
-        kwargs[field.name] = _coerce(hints[field.name], data[field.name])
-    return cls(**kwargs)
-
-
-def _is_default(field: 'dataclasses.Field[Any]', value: Any) -> bool:
-    """Whether ``value`` equals the field's declared default."""
-    if field.default is not dataclasses.MISSING:
-        return value == field.default
-    if field.default_factory is not dataclasses.MISSING:
-        return value == field.default_factory()
-    return False
-
-
-def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
-    """``DatabagModel.load`` replacement: per-key ``json.loads`` then validate.
-
-    Each databag key holds a JSON-encoded value (Juju's relation-databag
-    convention). Unknown keys are ignored (matching pydantic's
-    ``extra="ignore"``).
-    """
-    field_names = {f.name for f in dataclasses.fields(cls)}
-    try:
-        data = {k: json.loads(v) for k, v in databag.items() if k in field_names}
-    except json.JSONDecodeError as e:
-        msg = f'invalid databag contents: expecting json. {databag}'
-        logger.error(msg)
-        raise DataValidationError(msg) from e
-
-    try:
-        return _build(cls, data)
-    except (TypeError, ValueError, KeyError) as e:
-        msg = f'failed to validate databag: {databag}'
-        logger.debug(msg, exc_info=True)
-        raise DataValidationError(msg) from e
-
-
-def _databag_dump(
-    obj: Any,
-    databag: Optional[MutableMapping[str, str]] = None,
-    clear: bool = True,
-) -> MutableMapping[str, str]:
-    """``DatabagModel.dump`` replacement: JSON-encode each non-default field."""
-    if clear and databag:
-        databag.clear()
-    if databag is None:
-        databag = {}
-    for field in dataclasses.fields(obj):
-        value = getattr(obj, field.name)
-        # Skip values equal to the field default (matches pydantic's
-        # ``exclude_defaults=True``).
-        if _is_default(field, value):
-            continue
-        databag[field.name] = json.dumps(_json_safe(value))
-    return databag
-
-
 @dataclasses.dataclass(frozen=True)
 class ProtocolType:
     """Protocol Type."""
@@ -269,7 +161,7 @@ class TracingProviderAppData:
     @classmethod
     def load(cls, databag: MutableMapping[str, str]) -> 'TracingProviderAppData':
         """Load this model from a Juju databag."""
-        return _databag_load(cls, databag)
+        return _databag.load(cls, databag, DataValidationError)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -282,13 +174,13 @@ class TracingRequirerAppData:
     @classmethod
     def load(cls, databag: MutableMapping[str, str]) -> 'TracingRequirerAppData':
         """Load this model from a Juju databag."""
-        return _databag_load(cls, databag)
+        return _databag.load(cls, databag, DataValidationError)
 
     def dump(
         self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True
     ) -> MutableMapping[str, str]:
         """Write the contents of this model to a Juju databag."""
-        return _databag_dump(self, databag, clear)
+        return _databag.dump(self, databag, clear)
 
 
 class EndpointRemovedEvent(RelationBrokenEvent):

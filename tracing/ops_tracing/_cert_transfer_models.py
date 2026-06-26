@@ -64,11 +64,8 @@ if __name__ == "__main__":
 """
 
 import dataclasses
-import enum
-import json
 import logging
-import typing
-from typing import Any, List, MutableMapping, Optional, Set
+from typing import List, MutableMapping, Optional, Set
 
 from ops import (
     CharmEvents,
@@ -82,6 +79,8 @@ from ops import (
 from ops.charm import CharmBase
 from ops.framework import Object
 
+from . import _databag
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,69 +92,6 @@ class DataValidationError(TLSCertificatesError):
     """Raised when data validation fails."""
 
 
-def _coerce(tp: Any, value: Any) -> Any:
-    """Coerce a JSON-decoded ``value`` into the dataclass field type ``tp``."""
-    origin = typing.get_origin(tp)
-    if origin is not None:
-        args = typing.get_args(tp)
-        if origin in (list, tuple):
-            return [_coerce(args[0], v) for v in value]
-        if origin in (set, frozenset):
-            return {_coerce(args[0], v) for v in value}
-        # Literal, Union, etc.: accept the value as-is.
-        return value
-    if isinstance(tp, type):
-        if dataclasses.is_dataclass(tp):
-            return _build(tp, value)
-        if issubclass(tp, enum.Enum):
-            return tp(value)
-    return value
-
-
-def _build(cls: Any, data: MutableMapping[str, Any]) -> Any:
-    """Construct a dataclass ``cls`` from a plain ``data`` mapping.
-
-    Required fields (those with no default) must be present; missing ones raise
-    ``DataValidationError`` (mirroring pydantic's required-field behaviour).
-    """
-    hints = typing.get_type_hints(cls)
-    kwargs: dict[str, Any] = {}
-    for field in dataclasses.fields(cls):
-        if field.name not in data:
-            has_default = (
-                field.default is not dataclasses.MISSING
-                or field.default_factory is not dataclasses.MISSING
-            )
-            if has_default:
-                continue
-            raise DataValidationError(f'missing required field {field.name!r}')
-        kwargs[field.name] = _coerce(hints[field.name], data[field.name])
-    return cls(**kwargs)
-
-
-def _databag_load(cls: Any, databag: MutableMapping[str, str]) -> Any:
-    """``DatabagModel.load`` replacement: per-key ``json.loads`` then validate.
-
-    Each databag key holds a JSON-encoded value (Juju's relation-databag
-    convention). Unknown keys are ignored (matching pydantic's
-    ``extra="ignore"``).
-    """
-    field_names = {f.name for f in dataclasses.fields(cls)}
-    try:
-        data = {k: json.loads(v) for k, v in databag.items() if k in field_names}
-    except json.JSONDecodeError as e:
-        msg = f'invalid databag contents: expecting json. {databag}'
-        logger.error(msg)
-        raise DataValidationError(msg) from e
-
-    try:
-        return _build(cls, data)
-    except (TypeError, ValueError, KeyError) as e:
-        msg = f'failed to validate databag: {databag}'
-        logger.debug(msg, exc_info=True)
-        raise DataValidationError(msg) from e
-
-
 @dataclasses.dataclass(frozen=True)
 class ProviderApplicationData:
     """App databag model for the certificate-transfer provider."""
@@ -165,7 +101,7 @@ class ProviderApplicationData:
     @classmethod
     def load(cls, databag: MutableMapping[str, str]) -> 'ProviderApplicationData':
         """Load this model from a Juju databag."""
-        return _databag_load(cls, databag)
+        return _databag.load(cls, databag, DataValidationError)
 
 
 class CertificatesAvailableEvent(EventBase):
