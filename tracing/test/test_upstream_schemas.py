@@ -220,9 +220,10 @@ def test_cert_transfer_provider_keys(cert_transfer_upstream: dict[str, typing.An
     # If upstream renames it, our ``_read_certificates`` would silently return
     # an empty set — this test guards against that drift.
     assert 'certificates' in upstream, f'upstream lost `certificates`: {upstream}'
-    assert upstream['certificates'] in (('set', 'str'), ('list', 'str')), (
-        f'upstream `certificates` shape changed: {upstream["certificates"]!r}'
-    )
+    assert upstream['certificates'] in (
+        ('set', 'str'),
+        ('list', 'str'),
+    ), f'upstream `certificates` shape changed: {upstream["certificates"]!r}'
     # ``version`` is upstream-optional metadata; we deliberately ignore it.
     # If a NEW required field appears, fail loudly so we can decide whether to
     # adopt it.

@@ -14,9 +14,9 @@
 
 """Conformance tests for the ``certificate_transfer`` v1 interface.
 
-These tests pin our requirer-side behaviour (the ``ca_relation_name`` branch of
-the ``Tracing`` class in ``ops_tracing/_api.py``) against the behaviour the
-upstream charm relation interface documents at:
+These tests pin our requirer-side behaviour (the CA branch of the ``Tracing``
+class and ``_read_certificates`` in ``ops_tracing/_api.py``) against the
+behaviour the upstream charm relation interface documents at:
 
     https://canonical.com/juju/docs/charmlibs/reference/interfaces/certificate_transfer/v1/
 
