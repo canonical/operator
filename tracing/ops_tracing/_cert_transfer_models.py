@@ -29,8 +29,7 @@ Example:
 ```python
 import logging
 
-from ops.charm import CharmBase
-from ops.main import main
+import ops
 
 from lib.charms.certificate_transfer_interface.v1.certificate_transfer import (
     CertificatesAvailableEvent,
@@ -39,7 +38,7 @@ from lib.charms.certificate_transfer_interface.v1.certificate_transfer import (
 )
 
 
-class DummyCertificateTransferRequirerCharm(CharmBase):
+class DummyCertificateTransferRequirerCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.certificate_transfer = CertificateTransferRequires(self, "certificates")
@@ -59,7 +58,7 @@ class DummyCertificateTransferRequirerCharm(CharmBase):
 
 
 if __name__ == "__main__":
-    main(DummyCertificateTransferRequirerCharm)
+    ops.main(DummyCertificateTransferRequirerCharm)
 ```
 """
 
@@ -67,17 +66,7 @@ import dataclasses
 import logging
 from typing import List, MutableMapping, Optional, Set
 
-from ops import (
-    CharmEvents,
-    EventBase,
-    EventSource,
-    Handle,
-    Relation,
-    RelationBrokenEvent,
-    RelationChangedEvent,
-)
-from ops.charm import CharmBase
-from ops.framework import Object
+import ops
 
 from . import _databag
 
@@ -104,12 +93,12 @@ class ProviderApplicationData:
         return _databag.load(cls, databag, DataValidationError)
 
 
-class CertificatesAvailableEvent(EventBase):
+class CertificatesAvailableEvent(ops.EventBase):
     """Charm Event triggered when the set of provided certificates is updated."""
 
     def __init__(
         self,
-        handle: Handle,
+        handle: ops.Handle,
         certificates: Set[str],
         relation_id: int,
     ):
@@ -130,10 +119,10 @@ class CertificatesAvailableEvent(EventBase):
         self.relation_id = snapshot['relation_id']
 
 
-class CertificatesRemovedEvent(EventBase):
+class CertificatesRemovedEvent(ops.EventBase):
     """Charm Event triggered when the set of provided certificates is removed."""
 
-    def __init__(self, handle: Handle, relation_id: int):
+    def __init__(self, handle: ops.Handle, relation_id: int):
         super().__init__(handle)
         self.relation_id = relation_id
 
@@ -146,21 +135,21 @@ class CertificatesRemovedEvent(EventBase):
         self.relation_id = snapshot['relation_id']
 
 
-class CertificateTransferRequirerCharmEvents(CharmEvents):
+class CertificateTransferRequirerCharmEvents(ops.CharmEvents):
     """List of events that the Certificate Transfer requirer charm can leverage."""
 
-    certificate_set_updated = EventSource(CertificatesAvailableEvent)
-    certificates_removed = EventSource(CertificatesRemovedEvent)
+    certificate_set_updated = ops.EventSource(CertificatesAvailableEvent)
+    certificates_removed = ops.EventSource(CertificatesRemovedEvent)
 
 
-class CertificateTransferRequires(Object):
+class CertificateTransferRequires(ops.Object):
     """Certificate transfer requirer class to be instantiated by charms expecting certificates."""
 
     on = CertificateTransferRequirerCharmEvents()  # type: ignore
 
     def __init__(
         self,
-        charm: CharmBase,
+        charm: ops.CharmBase,
         relationship_name: str,
     ):
         """Observe events related to the relation.
@@ -179,7 +168,7 @@ class CertificateTransferRequires(Object):
             charm.on[relationship_name].relation_broken, self._on_relation_broken
         )
 
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_relation_changed(self, event: ops.RelationChangedEvent) -> None:
         """Emit certificate set updated event.
 
         Args:
@@ -194,7 +183,7 @@ class CertificateTransferRequires(Object):
             relation_id=event.relation.id,
         )
 
-    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
+    def _on_relation_broken(self, event: ops.RelationBrokenEvent) -> None:
         """Handle relation broken event.
 
         Args:
@@ -221,7 +210,7 @@ class CertificateTransferRequires(Object):
             result = result.union(data)
         return result
 
-    def is_ready(self, relation: Relation) -> bool:
+    def is_ready(self, relation: ops.Relation) -> bool:
         """Check if the relation is ready by checking that it has valid relation data."""
         databag = relation.data[relation.app]
         try:
@@ -230,7 +219,7 @@ class CertificateTransferRequires(Object):
         except DataValidationError:
             return False
 
-    def _get_relation_data(self, relation: Relation) -> Set[str]:
+    def _get_relation_data(self, relation: ops.Relation) -> Set[str]:
         """Get the given relation data."""
         databag = relation.data[relation.app]
         try:
@@ -247,7 +236,7 @@ class CertificateTransferRequires(Object):
             )
             return set()
 
-    def _get_relevant_relations(self, relation_id: Optional[int] = None) -> List[Relation]:
+    def _get_relevant_relations(self, relation_id: Optional[int] = None) -> List[ops.Relation]:
         """Get the relevant relation if relation_id is given, all relations otherwise."""
         if relation_id is not None and (
             relation := self.model.get_relation(
