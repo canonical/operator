@@ -1,65 +1,9 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# Forked from
-# https://github.com/canonical/certificate-transfer-interface
-# (lib charms.certificate_transfer_interface.v1.certificate_transfer, LIBAPI 1
-# LIBPATCH 2). De-pydantic'd for ops_tracing's use: the pydantic ``BaseModel``
-# databag models have been replaced with stdlib ``dataclasses`` plus manual
-# validation, so that ops_tracing no longer pulls ``pydantic`` (and
-# ``pydantic-core`` / ``annotated-types`` / ``typing-inspection``) into its
-# dependency tree. The provider-side surface (``CertificateTransferProvides``)
-# and the charmhub publish metadata (``LIBID`` / ``LIBAPI`` / ``LIBPATCH`` /
-# ``PYDEPS``) have been dropped, since ops_tracing only acts as a requirer and
-# never re-publishes this copy. Do NOT re-sync from upstream without
-# re-applying this fork. See ``non-roadmap/depydantic-charm-libs`` in the
-# canonical-work-queue repo for the audit of exactly what was dropped.
+"""Requirer-side models for the ``certificate_transfer`` relation interface.
 
-"""Library for the certificate_transfer relation (requirer side only).
-
-This private copy contains just the ``CertificateTransferRequires`` class and
-the data model it needs, for handling the requirer side of the
-certificate-transfer interface.
-
-### Requirer charm
-The requirer charm is the charm requiring certificates from another charm that
-provides them.
-
-Example:
-```python
-import logging
-
-import ops
-
-from lib.charms.certificate_transfer_interface.v1.certificate_transfer import (
-    CertificatesAvailableEvent,
-    CertificatesRemovedEvent,
-    CertificateTransferRequires,
-)
-
-
-class DummyCertificateTransferRequirerCharm(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.certificate_transfer = CertificateTransferRequires(self, "certificates")
-        self.framework.observe(
-            self.certificate_transfer.on.certificate_set_updated, self._on_certificates_available
-        )
-        self.framework.observe(
-            self.certificate_transfer.on.certificates_removed, self._on_certificates_removed
-        )
-
-    def _on_certificates_available(self, event: CertificatesAvailableEvent):
-        logging.info(event.certificates)
-        logging.info(event.relation_id)
-
-    def _on_certificates_removed(self, event: CertificatesRemovedEvent):
-        logging.info(event.relation_id)
-
-
-if __name__ == "__main__":
-    ops.main(DummyCertificateTransferRequirerCharm)
-```
+Schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/certificate_transfer
 """
 
 import dataclasses

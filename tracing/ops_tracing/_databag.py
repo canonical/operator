@@ -1,14 +1,10 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Shared dataclass-based databag deserialisation helper.
+"""Databag load helper that recursively coerces nested dataclasses and enums.
 
-Replaces what pydantic's ``DatabagModel.load`` did for the requirer-side
-reads in ``_tracing_models`` and ``_cert_transfer_models``, recursively
-coercing nested dataclasses, enums, and set/frozenset field types that
-``ops.Relation.load``'s default ``json.loads`` decoder leaves as raw dicts
-and lists. ``ops.Relation.save`` covers the writing side directly, so no
-``dump`` helper lives here.
+``ops.Relation.load``'s default decoder hands back raw dicts/strings for
+nested fields; writes go through ``ops.Relation.save`` directly.
 """
 
 from __future__ import annotations
@@ -43,11 +39,7 @@ def _coerce(tp: Any, value: Any, error_cls: type[Exception]) -> Any:
 
 
 def _build(cls: Any, data: MutableMapping[str, Any], error_cls: type[Exception]) -> Any:
-    """Construct a dataclass ``cls`` from a plain ``data`` mapping.
-
-    Required fields (those with no default) must be present; missing ones raise
-    ``error_cls`` (mirroring pydantic's required-field behaviour).
-    """
+    """Construct a dataclass ``cls`` from ``data``, raising ``error_cls`` on missing fields."""
     hints = typing.get_type_hints(cls)
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
@@ -64,12 +56,7 @@ def _build(cls: Any, data: MutableMapping[str, Any], error_cls: type[Exception])
 
 
 def load(cls: Any, databag: MutableMapping[str, str], error_cls: type[Exception]) -> Any:
-    """``DatabagModel.load`` replacement: per-key ``json.loads`` then validate.
-
-    Each databag key holds a JSON-encoded value (Juju's relation-databag
-    convention). Unknown keys are ignored (matching pydantic's
-    ``extra="ignore"``).
-    """
+    """JSON-decode each known databag key and build ``cls``; unknown keys are ignored."""
     field_names = {f.name for f in dataclasses.fields(cls)}
     try:
         data = {k: json.loads(v) for k, v in databag.items() if k in field_names}
