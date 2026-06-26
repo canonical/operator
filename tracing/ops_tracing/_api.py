@@ -24,9 +24,10 @@ import ops
 
 from ._buffer import Destination
 from ._tracing_models import (
-    AmbiguousRelationUsageError,
-    ProtocolNotRequestedError,
-    TracingEndpointRequirer,
+    DataValidationError,
+    ReceiverProtocol,
+    TracingProviderAppData,
+    TracingRequirerAppData,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,39 @@ def _read_certificates(relation: ops.Relation) -> set[str] | None:
         return set(json.loads(raw))
     except (json.JSONDecodeError, TypeError):
         return None
+
+
+def _read_endpoint(relation: ops.Relation, protocol: ReceiverProtocol) -> str | None:
+    """Return the URL the provider advertises for ``protocol`` on this relation."""
+    try:
+        data = TracingProviderAppData.load(relation.data[relation.app])
+    except DataValidationError:
+        logger.info('failed validating tracing provider databag for %s', relation)
+        return None
+    for receiver in data.receivers:
+        if receiver.protocol.name == protocol:
+            return receiver.url
+    return None
+
+
+def _request_protocols(
+    charm: ops.CharmBase, relation_name: str, protocols: list[ReceiverProtocol]
+) -> None:
+    """Publish ``protocols`` to every relation on ``relation_name`` (leader only)."""
+    if not charm.unit.is_leader():
+        return
+    data = TracingRequirerAppData(receivers=protocols)
+    try:
+        for relation in charm.model.relations[relation_name]:
+            relation.save(data, charm.app)
+    except ops.ModelError as e:
+        msg = e.args[0] if e.args else b''
+        if isinstance(msg, bytes) and msg.startswith(
+            b'ERROR cannot read relation application settings: permission denied'
+        ):
+            logger.error('cannot request tracing protocols on %s: %s', relation_name, e)
+            return
+        raise
 
 
 class Tracing(ops.Object):
@@ -126,17 +160,14 @@ class Tracing(ops.Object):
                     f' expected'
                 )
 
-            self._tracing = TracingEndpointRequirer(
-                self.charm,
-                tracing_relation_name,
-                protocols=['otlp_http'],
-            )
+            _request_protocols(self.charm, tracing_relation_name, ['otlp_http'])
 
+            tracing_events = self.charm.on[tracing_relation_name]
             for event in (
                 self.charm.on.start,
                 self.charm.on.upgrade_charm,
-                self._tracing.on.endpoint_changed,
-                self._tracing.on.endpoint_removed,
+                tracing_events.relation_changed,
+                tracing_events.relation_broken,
             ):
                 self.framework.observe(event, self._reconcile)
 
@@ -165,40 +196,35 @@ class Tracing(ops.Object):
 
     def _get_destination(self) -> Destination:
         try:
-            if not self._tracing.is_ready():
-                return Destination(None, None)
-
-            base_url = self._tracing.get_endpoint('otlp_http')
-
-            if not base_url:
-                return Destination(None, None)
-
-            if not base_url.startswith(('http://', 'https://')):
-                logger.warning('The base_url=%s must be an HTTP or an HTTPS URL', base_url)
-                return Destination(None, None)
-
-            url = f'{base_url.rstrip("/")}/v1/traces'
-
-            if url.startswith('http://'):
-                return Destination(url, None)
-
-            if not self.ca_relation_name:
-                return Destination(url, self.ca_data)
-
-            ca = self._get_ca()
-            if not ca:
-                return Destination(None, None)
-
-            return Destination(url, ca)
-        except (
-            ops.TooManyRelatedAppsError,
-            AmbiguousRelationUsageError,
-            ProtocolNotRequestedError,
-        ):
-            # These should not really happen, as we've set up a single relation
-            # and requested the protocol explicitly.
-            logger.exception('Error getting the tracing destination')
+            relation = self.model.get_relation(self.tracing_relation_name)
+        except ops.TooManyRelatedAppsError:
+            # Shouldn't happen — the docs require limit=1 on the tracing relation.
+            logger.exception('multiple tracing relations on %s', self.tracing_relation_name)
             return Destination(None, None)
+        if not relation:
+            return Destination(None, None)
+
+        base_url = _read_endpoint(relation, 'otlp_http')
+        if not base_url:
+            return Destination(None, None)
+
+        if not base_url.startswith(('http://', 'https://')):
+            logger.warning('The base_url=%s must be an HTTP or an HTTPS URL', base_url)
+            return Destination(None, None)
+
+        url = f'{base_url.rstrip("/")}/v1/traces'
+
+        if url.startswith('http://'):
+            return Destination(url, None)
+
+        if not self.ca_relation_name:
+            return Destination(url, self.ca_data)
+
+        ca = self._get_ca()
+        if not ca:
+            return Destination(None, None)
+
+        return Destination(url, ca)
 
     def _get_ca(self) -> str | None:
         if not self.ca_relation_name:
