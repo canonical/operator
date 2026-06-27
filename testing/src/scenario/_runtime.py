@@ -89,7 +89,10 @@ class Runtime(Generic[CharmType]):
         if self._principal_unit is not None:
             env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
-        if event._is_action_event and (action := event.action):
+        if event._is_action_event:
+            # Enforced by the consistency checker, but for type checkers:
+            action = event.action
+            assert action is not None
             # Juju dispatches actions as `actions/<action-name>` (no
             # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
             env.update(

@@ -2368,7 +2368,7 @@ class _EventPath(str):
         python_name: str
         owner_path: list[str]
         python_suffix: str
-        prefix: str
+        juju_prefix: str
         type: _EventType
 
     def __new__(cls, string: str):
@@ -2388,7 +2388,7 @@ class _EventPath(str):
         # name is preserved verbatim (e.g. ``foo-bar`` in
         # ``foo-bar_pebble_ready``): Juju hook names keep the metadata name
         # exactly as declared, and only the suffix is known to be hyphenated.
-        instance.prefix = raw_name[: len(raw_name) - len(instance.python_suffix)]
+        instance.juju_prefix = raw_name[: len(raw_name) - len(instance.python_suffix)]
 
         return instance
 
@@ -2498,7 +2498,7 @@ class _Event:  # type: ignore
         object.__setattr__(
             self,
             '_juju_name',
-            f'{path.prefix}{path.python_suffix.replace("_", "-")}',
+            f'{path.juju_prefix}{path.python_suffix.replace("_", "-")}',
         )
 
     @property
@@ -2518,7 +2518,7 @@ class _Event:  # type: ignore
          - "foo_bar"=prefix (name of a relation, hyphens translated to underscores),
          - "_relation_changed"=suffix (relation event)
 
-        The verbatim endpoint name is preserved in ``self._path.prefix``.
+        The verbatim endpoint name is preserved in ``self._path.juju_prefix``.
         """
         return self._path.python_name
 

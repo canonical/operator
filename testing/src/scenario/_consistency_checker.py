@@ -206,9 +206,9 @@ def _check_relation_event(
             'cannot construct a relation event without the relation instance. Please pass one.',
         )
     else:
-        if event._path.prefix != event.relation.endpoint:
+        if event._path.juju_prefix != event.relation.endpoint:
             errors.append(
-                f'relation event prefix {event._path.prefix!r} does not match the relation '
+                f'relation event prefix {event._path.juju_prefix!r} does not match the relation '
                 f'endpoint name {event.relation.endpoint!r} (the endpoint name must appear '
                 'exactly as declared in the charm metadata).',
             )
@@ -232,9 +232,9 @@ def _check_workload_event(
             'cannot construct a workload event without the container instance. Please pass one.',
         )
     else:
-        if event._path.prefix != event.container.name:
+        if event._path.juju_prefix != event.container.name:
             errors.append(
-                f'workload event prefix {event._path.prefix!r} does not match the container '
+                f'workload event prefix {event._path.juju_prefix!r} does not match the container '
                 f'name {event.container.name!r} (the container name must appear exactly '
                 f'as declared in the charm metadata).',
             )
@@ -270,9 +270,9 @@ def _check_action_event(
         )
         return
 
-    elif event._path.prefix != action.name:
+    elif event._path.juju_prefix != action.name:
         errors.append(
-            f'action event prefix {event._path.prefix!r} does not match the action '
+            f'action event prefix {event._path.juju_prefix!r} does not match the action '
             f'name {action.name!r}.',
         )
     if action.name not in (charm_spec.actions or ()):
@@ -299,9 +299,9 @@ def _check_storage_event(
         errors.append(
             'cannot construct a storage event without the Storage instance. Please pass one.',
         )
-    elif event._path.prefix != storage.name:
+    elif event._path.juju_prefix != storage.name:
         errors.append(
-            f'storage event prefix {event._path.prefix!r} does not match the storage '
+            f'storage event prefix {event._path.juju_prefix!r} does not match the storage '
             f'name {storage.name!r} (the storage name must appear exactly as declared '
             f'in the charm metadata).',
         )
@@ -664,7 +664,7 @@ def check_containers_consistency(
     # - you're processing a Pebble event and that container is not in state.containers or
     #   meta.containers
     if event._is_workload_event:
-        evt_container_name = event._path.prefix
+        evt_container_name = event._path.juju_prefix
         if evt_container_name not in meta_containers:
             errors.append(
                 f'the event being processed concerns container {evt_container_name!r}, but a '

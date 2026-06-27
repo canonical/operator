@@ -56,7 +56,7 @@ def test_run_action():
 
     assert isinstance(e, _Event)
     assert e.name == 'do_foo_action'
-    assert e._path.prefix == 'do-foo'
+    assert e._path.juju_prefix == 'do-foo'
     assert s is state
     assert e.action is not None
     assert e.action.id == expected_id
