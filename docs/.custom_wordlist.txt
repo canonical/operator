@@ -21,6 +21,7 @@ lightkube
 liveness
 manpages
 misconfiguration
+mitigations
 pathops
 Parca
 protobuf
