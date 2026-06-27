@@ -24,6 +24,7 @@ import ops
 
 from ._buffer import Destination
 from ._tracing_models import (
+    CertificateTransferProviderAppData,
     ReceiverProtocol,
     TracingProviderAppData,
     TracingRequirerAppData,
@@ -35,10 +36,9 @@ tracer = opentelemetry.trace.get_tracer('ops.tracing')
 
 def _read_certificates(relation: ops.Relation) -> set[str] | None:
     """Parse the provider's ``certificates`` databag key; ``None`` if it doesn't parse."""
-    raw = relation.data[relation.app].get('certificates', '[]')
     try:
-        return set(json.loads(raw))
-    except (json.JSONDecodeError, TypeError):
+        return relation.load(CertificateTransferProviderAppData, relation.app).certificates
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None
 
 
