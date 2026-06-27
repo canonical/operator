@@ -34,6 +34,19 @@ def juju() -> Generator[jubilant.Juju]:
         print(juju.debug_log())
 
 
+def _xfail_on_caas_juju4(juju: jubilant.Juju, reason: str = '') -> None:
+    """xfail the current test on Kubernetes substrates with Juju 4.x.
+
+    Two known upstream bugs make several tracing- and secrets-related tests
+    unrunnable in that matrix slot: actions queued against the test-secrets
+    charm are never dispatched, and the minio Service patch races with the
+    `caasfirewaller` worker.
+    """
+    status = juju.status()
+    if status.model.type == 'caas' and status.model.version.startswith('4.'):
+        pytest.xfail(reason or 'known Juju 4 + k8s bug; see PR for issue links')
+
+
 @pytest.fixture
 def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""

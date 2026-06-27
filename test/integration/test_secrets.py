@@ -22,6 +22,7 @@ import jubilant
 import pytest
 
 from test.charms.test_secrets.src.charm import Result
+from test.integration.conftest import _xfail_on_caas_juju4
 
 _JUJU4_COMMIT_BUG = (
     'Juju 4.0 uniter commit-phase regression breaks secret-add (juju/juju#22523, juju/juju#22524)'
@@ -56,11 +57,9 @@ def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
-# Juju 4's `juju run` defaults `--wait` to 60s (Juju 3 waited indefinitely), and
-# action dispatch on k8s exceeds that, so every action call below sets `wait=`
-# explicitly.
 def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
-    rv = juju.run(leader, 'add-secret', wait=300)
+    _xfail_on_caas_juju4(juju)
+    rv = juju.run(leader, 'add-secret')
     result = cast('Result', rv.results)
 
     secrets = juju.secrets()
@@ -85,7 +84,8 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     ],
 )
 def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
-    rv = juju.run(leader, 'add-with-meta', params={'fields': fields}, wait=300)
+    _xfail_on_caas_juju4(juju)
+    rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
     result = cast('Result', rv.results)
 
     assert 'secretid' in result
@@ -144,7 +144,8 @@ def test_set_secret(
     else:
         params = {'flow': flow, 'secretlabel': 'thelabel'}
 
-    rv = juju.run(leader, 'set-secret-flow', params=params, wait=300)
+    _xfail_on_caas_juju4(juju)
+    rv = juju.run(leader, 'set-secret-flow', params=params)
     result = cast('Result', rv.results)
 
     assert 'secretid' in result

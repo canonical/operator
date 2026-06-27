@@ -24,6 +24,8 @@ from typing import Any
 import httpx
 import jubilant
 
+from test.integration.conftest import _xfail_on_caas_juju4
+
 
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The traced charm is connected to the trace data collector directly."""
@@ -55,6 +57,10 @@ def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju:
 
 def test_with_tls(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The trace data collector has TLS enabled, connection is direct."""
+    _xfail_on_caas_juju4(
+        tracing_juju,
+        'k8s + Juju 4: minio Service patch races with caasfirewaller worker',
+    )
     charm_path = build_tracing_charm()
     tracing_juju.deploy('self-signed-certificates')
     tracing_juju.integrate('tempo:certificates', 'self-signed-certificates')
