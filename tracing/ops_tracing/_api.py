@@ -24,7 +24,6 @@ import ops
 
 from ._buffer import Destination
 from ._tracing_models import (
-    DataValidationError,
     ReceiverProtocol,
     TracingProviderAppData,
     TracingRequirerAppData,
@@ -46,9 +45,9 @@ def _read_certificates(relation: ops.Relation) -> set[str] | None:
 def _read_endpoint(relation: ops.Relation, protocol: ReceiverProtocol) -> str | None:
     """Return the URL the provider advertises for ``protocol`` on this relation."""
     try:
-        data = TracingProviderAppData.load(relation.data[relation.app])
-    except DataValidationError:
-        logger.info('failed validating tracing provider databag for %s', relation)
+        data = relation.load(TracingProviderAppData, relation.app)
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        logger.info('failed validating tracing provider databag for %s: %s', relation, e)
         return None
     for receiver in data.receivers:
         if receiver.protocol.name == protocol:

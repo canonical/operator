@@ -8,9 +8,7 @@ Schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/tracing/v
 
 import dataclasses
 import enum
-from typing import List, Literal, MutableMapping
-
-from . import _databag
+from typing import List, Literal
 
 # Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
@@ -27,10 +25,6 @@ class TransportProtocolType(str, enum.Enum):
 
     http = 'http'
     grpc = 'grpc'
-
-
-class DataValidationError(Exception):
-    """Raised when data validation fails on tracing relation data."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -62,11 +56,6 @@ class TracingProviderAppData:
 
     receivers: List[Receiver]
     """List of all receivers enabled on the tracing provider."""
-
-    @classmethod
-    def load(cls, databag: MutableMapping[str, str]) -> 'TracingProviderAppData':
-        """Load this model from a Juju databag."""
-        return _databag.load(cls, databag, DataValidationError)
 
 
 @dataclasses.dataclass(frozen=True)
