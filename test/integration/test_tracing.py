@@ -29,6 +29,10 @@ from test.integration.conftest import _xfail_on_caas_juju4
 
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The traced charm is connected to the trace data collector directly."""
+    _xfail_on_caas_juju4(
+        tracing_juju,
+        'k8s + Juju 4: minio Service patch races with caasfirewaller worker',
+    )
     charm_path = build_tracing_charm()
     tracing_juju.deploy(charm_path)
     tracing_juju.integrate('test-tracing', 'tempo')
