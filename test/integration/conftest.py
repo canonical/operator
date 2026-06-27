@@ -39,12 +39,17 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""
     deploy_tempo(juju)
     deploy_tempo_worker(juju)
-    juju.deploy(
-        'minio',
-        channel='latest/edge',
-        trust=True,
-        config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
-    )
+    # On Juju 4, the default minio channel resolves to a podspec charm that
+    # crashes on install (pod-spec-set was removed in Juju 4); latest/edge is
+    # the only sidecar variant. On Juju 3 the latest/edge charm doesn't reach
+    # active either, but the unpinned default does.
+    minio_deploy: dict[str, object] = {
+        'config': {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
+    }
+    if juju.status().model.version.startswith('4.'):
+        minio_deploy['channel'] = 'latest/edge'
+        minio_deploy['trust'] = True
+    juju.deploy('minio', **minio_deploy)  # type: ignore[arg-type]
     juju.deploy('s3-integrator')
 
     juju.integrate('tempo:s3', 's3-integrator')
