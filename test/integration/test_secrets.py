@@ -195,6 +195,7 @@ def cleanup(juju: jubilant.Juju, leader: str) -> None:
 @pytest.fixture
 def fresh_secret(juju: jubilant.Juju, leader: str, cleanup: None) -> str:
     """Remove all old secrets (via cleanup) and add a new secret owned by the test app."""
+    _xfail_on_caas_juju4(juju)
     juju.exec('secret-add --label thelabel some=content', unit=leader)
     secrets = juju.secrets()
     assert secrets
