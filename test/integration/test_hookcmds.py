@@ -422,9 +422,7 @@ def test_goal_state_reports_units(juju: jubilant.Juju, any_unit: str):
         'maintenance',
         'waiting',
         'error',
-        'unknown',
         'alive',
-        'dying',
     )
     for status in statuses:
         assert status in allowed, f'Unexpected goal status: {status}'
