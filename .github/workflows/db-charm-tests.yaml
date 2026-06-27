@@ -22,13 +22,13 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/postgresql-operator
-            commit: cdaffd23a2a50efb7ff0c7e1ffb70d85da526505  # 2026-05-24T21:43:47Z
+            commit: 938cad4d59079dc74221cfbdae88825c62be6989  # 2026-06-24T10:39:31Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: c434df80953409f290e7ea6e76f78a3ec46cecc2  # 2026-05-30T03:35:40Z
+            commit: 0f9586d6d0d41ed9718d967e764b8fc1ab5f7deb  # 2026-06-23T22:05:05Z
           - charm-repo: canonical/mysql-operator
-            commit: 8b73ff31c76ab3234acd4e4172b0347073def2fa  # 2026-01-20T15:34:11Z
+            commit: f2e0fda4129a9466d204e55702fb4c16c54e4d94  # 2026-01-23T10:54:25Z
           - charm-repo: canonical/mysql-k8s-operator
-            commit: 0088c9583f63999ff37d982948e47b9e3e3fba2a  # 2026-01-20T15:48:23Z
+            commit: e669bb8042003a958529723209ed6a043a47160b  # 2026-01-23T10:56:26Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@v6.0.2
