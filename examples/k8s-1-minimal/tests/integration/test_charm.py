@@ -44,8 +44,5 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
     version = juju.status().apps[APP_NAME].version
-    # Ideally, the test should get the version directly from the workload application
-    # (for example, through an API call) and use that in this assertion.
-    # For simplicity, we hardcode the version here. We update the tutorial whenever we
-    # release a new version of api_demo_server.
+    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
     assert version == "1.0.4"
