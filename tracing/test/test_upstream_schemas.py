@@ -170,7 +170,10 @@ def test_tracing_requirer_shape(tracing_upstream: dict[str, typing.Any]):
     )
 
 
-def test_tracing_provider_roundtrip(tracing_upstream: dict[str, typing.Any]):
+def test_tracing_provider_roundtrip(
+    tracing_upstream: dict[str, typing.Any],
+    load_provider_app_data,
+):
     """A valid upstream payload must deserialise identically through our loader."""
     upstream_cls = tracing_upstream['TracingProviderData']
     payload = {
@@ -180,7 +183,7 @@ def test_tracing_provider_roundtrip(tracing_upstream: dict[str, typing.Any]):
         ])
     }
     upstream_obj = upstream_cls(**payload)
-    ours = _tracing_models.TracingProviderAppData.load(payload)
+    ours = load_provider_app_data(payload)
 
     upstream_receivers = [
         {'name': r.protocol.name, 'type': r.protocol.type, 'url': r.url}
