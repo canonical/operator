@@ -564,7 +564,10 @@ class CertificateTransferRequires(Object):
             charm: Charm object
             relationship_name: Juju relation name
         """
-        super().__init__(charm, relationship_name + "_v1")
+        # Vendored customisation: prefix the handle with "internal: " so that
+        # ops_tracing's instance does not collide with a charm that also uses
+        # this library on the same relation name.
+        super().__init__(charm, f"internal: {relationship_name}_v1")
         self.relationship_name = relationship_name
         self.charm = charm
         self.framework.observe(
