@@ -41,7 +41,7 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     deploy_tempo_worker(juju)
     juju.deploy(
         'minio',
-        channel='ckf-1.10/stable',
+        channel='latest/edge',
         trust=True,
         config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
     )
