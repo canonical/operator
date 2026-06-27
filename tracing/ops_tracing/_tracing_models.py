@@ -1,14 +1,16 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Requirer-side models for the ``tracing`` relation interface.
+"""Requirer-side models for the ``tracing`` and ``certificate_transfer`` relation interfaces.
 
-Schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/tracing/v2/
+Schemas:
+- https://canonical.com/juju/docs/charmlibs/reference/interfaces/tracing/v2/
+- https://canonical.com/juju/docs/charmlibs/reference/interfaces/certificate_transfer/v1/
 """
 
 import dataclasses
 import enum
-from typing import List, Literal
+from typing import List, Literal, Set
 
 # Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
@@ -64,3 +66,11 @@ class TracingRequirerAppData:
 
     receivers: List[ReceiverProtocol]
     """Requested receivers."""
+
+
+@dataclasses.dataclass(frozen=True)
+class CertificateTransferProviderAppData:
+    """Application databag model for the certificate_transfer provider."""
+
+    certificates: Set[str]
+    """PEM-encoded certificates and/or CA certificates published by the provider."""

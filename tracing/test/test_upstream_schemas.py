@@ -206,45 +206,35 @@ def test_tracing_requirer_roundtrip(tracing_upstream: dict[str, typing.Any]):
 
 # ---- certificate_transfer v1 ---------------------------------------------
 
-# We don't model certificate_transfer as a dataclass — the provider-side
-# ``certificates`` key is JSON-decoded directly by ``_read_certificates`` in
-# ``ops_tracing/_api.py``. So instead of a structural match, we pin the key
-# names and the wire format that ``_read_certificates`` expects.
-
 
 @pytest.fixture(scope='module')
 def cert_transfer_upstream() -> dict[str, typing.Any]:
     return _load_upstream(CERT_TRANSFER_SCHEMA_URL)
 
 
-def test_cert_transfer_provider_keys(cert_transfer_upstream: dict[str, typing.Any]):
+def test_cert_transfer_provider_shape(cert_transfer_upstream: dict[str, typing.Any]):
     upstream = _model_signature(cert_transfer_upstream['CertificateTransferProviderAppData'])
-    # The only field we read is ``certificates`` (a set/list of PEM strings).
-    # If upstream renames it, our ``_read_certificates`` would silently return
-    # an empty set — this test guards against that drift.
-    assert 'certificates' in upstream, f'upstream lost `certificates`: {upstream}'
-    assert upstream['certificates'] in (
-        ('set', 'str'),
-        ('list', 'str'),
-    ), f'upstream `certificates` shape changed: {upstream["certificates"]!r}'
-    # ``version`` is upstream-optional metadata; we deliberately ignore it.
-    # If a NEW required field appears, fail loudly so we can decide whether to
+    ours = _dataclass_signature(_tracing_models.CertificateTransferProviderAppData)
+    # ``version`` is upstream-optional metadata; we deliberately ignore it. If
+    # a NEW required field appears, fail loudly so we can decide whether to
     # adopt it.
     upstream_cls = cert_transfer_upstream['CertificateTransferProviderAppData']
     required = {name for name, f in upstream_cls.model_fields.items() if f.is_required()}
-    assert required <= {'certificates'}, (
-        f'upstream added required field(s): {required - {"certificates"}}'
+    assert required <= set(ours), f'upstream added required field(s): {required - set(ours)}'
+    upstream_required = {k: v for k, v in upstream.items() if k in ours}
+    assert upstream_required == ours, (
+        f'CertificateTransferProviderAppData drift\n'
+        f'  upstream: {upstream_required}\n  ours:     {ours}'
     )
 
 
-def test_cert_transfer_wire_format_roundtrip(cert_transfer_upstream: dict[str, typing.Any]):
-    """A databag value built by the upstream model must parse with our reader."""
+def test_cert_transfer_provider_roundtrip(cert_transfer_upstream: dict[str, typing.Any]):
+    """A valid upstream payload must deserialise identically through our loader."""
     upstream_cls = cert_transfer_upstream['CertificateTransferProviderAppData']
     obj = upstream_cls(certificates={'pem-a', 'pem-b'})
-    # ``model_dump_json`` produces what an upstream provider would write to
-    # the app databag under the ``certificates`` key; we just need the list
-    # serialisation matching our ``json.loads(...)`` of the raw value.
     dumped = obj.model_dump(mode='json')
     raw = json.dumps(dumped['certificates'])
-    parsed = set(json.loads(raw))
-    assert parsed == {'pem-a', 'pem-b'}
+    ours = _tracing_models.CertificateTransferProviderAppData(
+        certificates=set(json.loads(raw)),
+    )
+    assert ours.certificates == set(obj.certificates) == {'pem-a', 'pem-b'}
