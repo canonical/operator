@@ -87,9 +87,9 @@ resources:
 
 ### Write a helper module
 
-Your charm will interact with our workload application `api_demo_server`. It's a good idea to write a helper module that wraps `api_demo_server`. Charmcraft created `src/fastapi_demo.py` as a placeholder helper module.
+Your charm will interact with our workload application. It's a good idea to write a helper module that wraps the workload application. Charmcraft created `src/fastapi_demo.py` as a placeholder helper module.
 
-The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. In this tutorial, the helper module only contains the logic to get the version of `api_demo_server`. The server has an endpoint at `/version` that returns a JSON payload containing the version number. This is called the workload version.
+The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. In this tutorial, the helper module only contains the logic to get the version of the workload application. The server has an endpoint at `/version` that returns a JSON payload containing the version number. This is called the workload version.
 
 To make things easier for Juju users, your charm should expose the workload version to Juju. It will be visible in Juju's status output. For more information, see {ref}`how-to-set-the-workload-version`.
 
@@ -124,7 +124,7 @@ def get_version(port: int) -> str:
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
 
 1. Receive an event from Juju.
-2. Use Pebble calls and the helper module to manage `api_demo_server` and check its status.
+2. Use Pebble calls and the helper module to manage the workload application and check its status.
 3. Report the status back to Juju.
 
 ```{tip}
