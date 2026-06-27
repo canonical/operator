@@ -3,66 +3,12 @@ name: ops Integration Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: '41 7 25 * *'
+    - cron: '41 7 * * 1'
 
 permissions: {}
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        preset: ['k8s', 'microk8s']
-        test:
-          # https://github.com/canonical/observability-stack/issues/110
-          # - test_direct_connection
-          # - test_with_tls
-          - test_relation_units
-
-    steps:
-      - run: sudo snap install --classic concierge
-      - run: >
-          sudo concierge prepare
-          --juju-channel=3/stable
-          --charmcraft-channel=3.x/stable
-          -p "${{ matrix.preset }}"
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      - run: uv tool install tox --with tox-uv
-      - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
-
-  secrets:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        juju-channel:
-          - 3.6/stable
-          - 4.0/stable
-
-    continue-on-error: ${{ matrix.juju-channel == '4.0/stable' }}
-
-    steps:
-      - run: sudo snap install --classic concierge
-      - run: >
-          sudo concierge prepare
-          --juju-channel=${{ matrix.juju-channel }}
-          --charmcraft-channel=3.x/stable
-          -p microk8s
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      - run: uv tool install tox --with tox-uv
-      - run: tox -e integration -- --log-cli-level=INFO -s -k test_secrets
-        timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
-
-  hookcmds:
+  integration:
     runs-on: ubuntu-latest
 
     strategy:
@@ -74,17 +20,30 @@ jobs:
           - 4.0/stable
           - 4.0/edge
           - 4.1/edge
+        test:
+          - test_direct_connection
+          - test_with_tls
+          - test_relation_units
+          - test_secrets
+          - test_hookcmds
+        exclude:
+          # tempo-coordinator-k8s only deploys on Kubernetes substrates.
+          - preset: machine
+            test: test_direct_connection
+          - preset: machine
+            test: test_with_tls
 
     steps:
       - run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}
+          --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       - run: uv tool install tox --with tox-uv
-      - run: tox -e integration -- --log-cli-level=INFO -s -k test_hookcmds
+      - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
