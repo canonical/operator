@@ -39,7 +39,12 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""
     deploy_tempo(juju)
     deploy_tempo_worker(juju)
-    juju.deploy('minio', config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'})
+    juju.deploy(
+        'minio',
+        channel='ckf-1.10/stable',
+        trust=True,
+        config={'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
+    )
     juju.deploy('s3-integrator')
 
     juju.integrate('tempo:s3', 's3-integrator')
