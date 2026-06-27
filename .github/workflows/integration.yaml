@@ -32,6 +32,17 @@ jobs:
             test: test_direct_connection
           - preset: machine
             test: test_with_tls
+          # test_secrets actions on k8s + Juju 4 are dispatched but never run,
+          # so every call times out. Tracked upstream; revisit when fixed.
+          - preset: k8s
+            juju-channel: 4.0/stable
+            test: test_secrets
+          - preset: k8s
+            juju-channel: 4.0/edge
+            test: test_secrets
+          - preset: k8s
+            juju-channel: 4.1/edge
+            test: test_secrets
 
     steps:
       - run: sudo snap install --classic concierge
