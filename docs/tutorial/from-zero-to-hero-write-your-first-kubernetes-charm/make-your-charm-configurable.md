@@ -131,21 +131,12 @@ def _replan_workload(self) -> None:
         logger.info("Unable to connect to Pebble: %s", e)
         self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
         return
-    try:
-        version = fastapi_demo.get_version(config.server_port)
-    except RuntimeError as version_e:
-        logger.error("Failed to get workload version: %s", version_e)
-        self.unit.status = ops.BlockedStatus(
-            "Failed to get version from server: check port config"
-        )
-        return
     self.unit.status = ops.ActiveStatus()
+    version = fastapi_demo.get_version(config.server_port)
     self.unit.set_workload_version(version)
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
-
-We also add error handling for getting the workload version. If we cannot access the workload to get its version, a `RuntimeError` will be raised. The `_replan_workload` method will log the error, and set the unit status to `blocked` with a message. This lets the Juju user know that they need to check the port configuration.
 
 Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
 

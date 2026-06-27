@@ -91,15 +91,8 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info("Unable to connect to Pebble: %s", e)
             self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
             return
-        try:
-            version = fastapi_demo.get_version(config.server_port)
-        except RuntimeError as version_e:
-            logger.error("Failed to get workload version: %s", version_e)
-            self.unit.status = ops.BlockedStatus(
-                "Failed to get version from server: check port config"
-            )
-            return
         self.unit.status = ops.ActiveStatus()
+        version = fastapi_demo.get_version(config.server_port)
         self.unit.set_workload_version(version)
 
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:

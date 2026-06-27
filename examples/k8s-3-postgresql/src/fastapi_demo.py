@@ -21,7 +21,6 @@ The intention is that this module could be used outside the context of a charm.
 
 import json
 import logging
-import urllib.error
 import urllib.request
 
 logger = logging.getLogger(__name__)
@@ -32,13 +31,7 @@ def get_version(port: int) -> str:
 
     Args:
         port: The port where fastapi_demo web server is listening.
-
-    Raises:
-        RuntimeError: If the server can't be reached, for example because of an invalid port.
     """
-    try:
-        response = urllib.request.urlopen(f"http://0.0.0.0:{port}/version")
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Could not connect to the workload server on port {port}") from e
+    response = urllib.request.urlopen(f"http://localhost:{port}/version")
     data = json.loads(response.read())
     return data["version"]
