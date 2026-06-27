@@ -267,12 +267,8 @@ def deploy_tempo(tracing_juju: jubilant.Juju):
     tracing_juju.deploy(
         'tempo-coordinator-k8s',
         app='tempo',
-        channel='edge',
+        channel='2/stable',
         trust=True,
-        resources={
-            'nginx-image': 'ubuntu/nginx:1.24-24.04_beta',
-            'nginx-prometheus-exporter-image': 'nginx/nginx-prometheus-exporter:1.1.0',
-        },
     )
 
 
@@ -280,10 +276,9 @@ def deploy_tempo_worker(tracing_juju: jubilant.Juju):
     tracing_juju.deploy(
         'tempo-worker-k8s',
         app='tempo-worker',
-        channel='edge',
+        channel='2/stable',
         config={'role-all': True},
         trust=True,
-        resources={'tempo-image': 'docker.io/ubuntu/tempo:2-22.04'},
     )
 
 
