@@ -56,8 +56,11 @@ def test_setup(build_secrets_charm: Callable[[], str], juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
+# Juju 4's `juju run` defaults `--wait` to 60s (Juju 3 waited indefinitely), and
+# action dispatch on k8s exceeds that, so every action call below sets `wait=`
+# explicitly.
 def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
-    rv = juju.run(leader, 'add-secret')
+    rv = juju.run(leader, 'add-secret', wait=300)
     result = cast('Result', rv.results)
 
     secrets = juju.secrets()
@@ -82,7 +85,7 @@ def test_add_secret(juju: jubilant.Juju, cleanup: None, leader: str):
     ],
 )
 def test_add_with_meta(juju: jubilant.Juju, cleanup: None, leader: str, fields: str):
-    rv = juju.run(leader, 'add-with-meta', params={'fields': fields})
+    rv = juju.run(leader, 'add-with-meta', params={'fields': fields}, wait=300)
     result = cast('Result', rv.results)
 
     assert 'secretid' in result
@@ -141,7 +144,7 @@ def test_set_secret(
     else:
         params = {'flow': flow, 'secretlabel': 'thelabel'}
 
-    rv = juju.run(leader, 'set-secret-flow', params=params)
+    rv = juju.run(leader, 'set-secret-flow', params=params, wait=300)
     result = cast('Result', rv.results)
 
     assert 'secretid' in result
