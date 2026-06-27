@@ -11,7 +11,7 @@ When you deploy a Kubernetes charm, the following things happen:
 1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
 1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble.
 1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations.
-1. During operations, the charm may need to directly communicate with the workload using HTTP requests. This is possible because the charm container and workload container share the same pod.
+1. During operations, the charm may need to directly communicate with the workload application. The charm container and workload container can communicate via `localhost` because they share the same pod, and containers in the same pod share the same network namespace.
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
