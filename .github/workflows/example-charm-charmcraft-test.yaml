@@ -65,3 +65,24 @@ jobs:
         # allocator (runs against the runner itself) instead of launching
         # a nested LXD VM for the spread target.
         run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [collect-spread-jobs, integration]
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+
+    steps:
+      - name: Create issue on failure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
