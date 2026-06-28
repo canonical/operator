@@ -32,7 +32,6 @@ dependencies = [
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.30",
     "ops==3.7.1",
-    "pydantic",
 ]
 
 [project.urls]

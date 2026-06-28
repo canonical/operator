@@ -20,10 +20,6 @@ import ops
 import ops.testing
 import pytest
 
-_pydantic = pytest.importorskip('pydantic')
-
-pytestmark = pytest.mark.filterwarnings('ignore::pydantic.PydanticDeprecatedSince20')
-
 
 def test_charm_runs(sample_charm: type[ops.CharmBase]):
     ctx = ops.testing.Context(sample_charm)
