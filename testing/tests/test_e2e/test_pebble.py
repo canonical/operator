@@ -17,7 +17,7 @@ import ops
 from ops import CharmBase, Framework, pebble
 from ops.log import _get_juju_log_and_app_id
 
-from ..helpers import jsonpatch_delta, trigger
+from ..helpers import state_delta, trigger
 
 if TYPE_CHECKING:
     from ops.pebble import LayerDict, ServiceDict
@@ -156,7 +156,7 @@ def test_fs_pull(tmp_path: pathlib.Path, make_dirs: bool):
     else:
         # nothing has changed
         out_purged = dataclasses.replace(out, stored_states=state.stored_states)
-        assert not jsonpatch_delta(out_purged, state)
+        assert not state_delta(out_purged, state)
 
 
 LS = """

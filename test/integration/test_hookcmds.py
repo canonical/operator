@@ -412,12 +412,20 @@ def test_goal_state_reports_units(juju: jubilant.Juju, any_unit: str):
     assert unit_count >= 1
     unit_names = r['unit-names'].split(',')
     assert any(u.startswith('test-hookcmds/') for u in unit_names)
-    # Every unit should be in an 'alive' or 'waiting' goal state.
+    # Every unit should report a known goal status. This is the unit's
+    # workload status, plus the lifecycle values that goal-state can
+    # surface before the workload status is set.
     statuses = r['unit-statuses'].split(',')
+    allowed = (
+        'active',
+        'blocked',
+        'maintenance',
+        'waiting',
+        'error',
+        'alive',
+    )
     for status in statuses:
-        assert status in ('alive', 'waiting', 'dying', 'active'), (
-            f'Unexpected goal status: {status}'
-        )
+        assert status in allowed, f'Unexpected goal status: {status}'
     assert len(unit_names) == unit_count
     assert len(statuses) == unit_count
     # The peer relation is always present in this deployment.

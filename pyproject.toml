@@ -51,7 +51,6 @@ mypy = [  # used to type check example charms in CI
 unit = [
     "ops[testing,tracing]",
     "pytest~=9.0",
-    "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
 xdist = [
