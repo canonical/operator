@@ -15,10 +15,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import pathlib
+import socket
 import subprocess
-from collections.abc import Callable, Generator
+import time
+from collections.abc import Callable, Generator, Iterator
 
 import jubilant
 import minio
@@ -34,17 +37,90 @@ def juju() -> Generator[jubilant.Juju]:
         print(juju.debug_log())
 
 
+def _kubectl_cluster_ip(namespace: str, service: str) -> str:
+    """Return the ClusterIP of `service` in `namespace` via kubectl.
+
+    Juju 4 no longer exposes the Service ClusterIP on apps[X].address for caas
+    models; only units have an address, and that's the Pod IP. We still need
+    the ClusterIP to configure in-cluster consumers (such as the
+    s3-integrator endpoint that Tempo pods resolve from inside the cluster).
+    """
+    out = subprocess.check_output(
+        [  # noqa: S607
+            'kubectl',
+            '--namespace',
+            namespace,
+            'get',
+            'svc',
+            service,
+            '-o',
+            'jsonpath={.spec.clusterIP}',
+        ],
+        text=True,
+    )
+    return out.strip()
+
+
+@contextlib.contextmanager
+def kubectl_port_forward(namespace: str, target: str, port: int) -> Iterator[tuple[str, int]]:
+    """Forward `target:port` to a free local port via kubectl port-forward.
+
+    Yields (host, port) pointing at 127.0.0.1:<local>. Used by host-side test
+    code to reach in-cluster services without depending on the runner being
+    able to route to the ClusterIP or pod CIDR. On GitHub Actions, direct
+    connections to ClusterIPs return EPERM ("Operation not permitted"), and
+    Juju 4 stopped exposing the ClusterIP on app status, so port-forward is
+    the portable way for the host to reach a Service.
+
+    `target` is the kubectl resource (such as 'svc/minio' or 'pod/tempo-0').
+    """
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        local_port = sock.getsockname()[1]
+    proc = subprocess.Popen(
+        [  # noqa: S607
+            'kubectl',
+            '--namespace',
+            namespace,
+            'port-forward',
+            target,
+            f'{local_port}:{port}',
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(('127.0.0.1', local_port), timeout=0.5):
+                    break
+            except OSError:
+                time.sleep(0.2)
+        else:
+            raise RuntimeError(f'port-forward to {target}:{port} did not become reachable')
+        yield '127.0.0.1', local_port
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def _xfail_on_caas_juju4(juju: jubilant.Juju, reason: str = '') -> None:
     """xfail the current test on Kubernetes substrates with Juju 4.x.
 
-    Two known upstream bugs make several tracing- and secrets-related tests
-    unrunnable in that matrix slot: actions queued against the test-secrets
-    charm are never dispatched, and the minio Service patch races with the
-    `caasfirewaller` worker.
+    Juju 4 on k8s ships a broken `juju-secret-consumer-<id>` Role: it grants
+    `get,list` on `namespaces` but nothing on `secrets`. Any charm that
+    patches a secret it owns (such as self-signed-certificates, tempo-coordinator
+    with TLS, or the test-secrets charm under test) hits a 403 on the second
+    secret-set and goes into hook-error. Tests that exercise that path can't
+    run until the upstream fix lands.
     """
     status = juju.status()
     if status.model.type == 'caas' and status.model.version.startswith('4.'):
-        pytest.xfail(reason or 'known Juju 4 + k8s bug; see PR for issue links')
+        pytest.xfail(reason or 'Juju 4 k8s juju-secret-consumer Role lacks secrets rules')
 
 
 @pytest.fixture
@@ -74,19 +150,24 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
         )
     )
 
-    address = juju.status().apps['minio'].address
-    mc_client = minio.Minio(
-        f'{address}:9000',
-        access_key='accesskey',
-        secret_key='mysoverysecretkey',
-        secure=False,
-    )
+    # Juju 4 stopped exposing the Service ClusterIP on apps[X].address for
+    # caas; resolve it from k8s directly. The ClusterIP is what in-cluster
+    # consumers (the Tempo pods, via s3-integrator) need.
+    cluster_ip = _kubectl_cluster_ip(juju.model, 'minio')
 
-    found = mc_client.bucket_exists('tempo')
-    if not found:
-        mc_client.make_bucket('tempo')
+    # The host can't necessarily reach the ClusterIP (on GitHub Actions a
+    # direct connect returns EPERM), so create the bucket via a port-forward.
+    with kubectl_port_forward(juju.model, 'svc/minio', 9000) as (host, port):
+        mc_client = minio.Minio(
+            f'{host}:{port}',
+            access_key='accesskey',
+            secret_key='mysoverysecretkey',
+            secure=False,
+        )
+        if not mc_client.bucket_exists('tempo'):
+            mc_client.make_bucket('tempo')
 
-    juju.config('s3-integrator', dict(endpoint=f'http://{address}:9000', bucket='tempo'))
+    juju.config('s3-integrator', dict(endpoint=f'http://{cluster_ip}:9000', bucket='tempo'))
     juju.run(
         's3-integrator/0',
         'sync-s3-credentials',
