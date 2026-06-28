@@ -8,8 +8,11 @@ from __future__ import annotations
 import copy
 import dataclasses
 import os
+import sys
 import tempfile
+import threading
 import typing
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -38,6 +41,74 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = scenario_logger.getChild('runtime')
 
 RUNTIME_MODULE = Path(__file__).parent
+
+
+_CWD_AUDIT_STATE = threading.local()
+
+
+def _cwd_audit_hook(event: str, args: tuple[object, ...]) -> None:
+    """Audit hook that warns when charm code reads relative paths during an event.
+
+    Under Juju, the working directory at hook start is the charm root. Scenario
+    historically left it as wherever pytest ran, so relative reads silently
+    resolve against the test directory. This hook flags any relative path
+    access that would resolve differently between the two, so charms can be
+    updated before the default flips.
+    """
+    state = getattr(_CWD_AUDIT_STATE, 'current', None)
+    if state is None:
+        return
+    if event not in ('open', 'os.listdir', 'os.scandir'):
+        return
+    if state.get('reentrant'):
+        return
+    path = args[0] if args else None
+    if path is None or isinstance(path, int):
+        return
+    try:
+        path_str = os.fspath(path)
+    except TypeError:
+        return
+    if isinstance(path_str, bytes):
+        try:
+            path_str = path_str.decode()
+        except UnicodeDecodeError:
+            return
+    if not path_str or os.path.isabs(path_str):
+        return
+    if path_str in state['warned']:
+        return
+    state['reentrant'] = True
+    try:
+        old_path = os.path.normpath(os.path.join(state['test_cwd'], path_str))
+        new_path = os.path.normpath(os.path.join(state['charm_root'], path_str))
+        if old_path == new_path:
+            return
+        if not (os.path.exists(old_path) or os.path.exists(new_path)):
+            return
+        state['warned'].add(path_str)
+        warnings.warn(
+            f'Scenario charm code accessed relative path {path_str!r} during '
+            f'event dispatch. Under Juju the working directory is the charm '
+            f'root, but Scenario currently keeps the test runner working '
+            f'directory; in a future major release Scenario will chdir to '
+            f'the charm root to match Juju. Set '
+            f'SCENARIO_CHDIR_TO_CHARM_ROOT=1 to opt in to the new behaviour '
+            f'now, or use self.framework.charm_dir to make the lookup '
+            f'explicit.',
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    finally:
+        state['reentrant'] = False
+
+
+sys.addaudithook(_cwd_audit_hook)
+
+
+def _chdir_to_charm_root_opt_in() -> bool:
+    value = os.getenv('SCENARIO_CHDIR_TO_CHARM_ROOT', '')
+    return value.lower() in ('true', '1', 'yes') or (value.isdigit() and int(value) != 0)
 
 
 class Runtime(Generic[CharmType]):
@@ -321,6 +392,29 @@ class Runtime(Generic[CharmType]):
             previous_env = os.environ.copy()
             os.environ.update(env)
 
+            # In Juju, the current working directory is the charm root when a
+            # hook starts. Charms (and libraries) rely on this, for example to
+            # read files relative to it. Scenario does not yet match that
+            # behaviour by default, to avoid breaking existing tests that
+            # depend on the test runner working directory. Set
+            # SCENARIO_CHDIR_TO_CHARM_ROOT=1 to opt in to the Juju behaviour;
+            # otherwise, an audit hook emits a DeprecationWarning the first
+            # time a relative path is accessed that would resolve differently
+            # under the new behaviour.
+            previous_cwd = os.getcwd()
+            chdir_to_charm_root = _chdir_to_charm_root_opt_in()
+            if chdir_to_charm_root:
+                os.chdir(temporary_charm_root)
+                audit_state = None
+            else:
+                audit_state = {
+                    'test_cwd': previous_cwd,
+                    'charm_root': str(temporary_charm_root),
+                    'warned': set(),
+                    'reentrant': False,
+                }
+                _CWD_AUDIT_STATE.current = audit_state
+
             logger.info(' - entering ops.main (mocked)')
             from ._ops_main_mock import Ops
 
@@ -364,6 +458,10 @@ class Runtime(Generic[CharmType]):
                     if key not in previous_env:
                         del os.environ[key]
                 os.environ.update(previous_env)
+                if chdir_to_charm_root:
+                    os.chdir(previous_cwd)
+                else:
+                    _CWD_AUDIT_STATE.current = None
                 logger.info(' - exited ops.main')
 
         logger.info('event dispatched. done.')

@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
+import warnings
 from collections.abc import Generator, Mapping
 from pathlib import Path
 from typing import Any
@@ -56,6 +58,82 @@ def test_charm_virtual_root(charm_virtual_root: Path):
         charm_root=charm_virtual_root,
     )
     assert out.unit_status == ActiveStatus('hello world')
+
+
+class CwdCharm(CharmBase):
+    META: Mapping[str, Any] = {'name': 'my-charm'}
+
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        self.unit.status = ActiveStatus(os.getcwd())
+
+
+def test_cwd_unchanged_by_default():
+    cwd_before = os.getcwd()
+    ctx = Context(CwdCharm, meta=dict(CwdCharm.META))
+    with ctx(ctx.on.start(), State()) as mgr:
+        mgr.run()
+        # By default, Scenario leaves the test runner working directory in
+        # place rather than chdir'ing to the charm root.
+        assert mgr.charm.unit.status.message == cwd_before
+    assert os.getcwd() == cwd_before
+
+
+def test_cwd_is_charm_root_when_opted_in(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_CHDIR_TO_CHARM_ROOT', '1')
+    cwd_before = os.getcwd()
+    ctx = Context(CwdCharm, meta=dict(CwdCharm.META))
+    with ctx(ctx.on.start(), State()) as mgr:
+        mgr.run()
+        # With the opt-in env var, cwd matches charm_dir to match Juju.
+        assert mgr.charm.unit.status.message == str(mgr.charm.framework.charm_dir)
+    # The original working directory is restored after the event is handled.
+    assert os.getcwd() == cwd_before
+
+
+class RelativeOpenCharm(CharmBase):
+    META: Mapping[str, Any] = {'name': 'my-charm'}
+    REL_PATH = 'metadata.yaml'
+
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        try:
+            with open(self.REL_PATH):
+                pass
+        except OSError:
+            pass
+
+
+def test_relative_path_open_emits_deprecation_warning(
+    charm_virtual_root: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # Ensure the env var is not set so we exercise the default (warn) path.
+    monkeypatch.delenv('SCENARIO_CHDIR_TO_CHARM_ROOT', raising=False)
+    # The relative path the charm opens exists at charm_root but not at the
+    # test cwd, so behaviour would differ between current and future defaults.
+    (charm_virtual_root / RelativeOpenCharm.REL_PATH).write_text('name: my-charm\n')
+    ctx = Context(
+        RelativeOpenCharm,
+        meta=dict(RelativeOpenCharm.META),
+        charm_root=charm_virtual_root,
+    )
+    with pytest.warns(DeprecationWarning, match='SCENARIO_CHDIR_TO_CHARM_ROOT'):
+        ctx.run(ctx.on.start(), State())
+
+
+def test_relative_path_open_no_warning_when_opted_in(
+    charm_virtual_root: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv('SCENARIO_CHDIR_TO_CHARM_ROOT', '1')
+    (charm_virtual_root / RelativeOpenCharm.REL_PATH).write_text('name: my-charm\n')
+    ctx = Context(
+        RelativeOpenCharm,
+        meta=dict(RelativeOpenCharm.META),
+        charm_root=charm_virtual_root,
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', DeprecationWarning)
+        ctx.run(ctx.on.start(), State())
 
 
 def test_charm_virtual_root_cleanup_if_exists(charm_virtual_root: Path):
