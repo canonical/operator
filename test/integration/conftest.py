@@ -285,8 +285,16 @@ def _prepare_generic_charm_dir(
             (sdist,) = charm_dir.glob('ops_tracing*.tar.gz')
             sdist.rename(charm_dir / 'ops_tracing.tar.gz')
 
+        # uv lock does not refresh the recorded hash for `path = ` sources
+        # when the package version is unchanged, so the committed uv.lock
+        # keeps its stale hash and charmcraft pack later fails with a hash
+        # mismatch inside the build container. --refresh-package forces a
+        # recompute.
+        refresh_packages = ['--refresh-package', 'ops']
+        if build_tracing:
+            refresh_packages += ['--refresh-package', 'ops-tracing']
         subprocess.run(
-            ['uv', 'lock'],  # noqa: S607
+            ['uv', 'lock', *refresh_packages],  # noqa: S607
             cwd=charm_dir,
             text=True,
             check=True,
