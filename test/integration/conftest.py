@@ -40,7 +40,7 @@ def juju() -> Generator[jubilant.Juju]:
 def _kubectl_cluster_ip(namespace: str, service: str) -> str:
     """Return the ClusterIP of `service` in `namespace` via kubectl.
 
-    Juju 4 no longer exposes the Service ClusterIP on apps[X].address for caas
+    Juju 4 no longer exposes the Service ClusterIP on apps[X].address for machine
     models; only units have an address, and that's the Pod IP. We still need
     the ClusterIP to configure in-cluster consumers (such as the
     s3-integrator endpoint that Tempo pods resolve from inside the cluster).
