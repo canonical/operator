@@ -57,7 +57,7 @@ Submit any newly-proposed public interfaces for review, to ensure that:
 - Interface names and structure are consistent with the charming ecosystem.
 - Tests cover integration with the applications consuming or providing the relations.
 
-> See more: [Charmlibs documentation](https://documentation.ubuntu.com/charmlibs/)
+> See more: [Charmlibs documentation](https://canonical.com/juju/docs/charmlibs/)
 
 ### The charm respects the Juju proxy options
 

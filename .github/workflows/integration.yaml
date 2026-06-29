@@ -59,5 +59,32 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
       - run: uv tool install tox --with tox-uv
-      - run: tox -e integration -- --log-cli-level=INFO -s test/integration/test_secrets.py
+      - run: tox -e integration -- --log-cli-level=INFO -s -k test_secrets
+        timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
+
+  hookcmds:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: ['k8s', 'machine']
+        juju-channel:
+          - 3/stable
+          - 4.0/stable
+          - 4.0/edge
+          - 4.1/edge
+
+    steps:
+      - run: sudo snap install --classic concierge
+      - run: >
+          sudo concierge prepare
+          --juju-channel=${{ matrix.juju-channel }}
+          -p "${{ matrix.preset }}"
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - run: uv tool install tox --with tox-uv
+      - run: tox -e integration -- --log-cli-level=INFO -s -k test_hookcmds
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the model

@@ -86,6 +86,30 @@ self.model.storages.request('cache', 2)  # Request two more instances.
 
 The additional instances won't be available immediately after the call. As with `juju add-storage`, your charm will receive a storage-attached event as each additional instance becomes available.
 
+### Clean up storage
+
+Juju emits a [storage-detaching](ops.StorageDetachingEvent) event whenever attached storage is being released: when a user runs `juju detach-storage` (or `juju remove-storage --force`), and during unit teardown. Observe this event to cleanly release resources before the storage goes away.
+
+In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the detaching event associated with your storage and pair that with an event handler. For example:
+
+```python
+framework.observe(
+    self.on['cache'].storage_detaching, self._on_storage_detaching
+)
+```
+
+Now, in the body of the charm class, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
+
+```python
+def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
+    """Handle the storage being detached."""
+    self.unit.status = ops.ActiveStatus(
+        'Caching disabled; provide storage to boost performance'
+    )
+```
+
+> Examples: [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
+
 ## Manage storage for a Kubernetes charm
 
 ### Define the storage
@@ -164,29 +188,11 @@ charm_cache_root = pathops.LocalPath(charm_cache_path)
 
 Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `web_cache_path` in the workload container. This approach is more appropriate if you need to reference additional data in the workload container.
 
-## Handle storage detaching
+### Clean up storage
 
-In the `src/charm.py` file, in the `__init__` function of your charm, set up an observer for the detaching event associated with your storage and pair that with an event handler. For example:
+On Kubernetes, `juju detach-storage` isn't supported, so storage is only detached during unit teardown. Juju emits a [storage-detaching](ops.StorageDetachingEvent) event during teardown, along with `stop`, `remove`, and other teardown events.
 
-```python
-framework.observe(
-    self.on['cache'].storage_detaching, self._on_storage_detaching
-)
-```
-
-> See more: [](ops.StorageDetachingEvent)
-
-Now, in the body of the charm definition, define the event handler, or adjust an existing holistic one. For example, to warn users that data won't be cached:
-
-```python
-def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
-    """Handle the storage being detached."""
-    self.unit.status = ops.ActiveStatus(
-        'Caching disabled; provide storage to boost performance'
-    )
-```
-
-> Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823), [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
+> Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
 
 ## Write unit tests
 
