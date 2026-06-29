@@ -73,8 +73,6 @@ class Runtime(Generic[CharmType]):
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
-            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
@@ -98,11 +96,15 @@ class Runtime(Generic[CharmType]):
             env.update(
                 {
                     'JUJU_DISPATCH_PATH': f'actions/{action.name}',
+                    'JUJU_HOOK_NAME': '',
                     'JUJU_ACTION_NAME': action.name,
                     'JUJU_ACTION_UUID': action.id,
                     'JUJU_ACTION_TAG': f'action-{action.id}',
                 },
             )
+        else:
+            env['JUJU_DISPATCH_PATH'] = f'hooks/{event._juju_name}'
+            env['JUJU_HOOK_NAME'] = event._juju_name
 
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
