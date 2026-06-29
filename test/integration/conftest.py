@@ -124,7 +124,7 @@ resource "secrets"` warnings.
 """
 
 
-def _xfail_on_caas_juju4(juju: jubilant.Juju, reason: str) -> None:
+def _xfail_on_k8s_juju4(juju: jubilant.Juju, reason: str) -> None:
     """xfail the current test on Kubernetes substrates with Juju 4.x.
 
     Caller must pass a reason that names the specific upstream Juju issue.
