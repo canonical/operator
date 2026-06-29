@@ -108,19 +108,30 @@ def kubectl_port_forward(namespace: str, target: str, port: int) -> Iterator[tup
             proc.kill()
 
 
-def _xfail_on_caas_juju4(juju: jubilant.Juju, reason: str = '') -> None:
+JUJU4_K8S_SECRET_RBAC_BUG = (
+    'Juju 4 k8s: juju-secret-consumer Role cannot patch secrets (juju/juju#22485)'
+)
+"""xfail reason for tests blocked by the Juju 4 k8s secret RBAC bug.
+
+The `juju-secret-consumer-<id>` Role grants `get,list` on `namespaces` but
+nothing on `secrets`. Any charm that patches a secret it owns (such as
+self-signed-certificates, tempo-coordinator with TLS, or the test-secrets
+charm under test) hits a 403 on every secret-set. Confirmed on Juju 4.0.11
+in a multipass VM: both the failing test_with_tls and test_secrets runs
+emit the same `juju.secrets.provider.kubernetes error saving secret
+content ... is forbidden: User "...juju-secret-consumer-..." cannot patch
+resource "secrets"` warnings.
+"""
+
+
+def _xfail_on_caas_juju4(juju: jubilant.Juju, reason: str) -> None:
     """xfail the current test on Kubernetes substrates with Juju 4.x.
 
-    Juju 4 on k8s ships a broken `juju-secret-consumer-<id>` Role: it grants
-    `get,list` on `namespaces` but nothing on `secrets`. Any charm that
-    patches a secret it owns (such as self-signed-certificates, tempo-coordinator
-    with TLS, or the test-secrets charm under test) hits a 403 on the second
-    secret-set and goes into hook-error. Tests that exercise that path can't
-    run until the upstream fix lands.
+    Caller must pass a reason that names the specific upstream Juju issue.
     """
     status = juju.status()
     if status.model.type == 'caas' and status.model.version.startswith('4.'):
-        pytest.xfail(reason or 'Juju 4 k8s juju-secret-consumer Role lacks secrets rules')
+        pytest.xfail(reason)
 
 
 @pytest.fixture

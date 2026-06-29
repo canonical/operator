@@ -24,7 +24,11 @@ from typing import Any
 import httpx
 import jubilant
 
-from test.integration.conftest import _xfail_on_caas_juju4, kubectl_port_forward
+from test.integration.conftest import (
+    JUJU4_K8S_SECRET_RBAC_BUG,
+    _xfail_on_caas_juju4,
+    kubectl_port_forward,
+)
 
 
 def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
@@ -59,9 +63,7 @@ def test_direct_connection(build_tracing_charm: Callable[[], str], tracing_juju:
 
 def test_with_tls(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
     """The trace data collector has TLS enabled, connection is direct."""
-    # Juju 4 on k8s can't patch the juju secrets that self-signed-certificates
-    # and tempo write certs into, so neither charm reaches active.
-    _xfail_on_caas_juju4(tracing_juju)
+    _xfail_on_caas_juju4(tracing_juju, JUJU4_K8S_SECRET_RBAC_BUG)
     charm_path = build_tracing_charm()
     tracing_juju.deploy('self-signed-certificates')
     tracing_juju.integrate('tempo:certificates', 'self-signed-certificates')
