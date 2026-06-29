@@ -2,10 +2,10 @@
 # (https://github.com/canonical/concierge/blob/main/presets/k8s.yaml) with
 # juju.extra-bootstrap-args set: `juju bootstrap` regularly fails on slow GHA
 # runners with `unable to contact api server after 60 attempts` because the
-# default --bootstrap-timeout is too short for the controller pod to expose
-# its API. Pin a longer timeout here.
+# default bootstrap-timeout is too short for the controller pod to expose its
+# API. Pin a longer timeout here (1800s = 30min, vs the 1200s default).
 juju:
-  extra-bootstrap-args: --bootstrap-timeout=30m
+  extra-bootstrap-args: --config bootstrap-timeout=1800
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "false"

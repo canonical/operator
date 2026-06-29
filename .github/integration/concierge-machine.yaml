@@ -2,7 +2,7 @@
 # (https://github.com/canonical/concierge/blob/main/presets/machine.yaml) with
 # juju.extra-bootstrap-args set to match the k8s config in this directory.
 juju:
-  extra-bootstrap-args: --bootstrap-timeout=30m
+  extra-bootstrap-args: --config bootstrap-timeout=1800
   model-defaults:
     test-mode: "true"
     automatically-retry-hooks: "false"
