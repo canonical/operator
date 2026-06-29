@@ -3,7 +3,8 @@ name: Dependency review
 on:
   pull_request:
     branches:
-      - main
+      - 'main'
+      - '*-maintenance'
 
 permissions: {}
 
