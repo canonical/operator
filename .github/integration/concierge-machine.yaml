@@ -1,0 +1,24 @@
+# Mirror of the upstream concierge machine preset
+# (https://github.com/canonical/concierge/blob/main/presets/machine.yaml) with
+# juju.extra-bootstrap-args set to match the k8s config in this directory.
+juju:
+  extra-bootstrap-args: --bootstrap-timeout=30m
+  model-defaults:
+    test-mode: "true"
+    automatically-retry-hooks: "false"
+
+providers:
+  lxd:
+    enable: true
+    bootstrap: true
+
+host:
+  packages:
+    - gnome-keyring
+    - python3-pip
+    - python3-venv
+  snaps:
+    charmcraft:
+    jq:
+    yq:
+    snapcraft:

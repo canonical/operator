@@ -1,0 +1,37 @@
+# Mirror of the upstream concierge k8s preset
+# (https://github.com/canonical/concierge/blob/main/presets/k8s.yaml) with
+# juju.extra-bootstrap-args set: `juju bootstrap` regularly fails on slow GHA
+# runners with `unable to contact api server after 60 attempts` because the
+# default --bootstrap-timeout is too short for the controller pod to expose
+# its API. Pin a longer timeout here.
+juju:
+  extra-bootstrap-args: --bootstrap-timeout=30m
+  model-defaults:
+    test-mode: "true"
+    automatically-retry-hooks: "false"
+
+providers:
+  lxd:
+    enable: true
+  k8s:
+    enable: true
+    bootstrap: true
+    bootstrap-constraints:
+      root-disk: "2G"
+    features:
+      load-balancer:
+        l2-mode: "true"
+        cidrs: "10.43.45.0/28"
+      local-storage: {}
+      network: {}
+
+host:
+  packages:
+    - gnome-keyring
+    - python3-pip
+    - python3-venv
+  snaps:
+    charmcraft:
+    jq:
+    yq:
+    rockcraft:
