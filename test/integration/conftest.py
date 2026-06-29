@@ -162,7 +162,7 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     )
 
     # Juju 4 stopped exposing the Service ClusterIP on apps[X].address for
-    # caas; resolve it from k8s directly. The ClusterIP is what in-cluster
+    # Kubernetes; resolve it from k8s directly. The ClusterIP is what in-cluster
     # consumers (the Tempo pods, via s3-integrator) need.
     cluster_ip = _kubectl_cluster_ip(juju.model, 'minio')
 
