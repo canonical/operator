@@ -80,8 +80,8 @@ def test_fs_push(charm_cls):
 
     def callback(self: CharmBase):
         container = self.unit.get_container('foo')
-        baz = container.pull('/bar/baz.txt')
-        assert baz.read() == text
+        with container.pull('/bar/baz.txt') as baz:
+            assert baz.read() == text
 
     trigger(
         State(
@@ -109,8 +109,8 @@ def test_fs_pull(charm_cls, make_dirs):
         if make_dirs:
             container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
             # check that pulling immediately 'works'
-            baz = container.pull('/foo/bar/baz.txt')
-            assert baz.read() == text
+            with container.pull('/foo/bar/baz.txt') as baz:
+                assert baz.read() == text
         else:
             with pytest.raises(pebble.PathError):
                 container.push('/foo/bar/baz.txt', text, make_dirs=make_dirs)
@@ -145,9 +145,8 @@ def test_fs_pull(charm_cls, make_dirs):
         assert file == Path(out.get_container('foo').mounts['foo'].source) / 'bar' / 'baz.txt'
 
         # but that is actually a symlink to the context's root tmp folder:
-        assert (
-            Path(ctx._tmp.name) / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt'
-        ).read_text() == text
+        base = ctx._tmp_path
+        assert (base / 'containers' / 'foo' / 'foo' / 'bar' / 'baz.txt').read_text() == text
         assert file.read_text() == text
 
         # shortcut for API niceness purposes:

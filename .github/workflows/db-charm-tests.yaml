@@ -6,12 +6,17 @@ on:
       - main
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
+  build-wheels:
+    uses: ./.github/workflows/_build-wheels.yaml
+
   db-charm-tests:
     runs-on: ubuntu-latest
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -19,36 +24,52 @@ jobs:
           - charm-repo: canonical/postgresql-operator
             commit: 33ca7f308fa4289cdf45ceefcb335f373713431d  # 2025-06-21T22:22:22Z
           - charm-repo: canonical/postgresql-k8s-operator
-            commit: a6753b27440a17ed5f37d4c2c5c6f53b1d3a1f7f  # 2025-06-22T11:27:17Z
+            commit: c434df80953409f290e7ea6e76f78a3ec46cecc2  # 2026-05-30T03:35:40Z
           - charm-repo: canonical/mysql-operator
             commit: 411fb45ecfe200d22b46af9cbacaf72e8eb09da7  # 2025-06-23T14:51:47Z
           - charm-repo: canonical/mysql-k8s-operator
             commit: 7b5775c9d07fd32c4453d93dfc51cf1b4d6c8024  # rev257 rev256 2025-06-23T15:19:19Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
-      - name: Checkout the operator repository
-        uses: actions/checkout@v4
+      - name: Download operator wheels
+        uses: actions/download-artifact@v8
         with:
-          path: myops
-          persist-credentials: false
+          name: ${{ needs.build-wheels.outputs.artifact-name }}
+          path: operator-wheels
 
       - name: Install patch dependencies
         run: pip install poetry~=2.0
 
       - name: Update 'ops' dependency in test charm to latest
         run: |
+          ops_wheel="$(ls operator-wheels/ops-[0-9]*.whl)"
+          ops_tracing_wheel="$(ls operator-wheels/ops_tracing-*.whl)"
           if [ -e "requirements.txt" ]; then
             sed -i -e "/^ops[ ><=]/d" -e "/canonical\/operator/d" -e "/#egg=ops/d" requirements.txt
-            echo -e "\ngit+$GITHUB_SERVER_URL/$GITHUB_REPOSITORY@$GITHUB_SHA#egg=ops" >> requirements.txt
+            echo -e "\n${ops_wheel}" >> requirements.txt
           else
-            sed -i -e "s/^ops[ ><=].*/ops = {path = \"myops\"}/" pyproject.toml
-            poetry lock
+            # The charm may declare ops with the 'tracing' extra, which pulls in
+            # ops-tracing from PyPI. Replacing ops with a local wheel drops the
+            # extra, so install the matching ops-tracing wheel explicitly when
+            # the charm asked for it. Check before `poetry remove`, which
+            # strips the ops line from pyproject.toml.
+            if grep -qE 'ops[^a-z]+=.*tracing|ops\[[^]]*tracing' pyproject.toml; then
+              wants_tracing=1
+            else
+              wants_tracing=0
+            fi
+            poetry remove ops --lock
+            if [ "${wants_tracing}" = "1" ]; then
+              poetry add "${ops_wheel}" "${ops_tracing_wheel}" --lock
+            else
+              poetry add "${ops_wheel}" --lock
+            fi
           fi
 
       - name: Install dependencies

@@ -1755,7 +1755,7 @@ class Relation:
         app = our_unit.app if is_peer else None
 
         try:
-            for unit_name in backend.relation_list(self.id):
+            for unit_name in backend.relation_list(self.id, relation_name=relation_name):
                 unit = cache.get(Unit, unit_name)
                 self.units.add(unit)
                 if app is None:
@@ -1768,7 +1768,7 @@ class Relation:
         # If we didn't get the remote app via our_unit.app or the units list,
         # look it up via JUJU_REMOTE_APP or "relation-list --app".
         if app is None:
-            app_name = backend.relation_remote_app_name(relation_id)
+            app_name = backend.relation_remote_app_name(self.id, relation_name=relation_name)
             if app_name is not None:
                 app = cache.get(Application, app_name)
 
@@ -1808,7 +1808,7 @@ class Relation:
                 "relation-model-get" hook tool.
         """
         if self._remote_model is None:
-            d = self._backend.relation_model_get(self.id)
+            d = self._backend.relation_model_get(self.id, relation_name=self.name)
             self._remote_model = RemoteModel(uuid=d['uuid'])
         return self._remote_model
 
@@ -2055,7 +2055,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
         try:
-            return self._backend.relation_get(self.relation.id, self._entity.name, self._is_app)
+            return self._backend.relation_get(
+                self.relation.id,
+                self._entity.name,
+                self._is_app,
+                relation_name=self.relation.name,
+            )
         except RelationNotFoundError:
             # Dead relations tell no tales (and have no data).
             return {}
@@ -2157,7 +2162,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _commit(self, data: Mapping[str, str]) -> None:
         self._backend.update_relation_data(
-            relation_id=self.relation.id, entity=self._entity, data=data
+            relation_id=self.relation.id,
+            entity=self._entity,
+            data=data,
+            relation_name=self.relation.name,
         )
 
     def _update_cache(self, data: Mapping[str, str]) -> None:
@@ -3665,10 +3673,11 @@ class _ModelBackend:
         relation_ids = typing.cast('Iterable[str]', relation_ids)
         return [int(relation_id.split(':')[-1]) for relation_id in relation_ids]
 
-    def relation_list(self, relation_id: int) -> list[str]:
+    def relation_list(self, relation_id: int, *, relation_name: str | None = None) -> list[str]:
+        relation = f'{relation_name}:{relation_id}' if relation_name else str(relation_id)
         try:
             rel_list = self._run(
-                'relation-list', '-r', str(relation_id), return_output=True, use_json=True
+                'relation-list', '-r', relation, return_output=True, use_json=True
             )
             return typing.cast('list[str]', rel_list)
         except ModelError as e:
@@ -3676,7 +3685,9 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_remote_app_name(self, relation_id: int) -> str | None:
+    def relation_remote_app_name(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> str | None:
         """Return remote app name for given relation ID, or None if not known."""
         if (
             self._juju_context.relation_id is not None
@@ -3690,8 +3701,9 @@ class _ModelBackend:
         # If caller is asking for information about another relation, use
         # "relation-list --app" to get it.
         try:
+            relation = f'{relation_name}:{relation_id}' if relation_name else str(relation_id)
             rel_id = self._run(
-                'relation-list', '-r', str(relation_id), '--app', return_output=True, use_json=True
+                'relation-list', '-r', relation, '--app', return_output=True, use_json=True
             )
             # if it returned anything at all, it's a str.
             return typing.cast('str', rel_id)
@@ -3706,7 +3718,12 @@ class _ModelBackend:
             raise
 
     def relation_get(
-        self, relation_id: int, member_name: str, is_app: bool
+        self,
+        relation_id: int,
+        member_name: str,
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
     ) -> _RelationDataContent_Raw:
         if not isinstance(is_app, bool):
             raise TypeError('is_app parameter to relation_get must be a boolean')
@@ -3717,7 +3734,8 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        args = ['relation-get', '-r', str(relation_id), '-', member_name]
+        relation = f'{relation_name}:{relation_id}' if relation_name else str(relation_id)
+        args = ['relation-get', '-r', relation, '-', member_name]
         if is_app:
             args.append('--app')
 
@@ -3729,7 +3747,14 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+    def relation_set(
+        self,
+        relation_id: int,
+        data: Mapping[str, str],
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
+    ) -> None:
         if not data:
             raise ValueError('at least one key:value pair is required for relation-set')
         if not isinstance(is_app, bool):
@@ -3741,7 +3766,8 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
-        args = ['relation-set', '-r', str(relation_id)]
+        relation = f'{relation_name}:{relation_id}' if relation_name else str(relation_id)
+        args = ['relation-set', '-r', relation]
         if is_app:
             args.append('--app')
         args.extend(['--file', '-'])
@@ -3754,8 +3780,11 @@ class _ModelBackend:
                 raise RelationNotFoundError() from e
             raise
 
-    def relation_model_get(self, relation_id: int) -> dict[str, Any]:
-        args = ['relation-model-get', '-r', str(relation_id)]
+    def relation_model_get(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> dict[str, Any]:
+        relation = f'{relation_name}:{relation_id}' if relation_name else str(relation_id)
+        args = ['relation-model-get', '-r', relation]
         try:
             result = self._run(*args, return_output=True, use_json=True)
             return typing.cast('dict[str, Any]', result)
@@ -4002,10 +4031,18 @@ class _ModelBackend:
         return num_alive
 
     def update_relation_data(
-        self, relation_id: int, entity: Unit | Application, data: Mapping[str, str]
+        self,
+        relation_id: int,
+        entity: Unit | Application,
+        data: Mapping[str, str],
+        *,
+        relation_name: str | None = None,
     ):
         self.relation_set(
-            relation_id=relation_id, data=data, is_app=isinstance(entity, Application)
+            relation_id=relation_id,
+            data=data,
+            is_app=isinstance(entity, Application),
+            relation_name=relation_name,
         )
 
     def secret_get(
