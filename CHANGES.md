@@ -12,7 +12,7 @@
 * Restore sys.breakpointhook on _Manager teardown (#2542)
 * Avoid errors in finalisation due to already-closed websocket (#2548)
 * Use the correct value for JUJU_HOOK_NAME when objects contain dashes (#2552)
-* Avoid double-closing the framework in scenario teardown (#2561)
+* Avoid double-closing the framework in testing teardown (#2561)
 * Don't leak exec I/O threads when waiting on the change fails (#2558)
 * Take Pebble defaults into consideration when consistency checking Checks (#2567)
 * Tear down `Runtime.exec()` when the charm raises (#2581)
@@ -30,7 +30,7 @@
 * Fix first unit tests command in machine charm tutorial (#2574)
 * Extend security explanation page to cover SEC0030 V1.3 gaps (#2571)
 * Move docs to canonical.com/juju/docs/ops (#2545)
-* Fix doc string of _Event._is_action_event (#2580)
+* Fix docstring of _Event._is_action_event (#2580)
 
 ## Tests
 
