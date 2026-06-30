@@ -37,30 +37,6 @@ def juju() -> Generator[jubilant.Juju]:
         print(juju.debug_log())
 
 
-def _kubectl_cluster_ip(namespace: str, service: str) -> str:
-    """Return the ClusterIP of `service` in `namespace` via kubectl.
-
-    Juju 4 no longer exposes the Service ClusterIP on apps[X].address for Kubernetes
-    models; only units have an address, and that's the Pod IP. We still need
-    the ClusterIP to configure in-cluster consumers (such as the
-    s3-integrator endpoint that Tempo pods resolve from inside the cluster).
-    """
-    out = subprocess.check_output(
-        [  # noqa: S607
-            'kubectl',
-            '--namespace',
-            namespace,
-            'get',
-            'svc',
-            service,
-            '-o',
-            'jsonpath={.spec.clusterIP}',
-        ],
-        text=True,
-    )
-    return out.strip()
-
-
 @contextlib.contextmanager
 def kubectl_port_forward(namespace: str, target: str, port: int) -> Iterator[tuple[str, int]]:
     """Forward `target:port` to a free local port via kubectl port-forward.
@@ -129,8 +105,8 @@ def _xfail_on_k8s_juju4(juju: jubilant.Juju, reason: str) -> None:
 
     Caller must pass a reason that names the specific upstream Juju issue.
     """
-    status = juju.status()
-    if status.model.type == 'caas' and status.model.version.startswith('4.'):
+    info = juju.show_model()
+    if info.type == 'kubernetes' and info.agent_version.startswith('4.'):
         pytest.xfail(reason)
 
 
@@ -139,17 +115,16 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     """Make a Juju model with the tracing part of COS ready."""
     deploy_tempo(juju)
     deploy_tempo_worker(juju)
-    # On Juju 4, the default minio channel resolves to a podspec charm that
-    # crashes on install (pod-spec-set was removed in Juju 4); latest/edge is
-    # the only sidecar variant. On Juju 3 the latest/edge charm doesn't reach
-    # active either, but the unpinned default does.
-    minio_deploy: dict[str, object] = {
-        'config': {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'},
-    }
-    if juju.status().model.version.startswith('4.'):
-        minio_deploy['channel'] = 'latest/edge'
-        minio_deploy['trust'] = True
-    juju.deploy('minio', **minio_deploy)  # type: ignore[arg-type]
+    minio_config = {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'}
+    if juju.show_model().agent_version.startswith('4.'):
+        # On Juju 4, the default minio channel resolves to a podspec charm that
+        # crashes on install (pod-spec-set was removed in Juju 4); latest/edge
+        # is the only sidecar variant.
+        juju.deploy('minio', channel='latest/edge', trust=True, config=minio_config)
+    else:
+        # On Juju 3 the latest/edge charm doesn't reach active, but the
+        # unpinned default does.
+        juju.deploy('minio', config=minio_config)
     juju.deploy('s3-integrator')
 
     juju.integrate('tempo:s3', 's3-integrator')
@@ -162,9 +137,21 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     )
 
     # Juju 4 stopped exposing the Service ClusterIP on apps[X].address for
-    # Kubernetes; resolve it from k8s directly. The ClusterIP is what in-cluster
-    # consumers (the Tempo pods, via s3-integrator) need.
-    cluster_ip = _kubectl_cluster_ip(juju.model, 'minio')
+    # Kubernetes; resolve it from k8s directly. In-cluster consumers (Tempo
+    # pods, via s3-integrator) still need the ClusterIP, not the Pod IP.
+    cluster_ip = subprocess.check_output(
+        [  # noqa: S607
+            'kubectl',
+            '--namespace',
+            juju.model,
+            'get',
+            'svc',
+            'minio',
+            '-o',
+            'jsonpath={.spec.clusterIP}',
+        ],
+        text=True,
+    ).strip()
 
     # The host can't necessarily reach the ClusterIP (on GitHub Actions a
     # direct connect returns EPERM), so create the bucket via a port-forward.
@@ -257,6 +244,7 @@ def _prepare_generic_charm_dir(
             path.unlink()
         for path in charm_dir.glob('*.charm'):
             path.unlink()
+        (charm_dir / 'uv.lock').unlink(missing_ok=True)
 
     cleanup()
 
@@ -296,16 +284,8 @@ def _prepare_generic_charm_dir(
             (sdist,) = charm_dir.glob('ops_tracing*.tar.gz')
             sdist.rename(charm_dir / 'ops_tracing.tar.gz')
 
-        # uv lock does not refresh the recorded hash for `path = ` sources
-        # when the package version is unchanged, so the committed uv.lock
-        # keeps its stale hash and charmcraft pack later fails with a hash
-        # mismatch inside the build container. --refresh-package forces a
-        # recompute.
-        refresh_packages = ['--refresh-package', 'ops']
-        if build_tracing:
-            refresh_packages += ['--refresh-package', 'ops-tracing']
         subprocess.run(
-            ['uv', 'lock', *refresh_packages],  # noqa: S607
+            ['uv', 'lock'],  # noqa: S607
             cwd=charm_dir,
             text=True,
             check=True,
