@@ -8,7 +8,30 @@ on:
 permissions: {}
 
 jobs:
+  collect:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.tests.outputs.result }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - name: Collect integration test files
+        id: tests
+        run: |
+          set -xueo pipefail
+          result=$(
+            uv run --group integration pytest --collect-only -q --no-header test/integration \
+              | grep '::' \
+              | awk -F:: '{print $1}' \
+              | sort -u \
+              | jq -Rnc '[inputs]'
+          )
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+
   integration:
+    needs: [collect]
     runs-on: ubuntu-latest
 
     strategy:
@@ -20,18 +43,11 @@ jobs:
           - 4.0/stable
           - 4.0/edge
           - 4.1/edge
-        test:
-          - test_direct_connection
-          - test_with_tls
-          - test_relation_units
-          - test_secrets
-          - test_hookcmds
+        test: ${{ fromJson(needs.collect.outputs.tests) }}
         exclude:
           # tempo-coordinator-k8s only deploys on Kubernetes substrates.
           - preset: machine
-            test: test_direct_connection
-          - preset: machine
-            test: test_with_tls
+            test: test/integration/test_tracing.py
 
     steps:
       - uses: actions/checkout@v7
@@ -48,5 +64,7 @@ jobs:
           -c .github/integration/concierge-${{ matrix.preset }}.yaml
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       - run: uv tool install tox --with tox-uv
-      - run: tox -e integration -- --log-cli-level=INFO -s -k "${{ matrix.test }}"
+      - run: tox -e integration -- --log-cli-level=INFO -s "$MATRIX_TEST"
+        env:
+          MATRIX_TEST: ${{ matrix.test }}
         timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
