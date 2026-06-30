@@ -1,9 +1,5 @@
 # 3.8.0 - 30 June 2026
 
-## Breaking Changes
-
-* Refactor: Move the otlp-json package to be a regular ops-tracing module (#2585)
-
 ## Features
 
 * Note the socket path in Pebble tracing spans (#2555)
@@ -48,16 +44,13 @@
 
 * Avoid yaml.load() to silence security scanner false positives (#2523)
 * Replace jsonpatch with an inline dict-diff (#2578)
+* Move the otlp-json package to be a regular ops-tracing module (#2585)
 * Distinguish between init and attribute types in testing state classes (#2331)
 
 ## CI
 
 * Remove obsolete containerd workaround from integration workflow (#2519)
 * Use the sys.monitoring coverage core (#2518)
-
-## Reverted
-
-* "chore: bump opentelemetry-api from 1.37.0 to 1.42.1" (#2568)
 
 # 3.7.1 - 28 May 2026
 
