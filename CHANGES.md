@@ -36,8 +36,7 @@
 
 * Treat warnings as errors when running unit tests (#2541)
 * Fix mock_temp_dir fixture's open() patch (#2553)
-* Add integration tests for ops.hookcmds (#2520)
-* Hookcmds integration tests for secret access and port management (#2562)
+* Add integration tests for ops.hookcmds (#2520, #2562)
 * Fix integration test flakes on Juju 3 k8s and Juju 4 secrets (#2584)
 
 ## Refactoring
