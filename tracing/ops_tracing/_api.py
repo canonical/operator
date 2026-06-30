@@ -20,9 +20,11 @@ import logging
 
 import opentelemetry.trace
 import ops
-from charmlibs.interfaces import certificate_transfer
 
 from ._buffer import Destination
+from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificateTransferRequires,
+)
 from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
@@ -146,9 +148,7 @@ class Tracing(ops.Object):
                         f" 'certificate_transfer' is expected"
                     )
 
-                self._certificate_transfer = certificate_transfer.CertificateTransferRequires(
-                    charm, ca_relation_name
-                )
+                self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
 
                 for event in (
                     self._certificate_transfer.on.certificate_set_updated,

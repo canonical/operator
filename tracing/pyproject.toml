@@ -29,7 +29,6 @@ classifiers = [
     "Framework :: OpenTelemetry",
 ]
 dependencies = [
-    "charmlibs-interfaces-certificate-transfer",
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.30",
     "ops==3.9.0.dev0",
