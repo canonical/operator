@@ -26,13 +26,14 @@ This module provides a way to interact with Pebble, including:
 
 For a command-line interface for local testing, see ``test/pebble_cli.py``.
 
-  See more: `Pebble documentation <https://documentation.ubuntu.com/pebble/>`_
+  See more: `Pebble documentation <https://ubuntu.com/docs/pebble/>`_
 """
 
 from __future__ import annotations
 
 import binascii
 import builtins
+import contextlib
 import copy
 import dataclasses
 import datetime
@@ -340,6 +341,8 @@ if TYPE_CHECKING:
 
 
 class _WebSocket(Protocol):
+    sock: socket.socket | None
+
     def connect(self, url: str, socket: socket.socket): ...
 
     def shutdown(self): ...
@@ -410,10 +413,37 @@ def _format_timeout(timeout: float) -> str:
 
 
 def _start_thread(target: Callable[..., Any], *args: Any, **kwargs: Any) -> threading.Thread:
-    """Helper to simplify starting a thread."""
-    thread = threading.Thread(target=target, args=args, kwargs=kwargs)
+    """Helper to simplify starting a thread.
+
+    The thread is marked as daemon so that exec I/O threads can never keep
+    the interpreter alive at exit, even when teardown is missed (for
+    example, if wait() is never called and the server holds the websockets
+    open).
+    """
+    thread = threading.Thread(target=target, args=args, kwargs=kwargs, daemon=True)
     thread.start()
     return thread
+
+
+def _force_close_websocket(ws: _WebSocket):
+    """Close a websocket so that reads and writes blocked on it unblock.
+
+    ``WebSocket.shutdown()`` only closes the socket's file descriptor, and
+    closing a socket doesn't wake up other threads that are blocked in
+    ``recv()`` on the same socket; an OS-level shutdown of the connection
+    does.
+
+    This reaches into websocket-client's ``WebSocket.sock`` (the underlying
+    ``socket.socket``) because the library exposes no public way to shut the
+    connection down without first closing the fd.
+    """
+    sock = ws.sock
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass  # Already disconnected or closed.
+    ws.shutdown()
 
 
 class Error(Exception):
@@ -814,7 +844,7 @@ class Plan:
 
     A plan is the combined layer configuration. The layer configuration is
     documented at
-    https://documentation.ubuntu.com/pebble/reference/layer-specification/
+    https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
     def __init__(self, raw: str | PlanDict | None = None):
@@ -893,7 +923,7 @@ class Layer:
     """Represents a Pebble configuration layer.
 
     The format of this is documented at
-    https://documentation.ubuntu.com/pebble/reference/layer-specification/
+    https://ubuntu.com/docs/pebble/reference/layer-specification/
     """
 
     #: Summary of the purpose of this layer.
@@ -1649,7 +1679,7 @@ class Notice:
     last_repeated: datetime.datetime
     """The time this notice was last repeated.
 
-    See Pebble's `Notices documentation <https://documentation.ubuntu.com/pebble/reference/notices/>`_
+    See Pebble's `Notices documentation <https://ubuntu.com/docs/pebble/reference/notices/>`_
     for an explanation of what "repeated" means.
     """
 
@@ -1776,7 +1806,7 @@ class ExecProcess(Generic[AnyStr]):
             ChangeError: if there was an error starting or running the process.
             ExecError: if the process exits with a non-zero exit code.
         """
-        with tracer.start_as_current_span('pebble wait'):
+        with self._client._start_span('pebble wait'):
             exit_code = self._wait()
             if exit_code != 0:
                 raise ExecError(self._command, exit_code, None, None)
@@ -1787,20 +1817,35 @@ class ExecProcess(Generic[AnyStr]):
         if timeout is not None:
             # A bit more than the command timeout to ensure that happens first
             timeout += 1
-        change = self._client.wait_change(self._change_id, timeout=timeout)
+        try:
+            change = self._client.wait_change(self._change_id, timeout=timeout)
+        except BaseException:
+            # The wait failed or was interrupted, for example because the
+            # change didn't finish before the client-side timeout above. The
+            # I/O threads may still be blocked on their websockets, so tear
+            # the connections down to unblock them, and reap the threads
+            # before propagating the error, otherwise they're left running
+            # and at interpreter shutdown block the join of non-daemon
+            # threads (#2556).
+            self._teardown_after_error()
+            raise
 
         # If stdin reader thread is running, stop it
         if self._cancel_stdin is not None:
             self._cancel_stdin()
+            self._cancel_stdin = None
 
         # Wait for all threads to finish (e.g., message barrier sent)
         for thread in self._threads:
             thread.join()
 
         # If we opened a cancel_reader pipe, close the read side now (write
-        # side was already closed by _cancel_stdin().
+        # side was already closed by _cancel_stdin()). Clear it afterwards so
+        # that a second call to _wait() (e.g. wait() then wait_output()) can't
+        # close the same fd again, matching _teardown_after_error().
         if self._cancel_reader is not None:
             os.close(self._cancel_reader)
+            self._cancel_reader = None
 
         # Close websockets (shutdown doesn't send CLOSE message or wait for response).
         self._control_ws.shutdown()
@@ -1816,6 +1861,35 @@ class ExecProcess(Generic[AnyStr]):
             exit_code = change.tasks[0].data.get('exit-code', -1)
         return exit_code
 
+    def _teardown_after_error(self):
+        # If stdin reader thread is running, stop it.
+        if self._cancel_stdin is not None:
+            self._cancel_stdin()
+            self._cancel_stdin = None
+
+        # Unlike the success path, close the websockets before joining the
+        # I/O threads: the server hasn't finished the exec, so the threads
+        # are still blocked reading from the websockets and would never
+        # finish on their own.
+        _force_close_websocket(self._control_ws)
+        _force_close_websocket(self._stdio_ws)
+        if self._stderr_ws is not None:
+            _force_close_websocket(self._stderr_ws)
+
+        for thread in self._threads:
+            # With the websockets closed the threads exit almost immediately;
+            # the timeout is belt-and-braces (they're daemon threads, so even
+            # a leak here can't block interpreter shutdown).
+            thread.join(timeout=1.0)
+            if thread.is_alive():
+                logger.warning('exec I/O thread did not finish after error in wait')
+
+        # If we opened a cancel_reader pipe, close the read side now (write
+        # side was already closed by _cancel_stdin()).
+        if self._cancel_reader is not None:
+            os.close(self._cancel_reader)
+            self._cancel_reader = None
+
     def wait_output(self) -> tuple[AnyStr, AnyStr | None]:
         """Wait for the process to finish and return tuple of (stdout, stderr).
 
@@ -1828,7 +1902,7 @@ class ExecProcess(Generic[AnyStr]):
             ExecError: if the process exits with a non-zero exit code.
             TypeError: if :meth:`Client.exec` was called with the ``stdout`` argument.
         """
-        with tracer.start_as_current_span('pebble wait_output'):
+        with self._client._start_span('pebble wait_output'):
             if self.stdout is None:
                 raise TypeError(
                     "can't use wait_output() when exec was called with the stdout argument; "
@@ -1865,7 +1939,7 @@ class ExecProcess(Generic[AnyStr]):
             sig: Name or number of signal to send, e.g., "SIGHUP", 1, or
                 signal.SIGHUP.
         """
-        with tracer.start_as_current_span('pebble send_signal') as span:
+        with self._client._start_span('pebble send_signal') as span:
             if isinstance(sig, int):
                 sig = signal.Signals(sig).name
             span.set_attribute('signal', sig)
@@ -1896,29 +1970,43 @@ def _reader_to_websocket(
     bufsize: int = 16 * 1024,
 ):
     """Read reader through to EOF and send each chunk read to the websocket."""
-    while True:
-        if cancel_reader is not None:
-            # Wait for either a read to be ready or the caller to cancel stdin.
-            # If the reader is also ready, drain it first so a cancel that
-            # arrives before this thread runs doesn't drop pending input.
-            result = select.select([cancel_reader, reader], [], [])
-            if reader not in result[0]:
+    try:
+        while True:
+            if cancel_reader is not None:
+                # Wait for either a read to be ready or the caller to cancel stdin.
+                # If the reader is also ready, drain it first so a cancel that
+                # arrives before this thread runs doesn't drop pending input.
+                result = select.select([cancel_reader, reader], [], [])
+                if reader not in result[0]:
+                    break
+
+            chunk = reader.read(bufsize)
+            if not chunk:
                 break
+            if isinstance(chunk, str):
+                chunk = chunk.encode(encoding)
+            ws.send_binary(chunk)
 
-        chunk = reader.read(bufsize)
-        if not chunk:
-            break
-        if isinstance(chunk, str):
-            chunk = chunk.encode(encoding)
-        ws.send_binary(chunk)
-
-    ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
+        ws.send('{"command":"end"}')  # Send "end" command as TEXT frame to signal EOF
+    except (websocket.WebSocketException, OSError) as e:
+        # The websocket or cancel pipe was closed underneath us (for example,
+        # because the exec failed and ExecProcess._wait tore the connection
+        # down), so there's nowhere to send the rest of the input to.
+        logger.debug('exec stdin forwarder stopped: %s', e)
 
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
     while True:
-        chunk = ws.recv()
+        try:
+            chunk = ws.recv()
+        except (websocket.WebSocketException, OSError) as e:
+            # The websocket was closed underneath us (for example, because
+            # the exec failed and ExecProcess._wait tore the connection
+            # down): treat it as end-of-stream rather than crashing the
+            # thread.
+            logger.debug('exec output forwarder stopped: %s', e)
+            break
 
         if isinstance(chunk, str):
             try:
@@ -1958,8 +2046,23 @@ class _WebsocketWriter(io.BufferedIOBase):
         return len(chunk)
 
     def close(self):
-        """Send end-of-file message to websocket."""
-        self.ws.send('{"command":"end"}')
+        """Send end-of-file message to websocket.
+
+        Idempotent and tolerant of the underlying websocket already being
+        closed: ``ExecProcess._wait`` shuts the stdio websocket down before
+        the writer (or the ``TextIOWrapper`` wrapping it) is finalised, so
+        ``IOBase.__del__`` would otherwise surface a
+        ``WebSocketConnectionClosedException`` as an "Exception ignored
+        while finalizing file" warning on Python 3.13+ (see CPython
+        gh-62948).
+        """
+        if self.closed:
+            return
+        try:
+            self.ws.send('{"command":"end"}')
+        except websocket.WebSocketConnectionClosedException:
+            pass
+        super().close()
 
 
 class _WebsocketReader(io.BufferedIOBase):
@@ -1981,7 +2084,16 @@ class _WebsocketReader(io.BufferedIOBase):
             return b''
 
         while not self.remaining:
-            chunk = self.ws.recv()
+            try:
+                chunk = self.ws.recv()
+            except (websocket.WebSocketException, OSError) as e:
+                # The websocket was closed underneath us (for example,
+                # because the exec failed and ExecProcess._wait tore the
+                # connection down): treat it as end-of-file. The error that
+                # caused the teardown is reported by wait()/wait_output().
+                logger.debug('exec output stream closed: %s', e)
+                self.eof = True
+                return b''
 
             if isinstance(chunk, str):
                 try:
@@ -2130,6 +2242,10 @@ class Client:
     connection attempt to Pebble; used by ``urllib.request.OpenerDirector.open``. It's not for
     methods like :meth:`start_services` and :meth:`replan_services` mentioned above, and it's not
     for the command execution timeout defined in method :meth:`Client.exec`.
+
+    ``socket_path`` is available as the ``pebble.socket_path`` attribute in every tracing span
+    emitted by the client. This is useful for distinguishing spans where multiple Pebble daemons
+    are used.
     """
 
     _chunk_size = 8192
@@ -2149,6 +2265,13 @@ class Client:
         self.opener = opener
         self.base_url = base_url
         self.timeout = timeout
+
+    @contextlib.contextmanager
+    def _start_span(self, span_name: str) -> Generator[Any, None, None]:
+        """Start a tracing span, annotated with the Pebble socket path."""
+        with tracer.start_as_current_span(span_name) as span:
+            span.set_attribute('pebble.socket_path', self.socket_path)
+            yield span
 
     @classmethod
     def _get_default_opener(cls, socket_path: str) -> urllib.request.OpenerDirector:
@@ -2222,15 +2345,16 @@ class Client:
         try:
             response = self.opener.open(request, timeout=self.timeout)
         except urllib.error.HTTPError as e:
-            code = e.code
-            status = e.reason
-            try:
-                body: dict[str, Any] = json.loads(e.read())
-                message: str = body['result']['message']
-            except (OSError, ValueError, KeyError) as e2:
-                # Will only happen on read error or if Pebble sends invalid JSON.
-                body: dict[str, Any] = {}
-                message = f'{type(e2).__name__} - {e2}'
+            with e:  # close the underlying tempfile so it doesn't leak
+                code = e.code
+                status = e.reason
+                try:
+                    body: dict[str, Any] = json.loads(e.read())
+                    message: str = body['result']['message']
+                except (OSError, ValueError, KeyError) as e2:
+                    # Will only happen on read error or if Pebble sends invalid JSON.
+                    body: dict[str, Any] = {}
+                    message = f'{type(e2).__name__} - {e2}'
             raise APIError(body, code, status, message) from None
         except urllib.error.URLError as e:
             if e.args and isinstance(e.args[0], FileNotFoundError):
@@ -2244,13 +2368,13 @@ class Client:
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
-        with tracer.start_as_current_span('pebble get_system_info'):
+        with self._start_span('pebble get_system_info'):
             resp = self._request('GET', '/v1/system-info')
             return SystemInfo.from_dict(resp['result'])
 
     def get_warnings(self, select: WarningState = WarningState.PENDING) -> list[Warning]:
         """Get list of warnings in given state (pending or all)."""
-        with tracer.start_as_current_span('pebble get_warnings') as span:
+        with self._start_span('pebble get_warnings') as span:
             query = {'select': select.value}
             span.set_attributes(query)
             resp = self._request('GET', '/v1/warnings', query)
@@ -2258,7 +2382,7 @@ class Client:
 
     def ack_warnings(self, timestamp: datetime.datetime) -> int:
         """Acknowledge warnings up to given timestamp, return number acknowledged."""
-        with tracer.start_as_current_span('pebble ack_warnings'):
+        with self._start_span('pebble ack_warnings'):
             body = {'action': 'okay', 'timestamp': timestamp.isoformat()}
             resp = self._request('POST', '/v1/warnings', body=body)
             return resp['result']
@@ -2269,7 +2393,7 @@ class Client:
         service: str | None = None,
     ) -> list[Change]:
         """Get list of changes in given state, filter by service name if given."""
-        with tracer.start_as_current_span('pebble get_changes') as span:
+        with self._start_span('pebble get_changes') as span:
             query: dict[str, str | int] = {'select': select.value}
             if service is not None:
                 query['for'] = service
@@ -2279,13 +2403,13 @@ class Client:
 
     def get_change(self, change_id: ChangeID) -> Change:
         """Get single change by ID."""
-        with tracer.start_as_current_span('pebble get_change'):
+        with self._start_span('pebble get_change'):
             resp = self._request('GET', f'/v1/changes/{change_id}')
             return Change.from_dict(resp['result'])
 
     def abort_change(self, change_id: ChangeID) -> Change:
         """Abort change with given ID."""
-        with tracer.start_as_current_span('pebble abort_change'):
+        with self._start_span('pebble abort_change'):
             body = {'action': 'abort'}
             resp = self._request('POST', f'/v1/changes/{change_id}', body=body)
             return Change.from_dict(resp['result'])
@@ -2409,7 +2533,7 @@ class Client:
         timeout: float | None,
         delay: float,
     ) -> ChangeID:
-        with tracer.start_as_current_span(f'pebble {action}_services') as span:
+        with self._start_span(f'pebble {action}_services') as span:
             if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
                 raise TypeError(
                     f'services must be of type Iterable[str], not {type(services).__name__}'
@@ -2454,7 +2578,7 @@ class Client:
         Raises:
             TimeoutError: If the maximum timeout is reached.
         """
-        with tracer.start_as_current_span('pebble wait_change'):
+        with self._start_span('pebble wait_change'):
             try:
                 return self._wait_change_using_wait(change_id, timeout)
             except NotImplementedError:
@@ -2519,7 +2643,7 @@ class Client:
         raise TimeoutError(f'timed out waiting for change {change_id} ({timeout} seconds)')
 
     def _checks_action(self, action: str, checks: Iterable[str]) -> list[str]:
-        with tracer.start_as_current_span(f'pebble {action}_checks') as span:
+        with self._start_span(f'pebble {action}_checks') as span:
             if isinstance(checks, str) or not hasattr(checks, '__iter__'):
                 raise TypeError(
                     f'checks must be of type Iterable[str], not {type(checks).__name__}',
@@ -2546,7 +2670,7 @@ class Client:
         exists, the two layers are combined into a single one considering the
         layer override rules; if the layer doesn't exist, it is added as usual.
         """
-        with tracer.start_as_current_span('pebble add_layer') as span:
+        with self._start_span('pebble add_layer') as span:
             if not isinstance(label, str):
                 raise TypeError(f'label must be a str, not {type(label).__name__}')
             span.set_attribute('label', label)
@@ -2574,7 +2698,7 @@ class Client:
 
     def get_plan(self) -> Plan:
         """Get the Pebble plan (contains combined layer configuration)."""
-        with tracer.start_as_current_span('pebble get_plan'):
+        with self._start_span('pebble get_plan'):
             resp = self._request('GET', '/v1/plan', {'format': 'yaml'})
             return Plan(resp['result'])
 
@@ -2584,7 +2708,7 @@ class Client:
         If names is specified, only fetch the service status for the services
         named.
         """
-        with tracer.start_as_current_span('pebble get_services') as span:
+        with self._start_span('pebble get_services') as span:
             query = None
             if names is not None:
                 names = list(names)
@@ -2622,7 +2746,7 @@ class Client:
                 example, if the file doesn't exist or is a directory.
         """
         path = str(path)
-        with tracer.start_as_current_span('pebble pull') as span:
+        with self._start_span('pebble pull') as span:
             query = {
                 'action': 'read',
                 'path': path,
@@ -2711,12 +2835,12 @@ class Client:
                 destination path doesn't exist and ``make_dirs`` is not used.
         """
         path = str(path)
-        with tracer.start_as_current_span('pebble push') as span:
+        with self._start_span('pebble push') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
             if make_dirs:
                 info['make-dirs'] = True
-            span.set_attributes(info)  # type: ignore
+            span.set_attributes(info)
             metadata = {
                 'action': 'write',
                 'files': [info],
@@ -2827,7 +2951,7 @@ class Client:
                 does not exist.
         """
         path = str(path)
-        with tracer.start_as_current_span('pebble list_files') as span:
+        with self._start_span('pebble list_files') as span:
             query = {'path': path}
             if pattern:
                 query['pattern'] = pattern
@@ -2872,12 +2996,12 @@ class Client:
                 does not exist, and ``make_parents`` is not used.
         """
         path = str(path)
-        with tracer.start_as_current_span('pebble make_dir') as span:
+        with self._start_span('pebble make_dir') as span:
             info = self._make_auth_dict(permissions, user_id, user, group_id, group)
             info['path'] = path
             if make_parents:
                 info['make-parents'] = True
-            span.set_attributes(info)  # type: ignore
+            span.set_attributes(info)
             body = {
                 'action': 'make-dirs',
                 'dirs': [info],
@@ -2900,7 +3024,7 @@ class Client:
                 and the file or directory cannot be removed (it does not exist or is not empty).
         """
         path = str(path)
-        with tracer.start_as_current_span('pebble remove_path') as span:
+        with self._start_span('pebble remove_path') as span:
             info: dict[str, Any] = {'path': path}
             if recursive:
                 info['recursive'] = True
@@ -3100,7 +3224,7 @@ class Client:
                 found.
             ExecError: if the command exits with a non-zero exit code.
         """
-        with tracer.start_as_current_span('pebble exec') as span:
+        with self._start_span('pebble exec') as span:
             if not isinstance(command, list) or not all(isinstance(s, str) for s in command):
                 raise TypeError(f'command must be a list of str, not {type(command).__name__}')
             if len(command) < 1:
@@ -3139,14 +3263,21 @@ class Client:
             task_id = resp['result']['task-id']
 
             stderr_ws: _WebSocket | None = None
+            connected: list[_WebSocket] = []
             try:
                 control_ws = self._connect_websocket(task_id, 'control')
+                connected.append(control_ws)
                 stdio_ws = self._connect_websocket(task_id, 'stdio')
+                connected.append(stdio_ws)
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
+                    connected.append(stderr_ws)
             except websocket.WebSocketException as e:
                 # Error connecting to websockets, probably due to the exec/change
-                # finishing early with an error. Call wait_change to pick that up.
+                # finishing early with an error. Close any websockets that did
+                # connect, then call wait_change to pick up the change error.
+                for ws in connected:
+                    ws.shutdown()
                 change = self.wait_change(ChangeID(change_id))
                 if change.err:
                     raise ChangeError(change.err, change) from e
@@ -3255,7 +3386,7 @@ class Client:
             APIError: If any of the services are not in the plan or are not
                 currently running.
         """
-        with tracer.start_as_current_span('pebble send_signal') as span:
+        with self._start_span('pebble send_signal') as span:
             if isinstance(services, (str, bytes)) or not hasattr(services, '__iter__'):
                 raise TypeError(
                     f'services must be of type Iterable[str], not {type(services).__name__}'
@@ -3289,7 +3420,7 @@ class Client:
         Returns:
             List of :class:`CheckInfo` objects.
         """
-        with tracer.start_as_current_span('pebble get_checks') as span:
+        with self._start_span('pebble get_checks') as span:
             query: dict[str, Any] = {}
             if level is not None:
                 query['level'] = level.value
@@ -3347,7 +3478,7 @@ class Client:
         Returns:
             The notice's ID.
         """
-        with tracer.start_as_current_span('pebble notify') as span:
+        with self._start_span('pebble notify') as span:
             span.set_attributes({'type': type.value, 'key': key})
             body: dict[str, Any] = {
                 'action': 'add',
@@ -3368,7 +3499,7 @@ class Client:
         Raises:
             APIError: if a notice with the given ID is not found (``code`` 404)
         """
-        with tracer.start_as_current_span('pebble get_notice') as span:
+        with self._start_span('pebble get_notice') as span:
             span.set_attribute('id', id)
             resp = self._request('GET', f'/v1/notices/{id}')
             return Notice.from_dict(resp['result'])
@@ -3404,7 +3535,7 @@ class Client:
             types: Filter for notices with any of the specified types.
             keys: Filter for notices with any of the specified keys.
         """
-        with tracer.start_as_current_span('pebble get_notices') as span:
+        with self._start_span('pebble get_notices') as span:
             query: dict[str, str | list[str]] = {}
             if users is not None:
                 query['users'] = users.value
@@ -3428,7 +3559,7 @@ class Client:
         Returns:
             A dict mapping identity names to :class:`Identity` objects.
         """
-        with tracer.start_as_current_span('pebble get_identities'):
+        with self._start_span('pebble get_identities'):
             resp = self._request('GET', '/v1/identities')
             result = resp['result']
             return {name: Identity.from_dict(d) for name, d in result.items()}
@@ -3443,7 +3574,7 @@ class Client:
         Args:
             identities: A dict mapping identity names to dicts or :class:`Identity` objects.
         """
-        with tracer.start_as_current_span('pebble replace_identities'):
+        with self._start_span('pebble replace_identities'):
             identities_dict = {
                 name: identity.to_dict() if isinstance(identity, Identity) else identity
                 for name, identity in identities.items()
@@ -3460,7 +3591,7 @@ class Client:
         Args:
             identities: A set of identity names to remove.
         """
-        with tracer.start_as_current_span('pebble remove_identities'):
+        with self._start_span('pebble remove_identities'):
             identities_dict = {name: None for name in identities}
             body = {'action': 'remove', 'identities': identities_dict}
             self._request('POST', '/v1/identities', body=body)

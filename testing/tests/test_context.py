@@ -106,6 +106,62 @@ def test_context_manager():
         assert mgr.charm.meta.name == 'foo'
 
 
+class _RaisingCharm(ops.CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, _: ops.StartEvent):
+        raise RuntimeError('charm went bang')
+
+
+def test_context_manager_does_not_leak_env_when_implicit_run_raises(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Manager.__exit__ must tear down Runtime.exec() even if the implicit run() raises.
+
+    Otherwise OPERATOR_DISPATCH (set during _Dispatcher.__init__) leaks into the
+    process environment and every subsequent test in the same process hits
+    `raise _Abort(0)`.
+    """
+    monkeypatch.delenv('OPERATOR_DISPATCH', raising=False)
+    ctx = Context(_RaisingCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError):
+        with ctx(ctx.on.start(), State()):
+            # Deliberately don't call mgr.run() — let __exit__ trigger it,
+            # then have the charm raise.
+            pass
+    assert 'OPERATOR_DISPATCH' not in os.environ
+
+
+def test_explicit_run_does_not_leak_env_when_charm_raises(monkeypatch: pytest.MonkeyPatch):
+    """Manager.run() must tear down Runtime.exec() even if ops.run() raises."""
+    monkeypatch.delenv('OPERATOR_DISPATCH', raising=False)
+    ctx = Context(_RaisingCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError):
+        with ctx(ctx.on.start(), State()) as mgr:
+            mgr.run()
+    assert 'OPERATOR_DISPATCH' not in os.environ
+
+
+def test_wrapped_ctx_exit_called_once_on_happy_path():
+    """Runtime.exec()'s __exit__ should fire exactly once when nothing raises."""
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with ctx(ctx.on.start(), State()) as mgr:
+        original_exit = mgr._wrapped_ctx.__exit__
+        call_count = 0
+
+        def counting_exit(*args: Any):
+            nonlocal call_count
+            call_count += 1
+            return original_exit(*args)
+
+        mgr._wrapped_ctx.__exit__ = counting_exit  # type: ignore[method-assign]
+        mgr.run()
+        assert call_count == 1
+    assert call_count == 1
+
+
 def test_app_name_and_unit_id_default():
     ctx = Context(MyCharm, meta={'name': 'foo'})
     assert ctx.app_name == 'foo'
@@ -295,3 +351,44 @@ def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_actions():
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
     with pytest.raises(ValueError, match='actions'):
         Context(MyCharm, charmcraft_yaml, actions=actions)
+
+
+def test_framework_closed_exactly_once_per_run():
+    # Charm libraries (for example tempo's charm_tracing) replace the
+    # framework's close with a wrapper that is not safe to invoke twice, so
+    # a run must close the framework exactly once.
+    close_calls: list[int] = []
+
+    class WrappingCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            original_close = framework.close
+
+            def wrap_close():
+                close_calls.append(1)
+                if len(close_calls) > 1:
+                    raise RuntimeError('framework.close() called twice')
+                original_close()
+
+            framework.close = wrap_close
+
+    ctx = Context(WrappingCharm, meta={'name': 'foo'})
+    ctx.run(ctx.on.start(), State())
+    assert len(close_calls) == 1
+
+
+def test_framework_closed_when_manager_scope_raises():
+    # If the test body raises before the event is emitted, the framework
+    # (and so the SQLite storage) must still be released on the way out.
+    captured: dict[str, ops.Framework] = {}
+
+    class CapturingCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            captured['framework'] = framework
+
+    ctx = Context(CapturingCharm, meta={'name': 'foo'})
+    with pytest.raises(RuntimeError, match='boom'):
+        with ctx(ctx.on.start(), State()):
+            raise RuntimeError('boom')
+    assert captured['framework']._closed

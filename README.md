@@ -6,7 +6,7 @@ The `ops` library is a Python framework for developing and testing Kubernetes an
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - The latest version of `ops` requires Python 3.10 or above.
-> - Read our [docs](https://documentation.ubuntu.com/ops/latest/) for tutorials, how-to guides, the library reference, and more.
+> - Read our [docs](https://canonical.com/juju/docs/ops/latest/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 
@@ -58,6 +58,7 @@ Things to note:
 ```python
 import ops
 
+
 class OpsExampleCharm(ops.CharmBase):
     """Charm the service."""
 
@@ -73,12 +74,12 @@ class OpsExampleCharm(ops.CharmBase):
         environment configuration for your specific workload.
 
         Learn more about interacting with Pebble at
-            https://documentation.ubuntu.com/ops/latest/reference/pebble/
+            https://canonical.com/juju/docs/ops/latest/reference/pebble/
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer("httpbin", self._pebble_layer, combine=True)
+        container.add_layer('httpbin', self._pebble_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         # Learn more about statuses at
@@ -86,7 +87,7 @@ class OpsExampleCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-> See more: [`ops.PebbleReadyEvent`](https://documentation.ubuntu.com/ops/latest/reference/ops/#ops.PebbleReadyEvent)
+> See more: [`ops.PebbleReadyEvent`](https://canonical.com/juju/docs/ops/latest/reference/ops/#ops.PebbleReadyEvent)
 
 - The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a unit test:
 
@@ -100,7 +101,7 @@ from charm import OpsExampleCharm
 def test_httpbin_pebble_ready():
     # Arrange:
     ctx = testing.Context(OpsExampleCharm)
-    container = testing.Container("httpbin", can_connect=True)
+    container = testing.Container('httpbin', can_connect=True)
     state_in = testing.State(containers={container})
 
     # Act:
@@ -109,25 +110,25 @@ def test_httpbin_pebble_ready():
     # Assert:
     updated_plan = state_out.get_container(container.name).plan
     expected_plan = {
-        "services": {
-            "httpbin": {
-                "override": "replace",
-                "summary": "httpbin",
-                "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                "startup": "enabled",
-                "environment": {"GUNICORN_CMD_ARGS": "--log-level info"},
+        'services': {
+            'httpbin': {
+                'override': 'replace',
+                'summary': 'httpbin',
+                'command': 'gunicorn -b 0.0.0.0:80 httpbin:app -k gevent',
+                'startup': 'enabled',
+                'environment': {'GUNICORN_CMD_ARGS': '--log-level info'},
             }
         },
     }
     assert expected_plan == updated_plan
     assert (
-        state_out.get_container(container.name).service_statuses["httpbin"]
+        state_out.get_container(container.name).service_statuses['httpbin']
         == ops.pebble.ServiceStatus.ACTIVE
     )
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing`](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/)
+> See more: [`ops.testing`](https://canonical.com/juju/docs/ops/latest/reference/ops-testing/)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
@@ -150,6 +151,6 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ## Next steps
 
-- Read the [docs](https://documentation.ubuntu.com/ops/latest/).
+- Read the [docs](https://canonical.com/juju/docs/ops/latest/).
 - Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and join our [chat](https://matrix.to/#/#charmhub-ops:ubuntu.com) and [forum](https://discourse.charmhub.io/) or [open an issue](https://github.com/canonical/operator/issues).
 - Read our [CONTRIBUTING guide](https://github.com/canonical/operator/blob/main/HACKING.md) and contribute!

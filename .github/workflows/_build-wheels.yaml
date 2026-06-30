@@ -16,7 +16,7 @@ jobs:
       artifact-name: ${{ steps.artifact-name.outputs.name }}
     steps:
       - name: Checkout the operator repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
 

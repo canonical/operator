@@ -105,7 +105,7 @@ def get_packages_from_charmhub():
     """Get the list of published charms from Charmhub."""
     logger.info('Fetching the list of published charms')
     url = 'https://charmhub.io/packages.json'
-    with urllib.request.urlopen(url, timeout=120) as response:  # noqa: S310 (unsafe URL)
+    with urllib.request.urlopen(url, timeout=120) as response:
         data = response.read().decode()
         packages = json.loads(data)['packages']
     return packages

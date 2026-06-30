@@ -110,10 +110,17 @@ class TestFramework:
                 None,  # type: ignore
                 juju_debug_at=set(),
             )
-        assert 'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path' in [
-            f'{record.levelname}:{record.name}:{record.message}' for record in caplog.records
-        ]
-        assert isinstance(framework._storage, SQLiteStorage)
+        try:
+            assert (
+                'WARNING:ops.framework:deprecated: Framework now takes a Storage not a path'
+                in [
+                    f'{record.levelname}:{record.name}:{record.message}'
+                    for record in caplog.records
+                ]
+            )
+            assert isinstance(framework._storage, SQLiteStorage)
+        finally:
+            framework.close()
 
     def test_handle_path(self):
         cases = [
@@ -198,7 +205,8 @@ class TestFramework:
         framework3 = create_framework(request, tmpdir=tmp_path)
         framework3.register_type(Foo, None, handle.kind)
 
-        pytest.raises(NoSnapshotError, framework3.load_snapshot, handle)
+        with pytest.raises(NoSnapshotError):
+            framework3.load_snapshot(handle)
 
     def test_simple_event_observer(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
@@ -446,9 +454,12 @@ class TestFramework:
         assert ' '.join(obs2.seen) == 'a b c a b c a b c a c a c c'
 
         # Now the event objects must all be gone from storage.
-        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_a_handle)
-        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_b_handle)
-        pytest.raises(NoSnapshotError, framework.load_snapshot, ev_c_handle)
+        with pytest.raises(NoSnapshotError):
+            framework.load_snapshot(ev_a_handle)
+        with pytest.raises(NoSnapshotError):
+            framework.load_snapshot(ev_b_handle)
+        with pytest.raises(NoSnapshotError):
+            framework.load_snapshot(ev_c_handle)
 
     def test_repeated_defer(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
@@ -883,7 +894,8 @@ class TestFramework:
 
         # Register the type and check that the event is gone from storage.
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
-        pytest.raises(NoSnapshotError, framework_copy.load_snapshot, event_handle)
+        with pytest.raises(NoSnapshotError):
+            framework_copy.load_snapshot(event_handle)
 
     def test_auto_register_event_types(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
@@ -981,8 +993,10 @@ class TestFramework:
         assert obs.seen == ['on_foo:MyFoo:foo', 'on_bar:MyBar:bar']
 
         # Definitions remained local to the specific type.
-        pytest.raises(AttributeError, lambda: pub.on_a.bar)
-        pytest.raises(AttributeError, lambda: pub.on_b.foo)
+        with pytest.raises(AttributeError):
+            pub.on_a.bar
+        with pytest.raises(AttributeError):
+            pub.on_b.foo
 
         # Try to use an event name which is not a valid python identifier.
         with pytest.raises(RuntimeError):

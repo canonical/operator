@@ -1,7 +1,7 @@
 # ops-scenario, the unit testing framework for ops charms
 
 `ops-scenario` is a Python library that provides state-transition testing for
-[Ops](https://documentation.ubuntu.com/ops/latest/) charms. These tests are higher level than
+[Ops](https://canonical.com/juju/docs/ops/latest/) charms. These tests are higher level than
 typical unit tests, but run at similar speeds and are the recommended approach
 for testing charms within requiring a full [Juju](https://canonical.com/juju) installation.
 
@@ -18,6 +18,7 @@ from ops import testing
 
 # 'src/charm.py' typically contains the charm class.
 from charm import MyCharm
+
 
 def test_start():
     ctx = testing.Context(MyCharm)
@@ -37,6 +38,7 @@ import pytest
 from ops import testing
 
 from charm import MyCharm
+
 
 @pytest.mark.parametrize(
     'leader',
@@ -93,16 +95,16 @@ package.
 
 ## Documentation
 
- * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://documentation.ubuntu.com/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm/#write-unit-tests-for-your-charm), following the instructions for adding
+ * To get started, work through our ['Write your first Kubernetes charm' tutorial](https://canonical.com/juju/docs/ops/latest/tutorial/from-zero-to-hero-write-your-first-kubernetes-charm/create-a-minimal-kubernetes-charm/#write-unit-tests-for-your-charm), following the instructions for adding
    unit tests at the end of each chapter.
  * When you need to write a test that involves specific ops functionality,
-   refer to our [how-to guides](https://documentation.ubuntu.com/ops/latest/howto/)
+   refer to our [how-to guides](https://canonical.com/juju/docs/ops/latest/howto/)
    which all conclude with examples of tests of the ops functionality.
- * Use our extensive [reference documentation](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/#ops-testing) when you need to know how each `testing` object works. These
+ * Use our extensive [reference documentation](https://canonical.com/juju/docs/ops/latest/reference/ops-testing/#ops-testing) when you need to know how each `testing` object works. These
    docs are also available via the standard Python `help()` functionality and in
    your IDE.
 
-[**Read the full documentation**](https://documentation.ubuntu.com/ops/latest/)
+[**Read the full documentation**](https://canonical.com/juju/docs/ops/latest/)
 
 ## Community
 
