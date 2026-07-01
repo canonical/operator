@@ -37,7 +37,7 @@ updates:
       default-days: 7
       semver-major-days: 14
     groups:
-      # Charm Tech's own releases (lockstep-versioned; we trust the release).
+      # Charm Tech's own releases (we trust the release).
       charm-tech:
         patterns:
           - "jubilant"
