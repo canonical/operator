@@ -71,7 +71,7 @@ integration = [
     "httpx~=0.28",
 ]
 release = [
-    "packaging~=24.0",
+    "packaging>=24,<27",
     "pygithub~=2.6",
     "rich~=14.1",
 ]
