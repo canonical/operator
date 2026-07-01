@@ -25,6 +25,16 @@ To check that your preferred name isn't already in use, visit the (future) Charm
 https://charmhub.io/mega-calendar-k8s
 ```
 
+```{admonition} Best practice
+:class: hint
+
+Your charm's name should be slug-oriented (ASCII lowercase letters, numbers, and hyphens) and follow the pattern `<workload name in full>[<function>][-k8s]`.
+
+For a Kubernetes charm, include the `k8s` suffix if there is (or could be in the future) a machine variant of your charm. If your charm is inherently tied to Kubernetes and there could never be a machine variant, don't include the `k8s` suffix.
+
+Don't add an `operator` or `charm` prefix/suffix. Don't include an organisation or publisher name.
+```
+
 Some charms do not operate a workload, such as integrator and configurator charms. These categories serve different purposes:
 
 * An integrator charm allows integration with a service that is not managed through Juju. This can both apply to server side integrations (such as `s3-integrator`, which integrates an externally managed S3 object storage) or to client side integrations (such as `data-integrator`, representing the integration of external client application that needs a database).
