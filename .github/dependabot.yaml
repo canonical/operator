@@ -40,9 +40,6 @@ updates:
       # Charm Tech's own releases (lockstep-versioned; we trust the release).
       charm-tech:
         patterns:
-          - "ops"
-          - "ops-scenario"
-          - "ops-tracing"
           - "jubilant"
           - "pytest-jubilant"
       # Linters / type-checkers / formatters / dev tooling. Majors ride along;
