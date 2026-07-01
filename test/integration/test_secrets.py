@@ -32,7 +32,7 @@ _JUJU4_COMMIT_BUG = (
 _JUJU4_MARKED_ONE_XFAIL = False
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True)  # noqa: RUF076  # gate every test in the module
 def _skip_on_juju4(juju: jubilant.Juju):
     """Skip the whole module on Juju >= 4 until the upstream bug is fixed.
 
