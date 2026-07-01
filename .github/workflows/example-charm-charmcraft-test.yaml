@@ -16,7 +16,7 @@ jobs:
     outputs:
       jobs: ${{ steps.collect.outputs.jobs }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Collect spread jobs
@@ -39,7 +39,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.collect-spread-jobs.outputs.jobs) }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up LXD

@@ -17,7 +17,7 @@ jobs:
         dir:
           - examples/machine-tinyproxy
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up uv
@@ -51,7 +51,7 @@ jobs:
           - examples/k8s-4-action
           - examples/k8s-5-observe
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up uv
