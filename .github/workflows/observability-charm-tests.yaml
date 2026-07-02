@@ -30,14 +30,14 @@ jobs:
             commit: f3999254035d5f39eda07261af2b86a4454846d4  # 2026-05-20T14:52:38Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Download operator wheels
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels
