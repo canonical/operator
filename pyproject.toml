@@ -93,6 +93,9 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.workspace]
 members = ["tracing", "testing"]
 
