@@ -45,7 +45,7 @@ When naming your charm, use `-integrator` and `-configurator` to signal the cate
 
 The `k8s` suffix is for disambiguation, not classification. Only use `-k8s` in the name of a Kubernetes charm if there is (or could be in the future) a machine variant of your charm.
 
-Don't use `-k8s` if your charm is inherently tied to Kubernetes and there could never be a machine variant. For example, a charm that uses `lightkube` to manage Kubernetes resources.
+For example, a charm that manages Kubernetes resources with `lightkube` shouldn't use `-k8s` in the name, as the charm is inherently tied to Kubernetes.
 
 Don't use `-k8s` for workload-less charms. These charms work on machines and Kubernetes.
 
