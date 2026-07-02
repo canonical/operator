@@ -20,6 +20,8 @@ import logging
 
 import ops
 
+import fastapi_demo
+
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,9 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.ActiveStatus()
+        # Set the workload version of this charm.
+        version = fastapi_demo.get_version(port=8000)
+        self.unit.set_workload_version(version)
 
     def _get_pebble_layer(self) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""

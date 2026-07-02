@@ -11,6 +11,7 @@ When you deploy a Kubernetes charm, the following things happen:
 1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
 1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble.
 1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations.
+1. During operations, the charm may need to directly communicate with the workload application. The charm container and workload container can communicate via `localhost` because they share the same pod, and containers in the same pod share the same network namespace.
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
@@ -22,7 +23,7 @@ All subsequent workload management happens in the same way -- the Juju controlle
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
 
- - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
+- descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
 - executable files (like the `src/charm.py` file that we will see shortly) where you will use Ops-enriched Python to write all the logic of your charm.
 
 ## Create a charm project
@@ -45,6 +46,7 @@ Charmcraft created several files, including:
 - `charmcraft.yaml` - Metadata about your charm. Used by Juju and Charmcraft.
 - `pyproject.toml` - Python project configuration. Lists the dependencies of your charm.
 - `src/charm.py` - The Python file that will contain the logic of your charm.
+- `src/fastapi_demo.py` - A helper module that will contain functions for interacting with your workload application.
 
 These files currently contain placeholder code and configuration.
 
@@ -83,6 +85,47 @@ resources:
     upstream-source: ghcr.io/canonical/api_demo_server:1.0.4
 ```
 
+### Write a helper module
+
+Your charm will interact with our workload application. It's a good idea to write a helper module that wraps the workload application. Charmcraft created `src/fastapi_demo.py` as a placeholder helper module.
+
+The helper module will be independent of the main logic of your charm. This will make it easier to test your charm. In this tutorial, the helper module only contains the logic to get the version of the workload application. The server has an endpoint at `/version` that returns a JSON payload containing the version number. This is called the workload version.
+
+To make things easier for Juju users, your charm should expose the workload version to Juju. It will be visible in Juju's status output. For more information, see {ref}`how-to-set-the-workload-version`.
+
+Replace the content of `src/fastapi_demo.py` with:
+
+```python
+import json
+import logging
+import urllib.request
+
+logger = logging.getLogger(__name__)
+
+
+def get_version(port: int) -> str:
+    """Get the version of fastapi_demo that is running.
+
+    Args:
+        port: The port where fastapi_demo web server is listening.
+    """
+    response = urllib.request.urlopen(f"http://localhost:{port}/version")
+    data = json.loads(response.read())
+    return data["version"]
+```
+
+Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
+
+1. Receive an event from Juju.
+2. Use Pebble calls and the helper module to manage the workload application and check its status.
+3. Report the status back to Juju.
+
+```{tip}
+After adding code to your charm, run `tox -e format` to format the code. Then run `tox -e lint` to check the code against coding style standards and run static checks. You can run these commands from anywhere in the `~/fastapi-demo` directory in your virtual machine.
+
+You can also run these commands in `~/k8s-tutorial` if uv and tox are available on your host machine. However, be careful when running the same tox command inside and outside your virtual machine. If tox fails with an error related to the `.tox` directory, use `-re` instead of `-e` in the commands. This recreates the tox environment.
+```
+
 ### Define the charm class
 
 We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic.
@@ -95,6 +138,8 @@ Replace the contents of `src/charm.py` with:
 """Kubernetes charm for a demo app."""
 
 import ops
+
+import fastapi_demo
 
 
 class FastAPIDemoCharm(ops.CharmBase):
@@ -188,6 +233,20 @@ def _get_pebble_layer(self) -> ops.pebble.Layer:
     return ops.pebble.Layer(pebble_layer)
 ```
 
+### Set the workload version
+
+The workload version is available after the workload starts, which happens after Pebble reevaluates its plan. We'll use the `src/fastapi_demo.py` helper module for this step.
+
+In `src/charm.py`, append the following lines to the `_on_demo_server_pebble_ready` function:
+
+```python
+# Set the workload version of this charm.
+version = fastapi_demo.get_version(port=8000)
+self.unit.set_workload_version(version)
+```
+
+We get the workload version over port 8000 because `_get_pebble_layer` deploys the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
+
 ### Add logger functionality
 
 In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
@@ -245,14 +304,14 @@ Monitor your deployment:
 juju status --watch 1s
 ```
 
-When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod.
+When all units are settled down, you should see the output below, where `10.152.183.215` is the IP of the K8s Service and `10.1.157.73` is the IP of the pod. The workload version is located in the app's `Version` column.
 
 ```text
 Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.13   unsupported  13:38:19+01:00
 
 App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
-fastapi-demo           active      1  fastapi-demo             0  10.152.183.215  no
+fastapi-demo  1.0.4    active      1  fastapi-demo             0  10.152.183.215  no
 
 Unit             Workload  Agent  Address      Ports  Message
 fastapi-demo/0*  active    idle   10.1.157.73
@@ -260,7 +319,7 @@ fastapi-demo/0*  active    idle   10.1.157.73
 
 ### Try the web server
 
-Validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
+Validate that the app is running and reachable by sending an HTTP request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
 
 ```
 curl 10.1.157.73:8000/version
@@ -325,12 +384,23 @@ Replace the contents of `tests/unit/test_charm.py` with:
 
 ```python
 import ops
+import pytest
 from ops import testing
 
 from charm import FastAPIDemoCharm
 
 
-def test_pebble_layer():
+def mock_get_version(port: int):
+    """Get a mock version string without executing the workload code."""
+    return "0.0.1"
+
+
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
+
+
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -361,9 +431,13 @@ def test_pebble_layer():
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
+    # Check the workload version is set
+    assert state_out.workload_version is not None
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
+
+In unit tests, we avoid any interaction with the outside world. The `get_version` method performs an HTTP call, which must be patched. We use the `mock_version` fixture to achieve this.
 
 ### Run the test
 
@@ -390,10 +464,10 @@ tests/unit/test_charm.py::test_pebble_layer PASSED
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             17      0      0      0   100%
-src/fastapi_demo.py       4      4      0      0     0%   9-20
+src/charm.py             20      0      0      0   100%
+src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    21      4      0      0    81%
+TOTAL                    28      3      0      0    89%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```
@@ -440,6 +514,13 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+
+
+def test_workload_version_is_set(juju: jubilant.Juju):
+    # Verify that the workload version has been set.
+    version = juju.status().apps[APP_NAME].version
+    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
+    assert version == "1.0.4"
 ```
 
 This test depends on two fixtures:

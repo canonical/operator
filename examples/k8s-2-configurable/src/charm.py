@@ -21,6 +21,8 @@ import logging
 
 import ops
 
+import fastapi_demo
+
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
@@ -85,11 +87,13 @@ class FastAPIDemoCharm(ops.CharmBase):
             # service if required.
             self.container.replan()
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
-
-            self.unit.status = ops.ActiveStatus()
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info("Unable to connect to Pebble: %s", e)
             self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
+            return
+        self.unit.status = ops.ActiveStatus()
+        version = fastapi_demo.get_version(config.server_port)
+        self.unit.set_workload_version(version)
 
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""

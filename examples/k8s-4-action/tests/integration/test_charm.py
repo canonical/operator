@@ -55,3 +55,7 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+    version = juju.status().apps[APP_NAME].version
+    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
+    assert version == "1.0.4"
