@@ -68,7 +68,7 @@ Examples:
 - [kafka-k8s-operator](https://github.com/canonical/kafka-k8s-operator) - Contains a single charm that operates a K8s workload.
 - [katib-operators](https://github.com/canonical/katib-operators) - Contains multiple charms.
 - [data-integrator](https://github.com/canonical/data-integrator) - Contains a charm that integrates an externally managed service (such as a client application).
-- [s3-integrator](https://github.com/canonical/object-storage--integrators) - Contains multiple charms that integrate an externally managed service (such as different kinds of object storage backends).
+- [s3-integrator](https://github.com/canonical/object-storage-integrators) - Contains multiple charms that integrate an externally managed service (such as different kinds of object storage backends).
 - [request-authentication-configurator](https://github.com/canonical/request-authentication-configurator) - Contains a charm that configures Gateway to perform request authentication.
 
 (initialise-the-repository)=
