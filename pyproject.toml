@@ -37,7 +37,7 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.14",
+    "ruff==0.15.19",
     "codespell==2.4.1",
     "zizmor==1.26.1",
     "ops[testing,tracing]",
@@ -71,7 +71,7 @@ integration = [
     "httpx~=0.28",
 ]
 release = [
-    "packaging~=24.0",
+    "packaging>=24,<27",
     "pygithub~=2.6",
     "rich~=14.1",
 ]
