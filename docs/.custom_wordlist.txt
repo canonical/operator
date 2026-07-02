@@ -33,6 +33,7 @@ replan
 repo
 requirers
 reusability
+sidecar
 snappass
 stderr
 stdout
