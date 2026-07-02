@@ -165,7 +165,7 @@ def test_backup_action_failed():
     ctx = testing.Context(MyCharm)
 
     with pytest.raises(testing.ActionFailed) as exc_info:
-        ctx.run(ctx.on.action('do_backup'), State())
+        ctx.run(ctx.on.action('do-backup'), State())
     assert exc_info.value.message == "sorry, couldn't do the backup"
     # The state is also available if that's required:
     assert exc_info.value.state.get_container(...)

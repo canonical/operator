@@ -431,9 +431,60 @@ class Secret:
             object.__setattr__(self, 'rotate', rotate)
 
 
-def _normalise_name(s: str):
-    """Event names, in Scenario, uniformly use underscores instead of dashes."""
+def _to_python_attr(s: str):
+    """Translate a Juju metadata name (which may contain hyphens) into attribute form.
+
+    This is **lossy** — calling it on an already-hyphen-free name discards no
+    information, but a verbatim metadata name like ``foo-bar`` and the
+    Python attribute form ``foo_bar`` are not distinguishable afterwards. Use it
+    only for matching/dispatch; never round-trip through it to build outgoing
+    Juju env vars, since Juju preserves the metadata name verbatim.
+    """
     return s.replace('-', '_')
+
+
+# Juju's naming rules for charm metadata entities. Scenario enforces these
+# these so that tests cannot pass with names that a real deployment would reject.
+#
+# Sources (juju/names and juju/charm, identical in Juju 3.6 and 4.0):
+# - relation endpoints: RelationSnippet — underscores ARE allowed.
+# - storage: StorageNameSnippet — hyphen-separated, each segment needs a letter.
+# - actions: actionNameRule from actions.yaml parsing.
+# - containers: Juju passes the name verbatim as the Kubernetes container
+#   name, so the RFC 1123 DNS-label rule applies (max 63 characters).
+_NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
+    'relation endpoint': (
+        re.compile(r'^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$'),
+        'lowercase alphanumeric characters separated by single hyphens or '
+        'underscores, starting with a letter',
+    ),
+    'storage': (
+        re.compile(r'^[a-z][a-z0-9]*(?:-[a-z0-9]*[a-z][a-z0-9]*)*$'),
+        'lowercase alphanumeric characters separated by single hyphens, '
+        'starting with a letter, with each hyphen-separated part '
+        'containing at least one letter',
+    ),
+    'action': (
+        re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'),
+        'lowercase alphanumeric characters and hyphens, starting and '
+        'ending with an alphanumeric character',
+    ),
+    'container': (
+        re.compile(r'^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'),
+        'lowercase alphanumeric characters and hyphens, starting and '
+        'ending with an alphanumeric character',
+    ),
+}
+_K8S_CONTAINER_NAME_MAX_LENGTH = 63
+
+
+def _check_name(name: str, kind: str):
+    pattern, requirements = _NAME_RULES[kind]
+    if not pattern.match(name):
+        raise StateValidationError(
+            f'invalid {kind} name {name!r}: Juju requires {kind} names to '
+            f'consist of {requirements}',
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -616,7 +667,7 @@ class RelationBase:
 
     @property
     def _databags(self):
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
 
@@ -638,6 +689,8 @@ class RelationBase:
                 'RelationBase cannot be instantiated directly; '
                 'please use Relation, PeerRelation, or SubordinateRelation',
             )
+
+        _check_name(self.endpoint, 'relation endpoint')
 
         for databag in self._databags:
             self._validate_databag(databag)
@@ -710,7 +763,7 @@ class Relation(RelationBase):
 
     @property
     def _databags(self):  # type: ignore
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -752,7 +805,7 @@ class SubordinateRelation(RelationBase):
 
     @property
     def _databags(self):
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -782,7 +835,7 @@ class PeerRelation(RelationBase):
 
     @property
     def _databags(self):  # type: ignore
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield from self.peers_data.values()
@@ -1229,6 +1282,14 @@ class Container:
         notices: Iterable[Notice] = (),
         check_infos: Iterable[CheckInfo] = (),
     ):
+        # Juju passes the charm container name verbatim through to Kubernetes,
+        # so the Kubernetes naming rules (RFC 1123 DNS label) apply.
+        _check_name(name, 'container')
+        if len(name) > _K8S_CONTAINER_NAME_MAX_LENGTH:
+            raise StateValidationError(
+                f'invalid container name {name!r}: must be at most '
+                f'{_K8S_CONTAINER_NAME_MAX_LENGTH} characters long',
+            )
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'can_connect', can_connect)
         # _base_plan values are arbitrary JSON-ish data, and pebble.Layer is not
@@ -1685,6 +1746,9 @@ class Storage:
     For Kubernetes charms, this will always be 1. For machine charms, each new
     Storage instance gets a new index."""
 
+    def __post_init__(self):
+        _check_name(self.name, 'storage')
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Storage, ops.Storage)):
             return (self.name, self.index) == (other.name, other.index)
@@ -1968,16 +2032,13 @@ class State:
         raise KeyError(f'relation: id={rel_id} not found in the State')
 
     def get_relations(self, endpoint: str) -> tuple[RelationBase, ...]:
-        """Get all relations on this endpoint from the current state."""
-        # we rather normalize the endpoint than worry about cursed metadata situations such as:
-        # requires:
-        #   foo-bar: ...
-        #   foo_bar: ...
+        """Get all relations on this endpoint from the current state.
 
-        normalized_endpoint = _normalise_name(endpoint)
-        return tuple(
-            r for r in self.relations if _normalise_name(r.endpoint) == normalized_endpoint
-        )
+        The endpoint is matched verbatim against the names declared in the
+        charm's metadata — pass ``foo-bar`` to find a relation declared as
+        ``foo-bar``, not ``foo_bar``.
+        """
+        return tuple(r for r in self.relations if r.endpoint == endpoint)
 
     @classmethod
     def from_context(
@@ -2304,29 +2365,30 @@ class _EventType(str, Enum):
 
 class _EventPath(str):
     if TYPE_CHECKING:  # pragma: no cover
-        name: str
+        python_name: str
         owner_path: list[str]
-        suffix: str
-        prefix: str
-        original_prefix: str
-        is_custom: bool
+        python_suffix: str
+        juju_prefix: str
         type: _EventType
 
     def __new__(cls, string: str):
-        original_string = string
-        string = _normalise_name(string)
         instance = super().__new__(cls, string)
 
-        instance.name = name = string.split('.')[-1]
+        raw_name = string.split('.')[-1]
         instance.owner_path = string.split('.')[:-1] or ['on']
 
-        instance.suffix, instance.type = _EventPath._get_suffix_and_type(name)
-        instance.prefix = string.removesuffix(instance.suffix)
-        # The original (un-normalised) prefix, preserving the exact spelling
-        # of the entity name as declared in the charm metadata. _normalise_name
-        # only swaps dashes for underscores, so lengths match.
-        instance.original_prefix = original_string[: len(instance.prefix)]
-        instance._is_custom = instance.suffix == ''
+        # `python_name` is the Python-attribute form: what the event is called
+        # on `charm.on`, and the event kind ops uses in handle paths (for
+        # example ``foo_bar_pebble_ready`` for container ``foo-bar``).
+        instance.python_name = _to_python_attr(raw_name)
+        instance.python_suffix, instance.type = _EventPath._get_suffix_and_type(
+            instance.python_name,
+        )
+        # The prefix is sliced from the raw string by length so the entity
+        # name is preserved verbatim (e.g. ``foo-bar`` in
+        # ``foo-bar_pebble_ready``): Juju hook names keep the metadata name
+        # exactly as declared, and only the suffix is known to be hyphenated.
+        instance.juju_prefix = raw_name[: len(raw_name) - len(instance.python_suffix)]
 
         return instance
 
@@ -2361,7 +2423,9 @@ class _EventPath(str):
             return _PEBBLE_CHECK_RECOVERED_EVENT_SUFFIX, _EventType.WORKLOAD
 
         if s in _BUILTIN_EVENTS:
-            return '', _EventType.BUILTIN
+            # The whole name is the suffix, so that the Juju hook name gets
+            # hyphenated (for example ``update_status`` -> ``update-status``).
+            return s, _EventType.BUILTIN
 
         return '', _EventType.CUSTOM
 
@@ -2427,26 +2491,15 @@ class _Event:  # type: ignore
         path = _EventPath(self.path)
         # bypass frozen dataclass
         object.__setattr__(self, 'path', path)
-        # This is the event name as Juju provides it. Juju keeps the entity
-        # name (a relation endpoint, storage name, or container name) exactly
-        # as it is declared in the charm metadata -- which may contain dashes
-        # *or* underscores -- and only ever uses dashes in the event-type
-        # suffix. For events that are not tied to such an entity, the whole
-        # name uses dashes. See #2511.
-        object.__setattr__(self, '_juju_name', self._build_juju_name(path))
-
-    @staticmethod
-    def _build_juju_name(path: _EventPath) -> str:
-        suffix = path.suffix
-        if suffix and path.type in (
-            _EventType.RELATION,
-            _EventType.STORAGE,
-            _EventType.WORKLOAD,
-        ):
-            # Preserve the entity name (the prefix) verbatim; only the suffix
-            # is normalised to dashes.
-            return f'{path.original_prefix}{suffix.replace("_", "-")}'
-        return path.name.replace('_', '-')
+        # This is the hook name as Juju provides it: the entity name
+        # (container/relation/storage) carries verbatim from the path; only
+        # the event-type suffix is hyphenated. (Not meaningful for action or
+        # custom events, which have no Juju hook name.)
+        object.__setattr__(
+            self,
+            '_juju_name',
+            f'{path.juju_prefix}{path.python_suffix.replace("_", "-")}',
+        )
 
     @property
     def _path(self) -> _EventPath:
@@ -2455,16 +2508,19 @@ class _Event:  # type: ignore
 
     @property
     def name(self) -> str:
-        """Full event name.
+        """Full event name, in Python-attribute form (as ops names the event).
 
         Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of the event, the
-        prefix the name of the entity the event is about.
+        prefix the name of the entity the event is about. Hyphens in the entity name are
+        translated to underscores, so an event for relation endpoint "foo-bar" has the name:
 
-        "foo-relation-changed":
-         - "foo"=prefix (name of a relation),
-         - "-relation-changed"=suffix (relation event)
+        "foo_bar_relation_changed":
+         - "foo_bar"=prefix (name of a relation, hyphens translated to underscores),
+         - "_relation_changed"=suffix (relation event)
+
+        The verbatim endpoint name is preserved in ``self._path.juju_prefix``.
         """
-        return self._path.name
+        return self._path.python_name
 
     @property
     def owner_path(self) -> list[str]:
@@ -2679,7 +2735,7 @@ class _Action:
         def test_backup_action():
             ctx = Context(MyCharm)
             state = ctx.run(
-                ctx.on.action('do_backup', params={'filename': 'foo'}),
+                ctx.on.action('do-backup', params={'filename': 'foo'}),
                 State(),
             )
             assert ctx.action_results == ...
@@ -2698,3 +2754,6 @@ class _Action:
 
     Every action invocation is automatically assigned a new one. Override in
     the rare cases where a specific ID is required."""
+
+    def __post_init__(self):
+        _check_name(self.name, 'action')
