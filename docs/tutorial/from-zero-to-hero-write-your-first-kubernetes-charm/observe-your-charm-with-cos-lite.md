@@ -556,7 +556,7 @@ def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
 
 def _get_loki_logs(loki_api_url: str) -> list[str] | None:
     """Wait for logs to be available from Loki and return them."""
-    for attempt in range(60):
+    for attempt in range(3 * 60):
         if attempt:  # If not the first attempt, wait before retrying.
             time.sleep(1)
         response = requests.get(loki_api_url)

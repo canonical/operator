@@ -386,7 +386,7 @@ class Harness(Generic[CharmType]):
 
     @property
     def charm(self) -> CharmType:
-        """Return the instance of the charm class that was passed to ``__init__``.
+        """The instance of the charm class that was passed to ``__init__``.
 
         Note that the Charm is not instantiated until :meth:`.begin()` is called.
         Until then, attempting to access this property will raise an exception.
@@ -399,12 +399,12 @@ class Harness(Generic[CharmType]):
 
     @property
     def model(self) -> model.Model:
-        """Return the :class:`~ops.model.Model` that is being driven by this Harness."""
+        """The :class:`~ops.model.Model` that is being driven by this Harness."""
         return self._model
 
     @property
     def framework(self) -> framework.Framework:
-        """Return the Framework that is being driven by this Harness."""
+        """The Framework that is being driven by this Harness."""
         return self._framework
 
     def begin(self) -> None:
