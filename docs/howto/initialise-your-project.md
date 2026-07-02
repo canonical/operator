@@ -25,15 +25,13 @@ To check that your preferred name isn't already in use, visit the (future) Charm
 https://charmhub.io/mega-calendar-k8s
 ```
 
-```{admonition} Best practice
-:class: hint
+Make sure that your charm's name only contains ASCII lowercase letters, numbers, and hyphens.
 
-Your charm's name should be slug-oriented (ASCII lowercase letters, numbers, and hyphens) and follow the pattern `<workload name in full>[<function>][-k8s]`.
-
-For a Kubernetes charm, include the `k8s` suffix if there is (or could be in the future) a machine variant of your charm. If your charm is inherently tied to Kubernetes and there could never be a machine variant, don't include the `k8s` suffix.
+The general naming pattern is `<workload name>[-<function>][-k8s]`, where `<function>` could be `server`, `dashboard`, and so on.
 
 Don't add an `operator` or `charm` prefix/suffix. Don't include an organisation or publisher name.
-```
+
+### Charms without a workload
 
 Some charms do not operate a workload, such as integrator and configurator charms. These categories serve different purposes:
 
@@ -41,9 +39,15 @@ Some charms do not operate a workload, such as integrator and configurator charm
 
 * A configurator charm provides logic to configure a particular charm or relation that is already in Juju. Examples include `cos-configuration` when it applies to a single charm (such as providing more fine-grained configuration of the Prometheus scraping) or for a relation (such as `ingress-configurator` to provide additional configuration of ingress requests).
 
-Since workload-less charms can work both on machines and on Kubernetes, avoid using the `k8s` suffix when naming integrator charms and configurator charms, unless the charm is only relevant for Kubernetes (for example, managing K8s resources within the charm logic using `lightkube`).
+When naming your charm, use `-integrator` and `-configurator` to signal the category. For example, `foo-integrator` or `bar-configurator`.
 
-When naming the charm, use `-integrator` and `-configurator` to signal the category of the charm. For example, `foo-integrator` or `bar-configurator`.
+### Kubernetes charms
+
+The `k8s` suffix is for disambiguation, not classification. Only use `-k8s` in the name of a Kubernetes charm if there is (or could be in the future) a machine variant of your charm.
+
+Don't use `-k8s` if your charm is inherently tied to Kubernetes and there could never be a machine variant. For example, a charm that uses `lightkube` to manage Kubernetes resources.
+
+Don't use `-k8s` for workload-less charms. These charms work on machines and Kubernetes.
 
 (create-a-repository)=
 ## Create a repository
@@ -64,7 +68,7 @@ Examples:
 - [kafka-k8s-operator](https://github.com/canonical/kafka-k8s-operator) - Contains a single charm that operates a K8s workload.
 - [katib-operators](https://github.com/canonical/katib-operators) - Contains multiple charms.
 - [data-integrator](https://github.com/canonical/data-integrator) - Contains a charm that integrates an externally managed service (such as a client application).
-- [s3-integrator](https://github.com/canonical/object-storage-integrators) - Contains multiple charms that integrate an externally managed service (such as different kinds of object storage backends).
+- [s3-integrator](https://github.com/canonical/object-storage--integrators) - Contains multiple charms that integrate an externally managed service (such as different kinds of object storage backends).
 - [request-authentication-configurator](https://github.com/canonical/request-authentication-configurator) - Contains a charm that configures Gateway to perform request authentication.
 
 (initialise-the-repository)=
