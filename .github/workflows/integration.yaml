@@ -28,7 +28,7 @@ jobs:
           --juju-channel=3/stable
           --charmcraft-channel=3.x/stable
           -p "${{ matrix.preset }}"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -54,7 +54,7 @@ jobs:
           --juju-channel=${{ matrix.juju-channel }}
           --charmcraft-channel=3.x/stable
           -p microk8s
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -81,7 +81,7 @@ jobs:
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}
           -p "${{ matrix.preset }}"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
