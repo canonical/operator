@@ -120,7 +120,7 @@ class Handle:
 
     @property
     def parent(self) -> Handle | None:
-        """The parent handle."""
+        """The handle of the handle's parent."""
         return self._parent
 
     @property
