@@ -667,7 +667,7 @@ class RelationBase:
 
     @property
     def _databags(self):
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
 
@@ -763,7 +763,7 @@ class Relation(RelationBase):
 
     @property
     def _databags(self):  # type: ignore
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -805,7 +805,7 @@ class SubordinateRelation(RelationBase):
 
     @property
     def _databags(self):
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield self.remote_app_data
@@ -835,7 +835,7 @@ class PeerRelation(RelationBase):
 
     @property
     def _databags(self):  # type: ignore
-        """Yield all databags in this relation."""
+        """All databags in this relation."""
         yield self.local_app_data
         yield self.local_unit_data
         yield from self.peers_data.values()

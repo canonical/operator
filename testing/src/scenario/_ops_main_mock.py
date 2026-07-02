@@ -35,7 +35,6 @@ from .state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .context import Context
     from .state import State, _CharmSpec, _Event
 
 EVENT_REGEX = re.compile(_event_regex)
