@@ -512,8 +512,6 @@ class Address:
 class BindAddress:
     """An address bound to a network interface in a Juju space."""
 
-    # This has the 'ops.testing.' prefix so that Sphinx knows which
-    # 'Address' class it is (it's not the one from 'hookcmds').
     addresses: Sequence[Address]
     """The addresses in the space."""
 
