@@ -501,6 +501,34 @@ def test_add_grant_revoke_remove():
         output.get_secret(label='mylabel')
 
 
+def test_revoke_preexisting_remote_grant():
+    class RevokeCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_broken, self._on_broken)
+
+        def _on_broken(self, event: ops.RelationBrokenEvent):
+            secret = self.model.get_secret(label='my-secret')
+            secret.revoke(event.relation)
+
+    ctx = Context(
+        RevokeCharm,
+        meta={'name': 'revoke-charm', 'provides': {'db': {'interface': 'x'}}},
+    )
+    relation = Relation('db', remote_app_name='remote-app', id=1)
+    secret = Secret(
+        {'token': 's3cret'},
+        owner='app',
+        label='my-secret',
+        remote_grants={1: {'remote-app'}},
+    )
+    state = ctx.run(
+        ctx.on.relation_broken(relation),
+        State(leader=True, relations={relation}, secrets={secret}),
+    )
+    assert state.get_secret(label='my-secret').remote_grants == {}
+
+
 def test_secret_removed_event():
     class SecretCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
