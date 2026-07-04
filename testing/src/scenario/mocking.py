@@ -137,7 +137,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         state: State,
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context,
+        context: Context[CharmType],
         juju_context: JujuContext,
     ):
         super().__init__(juju_context=juju_context)
@@ -181,7 +181,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         ]  # /charm/containers/<container_name>/pebble.socket
         container_root = self._context._get_container_root(container_name)
         try:
-            mounts = self._state.get_container(container_name).mounts
+            mounts = dict(self._state.get_container(container_name).mounts)
         except KeyError:
             # container not defined in state.
             mounts = {}
@@ -268,7 +268,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         data = self._relation_get(
             relation_id, member_name=member_name, is_app=is_app, relation_name=relation_name
         )
-        return data.copy()
+        return dict(data)
 
     def _relation_get(
         self,
@@ -334,8 +334,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         remote_name = self.relation_remote_app_name(relation_id, relation_name=relation_name)
         return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
-    def config_get(self):
-        state_config = self._state.config.copy()  # dedup or we'll mutate the state!
+    def config_get(self) -> dict[str, str | int | float | bool]:
+        state_config = dict(self._state.config)  # dedup or we'll mutate the state!
 
         # add defaults
         charm_config = self._charm_spec.config
@@ -436,9 +436,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 # will in practice not be reached because RelationData will check leadership
                 # and raise RelationDataAccessError upstream on this path
                 raise RuntimeError('needs leadership to set app data')
-            tgt = relation.local_app_data
+            tgt = cast('dict[str, str]', relation.local_app_data)
         else:
-            tgt = relation.local_unit_data
+            tgt = cast('dict[str, str]', relation.local_unit_data)
         for key, value in data.items():
             if value == '':
                 # Match the behavior of Juju, which is that setting the value to an
@@ -515,9 +515,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             if refresh:
                 secret._track_latest_revision()
             assert secret.latest_content is not None
-            return secret.latest_content.copy()
+            return dict(secret.latest_content)
 
-        return secret.tracked_content.copy()
+        return dict(secret.tracked_content)
 
     def secret_info_get(
         self,
@@ -583,7 +583,8 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             _raise_on_error=True,
         )
 
-        secret.remote_grants[relation_id] = secret.remote_grants.get(
+        remote_grants = cast('dict[int, frozenset[str]]', secret.remote_grants)
+        remote_grants[relation_id] = remote_grants.get(
             relation_id,
             frozenset(),
         ) | {cast('str', grantee)}
@@ -596,11 +597,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             relation_id,
             _raise_on_error=True,
         )
-        secret.remote_grants[relation_id] = secret.remote_grants[relation_id] - {
-            cast('str', grantee),
-        }
-        if not secret.remote_grants[relation_id]:
-            del secret.remote_grants[relation_id]
+        remote_grants = cast('dict[int, frozenset[str]]', secret.remote_grants)
+        remote_grants[relation_id] = remote_grants[relation_id] - {cast('str', grantee)}
+        if not remote_grants[relation_id]:
+            del remote_grants[relation_id]
 
     def secret_remove(self, id: str, *, revision: int | None = None):
         secret = self._get_secret(id)
@@ -804,7 +804,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         state: State,
         event: _Event,
         charm_spec: _CharmSpec[CharmType],
-        context: Context,
+        context: Context[CharmType],
         container_name: str,
     ):
         self._state = state
@@ -877,6 +877,7 @@ class _MockPebbleClient(_TestingPebbleClient):
                     spawn_time=now,
                     ready_time=now,
                 )
+                assert check.change_id is not None
                 self._changes[check.change_id] = change
 
     def get_plan(self) -> pebble.Plan:
@@ -943,12 +944,12 @@ class _MockPebbleClient(_TestingPebbleClient):
             ) from None
 
     @property
-    def _layers(self) -> dict[str, pebble.Layer]:
-        return self._container.layers
+    def _layers(self) -> dict[str, pebble.Layer]:  # pyright: ignore[reportIncompatibleVariableOverride]
+        return cast('dict[str, pebble.Layer]', self._container.layers)
 
     @property
-    def _service_status(self) -> dict[str, pebble.ServiceStatus]:
-        return self._container.service_statuses
+    def _service_status(self) -> dict[str, pebble.ServiceStatus]:  # pyright: ignore[reportIncompatibleVariableOverride]
+        return cast('dict[str, pebble.ServiceStatus]', self._container.service_statuses)
 
     # Based on a method of the same name from Harness.
     def _find_exec_handler(self, command: list[str]) -> Exec | None:

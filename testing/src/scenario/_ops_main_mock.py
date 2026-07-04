@@ -34,6 +34,9 @@ from .state import (
     StoredState,
 )
 
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import ReadableSpan
+
 if TYPE_CHECKING:  # pragma: no cover
     from .state import State, _CharmSpec, _Event
 
@@ -125,7 +128,7 @@ class Ops(_Manager, Generic[CharmType]):
         self.charm_spec = charm_spec
         self.store = None
         self.captured_events: list[ops.EventBase] = []
-        self.trace_data = []
+        self.trace_data: list[ReadableSpan] = []
 
         try:
             import ops_tracing._mock  # break circular import
@@ -244,6 +247,7 @@ class Ops(_Manager, Generic[CharmType]):
     def _get_owner(root: Any, path: Sequence[str]) -> ops.ObjectEvents:
         """Walk path on root to an ObjectEvents instance."""
         obj = root
+        step = ''
         try:
             for step in path:
                 obj = getattr(obj, step)
@@ -279,7 +283,7 @@ class Ops(_Manager, Generic[CharmType]):
             self.framework.close()
         if self._tracing_mock:
             assert self._tracing_exporter
-            self.trace_data = self._tracing_exporter.get_finished_spans()
+            self.trace_data = list(self._tracing_exporter.get_finished_spans())
             self._tracing_mock.__exit__(None, None, None)
 
         # Clean up logging handlers to avoid test pollution.
