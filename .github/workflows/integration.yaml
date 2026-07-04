@@ -22,7 +22,7 @@ jobs:
         run: |
           set -xueo pipefail
           result=$(
-            uv run --group integration --locked pytest --collect-only -q --no-header test/integration \
+            uv run --group integration pytest --collect-only -q --no-header test/integration \
               | grep '::' \
               | awk -F:: '{print $1}' \
               | sort -u \
