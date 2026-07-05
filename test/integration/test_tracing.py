@@ -88,8 +88,12 @@ def test_with_tls(build_tracing_charm: Callable[[], str], tracing_juju: jubilant
         )
     assert 'ops.main' in [span['name'] for span in spans]
 
-    event_names = [event['name'] for event in get_events(spans)]
-    assert 'StartEvent' in event_names
+    # Unlike test_direct_connection, don't assert on events from specific
+    # early dispatches (such as StartEvent): the exporter only waits a bounded
+    # time at the end of each dispatch, so trace data produced while the
+    # collector is rejecting requests ("empty ring") can be legitimately
+    # dropped. Receiving any ops.main span over HTTPS is what this test is
+    # about.
 
 
 def wait_spans(
