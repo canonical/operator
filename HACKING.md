@@ -197,6 +197,16 @@ The Python dependencies of `ops` are kept as minimal as possible, to avoid
 bloat and to minimise conflict with the charm's dependencies. The dependencies
 are listed in [pyproject.toml](pyproject.toml) in the `project.dependencies` section.
 
+When adding a new dependency, also add it to the appropriate group in
+[.github/dependabot.yaml](.github/dependabot.yaml) so Dependabot bundles
+it into the right update PR:
+
+- `charm-tech`: Charm Tech tooling (for example, `jubilant`, `pytest-jubilant`).
+- `dev-tooling`: linters, type checkers, and other dev tools (for example,
+  `ruff`, `pyright`, `codespell`, `pre-commit`).
+- `test-deps`: `pytest` and its plugins.
+- `runtime`: catch-all for everything else; minor and patch bumps only.
+
 # Dev Tools
 
 ## Formatting and Checking
