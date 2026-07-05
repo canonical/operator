@@ -195,3 +195,28 @@ def test_requirer_follower_does_not_write_version(
     state_out = ctx.run(ctx.on.relation_created(ca_relation), state_in)
     rel_out = state_out.get_relation(ca_relation.id)
     assert dict(rel_out.local_app_data) == {}
+
+
+def test_requirer_reads_v0_fallback_from_unit_databag(
+    sample_charm: type[ops.CharmBase],
+    mock_destination: Mock,
+    https_relation: ops.testing.Relation,
+):
+    """A v0 provider publishes ca/certificate/chain on the unit databag; we honour it."""
+    ca_relation = ops.testing.Relation(
+        'receive-ca-cert',
+        remote_app_data={},
+        remote_units_data={
+            0: {
+                'ca': json.dumps('CA-PEM'),
+                'certificate': json.dumps('CERT-PEM'),
+                'chain': json.dumps(['LEAF', 'INTER', 'ROOT']),
+            },
+        },
+    )
+    ctx = ops.testing.Context(sample_charm)
+    state = ops.testing.State(leader=True, relations={https_relation, ca_relation})
+    ctx.run(ctx.on.relation_changed(ca_relation), state)
+    mock_destination.assert_called_with(
+        url='https://tls.example/v1/traces', ca='INTER\nLEAF\nROOT'
+    )
