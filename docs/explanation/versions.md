@@ -9,10 +9,10 @@ When you're deciding which version of tools to use within the charming ecosystem
 | Base | Python | Juju | Ops | Charmcraft |
 |------|----------------|---------------|--------------|-------------------|
 | 18.04 (Bionic Beaver) | [3.6](https://docs.python.org/3/whatsnew/3.6.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/) | 1.x | 2.x |
-| 20.04 (Focal Fossa) | [3.8](https://docs.python.org/3/whatsnew/3.8.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/) | 2.x |
-| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
-| 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://documentation.ubuntu.com/ops/2.x/), [3.x](https://documentation.ubuntu.com/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
-| 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [3.x](https://documentation.ubuntu.com/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)¹ |
+| 20.04 (Focal Fossa) | [3.8](https://docs.python.org/3/whatsnew/3.8.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://canonical.com/juju/docs/ops/2.x/) | 2.x |
+| 22.04 (Jammy Jellyfish) | [3.10](https://docs.python.org/3/whatsnew/3.10.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://canonical.com/juju/docs/ops/2.x/), [3.x](https://canonical.com/juju/docs/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
+| 24.04 (Noble Numbat) | [3.12](https://docs.python.org/3/whatsnew/3.12.html) | [2.9](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_2.9.x/), [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [2.x](https://canonical.com/juju/docs/ops/2.x/), [3.x](https://canonical.com/juju/docs/ops/latest/) | [3.x](https://documentation.ubuntu.com/charmcraft/3.5.3/), [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/) |
+| 26.04 (Resolute Raccoon) | [3.14](https://docs.python.org/3/whatsnew/3.14.html) | [3.6](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_3.6.x/), [4.0](https://documentation.ubuntu.com/juju/latest/releasenotes/juju_4.0.x/juju_4.0.0/) | [3.x](https://canonical.com/juju/docs/ops/latest/) | [4.x](https://documentation.ubuntu.com/charmcraft/4.2.1/)¹ |
 
 ¹ `base: ubuntu@26.04` is supported by Charmcraft >= 4.3. On Charmcraft 4.2.x, build with `build-base: ubuntu@devel` instead (unstable).
 
@@ -61,7 +61,7 @@ Ops releases new minor versions approximately once per month. Major versions are
 |---------|--------|--------------|-------------|
 | Ops 1.5 | <span style="color:red">✗</span> EOL | 2020-10-31 | 2024-04-26 |
 | Ops 2.23 (LTS) | <span style="color:green">●</span> Active | 2023-01-25 | 2038-01-25 |
-| Ops 3.7 | <span style="color:green">●</span> Active | 2026-03-30 | 2027-05-28 |
+| Ops 3.8 | <span style="color:green">●</span> Active | 2026-06-30 | 2027-06-30 |
 
 **Legend:**
 - <span style="color:green">●</span> Active: Currently supported

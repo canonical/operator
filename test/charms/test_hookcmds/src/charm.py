@@ -23,10 +23,17 @@ hookcmds wrapper functions.
 from __future__ import annotations
 
 import json
+import os
+import pathlib
+import time
 from typing import Any
 
 import ops
 import ops.hookcmds as hookcmds
+
+_REBOOT_MARKER = (
+    pathlib.Path(os.environ.get('JUJU_CHARM_DIR', '.')) / '.test-hookcmds.reboot-triggered'
+)
 
 
 class TestHookcmdsCharm(ops.CharmBase):
@@ -53,7 +60,8 @@ class TestHookcmdsCharm(ops.CharmBase):
             self.on['trigger-relation-error'].action, self._on_trigger_relation_error
         )
         framework.observe(self.on['test-credential-get'].action, self._on_test_credential_get)
-        framework.observe(self.on['test-juju-reboot'].action, self._on_test_juju_reboot)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        framework.observe(self.on['test-reboot-marker'].action, self._on_test_reboot_marker)
         framework.observe(
             self.on['test-relation-model-get'].action, self._on_test_relation_model_get
         )
@@ -61,6 +69,10 @@ class TestHookcmdsCharm(ops.CharmBase):
         framework.observe(self.on['test-secret-grant'].action, self._on_test_secret_grant)
         framework.observe(self.on['test-secret-revoke'].action, self._on_test_secret_revoke)
         framework.observe(self.on['test-storage-add'].action, self._on_test_storage_add)
+        framework.observe(
+            self.on['test-ports-endpoint-scoped'].action,
+            self._on_test_ports_endpoint_scoped,
+        )
 
     # Lifecycle
 
@@ -343,23 +355,49 @@ class TestHookcmdsCharm(ops.CharmBase):
         cloud = hookcmds.credential_get()
         event.set_results({'cloud-type': cloud.type, 'cloud-name': cloud.name})
 
-    # Reboot
+    # Reboot — driven by config-changed because juju forbids juju-reboot
+    # from an action context.
 
-    def _on_test_juju_reboot(self, event: ops.ActionEvent):
-        """Queue a machine reboot via juju_reboot(now=False)."""
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        if self.config.get('reboot-trigger') != 'reboot-please':
+            return
+        if _REBOOT_MARKER.exists():
+            # Already triggered this deployment; don't reboot again.
+            return
+        _REBOOT_MARKER.write_text('triggered')
         hookcmds.juju_reboot(now=False)
+
+    def _on_test_reboot_marker(self, event: ops.ActionEvent):
+        # Compute the boot epoch as `now - uptime`. /proc/stat's `btime` is
+        # the host kernel boot time and doesn't change in LXD containers, so
+        # we can't use it directly; /proc/uptime, however, is virtualised
+        # per-container by lxcfs and resets on juju-reboot. Comparing the
+        # derived boot epoch before/after proves the reboot took effect (the
+        # marker alone only proves config-changed ran the path).
+        with open('/proc/uptime') as f:
+            uptime_seconds = float(f.read().split()[0])
+        boot_time = int(time.time() - uptime_seconds)
+        event.set_results({
+            'marker-exists': str(_REBOOT_MARKER.exists()).lower(),
+            'boot-time': str(boot_time),
+        })
 
     # Relation model
 
     def _on_test_relation_model_get(self, event: ops.ActionEvent):
-        """Return the model UUID for the peer relation."""
+        """Return the model UUID for the peer relation, plus JUJU_MODEL_UUID."""
         ids = hookcmds.relation_ids('peer')
         if not ids:
             event.fail('No peer relation IDs - deploy 2+ units')
             return
         rel_id = int(ids[0].split(':')[-1])
         model = hookcmds.relation_model_get(id=rel_id, endpoint='peer')
-        event.set_results({'uuid': model.uuid})
+        event.set_results({
+            'uuid': model.uuid,
+            # Emit the env-side model UUID alongside so the test can verify
+            # the two match without doing its own juju show-model dance.
+            'env-model-uuid': os.environ.get('JUJU_MODEL_UUID', ''),
+        })
 
     # Resource
 
@@ -368,28 +406,42 @@ class TestHookcmdsCharm(ops.CharmBase):
         path = hookcmds.resource_get('test-file')
         event.set_results({'path': str(path)})
 
-    # Secret grant / revoke
+    # Cross-app secret grant / revoke
 
     def _on_test_secret_grant(self, event: ops.ActionEvent):
-        """Create a secret and grant it to the peer relation."""
-        ids = hookcmds.relation_ids('peer')
+        """Add a secret and grant it to the related any-charm app."""
+        ids = hookcmds.relation_ids('anycharm')
         if not ids:
-            event.fail('No peer relation - deploy 2+ units')
+            event.fail('No anycharm relation IDs - is any-charm deployed and integrated?')
             return
         rel_id = int(ids[0].split(':')[-1])
-        secret_id = hookcmds.secret_add({'key': 'grant-test-value'}, label='grant-test')
+
+        secret_id = hookcmds.secret_add(
+            {'token': 'grant-test-token'},
+            label='hookcmds-grant-test',
+            description='Created for grant/revoke integration test',
+        )
         hookcmds.secret_grant(secret_id, rel_id)
-        event.set_results({'secret-id': secret_id})
+
+        event.set_results({
+            'secret-id': secret_id,
+            'relation-id': str(rel_id),
+            'granted': 'true',
+        })
 
     def _on_test_secret_revoke(self, event: ops.ActionEvent):
-        """Revoke access to a secret from the peer relation."""
+        """Revoke the grant on a secret, then remove it entirely."""
         secret_id = event.params['secret-id']
-        ids = hookcmds.relation_ids('peer')
+        ids = hookcmds.relation_ids('anycharm')
         if not ids:
-            event.fail('No peer relation - deploy 2+ units')
+            event.fail('No anycharm relation IDs - is any-charm deployed and integrated?')
             return
         rel_id = int(ids[0].split(':')[-1])
+
         hookcmds.secret_revoke(secret_id, relation_id=rel_id)
+        hookcmds.secret_remove(secret_id)
+
+        event.set_results({'revoked': 'true'})
 
     # Storage add
 
@@ -398,6 +450,37 @@ class TestHookcmdsCharm(ops.CharmBase):
         current = hookcmds.storage_list('data')
         hookcmds.storage_add({'data': 1})
         event.set_results({'count-before-add': str(len(current))})
+
+    # Endpoint-scoped ports
+
+    def _on_test_ports_endpoint_scoped(self, event: ops.ActionEvent):
+        """Open a port scoped to the peer endpoint, verify, then close it."""
+        port = int(event.params.get('port', 7766))
+        endpoint = 'peer'
+
+        hookcmds.open_port('tcp', port, endpoints=endpoint)
+
+        all_ports = hookcmds.opened_ports(endpoints=True)
+        our_port = next(
+            (p for p in all_ports if p.port == port and p.protocol == 'tcp'),
+            None,
+        )
+
+        port_found = our_port is not None
+        ep_list = (our_port.endpoints or []) if our_port else []
+        endpoint_matches = port_found and endpoint in ep_list
+
+        hookcmds.close_port('tcp', port, endpoints=endpoint)
+
+        final = hookcmds.opened_ports(endpoints=True)
+        still_open = any(p.port == port and p.protocol == 'tcp' for p in final)
+
+        event.set_results({
+            'port-found-with-endpoint': str(port_found).lower(),
+            'endpoints-list': ','.join(ep_list),
+            'endpoint-matches': str(endpoint_matches).lower(),
+            'closed-after': str(not still_open).lower(),
+        })
 
 
 if __name__ == '__main__':

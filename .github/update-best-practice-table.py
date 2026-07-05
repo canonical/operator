@@ -160,7 +160,7 @@ def main():
     args = parser.parse_args()
     path_to_ops = pathlib.Path(__file__).parent.parent
     for directory, base_url, make_ref, ref_sub in (
-        (path_to_ops / 'docs', 'https://documentation.ubuntu.com/ops/latest/', make_ops_ref, None),
+        (path_to_ops / 'docs', 'https://canonical.com/juju/docs/ops/latest/', make_ops_ref, None),
         (
             args.path_to_charmcraft / 'docs',
             'https://documentation.ubuntu.com/charmcraft/latest/',
