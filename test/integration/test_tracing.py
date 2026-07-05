@@ -77,8 +77,15 @@ def test_with_tls(build_tracing_charm: Callable[[], str], tracing_juju: jubilant
     # Query the tempo coordinator: it terminates TLS (self-signed-certificates
     # is related to tempo, not tempo-worker), so the worker's 3200 still
     # speaks plain HTTP and causes a TLS handshake failure on a TLS client.
+    #
+    # After TLS is enabled, tempo's ingester ring can take minutes to re-form,
+    # and until it does the collector rejects spans ("empty ring"). The charm
+    # buffers rejected spans and only retries on a later dispatch, such as
+    # update-status, so allow enough time for a retry to land.
     with kubectl_port_forward(tracing_juju.model, 'svc/tempo', 3200) as endpoint:
-        spans = wait_spans(endpoint, ready=lambda spans: 'ops.main' in str(spans), https=True)
+        spans = wait_spans(
+            endpoint, ready=lambda spans: 'ops.main' in str(spans), https=True, timeout=600
+        )
     assert 'ops.main' in [span['name'] for span in spans]
 
     event_names = [event['name'] for event in get_events(spans)]

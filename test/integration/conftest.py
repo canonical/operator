@@ -121,6 +121,10 @@ def tracing_juju() -> Generator[jubilant.Juju]:
     """
     with jubilant.temp_model() as juju:
         juju.wait_timeout = 900
+        # The charm under test only retries sending buffered trace data on a
+        # later dispatch, so make update-status fire frequently to bound how
+        # long the tests wait for spans to arrive.
+        juju.cli('model-config', 'update-status-hook-interval=1m')
         _deploy_tracing_stack(juju)
         yield juju
         print(juju.debug_log())
