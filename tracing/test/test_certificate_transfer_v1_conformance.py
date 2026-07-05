@@ -168,33 +168,55 @@ def test_requirer_ignores_unknown_provider_keys(
 # Requirer clause, verbatim (version half):
 #   "Is expected to provide 1 as a version number ..."
 #
-# The upstream v1 RequirerSchema marks ``version`` with ``default=1`` and its
-# example shows ``app: <empty>`` — i.e. omitting the key is permitted. Our
-# requirer side deliberately does not write to the relation databag at all.
-# This test documents that as a deliberate choice rather than an oversight: if
-# the upstream contract ever tightens to require an explicit write, this is
-# the test that should be inverted.
-def test_requirer_does_not_write_to_databag(
+# A dual v0/v1 provider (LIBPATCH 15+ of the vendored library) uses this to
+# decide whether to publish v1 (app databag ``certificates``) or fall back to
+# v0 (unit databag ``ca``/``certificate``/``chain``). We write it on
+# ``-created`` on the leader only.
+def test_requirer_writes_version_on_relation_created(
     sample_charm: type[ops.CharmBase],
     mock_destination: Mock,
 ):
     ca_relation = ops.testing.Relation('receive-ca-cert')
-    https_relation = ops.testing.Relation(
-        'charm-tracing',
-        remote_app_data={
-            'receivers': json.dumps([
-                {
-                    'protocol': {'name': 'otlp_http', 'type': 'http'},
-                    'url': 'https://tls.example/',
-                }
-            ]),
+    ctx = ops.testing.Context(sample_charm)
+    state_in = ops.testing.State(leader=True, relations={ca_relation})
+    state_out = ctx.run(ctx.on.relation_created(ca_relation), state_in)
+    rel_out = state_out.get_relation(ca_relation.id)
+    assert rel_out.local_app_data == {'version': json.dumps(1)}
+
+
+def test_requirer_follower_does_not_write_version(
+    sample_charm: type[ops.CharmBase],
+    mock_destination: Mock,
+):
+    """A follower unit must not attempt to write the app databag (Juju forbids it)."""
+    ca_relation = ops.testing.Relation('receive-ca-cert')
+    ctx = ops.testing.Context(sample_charm)
+    state_in = ops.testing.State(leader=False, relations={ca_relation})
+    state_out = ctx.run(ctx.on.relation_created(ca_relation), state_in)
+    rel_out = state_out.get_relation(ca_relation.id)
+    assert dict(rel_out.local_app_data) == {}
+
+
+def test_requirer_reads_v0_fallback_from_unit_databag(
+    sample_charm: type[ops.CharmBase],
+    mock_destination: Mock,
+    https_relation: ops.testing.Relation,
+):
+    """A v0 provider publishes ca/certificate/chain on the unit databag; we honour it."""
+    ca_relation = ops.testing.Relation(
+        'receive-ca-cert',
+        remote_app_data={},
+        remote_units_data={
+            0: {
+                'ca': json.dumps('CA-PEM'),
+                'certificate': json.dumps('CERT-PEM'),
+                'chain': json.dumps(['LEAF', 'INTER', 'ROOT']),
+            },
         },
     )
     ctx = ops.testing.Context(sample_charm)
-    state_in = ops.testing.State(leader=True, relations={https_relation, ca_relation})
-    state_out = ctx.run(ctx.on.relation_changed(ca_relation), state_in)
-    rel_out = state_out.get_relation(ca_relation.id)
-    # ``RequirerSchema`` example: ``app: <empty>``. (We don't assert on the
-    # unit databag — Juju injects ``ingress-address`` etc. and those are not
-    # us writing.)
-    assert dict(rel_out.local_app_data) == {}
+    state = ops.testing.State(leader=True, relations={https_relation, ca_relation})
+    ctx.run(ctx.on.relation_changed(ca_relation), state)
+    mock_destination.assert_called_with(
+        url='https://tls.example/v1/traces', ca='INTER\nLEAF\nROOT'
+    )

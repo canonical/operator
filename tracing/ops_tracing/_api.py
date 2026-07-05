@@ -25,6 +25,8 @@ import ops
 from ._buffer import Destination
 from ._tracing_models import (
     CertificateTransferProviderAppData,
+    CertificateTransferProviderUnitDataV0,
+    CertificateTransferRequirerAppData,
     ReceiverProtocol,
     TracingProviderAppData,
     TracingRequirerAppData,
@@ -35,11 +37,54 @@ tracer = opentelemetry.trace.get_tracer('ops.tracing')
 
 
 def _read_certificates(relation: ops.Relation) -> set[str] | None:
-    """Parse the provider's ``certificates`` databag key; ``None`` if it doesn't parse."""
+    """Parse the provider's certificates; ``None`` if neither v1 nor v0 parses.
+
+    Reads the v1 app databag first (``certificates`` key). If the app databag
+    has no certs and the relation has a remote unit, falls back to the v0 unit
+    databag shape (``ca``/``certificate``/``chain``) a dual v0/v1 provider
+    publishes when it hasn't seen ``version=1`` from us.
+    """
     try:
-        return relation.load(CertificateTransferProviderAppData, relation.app).certificates
+        certificates = relation.load(CertificateTransferProviderAppData, relation.app).certificates
     except (json.JSONDecodeError, TypeError, ValueError):
-        return None
+        certificates = None
+
+    if certificates:
+        return certificates
+
+    for unit in relation.units:
+        try:
+            v0 = relation.load(CertificateTransferProviderUnitDataV0, unit)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if v0.chain:
+            return set(v0.chain)
+        return {v0.ca, v0.certificate}
+
+    return certificates
+
+
+def _advertise_ca_version(charm: ops.CharmBase, ca_relation_name: str) -> None:
+    """Write ``version=1`` to our own app databag on the ca relation (leader only).
+
+    A dual v0/v1 ``certificate_transfer`` provider needs this to publish v1
+    (app databag ``certificates``) rather than falling back to v0 (unit
+    databag ``ca``/``certificate``/``chain``).
+    """
+    if not charm.unit.is_leader():
+        return
+    data = CertificateTransferRequirerAppData()
+    try:
+        for relation in charm.model.relations[ca_relation_name]:
+            relation.save(data, charm.app)
+    except ops.ModelError as e:
+        msg = e.args[0] if e.args else b''
+        if isinstance(msg, bytes) and msg.startswith(
+            b'ERROR cannot read relation application settings: permission denied'
+        ):
+            logger.error('cannot advertise ca version on %s: %s', ca_relation_name, e)
+            return
+        raise
 
 
 def _read_endpoint(relation: ops.Relation, protocol: ReceiverProtocol) -> str | None:
@@ -186,12 +231,19 @@ class Tracing(ops.Object):
                     )
 
                 ca_events = self.charm.on[ca_relation_name]
+                self.framework.observe(ca_events.relation_created, self._advertise_ca_version)
                 for event in (ca_events.relation_changed, ca_events.relation_broken):
                     self.framework.observe(event, self._reconcile)
 
     def _reconcile(self, _event: ops.EventBase):
         dst = self._get_destination()
         ops.tracing.set_destination(url=dst.url, ca=dst.ca)
+
+    def _advertise_ca_version(self, _event: ops.RelationCreatedEvent):
+        # This handler is only registered when ca_relation_name is set.
+        if not self.ca_relation_name:
+            return
+        _advertise_ca_version(self.charm, self.ca_relation_name)
 
     def _get_destination(self) -> Destination:
         try:
