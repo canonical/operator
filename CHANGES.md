@@ -1,3 +1,56 @@
+# 3.8.0 - 30 June 2026
+
+## Features
+
+* Note the socket path in Pebble tracing spans (#2555)
+
+## Fixes
+
+* Treat remote unit zero as explicit (#2454)
+* Ensure resources are cleaned up in testing.Context (#2506)
+* Close SQLite storage in Harness.cleanup() (#2507)
+* Restore sys.breakpointhook on _Manager teardown (#2542)
+* Avoid errors in finalisation due to already-closed websocket (#2548)
+* Use the correct value for JUJU_HOOK_NAME when objects contain dashes (#2552)
+* Avoid double-closing the framework in testing teardown (#2561)
+* Don't leak exec I/O threads when waiting on the change fails (#2558)
+* Take Pebble defaults into consideration when consistency checking Checks (#2567)
+* Tear down `Runtime.exec()` when the charm raises (#2581)
+
+## Documentation
+
+* Fix small issues in K8s tutorial (#2540)
+* Document user-secret observer lifecycle and secret-changed semantics (#2522)
+* Replace CoC with link to Ubuntu Code of Conduct (#2564)
+* Add a small note about -W error in the unit test how-to (#2560)
+* Add doc about subordinate charms (#2455)
+* Add 26.04 to the versions page and mark 2.23 as LTS (#2517)
+* Clarify storage-detaching applies to both machine and K8s charms (#2554)
+* Add guidance about names of workload-less charms (#2496)
+* Fix first unit tests command in machine charm tutorial (#2574)
+* Extend security explanation page to cover SEC0030 V1.3 gaps (#2571)
+* Move docs to canonical.com/juju/docs/ops (#2545)
+* Fix docstring of _Event._is_action_event (#2580)
+
+## Tests
+
+* Treat warnings as errors when running unit tests (#2541)
+* Fix mock_temp_dir fixture's open() patch (#2553)
+* Add integration tests for ops.hookcmds (#2520, #2562)
+* Fix integration test flakes on Juju 3 k8s and Juju 4 secrets (#2584)
+
+## Refactoring
+
+* Avoid yaml.load() to silence security scanner false positives (#2523)
+* Replace jsonpatch with an inline dict-diff (#2578)
+* Move the otlp-json package to be a regular ops-tracing module (#2585)
+* Distinguish between init and attribute types in testing state classes (#2331)
+
+## CI
+
+* Remove obsolete containerd workaround from integration workflow (#2519)
+* Use the sys.monitoring coverage core (#2518)
+
 # 3.7.1 - 28 May 2026
 
 ## Fixes

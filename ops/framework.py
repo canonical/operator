@@ -120,22 +120,22 @@ class Handle:
 
     @property
     def parent(self) -> Handle | None:
-        """Return own parent handle."""
+        """The handle of the handle's parent."""
         return self._parent
 
     @property
     def kind(self) -> str:
-        """Return the handle's kind."""
+        """The handle's kind."""
         return self._kind
 
     @property
     def key(self) -> str | None:
-        """Return the handle's key."""
+        """The handle's key."""
         return self._key
 
     @property
     def path(self) -> str:
-        """Return the handle's path."""
+        """The handle's path."""
         return self._path
 
     @classmethod

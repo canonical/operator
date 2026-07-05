@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 from tempfile import TemporaryDirectory
 from typing import Any
 
@@ -11,7 +12,7 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Relation, State, _CharmSpec, _Event
+from scenario.state import Container, Relation, Secret, State, Storage, _Action, _CharmSpec, _Event
 
 import ops
 from ops._main import _Abort
@@ -271,3 +272,80 @@ def test_bare_charm_errors_not_set(monkeypatch: pytest.MonkeyPatch):
     ctx = Context(ValueErrorCharm, meta={'name': 'value-error'})
     with pytest.raises(UncaughtCharmError):
         ctx.run(ctx.on.update_status(), State())
+
+
+def _env_for(charm_meta: dict[str, Any], event: _Event, state: State) -> dict[str, str]:
+    """Build the dispatch env that Runtime would set, for direct assertions."""
+    with TemporaryDirectory() as tmp:
+        rt: Runtime[ops.CharmBase] = Runtime(
+            app_name='dashchk',
+            charm_spec=_CharmSpec(charm_type(), charm_meta),
+            charm_root=tmp,
+            unit_id=0,
+        )
+        return rt._get_event_env(state, event, pathlib.Path(tmp))
+
+
+def test_workload_event_dispatch_path_preserves_container_name():
+    """JUJU_HOOK_NAME/JUJU_DISPATCH_PATH carry the container name verbatim."""
+    container = Container('temporal-worker')
+    meta: dict[str, Any] = {'name': 'dashchk', 'containers': {'temporal-worker': {}}}
+    event = _Event('temporal-worker_pebble_ready', container=container)
+    env = _env_for(meta, event, State(containers={container}))
+    assert env['JUJU_HOOK_NAME'] == 'temporal-worker-pebble-ready'
+    assert env['JUJU_DISPATCH_PATH'] == 'hooks/temporal-worker-pebble-ready'
+    assert env['JUJU_WORKLOAD_NAME'] == 'temporal-worker'
+
+
+def test_relation_event_dispatch_path_and_id_match_juju():
+    """JUJU_HOOK_NAME uses the verbatim endpoint; JUJU_RELATION_ID is ``endpoint:id``."""
+    meta: dict[str, Any] = {'name': 'dashchk', 'requires': {'receive-ca-cert': {'interface': 'x'}}}
+    relation = Relation('receive-ca-cert', remote_app_name='other')
+    event = _Event('receive-ca-cert_relation_changed', relation=relation)
+    env = _env_for(meta, event, State(relations={relation}))
+    assert env['JUJU_HOOK_NAME'] == 'receive-ca-cert-relation-changed'
+    assert env['JUJU_DISPATCH_PATH'] == 'hooks/receive-ca-cert-relation-changed'
+    assert env['JUJU_RELATION'] == 'receive-ca-cert'
+    assert env['JUJU_RELATION_ID'] == f'receive-ca-cert:{relation.id}'
+
+
+def test_storage_event_dispatch_path_preserves_storage_name():
+    meta: dict[str, Any] = {'name': 'dashchk', 'storage': {'my-store': {'type': 'filesystem'}}}
+    storage = Storage('my-store')
+    event = _Event('my-store_storage_attached', storage=storage)
+    env = _env_for(meta, event, State(storages={storage}))
+    assert env['JUJU_HOOK_NAME'] == 'my-store-storage-attached'
+    assert env['JUJU_DISPATCH_PATH'] == 'hooks/my-store-storage-attached'
+
+
+def test_action_dispatch_path_uses_actions_prefix():
+    """Real Juju dispatches actions under ``actions/<name>``, not ``hooks/...-action``."""
+    meta = {'name': 'dashchk'}
+    action = _Action('my-action')
+    event = _Event('my-action_action', action=action)
+    env = _env_for(meta, event, State())
+    assert env['JUJU_HOOK_NAME'] == ''
+    assert env['JUJU_DISPATCH_PATH'] == 'actions/my-action'
+    assert env['JUJU_ACTION_NAME'] == 'my-action'
+    assert env['JUJU_ACTION_TAG'] == f'action-{action.id}'
+
+
+@pytest.mark.parametrize(
+    ('path', 'hook_name'),
+    [
+        ('update_status', 'update-status'),
+        ('config_changed', 'config-changed'),
+        ('upgrade_charm', 'upgrade-charm'),
+        ('leader_elected', 'leader-elected'),
+        ('start', 'start'),
+        ('secret_changed', 'secret-changed'),
+    ],
+)
+def test_builtin_event_dispatch_path_is_hyphenated(path: str, hook_name: str):
+    """Juju hook names are hyphenated; scenario used to leak underscores."""
+    meta = {'name': 'dashchk'}
+    secret = Secret({'key': 'value'}, id='secret:0')
+    event = _Event(path, secret=secret if path == 'secret_changed' else None)
+    env = _env_for(meta, event, State(secrets={secret}))
+    assert env['JUJU_HOOK_NAME'] == hook_name
+    assert env['JUJU_DISPATCH_PATH'] == f'hooks/{hook_name}'

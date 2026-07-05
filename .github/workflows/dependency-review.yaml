@@ -1,0 +1,24 @@
+name: Dependency review
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+      - '*-maintenance'
+
+permissions: {}
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
