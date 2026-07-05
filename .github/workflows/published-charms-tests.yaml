@@ -283,7 +283,12 @@ jobs:
             profile: simple
     steps:
       - name: Install charmcraft
-        run: sudo snap install charmcraft --classic --channel=${{ matrix.charmcraft_channel }}
+        run: |
+          for i in 1 2 3 4 5; do
+            if sudo snap install charmcraft --classic --channel=${{ matrix.charmcraft_channel }}; then exit 0; fi
+            sleep $((RANDOM % 30 + i * 20))
+          done
+          sudo snap install charmcraft --classic --channel=${{ matrix.charmcraft_channel }}
 
       - name: Charmcraft init
         run: charmcraft init --profile=${{ matrix.profile }} --author=charm-tech

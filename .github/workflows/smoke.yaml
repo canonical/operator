@@ -19,7 +19,13 @@ jobs:
     continue-on-error: ${{ matrix.juju-channel == '4/stable' && matrix.preset == 'microk8s' }}
 
     steps:
-      - run: sudo snap install --classic concierge
+      - name: Install Concierge
+        run: |
+          for i in 1 2 3 4 5; do
+            if sudo snap install --classic concierge; then exit 0; fi
+            sleep $((RANDOM % 30 + i * 20))
+          done
+          sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}

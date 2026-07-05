@@ -52,7 +52,12 @@ jobs:
         with:
           channel: 5.21/stable
       - name: Install charmcraft
-        run: sudo snap install charmcraft --classic
+        run: |
+          for i in 1 2 3 4 5; do
+            if sudo snap install charmcraft --classic; then exit 0; fi
+            sleep $((RANDOM % 30 + i * 20))
+          done
+          sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
         working-directory: examples/${{ matrix.charm }}
         run: |

@@ -35,6 +35,13 @@ jobs:
             uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
           - name: Install secscan cli
             run: |
+              for i in 1 2 3 4 5; do
+                if sudo snap install canonical-secscan-client; then
+                  sudo snap connect canonical-secscan-client:home system:home
+                  exit 0
+                fi
+                sleep $((RANDOM % 30 + i * 20))
+              done
               sudo snap install canonical-secscan-client
               sudo snap connect canonical-secscan-client:home system:home
           - name: Prepare the artifacts
