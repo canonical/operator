@@ -67,4 +67,7 @@ jobs:
       - run: tox -e integration -- --log-cli-level=INFO -s "$MATRIX_TEST"
         env:
           MATRIX_TEST: ${{ matrix.test }}
-        timeout-minutes: 20  # Juju 4 gets stuck while destroying the model
+        # A backstop for Juju 4 getting stuck while destroying the model. The
+        # tracing tests each deploy the tempo stack into their own fresh
+        # model, so that file needs longer than the others.
+        timeout-minutes: ${{ matrix.test == 'test/integration/test_tracing.py' && 40 || 20 }}
