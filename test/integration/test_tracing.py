@@ -132,15 +132,15 @@ def test_buffer_replay_before_provider_ready(
     tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
 
     tracing_juju.integrate('test-tracing', 'tempo')
-    status = tracing_juju.wait(jubilant.all_active)
-    trace_api = status.apps['tempo-worker'].address
+    tracing_juju.wait(jubilant.all_active)
 
-    spans = wait_spans(
-        trace_api,
-        ready=lambda spans: 'custom trace on any action' in str(spans),
-        since=checkpoint,
-        timeout=180,
-    )
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: 'custom trace on any action' in str(spans),
+            since=checkpoint,
+            timeout=180,
+        )
     names = [span['name'] for span in spans]
     assert 'custom trace on any action' in names, (
         f'buffered action span never replayed; saw: {names}'
@@ -165,18 +165,18 @@ def test_relation_churn(build_tracing_charm: Callable[[], str], tracing_juju: ju
     tracing_juju.wait(lambda status: jubilant.all_active(status, 'test-tracing'))
 
     tracing_juju.integrate('test-tracing', 'tempo')
-    status = tracing_juju.wait(jubilant.all_active)
-    trace_api = status.apps['tempo-worker'].address
+    tracing_juju.wait(jubilant.all_active)
 
     checkpoint = time.time()
     arg_value = 'post-churn-arg'
     tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
 
-    spans = wait_spans(
-        trace_api,
-        ready=lambda spans: arg_value in json.dumps(spans),
-        since=checkpoint,
-    )
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: arg_value in json.dumps(spans),
+            since=checkpoint,
+        )
     assert 'custom trace on any action' in [span['name'] for span in spans], (
         'spans did not flow after re-integrating charm-tracing'
     )
@@ -189,6 +189,7 @@ def test_ca_rotation(build_tracing_charm: Callable[[], str], tracing_juju: jubil
     trusted CA and -changed on re-integration must re-load it without
     restarting the requirer.
     """
+    _xfail_on_k8s_juju4(tracing_juju, JUJU4_K8S_SECRET_RBAC_BUG)
     charm_path = build_tracing_charm()
     tracing_juju.deploy('self-signed-certificates')
     tracing_juju.integrate('tempo:certificates', 'self-signed-certificates')
@@ -197,26 +198,28 @@ def test_ca_rotation(build_tracing_charm: Callable[[], str], tracing_juju: jubil
     tracing_juju.deploy(charm_path)
     tracing_juju.integrate('test-tracing', 'self-signed-certificates')
     tracing_juju.integrate('test-tracing', 'tempo')
-    status = tracing_juju.wait(jubilant.all_active)
-    trace_api = status.apps['tempo-worker'].address
-
-    wait_spans(trace_api, ready=lambda spans: 'ops.main' in str(spans), https=True)
-
-    # Rotate the CA on the provider; the requirer must pick up the new cert
-    # via certificate_transfer -changed without restarting the export pipeline.
-    tracing_juju.run('self-signed-certificates/0', 'rotate-private-key')
     tracing_juju.wait(jubilant.all_active)
 
-    checkpoint = time.time()
-    arg_value = 'post-rotation-arg'
-    tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
+    # tempo terminates TLS (self-signed-certificates is related to tempo, not
+    # tempo-worker), so we query the coordinator, not the worker.
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo', 3200) as endpoint:
+        wait_spans(endpoint, ready=lambda spans: 'ops.main' in str(spans), https=True)
 
-    spans = wait_spans(
-        trace_api,
-        ready=lambda spans: arg_value in json.dumps(spans),
-        since=checkpoint,
-        https=True,
-    )
+        # Rotate the CA on the provider; the requirer must pick up the new cert
+        # via certificate_transfer -changed without restarting the export pipeline.
+        tracing_juju.run('self-signed-certificates/0', 'rotate-private-key')
+        tracing_juju.wait(jubilant.all_active)
+
+        checkpoint = time.time()
+        arg_value = 'post-rotation-arg'
+        tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
+
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: arg_value in json.dumps(spans),
+            since=checkpoint,
+            https=True,
+        )
     assert 'custom trace on any action' in [span['name'] for span in spans], (
         'spans did not flow over TLS after CA was rotated'
     )
@@ -234,8 +237,7 @@ def test_only_leader_writes_requirer_databag(
     charm_path = build_tracing_charm()
     tracing_juju.deploy(charm_path, num_units=2)
     tracing_juju.integrate('test-tracing', 'tempo')
-    status = tracing_juju.wait(jubilant.all_active)
-    trace_api = status.apps['tempo-worker'].address
+    tracing_juju.wait(jubilant.all_active)
 
     # Both units export traces independently — pin that the follower exports too
     # by firing an action on each and looking for distinct arg values.
@@ -243,14 +245,15 @@ def test_only_leader_writes_requirer_databag(
     tracing_juju.run('test-tracing/0', 'one', params={'arg': 'from-unit-0'})
     tracing_juju.run('test-tracing/1', 'one', params={'arg': 'from-unit-1'})
 
-    spans = wait_spans(
-        trace_api,
-        ready=lambda spans: (
-            'from-unit-0' in json.dumps(spans) and 'from-unit-1' in json.dumps(spans)
-        ),
-        since=checkpoint,
-        timeout=120,
-    )
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: (
+                'from-unit-0' in json.dumps(spans) and 'from-unit-1' in json.dumps(spans)
+            ),
+            since=checkpoint,
+            timeout=120,
+        )
     payload = json.dumps(spans)
     assert 'from-unit-0' in payload and 'from-unit-1' in payload, (
         'both units should export their own spans'
