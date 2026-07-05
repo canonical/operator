@@ -111,8 +111,23 @@ def _xfail_on_k8s_juju4(juju: jubilant.Juju, reason: str) -> None:
 
 
 @pytest.fixture
-def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
-    """Make a Juju model with the tracing part of COS ready."""
+def tracing_juju() -> Generator[jubilant.Juju]:
+    """Make a fresh Juju model with the tracing part of COS ready.
+
+    Unlike the module-scoped `juju` fixture, this makes a new model for each
+    test: the tracing tests each deploy the same charm under test and
+    reconfigure the tempo stack (for example, enabling TLS), so a model cannot
+    be shared between them.
+    """
+    with jubilant.temp_model() as juju:
+        juju.wait_timeout = 900
+        _deploy_tracing_stack(juju)
+        yield juju
+        print(juju.debug_log())
+
+
+def _deploy_tracing_stack(juju: jubilant.Juju) -> None:
+    """Deploy tempo, its worker, and the minio/s3 storage it requires."""
     deploy_tempo(juju)
     deploy_tempo_worker(juju)
     minio_config = {'access-key': 'accesskey', 'secret-key': 'mysoverysecretkey'}
@@ -181,8 +196,6 @@ def tracing_juju(juju: jubilant.Juju) -> Generator[jubilant.Juju]:
     # This process may take a while.
 
     juju.wait(jubilant.all_active)
-
-    yield juju
 
 
 @pytest.fixture(scope='session')
