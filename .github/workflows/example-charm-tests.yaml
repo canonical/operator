@@ -40,7 +40,12 @@ jobs:
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Charmcraft
-        run: sudo snap install charmcraft --classic
+        run: |
+          for i in 1 2 3 4 5; do
+            if sudo snap install charmcraft --classic; then exit 0; fi
+            sleep $((RANDOM % 30 + i * 20))
+          done
+          sudo snap install charmcraft --classic
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
