@@ -69,20 +69,6 @@ jobs:
   open-issue-on-failure-if-scheduled:
     if: ${{ failure() && github.event_name == 'schedule' }}
     needs: [collect-spread-jobs, integration]
-    runs-on: ubuntu-latest
-
     permissions:
       issues: write
-
-    steps:
-      - name: Create issue on failure
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WORKFLOW_NAME: ${{ github.workflow }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          gh issue create \
-            --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
+    uses: ./.github/workflows/notify-scheduled-failure.yml
