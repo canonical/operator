@@ -70,3 +70,10 @@ jobs:
         # allocator (runs against the runner itself) instead of launching
         # a nested LXD VM for the spread target.
         run: charmcraft test "craft:ubuntu-24.04:spread/integration/${{ matrix.task }}"
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [integration]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

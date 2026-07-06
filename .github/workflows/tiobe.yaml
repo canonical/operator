@@ -35,3 +35,10 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: operator
           installTics: true
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [TICS]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml
