@@ -10,7 +10,7 @@ from scenario.state import BlockedStatus, Relation, State
 
 import ops
 
-from ..helpers import jsonpatch_delta, trigger
+from ..helpers import state_delta, trigger
 
 
 @pytest.fixture(scope='function')
@@ -63,7 +63,7 @@ def test_charm_heals_on_start(mycharm: type[ops.CharmBase]):
     assert out.unit_status == ops.ActiveStatus('yabadoodle')
 
     out_purged = dataclasses.replace(out, stored_states=initial_state.stored_states)
-    assert jsonpatch_delta(out_purged, initial_state) == [
+    assert state_delta(out_purged, initial_state) == [
         {
             'op': 'replace',
             'path': '/unit_status/message',

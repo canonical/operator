@@ -38,7 +38,6 @@ from .state import (
     SubordinateRelation,
     _Action,
     _CharmSpec,
-    _normalise_name,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -207,10 +206,11 @@ def _check_relation_event(
             'cannot construct a relation event without the relation instance. Please pass one.',
         )
     else:
-        if not event.name.startswith(_normalise_name(event.relation.endpoint)):
+        if event._path.juju_prefix != event.relation.endpoint:
             errors.append(
-                f'relation event should start with relation endpoint name. {event.name} does '
-                f'not start with {event.relation.endpoint}.',
+                f'relation event prefix {event._path.juju_prefix!r} does not match the relation '
+                f'endpoint name {event.relation.endpoint!r} (the endpoint name must appear '
+                'exactly as declared in the charm metadata).',
             )
         if event.relation not in state.relations:
             errors.append(
@@ -232,22 +232,23 @@ def _check_workload_event(
             'cannot construct a workload event without the container instance. Please pass one.',
         )
     else:
-        if not event.name.startswith(_normalise_name(event.container.name)):
+        if event._path.juju_prefix != event.container.name:
             errors.append(
-                f'workload event should start with container name. {event.name} does '
-                f'not start with {event.container.name}.',
+                f'workload event prefix {event._path.juju_prefix!r} does not match the container '
+                f'name {event.container.name!r} (the container name must appear exactly '
+                f'as declared in the charm metadata).',
             )
-            if event.container not in state.containers:
-                errors.append(
-                    f'cannot emit {event.name} because container {event.container.name} '
-                    f'is not in the state (a container with the same name is not '
-                    f'sufficient - you must pass the object in the state to the event).',
-                )
-            if not event.container.can_connect:
-                warnings.append(
-                    'you **can** fire fire pebble-ready while the container cannot connect, '
-                    "but that's most likely not what you want.",
-                )
+        if event.container not in state.containers:
+            errors.append(
+                f'cannot emit {event.name} because container {event.container.name} '
+                f'is not in the state (a container with the same name is not '
+                f'sufficient. You must pass the object in the state to the event).',
+            )
+        if not event.container.can_connect:
+            warnings.append(
+                f'you **can** fire {event.name} while the container cannot connect, '
+                "but that's most likely not what you want.",
+            )
         names = Counter(exe.command_prefix for exe in event.container.execs)
         if dupes := [n for n in names if names[n] > 1]:
             errors.append(
@@ -265,14 +266,14 @@ def _check_action_event(
     action = event.action
     if not action:
         errors.append(
-            'cannot construct a workload event without the container instance. Please pass one.',
+            'cannot construct an action event without the action instance. Please pass one.',
         )
         return
 
-    elif not event.name.startswith(_normalise_name(action.name)):
+    elif event._path.juju_prefix != action.name:
         errors.append(
-            f'action event should start with action name. {event.name} does '
-            f'not start with {action.name}.',
+            f'action event prefix {event._path.juju_prefix!r} does not match the action '
+            f'name {action.name!r}.',
         )
     if action.name not in (charm_spec.actions or ()):
         errors.append(
@@ -298,10 +299,11 @@ def _check_storage_event(
         errors.append(
             'cannot construct a storage event without the Storage instance. Please pass one.',
         )
-    elif not event.name.startswith(_normalise_name(storage.name)):
+    elif event._path.juju_prefix != storage.name:
         errors.append(
-            f'storage event should start with storage name. {event.name} does '
-            f'not start with {storage.name}.',
+            f'storage event prefix {event._path.juju_prefix!r} does not match the storage '
+            f'name {storage.name!r} (the storage name must appear exactly as declared '
+            f'in the charm metadata).',
         )
     elif storage.name not in meta['storage']:
         errors.append(
@@ -650,10 +652,9 @@ def check_containers_consistency(
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :class:`scenario.State` containers with the charm_spec metadata."""
-    # event names will be normalized; need to compare against normalized container names.
     meta = charm_spec.meta
-    meta_containers = list(map(_normalise_name, meta.get('containers', {})))
-    state_containers = [_normalise_name(c.name) for c in state.containers]
+    meta_containers = list(meta.get('containers', {}))
+    state_containers = [c.name for c in state.containers]
     all_notices = {notice.id for c in state.containers for notice in c.notices}
     all_checks = {(c.name, check.name) for c in state.containers for check in c.check_infos}
     errors: list[str] = []
@@ -663,7 +664,7 @@ def check_containers_consistency(
     # - you're processing a Pebble event and that container is not in state.containers or
     #   meta.containers
     if event._is_workload_event:
-        evt_container_name = event.name.split('_pebble_')[0]
+        evt_container_name = event._path.juju_prefix
         if evt_container_name not in meta_containers:
             errors.append(
                 f'the event being processed concerns container {evt_container_name!r}, but a '

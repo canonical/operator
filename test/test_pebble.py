@@ -30,6 +30,9 @@ import unittest.util
 
 import pytest
 import websocket
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import test.fake_pebble as fake_pebble
 from ops import pebble
@@ -1420,7 +1423,8 @@ _bytes_generator = typing.Generator[bytes, typing.Any, typing.Any]
 class MockClient(pebble.Client):
     """Mock Pebble client that simply records requests and returns stored responses."""
 
-    def __init__(self):
+    def __init__(self, socket_path: str = '/charm/containers/c1/pebble.socket'):
+        self.socket_path = socket_path
         self.requests: list[typing.Any] = []
         self.responses: list[typing.Any] = []
         self.timeout = 5
@@ -1680,6 +1684,29 @@ class TestClient:
         pebble.Client(socket_path='foo')  # test that constructor runs
         with pytest.raises(TypeError):
             pebble.Client()  # type: ignore (socket_path arg required)
+
+    def test_span_includes_socket_path(self, monkeypatch: pytest.MonkeyPatch):
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        monkeypatch.setattr('ops.pebble.tracer', provider.get_tracer('ops-test'))
+
+        client = MockClient(socket_path='/charm/containers/postgres/pebble.socket')
+        client.responses.append({
+            'result': {'version': '1.2.3'},
+            'status': 'OK',
+            'status-code': 200,
+            'type': 'sync',
+        })
+        client.get_system_info()
+
+        spans = exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].name == 'pebble get_system_info'
+        assert spans[0].attributes is not None
+        assert (
+            spans[0].attributes['pebble.socket_path'] == '/charm/containers/postgres/pebble.socket'
+        )
 
     def test_get_system_info(self, client: MockClient):
         client.responses.append({

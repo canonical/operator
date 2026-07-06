@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import yaml
 from scenario.context import Context
+from scenario.errors import StateValidationError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
     Address,
@@ -41,7 +42,7 @@ import ops
 from ops.charm import CharmBase, CharmEvents, CollectStatusEvent
 from ops.framework import EventBase, Framework
 from ops.model import ActiveStatus, UnknownStatus, WaitingStatus
-from tests.helpers import jsonpatch_delta, trigger
+from tests.helpers import state_delta, trigger
 
 CUSTOM_EVT_SUFFIXES = {
     'relation_created',
@@ -98,7 +99,7 @@ def test_bare_event(state: State, mycharm: type[CharmBase]):
         config={'options': {'foo': {'type': 'string'}}},
     )
     out_purged = replace(out, stored_states=state.stored_states)
-    assert jsonpatch_delta(state, out_purged) == []
+    assert state_delta(state, out_purged) == []
 
 
 def test_leader_get(state: State, mycharm: type[CharmBase]):
@@ -145,7 +146,7 @@ def test_status_setting(state: State, mycharm: type[CharmBase]):
         {'op': 'replace', 'path': '/unit_status/message', 'value': 'foo test'},
         {'op': 'replace', 'path': '/unit_status/name', 'value': 'active'},
     ]
-    assert jsonpatch_delta(out_purged, state) == expected
+    assert state_delta(out_purged, state) == expected
 
 
 @pytest.mark.parametrize('connect', (True, False))
@@ -317,6 +318,65 @@ def test_container_positional_arguments():
         Container('', True)  # type: ignore
 
 
+@pytest.mark.parametrize('name', ('workload', 'workload-a', 'a', '0', 'w0rk-l0ad-2'))
+def test_container_name_valid(name: str):
+    assert Container(name).name == name
+
+
+@pytest.mark.parametrize(
+    'name',
+    ('workload_a', 'Workload', '-workload', 'workload-', '', 'wörkload', 'a' * 64),
+)
+def test_container_name_invalid(name: str):
+    with pytest.raises(StateValidationError):
+        Container(name)
+
+
+@pytest.mark.parametrize('name', ('store', 'store-a', 's', 'store-a1', 's0'))
+def test_storage_name_valid(name: str):
+    assert Storage(name).name == name
+
+
+@pytest.mark.parametrize(
+    'name',
+    ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
+)
+def test_storage_name_invalid(name: str):
+    with pytest.raises(StateValidationError):
+        Storage(name)
+
+
+@pytest.mark.parametrize(
+    ('klass', 'kwargs'),
+    [
+        (Relation, {}),
+        (PeerRelation, {}),
+        (SubordinateRelation, {}),
+    ],
+)
+@pytest.mark.parametrize('endpoint', ('db', 'receive-ca-cert', 'receive_ca_cert', 'db0', 'a1-b2'))
+def test_relation_endpoint_name_valid(
+    klass: type[RelationBase], kwargs: dict[str, Any], endpoint: str
+):
+    assert klass(endpoint, **kwargs).endpoint == endpoint
+
+
+@pytest.mark.parametrize(
+    ('klass', 'kwargs'),
+    [
+        (Relation, {}),
+        (PeerRelation, {}),
+        (SubordinateRelation, {}),
+    ],
+)
+@pytest.mark.parametrize('endpoint', ('0db', 'DB', '-db', 'db-', 'db--x', 'db__x', ''))
+def test_relation_endpoint_name_invalid(
+    klass: type[RelationBase], kwargs: dict[str, Any], endpoint: str
+):
+    with pytest.raises(StateValidationError):
+        klass(endpoint, **kwargs)
+
+
 def test_container_default_values():
     name = 'foo'
     container = Container(name)
@@ -372,7 +432,6 @@ def test_replace_state():
         (CloudCredential, 'attributes', {'auth_type': 'foo'}),
         (Secret, 'tracked_content', {}),
         (Secret, 'latest_content', {'tracked_content': {'password': 'password'}}),
-        (Secret, 'remote_grants', {'tracked_content': {'password': 'password'}}),
         (Relation, 'local_app_data', {'endpoint': 'foo'}),
         (Relation, 'local_unit_data', {'endpoint': 'foo'}),
         (Relation, 'remote_app_data', {'endpoint': 'foo'}),
@@ -386,7 +445,6 @@ def test_replace_state():
         (Container, 'layers', {'name': 'foo'}),
         (Container, 'service_statuses', {'name': 'foo'}),
         (Container, 'mounts', {'name': 'foo'}),
-        (Container, 'notices', {'name': 'foo'}),
         (StoredState, 'content', {}),
     ],
 )
@@ -407,6 +465,19 @@ def test_immutable_content_dict(
     assert getattr(obj2, attribute) == {'foo': 'bar'}
 
 
+def test_immutable_remote_grants():
+    content = {0: {'app1', 'app2'}}
+    obj1 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    obj2 = Secret(tracked_content={'password': 'password'}, remote_grants=content)
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    assert obj1.remote_grants is not obj2.remote_grants
+    content[1] = {'app3'}
+    assert obj1.remote_grants == obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+    object.__setattr__(obj1, 'remote_grants', {1: frozenset({'app3'})})
+    assert obj1.remote_grants == {1: frozenset({'app3'})}
+    assert obj2.remote_grants == {0: frozenset({'app1', 'app2'})}
+
+
 @pytest.mark.parametrize(
     'component,attribute,required_args',
     [
@@ -416,6 +487,7 @@ def test_immutable_content_dict(
         (Network, 'bind_addresses', {'binding_name': 'foo'}),
         (Network, 'ingress_addresses', {'binding_name': 'foo'}),
         (Network, 'egress_subnets', {'binding_name': 'foo'}),
+        (Container, 'notices', {'name': 'foo'}),
     ],
 )
 def test_immutable_content_list(
@@ -433,6 +505,25 @@ def test_immutable_content_list(
     object.__setattr__(obj1, attribute, ['baz', 'qux'])
     assert getattr(obj1, attribute) == ['baz', 'qux']
     assert getattr(obj2, attribute) == ['foo', 'bar']
+
+
+@pytest.mark.parametrize(
+    'component,required_args,attribute',
+    [
+        (CloudCredential, {'auth_type': 'foo'}, 'redacted'),
+        (CloudSpec, {'type': 'foo'}, 'ca_certificates'),
+        (Network, {'binding_name': 'foo'}, 'ingress_addresses'),
+        (Network, {'binding_name': 'foo'}, 'egress_subnets'),
+    ],
+)
+def test_bare_str_rejected(component: type[object], required_args: dict[str, Any], attribute: str):
+    with pytest.raises(StateValidationError):
+        component(**required_args, **{attribute: 'oops'})
+
+
+def test_bare_str_rejected_in_remote_grants():
+    with pytest.raises(StateValidationError):
+        Secret(tracked_content={'k': 'v'}, remote_grants={0: 'app'})
 
 
 @pytest.mark.parametrize(
@@ -461,6 +552,53 @@ def test_immutable_content_dict_of_dicts(
     object.__setattr__(obj1, attribute, {0: {'foo': 'qux'}})
     assert getattr(obj1, attribute) == {0: {'foo': 'qux'}}
     assert getattr(obj2, attribute) == {0: {'foo': 'bar'}, 1: {'baz': 'qux'}}
+
+
+@pytest.mark.parametrize(
+    'component,required_args,attribute,input_value,expected_type',
+    [
+        # Mapping -> dict
+        (CloudCredential, {'auth_type': 'foo'}, 'attributes', {'a': 'b'}, dict),
+        (Secret, {'tracked_content': {'k': 'v'}}, 'remote_grants', {1: {'app'}}, dict),
+        (Notice, {'key': 'foo'}, 'last_data', {'k': 'v'}, dict),
+        (Container, {'name': 'foo'}, 'layers', {}, dict),
+        (Container, {'name': 'foo'}, 'service_statuses', {}, dict),
+        (Container, {'name': 'foo'}, 'mounts', {}, dict),
+        (StoredState, {}, 'content', {'k': 'v'}, dict),
+        # Iterable -> list
+        (CloudCredential, {'auth_type': 'foo'}, 'redacted', ('a', 'b'), list),
+        (CloudSpec, {'type': 'foo'}, 'ca_certificates', ('a', 'b'), list),
+        (
+            Network,
+            {'binding_name': 'foo'},
+            'bind_addresses',
+            iter([BindAddress([Address('192.0.2.0')])]),
+            list,
+        ),
+        (Network, {'binding_name': 'foo'}, 'ingress_addresses', ('1.2.3.4',), list),
+        (Network, {'binding_name': 'foo'}, 'egress_subnets', ('1.2.3.0/24',), list),
+        (Container, {'name': 'foo'}, 'notices', (Notice(key='foo'),), list),
+        (State, {}, 'deferred', (), list),
+        # Iterable -> frozenset
+        (Container, {'name': 'foo'}, 'execs', (), frozenset),
+        (Container, {'name': 'foo'}, 'check_infos', (), frozenset),
+        (State, {}, 'relations', (Relation(endpoint='foo'),), frozenset),
+        (State, {}, 'networks', (Network(binding_name='foo'),), frozenset),
+        (State, {}, 'containers', (Container(name='foo'),), frozenset),
+        (State, {}, 'secrets', (Secret(tracked_content={'k': 'v'}),), frozenset),
+        (State, {}, 'stored_states', (), frozenset),
+    ],
+)
+def test_init_converts_to_concrete_type(
+    component: type[object],
+    required_args: dict[str, Any],
+    attribute: str,
+    input_value: Any,
+    expected_type: type,
+):
+    """Verify that __init__ converts broader input types to concrete attribute types."""
+    obj = component(**required_args, **{attribute: input_value})
+    assert isinstance(getattr(obj, attribute), expected_type)
 
 
 @pytest.mark.parametrize(
@@ -536,15 +674,17 @@ def test_state_immutable(
 def test_state_immutable_with_changed_data_relation(
     relation_type: type[RelationBase], mycharm: type[CharmBase]
 ):
+    endpoint = relation_type.__name__.lower()
+
     def event_handler(charm: CharmBase, _: EventBase):
-        rel = charm.model.get_relation(relation_type.__name__)
+        rel = charm.model.get_relation(endpoint)
         assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
     mycharm._call = event_handler  # type: ignore
 
-    relation_in = relation_type(relation_type.__name__)
+    relation_in = relation_type(endpoint)
 
     state_in = State(relations={relation_in}, leader=True)
 
@@ -554,10 +694,10 @@ def test_state_immutable_with_changed_data_relation(
         charm_type=mycharm,
         meta={
             'name': 'foo',
-            'peers': {'PeerRelation': {'interface': 'bar'}},
+            'peers': {'peerrelation': {'interface': 'bar'}},
             'requires': {
-                'Relation': {'interface': 'bar'},
-                'SubordinateRelation': {'interface': 'bar', 'scope': 'container'},
+                'relation': {'interface': 'bar'},
+                'subordinaterelation': {'interface': 'bar', 'scope': 'container'},
             },
         },
     )

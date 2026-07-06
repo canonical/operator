@@ -171,7 +171,7 @@ class Model:
 
     @property
     def config(self) -> ConfigData:
-        """Return a mapping of config for the current application."""
+        """A mapping of config for the current application."""
         return self._config
 
     @property
@@ -202,7 +202,7 @@ class Model:
 
     @property
     def name(self) -> str:
-        """Return the name of the Model that this unit is running in.
+        """The name of the Model that this unit is running in.
 
         This is read from the environment variable ``JUJU_MODEL_NAME``.
         """
@@ -210,7 +210,7 @@ class Model:
 
     @property
     def uuid(self) -> str:
-        """Return the identifier of the Model that this unit is running in.
+        """The identifier of the Model that this unit is running in.
 
         This is read from the environment variable ``JUJU_MODEL_UUID``.
         """
@@ -218,7 +218,7 @@ class Model:
 
     @property
     def juju_version(self) -> JujuVersion:
-        """Return the version of Juju that is running the model."""
+        """The version of Juju that is running the model."""
         return self._backend._juju_context.version
 
     def get_unit(self, unit_name: str) -> Unit:
@@ -666,7 +666,7 @@ class Unit:
 
     @property
     def containers(self) -> Mapping[str, Container]:
-        """Return a mapping of containers indexed by name.
+        """A mapping of containers indexed by name.
 
         Raises:
             RuntimeError: if called for another unit

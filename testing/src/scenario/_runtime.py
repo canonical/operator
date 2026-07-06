@@ -67,14 +67,12 @@ class Runtime(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
 
-    def _get_event_env(self, state: State, event: _Event, charm_root: Path):
+    def _get_event_env(self, state: State, event: _Event, charm_root: Path) -> dict[str, str]:
         """Build the simulated environment the operator framework expects."""
         env = {
             'JUJU_VERSION': self._juju_version,
             'JUJU_UNIT_NAME': f'{self._app_name}/{self._unit_id}',
             '_': './dispatch',
-            'JUJU_DISPATCH_PATH': f'hooks/{event._juju_name}',
-            'JUJU_HOOK_NAME': '' if event._is_action_event else event._juju_name,
             'JUJU_MODEL_NAME': state.model.name,
             'JUJU_MODEL_UUID': state.model.uuid,
             'JUJU_CHARM_DIR': str(charm_root.absolute()),
@@ -89,13 +87,24 @@ class Runtime(Generic[CharmType]):
         if self._principal_unit is not None:
             env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
-        if event._is_action_event and (action := event.action):
+        if event._is_action_event:
+            # Enforced by the consistency checker, but for type checkers:
+            action = event.action
+            assert action is not None
+            # Juju dispatches actions as `actions/<action-name>` (no
+            # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
             env.update(
                 {
-                    'JUJU_ACTION_NAME': action.name.replace('_', '-'),
+                    'JUJU_DISPATCH_PATH': f'actions/{action.name}',
+                    'JUJU_HOOK_NAME': '',
+                    'JUJU_ACTION_NAME': action.name,
                     'JUJU_ACTION_UUID': action.id,
+                    'JUJU_ACTION_TAG': f'action-{action.id}',
                 },
             )
+        else:
+            env['JUJU_DISPATCH_PATH'] = f'hooks/{event._juju_name}'
+            env['JUJU_HOOK_NAME'] = event._juju_name
 
         if event._is_relation_event and (relation := event.relation):
             if isinstance(relation, PeerRelation):
@@ -107,7 +116,7 @@ class Runtime(Generic[CharmType]):
             env.update(
                 {
                     'JUJU_RELATION': relation.endpoint,
-                    'JUJU_RELATION_ID': str(relation.id),
+                    'JUJU_RELATION_ID': f'{relation.endpoint}:{relation.id}',
                     'JUJU_REMOTE_APP': remote_app_name,
                 },
             )
