@@ -82,4 +82,4 @@ jobs:
     needs: [machine-examples-integration, k8s-examples-integration]
     permissions:
       issues: write
-    uses: ./.github/workflows/notify-scheduled-failure.yml
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

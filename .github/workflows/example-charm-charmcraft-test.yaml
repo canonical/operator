@@ -71,4 +71,4 @@ jobs:
     needs: [collect-spread-jobs, integration]
     permissions:
       issues: write
-    uses: ./.github/workflows/notify-scheduled-failure.yml
+    uses: ./.github/workflows/notify-scheduled-failure.yaml
