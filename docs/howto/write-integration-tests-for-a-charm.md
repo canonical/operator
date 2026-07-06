@@ -463,7 +463,7 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 (write-integration-tests-for-a-charm-configuring-jubilant-logs)=
 ## Configuring Jubilant logs
 
-Jubilant emits logs during the integration tests. These logs are handled by pytest if you are using `pytest-jubilant`. We can configure this behavior through pytest's ini options in `pyproject.toml`.
+Jubilant emits logs during the integration tests. These logs are handled by pytest if you are using `pytest-jubilant`. We can configure this behavior in `pyproject.toml`.
 
 If you initialised the charm with `charmcraft init`, the default configuration should already be in the `[tool.pytest.ini_options]` table. For example:
 
@@ -472,12 +472,13 @@ If you initialised the charm with `charmcraft init`, the default configuration s
 ...
 ```
 
-You can freely configure this to your needs.
+You can freely configure it to your needs.
 
 > See more:
 > - [`pytest | How to manage loggings`](https://docs.pytest.org/en/stable/reference/reference.html#logging)
+> - [`pytest` | pyproject.toml](https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml)
 
-This section covers the logging modes that we suggest.
+The sections below cover the configuration that we suggest.
 
 ### Brief mode
 
@@ -601,7 +602,7 @@ If any tests fail, `pytest-jubilant` automatically logs the last 1000 lines of `
 
 You can also save the complete `juju debug-log` to disk with the `--juju-dump-logs` option.
 
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the Github Actions from [](write-integration-tests-log-to-a-file-mode):
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the GitHub Actions from [](write-integration-tests-log-to-a-file-mode):
 
 ```yaml
 -  - run: tox -e integration
