@@ -20,12 +20,7 @@ jobs:
 
     steps:
       - name: Install Concierge
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install --classic concierge; then exit 0; fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install --classic concierge
+        run: sudo snap install --classic concierge
       - run: >
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}

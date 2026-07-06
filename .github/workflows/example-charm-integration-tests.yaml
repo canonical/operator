@@ -25,12 +25,7 @@ jobs:
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install --classic concierge; then exit 0; fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install --classic concierge
+        run: sudo snap install --classic concierge
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
@@ -65,12 +60,7 @@ jobs:
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install --classic concierge; then exit 0; fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install --classic concierge
+        run: sudo snap install --classic concierge
       - name: Prepare for deploying K8s charms
         run: sudo concierge prepare -p k8s
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
