@@ -162,7 +162,13 @@ def test_relation_churn(build_tracing_charm: Callable[[], str], tracing_juju: ju
     tracing_juju.wait(jubilant.all_active)
 
     tracing_juju.cli('remove-relation', 'test-tracing:charm-tracing', 'tempo:tracing')
-    tracing_juju.wait(lambda status: jubilant.all_active(status, 'test-tracing'))
+    # Waiting only for test-tracing races the re-integrate below: test-tracing's
+    # -relation-departed hook finishes in ~1s, but the relation stays "dying" on
+    # the controller until tempo has also processed its -broken hook, and
+    # `juju integrate` refuses "relation ... is dying, but not yet removed
+    # (already exists)" during that window. Wait for the whole model to settle
+    # so both sides have torn down before we re-integrate.
+    tracing_juju.wait(jubilant.all_active)
 
     tracing_juju.integrate('test-tracing', 'tempo')
     tracing_juju.wait(jubilant.all_active)
