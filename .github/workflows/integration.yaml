@@ -53,19 +53,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # Retry with jittered backoff: 36 parallel jobs hit
-      # `snap install concierge` at the same instant and the snap store
-      # rate-limits with "too many requests". A single install can still
-      # succeed if we spread the retries out.
       - name: Install concierge
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install --classic concierge; then
-              exit 0
-            fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install --classic concierge
+        run: sudo snap install --classic concierge
       # .github/integration/concierge-*.yaml mirrors the upstream concierge
       # preset and adds juju.extra-bootstrap-args: `juju bootstrap` regularly
       # fails on slow GHA runners with `unable to contact api server after

@@ -40,12 +40,7 @@ jobs:
           CLONE_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Install yq
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install yq; then exit 0; fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install yq
+        run: sudo snap install yq
 
       - name: Add 'git' as a build package
         run: |
@@ -63,12 +58,7 @@ jobs:
           channel: 5.0/stable
 
       - name: Install charmcraft
-        run: |
-          for i in 1 2 3 4 5; do
-            if sudo snap install charmcraft --classic; then exit 0; fi
-            sleep $((RANDOM % 30 + i * 20))
-          done
-          sudo snap install charmcraft --classic
+        run: sudo snap install charmcraft --classic
 
       - name: Pack the charm
         run: |
