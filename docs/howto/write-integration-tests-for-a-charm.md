@@ -465,7 +465,7 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 
 Jubilant emits logs during the integration tests. These logs are handled by pytest if you are using `pytest-jubilant`. We can configure this behavior in `pyproject.toml`.
 
-If you initialised the charm with `charmcraft init`, the default configuration should already be in the `[tool.pytest.ini_options]` table. For example:
+If you initialised the charm with `charmcraft init`, the `[tool.pytest.ini_options]` table already exist in `pyproject.toml`. For example:
 
 ```toml
 [tool.pytest.ini_options]
@@ -490,7 +490,7 @@ log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 ```
 
-While the test is running, logs with level `INFO` and above are emitted live to the console. Each log message will contain the log level, the logger's name and the message.
+While the test is running, logs with level `INFO` and above are emitted live to the console.
 
 ### Verbose mode
 
@@ -505,7 +505,7 @@ log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
 
-As we show the timestamps, we need to define its format with the `log_cli_date_format` key.
+We define the timestamps format with the `log_cli_date_format` key, following ISO 8601.
 
 > See more:
 > - [`datetime | strftime() and strptime() format codes`](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
@@ -523,6 +523,7 @@ log_cli = true
 log_cli_level = "ERROR"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 ```
+
 (write-integration-tests-log-to-a-file-mode)=
 ### Log to a file
 
@@ -551,7 +552,7 @@ When a test item fails, pytest prints all logs captured during the test to the t
 ...
 ```
 
-`log_level = "INFO"` is intentional to keep the `Captured log call` consistent with Brief mode. If you still want Verbose mode in `Captured log call`, `log_level` can be removed.
+`log_level = "INFO"` is intentional to keep the `Captured log call` consistent with Brief mode. If you want Verbose mode in `Captured log call`, you can set `log_level` to `DEBUG`.
 
 The local file where Verbose mode logs land is `logs/verbose.log`. It contains logs from one pytest session. If you want to run multiple test suites, and store Verbose logs in separated files. You can override `log_file` for each pytest invocation:
 
@@ -577,10 +578,9 @@ Use this mode in CI with `actions/upload-artifact` to make `logs/verbose.log` av
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
     with:
-      name: integration-logs
+      name: integration-test-logs
       path: logs
 ```
-
 
 ### Behavior when no pytest's logging config is set
 
@@ -588,25 +588,32 @@ This section covers the behavior when no logging configuration is set, either in
 
 - `pytest`. For example: `tests/integration/test_charm.py::test_deploy PASSED`
 - Logs from other modules if they are at `WARNING` or above.
-- Usage hints from pytest-jubilant. For example: `Models were torn down. To keep models available for subsequent test runs or manual debugging, pass the following:
+- Usage hints from `pytest-jubilant`. For example: `Models were torn down. To keep models available for subsequent test runs or manual debugging, pass the following:
 --no-juju-teardown`
 
 (write-integration-tests-for-a-charm-view-juju-logs)=
 ## View `juju debug-log` logs
 
-If any tests fail, `pytest-jubilant` automatically logs the last 1000 lines of `juju debug-log`. Log messages from `pytest-jubilant` are handled depending on how you configure pytest (see [](write-integration-tests-for-a-charm-configuring-jubilant-logs):
+If any tests fail, `pytest-jubilant` automatically logs the last 1000 lines of `juju debug-log` at `DEBUG` level. Log messages from `pytest-jubilant` are handled depending on how you configure pytest (see [](write-integration-tests-for-a-charm-configuring-jubilant-logs):
 
-- For Brief mode and Error mode: They don't appear anywhere. 
+- For Brief mode and Error mode: They don't appear anywhere.
 - For Verbose mode: They appear in the terminal.
-- For Log to a file: They only land in `log_file`, and don't appear in the terminal. 
+- For Log to a file: They appear in `log_file`, and don't appear in the terminal.
 
 You can also save the complete `juju debug-log` to disk with the `--juju-dump-logs` option.
 
 Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the GitHub Actions from [](write-integration-tests-log-to-a-file-mode):
 
-```yaml
+```diff
+  # In your integration test job
 -  - run: tox -e integration
 +  - run: tox -e integration -- --juju-dump-logs logs
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: integration-test-logs
+      path: logs
 ```
 
 ## Generate crash dumps
