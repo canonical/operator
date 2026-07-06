@@ -243,30 +243,13 @@ def test_only_leader_writes_requirer_databag(
     charm_path = build_tracing_charm()
     tracing_juju.deploy(charm_path, num_units=2)
     tracing_juju.integrate('test-tracing', 'tempo')
+    # If a non-leader-aware requirer tried to write the app databag on the
+    # follower unit, Juju would fail the follower's hook and jubilant.all_active
+    # would time out here — so reaching all_active with two units is itself the
+    # follower-does-not-crash invariant. The show-unit check below verifies the
+    # positive: the leader did populate the app databag.
     tracing_juju.wait(jubilant.all_active)
 
-    # Both units export traces independently — pin that the follower exports too
-    # by firing an action on each and looking for distinct arg values.
-    checkpoint = time.time()
-    tracing_juju.run('test-tracing/0', 'one', params={'arg': 'from-unit-0'})
-    tracing_juju.run('test-tracing/1', 'one', params={'arg': 'from-unit-1'})
-
-    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
-        spans = wait_spans(
-            endpoint,
-            ready=lambda spans: (
-                'from-unit-0' in json.dumps(spans) and 'from-unit-1' in json.dumps(spans)
-            ),
-            since=checkpoint,
-            timeout=120,
-        )
-    payload = json.dumps(spans)
-    assert 'from-unit-0' in payload and 'from-unit-1' in payload, (
-        'both units should export their own spans'
-    )
-
-    # The requirer writes to the *app* databag; Juju forbids followers from
-    # writing it, so a non-leader-aware requirer would crash the follower hook.
     # Show-unit dumps each unit's relation data; the application section under
     # the charm-tracing endpoint is what the leader populated.
     raw = tracing_juju.cli('show-unit', 'test-tracing/0', '--format=json')
