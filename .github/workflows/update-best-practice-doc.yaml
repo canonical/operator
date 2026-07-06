@@ -56,3 +56,10 @@ jobs:
         working-directory: operator
         env:
             GITHUB_TOKEN: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [update-docs]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

@@ -44,3 +44,10 @@ jobs:
         with:
           name: charmcraft-logs
           path: /home/runner/.local/state/charmcraft/log/*.log
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [test]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

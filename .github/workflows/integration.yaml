@@ -71,3 +71,10 @@ jobs:
         # tracing tests each deploy the tempo stack into their own fresh
         # model, so that file needs longer than the others.
         timeout-minutes: ${{ matrix.test == 'test/integration/test_tracing.py' && 40 || 20 }}
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [integration]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml
