@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -36,7 +36,7 @@ jobs:
         python-version: ["3.10", "3.12", "3.14"]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -59,7 +59,7 @@ jobs:
         python-version: ["3.10", "3.12", "3.14"]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -93,7 +93,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0

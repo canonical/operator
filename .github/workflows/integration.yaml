@@ -13,10 +13,10 @@ jobs:
     outputs:
       tests: ${{ steps.tests.outputs.result }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       - name: Collect integration test files
         id: tests
         run: |
@@ -50,7 +50,7 @@ jobs:
             test: test/integration/test_tracing.py
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - run: sudo snap install --classic concierge

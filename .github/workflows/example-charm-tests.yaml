@@ -28,7 +28,7 @@ jobs:
           - examples/k8s-5-observe
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - name: Set up Python 3

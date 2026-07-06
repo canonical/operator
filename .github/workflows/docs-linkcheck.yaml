@@ -15,7 +15,7 @@ jobs:
     name: Links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
       - name: Set up uv
