@@ -16,7 +16,7 @@ jobs:
       - name: Create issue on failure
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that called this one.
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

@@ -68,7 +68,7 @@ jobs:
 
   open-issue-on-failure-if-scheduled:
     if: ${{ failure() && github.event_name == 'schedule' }}
-    needs: [collect-spread-jobs, integration]
+    needs: [integration]
     permissions:
       issues: write
     uses: ./.github/workflows/notify-scheduled-failure.yaml
