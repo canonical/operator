@@ -737,12 +737,7 @@ def _strip_juju4_defaults(state: State, juju_version: str) -> None:
     Mutates the databag dicts in place; only keys still set to the default
     sentinel IP are removed, so explicit user-set values are preserved.
     """
-    parts = juju_version.split('.', 1)
-    try:
-        major = int(parts[0])
-    except ValueError:
-        return
-    if major < 4:
+    if ops.JujuVersion(juju_version).major < 4:
         return
     for relation in state.relations:
         for databag in relation._databags:
