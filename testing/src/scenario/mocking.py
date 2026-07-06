@@ -943,6 +943,13 @@ class _MockPebbleClient(_TestingPebbleClient):
                 f'{self.socket_path!r} wrong?',
             ) from None
 
+    # These properties override plain-dict attributes on the Harness parent
+    # (self._layers / self._service_status) because the scenario mock keeps
+    # state on the Container dataclass rather than on the client. Pyright
+    # rightly flags overriding a variable with a differently-typed property,
+    # but resolving it properly would require reworking the parent class to
+    # let subclasses plug in a state source. Don't remove the ignores without
+    # that refactor.
     @property
     def _layers(self) -> dict[str, pebble.Layer]:  # pyright: ignore[reportIncompatibleVariableOverride]
         return cast('dict[str, pebble.Layer]', self._container.layers)

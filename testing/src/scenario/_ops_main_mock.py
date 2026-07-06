@@ -34,10 +34,9 @@ from .state import (
     StoredState,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from opentelemetry.sdk.trace import ReadableSpan
 
-if TYPE_CHECKING:  # pragma: no cover
     from .state import State, _CharmSpec, _Event
 
 EVENT_REGEX = re.compile(_event_regex)

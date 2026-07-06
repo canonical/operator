@@ -48,8 +48,11 @@ if TYPE_CHECKING:  # pragma: no cover
 
     from . import Context
 
-    # Fields that from_context() forwards through **kwargs — the ones it
-    # doesn't already accept explicitly to merge with metadata-derived defaults.
+    # Fields that from_context() forwards through **kwargs to State.__init__.
+    # These are the State fields that from_context() does not accept as
+    # explicit parameters — the explicit ones (config, relations, containers,
+    # storages, stored_states) merge with or replace metadata-derived
+    # defaults; these have no metadata equivalent and pass straight through.
     class _StateKwargsRest(TypedDict, total=False):
         networks: Iterable[Network]
         opened_ports: Iterable[Port]

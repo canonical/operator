@@ -757,9 +757,10 @@ class Context(Generic[CharmType]):
             )
 
         # If neither ``app_name`` nor a ``name`` in the charm metadata is
-        # provided, fall back to an empty string and let the charm code fail
-        # later. Raising here would prevent tests from asserting on the
-        # downstream failure path (see ``test_init_and_run_with_bad_meta``).
+        # provided, fall back to an empty string. Raising here would prevent
+        # tests from asserting on the downstream failure that Ops raises when
+        # it later looks up the missing metadata (see
+        # ``test_init_and_run_with_bad_meta``).
         self.app_name = app_name or self._charm_spec.meta.get('name') or ''
         self.unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
