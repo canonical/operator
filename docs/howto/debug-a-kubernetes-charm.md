@@ -203,7 +203,7 @@ mycharm-0
 
 Pushing binaries in modifies the running container. Remove them when you're done, or restart the pod to get back to a clean state.
 
-Or use a tool like [Borescope](https://borescope.dev), which gives you a bash-like shell over Juju and Pebble without touching the container's filesystem.
+Or use a tool like [borescope](https://borescope.dev), which gives you a bash-like shell over Juju and Pebble without touching the container's filesystem.
 
 ### Enter the container as root from the host
 
