@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.fixture(autouse=True)  # noqa: RUF076  # applies to every test in the suite
+@pytest.fixture(autouse=True)
 def setup_tracing(monkeypatch: pytest.MonkeyPatch):
     """Disable tracing for most tests."""
     monkeypatch.setattr('ops.tracing', None)
