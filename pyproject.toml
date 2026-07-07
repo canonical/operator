@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.7.1",
+    "ops-scenario==8.9.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.7.1",
+    "ops-tracing==3.9.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -37,8 +37,8 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.14",
-    "codespell==2.4.1",
+    "ruff==0.15.20",
+    "codespell==2.4.2",
     "zizmor==1.26.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
@@ -71,13 +71,13 @@ integration = [
     "httpx~=0.28",
 ]
 release = [
-    "packaging~=24.0",
+    "packaging>=24,<27",
     "pygithub~=2.6",
-    "rich~=14.1",
+    "rich>=14.1,<16.0",
 ]
 tiobe = [
     "flake8==7.3.0",
-    "pylint==4.0.5",
+    "pylint==4.0.6",
 ]
 
 [project.urls]

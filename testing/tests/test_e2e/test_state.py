@@ -318,6 +318,65 @@ def test_container_positional_arguments():
         Container('', True)  # type: ignore
 
 
+@pytest.mark.parametrize('name', ('workload', 'workload-a', 'a', '0', 'w0rk-l0ad-2'))
+def test_container_name_valid(name: str):
+    assert Container(name).name == name
+
+
+@pytest.mark.parametrize(
+    'name',
+    ('workload_a', 'Workload', '-workload', 'workload-', '', 'wörkload', 'a' * 64),
+)
+def test_container_name_invalid(name: str):
+    with pytest.raises(StateValidationError):
+        Container(name)
+
+
+@pytest.mark.parametrize('name', ('store', 'store-a', 's', 'store-a1', 's0'))
+def test_storage_name_valid(name: str):
+    assert Storage(name).name == name
+
+
+@pytest.mark.parametrize(
+    'name',
+    ('store_a', 'Store', '0store', '-store', 'store-', 'store-1', ''),
+)
+def test_storage_name_invalid(name: str):
+    with pytest.raises(StateValidationError):
+        Storage(name)
+
+
+@pytest.mark.parametrize(
+    ('klass', 'kwargs'),
+    [
+        (Relation, {}),
+        (PeerRelation, {}),
+        (SubordinateRelation, {}),
+    ],
+)
+@pytest.mark.parametrize('endpoint', ('db', 'receive-ca-cert', 'receive_ca_cert', 'db0', 'a1-b2'))
+def test_relation_endpoint_name_valid(
+    klass: type[RelationBase], kwargs: dict[str, Any], endpoint: str
+):
+    assert klass(endpoint, **kwargs).endpoint == endpoint
+
+
+@pytest.mark.parametrize(
+    ('klass', 'kwargs'),
+    [
+        (Relation, {}),
+        (PeerRelation, {}),
+        (SubordinateRelation, {}),
+    ],
+)
+@pytest.mark.parametrize('endpoint', ('0db', 'DB', '-db', 'db-', 'db--x', 'db__x', ''))
+def test_relation_endpoint_name_invalid(
+    klass: type[RelationBase], kwargs: dict[str, Any], endpoint: str
+):
+    with pytest.raises(StateValidationError):
+        klass(endpoint, **kwargs)
+
+
 def test_container_default_values():
     name = 'foo'
     container = Container(name)
@@ -615,15 +674,17 @@ def test_state_immutable(
 def test_state_immutable_with_changed_data_relation(
     relation_type: type[RelationBase], mycharm: type[CharmBase]
 ):
+    endpoint = relation_type.__name__.lower()
+
     def event_handler(charm: CharmBase, _: EventBase):
-        rel = charm.model.get_relation(relation_type.__name__)
+        rel = charm.model.get_relation(endpoint)
         assert rel is not None
         rel.data[charm.app]['a'] = 'b'
         rel.data[charm.unit]['c'] = 'd'
 
     mycharm._call = event_handler  # type: ignore
 
-    relation_in = relation_type(relation_type.__name__)
+    relation_in = relation_type(endpoint)
 
     state_in = State(relations={relation_in}, leader=True)
 
@@ -633,10 +694,10 @@ def test_state_immutable_with_changed_data_relation(
         charm_type=mycharm,
         meta={
             'name': 'foo',
-            'peers': {'PeerRelation': {'interface': 'bar'}},
+            'peers': {'peerrelation': {'interface': 'bar'}},
             'requires': {
-                'Relation': {'interface': 'bar'},
-                'SubordinateRelation': {'interface': 'bar', 'scope': 'container'},
+                'relation': {'interface': 'bar'},
+                'subordinaterelation': {'interface': 'bar', 'scope': 'container'},
             },
         },
     )
