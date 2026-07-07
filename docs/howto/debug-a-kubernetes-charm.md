@@ -187,7 +187,7 @@ Production workload images are often minimal: no shell, no `ls`, no package mana
 | `cp local.conf /etc/myapp/` | `pebble push local.conf /etc/myapp/local.conf` |
 | `env` | `pebble exec --context <service> -- env` (uses the service's environment) |
 
-`pebble ls`, `pebble push`, and `pebble pull` work even when the container has no shell at all, because they go through Pebble's API rather than exec'ing a binary in the container.
+`pebble ls`, `pebble push`, and `pebble pull` work even when the container has no shell at all, because they go through Pebble's API rather than running a binary in the container.
 
 ### Inject a rescue shell
 
@@ -203,7 +203,7 @@ mycharm-0
 
 Pushing binaries in modifies the running container. Remove them when you're done, or restart the pod to get back to a clean state.
 
-Or use a tool like [borescope](https://borescope.dev), which gives you a bash-like shell over Juju and Pebble without touching the container's filesystem.
+Or use a tool like [Borescope](https://borescope.dev), which gives you a bash-like shell over Juju and Pebble without touching the container's filesystem.
 
 ### Enter the container as root from the host
 
