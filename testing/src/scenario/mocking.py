@@ -584,10 +584,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         )
 
         grants = secret.remote_grants
-        if relation_id not in grants:
-            grants[relation_id] = frozenset({cast('str', grantee)})
-        else:
+        if relation_id in grants:
             grants[relation_id] = grants[relation_id].union({cast('str', grantee)})
+        else:
+            grants[relation_id] = frozenset({cast('str', grantee)})
 
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
