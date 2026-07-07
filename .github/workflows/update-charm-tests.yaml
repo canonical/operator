@@ -53,3 +53,10 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.UPDATE_CHARM_PINS_ACCESS_TOKEN }}
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [update-pins]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

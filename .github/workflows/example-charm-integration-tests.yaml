@@ -76,3 +76,10 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e integration
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [machine-examples-integration, k8s-examples-integration]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml
