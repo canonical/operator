@@ -44,7 +44,7 @@ If you're not sure where to start, find your symptom here and jump to the sectio
 | Charm raises `ConnectionError` mid-handler | The workload's Pebble became unreachable. Guard Pebble calls with `try`/`except` rather than `can_connect()` ([](ops.Container.can_connect)). |
 | `pebble_custom_notice` never fires | Confirm the notice was recorded with `pebble notices`. Check the `key` your handler matches on ([](#k8s-pebble-cli)). |
 | Workload isn't ready despite running | A health check is failing. Run `pebble checks` and `pebble check <name> --refresh` ([](#k8s-pebble-cli)). |
-| `juju ssh --container` lands in an image with no shell or tools | The workload image is stripped down. Run Pebble against it from the charm container instead, where the socket is mounted ([](#k8s-debug-from-charm-container)). |
+| `juju ssh --container` lands in an image with no shell or tools | The workload image is stripped down. Run Pebble against it from the charm container instead, where the socket is mounted ([](#k8s-debug-from-charm-container)), or see [](#k8s-limited-containers). |
 
 (k8s-pebble-cli)=
 ## Inspect the workload with the Pebble CLI
@@ -171,6 +171,54 @@ export PEBBLE_SOCKET=/charm/myapp/pebble.sock   # point at the workload's Pebble
 ```
 
 This is also the most faithful way to reproduce what your charm sees, since your charm talks to exactly this socket. If a Pebble command works here but your charm raises an error, the problem is in the charm code rather than the Pebble configuration.
+
+(k8s-limited-containers)=
+## Work in a stripped-down or rootless workload container
+
+Production workload images are often minimal: no shell, no `ls`, no package manager, and sometimes no root. `juju ssh --container` still lands you inside, but the usual debugging reflexes don't work. Pebble runs as PID 1 in the container and can stand in for most of them.
+
+### Shell commands via Pebble
+
+| Instead of | Use |
+| --- | --- |
+| `ls /var/lib/myapp` | `pebble ls /var/lib/myapp` |
+| `cat /etc/myapp/config.yaml` | `pebble pull /etc/myapp/config.yaml /tmp/config.yaml`, then read it locally |
+| `./myprogram --flag` | `pebble exec -- /path/to/myprogram --flag` |
+| `cp local.conf /etc/myapp/` | `pebble push local.conf /etc/myapp/local.conf` |
+| `env` | `pebble exec --context <service> -- env` (uses the service's environment) |
+
+`pebble ls`, `pebble push`, and `pebble pull` work even when the container has no shell at all, because they go through Pebble's API rather than exec'ing a binary in the container.
+
+### Inject a rescue shell
+
+If you need an interactive shell and the image doesn't ship one, push a statically-linked `busybox` in from the outside:
+
+```shell
+apt install busybox-static                          # on your local machine
+pebble push /usr/bin/busybox /charm/bin/busybox     # into the workload container
+pebble exec /charm/bin/busybox sh
+# hostname
+mycharm-0
+```
+
+Pushing binaries in modifies the running container. Remove them when you're done, or restart the pod to get back to a clean state.
+
+Or use a tool like [borescope](https://borescope.dev), which gives you a bash-like shell over Juju and Pebble without touching the container's filesystem.
+
+### Enter the container as root from the host
+
+If you have shell access to the Kubernetes node the pod is scheduled on, and sufficient host capabilities, you can `nsenter` into the container as root -- useful when the workload runs unprivileged and you need to inspect something Pebble's own user can't touch:
+
+```shell
+# On the node:
+apt install busybox-static
+cp /usr/bin/busybox /proc/<pebble-pid>/root/charm/bin/busybox
+nsenter -a -t <pebble-pid> -S 0 -G 0 /charm/bin/busybox sh
+# whoami
+root
+```
+
+`<pebble-pid>` is Pebble's PID as seen from the host (find it with `pgrep pebble` or from `crictl inspect`). This bypasses Pebble entirely and requires root on the node, so it's a last resort for things the other approaches can't reach.
 
 (k8s-inspect-the-pod)=
 ## Inspect the pod at the Kubernetes layer
