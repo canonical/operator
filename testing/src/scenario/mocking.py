@@ -200,11 +200,15 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             ),
         )
 
-    def _get_relation_by_id(self, rel_id: int) -> RelationBase:
+    def _get_relation_by_id(self, rel_id: int, relation_name: str | None = None) -> RelationBase:
         try:
-            return self._state.get_relation(rel_id)
+            relation = self._state.get_relation(rel_id)
         except KeyError:
             raise RelationNotFoundError() from None
+        if relation_name is not None and relation.endpoint != relation_name:
+            # Mimic Juju's behaviour when given a mismatched ``endpoint:id``.
+            raise RelationNotFoundError()
+        return relation
 
     def _get_secret(self, id: str | None = None, label: str | None = None):
         if JujuVersion(self._context.juju_version) < '3.0.2':
@@ -252,13 +256,28 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 f'setting application data is not supported on Juju version {version}',
             )
 
-    def relation_get(self, relation_id: int, member_name: str, is_app: bool):
+    def relation_get(
+        self,
+        relation_id: int,
+        member_name: str,
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
+    ):
         self._check_app_data_access(is_app)
-        data = self._relation_get(relation_id, member_name=member_name, is_app=is_app)
+        data = self._relation_get(
+            relation_id, member_name=member_name, is_app=is_app, relation_name=relation_name
+        )
         return data.copy()
 
-    def _relation_get(self, relation_id: int, member_name: str, is_app: bool):
-        relation = self._get_relation_by_id(relation_id)
+    def _relation_get(
+        self,
+        relation_id: int,
+        member_name: str,
+        is_app: bool,
+        relation_name: str | None = None,
+    ):
+        relation = self._get_relation_by_id(relation_id, relation_name)
         if is_app and member_name == self.app_name:
             return relation.local_app_data
         if is_app:
@@ -273,11 +292,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         unit_id = int(member_name.split('/')[-1])
         return relation._get_databag_for_remote(unit_id)  # noqa
 
-    def relation_model_get(self, relation_id: int) -> dict[str, Any]:
+    def relation_model_get(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> dict[str, Any]:
         if JujuVersion(self._context.juju_version) < '3.6.2':
             raise ModelError('Relation.remote_model is only available on Juju >= 3.6.2')
 
-        relation = self._get_relation_by_id(relation_id)
+        relation = self._get_relation_by_id(relation_id, relation_name)
         # Only Relation has remote_model_uuid, not the other subclasses of RelationBase.
         if isinstance(relation, Relation) and relation.remote_model_uuid is not None:
             uuid = relation.remote_model_uuid
@@ -295,8 +316,10 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_ids(self, relation_name: str):
         return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
-    def relation_list(self, relation_id: int) -> tuple[str, ...]:
-        relation = self._get_relation_by_id(relation_id)
+    def relation_list(
+        self, relation_id: int, *, relation_name: str | None = None
+    ) -> tuple[str, ...]:
+        relation = self._get_relation_by_id(relation_id, relation_name)
 
         if isinstance(relation, PeerRelation):
             # The current unit should never be in `peers_data`, and there is a
@@ -308,7 +331,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 for unit_id in relation.peers_data
                 if unit_id != this_unit
             )
-        remote_name = self.relation_remote_app_name(relation_id)
+        remote_name = self.relation_remote_app_name(relation_id, relation_name=relation_name)
         return tuple(f'{remote_name}/{unit_id}' for unit_id in relation._remote_unit_ids)
 
     def config_get(self):
@@ -392,7 +415,14 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
-    def relation_set(self, relation_id: int, data: Mapping[str, str], is_app: bool) -> None:
+    def relation_set(
+        self,
+        relation_id: int,
+        data: Mapping[str, str],
+        is_app: bool,
+        *,
+        relation_name: str | None = None,
+    ) -> None:
         self._check_app_data_access(is_app)
         # NOTE: The code below currently does not have any effect, because
         # the dictionary has already had the same set/delete operations
@@ -400,7 +430,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         # where this method calls out to Juju's relation-set to operate on
         # the real databag, this method currently operates on the same
         # dictionary object that RelationDataContent does.
-        relation = self._get_relation_by_id(relation_id)
+        relation = self._get_relation_by_id(relation_id, relation_name)
         if is_app:
             if not self._state.leader:
                 # will in practice not be reached because RelationData will check leadership
@@ -601,11 +631,13 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_remote_app_name(
         self,
         relation_id: int,
+        *,
+        relation_name: str | None = None,
         _raise_on_error: bool = False,
     ) -> str | None:
         # ops catches RelationNotFoundErrors and returns None:
         try:
-            relation = self._get_relation_by_id(relation_id)
+            relation = self._get_relation_by_id(relation_id, relation_name)
         except RelationNotFoundError:
             if _raise_on_error:
                 raise
