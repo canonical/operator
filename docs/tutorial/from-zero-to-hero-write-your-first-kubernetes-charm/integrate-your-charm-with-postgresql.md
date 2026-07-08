@@ -527,8 +527,7 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
     version = juju.status().apps[APP_NAME].version
-    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
-    assert version == "1.0.4"
+    assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
 This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.

@@ -425,8 +425,8 @@ def test_pebble_layer(mock_version):
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
-    # Check the workload version is set
-    assert state_out.workload_version is not None
+    # Check the workload version is set:
+    assert state_out.workload_version == "0.0.1"
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
@@ -513,8 +513,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
     version = juju.status().apps[APP_NAME].version
-    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
-    assert version == "1.0.4"
+    assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
 This test depends on two fixtures:
