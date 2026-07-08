@@ -25,15 +25,29 @@ To check that your preferred name isn't already in use, visit the (future) Charm
 https://charmhub.io/mega-calendar-k8s
 ```
 
+Make sure that your charm's name only contains ASCII lowercase letters, numbers, and hyphens.
+
+The general naming pattern is `<workload name>[-<function>][-k8s]`, where `<function>` could be `server`, `dashboard`, and so on.
+
+Don't add an `operator` or `charm` prefix/suffix. Don't include an organisation or publisher name.
+
+### Charms without a workload
+
 Some charms do not operate a workload, such as integrator and configurator charms. These categories serve different purposes:
 
 * An integrator charm allows integration with a service that is not managed through Juju. This can both apply to server side integrations (such as `s3-integrator`, which integrates an externally managed S3 object storage) or to client side integrations (such as `data-integrator`, representing the integration of external client application that needs a database).
 
 * A configurator charm provides logic to configure a particular charm or relation that is already in Juju. Examples include `cos-configuration` when it applies to a single charm (such as providing more fine-grained configuration of the Prometheus scraping) or for a relation (such as `ingress-configurator` to provide additional configuration of ingress requests).
 
-Since workload-less charms can work both on machines and on Kubernetes, avoid using the `k8s` suffix when naming integrator charms and configurator charms, unless the charm is only relevant for Kubernetes (for example, managing K8s resources within the charm logic using `lightkube`).
+When naming your charm, use `-integrator` and `-configurator` to signal the category. For example, `foo-integrator` or `bar-configurator`.
 
-When naming the charm, use `-integrator` and `-configurator` to signal the category of the charm. For example, `foo-integrator` or `bar-configurator`.
+### Kubernetes charms
+
+The `k8s` suffix is for disambiguation, not classification. Only use `-k8s` in the name of a Kubernetes charm if there is (or could be in the future) a machine variant of your charm.
+
+For example, a charm that manages Kubernetes resources with `lightkube` shouldn't use `-k8s` in the name, as the charm is inherently tied to Kubernetes.
+
+Don't use `-k8s` for workload-less charms. These charms work on machines and Kubernetes.
 
 (create-a-repository)=
 ## Create a repository
@@ -71,17 +85,6 @@ Or for a machine charm:
 ```text
 charmcraft init --name mega-calendar --profile machine
 ```
-
-<!-- Remove this tip when the charmcraft stable version is up-to-date. -->
-````{tip}
-The `charmcraft` version that you have installed may come with older versions of the profiles.
-
-To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
-
-```text
-uvx git+https://github.com/canonical/charmcraft@74d12bc init --name <name> --profile <profile>
-```
-````
 
 If you don't specify `--name` when running `charmcraft init`, Charmcraft uses the parent directory name for your charm. For example, `mega-calendar-k8s-operator`, from the name of the repository. So we recommend specifying `--name` to ensure that your charm's name doesn't end with `-operator`.
 
