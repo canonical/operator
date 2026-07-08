@@ -131,9 +131,9 @@ def _replan_workload(self) -> None:
         logger.info("Unable to connect to Pebble: %s", e)
         self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
         return
-    self.unit.status = ops.ActiveStatus()
     version = fastapi_demo.get_version(config.server_port)
     self.unit.set_workload_version(version)
+    self.unit.status = ops.ActiveStatus()
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.

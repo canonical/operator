@@ -44,5 +44,4 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(juju: jubilant.Juju):
     # Verify that the workload version has been set.
     version = juju.status().apps[APP_NAME].version
-    # Hardcoded version for simplicity. Ideally we'd get the version directly from the workload.
-    assert version == "1.0.4"
+    assert version == "1.0.4"  # Hardcoded for simplicity.

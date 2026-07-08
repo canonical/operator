@@ -231,7 +231,7 @@ def _get_pebble_layer(self) -> ops.pebble.Layer:
 
 The workload version is available after the workload starts, which happens after Pebble reevaluates its plan. We'll use the `src/fastapi_demo.py` helper module for this step.
 
-In `src/charm.py`, append the following lines to the `_on_demo_server_pebble_ready` function:
+In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function before the final `self.unit.status = ops.ActiveStatus()`:
 
 ```python
 # Set the workload version of this charm.

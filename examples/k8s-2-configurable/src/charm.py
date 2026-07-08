@@ -91,9 +91,9 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info("Unable to connect to Pebble: %s", e)
             self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
             return
-        self.unit.status = ops.ActiveStatus()
         version = fastapi_demo.get_version(config.server_port)
         self.unit.set_workload_version(version)
+        self.unit.status = ops.ActiveStatus()
 
     def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""

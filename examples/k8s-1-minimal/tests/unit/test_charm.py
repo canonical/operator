@@ -62,5 +62,5 @@ def test_pebble_layer(mock_version):
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
-    # Check the workload version is set
-    assert state_out.workload_version is not None
+    # Check the workload version is set:
+    assert state_out.workload_version == "0.0.1"
