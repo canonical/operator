@@ -487,6 +487,70 @@ def test_relation_default_unit_data_peer():
     assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
 
 
+@pytest.mark.parametrize(
+    'juju_version,expect_private_address',
+    [('3.6.14', True), ('4.0.0', False), ('4.1.0', False)],
+)
+def test_private_address_default_dropped_on_juju_4(
+    juju_version: str, expect_private_address: bool
+):
+    """Juju 4 no longer auto-populates `private-address` in relation databags.
+
+    Verify the output state reflects that — the default key is preserved on
+    Juju 3, and stripped on Juju 4+.
+    """
+    ctx = Context(
+        Charm,
+        meta={
+            'name': 'foo',
+            'requires': {'foo': {'interface': 'foo'}},
+            'peers': {'p': {'interface': 'p'}},
+            'provides': {'sub': {'interface': 'sub', 'scope': 'container'}},
+        },
+        juju_version=juju_version,
+    )
+    relation = Relation('foo')
+    peer = PeerRelation('p')
+    sub = SubordinateRelation('sub')
+    state_in = State(leader=True, relations={relation, peer, sub})
+
+    state_out = ctx.run(ctx.on.start(), state_in)
+
+    rel = state_out.get_relation(relation.id)
+    peer_rel = state_out.get_relation(peer.id)
+    sub_rel = state_out.get_relation(sub.id)
+    assert isinstance(rel, Relation)
+    assert isinstance(peer_rel, PeerRelation)
+    assert isinstance(sub_rel, SubordinateRelation)
+    assert ('private-address' in rel.local_unit_data) is expect_private_address
+    assert ('private-address' in rel.remote_units_data[0]) is expect_private_address
+    assert ('private-address' in peer_rel.local_unit_data) is expect_private_address
+    assert ('private-address' in sub_rel.local_unit_data) is expect_private_address
+    assert ('private-address' in sub_rel.remote_unit_data) is expect_private_address
+    # `egress-subnets` and `ingress-address` are still set on Juju 4.
+    assert rel.local_unit_data['ingress-address'] == '192.0.2.0'
+    assert rel.local_unit_data['egress-subnets'] == '192.0.2.0'
+
+
+def test_private_address_explicit_value_preserved_on_juju_4():
+    """Only the default sentinel IP is stripped — explicit user values stay."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+        juju_version='4.0.0',
+    )
+    relation = Relation(
+        'foo',
+        local_unit_data={'private-address': '10.0.0.5', 'extra': 'kept'},
+    )
+    state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
+
+    rel = state_out.get_relation(relation.id)
+    assert isinstance(rel, Relation)
+    assert rel.local_unit_data['private-address'] == '10.0.0.5'
+    assert rel.local_unit_data['extra'] == 'kept'
+
+
 @pytest.mark.parametrize('evt_name', ('broken', 'created'))
 def test_relation_events_no_remote_units(evt_name: str, caplog: pytest.LogCaptureFixture):
     relation = Relation(

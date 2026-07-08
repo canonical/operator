@@ -716,11 +716,34 @@ class RelationBase:
 
 
 _DEFAULT_IP = '192.0.2.0'
+# Juju 3.x populates `private-address` in every relation databag, but Juju 4
+# does not. The dataclass `default_factory` runs at `Relation()` construction
+# time, before the test's `juju_version` is known, so we always include
+# `private-address` here and strip it later in `_strip_juju4_defaults` if the
+# `Context.juju_version` is 4.0 or later.
 _DEFAULT_JUJU_DATABAG = {
     'egress-subnets': _DEFAULT_IP,
     'ingress-address': _DEFAULT_IP,
     'private-address': _DEFAULT_IP,
 }
+
+# Keys in `_DEFAULT_JUJU_DATABAG` that Juju 4 no longer auto-populates.
+_JUJU_4_REMOVED_DATABAG_KEYS = ('private-address',)
+
+
+def _strip_juju4_defaults(state: State, juju_version: str) -> None:
+    """Strip Juju-3-only default databag keys from `state` for Juju 4+.
+
+    Mutates the databag dicts in place; only keys still set to the default
+    sentinel IP are removed, so explicit user-set values are preserved.
+    """
+    if ops.JujuVersion(juju_version).major < 4:
+        return
+    for relation in state.relations:
+        for databag in relation._databags:
+            for key in _JUJU_4_REMOVED_DATABAG_KEYS:
+                if databag.get(key) == _DEFAULT_IP:
+                    del databag[key]
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
