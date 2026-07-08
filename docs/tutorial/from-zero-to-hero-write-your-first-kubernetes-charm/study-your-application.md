@@ -51,6 +51,7 @@ The application is set up such that, once deployed, you can access the deployed 
 |-|-|
 | To get Prometheus metrics: | `http://<IP>:8000/metrics` |
 | To get a Swagger UI to interact with API: |`http://<IP>:8000/docs`|
+| To get the app's version |`http://<IP>:8000/version`|
 
 ## OCI image
 

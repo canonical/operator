@@ -127,11 +127,13 @@ def _replan_workload(self) -> None:
         # service if required.
         self.container.replan()
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
-
-        self.unit.status = ops.ActiveStatus()
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
         self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
+        return
+    version = fastapi_demo.get_version(config.server_port)
+    self.unit.set_workload_version(version)
+    self.unit.status = ops.ActiveStatus()
 ```
 
 When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
@@ -242,7 +244,7 @@ Since we added a new feature to configure `server-port` and use it in the Pebble
 First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
 
 ```python
-def test_config_changed():
+def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -260,10 +262,12 @@ def test_config_changed():
     assert "--port=8080" in command
 ```
 
+We need the `mock_version` fixture because `_on_config_changed` calls `_replan_workload`, which gets the workload version using `fastapi_demo.get_version`. The fixture patches `get_version` to avoid making a real HTTP call, so that the unit test deterministic.
+
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
 
 ```python
-def test_config_changed_invalid_port():
+def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(

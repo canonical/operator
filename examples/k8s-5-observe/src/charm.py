@@ -33,6 +33,8 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
+import fastapi_demo
+
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
@@ -194,6 +196,9 @@ class FastAPIDemoCharm(ops.CharmBase):
             logger.info(f"Replanned with '{self.pebble_service_name}' service")
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info("Unable to connect to Pebble: %s", e)
+            return
+        version = fastapi_demo.get_version(config.server_port)
+        self.unit.set_workload_version(version)
 
     def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""
