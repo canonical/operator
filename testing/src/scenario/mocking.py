@@ -951,11 +951,16 @@ class _MockPebbleClient(_TestingPebbleClient):
     # that refactor.
     @property
     def _layers(self) -> dict[str, pebble.Layer]:  # pyright: ignore[reportIncompatibleVariableOverride]
-        return cast('dict[str, pebble.Layer]', self._container.layers)
+        # The runtime value is a dict, but Container.layers is annotated
+        # Mapping. Ignored (rather than cast) so pyright alerts us if the
+        # source type is ever narrowed to dict and this override is no
+        # longer needed.
+        return self._container.layers  # pyright: ignore[reportReturnType]
 
     @property
     def _service_status(self) -> dict[str, pebble.ServiceStatus]:  # pyright: ignore[reportIncompatibleVariableOverride]
-        return cast('dict[str, pebble.ServiceStatus]', self._container.service_statuses)
+        # See _layers.
+        return self._container.service_statuses  # pyright: ignore[reportReturnType]
 
     # Based on a method of the same name from Harness.
     def _find_exec_handler(self, command: list[str]) -> Exec | None:
