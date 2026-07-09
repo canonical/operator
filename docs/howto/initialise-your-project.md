@@ -86,17 +86,6 @@ Or for a machine charm:
 charmcraft init --name mega-calendar --profile machine
 ```
 
-<!-- Remove this tip when the charmcraft stable version is up-to-date. -->
-````{tip}
-The `charmcraft` version that you have installed may come with older versions of the profiles.
-
-To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
-
-```text
-uvx git+https://github.com/canonical/charmcraft@74d12bc init --name <name> --profile <profile>
-```
-````
-
 If you don't specify `--name` when running `charmcraft init`, Charmcraft uses the parent directory name for your charm. For example, `mega-calendar-k8s-operator`, from the name of the repository. So we recommend specifying `--name` to ensure that your charm's name doesn't end with `-operator`.
 
 ## Inspect your charm
