@@ -31,7 +31,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
@@ -50,6 +50,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_blocked)
 
 
+def test_workload_version_is_set(juju: jubilant.Juju):
+    # Verify that the workload version has been set.
+    version = juju.status().apps[APP_NAME].version
+    assert version == "1.0.4"  # Hardcoded for simplicity.
+
+
 @pytest.mark.juju_setup
 def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
@@ -59,12 +65,6 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
-
-
-def test_workload_version_is_set(juju: jubilant.Juju):
-    # Verify that the workload version has been set.
-    version = juju.status().apps[APP_NAME].version
-    assert version == "1.0.4"  # Hardcoded for simplicity.
 
 
 @pytest.fixture(scope="module")

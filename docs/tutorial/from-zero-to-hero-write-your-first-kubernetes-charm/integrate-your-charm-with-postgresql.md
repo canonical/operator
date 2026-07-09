@@ -492,7 +492,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
@@ -579,7 +579,9 @@ PASSED
 ```
 
 ```text
-tests/integration/test_charm.py::test_workload_version_is_set PASSED
+tests/integration/test_charm.py::test_workload_version_is_set
+...
+PASSED
 ```
 
 Congratulations, with this integration test you have verified that your charm's relation to PostgreSQL works as well!
