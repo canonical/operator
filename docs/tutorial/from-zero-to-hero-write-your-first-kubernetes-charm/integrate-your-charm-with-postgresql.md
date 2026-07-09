@@ -509,6 +509,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
+
+
+def test_workload_version_is_set(juju: jubilant.Juju):
+    # Verify that the workload version has been set.
+    version = juju.status().apps[APP_NAME].version
+    assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
@@ -525,9 +531,6 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
-
-    version = juju.status().apps[APP_NAME].version
-    assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
 This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
@@ -548,7 +551,7 @@ If the tests fail with a timeout error, override the default timeout in `test_da
 
 Then run `tox -e integration` again. If the tests still fail, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
 
-When the tests are done, the output should show two passing tests:
+When the tests are done, the output should show these passing tests:
 
 ```text
 tests/integration/test_charm.py::test_deploy
@@ -573,6 +576,10 @@ INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 + .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
 + .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
 PASSED
+```
+
+```text
+tests/integration/test_charm.py::test_workload_version_is_set PASSED
 ```
 
 Congratulations, with this integration test you have verified that your charm's relation to PostgreSQL works as well!
