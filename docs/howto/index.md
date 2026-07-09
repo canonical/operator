@@ -70,6 +70,7 @@ Juju provides a variety of debugging tools, which Ops integrates with.
 
 Log from your charm <log-from-your-charm>
 Debug your charm <debug-your-charm>
+Debug a Kubernetes charm <debug-a-kubernetes-charm>
 ```
 
 ## Managing machine workloads

@@ -15,12 +15,23 @@
 # To learn more about testing, see https://canonical.com/juju/docs/ops/latest/explanation/testing/
 
 import ops
+import pytest
 from ops import testing
 
 from charm import FastAPIDemoCharm
 
 
-def test_pebble_layer():
+def mock_get_version(port: int):
+    """Get a mock version string without executing the workload code."""
+    return "0.0.1"
+
+
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
+
+
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -51,3 +62,5 @@ def test_pebble_layer():
         state_out.get_container(container.name).service_statuses["fastapi-service"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
+    # Check the workload version is set:
+    assert state_out.workload_version == "0.0.1"

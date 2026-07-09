@@ -236,6 +236,9 @@ def _replan_workload(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
+        return
+    version = fastapi_demo.get_version(config.server_port)
+    self.unit.set_workload_version(version)
 ```
 
 We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
@@ -419,7 +422,7 @@ Congratulations, your relation with PostgreSQL is functional!
 Now that our charm uses `fetch_database_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_database_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
 
 ```python
-def test_relation_data():
+def test_relation_data(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -453,7 +456,7 @@ def test_relation_data():
 In this chapter, we also defined a new method `_on_collect_status` that checks various things, including whether the required database relation exists. If the relation doesn't exist, we wait and set the unit status to `blocked`. We can also add a test to cover this behaviour:
 
 ```python
-def test_no_database_blocked():
+def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     container = testing.Container(name="demo-server", can_connect=True)
     state_in = testing.State(
@@ -522,6 +525,9 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
+
+    version = juju.status().apps[APP_NAME].version
+    assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
 This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
