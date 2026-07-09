@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 
 import pytest
-from scenario.state import BlockedStatus, Relation, State
+from scenario.state import _DEFAULT_JUJU_DATABAG, BlockedStatus, Relation, State
 
 import ops
 
@@ -93,8 +93,8 @@ def test_relation_data_access(mycharm: type[ops.CharmBase]):
         remote_app_data = foo_rel.data[foo_rel.app]
 
         assert remote_units_data == {
-            'karlos/0': {'foo': 'bar'},
-            'karlos/1': {'baz': 'qux'},
+            'karlos/0': {**_DEFAULT_JUJU_DATABAG, 'foo': 'bar'},
+            'karlos/1': {**_DEFAULT_JUJU_DATABAG, 'baz': 'qux'},
         }
 
         assert remote_app_data == {'yaba': 'doodle'}
