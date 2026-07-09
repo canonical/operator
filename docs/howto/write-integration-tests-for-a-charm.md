@@ -585,6 +585,7 @@ If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI ar
 
 - pytest. For example: `tests/integration/test_charm.py::test_deploy PASSED`.
 - other modules if they are at `WARNING` or above.
+- `pytest-jubilant`. For example: `Models were torn down...`.
 
 (write-integration-tests-for-a-charm-view-juju-logs)=
 ## View `juju debug-log` logs
