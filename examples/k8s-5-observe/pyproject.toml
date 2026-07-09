@@ -24,7 +24,7 @@ requires-python = ">=3.10"
 # 'charm-libs' block in charmcraft.yaml, run `charmcraft fetch-libs` to download the libraries,
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
-    "cosl>=1.9.1",
+    "cosl>=1.9.1,<2",
     "ops~=3.7",
 ]
 

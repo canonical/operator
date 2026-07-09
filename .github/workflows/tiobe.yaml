@@ -11,7 +11,7 @@ jobs:
   TICS:
     runs-on: [self-hosted, reactive, amd64, tiobe, noble]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
 
@@ -35,3 +35,10 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: operator
           installTics: true
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [TICS]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml
