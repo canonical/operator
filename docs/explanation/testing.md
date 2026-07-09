@@ -126,4 +126,4 @@ basepython = python3.10
 
 ### Examples
 
-- [Tempo worker integration tests](https://github.com/canonical/tempo-operators/blob/main/worker/tests/integration/test_deploy.py)
+- [Tempo worker integration tests](https://github.com/canonical/tempo-operators/blob/main/tests/integration/test_worker_deploy.py)

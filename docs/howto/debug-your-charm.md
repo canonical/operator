@@ -63,7 +63,10 @@ juju ssh --container <container-name> <unit>
 
 Then use the Pebble CLI (available at `/charm/bin/pebble`) to inspect the workload. We've included several examples below.
 
-> See also: {external+pebble:doc}`Pebble | CLI commands <reference/cli-commands>`
+See also:
+
+- {ref}`debug-a-kubernetes-charm`, which covers Kubernetes charm failure modes and debugging tools in more depth
+- {external+pebble:doc}`Pebble | CLI commands <reference/cli-commands>`
 
 ### Check service status
 
