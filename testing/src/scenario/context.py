@@ -19,7 +19,7 @@ import weakref
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Any, Generic
 
 from typing_extensions import deprecated
 
@@ -101,7 +101,7 @@ class Manager(Generic[CharmType]):
             raise RuntimeError(
                 'you should __enter__ this context manager before accessing this',
             )
-        return cast('CharmType', self.ops.charm)
+        return self.ops.charm
 
     @property
     def _runner(self):
@@ -722,10 +722,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec = cast(
-                    '_CharmSpec[CharmType]',
-                    _CharmSpec.autoload(charm_type),
-                )
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # pyright: ignore[reportAssignmentType]
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
@@ -761,7 +758,7 @@ class Context(Generic[CharmType]):
         # tests from asserting on the downstream failure that Ops raises when
         # it later looks up the missing metadata (see
         # ``test_init_and_run_with_bad_meta``).
-        self.app_name = app_name or self._charm_spec.meta.get('name') or ''
+        self.app_name = app_name or self._charm_spec.meta.get('name', '')
         self.unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone

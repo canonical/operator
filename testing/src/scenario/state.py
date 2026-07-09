@@ -186,6 +186,8 @@ class CloudCredential:  # noqa: D101
         object.__setattr__(self, 'redacted', _list_of_str(redacted, 'redacted'))
 
     def _to_ops(self) -> CloudCredential_Ops:
+        # ops.model.CloudCredential is frozen with concrete dict/list types;
+        # we convert here rather than widening the ops annotations.
         return CloudCredential_Ops(
             auth_type=self.auth_type,
             attributes=dict(self.attributes),
@@ -255,6 +257,8 @@ class CloudSpec:  # noqa: D101
         object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
 
     def _to_ops(self) -> CloudSpec_Ops:
+        # ops.model.CloudSpec is frozen with concrete list typing;
+        # we convert here rather than widening the ops annotations.
         return CloudSpec_Ops(
             type=self.type,
             name=self.name,
@@ -696,7 +700,7 @@ class RelationBase:
         # Deepcopy mutable fields to disassociate from the caller's objects.
         for attr, value in self.__dict__.items():
             if isinstance(value, (dict, list)):
-                object.__setattr__(self, attr, copy.deepcopy(cast('Any', value)))
+                object.__setattr__(self, attr, copy.deepcopy(value))  # pyright: ignore[reportUnknownArgumentType]
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -2174,8 +2178,7 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
                 meta[key] = copy.deepcopy(ext_value)
             elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
                 ext_dict = cast('dict[str, Any]', ext_value)
-                meta_dict = cast('dict[str, Any]', meta[key])
-                overlap = set(ext_dict) & set(meta_dict)
+                overlap = set(ext_dict) & set(meta[key])
                 if overlap:
                     raise ValueError(
                         f'overlapping keys {overlap} in {key} of '
@@ -2183,13 +2186,12 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
                         f'{ext_name} extension, please rename or remove them'
                     )
                 merged_dict: dict[str, Any] = copy.deepcopy(ext_dict)
-                merged_dict.update(meta_dict)
+                merged_dict.update(meta[key])
                 meta[key] = merged_dict
             elif isinstance(ext_value, list) and isinstance(meta[key], list):
                 ext_list = cast('list[Any]', ext_value)
-                meta_list = cast('list[Any]', meta[key])
                 merged_list: list[Any] = copy.deepcopy(ext_list)
-                merged_list.extend(i for i in meta_list if i not in merged_list)
+                merged_list.extend(i for i in meta[key] if i not in merged_list)
                 meta[key] = merged_list
             else:
                 raise ValueError(

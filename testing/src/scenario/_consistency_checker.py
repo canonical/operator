@@ -794,7 +794,7 @@ def check_storedstate_consistency(
         # We don't need the marshalled state, just to know that it can be.
         # This is the same "only simple types" check that ops does.
         try:
-            marshal.dumps(dict(ss.content))
+            marshal.dumps(ss.content)  # pyright: ignore[reportArgumentType]
         except ValueError:  # noqa: PERF203
             errors.append(
                 f'The StoredState object {ss.owner_path}.{ss.name} '

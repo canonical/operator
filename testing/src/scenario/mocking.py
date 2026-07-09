@@ -180,8 +180,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             3
         ]  # /charm/containers/<container_name>/pebble.socket
         container_root = self._context._get_container_root(container_name)
+        mounts: Mapping[str, Mount]
         try:
-            mounts = dict(self._state.get_container(container_name).mounts)
+            mounts = self._state.get_container(container_name).mounts
         except KeyError:
             # container not defined in state.
             mounts = {}
@@ -799,7 +800,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         self,
         socket_path: str,
         container_root: Path,
-        mounts: dict[str, Mount],
+        mounts: Mapping[str, Mount],
         *,
         state: State,
         event: _Event,
