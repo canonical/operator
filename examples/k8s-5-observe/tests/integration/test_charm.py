@@ -37,21 +37,16 @@ APP_NAME = METADATA["name"]
 
 @pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy the charm under test."""
     resources = {
         "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
     }
-
-    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
 
 
-def test_workload_version_is_set(juju: jubilant.Juju):
-    # Verify that the workload version has been set.
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
     version = juju.status().apps[APP_NAME].version
     assert version == "1.0.4"  # Hardcoded for simplicity.
 

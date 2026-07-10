@@ -510,16 +510,18 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 
 
-def test_workload_version_is_set(juju: jubilant.Juju):
-    # Verify that the workload version has been set.
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
     version = juju.status().apps[APP_NAME].version
     assert version == "1.0.4"  # Hardcoded for simplicity.
 ```
 
-This test depends on two fixtures:
+These tests depend on two fixtures:
 
 - `charm` - The `.charm` file to deploy. This fixture is defined in `tests/integration/conftest.py`.
 - `juju` - A Jubilant object for interacting with a temporary Juju model. This fixture is provided by the `pytest-jubilant` plugin.
+
+Both tests depend on the `charm` fixture even though only `test_deploy` uses the fixture. This ensures that the tests fail immediately if a `.charm` file isn't available.
 
 ### Run the test
 

@@ -480,46 +480,16 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, to expect blocked status in `juju.wait`. Replace the contents of `tests/integration/test_charm.py` with:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. In your `tests/integration/test_charm.py` file, update `test_deploy` to expect blocked status:
 
-```python
-import logging
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    """Deploy the charm under test.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
-    resources = {
-        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
-    }
-
-    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
-    juju.deploy(charm, app=APP_NAME, resources=resources)
-    juju.wait(jubilant.all_blocked)
-
-
-def test_workload_version_is_set(juju: jubilant.Juju):
-    # Verify that the workload version has been set.
-    version = juju.status().apps[APP_NAME].version
-    assert version == "1.0.4"  # Hardcoded for simplicity.
+```diff
+-    juju.wait(jubilant.all_active)
++    juju.wait(jubilant.all_blocked)
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
 
-In your `tests/integration/test_charm.py` file add the following test case:
+In your `tests/integration/test_charm.py` file add the following test case after `test_workload_version_is_set`:
 
 ```python
 @pytest.mark.juju_setup
@@ -532,8 +502,6 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
 ```
-
-This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
 
 In your Multipass Ubuntu VM, run the tests again:
 
@@ -564,6 +532,12 @@ PASSED
 ```
 
 ```text
+tests/integration/test_charm.py::test_workload_version_is_set
+...
+PASSED
+```
+
+```text
 tests/integration/test_charm.py::test_database_integration
 ...
 INFO     jubilant.wait:_juju.py:1164 wait: status changed:
@@ -575,12 +549,6 @@ INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'awaiting for cluster to start'
 + .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
 + .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
-PASSED
-```
-
-```text
-tests/integration/test_charm.py::test_workload_version_is_set
-...
 PASSED
 ```
 
