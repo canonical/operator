@@ -590,15 +590,13 @@ If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI ar
 (write-integration-tests-for-a-charm-view-juju-logs)=
 ## View `juju debug-log` logs
 
-If any tests fail, `pytest-jubilant` automatically logs the last 1000 lines of `juju debug-log` at `DEBUG` level. Log messages from `pytest-jubilant` are handled depending on how you configure pytest (see [](write-integration-tests-for-a-charm-configure-jubilant-logs)):
+Save the complete `juju debug-log` logs to disk with the `--juju-dump-logs` option from `pytest-jubilant`. For example:
 
-- For Brief mode and Error mode: They don't appear anywhere.
-- For Verbose mode: They appear in the terminal.
-- For Log to a file: They appear in `log_file`, and don't appear in the terminal.
+```text
+tox -e integration -- --juju-dump-logs logs
+```
 
-You can also save the complete `juju debug-log` to disk with the `--juju-dump-logs` option.
-
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the GitHub Actions from [](write-integration-tests-log-to-a-file):
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the GitHub Actions workflow from [](write-integration-tests-log-to-a-file):
 
 ```diff
   # In your integration test job
