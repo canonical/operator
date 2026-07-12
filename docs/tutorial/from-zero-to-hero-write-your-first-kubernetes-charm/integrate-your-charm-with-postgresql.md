@@ -503,10 +503,10 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-In your Multipass Ubuntu VM, run the tests again:
+Run the following command from anywhere in the `~/fastapi-demo` directory:
 
 ```text
-ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
+tox -e integration
 ```
 
 The tests may take some time to run, depending on your computer and network.

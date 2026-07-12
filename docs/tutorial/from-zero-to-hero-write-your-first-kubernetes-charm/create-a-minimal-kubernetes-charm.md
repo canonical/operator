@@ -478,11 +478,9 @@ For example, it should be able to pack, deploy, and integrate without throwing e
 
 You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with {external+jubilant:doc}`Jubilant <reference/jubilant>` and [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant).
 
-In this section we'll write a small integration test to check that the charm packs and deploys correctly.
-
 ### Write integration tests
 
-Let's write some simplest possible integration tests, [smoke tests](https://en.wikipedia.org/wiki/Smoke_testing_(software)). These tests will deploy the charm, verify that the installation event is handled without errors and the workload version is set correctly.
+Let's write some integration tests as [smoke tests](https://en.wikipedia.org/wiki/Smoke_testing_(software)). These tests will deploy the charm, verify that the installation event is handled without errors and the workload version is set correctly.
 
 Replace the contents of `tests/integration/test_charm.py` with:
 
