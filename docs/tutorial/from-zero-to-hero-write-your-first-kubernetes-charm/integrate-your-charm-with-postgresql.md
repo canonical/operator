@@ -480,7 +480,7 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. In your `tests/integration/test_charm.py` file, update `test_deploy` to expect blocked status:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. In `tests/integration/test_charm.py`, update `test_deploy` to expect blocked status:
 
 ```diff
 -    juju.wait(jubilant.all_active)
@@ -489,7 +489,7 @@ Now that our charm integrates with the database, if there's not a database relat
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
 
-In your `tests/integration/test_charm.py` file add the following test case after `test_workload_version_is_set`:
+In `tests/integration/test_charm.py`, add the following test case after `test_workload_version_is_set`:
 
 ```python
 @pytest.mark.juju_setup

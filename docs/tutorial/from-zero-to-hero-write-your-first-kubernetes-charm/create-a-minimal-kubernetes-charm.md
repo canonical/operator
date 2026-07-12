@@ -480,9 +480,9 @@ You can ensure this by writing integration tests for your charm. In the charming
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
-### Write a test
+### Write integration tests
 
-Let's write the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will deploy the charm, then verify that the installation event is handled without errors.
+Let's write some simplest possible integration tests, [smoke tests](https://en.wikipedia.org/wiki/Smoke_testing_(software)). These tests will deploy the charm, verify that the installation event is handled without errors and the workload version is set correctly.
 
 Replace the contents of `tests/integration/test_charm.py` with:
 
@@ -523,7 +523,7 @@ These tests depend on two fixtures:
 
 Both tests depend on the `charm` fixture even though only `test_deploy` uses the fixture. This ensures that the tests fail immediately if a `.charm` file isn't available.
 
-### Run the test
+### Run tests
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
@@ -531,14 +531,14 @@ Run the following command from anywhere in the `~/fastapi-demo` directory:
 tox -e integration
 ```
 
-The test takes some time to run as a new Juju model is created and your charm is deployed. If successful, it'll verify that your packed charm can be deployed as expected.
+These tests take some time to run as a new Juju model is created and your charm is deployed. If successful, they'll verify that your packed charm can be deployed as expected.
 
 The result should be similar to the following output:
 
 ```text
 ...
 
-============================= 1 passed in 55.43s =============================
+============================= 2 passed in 55.43s =============================
   integration: OK (57.79=setup[0.23]+cmd[57.57] seconds)
   congratulations :) (57.84 seconds)
 ```
@@ -547,7 +547,7 @@ The result should be similar to the following output:
 `tox -e integration` doesn't pack your charm. If you modify the charm code and want to run the integration tests again, run `charmcraft pack` before `tox -e integration`.
 ```
 
-The Juju model is destroyed at the end of the test. If you want to run the test and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
+The Juju model is destroyed at the end of the tests. If you want to run the tests and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
 
 ### Run tests with `charmcraft test`
 
