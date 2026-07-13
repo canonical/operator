@@ -599,7 +599,7 @@ In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` availabl
 (write-integration-tests-for-a-charm-view-juju-logs)=
 ## View `juju debug-log` logs
 
-Save the complete `juju debug-log` logs to disk with the `--juju-dump-logs` option from `pytest-jubilant`. For example:
+Save the complete `juju debug-log` logs to disk with the `--juju-dump-logs` option from [pytest-jubilant](https://github.com/canonical/pytest-jubilant). For example:
 
 ```text
 tox -e integration -- --juju-dump-logs logs
