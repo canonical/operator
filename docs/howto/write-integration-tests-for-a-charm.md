@@ -494,8 +494,7 @@ log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
 
 We define the timestamps format with the `log_cli_date_format` key, following ISO 8601.
 
-> See more:
-> - [`datetime | strftime() and strptime() format codes`](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
+> See more: [datetime | strftime() and strptime() format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
 
 You can remove the timestamps without changing the mode, but we recommend leaving it in.
 
@@ -513,13 +512,12 @@ log_cli_format = "%(levelname)s %(name)s %(message)s"
 
 These options can also be configured from the command line.
 
-> See more:
-> - [`pytest | How to manage logging`](https://docs.pytest.org/en/stable/how-to/logging.html)
+> See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
 (write-integration-tests-log-to-a-file)=
 ### Log to a file
 
-This is an ideal configuration for long-running integration tests (for example, in CI). It uses Brief mode for logging to the console, and Verbose mode for logging to a local file.
+This is an ideal configuration for long-running integration tests (for example, in CI). It outputs brief logs to the console and verbose logs to a local file.
 
 ```toml
 [tool.pytest.ini_options]
@@ -537,23 +535,21 @@ log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
 
-When a test item fails, pytest prints all logs captured during the test to the terminal:
+If a test item fails, pytest outputs all brief logs captured during the test to the console:
 
 ```
 ------- Captured log call -------
 ...
 ```
 
-`log_level = "INFO"` is intentional to keep the `Captured log call` consistent with Brief mode. If you want Verbose mode in `Captured log call`, you can set `log_level` to `DEBUG`.
-
-The local file where Verbose mode logs land is `logs/verbose.log`. It contains logs from one pytest session. If you want to run multiple test suites, and store Verbose logs in separated files. You can override `log_file` for each pytest invocation:
+If you run the integration tests multiple times, `logs/verbose.log` only contains logs from the last pytest session. To use a separate file for each session, override `log_file` for each pytest invocation:
 
 ```
 pytest --log-file "run1.log" ...
 pytest --log-file "run2.log" ...
 ```
 
-Alternatively, you can set `log-file-mode` to `append`. Pytest will put verbose logs from all invocations into one file:
+Alternatively, you can set `log-file-mode` to `append`. pytest will put verbose logs from all invocations into one file:
 
 ```toml
 [tool.pytest.ini_options]
@@ -564,9 +560,9 @@ log-file-mode = "a"
 These options can also be configured from the command line.
 
 > See more:
-> - [`pytest | How to manage logging`](https://docs.pytest.org/en/stable/how-to/logging.html)
+> - [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
-Use this mode in CI with `actions/upload-artifact` to make `logs/verbose.log` available as build artifacts:
+In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` available as a build artifact:
 
 ```yaml
   # In your integration test job
@@ -581,10 +577,10 @@ Use this mode in CI with `actions/upload-artifact` to make `logs/verbose.log` av
 
 ### Default behaviour
 
-If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above and doesn't log to a file. You can still see messages from:
+If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above and doesn't log to a file. You will still see messages from:
 
 - pytest. For example: `tests/integration/test_charm.py::test_deploy PASSED`.
-- other modules if they are at `WARNING` or above.
+- Other modules if the messages are at `WARNING` or above.
 - `pytest-jubilant`. For example: `Models were torn down...`.
 
 (write-integration-tests-for-a-charm-view-juju-logs)=
@@ -596,12 +592,11 @@ Save the complete `juju debug-log` logs to disk with the `--juju-dump-logs` opti
 tox -e integration -- --juju-dump-logs logs
 ```
 
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts. We can modify the GitHub Actions workflow from [](write-integration-tests-log-to-a-file):
+Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts:
 
-```diff
+```yaml
   # In your integration test job
--  - run: tox -e integration
-+  - run: tox -e integration -- --juju-dump-logs logs
+  - run: tox -e integration -- --juju-dump-logs logs
   - name: Upload logs
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
