@@ -505,9 +505,7 @@ log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
 
-We define the timestamps format with the `log_cli_date_format` key, following ISO 8601.
-
-> See more: [datetime | strftime() and strptime() format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
+We define the timestamps format with the `log_cli_date_format` key, following ISO 8601. See more: [datetime | strftime() and strptime() format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
 
 A sample output (timestamps removed for clarity):
 
@@ -531,9 +529,7 @@ DEBUG jubilant.wait wait: status changed:
 ...
 ```
 
-The pytest logging options can also be configured from the command line.
-
-> See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+The pytest logging options can also be configured from the command line. See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
 ### Default behaviour
 
@@ -579,9 +575,7 @@ log-file-mode = "a"
 ...
 ```
 
-These options can also be configured from the command line.
-
-> See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+These options can also be configured from the command line. See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
 In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` available as a build artifact:
 
