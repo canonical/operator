@@ -465,9 +465,16 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 
 Jubilant emits logs during the integration tests. These logs are captured and displayed by pytest. You can configure the logging behaviour in the `[tool.pytest.ini_options]` table in `pyproject.toml`.
 
-### Logging modes
+### Logging levels
 
-**Brief**
+Jubilant logs across three levels:
+- `INFO`: brief progress updates, including run Juju CLI commands, the test model's bootstrap status, and any application or unit status changes during `juju.wait()`.
+- `DEBUG`: verbose model status changes during `juju.wait()`.
+- `ERROR`: application or unit status changes during `juju.wait()` whenever they transition into error.
+
+### Examples
+
+**Config for brief logging**
 
 ```toml
 [tool.pytest.ini_options]
@@ -477,11 +484,17 @@ log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 ```
 
-While the test is running, logs with level `INFO` and above are emitted live to the console.
+A sample output:
 
-**Verbose**
+```text
+INFO jubilant cli: juju deploy --model jubilant-b3578475-test-charm ...
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+```
 
-This mode shows whatever is in Brief, and the verbose `DEBUG` level logs. Lowering the log level is all it needs to switch from Brief to Verbose mode.
+**Config for verbose logging**
 
 ```toml
 [tool.pytest.ini_options]
@@ -496,23 +509,39 @@ We define the timestamps format with the `log_cli_date_format` key, following IS
 
 > See more: [datetime | strftime() and strptime() format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
 
-You can remove the timestamps without changing the mode, but we recommend leaving it in.
+A sample output (timestamps removed for clarity):
 
-**Error**
-
-Jubilant emits logs at `ERROR` level when an application or unit transition into `error` during `juju.wait()`. This mode is useful if you only care if any charm turns into error status.
-
-```toml
-[tool.pytest.ini_options]
+```text
+INFO jubilant cli: juju deploy --model jubilant-6ffd8f91-test-charm ...
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+DEBUG jubilant.wait wait: status changed:
++ .apps['fastapi-demo'].app_status.current = 'waiting'
++ .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.current = 'waiting'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
 ...
-log_cli = true
-log_cli_level = "ERROR"
-log_cli_format = "%(levelname)s %(name)s %(message)s"
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+DEBUG jubilant.wait wait: status changed:
+- .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].app_status.message = 'agent initialising'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'agent initialising'
+...
 ```
 
-These options can also be configured from the command line.
+The pytest logging options can also be configured from the command line.
 
 > See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+
+### Default behaviour
+
+If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above. You will still see messages from:
+
+- pytest. For example: `tests/integration/test_charm.py::test_deploy PASSED`.
+- Other modules if the messages are at `WARNING` or above.
+- `pytest-jubilant`. For example: `Models were torn down...`.
 
 (write-integration-tests-log-to-a-file)=
 ### Log to a file
@@ -535,13 +564,6 @@ log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
 
-If a test item fails, pytest outputs all brief logs captured during the test to the console:
-
-```
-------- Captured log call -------
-...
-```
-
 If you run the integration tests multiple times, `logs/verbose.log` only contains logs from the last pytest session. To use a separate file for each session, override `log_file` for each pytest invocation:
 
 ```
@@ -559,8 +581,7 @@ log-file-mode = "a"
 
 These options can also be configured from the command line.
 
-> See more:
-> - [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+> See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
 In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` available as a build artifact:
 
@@ -574,14 +595,6 @@ In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` availabl
       name: integration-test-logs
       path: logs
 ```
-
-### Default behaviour
-
-If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above and doesn't log to a file. You will still see messages from:
-
-- pytest. For example: `tests/integration/test_charm.py::test_deploy PASSED`.
-- Other modules if the messages are at `WARNING` or above.
-- `pytest-jubilant`. For example: `Models were torn down...`.
 
 (write-integration-tests-for-a-charm-view-juju-logs)=
 ## View `juju debug-log` logs
