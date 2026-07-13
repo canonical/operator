@@ -482,9 +482,20 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. In `tests/integration/test_charm.py`, update `test_deploy` to expect blocked status:
 
-```diff
--    juju.wait(jubilant.all_active)
-+    juju.wait(jubilant.all_blocked)
+```python
+@pytest.mark.juju_setup
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
+    """Deploy the charm under test.
+
+    Assert on the unit status before any relations/configurations take place.
+    """
+    resources = {
+        "demo-server-image": METADATA["resources"]["demo-server-image"]["upstream-source"]
+    }
+
+    # Deploy the charm and wait for it to report blocked, as it needs Postgres.
+    juju.deploy(charm, app=APP_NAME, resources=resources)
+    juju.wait(jubilant.all_blocked)
 ```
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
@@ -505,7 +516,7 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-```text
+```shell
 tox -e integration
 ```
 

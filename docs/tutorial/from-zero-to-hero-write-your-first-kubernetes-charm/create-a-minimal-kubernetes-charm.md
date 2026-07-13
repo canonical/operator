@@ -525,7 +525,7 @@ Both tests depend on the `charm` fixture even though only `test_deploy` uses the
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-```text
+```shell
 tox -e integration
 ```
 
