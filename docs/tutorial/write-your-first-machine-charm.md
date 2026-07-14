@@ -942,7 +942,7 @@ If you wanted isolated tests, you could change `juju` to be function-scoped (pyt
 
 Now run the tests:
 
-```text
+```shell
 tox -e integration
 ```
 

@@ -26,7 +26,7 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from ops import pebble
 
@@ -337,7 +337,9 @@ def _check_action_param_types(
         'object': dict,
     }
     expected_param_type: dict[str, Any] = {}
-    for par_name, par_spec in (actions[action.name] or {}).get('params', {}).items():
+    action_spec = cast('dict[str, Any]', actions[action.name] or {})
+    action_params = cast('dict[str, dict[str, Any]]', action_spec.get('params', {}))
+    for par_name, par_spec in action_params.items():
         value = par_spec.get('type')
         if not value:
             errors.append(
@@ -792,7 +794,7 @@ def check_storedstate_consistency(
         # We don't need the marshalled state, just to know that it can be.
         # This is the same "only simple types" check that ops does.
         try:
-            marshal.dumps(ss.content)
+            marshal.dumps(ss.content)  # pyright: ignore[reportArgumentType]
         except ValueError:  # noqa: PERF203
             errors.append(
                 f'The StoredState object {ss.owner_path}.{ss.name} '
