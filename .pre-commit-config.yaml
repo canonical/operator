@@ -37,6 +37,12 @@ repos:
         entry: uv run --group lint -- codespell
         language: system
         types: [text]
+      - id: pyright
+        name: pyright (uv)
+        entry: uv run --group lint -- pyright
+        language: system
+        types: [python]
+        pass_filenames: false
       - id: zizmor
         name: zizmor (uv)
         entry: uv run --group lint -- zizmor
