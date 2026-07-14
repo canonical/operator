@@ -484,7 +484,7 @@ First, in `tests/integration/test_charm.py`, import `json` and `time` from the s
 
 ```text
 uv add --group integration requests
-``` 
+```
 
 Your imports should now look like this:
 
