@@ -1,0 +1,26 @@
+name: Notify on scheduled failure
+
+# Reusable workflow: opens an issue when a scheduled workflow fails.
+# Callers gate the invocation with `if: failure() && github.event_name == 'schedule'`
+# and pass `permissions: issues: write`.
+
+on:
+  workflow_call:
+
+jobs:
+  open-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create issue on failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that called this one.
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"

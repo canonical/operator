@@ -37,8 +37,8 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.19",
-    "codespell==2.4.1",
+    "ruff==0.15.20",
+    "codespell==2.4.2",
     "zizmor==1.26.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
@@ -73,11 +73,11 @@ integration = [
 release = [
     "packaging>=24,<27",
     "pygithub~=2.6",
-    "rich~=14.1",
+    "rich>=14.1,<16.0",
 ]
 tiobe = [
     "flake8==7.3.0",
-    "pylint==4.0.5",
+    "pylint==4.0.6",
 ]
 
 [project.urls]
@@ -284,7 +284,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
 ]

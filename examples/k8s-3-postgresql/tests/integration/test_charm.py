@@ -27,7 +27,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
@@ -44,6 +44,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
+
+
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
+    version = juju.status().apps[APP_NAME].version
+    assert version == "1.0.4"  # Hardcoded for simplicity.
 
 
 @pytest.mark.juju_setup

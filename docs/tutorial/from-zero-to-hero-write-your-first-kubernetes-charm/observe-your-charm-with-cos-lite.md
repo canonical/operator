@@ -480,7 +480,13 @@ Let's write some integration tests to check that our application works correctly
 
 The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
 
-First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest`, `pytest_jubilant`, and `requests`. Your imports should now look like this:
+First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest` and `pytest_jubilant`, which are already dependencies of the integration tests. Also import `requests`, which is a new dependency. Run the following command to add `requests` as a dependency:
+
+```text
+uv add --group integration requests
+``` 
+
+Your imports should now look like this:
 
 ```python
 import json
@@ -513,14 +519,14 @@ Add two test functions to `tests/integration/test_charm.py`:
 
 ```python
 @pytest.mark.juju_setup
-def test_deploy_cos(cos: jubilant.Juju):
+def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
 @pytest.mark.juju_setup
-def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+def test_integrate_loki(charm: pathlib.Path, juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
@@ -533,7 +539,7 @@ def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
 Add a test function to `tests/integration/test_charm.py`:
 
 ```python
-def test_loki_data(cos: jubilant.Juju):
+def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
     """Use Loki's HTTP API to verify that Loki has a label for our app.
 
     COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
@@ -570,7 +576,7 @@ For more information, see:
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-```text
+```shell
 tox -e integration
 ```
 
