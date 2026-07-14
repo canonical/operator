@@ -722,7 +722,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # pyright: ignore[reportAssignmentType]
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
@@ -753,8 +753,13 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self._charm_spec.meta.get('name')
-        self.unit_id = unit_id
+        # If neither ``app_name`` nor a ``name`` in the charm metadata is
+        # provided, fall back to an empty string. Raising here would prevent
+        # tests from asserting on the downstream failure that Ops raises when
+        # it later looks up the missing metadata (see
+        # ``test_init_and_run_with_bad_meta``).
+        self.app_name = app_name or self._charm_spec.meta.get('name', '')
+        self.unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
@@ -899,11 +904,11 @@ class Context(Generic[CharmType]):
                 'leader_elected',
                 'collect_app_status',
                 'collect_unit_status',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}()'
-            elif event in ('secret_changed', 'secret_rotate'):  # type: ignore
+            elif event in ('secret_changed', 'secret_rotate'):
                 suggested = f'{event}(my_secret)'
-            elif event in ('secret_expired', 'secret_remove'):  # type: ignore
+            elif event in ('secret_expired', 'secret_remove'):
                 suggested = f'{event}(my_secret, revision=1)'
             elif event in (
                 'relation_created',
@@ -911,9 +916,9 @@ class Context(Generic[CharmType]):
                 'relation_changed',
                 'relation_departed',
                 'relation_broken',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}(my_relation)'
-            elif event in ('storage_attached', 'storage_detaching'):  # type: ignore
+            elif event in ('storage_attached', 'storage_detaching'):
                 suggested = f'{event}(my_storage)'
             elif event == 'pebble_ready':
                 suggested = f'{event}(my_container)'

@@ -576,7 +576,7 @@ For more information, see:
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-```text
+```shell
 tox -e integration
 ```
 
