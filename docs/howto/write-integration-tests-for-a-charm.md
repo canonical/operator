@@ -565,6 +565,8 @@ This is an ideal configuration for long-running integration tests (for example, 
 [tool.pytest.ini_options]
 ...
 
+# Retain INFO logs in the "Captured log call" section when run interactively.
+# Otherwise, that section will have DEBUG logs (coming from log_file_level).
 log_level = "INFO"
 
 log_cli = true
