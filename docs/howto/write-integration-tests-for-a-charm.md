@@ -460,13 +460,167 @@ tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 > - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
 > - [](#validate-your-charm-with-every-change)
 
+(write-integration-tests-for-a-charm-configure-jubilant-logs)=
+## Configure Jubilant logs
+
+Jubilant emits logs during the integration tests. These logs are captured and displayed by pytest. You can configure the logging behaviour in the `[tool.pytest.ini_options]` table in `pyproject.toml`.
+
+### Logging levels
+
+Jubilant logs at three levels:
+- `INFO` — Brief progress updates, including Juju commands, the test model's bootstrap status, and any application or unit status changes during `juju.wait()`.
+- `DEBUG` — Verbose model status changes during `juju.wait()`.
+- `ERROR` — Application or unit status changes during `juju.wait()` whenever the state becomes "error".
+
+### Example of brief logging
+
+```toml
+[tool.pytest.ini_options]
+...
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s %(message)s"
+```
+
+Sample output:
+
+```text
+INFO jubilant cli: juju deploy --model jubilant-b3578475-test-charm ...
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+```
+
+### Example of verbose logging
+
+```toml
+[tool.pytest.ini_options]
+...
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
+log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
+```
+
+The timestamp format follows ISO 8601.
+
+See more: {external+python:ref}`strftime() and strptime() behavior <strftime-strptime-behavior>`
+
+Sample output:
+
+```text
+2026-07-15T09:42:15Z INFO jubilant cli: juju deploy --model jubilant-6966ceb1-test-charm ...
+2026-07-15T09:42:17Z INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+2026-07-15T09:42:17Z INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+2026-07-15T09:42:17Z DEBUG jubilant.wait wait: status changed:
++ .model.name = 'jubilant-6966ceb1-test-charm'
++ .model.controller = 'concierge-k8s'
++ .model.cloud = 'k8s'
++ .model.model_status.current = 'available'
++ .apps['fastapi-demo'].charm = 'local:fastapi-demo-0'
++ .apps['fastapi-demo'].charm_name = 'fastapi-demo'
++ .apps['fastapi-demo'].charm_rev = 0
++ .apps['fastapi-demo'].scale = 1
++ .apps['fastapi-demo'].app_status.current = 'waiting'
++ .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.current = 'waiting'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'allocating'
+2026-07-15T09:42:21Z DEBUG jubilant.wait wait: status changed:
++ .apps['fastapi-demo'].provider_id = '310fb924-1932-4242-aeea-abb14a2b0cbe'
++ .apps['fastapi-demo'].address = '10.152.183.180'
+2026-07-15T09:42:23Z DEBUG jubilant.wait wait: status changed:
++ .apps['fastapi-demo'].units['fastapi-demo/0'].provider_id = 'fastapi-demo-0'
+2026-07-15T09:42:24Z INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+2026-07-15T09:42:24Z INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+2026-07-15T09:42:24Z DEBUG jubilant.wait wait: status changed:
+- .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].app_status.message = 'agent initialising'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'agent initialising'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.version = '3.6.23'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].leader = True
++ .apps['fastapi-demo'].units['fastapi-demo/0'].address = '10.1.0.108'
+```
+
+You can also configure pytest logging options on the command line.
+
+See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+
+### Default behaviour
+
+If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above. You will still see messages from:
+
+- pytest. For example, `tests/integration/test_charm.py::test_deploy PASSED`.
+- Other modules if the messages are at `WARNING` or above.
+- `pytest-jubilant`. For example, `Models were torn down...`.
+
+(write-integration-tests-log-to-a-file)=
+### Log to a file
+
+This is an ideal configuration for long-running integration tests (for example, in CI). It outputs brief logs to the console and verbose logs to a local file.
+
+```toml
+[tool.pytest.ini_options]
+...
+
+# Retain INFO logs in the "Captured log call" section when run interactively.
+# Otherwise, that section will have DEBUG logs (coming from log_file_level).
+log_level = "INFO"
+
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s %(message)s"
+
+log_file = "logs/verbose.log"
+log_file_level = "DEBUG"
+log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
+log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
+```
+
+If you run the integration tests multiple times, `logs/verbose.log` only contains logs from the last pytest session. To use a separate file for each session, override `log_file` for each pytest invocation:
+
+```
+pytest --log-file "run1.log" ...
+pytest --log-file "run2.log" ...
+```
+
+Alternatively, you can set `log_file_mode` to `append`. pytest will put verbose logs from all invocations into one file:
+
+```toml
+[tool.pytest.ini_options]
+log_file_mode = "a"
+...
+```
+
+You can also configure these options on the command line.
+
+See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+
+In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` available as a build artifact:
+
+```yaml
+  # In your integration test job
+  - run: tox -e integration
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: integration-test-logs
+      path: logs
+```
 
 (write-integration-tests-for-a-charm-view-juju-logs)=
-## View Juju logs
+## View `juju debug-log` logs
 
-If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr. You can also save the complete logs to disk with the `--juju-dump-logs` option.
+Use the `--juju-dump-logs` option from [pytest-jubilant](https://github.com/canonical/pytest-jubilant#--juju-dump-logs) to save the complete `juju debug-log` logs to disk:
 
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
+```text
+tox -e integration -- --juju-dump-logs logs
+```
+
+In CI, you can use `--juju-dump-logs` with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts:
 
 ```yaml
   # In your integration test job
@@ -475,7 +629,7 @@ Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs a
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
     with:
-      name: juju-dump-logs
+      name: integration-test-logs
       path: logs
 ```
 
