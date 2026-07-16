@@ -49,7 +49,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the workload version has been set."""
     version = juju.status().apps[APP_NAME].version
-    assert version == "1.0.4"  # Hardcoded for simplicity.
+    assert version == "2.1.0"  # Hardcoded for simplicity.
 
 
 @pytest.mark.juju_setup
