@@ -1416,7 +1416,7 @@ def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
     rockcraft.yaml file, that can then be passed to :class:`Container`,
     rather than duplicating the layer content in the test code. For example::
 
-        container = Container(
+        container = testing.Container(
             name='my-container',
             layers={'rock': layer_from_rockcraft(pathlib.Path('rockcraft.yaml'))},
         )
