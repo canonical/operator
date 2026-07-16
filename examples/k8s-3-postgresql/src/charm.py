@@ -145,8 +145,8 @@ class FastAPIDemoCharm(ops.CharmBase):
             [
                 "/bin/uvicorn",
                 "api_demo_server.app:app",
-                "--host=0.0.0.0",
-                f"--port={port}",
+                "--host 0.0.0.0",
+                f"--port {port}",
             ]
         )
         pebble_layer: ops.pebble.LayerDict = {
