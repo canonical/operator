@@ -20,6 +20,24 @@ from ops import testing
 
 from charm import FastAPIDemoCharm
 
+# The default Pebble layer in the application image.
+# Defined in https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml
+ROCK_LAYER = ops.pebble.Layer(
+    {
+        "services": {
+            "fastapi": {
+                "override": "replace",
+                "summary": "FastAPI demo server",
+                "command": "/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000",
+                "startup": "enabled",
+                "environment": {"DEMO_SERVER_LOGFILE": "/tmp/demo_server.log"},
+                "on-success": "shutdown",
+                "on-failure": "shutdown",
+            }
+        },
+    }
+)
+
 
 def mock_get_version(port: int):
     """Get a mock version string without executing the workload code."""
@@ -33,25 +51,17 @@ def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,
     )
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
     # Expected plan after Pebble ready with default config
-    expected_plan = {
-        "services": {
-            "fastapi-service": {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
-                "startup": "enabled",
-                # Since the environment is empty, Layer.to_dict() will not
-                # include it.
-            }
-        }
-    }
+    expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
+    expected_plan.services["fastapi"].override = "merge"
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
@@ -59,7 +69,7 @@ def test_pebble_layer(mock_version):
     assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
     # Check the service was started:
     assert (
-        state_out.get_container(container.name).service_statuses["fastapi-service"]
+        state_out.get_container(container.name).service_statuses["fastapi"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
     # Check the workload version is set:
@@ -68,25 +78,24 @@ def test_pebble_layer(mock_version):
 
 def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    command = (
-        state_out.get_container(container.name)
-        .layers["fastapi_demo"]
-        .services["fastapi-service"]
-        .command
-    )
-    assert "--port=8080" in command
+    command = state_out.get_container(container.name).plan.services["fastapi"].command
+    assert "--port 8080" in command
 
 
 def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 22},
@@ -110,7 +119,9 @@ def test_relation_data(mock_version):
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -119,9 +130,8 @@ def test_relation_data(mock_version):
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
-        "fastapi-service"
-    ].environment == {
+    assert state_out.get_container(container.name).plan.services["fastapi"].environment == {
+        **ROCK_LAYER.services["fastapi"].environment,
         "DEMO_SERVER_DB_HOST": "example.com",
         "DEMO_SERVER_DB_PORT": "5432",
         "DEMO_SERVER_DB_USER": "foo",
@@ -131,7 +141,9 @@ def test_relation_data(mock_version):
 
 def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,
