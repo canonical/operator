@@ -1,0 +1,33 @@
+name: Tracing upstream schema drift
+
+# Opt-in drift check: compares ``ops_tracing``'s de-pydantic'd dataclasses
+# against the canonical/charmlibs schemas at HEAD. Needs network access and
+# pydantic, so it's gated to PRs/pushes that touch the tracing tree.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tracing/**'
+      - '.github/workflows/tracing-upstream-schemas.yaml'
+  pull_request:
+    paths:
+      - 'tracing/**'
+      - '.github/workflows/tracing-upstream-schemas.yaml'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  upstream-schemas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - run: uv tool install tox --with tox-uv
+      - run: uv python install 3.12
+      - name: Run tracing upstream schema drift check
+        run: cd tracing && tox -e upstream-schemas

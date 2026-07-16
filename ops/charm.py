@@ -21,6 +21,7 @@ import enum
 import logging
 import os
 import pathlib
+import typing
 import warnings
 from collections.abc import Mapping
 from typing import (
@@ -33,6 +34,7 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
+    get_type_hints,
 )
 
 from . import model
@@ -1697,6 +1699,44 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
         return class_fields
     # It's not clear, so give up.
     raise ValueError('Unable to find class fields')
+
+
+def _coerce_field(tp: Any, value: Any) -> Any:
+    """Coerce a decoded ``value`` into the dataclass field type ``tp``.
+
+    Used by :meth:`ops.Relation.load` to recursively construct nested
+    dataclasses and enum values from JSON-decoded relation data.
+    """
+    origin = typing.get_origin(tp)
+    if origin is not None:
+        args = typing.get_args(tp)
+        if origin in (list, tuple) and args:
+            return [_coerce_field(args[0], v) for v in value]
+        if origin in (set, frozenset) and args:
+            return {_coerce_field(args[0], v) for v in value}
+        # Literal, Union, Optional, Dict, etc.: accept the value as-is.
+        return value
+    if isinstance(tp, type):
+        if dataclasses.is_dataclass(tp):
+            return _build_dataclass(tp, value)
+        if issubclass(tp, enum.Enum):
+            return tp(value)
+    return value
+
+
+def _build_dataclass(cls: Any, data: Mapping[str, Any]) -> Any:
+    """Construct dataclass ``cls`` from ``data``, recursively coercing nested fields.
+
+    Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
+    missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
+    """
+    hints = get_type_hints(cls)
+    kwargs: dict[str, Any] = {}
+    for field in dataclasses.fields(cls):
+        if field.name not in data:
+            continue
+        kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
+    return cls(**kwargs)
 
 
 class CharmMeta:

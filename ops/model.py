@@ -1831,6 +1831,14 @@ class Relation:
                 data[key] = value
             elif key in fields:
                 data[fields[key]] = value
+        # For plain (non-pydantic) dataclass targets, recursively coerce nested
+        # dataclass / enum / list / set fields. Pydantic handles its own coercion.
+        if (
+            not args
+            and dataclasses.is_dataclass(cls)
+            and not getattr(cls, '__is_pydantic_dataclass__', False)
+        ):
+            return _charm._build_dataclass(cls, data)
         return cls(*args, **data)
 
     def save(
