@@ -1413,10 +1413,10 @@ def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
     """Create a layer from a `rockcraft.yaml` file.
 
     This is a convenience function to create a Pebble layer from a
-    rockcraft.yaml file, that can then be passed to :class:`testing.Container`,
+    rockcraft.yaml file, that can then be passed to :class:`Container`,
     rather than duplicating the layer content in the test code. For example::
 
-        container = Container(
+        container = testing.Container(
             name='my-container',
             layers={'rock': layer_from_rockcraft(pathlib.Path('rockcraft.yaml'))},
         )

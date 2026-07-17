@@ -134,4 +134,4 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.errors.ActionMissingFromContextError
 .. autoclass:: ops.testing.errors.NoObserverError
 .. autoclass:: ops.testing.errors.BadOwnerPath
-.. automethod:: ops.testing.layer_from_rockcraft
+.. autofunction:: ops.testing.layer_from_rockcraft

@@ -102,7 +102,7 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: juju-dump-logs
+          name: integration-test-logs
           path: logs
 ```
 
