@@ -545,6 +545,11 @@ PASSED
 ```text
 tests/integration/test_charm.py::test_workload_version_is_set
 ...
+INFO     jubilant.wait:_juju.py:1491 wait: status changed:
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
++ .apps['fastapi-demo'].version = '1.0.4'
 PASSED
 ```
 
