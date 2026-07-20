@@ -57,6 +57,6 @@ The application is set up such that, once deployed, you can access the deployed 
 
 Our app's OCI image is at
 
-https://github.com/canonical/api_demo_server/pkgs/container/api_demo_server
+https://github.com/canonical/api_demo_server/pkgs/container/api_demo_server%2Fapi-demo-server
 
 > **See next: {ref}`Set up your development environment <set-up-your-development-environment>`**

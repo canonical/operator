@@ -250,10 +250,10 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
     """Pebble layer for the FastAPI demo services."""
     command = " ".join(
         [
-            "uvicorn",
+            "/bin/uvicorn",
             "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
+            "--host 0.0.0.0",
+            f"--port {port}",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
@@ -261,10 +261,8 @@ def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebbl
         "description": "pebble config layer for FastAPI demo server",
         "services": {
             self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
+                "override": "merge",
                 "command": command,
-                "startup": "enabled",
                 "environment": environment,
             }
         },
@@ -344,7 +342,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -434,7 +432,9 @@ def test_relation_data(mock_version):
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -443,9 +443,8 @@ def test_relation_data(mock_version):
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
-        "fastapi-service"
-    ].environment == {
+    assert state_out.get_container(container.name).plan.services["fastapi"].environment == {
+        **ROCK_LAYER.services["fastapi"].environment,
         "DEMO_SERVER_DB_HOST": "example.com",
         "DEMO_SERVER_DB_PORT": "5432",
         "DEMO_SERVER_DB_USER": "foo",
@@ -458,7 +457,9 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```python
 def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,

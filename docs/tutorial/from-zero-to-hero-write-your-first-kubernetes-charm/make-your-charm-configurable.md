@@ -145,10 +145,10 @@ def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
     command = " ".join(
         [
-            "uvicorn",
+            "/bin/uvicorn",
             "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
+            "--host 0.0.0.0",
+            f"--port {port}",
         ]
     )
     pebble_layer: ops.pebble.LayerDict = {
@@ -156,10 +156,8 @@ def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
         "description": "pebble config layer for FastAPI demo server",
         "services": {
             self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
+                "override": "merge",
                 "command": command,
-                "startup": "enabled",
             }
         },
     }
@@ -181,7 +179,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 ```{tip}
@@ -206,7 +204,7 @@ Now, let's validate that the app is actually running and reachable on the new po
 curl 10.1.157.74:5000/version
 ```
 
-You should see JSON string with the version of the application: `{"version":"1.0.4"}`
+You should see JSON string with the version of the application: `{"version":"2.1.0"}`
 
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
 
@@ -246,20 +244,17 @@ First, we'll add a test that sets the port in the input state and asserts that t
 ```python
 def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    command = (
-        state_out.get_container(container.name)
-        .layers["fastapi_demo"]
-        .services["fastapi-service"]
-        .command
-    )
-    assert "--port=8080" in command
+    command = state_out.get_container(container.name).plan.services["fastapi"].command
+    assert "--port 8080" in command
 ```
 
 We need the `mock_version` fixture because `_on_config_changed` calls `_replan_workload`, which gets the workload version using `fastapi_demo.get_version`. The fixture patches `get_version` to avoid making a real HTTP call, so that the unit test deterministic.
@@ -269,7 +264,9 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 22},
