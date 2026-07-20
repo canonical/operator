@@ -23,17 +23,14 @@ Finally, every time a user interacts with the database, our app writes logging i
 
 To summarize, our demo application is a minimal but real-life-like application that has external API endpoints, performs database read and write operations, and collects real-time metrics and logs for observability purposes.
 
-
 ## Structure
 
-The app source code is hosted at https://github.com/canonical/api_demo_server .
+The [app source](https://github.com/canonical/api_demo_server/tree/master/src/api_demo_server) has the following main files:
 
-As you can see [here](https://github.com/canonical/api_demo_server/tree/master/api_demo_server), the app consists of primarily the following two files:
-
-- `app.py`, which describes the API endpoints and the logging definition, and
+- `app.py`, which describes the API endpoints and the logging definition.
 - `database.py`, which describes the interaction with the PostgreSQL database.
 
-Furthermore, as you can see [here](https://github.com/canonical/api_demo_server/tree/master?tab=readme-ov-file#configuration-via-environment-variables), the application provides a way to configure the output logging file and the database access points (IP, port, username, password) via environment variables:
+The app supports environment variables to configure the output logging file and the database connection information:
 
 - `DEMO_SERVER_LOGFILE`
 - `DEMO_SERVER_DB_HOST`
@@ -41,21 +38,19 @@ Furthermore, as you can see [here](https://github.com/canonical/api_demo_server/
 - `DEMO_SERVER_DB_USER`
 - `DEMO_SERVER_DB_PASSWORD`
 
+For more detail about the structure of the app, see https://github.com/canonical/api_demo_server.
 
 ## API endpoints
 
-The application is set up such that, once deployed, you can access the deployed IP on port 8000. Specifically:
-
+The app is set up such that, once deployed, you can access the deployed IP on port 8000. Specifically:
 
 |||
 |-|-|
-| To get Prometheus metrics: | `http://<IP>:8000/metrics` |
-| To get a Swagger UI to interact with API: |`http://<IP>:8000/docs`|
-| To get the app's version |`http://<IP>:8000/version`|
+| Get Prometheus metrics | `http://<IP>:8000/metrics` |
+| Get a Swagger UI to interact with the API |`http://<IP>:8000/docs`|
+| Get the app's version |`http://<IP>:8000/version`|
 
 ## OCI image
-
-Our app's OCI image is at
 
 https://github.com/canonical/api_demo_server/pkgs/container/api_demo_server%2Fapi-demo-server
 
