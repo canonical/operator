@@ -277,6 +277,10 @@ When Pebble starts or restarts the service:
 * If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
 * If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
 
+```{note}
+The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service environment has variables from both layers (because our constructed layer sets `override` to `merge`).
+```
+
 We'll now make sure that the unit status is set correctly.
 
 (integrate-your-charm-with-postgresql-update-unit-status)=
