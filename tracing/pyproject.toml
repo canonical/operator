@@ -43,12 +43,14 @@ dependencies = [
 
 
 [dependency-groups]
-dev = [
-    "pyright ~= 1.1",
-    "ruff ~= 0.9",
+lint = [
+    "ruff==0.15.20",
+    "codespell==2.4.2",
+    "pyright~=1.1",
 ]
-testing = [
-    "pytest ~= 9.0",
+unit = [
+    "ops[testing]",
+    "pytest~=9.0",
 ]
 
 [build-system]
