@@ -170,64 +170,44 @@ framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebb
 
 ```
 
-Next, define the event handler, as follows:
-
-We'll use the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
-
-Use `ActiveStatus` as well as further Ops constructs to define the event handler, as below. As you can see, what is happening is that, from the `event` argument, you extract the workload container object in which you add a custom layer. Once the layer is set you replan your service and set the charm status to active.
-
+Next, define the event handler:
 
 ```python
 def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     """Define and start a workload using the Pebble API."""
     # Get a reference the container attribute on the PebbleReadyEvent
     container = event.workload
-    # Add initial Pebble config layer using the Pebble API
-    container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
-    # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
+    # Start the service defined by the Pebble layer in the application image.
     container.replan()
     # Learn more about statuses at
     # https://documentation.ubuntu.com/juju/3.6/reference/status/
     self.unit.status = ops.ActiveStatus()
 ```
 
-The custom Pebble layer that you just added is defined in the  `self._get_pebble_layer()` method. We'll now add this method.
+We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
 
-In the `__init__` method of your charm class, name your service to `fastapi` and add it as a class attribute:
+The `api_demo_server` application is packaged as a "rock" using Canonical's OCI-compliant format for container images. The image has a Pebble layer that defines how to run the app. Since our minimal charm doesn't need to change how the app runs, our charm just needs to call `replan()` to start the service defined in the Pebble layer.
 
-```python
-self.pebble_service_name = "fastapi"
+To inspect the Pebble layer, see [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml). Look for a service called `fastapi`:
+
+```yaml
+...
+services:
+  fastapi:
+    override: replace
+    summary: FastAPI demo server
+    command: /bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000
+    startup: enabled
+    environment:
+      DEMO_SERVER_LOGFILE: /tmp/demo_server.log
+    ...
 ```
 
-Finally, define  the `_get_pebble_layer` function as below. The `command` variable represents a command line that should be executed in order to start our application.
-
-```python
-def _get_pebble_layer(self) -> ops.pebble.Layer:
-    """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "/bin/uvicorn",
-            "api_demo_server.app:app",
-            "--host 0.0.0.0",
-            "--port 8000",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
-        "summary": "FastAPI demo service",
-        "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "merge",
-                "command": command,
-            }
-        },
-    }
-    return ops.pebble.Layer(pebble_layer)
-```
+The `fastapi` service has `startup: enabled`, so why does our charm need to start the service? When Juju creates the workload container, it tells Pebble not to start any services. It's the charm's job to decide when to start services.
 
 ### Set the workload version
 
-The workload version is available after the workload starts, which happens after Pebble reevaluates its plan. We'll use the `src/fastapi_demo.py` helper module for this step.
+The workload version is available after the workload starts, which happens after Pebble starts the `fastapi` service. We'll use the `src/fastapi_demo.py` helper module for this step.
 
 In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function before the final `self.unit.status = ops.ActiveStatus()`:
 
@@ -237,7 +217,7 @@ version = fastapi_demo.get_version(port=8000)
 self.unit.set_workload_version(version)
 ```
 
-We get the workload version over port 8000 because `_get_pebble_layer` deploys the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
+We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
 
 ### Add logger functionality
 
@@ -368,7 +348,7 @@ You can ensure all this by writing a rich battery of unit tests. In the context 
 
 We'll also use the Python testing tool [`tox`](https://tox.wiki/en/4.14.2/index.html) to automate our testing and set up our testing environment.
 
-In this section we'll write a test to check that Pebble is configured as expected.
+In this section we'll write a test to check that the `fastapi` service is started as expected.
 
 ### Write a test
 
@@ -420,9 +400,8 @@ def test_pebble_layer(mock_version):
         leader=True,
     )
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    # Expected plan after Pebble ready with default config
+    # Expected plan after Pebble ready (our charm doesn't add any layers).
     expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
-    expected_plan.services["fastapi"].override = "merge"
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
@@ -438,6 +417,8 @@ def test_pebble_layer(mock_version):
 ```
 
 This test checks the behaviour of the `_on_demo_server_pebble_ready` function that you set up earlier. The test simulates your charm receiving the pebble-ready event, then checks that the unit and workload container have the correct state.
+
+The unit tests don't have access to the application image, so we provide `ROCK_LAYER` to represent the base configuration of the workload container. If you're developing a charm in the same repository as a rock workload, use [`testing.layer_from_rockcraft`](ops.testing.layer_from_rockcraft) to read `ROCK_LAYER` from `rockcraft.yaml`.
 
 In unit tests, we avoid any interaction with the outside world. The `get_version` method performs an HTTP call, which must be patched. We use the `mock_version` fixture to achieve this.
 
