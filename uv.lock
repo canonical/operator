@@ -1003,11 +1003,13 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+lint = [
+    { name = "codespell" },
     { name = "pyright" },
     { name = "ruff" },
 ]
-testing = [
+unit = [
+    { name = "ops", extra = ["testing"] },
     { name = "pytest" },
 ]
 
@@ -1020,11 +1022,15 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
+lint = [
+    { name = "codespell", specifier = "==2.4.2" },
     { name = "pyright", specifier = "~=1.1" },
-    { name = "ruff", specifier = "~=0.9" },
+    { name = "ruff", specifier = "==0.15.20" },
 ]
-testing = [{ name = "pytest", specifier = "~=9.0" }]
+unit = [
+    { name = "ops", extras = ["testing"], editable = "." },
+    { name = "pytest", specifier = "~=9.0" },
+]
 
 [[package]]
 name = "packaging"
