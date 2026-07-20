@@ -31,7 +31,7 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        self.pebble_service_name = "fastapi-service"
+        self.pebble_service_name = "fastapi"
         framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
@@ -53,10 +53,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         """Pebble layer for the FastAPI demo services."""
         command = " ".join(
             [
-                "uvicorn",
+                "/bin/uvicorn",
                 "api_demo_server.app:app",
-                "--host=0.0.0.0",
-                "--port=8000",
+                "--host 0.0.0.0",
+                "--port 8000",
             ]
         )
         pebble_layer: ops.pebble.LayerDict = {
@@ -64,10 +64,8 @@ class FastAPIDemoCharm(ops.CharmBase):
             "description": "pebble config layer for FastAPI demo server",
             "services": {
                 self.pebble_service_name: {
-                    "override": "replace",
-                    "summary": "fastapi demo",
+                    "override": "merge",
                     "command": command,
-                    "startup": "enabled",
                 }
             },
         }
