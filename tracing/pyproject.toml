@@ -50,7 +50,7 @@ lint = [
 ]
 unit = [
     "ops[testing]",
-    "pytest ~= 9.0",
+    "pytest~=9.0",
 ]
 
 [build-system]
