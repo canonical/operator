@@ -275,7 +275,7 @@ With these changes, we've made sure that our application knows how to access the
 When Pebble starts or restarts the service:
 
 * If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
-* Otherwise, the service environment is empty, so our application can't get database authentication data. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+* If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
 
 We'll now make sure that the unit status is set correctly.
 
