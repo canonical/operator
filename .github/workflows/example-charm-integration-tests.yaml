@@ -43,7 +43,8 @@ jobs:
             exit 0
           fi
           # On PRs, run only examples that have changed.
-          base='origin/${GITHUB_BASE_REF}'
+          # GITHUB_BASE_REF is a default env var set by GitHub Actions.
+          base="origin/$GITHUB_BASE_REF"
           for dir in $examples; do
             if git diff --name-only "$base...HEAD" -- "examples/$dir/" | grep -q .; then
               echo "$dir=true" >> "$GITHUB_OUTPUT"
