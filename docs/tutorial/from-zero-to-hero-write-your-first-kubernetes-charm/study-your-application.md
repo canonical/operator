@@ -9,19 +9,19 @@ As such, if you want to charm an application, the first thing you need to unders
 
 Of course, what exactly you'll need to know and how exactly you'll have to go about getting this knowledge will very much depend on the application.
 
-In this part of the tutorial we will choose an application for you and tell you all you need to know about it to start charming. Our demo app is called  'FastAPI Demo' and we have designed it specifically for this tutorial so that, by creating a Kubernetes charm for it, you can master all the fundamentals of Kubernetes charming.
+In this part of the tutorial we will choose an application for you and tell you all you need to know about it to start charming. Our demo app is called 'FastAPI Demo' and we have designed it specifically for this tutorial so that, by creating a Kubernetes charm for it, you can master all the fundamentals of Kubernetes charming.
 
 ## Features
 
 The FastAPI app was built using the Python [FastAPI](https://fastapi.tiangolo.com/) framework to deliver a very simple web server. It offers a couple of API endpoints that the user can interact with.
 
-The app also has a connection to a  [PostgreSQL](https://www.postgresql.org/) database. It provides users with an API to create a table with user names, add a name to the database, and get all the names from the database.
+The app also has a connection to a [PostgreSQL](https://www.postgresql.org/) database. It provides users with an API to create a table with user names, add a name to the database, and get all the names from the database.
 
-Additionally, our app uses [starlette-exporter](https://pypi.org/project/starlette-exporter/) to generate real-time application metrics and to expose them via a `/metrics` endpoint that is designed to be scraped by [Prometheus](https://prometheus.io/).
+Additionally, our app uses [starlette-exporter](https://pypi.org/project/starlette-exporter/) to generate real-time app metrics and to expose them via a `/metrics` endpoint that is designed to be scraped by [Prometheus](https://prometheus.io/).
 
 Finally, every time a user interacts with the database, our app writes logging information to the log file and also streams it to standard output.
 
-To summarize, our demo application is a minimal but real-life-like application that has external API endpoints, performs database read and write operations, and collects real-time metrics and logs for observability purposes.
+To summarize, our demo app is a minimal but real-life-like app that has external API endpoints, performs database read and write operations, and collects real-time metrics and logs for observability purposes.
 
 ## Structure
 
