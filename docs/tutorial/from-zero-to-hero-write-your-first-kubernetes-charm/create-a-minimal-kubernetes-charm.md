@@ -186,7 +186,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
 
 We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
 
-The `api_demo_server` application is packaged as a "rock" using Canonical's OCI-compliant format for container images. The image has a Pebble layer that defines how to run the app. Since our minimal charm doesn't need to change how the app runs, our charm just needs to call `replan()` to start the service defined in the Pebble layer.
+The `api_demo_server` application is packaged as a [rock](https://documentation.ubuntu.com/rockcraft/1.19/explanation/rocks/), which is an OCI-compliant container image. The image has a Pebble layer that defines how to run the app. Since our minimal charm doesn't need to change how the app runs, our charm just needs to call `replan()` to start the service defined in the Pebble layer.
 
 To inspect the Pebble layer, see [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml). Look for a service called `fastapi`:
 
