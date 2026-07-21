@@ -246,28 +246,20 @@ We removed three `self.unit.status = ` lines from this version of the method. We
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
 ```python
-def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
+def _get_pebble_layer(self, port: int, env: dict[str, str]) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "/bin/uvicorn",
-            "api_demo_server.app:app",
-            "--host 0.0.0.0",
-            f"--port {port}",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
+    cmd = f"/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port {port}"
+    service: ops.pebble.ServiceDict = {
+        "override": "merge",
+        "command": cmd,
+        "environment": env,
+    }
+    layer: ops.pebble.LayerDict = {
         "summary": "FastAPI demo service",
         "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "merge",
-                "command": command,
-                "environment": environment,
-            }
-        },
+        "services": {self.pebble_service_name: service},
     }
-    return ops.pebble.Layer(pebble_layer)
+    return ops.pebble.Layer(layer)
 ```
 
 With these changes, we've made sure that our application knows how to access the database.
