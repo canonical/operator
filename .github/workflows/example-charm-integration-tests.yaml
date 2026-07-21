@@ -4,82 +4,112 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '50 15 * * 2'  # 15:50 UTC Tuesdays
+  pull_request:
 
 permissions: {}
 
-jobs:
-  # Pack & run integration tests for machine charms.
-  machine-examples-integration:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        dir:
-          - examples/machine-tinyproxy
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
-        with:
-          persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying machine charms
-        run: sudo concierge prepare -p machine
-      - name: Pack charm
-        run: |
-          cd ${{ matrix.dir }}
-          charmcraft pack
-      - name: Run integration tests
-        run: |
-          cd ${{ matrix.dir }}
-          tox -e integration
+concurrency:
+  # Cancel in-flight PR runs when new commits are pushed. Scheduled and
+  # manual-dispatch runs are never cancelled (they use a different group).
+  group: example-charm-integration-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-  # Pack & run integration tests for K8s charms.
-  k8s-examples-integration:
+jobs:
+  # On PRs, detect which example directories have changed. On schedule and
+  # manual dispatch, all examples are selected.
+  detect-changes:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        dir:
-          # httpbin-demo runs under example-charm-charmcraft-test.yaml instead.
-          - examples/k8s-1-minimal
-          - examples/k8s-2-configurable
-          - examples/k8s-3-postgresql
-          - examples/k8s-4-action
-          - examples/k8s-5-observe
+    outputs:
+      machine-tinyproxy: ${{ steps.check.outputs.machine-tinyproxy }}
+      k8s-1-minimal: ${{ steps.check.outputs.k8s-1-minimal }}
+      k8s-2-configurable: ${{ steps.check.outputs.k8s-2-configurable }}
+      k8s-3-postgresql: ${{ steps.check.outputs.k8s-3-postgresql }}
+      k8s-4-action: ${{ steps.check.outputs.k8s-4-action }}
+      k8s-5-observe: ${{ steps.check.outputs.k8s-5-observe }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      - name: Set up tox and tox-uv
-        run: uv tool install tox --with tox-uv
-      - name: Install Concierge
-        run: sudo snap install --classic concierge
-      - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p microk8s
-      - name: Fetch any charmlibs
+          fetch-depth: 0  # Need full history to diff against the base branch.
+      - id: check
         run: |
-          cd ${{ matrix.dir }}
-          if grep -Eq "^charm-libs:" charmcraft.yaml; then
-            charmcraft fetch-libs
+          # httpbin-demo runs under example-charm-charmcraft-test.yaml instead.
+          examples='machine-tinyproxy k8s-1-minimal k8s-2-configurable k8s-3-postgresql k8s-4-action k8s-5-observe'
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            # On schedule and manual dispatch, run all examples.
+            for dir in $examples; do
+              echo "$dir=true" >> "$GITHUB_OUTPUT"
+            done
+            exit 0
           fi
-      - name: Pack charm
-        run: |
-          cd ${{ matrix.dir }}
-          charmcraft pack
-      - name: Run integration tests
-        run: |
-          cd ${{ matrix.dir }}
-          tox -e integration
+          # On PRs, run only examples that have changed.
+          base='origin/${GITHUB_BASE_REF}'
+          for dir in $examples; do
+            if git diff --name-only "$base...HEAD" -- "examples/$dir/" | grep -q .; then
+              echo "$dir=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$dir=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+  machine-tinyproxy:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.machine-tinyproxy == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/machine-tinyproxy
+      preset: machine
+
+  k8s-1-minimal:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.k8s-1-minimal == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/k8s-1-minimal
+      preset: microk8s
+
+  k8s-2-configurable:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.k8s-2-configurable == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/k8s-2-configurable
+      preset: microk8s
+
+  k8s-3-postgresql:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.k8s-3-postgresql == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/k8s-3-postgresql
+      preset: microk8s
+
+  k8s-4-action:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.k8s-4-action == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/k8s-4-action
+      preset: microk8s
+
+  k8s-5-observe:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.k8s-5-observe == 'true' }}
+    uses: ./.github/workflows/_example-integration.yaml
+    with:
+      dir: examples/k8s-5-observe
+      preset: microk8s
 
   open-issue-on-failure-if-scheduled:
     if: ${{ failure() && github.event_name == 'schedule' }}
-    needs: [machine-examples-integration, k8s-examples-integration]
+    needs:
+      - detect-changes
+      - machine-tinyproxy
+      - k8s-1-minimal
+      - k8s-2-configurable
+      - k8s-3-postgresql
+      - k8s-4-action
+      - k8s-5-observe
     permissions:
       issues: write
     uses: ./.github/workflows/notify-scheduled-failure.yaml
