@@ -79,7 +79,7 @@ resources:
   # An OCI image resource for the container listed above.
   demo-server-image:
     type: oci-image
-    description: OCI image from GitHub Container Repository
+    description: OCI image from GitHub Container registry
     # The upstream-source field is ignored by Charmcraft and Juju, but it can be
     # useful to developers in identifying the source of the OCI image.  It is also
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
