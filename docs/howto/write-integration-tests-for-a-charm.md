@@ -474,14 +474,17 @@ Jubilant logs at three levels:
 
 ### Example of brief logging
 
+In `pyproject.toml`:
+
 ```toml
 [tool.pytest.ini_options]
 ...
-log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 ```
 
-Sample output:
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
+Sample output of `tox -e integration`:
 
 ```text
 INFO jubilant cli: juju deploy --model jubilant-b3578475-test-charm ...
@@ -493,10 +496,11 @@ INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -
 
 ### Example of verbose logging
 
+In `pyproject.toml`:
+
 ```toml
 [tool.pytest.ini_options]
 ...
-log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
@@ -505,7 +509,9 @@ The timestamp format follows ISO 8601.
 
 See more: {external+python:ref}`strftime() and strptime() behavior <strftime-strptime-behavior>`
 
-Sample output:
+Also modify the `[testenv:integration]` environment in `tox.ini` so that the pytest command has `--log-cli-level=DEBUG`.
+
+Sample output of `tox -e integration`:
 
 ```text
 2026-07-15T09:42:15Z INFO jubilant cli: juju deploy --model jubilant-6966ceb1-test-charm ...
@@ -542,7 +548,7 @@ Sample output:
 + .apps['fastapi-demo'].units['fastapi-demo/0'].address = '10.1.0.108'
 ```
 
-You can also configure these options on the command line. If you don't see the live Jubilant logs, make sure the pytest command (for example, in `tox.ini`) has the `--log-cli-level=INFO` argument.
+You can also configure pytest logging options on the command line.
 
 See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
 
@@ -567,7 +573,6 @@ This is an ideal configuration for long-running integration tests (for example, 
 # Otherwise, that section will have DEBUG logs (coming from log_file_level).
 log_level = "INFO"
 
-log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 
 log_file_level = "DEBUG"
