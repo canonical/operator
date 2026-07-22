@@ -76,7 +76,7 @@ def cos(juju_factory: pytest_jubilant.JujuFactory):
 def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
-    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
+    cos.wait(jubilant.all_active, timeout=15 * 60)  # Allow time for the bundle to deploy.
 
 
 @pytest.mark.juju_setup
