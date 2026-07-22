@@ -580,6 +580,8 @@ log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
 
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
 Use the `--log-file` option from pytest to enable file logging:
 
 ```text
