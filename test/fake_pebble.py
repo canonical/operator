@@ -51,6 +51,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         server: socketserver.BaseServer,
     ):
         self.routes: Handler._route = [
+            ('GET', re.compile(r'^/logs$'), self.get_logs),
             ('GET', re.compile(r'^/system-info$'), self.get_system_info),
             ('POST', re.compile(r'^/services$'), self.services_action),
         ]
@@ -155,6 +156,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if isinstance(body, bytes):
             body = body.decode('utf-8')
         return json.loads(body)
+
+    def get_logs(self, match: typing.Any, query: dict[str, str], data: dict[str, str]):
+        entries = [
+            {'time': '2021-05-03T03:44:59.123Z', 'service': 'foo', 'message': 'hello'},
+            {'time': '2021-05-03T03:45:00.456Z', 'service': 'bar', 'message': 'world'},
+        ]
+        services = query.get('services')
+        if services:
+            names = services.split(',')
+            entries = [entry for entry in entries if entry['service'] in names]
+        n = int(query.get('n', '30'))
+        if n == 0:
+            entries = []
+        elif n > 0:
+            entries = entries[-n:]
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/x-ndjson')
+        self.end_headers()
+        for entry in entries:
+            self.wfile.write(json.dumps(entry).encode('utf-8') + b'\n')
 
     def get_system_info(self, match: typing.Any, query: dict[str, str], data: dict[str, str]):
         self.respond({

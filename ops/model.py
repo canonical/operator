@@ -2697,6 +2697,23 @@ class Container:
             raise RuntimeError(f'expected 1 service, got {len(services)}')
         return services[service_name]
 
+    def get_logs(self, *service_names: str, n: int = 30) -> list[pebble.LogEntry]:
+        """Fetch the most recent log entries from services in the workload container.
+
+        To follow the logs as they are written, use
+        :meth:`ops.pebble.Client.follow_logs` on :attr:`pebble` instead.
+
+        Args:
+            service_names: Optional service names to get logs for. If no
+                service names are specified, get logs for all services.
+            n: Maximum number of log entries to return, across all requested
+                services combined. Use -1 to get everything in the buffer.
+
+        Returns:
+            The log entries, ordered oldest first.
+        """
+        return self._pebble.get_logs(service_names or None, n=n)
+
     def get_checks(
         self, *check_names: str, level: pebble.CheckLevel | None = None
     ) -> CheckInfoMapping:

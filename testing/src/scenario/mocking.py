@@ -14,7 +14,7 @@ import datetime
 import io
 import shutil
 import uuid
-from collections.abc import Mapping
+from collections.abc import Generator, Iterable, Mapping
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -843,6 +843,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         # load any existing notices and check information from the state
         self._notices: dict[tuple[str, str], pebble.Notice] = {}
         self._check_infos: dict[str, pebble.CheckInfo] = {}
+        self._service_logs: list[pebble.LogEntry] = []
         try:
             container = state.get_container(self._container_name)
         except KeyError:
@@ -878,9 +879,41 @@ class _MockPebbleClient(_TestingPebbleClient):
                 )
                 assert check.change_id is not None
                 self._changes[check.change_id] = change
+            # Stable sort: entries with equal times keep the state's order.
+            self._service_logs = sorted(
+                (entry._to_ops() for entry in container.service_logs),
+                key=lambda entry: entry.time,
+            )
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
+
+    def get_logs(
+        self, services: Iterable[str] | None = None, *, n: int = 30
+    ) -> list[pebble.LogEntry]:
+        self._check_connection()
+        return self._filtered_logs(services, n)
+
+    def follow_logs(
+        self, services: Iterable[str] | None = None, *, n: int = 0
+    ) -> Generator[pebble.LogEntry, None, None]:
+        self._check_connection()
+        entries = self._filtered_logs(services, n)
+        # The real client blocks waiting for new entries until the connection
+        # is lost; nothing writes new entries here, so following ends once the
+        # buffered entries have been yielded.
+        return (entry for entry in entries)
+
+    def _filtered_logs(self, services: Iterable[str] | None, n: int) -> list[pebble.LogEntry]:
+        entries = self._service_logs
+        if services is not None:
+            names = set(services)
+            entries = [entry for entry in entries if entry.service in names]
+        if n == 0:
+            return []
+        if n > 0:
+            return list(entries[-n:])
+        return list(entries)
 
     def _update_state_check_infos(self):
         """Copy any new or changed check infos into the state."""

@@ -339,6 +339,15 @@ if TYPE_CHECKING:
         },
     )
 
+    _LogEntryDict = TypedDict(
+        '_LogEntryDict',
+        {
+            'time': str,
+            'service': str,
+            'message': str,
+        },
+    )
+
 
 class _WebSocket(Protocol):
     sock: socket.socket | None
@@ -368,12 +377,14 @@ class _UnixSocketConnection(http.client.HTTPConnection):
     """Implementation of HTTPConnection that connects to a named Unix socket."""
 
     def __init__(
-        self, host: str, socket_path: str, timeout: _NotProvidedFlag | float = _not_provided
+        self,
+        host: str,
+        socket_path: str,
+        timeout: _NotProvidedFlag | float | None = _not_provided,
     ):
-        if timeout is _not_provided:
+        if isinstance(timeout, _NotProvidedFlag):
             super().__init__(host)
         else:
-            assert isinstance(timeout, (int, float)), timeout  # type guard for pyright
             super().__init__(host, timeout=timeout)
         self.socket_path = socket_path
 
@@ -1721,6 +1732,29 @@ class Notice:
         )
 
 
+@dataclasses.dataclass(frozen=True)
+class LogEntry:
+    """A log entry from the buffer Pebble keeps for each service."""
+
+    time: datetime.datetime
+    """Time that the service wrote the log message."""
+
+    service: str
+    """Name of the service that wrote the log message."""
+
+    message: str
+    """The log message itself, without the trailing newline."""
+
+    @classmethod
+    def from_dict(cls, d: _LogEntryDict) -> LogEntry:
+        """Create new LogEntry object from dict parsed from JSON."""
+        return cls(
+            time=timeconv.parse_rfc3339(d['time']),
+            service=d['service'],
+            message=d['message'],
+        )
+
+
 class ExecProcess(Generic[AnyStr]):
     """Represents a process started by :meth:`Client.exec`.
 
@@ -2312,7 +2346,7 @@ class Client:
     @staticmethod
     def _ensure_content_type(
         headers: email.message.Message,
-        expected: Literal['multipart/form-data', 'application/json'],
+        expected: Literal['multipart/form-data', 'application/json', 'application/x-ndjson'],
     ):
         """Parse Content-Type header from headers and ensure it's equal to expected.
 
@@ -2332,8 +2366,14 @@ class Client:
         query: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         data: bytes | Generator[bytes, Any, Any] | None = None,
+        timeout: float | _NotProvidedFlag | None = _not_provided,
     ) -> http.client.HTTPResponse:
-        """Make a request to the Pebble server; return the raw HTTPResponse object."""
+        """Make a request to the Pebble server; return the raw HTTPResponse object.
+
+        The default timeout is the client's ``timeout`` attribute; pass ``None``
+        to make the request with no timeout at all (for endpoints that stream
+        indefinitely).
+        """
         url = self.base_url + path
         if query:
             url = f'{url}?{urllib.parse.urlencode(query, doseq=True)}'
@@ -2341,9 +2381,11 @@ class Client:
         if headers is None:
             headers = {}
         request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
+        if isinstance(timeout, _NotProvidedFlag):
+            timeout = self.timeout
 
         try:
-            response = self.opener.open(request, timeout=self.timeout)
+            response = self.opener.open(request, timeout=timeout)
         except urllib.error.HTTPError as e:
             with e:  # close the underlying tempfile so it doesn't leak
                 code = e.code
@@ -2716,6 +2758,81 @@ class Client:
                 span.set_attribute('names', names)
             resp = self._request('GET', '/v1/services', query)
             return [ServiceInfo.from_dict(info) for info in resp['result']]
+
+    def get_logs(self, services: Iterable[str] | None = None, *, n: int = 30) -> list[LogEntry]:
+        """Get log entries from the buffer Pebble keeps for each service.
+
+        Args:
+            services: Names of the services to get logs for. If not specified,
+                get logs for all services.
+            n: Maximum number of log entries to return, across all requested
+                services combined. Use -1 to get everything in the buffer.
+
+        Returns:
+            The log entries, ordered oldest first.
+        """
+        with self._start_span('pebble get_logs') as span:
+            query: dict[str, Any] = {'n': n}
+            if services is not None:
+                services = list(services)
+                query['services'] = services
+                span.set_attribute('services', services)
+            response = self._request_raw('GET', '/v1/logs', query)
+            self._ensure_content_type(response.headers, 'application/x-ndjson')
+            return list(self._parse_log_stream(response))
+
+    def follow_logs(
+        self, services: Iterable[str] | None = None, *, n: int = 0
+    ) -> Generator[LogEntry, None, None]:
+        """Get log entries from the given services as they are written.
+
+        The request is made with no timeout, and iterating the returned
+        generator blocks waiting for a new entry until the connection is
+        lost. Close the generator (or break out of the loop) to hang up.
+
+        For example, to stream entries until a service reports readiness::
+
+            for entry in client.follow_logs(['database']):
+                if 'ready to accept connections' in entry.message:
+                    break
+
+        Args:
+            services: Names of the services to get logs for. If not specified,
+                get logs for all services.
+            n: Number of buffered log entries to yield before following. This
+                defaults to 0 (only new entries); use -1 to first get
+                everything in the buffer.
+
+        Returns:
+            A generator of log entries, ordered oldest first.
+        """
+        with self._start_span('pebble follow_logs') as span:
+            query: dict[str, Any] = {'n': n, 'follow': 'true'}
+            if services is not None:
+                services = list(services)
+                query['services'] = services
+                span.set_attribute('services', services)
+            # Following has no natural deadline, so make the request with no
+            # socket timeout rather than raising TimeoutError whenever the
+            # services go quiet for a while.
+            response = self._request_raw('GET', '/v1/logs', query, timeout=None)
+            self._ensure_content_type(response.headers, 'application/x-ndjson')
+        return self._parse_log_stream(response)
+
+    @staticmethod
+    def _parse_log_stream(
+        response: http.client.HTTPResponse,
+    ) -> Generator[LogEntry, None, None]:
+        """Yield a LogEntry per line of the JSON Lines stream in *response*."""
+        try:
+            for line in response:
+                line = line.strip()
+                if not line:
+                    continue
+                entry: _LogEntryDict = json.loads(line)
+                yield LogEntry.from_dict(entry)
+        finally:
+            response.close()
 
     @typing.overload
     def pull(self, path: str | pathlib.PurePath, *, encoding: None) -> BinaryIO: ...

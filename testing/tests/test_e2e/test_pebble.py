@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from scenario import Context
-from scenario.state import CheckInfo, Container, Exec, Mount, Notice, State
+from scenario.state import CheckInfo, Container, Exec, LogEntry, Mount, Notice, State
 
 import ops
 from ops import CharmBase, Framework, pebble
@@ -426,6 +426,56 @@ def test_pebble_custom_notice():
     with ctx(ctx.on.pebble_custom_notice(container=container, notice=notices[-1]), state) as mgr:
         container = mgr.charm.unit.get_container('foo')
         assert container.get_notices() == [n._to_ops() for n in notices]
+
+
+def test_pebble_logs():
+    entries = [
+        LogEntry('redis', 'starting'),
+        LogEntry('web', 'listening'),
+        LogEntry('redis', 'ready'),
+    ]
+    container = Container(
+        name='foo',
+        can_connect=True,
+        service_logs=entries,
+    )
+
+    state = State(containers=[container])
+    ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.pebble_ready(container=container), state) as mgr:
+        container = mgr.charm.unit.get_container('foo')
+        assert container.get_logs() == [entry._to_ops() for entry in entries]
+        assert container.get_logs('redis') == [entries[0]._to_ops(), entries[2]._to_ops()]
+        assert container.get_logs(n=1) == [entries[-1]._to_ops()]
+        assert container.get_logs(n=0) == []
+        # Following ends after the buffered entries: nothing writes new ones.
+        assert list(container.pebble.follow_logs(n=-1)) == [entry._to_ops() for entry in entries]
+        assert list(container.pebble.follow_logs()) == []
+
+
+def test_pebble_logs_sorted_by_time():
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    entries = [
+        LogEntry('web', 'second', time=now),
+        LogEntry('web', 'first', time=now - datetime.timedelta(minutes=1)),
+    ]
+    container = Container(name='foo', can_connect=True, service_logs=entries)
+
+    state = State(containers=[container])
+    ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.pebble_ready(container=container), state) as mgr:
+        logs = mgr.charm.unit.get_container('foo').get_logs()
+        assert [entry.message for entry in logs] == ['first', 'second']
+
+
+def test_pebble_logs_cannot_connect():
+    container = Container(name='foo', service_logs=[LogEntry('web', 'hello')])
+
+    state = State(containers=[container])
+    ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.update_status(), state) as mgr:
+        with pytest.raises(pebble.ConnectionError):
+            mgr.charm.unit.get_container('foo').get_logs()
 
 
 class CustomNoticeCharm(ops.CharmBase):

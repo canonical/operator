@@ -104,6 +104,7 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.Exec
 .. autoclass:: ops.testing.ICMPPort
 .. autoclass:: ops.testing.JujuLogLine
+.. autoclass:: ops.testing.LogEntry
 .. autoclass:: ops.testing.MaintenanceStatus
 .. autoclass:: ops.testing.Manager
 .. autoclass:: ops.testing.Model

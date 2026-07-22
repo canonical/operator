@@ -1428,6 +1428,7 @@ class MockClient(pebble.Client):
         self.requests: list[typing.Any] = []
         self.responses: list[typing.Any] = []
         self.timeout = 5
+        self.raw_timeouts: list[float | pebble._NotProvidedFlag | None] = []
         self.websockets: dict[typing.Any, MockWebsocket] = {}
 
     def _request(
@@ -1452,8 +1453,10 @@ class MockClient(pebble.Client):
         query: dict[str, typing.Any] | None = None,
         headers: dict[str, str] | None = None,
         data: bytes | _bytes_generator | None = None,
+        timeout: float | pebble._NotProvidedFlag | None = pebble._not_provided,
     ):
         self.requests.append((method, path, query, headers, data))
+        self.raw_timeouts.append(timeout)
         headers, body = self.responses.pop(0)
         assert headers is not None
         return MockHTTPResponse(headers, body)
@@ -1470,6 +1473,11 @@ class MockHTTPResponse:
         self.headers = message
         reader = io.BytesIO(body)
         self.read = reader.read
+        self.close = reader.close
+        self._reader = reader
+
+    def __iter__(self) -> typing.Iterator[bytes]:
+        return iter(self._reader)
 
 
 class MockTime:
@@ -3349,6 +3357,74 @@ bad path\r
         ]
 
 
+class TestLogs:
+    @staticmethod
+    def _response(entries: list[dict[str, str]]) -> tuple[dict[str, str], bytes]:
+        body = b''.join(json.dumps(entry).encode('utf-8') + b'\n' for entry in entries)
+        return {'Content-Type': 'application/x-ndjson'}, body
+
+    def test_get_logs(self, client: MockClient):
+        headers, body = self._response([
+            {'time': '2023-12-07T17:01:02.123456Z', 'service': 'svc1', 'message': 'started'},
+            {'time': '2023-12-07T17:01:03.456Z', 'service': 'svc2', 'message': 'listening'},
+        ])
+        # A blank line is not a log entry, and is skipped rather than an error.
+        client.responses.append((headers, body + b'\n'))
+
+        logs = client.get_logs()
+
+        assert logs == [
+            pebble.LogEntry(
+                time=datetime_utc(2023, 12, 7, 17, 1, 2, 123456),
+                service='svc1',
+                message='started',
+            ),
+            pebble.LogEntry(
+                time=datetime_utc(2023, 12, 7, 17, 1, 3, 456000),
+                service='svc2',
+                message='listening',
+            ),
+        ]
+        assert client.requests == [
+            ('GET', '/v1/logs', {'n': 30}, None, None),
+        ]
+        assert client.raw_timeouts == [pebble._not_provided]
+
+    def test_get_logs_filters(self, client: MockClient):
+        client.responses.append(self._response([]))
+
+        logs = client.get_logs(['svc1', 'svc2'], n=-1)
+
+        assert logs == []
+        assert client.requests == [
+            ('GET', '/v1/logs', {'n': -1, 'services': ['svc1', 'svc2']}, None, None),
+        ]
+
+    def test_follow_logs(self, client: MockClient):
+        client.responses.append(
+            self._response([
+                {'time': '2023-12-07T17:01:02.123456Z', 'service': 'svc1', 'message': 'started'},
+                {'time': '2023-12-07T17:01:03.456Z', 'service': 'svc1', 'message': 'exiting'},
+            ])
+        )
+
+        logs = client.follow_logs(['svc1'])
+
+        # The request is made (and the response checked) before iteration.
+        assert client.requests == [
+            ('GET', '/v1/logs', {'n': 0, 'follow': 'true', 'services': ['svc1']}, None, None),
+        ]
+        # Following must not time out while the services are quiet.
+        assert client.raw_timeouts == [None]
+        assert [entry.message for entry in logs] == ['started', 'exiting']
+
+    def test_get_logs_wrong_content_type(self, client: MockClient):
+        client.responses.append(({'Content-Type': 'application/json'}, b'{}'))
+
+        with pytest.raises(pebble.ProtocolError):
+            client.get_logs()
+
+
 class TestSocketClient:
     def test_socket_not_found(self):
         client = pebble.Client(socket_path='does_not_exist')
@@ -3374,6 +3450,38 @@ class TestSocketClient:
             assert excinfo.value.code == 400
             assert excinfo.value.status == 'Bad Request'
             assert excinfo.value.message == 'service "bar" does not exist'
+
+        finally:
+            shutdown()
+
+    def test_real_client_logs(self):
+        shutdown, socket_path = fake_pebble.start_server()
+
+        try:
+            client = pebble.Client(socket_path=socket_path)
+
+            entries = client.get_logs()
+            assert entries == [
+                pebble.LogEntry(
+                    time=datetime_utc(2021, 5, 3, 3, 44, 59, 123000),
+                    service='foo',
+                    message='hello',
+                ),
+                pebble.LogEntry(
+                    time=datetime_utc(2021, 5, 3, 3, 45, 0, 456000),
+                    service='bar',
+                    message='world',
+                ),
+            ]
+
+            entries = client.get_logs(['bar'])
+            assert [entry.message for entry in entries] == ['world']
+
+            entries = client.get_logs(n=1)
+            assert [entry.message for entry in entries] == ['world']
+
+            entries = client.get_logs(n=0)
+            assert entries == []
 
         finally:
             shutdown()

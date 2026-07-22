@@ -1190,6 +1190,43 @@ class CheckInfo:
 
 
 @dataclasses.dataclass(frozen=True, init=False)
+class LogEntry:
+    """A log entry in the buffer Pebble keeps for each service's output.
+
+    These are returned by :meth:`ops.Container.get_logs` and the
+    :meth:`ops.pebble.Client.get_logs` and :meth:`ops.pebble.Client.follow_logs`
+    methods, as :class:`ops.pebble.LogEntry` objects.
+    """
+
+    service: str
+    """Name of the service that wrote the log message."""
+
+    message: str
+    """The log message itself, without the trailing newline."""
+
+    time: datetime.datetime
+    """Time that the service wrote the log message."""
+
+    def __init__(
+        self,
+        service: str,
+        message: str,
+        *,
+        time: datetime.datetime | None = None,
+    ):
+        object.__setattr__(self, 'service', service)
+        object.__setattr__(self, 'message', message)
+        object.__setattr__(self, 'time', time if time is not None else _now_utc())
+
+    def _to_ops(self) -> pebble.LogEntry:
+        return pebble.LogEntry(
+            time=self.time,
+            service=self.service,
+            message=self.message,
+        )
+
+
+@dataclasses.dataclass(frozen=True, init=False)
 class Container:
     """A Kubernetes container where a charm's workload runs."""
 
@@ -1269,6 +1306,15 @@ class Container:
     check_infos: frozenset[CheckInfo]
     """All Pebble health checks that have been added to the container."""
 
+    service_logs: Sequence[LogEntry]
+    """Log entries in the buffer Pebble keeps for each service's output.
+
+    These are what the charm will get back from :meth:`ops.Container.get_logs`
+    and the :meth:`ops.pebble.Client.get_logs` and
+    :meth:`ops.pebble.Client.follow_logs` methods. Provide them oldest first;
+    entries with equal times keep the order given here.
+    """
+
     def __init__(
         self,
         name: str,
@@ -1285,6 +1331,7 @@ class Container:
         execs: Iterable[Exec] = (),
         notices: Iterable[Notice] = (),
         check_infos: Iterable[CheckInfo] = (),
+        service_logs: Iterable[LogEntry] = (),
     ):
         # Juju passes the charm container name verbatim through to Kubernetes,
         # so the Kubernetes naming rules (RFC 1123 DNS label) apply.
@@ -1308,6 +1355,7 @@ class Container:
         # Stored as list for backwards compatibility.
         object.__setattr__(self, 'notices', list(notices))
         object.__setattr__(self, 'check_infos', frozenset(check_infos))
+        object.__setattr__(self, 'service_logs', tuple(service_logs))
 
     def __hash__(self) -> int:
         return hash(self.name)

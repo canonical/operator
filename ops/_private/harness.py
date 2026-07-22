@@ -33,7 +33,7 @@ import tempfile
 import typing
 import uuid
 import warnings
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from io import BytesIO, IOBase, StringIO
 from textwrap import dedent
@@ -3565,6 +3565,16 @@ class _TestingPebbleClient:
             info = pebble.ServiceInfo(name, startup=startup, current=pebble.ServiceStatus(status))
             infos.append(info)
         return infos
+
+    def get_logs(
+        self, services: Iterable[str] | None = None, *, n: int = 30
+    ) -> list[pebble.LogEntry]:
+        raise NotImplementedError
+
+    def follow_logs(
+        self, services: Iterable[str] | None = None, *, n: int = 0
+    ) -> Generator[pebble.LogEntry, None, None]:
+        raise NotImplementedError
 
     @staticmethod
     def _check_absolute_path(path: str):
