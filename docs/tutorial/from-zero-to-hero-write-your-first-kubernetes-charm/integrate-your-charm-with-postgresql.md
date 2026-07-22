@@ -270,7 +270,7 @@ When Pebble starts or restarts the service:
 * If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
 
 ```{note}
-The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service environment has variables from both layers (because our constructed layer sets `override` to `merge`).
+The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service has environment variables from both layers (because our constructed layer sets `override` to `merge`).
 ```
 
 We'll now make sure that the unit status is set correctly.
@@ -546,7 +546,7 @@ INFO     jubilant.wait:_juju.py:1491 wait: status changed:
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
 + .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
-+ .apps['fastapi-demo'].version = '1.0.4'
++ .apps['fastapi-demo'].version = '2.1.0'
 PASSED
 ```
 

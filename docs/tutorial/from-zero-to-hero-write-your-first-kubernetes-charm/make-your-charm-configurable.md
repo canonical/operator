@@ -159,7 +159,7 @@ def _replan_workload(self) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-When the config is loaded as part of constructing the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+If the loaded config is invalid (in our case, if the port is set to 22), we set the status of the unit to blocked. This lets the Juju user know that they need to take action.
 
 As you may have noticed, `_replan_workload` looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Update the `_on_demo_server_pebble_ready` method to call `_replan_workload` instead:
 
@@ -246,7 +246,7 @@ expected_plan.services["fastapi"].override = "merge"
 
 This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.
 
-Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
+Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
 
 ```python
 def test_config_changed(mock_version):
