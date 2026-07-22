@@ -50,10 +50,12 @@ jobs:
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}
+          uv lock
           tox -e lint
       - name: Run unit tests
         run: |
           cd ${{ matrix.dir }}
+          uv lock
           tox -e unit
       - name: Write mypy-requirements.txt
         shell: uv run --script --no-project {0}

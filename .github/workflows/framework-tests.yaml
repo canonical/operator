@@ -21,10 +21,10 @@ jobs:
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       - run: uv tool install tox --with tox-uv
       - name: Run linting and static checks
-        run: tox -e lint
+        run: uv lock && tox -e lint
 
       - name: Run tracing linter and static checks
-        run: cd tracing && tox -e lint
+        run: cd tracing && uv lock && tox -e lint
 
   test:
     runs-on: ${{ matrix.os }}
@@ -44,10 +44,10 @@ jobs:
       - run: uv python install ${{ matrix.python-version }}
 
       - name: Run unit tests
-        run: tox -e py${{ matrix.python-version }}-unit
+        run: uv lock && tox -e py${{ matrix.python-version }}-unit
 
       - name: Run tracing unit tests
-        run: cd tracing && tox -e py${{ matrix.python-version }}-unit
+        run: cd tracing && uv lock && tox -e py${{ matrix.python-version }}-unit
 
   test-real-pebble:
     runs-on: ${{ matrix.os }}
@@ -81,7 +81,7 @@ jobs:
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
       - name: Run Real pebble tests
-        run: tox -e py${{ matrix.python-version }}-pebble
+        run: uv lock && tox -e py${{ matrix.python-version }}-pebble
 
   pip-install:
     runs-on: ${{ matrix.os }}
