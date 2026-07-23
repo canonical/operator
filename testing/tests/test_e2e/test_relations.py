@@ -186,6 +186,7 @@ def test_relation_set_single_add_del_change():
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
     assert rel_out.local_unit_data == {
+        **_DEFAULT_JUJU_DATABAG,
         'to-ignore-key': 'to-ignore-val',
         'to-change-key': 'to-change-val-new',
         'new-key': 'new-val',
@@ -319,7 +320,7 @@ def test_relation_set_bulk_update(
     rel_in = PeerRelation(endpoint=relation_name, local_unit_data=original_data)
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
-    assert rel_out.local_unit_data == result_data
+    assert rel_out.local_unit_data == {**_DEFAULT_JUJU_DATABAG, **result_data}
 
 
 @pytest.mark.parametrize(
@@ -472,19 +473,116 @@ def test_relation_events_no_attrs(
 
 def test_relation_default_unit_data_regular():
     relation = Relation('baz')
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
-    assert relation.remote_units_data == {0: _DEFAULT_JUJU_DATABAG}
+    assert relation.local_unit_data == {}
+    assert relation.remote_units_data == {0: {}}
 
 
 def test_relation_default_unit_data_sub():
     relation = SubordinateRelation('baz')
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
-    assert relation.remote_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == {}
+    assert relation.remote_unit_data == {}
 
 
 def test_relation_default_unit_data_peer():
     relation = PeerRelation('baz')
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == {}
+
+
+@pytest.mark.parametrize(
+    'juju_version,expect_private_address',
+    [('3.6.14', True), ('4.0.0', False), ('4.1.0', False)],
+)
+def test_juju_default_databag_injected_at_exec(juju_version: str, expect_private_address: bool):
+    """Scenario mirrors Juju: default databag keys are injected at exec time.
+
+    On Juju 3, `private-address`, `egress-subnets`, and `ingress-address` are
+    all populated; on Juju 4, `private-address` is not.
+    """
+    ctx = Context(
+        Charm,
+        meta={
+            'name': 'foo',
+            'requires': {'foo': {'interface': 'foo'}},
+            'peers': {'p': {'interface': 'p'}},
+            'provides': {'sub': {'interface': 'sub', 'scope': 'container'}},
+        },
+        juju_version=juju_version,
+    )
+    relation = Relation('foo')
+    peer = PeerRelation('p')
+    sub = SubordinateRelation('sub')
+    state_in = State(leader=True, relations={relation, peer, sub})
+
+    state_out = ctx.run(ctx.on.start(), state_in)
+
+    rel = state_out.get_relation(relation.id)
+    peer_rel = state_out.get_relation(peer.id)
+    sub_rel = state_out.get_relation(sub.id)
+    assert isinstance(rel, Relation)
+    assert isinstance(peer_rel, PeerRelation)
+    assert isinstance(sub_rel, SubordinateRelation)
+    for databag in (
+        rel.local_unit_data,
+        rel.remote_units_data[0],
+        peer_rel.local_unit_data,
+        sub_rel.local_unit_data,
+        sub_rel.remote_unit_data,
+    ):
+        assert databag['egress-subnets'] == '192.0.2.0'
+        assert databag['ingress-address'] == '192.0.2.0'
+        assert ('private-address' in databag) is expect_private_address
+
+
+def test_juju_default_databag_preserves_explicit_values():
+    """Explicit user-set values must not be overwritten by injection."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+        juju_version='3.6.14',
+    )
+    relation = Relation(
+        'foo',
+        local_unit_data={'private-address': '10.0.0.5', 'extra': 'kept'},
+    )
+    state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
+
+    rel = state_out.get_relation(relation.id)
+    assert isinstance(rel, Relation)
+    assert rel.local_unit_data['private-address'] == '10.0.0.5'
+    assert rel.local_unit_data['extra'] == 'kept'
+    # Missing defaults are still filled in.
+    assert rel.local_unit_data['egress-subnets'] == '192.0.2.0'
+    assert rel.local_unit_data['ingress-address'] == '192.0.2.0'
+
+
+def test_juju_default_databag_does_not_touch_input_state():
+    """Injection happens on the output state; the input State stays untouched."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+    )
+    relation = Relation('foo')
+    state_in = State(leader=True, relations={relation})
+
+    ctx.run(ctx.on.start(), state_in)
+
+    # The Relation the caller still holds is unchanged.
+    assert relation.local_unit_data == {}
+    assert relation.remote_units_data == {0: {}}
+
+
+def test_juju_default_databag_not_added_to_app_databags():
+    """App databags are not touched — Juju only sets these on unit databags."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+    )
+    relation = Relation('foo')
+    state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
+    rel = state_out.get_relation(relation.id)
+    assert isinstance(rel, Relation)
+    assert rel.local_app_data == {}
+    assert rel.remote_app_data == {}
 
 
 @pytest.mark.parametrize('evt_name', ('broken', 'created'))
@@ -692,11 +790,11 @@ def test_relation_default_values():
     assert relation.endpoint == endpoint
     assert relation.interface == interface
     assert relation.local_app_data == {}
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == {}
     assert relation.remote_app_name == 'remote'
     assert relation.limit == 1
     assert relation.remote_app_data == {}
-    assert relation.remote_units_data == {0: _DEFAULT_JUJU_DATABAG}
+    assert relation.remote_units_data == {0: {}}
 
 
 def test_subordinate_relation_default_values():
@@ -708,11 +806,11 @@ def test_subordinate_relation_default_values():
     assert relation.endpoint == endpoint
     assert relation.interface == interface
     assert relation.local_app_data == {}
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == {}
     assert relation.remote_app_name == 'remote'
     assert relation.remote_unit_id == 0
     assert relation.remote_app_data == {}
-    assert relation.remote_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.remote_unit_data == {}
 
 
 def test_peer_relation_default_values():
@@ -724,7 +822,7 @@ def test_peer_relation_default_values():
     assert relation.endpoint == endpoint
     assert relation.interface == interface
     assert relation.local_app_data == {}
-    assert relation.local_unit_data == _DEFAULT_JUJU_DATABAG
+    assert relation.local_unit_data == {}
     assert relation.peers_data == {}
 
 

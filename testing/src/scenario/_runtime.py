@@ -28,6 +28,7 @@ from .state import (
     PeerRelation,
     Relation,
     SubordinateRelation,
+    _inject_juju_default_databag_keys,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -313,6 +314,9 @@ class Runtime(Generic[CharmType]):
 
         # we make a copy to avoid mutating the input state
         output_state = copy.deepcopy(state)
+        # Mirror Juju: populate the auto-managed default keys in every
+        # relation unit databag before the charm observes them.
+        _inject_juju_default_databag_keys(output_state, self._juju_version)
 
         logger.info(' - generating virtual charm root')
         with self._virtual_charm_root() as temporary_charm_root:

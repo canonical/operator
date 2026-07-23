@@ -184,7 +184,7 @@ def test_relation_get(mycharm: type[CharmBase]):
             if unit.name == 'remote/1':
                 assert rel.data[unit]['e'] == 'f'
             else:
-                assert not rel.data[unit]
+                assert dict(rel.data[unit]) == _DEFAULT_JUJU_DATABAG
 
     state = State(
         relations={
@@ -269,6 +269,7 @@ def test_relation_set(mycharm: type[CharmBase]):
             relation,
             local_app_data={'a': 'b'},
             local_unit_data={'c': 'd', **_DEFAULT_JUJU_DATABAG},
+            remote_units_data={1: _DEFAULT_JUJU_DATABAG, 4: _DEFAULT_JUJU_DATABAG},
         )
     )
     assert out.get_relation(relation.id).local_app_data == {'a': 'b'}
