@@ -5,9 +5,7 @@
 version: 2
 
 updates:
-  # ===================================================================
-  # GitHub Actions: routine lane (monthly, single grouped PR)
-  # ===================================================================
+  # GitHub Actions: monthly, single grouped PR.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -24,9 +22,24 @@ updates:
         patterns:
           - "*"
 
-  # ===================================================================
-  # Python (uv), root: routine lane (monthly, grouped along three seams)
-  # ===================================================================
+  # pre-commit hooks: monthly, single grouped PR.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 100
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit:
+        patterns:
+          - "*"
+
+  # Python (uv), root: monthly, grouped into seams.
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -74,9 +87,7 @@ updates:
           - "minor"
           - "patch"
 
-  # ===================================================================
-  # Python (uv), examples/httpbin-demo: routine lane (same shape as root)
-  # ===================================================================
+  # Python (uv), examples/httpbin-demo: same shape as root.
   - package-ecosystem: "uv"
     directory: "/examples/httpbin-demo"
     schedule:
