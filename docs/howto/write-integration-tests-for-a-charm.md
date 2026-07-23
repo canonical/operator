@@ -265,26 +265,6 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-### Test a relation
-
-To test a relation between two applications, integrate them through
-the model. Both applications have to be deployed beforehand.
-
-```python
-def test_my_integration(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    # Both applications have to be deployed at this point.
-    # This could be done above in the current test or in a previous one.
-    juju.integrate('your-app:endpoint1', 'another:relation_name_2')
-    juju.wait(jubilant.all_active)
-    # check any assertion here
-    ...
-```
-
-> See more: [](jubilant.Juju.integrate)
-
-This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available. If all your tests depend on the same charm being deployed, you could make `charm` an `autouse` fixture.
-
 ### Test a configuration
 
 > See first: {ref}`manage-configuration`
