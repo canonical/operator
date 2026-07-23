@@ -184,10 +184,12 @@ def test_backup_action_failed():
 To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
-def test_logger(juju: jubilant.Juju):
+def test_logger(charm: pathlib.Path, juju: jubilant.Juju):
     action = juju.run(
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
     )
     assert action.status == 'completed'
     assert action.results['snapshot-size'].isdigit()
 ```
+
+> See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run),

@@ -265,24 +265,6 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-### Test an action
-
-> See also: {external+juju:ref}`Action <action>`
-
-You can execute an action on a unit and get its results.
-
-```python
-def test_run_action(charm: pathlib.Path, juju: jubilant.Juju):
-    action_register_user = juju.run(
-        'your-app/0', 'register-user', {'username': 'ubuntu'}
-    )
-    assert action_register_user.status == 'completed'
-    password = action_register_user.results['user-password']
-    # We could for example check here that we can login with the new user
-```
-
-> See also: [](jubilant.Juju.run)
-
 ### Interact with the workload
 
 To interact with the workload, you need to have access to it. This is dependent on many aspects of your application, environment and network topology.
