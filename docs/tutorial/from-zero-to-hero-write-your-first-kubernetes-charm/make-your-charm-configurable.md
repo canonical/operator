@@ -115,7 +115,7 @@ def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
     return ops.pebble.Layer(layer)
 ```
 
-This method defines a service with `override` set to `merge`, which means that unspecified properties should match the existing service definition.
+This method defines a service with `override` set to `merge`, which means that unspecified properties should be copied from the existing service definition.
 
 Next, create the `_replan_workload` method, as below. This method will add our constructed layer to the workload container and restart the `fastapi` service if the service definition has changed.
 
