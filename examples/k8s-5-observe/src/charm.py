@@ -67,7 +67,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         super().__init__(framework)
         # See 'containers' in charmcraft.yaml.
         self.container = self.unit.get_container("demo-server")
-        self.pebble_service_name = "fastapi-service"
+        self.pebble_service_name = "fastapi"
         framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
         framework.observe(self.on.config_changed, self._on_config_changed)
         # Report the unit status after each event.
@@ -200,30 +200,20 @@ class FastAPIDemoCharm(ops.CharmBase):
         version = fastapi_demo.get_version(config.server_port)
         self.unit.set_workload_version(version)
 
-    def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
+    def _get_pebble_layer(self, port: int, env: dict[str, str]) -> ops.pebble.Layer:
         """Pebble layer for the FastAPI demo services."""
-        command = " ".join(
-            [
-                "uvicorn",
-                "api_demo_server.app:app",
-                "--host=0.0.0.0",
-                f"--port={port}",
-            ]
-        )
-        pebble_layer: ops.pebble.LayerDict = {
+        cmd = f"/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port {port}"
+        service: ops.pebble.ServiceDict = {
+            "override": "merge",
+            "command": cmd,
+            "environment": env,
+        }
+        layer: ops.pebble.LayerDict = {
             "summary": "FastAPI demo service",
             "description": "pebble config layer for FastAPI demo server",
-            "services": {
-                self.pebble_service_name: {
-                    "override": "replace",
-                    "summary": "fastapi demo",
-                    "command": command,
-                    "startup": "enabled",
-                    "environment": environment,
-                }
-            },
+            "services": {self.pebble_service_name: service},
         }
-        return ops.pebble.Layer(pebble_layer)
+        return ops.pebble.Layer(layer)
 
     def get_app_environment(self) -> dict[str, str]:
         """Return a dictionary of environment variables for the application."""

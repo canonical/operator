@@ -87,14 +87,37 @@ We'll define `_replan_workload` shortly.
 A charm does not know which configuration option has been changed. Thus, make sure to validate all the values. This is especially important since multiple values can be changed in one call. Using a config class simplifies this, as all validation should be done when the config object is created.
 ```
 
-In the `__init__` function, add a new attribute to define a container object for your workload:
+In the `__init__` function, add attributes for the workload container and the name of the application service in the workload container:
 
 ```python
 # See 'containers' in charmcraft.yaml.
 self.container = self.unit.get_container("demo-server")
+self.pebble_service_name = "fastapi"
 ```
 
-Create a new method, as below. This method will get the current Pebble layer configuration and compare the new and the existing service definitions -- if they differ, it will update the layer and restart the service.
+As we saw in the previous chapter, the `fastapi` service exposes the app on port 8000. To be able to configure the port, our charm needs to add a Pebble layer that overrides the definition of the `fastapi` service.
+
+Create a method that constructs the Pebble layer:
+
+```python
+def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
+    """Pebble layer for the FastAPI demo services."""
+    cmd = f"/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port {port}"
+    service: ops.pebble.ServiceDict = {
+        "override": "merge",
+        "command": cmd,
+    }
+    layer: ops.pebble.LayerDict = {
+        "summary": "FastAPI demo service",
+        "description": "pebble config layer for FastAPI demo server",
+        "services": {self.pebble_service_name: service},
+    }
+    return ops.pebble.Layer(layer)
+```
+
+This method defines a service with `override` set to `merge`, which means that unspecified properties should be copied from the existing service definition.
+
+Next, create the `_replan_workload` method, as below. This method will add our constructed layer to the workload container and restart the `fastapi` service if the service definition has changed.
 
 ```python
 def _replan_workload(self) -> None:
@@ -136,37 +159,9 @@ def _replan_workload(self) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-When the config is loaded as part of creating the Pebble layer, if the config is invalid (in our case, if the port is set to 22), then a `ValueError` will be raised. The `_replan_workload` method handles that by logging the error and setting the status of the unit to blocked, letting the Juju user know that they need to take action.
+If the loaded config is invalid (in our case, if the port is set to 22), we set the status of the unit to blocked. This lets the Juju user know that they need to take action.
 
-Now, crucially, update the `_get_pebble_layer` method to make the layer definition dynamic, as shown below. This will replace the static port `8000` with the port passed to the method.
-
-```python
-def _get_pebble_layer(self, port: int) -> ops.pebble.Layer:
-    """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
-        "summary": "FastAPI demo service",
-        "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
-            }
-        },
-    }
-    return ops.pebble.Layer(pebble_layer)
-```
-
-As you may have noticed, the new `_replan_workload` method looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Remove the body of the `_on_demo_server_pebble_ready` method and replace it a call to `_replan_workload` like this:
+As you may have noticed, `_replan_workload` looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Update the `_on_demo_server_pebble_ready` method to call `_replan_workload` instead:
 
 ```python
 def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
@@ -181,7 +176,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 ```{tip}
@@ -206,7 +201,7 @@ Now, let's validate that the app is actually running and reachable on the new po
 curl 10.1.157.74:5000/version
 ```
 
-You should see JSON string with the version of the application: `{"version":"1.0.4"}`
+You should see JSON string with the version of the application: `{"version":"2.1.0"}`
 
 Let's also verify that our invalid port number check works by setting the port to `22` and then running `juju status`:
 
@@ -241,25 +236,32 @@ juju status
 
 Since we added a new feature to configure `server-port` and use it in the Pebble layer dynamically, we should write tests for the feature.
 
-First, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the container layer:
+First, in `tests/unit/test_charm.py`, find the `expected_plan = ` line then add a line that sets `override` for the `fastapi` service:
+
+```python
+# Expected plan after Pebble ready with default config.
+expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
+expected_plan.services["fastapi"].override = "merge"
+```
+
+This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.
+
+Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
 
 ```python
 def test_config_changed(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 8080},
         leader=True,
     )
     state_out = ctx.run(ctx.on.config_changed(), state_in)
-    command = (
-        state_out.get_container(container.name)
-        .layers["fastapi_demo"]
-        .services["fastapi-service"]
-        .command
-    )
-    assert "--port=8080" in command
+    command = state_out.get_container(container.name).plan.services["fastapi"].command
+    assert "--port 8080" in command
 ```
 
 We need the `mock_version` fixture because `_on_config_changed` calls `_replan_workload`, which gets the workload version using `fastapi_demo.get_version`. The fixture patches `get_version` to avoid making a real HTTP call, so that the unit test stays deterministic.
@@ -269,7 +271,9 @@ In `_on_config_changed`, we specifically don't allow port 22 to be used. If port
 ```python
 def test_config_changed_invalid_port(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         config={"server-port": 22},
