@@ -265,24 +265,6 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-### Test a configuration
-
-> See first: {ref}`manage-configuration`
-
-You can set a configuration option in your application and check its results.
-
-```python
-def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    juju.config('your-app', {'server_name': 'invalid_name'})
-    # In this case, when setting server_name to "invalid_name"
-    # we could for example expect a blocked status.
-    juju.wait(jubilant.all_blocked, timeout=60)
-    ...
-```
-
-> See also: [](jubilant.Juju.config)
-
 ### Test an action
 
 > See also: {external+juju:ref}`Action <action>`

@@ -110,6 +110,24 @@ def test_short_wiki_name():
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
 ```
 
+### Write integration tests
+
+> See first: {ref}`write-integration-tests-for-a-charm`
+
+You can set a configuration option in your application and check its results.
+
+```python
+def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
+    ...
+    juju.config('your-app', {'name': 'invalid name has spaces'})
+    # In this case, when setting name to an invalid name
+    # we could for example expect a blocked status.
+    juju.wait(jubilant.all_blocked, timeout=60)
+    ...
+```
+
+> See also: [](jubilant.Juju.config)
+
 ### Manually test
 
 To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `name` key defined above, you could try:
