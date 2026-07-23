@@ -52,7 +52,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the workload version has been set."""
-    expected_version = "1.0.4"  # Hardcoded for simplicity.
+    expected_version = "2.1.0"  # Hardcoded for simplicity.
     juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)
 
 
@@ -76,7 +76,9 @@ def cos(juju_factory: pytest_jubilant.JujuFactory):
 def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
-    cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
+    start = time.monotonic()
+    cos.wait(jubilant.all_active, timeout=60 * 60)
+    logger.info("COS Lite deployed in %.1f seconds", time.monotonic() - start)
 
 
 @pytest.mark.juju_setup

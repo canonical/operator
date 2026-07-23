@@ -1,0 +1,45 @@
+name: Example Charm Integration
+
+on:
+  workflow_call:
+    inputs:
+      dir:
+        type: string
+        required: true
+        description: The example charm directory to test (e.g., examples/k8s-1-minimal).
+      preset:
+        type: string
+        required: true
+        description: The Concierge preset to use (e.g., microk8s, machine).
+
+permissions: {}
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - name: Set up tox and tox-uv
+        run: uv tool install tox --with tox-uv
+      - name: Install Concierge
+        run: sudo snap install --classic concierge
+      - name: Prepare for deploying charms
+        run: sudo concierge prepare -p ${INPUTS_PRESET}
+        env:
+          INPUTS_PRESET: ${{ inputs.preset }}
+      - name: Fetch any charmlibs
+        working-directory: ${{ inputs.dir }}
+        run: |
+          if grep -Eq "^charm-libs:" charmcraft.yaml; then
+            charmcraft fetch-libs
+          fi
+      - name: Pack charm
+        working-directory: ${{ inputs.dir }}
+        run: charmcraft pack
+      - name: Run integration tests
+        working-directory: ${{ inputs.dir }}
+        run: tox -e integration

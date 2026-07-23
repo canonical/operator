@@ -31,16 +31,13 @@ class FastAPIDemoCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework) -> None:
         super().__init__(framework)
-        self.pebble_service_name = "fastapi-service"
         framework.observe(self.on["demo-server"].pebble_ready, self._on_demo_server_pebble_ready)
 
     def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
         """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        # Add initial Pebble config layer using the Pebble API
-        container.add_layer("fastapi_demo", self._get_pebble_layer(), combine=True)
-        # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
+        # Start the service defined by the Pebble layer in the application image.
         container.replan()
         # Set the workload version of this charm.
         version = fastapi_demo.get_version(port=8000)
@@ -48,30 +45,6 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/
         self.unit.status = ops.ActiveStatus()
-
-    def _get_pebble_layer(self) -> ops.pebble.Layer:
-        """Pebble layer for the FastAPI demo services."""
-        command = " ".join(
-            [
-                "uvicorn",
-                "api_demo_server.app:app",
-                "--host=0.0.0.0",
-                "--port=8000",
-            ]
-        )
-        pebble_layer: ops.pebble.LayerDict = {
-            "summary": "FastAPI demo service",
-            "description": "pebble config layer for FastAPI demo server",
-            "services": {
-                self.pebble_service_name: {
-                    "override": "replace",
-                    "summary": "fastapi demo",
-                    "command": command,
-                    "startup": "enabled",
-                }
-            },
-        }
-        return ops.pebble.Layer(pebble_layer)
 
 
 if __name__ == "__main__":  # pragma: nocover
