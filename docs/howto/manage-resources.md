@@ -123,3 +123,5 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 ```
 
 > See also: [](jubilant.Juju.deploy)
+
+> Examples of deploying with resources using Jubilant: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)

@@ -379,6 +379,9 @@ def test_active_with_another_app(charm: pathlib.Path, juju: jubilant.Juju):
 
 > See more: [](jubilant.Juju.integrate)
 
+<!-- valkey-operator example is probably too complicated -->
+> Examples for testing relations with Jubilant: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/clients/test_client_relation.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_provider_v1.py).
+
 This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available.
 
 (generate-tests-from-a-deployed-model)=

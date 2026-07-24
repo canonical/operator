@@ -130,6 +130,8 @@ def test_config_valid_name(juju: jubilant.Juju):
 
 > See also: [](jubilant.Juju.config)
 
+> Examples of changing configuration with Jubilant: [`kafka-k8s-operator` enables DEBUG log and check the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py#L170).
+
 ### Manually test
 
 To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `name` key defined above, you could try:
