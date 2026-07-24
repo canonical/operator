@@ -95,16 +95,11 @@ with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
 (manage-resources-integration-tests)=
 ### Write integration tests
 
+> See first: {ref}`write-integration-tests-for-a-charm`
+
 A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
 
-```python
-...
-resources = {'resource_name': 'localhost:32000/image_name:latest'}
-juju.deploy(charm, resources=resources)
-...
-```
-
-In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
+In `charmcraft.yaml`'s `resources` section, the `upstream-source` field is, by convention, a usable default image or file that can be used in testing:
 
 ```python
 import pathlib
@@ -123,7 +118,8 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
         name: res['upstream-source']
         for name, res in METADATA['resources'].items()
     }
-
     juju.deploy(charm, resources=resources)
     juju.wait(jubilant.all_active)
 ```
+
+> See also: [](jubilant.Juju.deploy)

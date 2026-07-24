@@ -117,13 +117,15 @@ def test_short_wiki_name():
 You can set a configuration option in your application and check its results.
 
 ```python
-def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
+def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config('your-app', {'name': 'invalid name has spaces'})
-    # In this case, when setting name to an invalid name
-    # we could for example expect a blocked status.
+    # A name with spaces should put the charm into blocked status.
     juju.wait(jubilant.all_blocked, timeout=60)
-    ...
+
+
+def test_config_valid_name(juju: jubilant.Juju):
+    juju.config('your-app', {'name': 'charming-wiki'})
+    juju.wait(jubilant.all_active)
 ```
 
 > See also: [](jubilant.Juju.config)
