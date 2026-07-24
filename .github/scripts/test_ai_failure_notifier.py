@@ -375,5 +375,156 @@ class MainFlowTests(unittest.TestCase):
         call_openrouter.assert_not_called()
 
 
+class GhCallShapeTests(unittest.TestCase):
+    """Pins the argv of each read-only gh call.
+
+    These mock only the `gh` subprocess boundary, not the functions under
+    test, so a wrong flag or a mis-quoted positional is visible here. The
+    MainFlowTests above patch out `locate_run_markers` and `search_candidates`
+    wholesale, which is why both shipped with argv bugs that 29 green tests
+    did not catch -- see the 2026-07-25 dev-box run against canonical/operator.
+    """
+
+    def _capture(self, stdout='[]'):
+        return mock.Mock(return_value=mock.Mock(returncode=0, stdout=stdout, stderr=''))
+
+    def test_search_issue_numbers_passes_repo_as_a_flag(self):
+        gh_calls = self._capture('[{"number": 2658}]')
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            numbers = afn.search_issue_numbers('canonical/operator', 'Example Charm Tests')
+        self.assertEqual(numbers, [2658])
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:2], ('search', 'issues'))
+        self.assertIn('--repo', args)
+        self.assertEqual(args[args.index('--repo') + 1], 'canonical/operator')
+        # The query is a bare positional -- no `repo:` prefix, no added quotes.
+        # `gh search issues` quotes each positional as one keyword, so folding
+        # the repo in produces `repo:"canonical/operator \"text\""`, which
+        # GitHub rejects with "Invalid search query".
+        self.assertIn('Example Charm Tests', args)
+        for arg in args:
+            self.assertNotIn('repo:canonical/operator', arg)
+
+    def test_search_candidates_passes_state_and_search_flags(self):
+        gh_calls = self._capture('[]')
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            afn.search_candidates('canonical/operator', 'Example Charm Tests')
+        states = []
+        for call in gh_calls.call_args_list:
+            args = call.args
+            self.assertEqual(args[:2], ('issue', 'list'))
+            self.assertEqual(args[args.index('--repo') + 1], 'canonical/operator')
+            self.assertEqual(args[args.index('--search') + 1], '"Example Charm Tests"')
+            states.append(args[args.index('--state') + 1])
+        self.assertEqual(states, ['open', 'closed'])
+
+    def test_fetch_job_log_uses_the_rest_logs_endpoint(self):
+        gh_calls = self._capture('2026-07-21T16:17:04Z some log line\n')
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            log = afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        self.assertIn('some log line', log)
+        self.assertEqual(
+            gh_calls.call_args.args,
+            ('api', 'repos/canonical/operator/actions/jobs/88693036489/logs'),
+        )
+
+    def test_fetch_job_log_reports_an_empty_log_instead_of_swallowing_it(self):
+        gh_calls = self._capture('')
+        with (
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary') as summary,
+        ):
+            log = afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        self.assertEqual(log, '')
+        summary.assert_called_once()
+        self.assertIn('no log text', summary.call_args.args[0])
+
+    def test_fetch_failed_jobs_requests_the_jobs_field(self):
+        gh_calls = self._capture(
+            '{"jobs": [{"databaseId": 1, "name": "j", "conclusion": "failure",'
+            ' "steps": [{"name": "s", "conclusion": "failure"}]}]}'
+        )
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            jobs = afn.fetch_failed_jobs('canonical/operator', '29847889218')
+        self.assertEqual(jobs, [{'id': 1, 'name': 'j', 'failed_step': 's'}])
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:3], ('run', 'view', '29847889218'))
+        self.assertEqual(args[args.index('--json') + 1], 'jobs')
+
+    def test_existing_labels_requests_the_name_field(self):
+        gh_calls = self._capture('[{"name": "tests"}, {"name": "docs"}]')
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            labels = afn.existing_labels('canonical/operator')
+        self.assertEqual(labels, {'tests', 'docs'})
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:2], ('label', 'list'))
+        self.assertEqual(args[args.index('--json') + 1], 'name')
+
+
+class MainDegradationTests(unittest.TestCase):
+    """main() degrades through its own fallbacks when a gh search fails.
+
+    Without these, a search failure raises out of main(), kills the enrich
+    job, and hands every run to the workflow-level plain-fallback -- so
+    enrichment silently never happens and the job still looks healthy.
+    """
+
+    def setUp(self):
+        self.env = {
+            'REPO': 'canonical/operator',
+            'RUN_ID': '28141163589',
+            'WORKFLOW_NAME': 'Broad Charm Compatibility Tests',
+            'RUN_URL': 'https://github.com/canonical/operator/actions/runs/28141163589',
+        }
+
+    def test_marker_lookup_failure_does_not_crash_main(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(
+                returncode=0, stdout='https://github.com/canonical/operator/issues/9999', stderr=''
+            )
+        )
+        with (
+            mock.patch.dict('os.environ', self.env, clear=True),
+            mock.patch.object(afn, 'locate_run_markers', side_effect=RuntimeError('boom')),
+            mock.patch.object(afn, 'fetch_failed_jobs', return_value=[]),
+            mock.patch.object(afn, 'fetch_run_meta', return_value={'createdAt': ''}),
+            mock.patch.object(afn, 'existing_labels', return_value=set()),
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary') as summary,
+            mock.patch.object(afn, 'set_output') as set_output,
+        ):
+            rc = afn.main()
+        self.assertEqual(rc, 0)
+        set_output.assert_called_with('handled', 'true')
+        self.assertTrue(
+            any('Marker lookup failed' in c.args[0] for c in summary.call_args_list),
+            'the failure should be reported in the step summary',
+        )
+
+    def test_candidate_search_failure_proceeds_with_no_candidates(self):
+        gh_calls = mock.Mock(return_value=mock.Mock(returncode=0, stdout='', stderr=''))
+        env = dict(self.env, OPENROUTER_API_KEY='test-key')
+        with (
+            mock.patch.dict('os.environ', env, clear=True),
+            mock.patch.object(afn, 'locate_run_markers', return_value=(None, 'new', 4242)),
+            mock.patch.object(afn, 'fetch_failed_jobs', return_value=[]),
+            mock.patch.object(afn, 'fetch_run_meta', return_value={'createdAt': ''}),
+            mock.patch.object(afn, 'search_candidates', side_effect=RuntimeError('boom')),
+            mock.patch.object(afn, 'existing_labels', return_value=set()),
+            mock.patch.object(
+                afn, 'call_openrouter', return_value={'action': 'not-a-real-action'}
+            ),
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary') as summary,
+            mock.patch.object(afn, 'set_output'),
+        ):
+            rc = afn.main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(
+            any('Candidate search failed' in c.args[0] for c in summary.call_args_list),
+            'the failure should be reported in the step summary',
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -682,10 +682,20 @@ def fetch_failed_jobs(repo: str, run_id: str) -> list[dict]:
 
 
 def fetch_job_log(repo: str, run_id: str, job_id: int) -> str:
-    """Fetch one job's full log text."""
-    return gh(
-        'run', 'view', str(run_id), '--repo', repo, '--job', str(job_id), '--log', check=False
-    ).stdout
+    """Fetch one job's full log text.
+
+    Uses the REST logs endpoint rather than `gh run view --log`: the latter
+    exits 0 with empty stdout on some `gh` builds (reproduced on 2.45.0), which
+    silently degrades the extracted signature to nothing. An empty log here is
+    reported rather than swallowed.
+    """
+    result = gh('api', f'repos/{repo}/actions/jobs/{job_id}/logs', check=False)
+    if not result.stdout.strip():
+        write_step_summary(
+            f'Warning: no log text for job {job_id} of run {run_id} '
+            f'(gh exit {result.returncode}); signature will be based on the job name alone.'
+        )
+    return result.stdout
 
 
 def fetch_run_meta(repo: str, run_id: str) -> dict:
@@ -706,8 +716,16 @@ def fetch_run_meta(repo: str, run_id: str) -> dict:
 
 def search_issue_numbers(repo: str, query_text: str) -> list[int]:
     """Search issues (any state) in `repo` for `query_text`, return issue numbers."""
-    query = f'repo:{repo} "{query_text}"'
-    data = gh_json('search', 'issues', '--limit', '10', '--json', 'number', query) or []
+    # The repo must be passed as `--repo`, not folded into the positional query.
+    # `gh search issues` quotes each positional argument as a single search
+    # keyword, so `repo:owner/name "text"` becomes the literal keyword
+    # `repo:"owner/name \"text\""` and GitHub rejects it as an invalid query.
+    data = (
+        gh_json(
+            'search', 'issues', '--repo', repo, '--limit', '10', '--json', 'number', query_text
+        )
+        or []
+    )
     return [item['number'] for item in data]
 
 
@@ -874,7 +892,15 @@ def main() -> int:
     api_key = os.environ.get('OPENROUTER_API_KEY', '')
     model = os.environ.get('OPENROUTER_MODEL') or DEFAULT_MODEL
 
-    enriched_issue, origin_kind, origin_issue = locate_run_markers(repo, run_id)
+    try:
+        enriched_issue, origin_kind, origin_issue = locate_run_markers(repo, run_id)
+    except Exception as exc:  # search API rejection, rate limit, transient 5xx.
+        # The marker lookup is the first thing main() does, so an uncaught
+        # failure here takes out the whole enrich job and hands every run to
+        # the workflow-level plain-fallback -- losing enrichment silently
+        # rather than degrading through the script's own fallback path.
+        write_step_summary(f'Marker lookup failed ({exc}); treating this run as un-marked.')
+        enriched_issue, origin_kind, origin_issue = None, None, None
 
     if enriched_issue is not None:
         # Rung 0 (spike-step-3/FINDINGS.md): this run id was already fully
@@ -951,7 +977,11 @@ def main() -> int:
         set_output('handled', 'true')
         return 0
 
-    open_candidates, closed_candidates = search_candidates(repo, workflow_name)
+    try:
+        open_candidates, closed_candidates = search_candidates(repo, workflow_name)
+    except Exception as exc:  # as above: degrade to "no candidates", don't crash.
+        write_step_summary(f'Candidate search failed ({exc}); proceeding with no candidates.')
+        open_candidates, closed_candidates = [], []
     open_candidates = [c for c in open_candidates if c['number'] != origin_issue]
     from datetime import datetime as _dt
 
