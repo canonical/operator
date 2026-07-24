@@ -18,7 +18,33 @@ name: AI-enrich scheduled-failure notification
 # `open-issue-on-failure-if-scheduled` job calls notify-scheduled-failure.yaml
 # (grep .github/workflows/ for `notify-scheduled-failure` to check).
 
-on:
+# zizmor flags every `workflow_run` trigger as dangerous, because the usual
+# uses of it are: download an artifact from the triggering (potentially
+# fork-controlled) run and trust it, or check out
+# `github.event.workflow_run.head_sha` and execute it with this workflow's
+# secrets and write token. Neither happens here:
+#
+#   - no artifact is downloaded;
+#   - `actions/checkout` takes no `ref`, so it checks out `GITHUB_SHA`, which
+#     for `workflow_run` is the default branch tip, never the triggering run's
+#     ref, and it uses `persist-credentials: false`;
+#   - every `github.event.workflow_run.*` value reaches the script through
+#     `env:`, never interpolated into a `run:` block, so there is no template
+#     injection surface;
+#   - the jobs gate on `github.event.workflow_run.event == 'schedule'`, and a
+#     fork pull request produces `event == 'pull_request'`, so a fork cannot
+#     trigger this at all. Every run that reaches it originates from
+#     `schedule:` on the default branch.
+#
+# `workflow_run` is also not substitutable here: stage 1 is a *reusable*
+# workflow invoked via `workflow_call`, which gets no independent run for
+# `workflow_run` to subscribe to, so this subscribes to its callers instead.
+# The alternative is splicing an enrichment call into all seven callers, which
+# is what the two-stage design exists to avoid.
+#
+# NOTE: this is the first zizmor suppression in this repository -- flagged
+# deliberately for review rather than slipped in.
+on:  # zizmor: ignore[dangerous-triggers]
   workflow_run:
     workflows:
       - "Example Charm charmcraft test"
