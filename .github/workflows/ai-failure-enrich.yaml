@@ -1,0 +1,93 @@
+name: AI-enrich scheduled-failure notification
+
+# Stage 2 of the two-stage ai-failure-notifications design (see
+# canonical-work-queue's non-roadmap/ai-failure-notifications/PLAN.md,
+# "Where it lives"; not shipped in this repo). Stage 1 is
+# .github/workflows/notify-scheduled-failure.yaml, which always creates or
+# comments on a placeholder issue with no LLM involved. This workflow fires
+# after a scheduled-workflow caller of stage 1 completes, and tries to
+# rewrite whatever stage 1 produced into a triaged, deduplicated artefact.
+#
+# `workflow_run` cannot target notify-scheduled-failure.yaml directly --
+# reusable workflows invoked via `workflow_call` don't get an independent run
+# for `workflow_run` to subscribe to. Instead this targets the *callers* (the
+# scheduled workflows that `uses:` it); their overall conclusion is
+# `failure` whenever the job that triggered notify-scheduled-failure.yaml
+# failed, which is the same condition those callers gate the notifier call
+# on. Keep this list in sync with TRIGGERS.md / any workflow whose
+# `open-issue-on-failure-if-scheduled` job calls notify-scheduled-failure.yaml
+# (grep .github/workflows/ for `notify-scheduled-failure` to check).
+
+on:
+  workflow_run:
+    workflows:
+      - "Example Charm charmcraft test"
+      - "Example Charm Integration Tests"
+      - "ops Integration Tests"
+      - "ops Smoke Tests"
+      - "TIOBE Quality Checks"
+      - "Update Best Practices Doc"
+      - "Update Charm Pins"
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  enrich:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'schedule' }}
+    runs-on: ubuntu-latest
+    environment: llm
+    permissions:
+      issues: write
+    outputs:
+      handled: ${{ steps.enrich.outputs.handled }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - name: Extract signature, dedupe, ask the LLM, apply
+        id: enrich
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.event.workflow_run.repository.full_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          # llm environment secret/variable (PLAN.md Approach §6): each
+          # caller repo provisions its own OPENROUTER_API_KEY here. Absent
+          # key -> the script uses the plain fallback body without calling
+          # OpenRouter (see ai_failure_notifier.py main()).
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: uv run .github/scripts/ai_failure_notifier.py
+
+  # Unchanged from the original single-step notify-scheduled-failure.yaml
+  # body, preserved as a last-resort fallback: if the `enrich` job crashes
+  # outright (network fully down, `uv run` itself fails, an unhandled
+  # exception before any of the script's own internal fallbacks can run),
+  # this still guarantees a notification. `always()` plus checking
+  # `needs.enrich.outputs.handled` (rather than needs.enrich's own job
+  # status) means this fires both when the enrich job goes red AND when it
+  # succeeds without ever setting `handled=true`.
+  plain-fallback:
+    needs: [enrich]
+    if: >-
+      ${{ always() && github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'schedule' &&
+      needs.enrich.outputs.handled != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create issue on failure (plain fallback, unchanged from the original notifier)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          REPO: ${{ github.event.workflow_run.repository.full_name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
