@@ -70,6 +70,8 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 
 ## Test the feature
 
+### Write unit tests
+
 > See first: {ref}`write-unit-tests-for-a-charm`
 
 If your charm requires access to resources, you can make them available to it
@@ -88,4 +90,40 @@ resource = testing.Resource(name='foo', path='/path/to/resource.tar')
 with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')
     assert path == pathlib.Path('/path/to/resource.tar')
+```
+
+(manage-resources-integration-tests)=
+### Write integration tests
+
+A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
+
+```python
+...
+resources = {'resource_name': 'localhost:32000/image_name:latest'}
+juju.deploy(charm, resources=resources)
+...
+```
+
+In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
+
+```python
+import pathlib
+
+import jubilant
+import pytest
+import yaml
+
+
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
+
+
+@pytest.mark.juju_setup
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
+    resources = {
+        name: res['upstream-source']
+        for name, res in METADATA['resources'].items()
+    }
+
+    juju.deploy(charm, resources=resources)
+    juju.wait(jubilant.all_active)
 ```
