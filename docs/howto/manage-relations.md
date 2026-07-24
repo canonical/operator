@@ -14,11 +14,11 @@ To integrate with another charm, or with itself (to communicate with other units
 
 **If you're using an existing interface:**
 
-Make sure to consult [the `charm-relations-interfaces` repository](https://github.com/canonical/charm-relation-interfaces) for guidance about how to implement them correctly.
+Make sure to consult {external+charmlibs:doc}`how-to/design-relation-interfaces` for guidance about how to implement them correctly.
 
 **If you're defining a new interface:**
 
-Make sure to add your interface to [the `charm-relations-interfaces` repository](https://github.com/canonical/charm-relation-interfaces).
+Make sure to add your interface to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/python-package`.
 ```
 
 To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).
@@ -364,19 +364,25 @@ relation.remote_unit_name  # 'zookeeper/42'
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
+To verify that a charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
 
 ```python
 # This assumes that your integration tests already include the standard
 # build and deploy test.
 
 
-def test_active_with_another_app(juju: jubilant.Juju):
+def test_active_with_another_app(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy('another-app')
     juju.integrate('your-app:endpoint', 'another-app:endpoint')
-
     juju.wait(jubilant.all_active)
 ```
+
+> See more: [](jubilant.Juju.integrate)
+
+<!-- valkey-operator example is probably too complicated -->
+> Examples for testing relations with Jubilant: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/clients/test_client_relation.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_provider_v1.py).
+
+This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available.
 
 (generate-tests-from-a-deployed-model)=
 ### Generate tests from a deployed model

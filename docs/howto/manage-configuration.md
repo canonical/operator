@@ -110,6 +110,28 @@ def test_short_wiki_name():
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
 ```
 
+### Write integration tests
+
+> See first: {ref}`write-integration-tests-for-a-charm`
+
+You can set a configuration option in your application and check its results.
+
+```python
+def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
+    juju.config('your-app', {'name': 'invalid name has spaces'})
+    # A name with spaces should put the charm into blocked status.
+    juju.wait(jubilant.all_blocked, timeout=60)
+
+
+def test_config_valid_name(juju: jubilant.Juju):
+    juju.config('your-app', {'name': 'charming-wiki'})
+    juju.wait(jubilant.all_active)
+```
+
+> See also: [](jubilant.Juju.config)
+
+> Examples of changing configuration with Jubilant: [`kafka-k8s-operator` enables DEBUG log and check the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py#L170).
+
 ### Manually test
 
 To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `name` key defined above, you could try:

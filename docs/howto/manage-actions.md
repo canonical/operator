@@ -184,10 +184,14 @@ def test_backup_action_failed():
 To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
 ```python
-def test_logger(juju: jubilant.Juju):
+def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
     action = juju.run(
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
     )
     assert action.status == 'completed'
-    assert action.results['snapshot-size'].isdigit()
+    assert action.results['result'] == 'Stored snapshot in db-snapshot.tar.gz.'
 ```
+
+> See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run)
+
+> Examples: [`discourse-k8s` runs the create-user action and asserts on the result](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)

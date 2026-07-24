@@ -70,6 +70,8 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 
 ## Test the feature
 
+### Write unit tests
+
 > See first: {ref}`write-unit-tests-for-a-charm`
 
 If your charm requires access to resources, you can make them available to it
@@ -89,3 +91,37 @@ with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')
     assert path == pathlib.Path('/path/to/resource.tar')
 ```
+
+(manage-resources-integration-tests)=
+### Write integration tests
+
+> See first: {ref}`write-integration-tests-for-a-charm`
+
+A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
+
+In `charmcraft.yaml`'s `resources` section, the `upstream-source` field is, by convention, a usable default image or file that can be used in testing:
+
+```python
+import pathlib
+
+import jubilant
+import pytest
+import yaml
+
+
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
+
+
+@pytest.mark.juju_setup
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
+    resources = {
+        name: res['upstream-source']
+        for name, res in METADATA['resources'].items()
+    }
+    juju.deploy(charm, resources=resources)
+    juju.wait(jubilant.all_active)
+```
+
+> See also: [](jubilant.Juju.deploy)
+
+> Examples of deploying with resources using Jubilant: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)
