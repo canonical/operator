@@ -265,13 +265,6 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 ".github/patch-charm-deps.py" = [
     "S607",  # Starting a process with a partial executable path
 ]
-".github/scripts/ai_failure_notifier.py" = [
-    "S607",  # Starting a process with a partial executable path: intentionally calls `gh` by name.
-]
-".github/scripts/test_ai_failure_notifier.py" = [
-    # All documentation linting, matching the `test/*` treatment above.
-    "D",
-]
 "docs/custom_conf.py" = [
     "D100",  # Missing docstring in public module
     "D101",  # Missing docstring in public class

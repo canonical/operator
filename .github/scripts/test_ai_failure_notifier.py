@@ -23,11 +23,17 @@ Run with: uv run .github/scripts/test_ai_failure_notifier.py
 (or: python3 -m unittest .github.scripts.test_ai_failure_notifier -v)
 
 No network calls and no `gh` calls happen in this file -- OpenRouter and gh
-I/O are mocked. The fixture in testdata/run-28141163589.json is derived from
-a real corpus run's extracted signature (see the file's own `_source` note),
-used here as a self-test per step 5's task brief, not as new dedup-ladder
-calibration (that's spike-step-3/FINDINGS.md's job).
+I/O are mocked. FIXTURE below is the extracted signature, candidate issue and
+LLM envelope from a real failing scheduled run (28141163589, "Broad Charm
+Compatibility Tests", 2026-06-25); the `tail_excerpt` arrays are trimmed for
+size; `pytest_failures` and `traceback_top_error` are verbatim, since those are
+what the dedup and schema logic actually exercise.
 """
+
+
+# Test methods are self-describing; exempt the docstring rules here rather than in
+# pyproject.toml, mirroring how `test/*` is treated.
+# ruff: noqa: D101, D102, D205
 
 from __future__ import annotations
 
@@ -43,7 +49,170 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import ai_failure_notifier as afn
 
-FIXTURE = json.loads((Path(__file__).parent / 'testdata' / 'run-28141163589.json').read_text())
+FIXTURE = {
+    'signature': {
+        'run_id': '28141163589',
+        'workflow_name': 'Broad Charm Compatibility Tests',
+        'html_url': 'https://github.com/canonical/operator/actions/runs/28141163589',
+        'created_at': '2026-06-25T01:40:15Z',
+        'jobs': [
+            {
+                'job_id': 83338922280,
+                'job_name': 'charm-tests (canonical/charm-ubuntu, .)',
+                'failed_step': "Run the charm's unit tests",
+                'pytest_failures': [
+                    {
+                        'kind': 'ERROR',
+                        'test': 'tests/unit/test_charm.py::TestCharm::test_charm_ready',
+                        'error': 'PendingDeprecat...',
+                    },
+                    {
+                        'kind': 'ERROR',
+                        'test': 'tests/unit/test_charm.py::TestCharm::test_hostname',
+                        'error': 'PendingDeprecation...',
+                    },
+                    {
+                        'kind': 'ERROR',
+                        'test': 'tests/unit/test_charm.py::TestCharm::test_version',
+                        'error': 'PendingDeprecationW...',
+                    },
+                ],
+                'go_failures': [],
+                'traceback_top_error': 'ResourceWarning: '
+                'Implicitly cleaning up '
+                '<TemporaryDirectory '
+                "'/tmp/ops-harness-ruod78qd'>",
+                'tail_excerpt': [
+                    'pytest.PytestUnraisableExceptionWarning: '
+                    'Exception ignored in: '
+                    '<finalize object at '
+                    '0x7f2f582dea60; dead>',
+                    'unit: FAIL code 1 (2.04=setup[1.23]+cmd[0.81] seconds)',
+                    'evaluation failed :( (2.07 seconds)',
+                ],
+            },
+            {
+                'job_id': 83338922315,
+                'job_name': 'charm-tests (canonical/k8s-operator, charms/worker/k8s)',
+                'failed_step': "Run the charm's static tests",
+                'pytest_failures': [],
+                'go_failures': [],
+                'traceback_top_error': None,
+                'tail_excerpt': [
+                    'Total issues (by severity):',
+                    'static: FAIL code 1 (16.01=setup[0.42]+cmd[15.59] seconds)',
+                    'evaluation failed :( (16.06 seconds)',
+                ],
+            },
+            {
+                'job_id': 83338923301,
+                'job_name': 'charm-tests (canonical/seldon-core-operator, .)',
+                'failed_step': "Run the charm's unit tests",
+                'pytest_failures': [
+                    {
+                        'kind': 'FAILED',
+                        'test': 'tests/unit/test_operator.py::TestCharm::test_prometheus_data_set',
+                        'error': 'AttributeError: '
+                        'module '
+                        "'ops.testing' "
+                        'has no '
+                        'attribute '
+                        "'_TestingModelBackend'",
+                    }
+                ],
+                'go_failures': [],
+                'traceback_top_error': 'AttributeError: module '
+                "'ops.testing' has no "
+                'attribute '
+                "'_TestingModelBackend'",
+                'tail_excerpt': [
+                    'FAILED '
+                    'tests/unit/test_operator.py::TestCharm::test_prometheus_data_set '
+                    '- AttributeError: module '
+                    "'ops.testing' has no "
+                    'attribute '
+                    "'_TestingModelBackend'",
+                    'unit: FAIL code 1 (8.95=setup[0.60]+cmd[8.35] seconds)',
+                ],
+            },
+            {
+                'job_id': 83338923304,
+                'job_name': 'charm-tests (canonical/self-signed-certificates-operator, .)',
+                'failed_step': "Run the charm's unit tests",
+                'pytest_failures': [],
+                'go_failures': [],
+                'traceback_top_error': None,
+                'tail_excerpt': [
+                    'ERROR tests/unit/test_charm_collect_status.py',
+                    '!!!!!!!!!!!!!!!!!!! '
+                    'Interrupted: 5 errors during '
+                    'collection '
+                    '!!!!!!!!!!!!!!!!!!!!',
+                    'unit: FAIL code 2 (3.43=setup[1.18]+cmd[0.06,0.02,2.16] seconds)',
+                ],
+            },
+            {
+                'job_id': 83338923318,
+                'job_name': 'charm-tests (canonical/traefik-k8s-operator, .)',
+                'failed_step': "Run the charm's unit tests",
+                'pytest_failures': [],
+                'go_failures': [],
+                'traceback_top_error': 'ImportError: cannot '
+                "import name 'Event' from "
+                "'scenario' "
+                '(/home/runner/work/operator/operator/charm-repo/.tox/unit/lib/python3.12/site-packages/scenario/__init__.py)',
+                'tail_excerpt': [
+                    'ImportError: cannot import '
+                    "name 'Event' from 'scenario' "
+                    '(/home/runner/work/operator/operator/charm-repo/.tox/unit/lib/python3.12/site-packages/scenario/__init__.py)',
+                    'unit: FAIL code 1 (6.43=setup[2.14]+cmd[0.06,0.02,4.21] seconds)',
+                ],
+            },
+        ],
+    },
+    'open_candidates': [
+        {
+            'number': 9010,
+            'title': 'Broad Charm Compatibility Tests: 4 downstream '
+            'charms failing, independent causes',
+            'body': 'canonical/k8s-operator: bandit exit 1 (Medium: '
+            '24, High: 591). '
+            'canonical/seldon-core-operator: '
+            "AttributeError: module 'ops.testing' has no "
+            "attribute '_TestingModelBackend'. "
+            'canonical/self-signed-certificates-operator: 5 '
+            'collection errors. '
+            'canonical/traefik-k8s-operator: ImportError: '
+            "cannot import name 'Event' from 'scenario'.",
+            'createdAt': '2026-05-25T10:00:00Z',
+            'closedAt': None,
+        }
+    ],
+    'closed_candidates': [],
+    'expected_envelope': {
+        'action': 'comment',
+        'target_issue': 9010,
+        'body': 'Another occurrence: '
+        'https://github.com/canonical/operator/actions/runs/28141163589\n'
+        '\n'
+        '4 of the 5 failing charms match #9010 unchanged. '
+        'New this run: canonical/charm-ubuntu is now also '
+        'failing its unit tests.',
+        'dedup_reason': "4 of 5 failing charms match #9010's "
+        'signature; charm-ubuntu is a new failure '
+        'not present in #9010',
+        'confidence': 'medium',
+    },
+    'invalid_envelope_missing_scheduled_failure_label': {
+        'action': 'new',
+        'title': 'Broad Charm Compatibility Tests: charm-ubuntu unit tests failing',
+        'body': 'Something broke.',
+        'labels': ['ci'],
+        'issue_type': None,
+        'dedup_reason': 'no match',
+        'confidence': 'low',
+    },
+}
 
 
 class SignatureExtractionTests(unittest.TestCase):
@@ -270,7 +439,7 @@ class SchemaValidationTests(unittest.TestCase):
 
 class MainFlowTests(unittest.TestCase):
     """Exercises main()'s branching with gh and OpenRouter mocked out --
-    per the task brief, no live gh/OpenRouter calls happen in this test.
+    No live gh or OpenRouter calls happen in this test.
     """
 
     def setUp(self):

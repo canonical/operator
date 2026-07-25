@@ -5,13 +5,13 @@ name: Notify on scheduled failure
 # `if: failure() && github.event_name == 'schedule'` and pass
 # `permissions: issues: write`.
 #
-# This is stage 1 of the two-stage ai-failure-notifications design (see
-# canonical-work-queue's non-roadmap/ai-failure-notifications/PLAN.md,
-# "Where it lives" -- staging repo, not shipped here): a cheap, deterministic,
-# always-works dedup pre-check with no LLM dependency and no secrets. Stage 2
-# is .github/workflows/ai-failure-enrich.yaml, triggered separately by
+# This is stage 1 of two: a cheap, deterministic, always-works dedup
+# pre-check, with no LLM dependency and no secrets. Stage 2 is
+# .github/workflows/ai-failure-enrich.yaml, triggered separately by
 # `workflow_run` on this workflow's callers, which rewrites whatever this
-# stage produced into a triaged artefact.
+# stage produced into a triaged artefact. Keeping the two separate is what
+# lets this stage keep its guarantee: if stage 2 is unprovisioned or broken,
+# a notification still happens.
 
 on:
   workflow_call:
@@ -34,10 +34,9 @@ jobs:
           marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
 
           # Prefer the scheduled-failure label once it exists in this repo
-          # (see PLAN.md Open Questions -- a centrally-managed rollout via
-          # canonical-repo-automation, not done as of this workflow's step-5
-          # revision); an unlabelled title/body search still works fine as
-          # the pre-check in the meantime.
+          # (creating it is a separate, centrally-managed change); an
+          # unlabelled title/body search still works fine as the pre-check in
+          # the meantime.
           label_filter=()
           if gh label list --repo "$REPO" --json name -q '.[].name' | grep -qx 'scheduled-failure'; then
             label_filter=(--label scheduled-failure)
@@ -46,12 +45,10 @@ jobs:
           # Match on the workflow name alone, not the full placeholder
           # sentence: stage 2 (the enricher) rewrites title/body, but always
           # preserves a "Workflow: <name>" footer line specifically so this
-          # search keeps working after enrichment. See
-          # non-roadmap/ai-failure-notifications/spike-step-3/FINDINGS.md
-          # "Candidate-search shape for step 5" in canonical-work-queue --
-          # deliberately not the `in:title` form PLAN.md originally sketched,
-          # since that spike found human-retitled issues drop the name from
-          # the title but keep it in the body.
+          # search keeps working after enrichment. Deliberately not an
+          # `in:title` search either -- on a corpus of past scheduled
+          # failures, issues that a human had retitled kept the workflow name
+          # in the body but had lost it from the title.
           match=$(gh issue list --repo "$REPO" --state open "${label_filter[@]}" \
             --search "\"$WORKFLOW_NAME\"" \
             --json number --limit 1 -q '.[0].number // empty')

@@ -36,10 +36,6 @@ run. This script:
 5. Falls back to a plain, generic issue/comment (still marker-stamped) if
    OpenRouter is unreachable, misconfigured, or returns invalid JSON.
 
-Design reference (not shipped in this repo): the `ai-failure-notifications`
-project folder in the `canonical-work-queue` staging repo — see PLAN.md,
-SCHEMA.md and spike-step-3/FINDINGS.md, spike-step-4/prompt.md.
-
 The functions above the `--- I/O ---` marker are pure and unit-tested in
 `test_ai_failure_notifier.py`. Everything below it talks to `gh` or
 OpenRouter and is exercised only by mocking in tests.
@@ -57,7 +53,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 MARKER_PREFIX = 'ai-failure-notifications'
-DEFAULT_MODEL = 'deepseek/deepseek-chat'  # DeepSeek V3 on OpenRouter (PLAN.md Approach §6).
+DEFAULT_MODEL = 'deepseek/deepseek-chat'  # DeepSeek V3 on OpenRouter.
 CLOSED_CANDIDATE_WINDOW_DAYS = 14
 MAX_CANDIDATES = 3
 
@@ -79,8 +75,7 @@ MARKER_RE = re.compile(
 )
 
 
-# --- Signature extraction (ported from canonical-work-queue's
-# non-roadmap/ai-failure-notifications/spike-step-2/extract_signature.py) ---
+# --- Signature extraction ---
 
 
 def strip_line(line: str) -> str:
@@ -256,12 +251,13 @@ def within_window(iso_timestamp: str, now: datetime, days: int) -> bool:
 def build_candidates_block(
     open_issues: list[dict], closed_issues: list[dict], now: datetime
 ) -> str:
-    """Render the {{CANDIDATES_BLOCK}} the step-4 prompt expects.
+    """Render the {{CANDIDATES_BLOCK}} the prompt expects.
 
-    Up to MAX_CANDIDATES entries: open issues first, recently-closed issues
-    (<=14 days, spike-step-3/FINDINGS.md "medium-max" rule) filling any
-    remaining slots and explicitly labelled as closed so the LLM never
-    auto-treats one as a strong match.
+    Up to MAX_CANDIDATES entries: open issues first, then recently-closed
+    issues (<=14 days) filling any remaining slots, explicitly labelled as
+    closed so the LLM never auto-treats one as a strong match. Calibration on
+    past scheduled failures found a closed issue can corroborate a match but
+    should never be enough to dedupe against on its own.
     """
     entries: list[str] = []
     for issue in open_issues:
@@ -291,7 +287,7 @@ def build_candidates_block(
     return '\n'.join(entries)
 
 
-# --- Prompt building (ported from spike-step-4/prompt.md) ---
+# --- Prompt building ---
 
 SYSTEM_PROMPT = """\
 You are the enrichment step of an internal CI failure-triage bot for the
@@ -483,7 +479,8 @@ def build_prompt(
 
 # --- Envelope schema validation (hand-rolled -- deliberately not the
 # `jsonschema` package, to keep the script's only third-party dependency as
-# `requests`; see SCHEMA.md for the source-of-truth JSON Schema this mirrors) ---
+# `requests`. Mirrors ENVELOPE_JSON_SCHEMA below, which is what OpenRouter is
+# asked to conform to; this re-checks it on the applier side.) ---
 
 _ENTRY_COMMON_REQUIRED = ('action', 'body', 'dedup_reason', 'confidence')
 _ENTRY_KNOWN_KEYS = {
@@ -656,7 +653,8 @@ ENVELOPE_JSON_SCHEMA = {
 
 def gh(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     """Run a `gh` subcommand, returning the completed process."""
-    return subprocess.run(['gh', *args], text=True, capture_output=True, check=check)
+    # S607: `gh` is deliberately called by name, resolved from the runner's PATH.
+    return subprocess.run(['gh', *args], text=True, capture_output=True, check=check)  # noqa: S607
 
 
 def gh_json(*args: str) -> Any:
@@ -845,7 +843,7 @@ def set_output(name: str, value: str) -> None:
 
 
 def plain_fallback_body(workflow_name: str, run_url: str) -> str:
-    """The original notifier's plain, generic body text."""
+    """The plain, generic body text used whenever enrichment is unavailable."""
     return f"Scheduled workflow '{workflow_name}' failed: {run_url}"
 
 
@@ -858,8 +856,8 @@ def apply_entry(repo: str, entry: dict, marker: str, *, default_target: int | No
         if 'scheduled-failure' not in available:
             write_step_summary(
                 '`scheduled-failure` label does not exist in this repo yet -- created issue '
-                'without it (see PLAN.md Open Questions: labels land via a separate '
-                'canonical-repo-automation PR).'
+                'without it. Labels are never auto-created; the label needs adding to the '
+                'repo separately.'
             )
         args = ['issue', 'create', '--repo', repo, '--title', entry['title'], '--body', body]
         for label in labels:
@@ -903,9 +901,11 @@ def main() -> int:
         enriched_issue, origin_kind, origin_issue = None, None, None
 
     if enriched_issue is not None:
-        # Rung 0 (spike-step-3/FINDINGS.md): this run id was already fully
-        # enriched once -- a re-run of the same failing jobs re-triggered us.
-        # Comment, don't skip and don't redo the full LLM pass.
+        # Rung 0: this run id was already fully enriched once -- a re-run of
+        # the same failing jobs re-triggered us. Comment, don't skip and don't
+        # redo the full LLM pass. On a corpus of past scheduled failures this
+        # rung accounted for half the real duplicate pairs, making it the
+        # highest-value one.
         gh(
             'issue',
             'comment',
