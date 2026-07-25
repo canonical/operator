@@ -28,9 +28,6 @@
 - Ensure that tooling is configured to automatically detect new versions, particularly security releases, for all your dependencies. See [Add Python dependencies to pyproject.toml and update the lock file](#define-the-required-dependencies).
 - Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python) version in your `pyproject.toml` so that tooling will detect any use of Python features not available in the versions you support. See [Use the Python provided by the base](#define-the-required-dependencies).
 
-**[Manage charms](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-charms/)**
-- If you're setting up a ``git`` repository: name it using the pattern ``<charm name>-operator``. For the charm name, see {external+charmcraft:ref}`specify-a-name`. See {external+charmcraft:ref}`Initialise a charm <initialise-a-charm>`.
-
 **[Manage resources](https://documentation.ubuntu.com/charmcraft/latest/howto/manage-resources/)**
 - For resources that are binary files, provide binaries for all the CPU architectures you intend to support. See {external+charmcraft:ref}`Publish a resource on Charmhub <publish-a-resource>`.
 
@@ -42,5 +39,4 @@
 - Just like Juju, a charm is an opinionated tool. Configure the application with the best defaults (ideally the application is deployable without providing any configuration at deploy time), and only expose application configuration options when necessary. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
 - Prefer lowercase alphanumeric option names, separated with dashes if required. For charms that have already standardised on underscores, it is not necessary to change them, and it is better to be consistent within a charm then to have some config names be dashed and some be underscored. See {external+charmcraft:ref}`config <charmcraft-yaml-key-config>`.
 - Documentation links should apply to the charm, and not to the application that is being charmed. Assume that the user already has basic competency in the use of the application. See {external+charmcraft:ref}`links <charmcraft-yaml-key-documentation>`.
-- The charm name should be slug-oriented (ASCII lowercase letters, numbers, and hyphens) and follow the pattern ``<workload name in full>[<function>][-k8s]``. For example, ``argo-server-k8s``. Include the ``-k8s`` suffix on all charms that run on a Kubernetes cloud, unless the charm has no workload or you know that there will never be a machine version of the charm. Don't include an organization or publisher in the name. Don't add an ``operator`` or ``charm`` prefix or suffix. For naming a repository, see {external+charmcraft:ref}`initialise-a-charm`. See {external+charmcraft:ref}`name <charmcraft-yaml-key-name>`.
 

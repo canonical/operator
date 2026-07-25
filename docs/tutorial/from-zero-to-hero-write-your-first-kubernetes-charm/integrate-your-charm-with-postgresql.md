@@ -236,6 +236,9 @@ def _replan_workload(self) -> None:
         logger.info(f"Replanned with '{self.pebble_service_name}' service")
     except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
         logger.info("Unable to connect to Pebble: %s", e)
+        return
+    version = fastapi_demo.get_version(config.server_port)
+    self.unit.set_workload_version(version)
 ```
 
 We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
@@ -243,30 +246,20 @@ We removed three `self.unit.status = ` lines from this version of the method. We
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
 ```python
-def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
+def _get_pebble_layer(self, port: int, env: dict[str, str]) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
+    cmd = f"/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port {port}"
+    service: ops.pebble.ServiceDict = {
+        "override": "merge",
+        "command": cmd,
+        "environment": env,
+    }
+    layer: ops.pebble.LayerDict = {
         "summary": "FastAPI demo service",
         "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
-                "environment": environment,
-            }
-        },
+        "services": {self.pebble_service_name: service},
     }
-    return ops.pebble.Layer(pebble_layer)
+    return ops.pebble.Layer(layer)
 ```
 
 With these changes, we've made sure that our application knows how to access the database.
@@ -274,7 +267,11 @@ With these changes, we've made sure that our application knows how to access the
 When Pebble starts or restarts the service:
 
 * If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
-* Otherwise, the service environment is empty, so our application can't get database authentication data. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+* If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+
+```{note}
+The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service has environment variables from both layers (because our constructed layer sets `override` to `merge`).
+```
 
 We'll now make sure that the unit status is set correctly.
 
@@ -341,7 +338,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -419,7 +416,7 @@ Congratulations, your relation with PostgreSQL is functional!
 Now that our charm uses `fetch_database_relation_data` to extract database authentication data and endpoint information from the relation data, we should write a test for the feature. Here, we're not testing the `fetch_database_relation_data` function directly, but rather, we're checking that the response to a Juju event is what it should be:
 
 ```python
-def test_relation_data():
+def test_relation_data(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
     relation = testing.Relation(
         endpoint="database",
@@ -431,7 +428,9 @@ def test_relation_data():
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -440,9 +439,8 @@ def test_relation_data():
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
-        "fastapi-service"
-    ].environment == {
+    assert state_out.get_container(container.name).plan.services["fastapi"].environment == {
+        **ROCK_LAYER.services["fastapi"].environment,
         "DEMO_SERVER_DB_HOST": "example.com",
         "DEMO_SERVER_DB_PORT": "5432",
         "DEMO_SERVER_DB_USER": "foo",
@@ -453,9 +451,11 @@ def test_relation_data():
 In this chapter, we also defined a new method `_on_collect_status` that checks various things, including whether the required database relation exists. If the relation doesn't exist, we wait and set the unit status to `blocked`. We can also add a test to cover this behaviour:
 
 ```python
-def test_no_database_blocked():
+def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -477,22 +477,9 @@ Now run `tox -e unit` to make sure all test cases pass.
 
 ## Write an integration test
 
-Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. Let's tweak our existing integration test `test_deploy` accordingly, to expect blocked status in `juju.wait`. Replace the contents of `tests/integration/test_charm.py` with:
+Now that our charm integrates with the database, if there's not a database relation, the app will be in `blocked` status instead of `active`. In `tests/integration/test_charm.py`, update `test_deploy` to expect blocked status:
 
 ```python
-import logging
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-logger = logging.getLogger(__name__)
-
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-
-
 @pytest.mark.juju_setup
 def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Deploy the charm under test.
@@ -510,7 +497,7 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 Then, let's add another test case to check the integration is successful. For that, we need to deploy a database to the test cluster and integrate both applications. If everything works as intended, the charm should report an active status.
 
-In your `tests/integration/test_charm.py` file add the following test case:
+In `tests/integration/test_charm.py`, add the following test case after `test_workload_version_is_set`:
 
 ```python
 @pytest.mark.juju_setup
@@ -524,12 +511,10 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-This test depends on the `charm` fixture so that the test fails immediately if a `.charm` file isn't available.
+Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-In your Multipass Ubuntu VM, run the tests again:
-
-```text
-ubuntu@juju-sandbox-k8s:~/fastapi-demo$ tox -e integration
+```shell
+tox -e integration
 ```
 
 The tests may take some time to run, depending on your computer and network.
@@ -542,7 +527,7 @@ If the tests fail with a timeout error, override the default timeout in `test_da
 
 Then run `tox -e integration` again. If the tests still fail, try [our example charm for this chapter](https://github.com/canonical/operator/tree/main/examples/k8s-3-postgresql) instead, in case there's a mistake in your code.
 
-When the tests are done, the output should show two passing tests:
+When the tests are done, the output should show these passing tests:
 
 ```text
 tests/integration/test_charm.py::test_deploy
@@ -551,6 +536,17 @@ INFO     jubilant.wait:_juju.py:1164 wait: status changed:
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running start hook'
 + .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
+PASSED
+```
+
+```text
+tests/integration/test_charm.py::test_workload_version_is_set
+...
+INFO     jubilant.wait:_juju.py:1491 wait: status changed:
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
++ .apps['fastapi-demo'].version = '2.1.0'
 PASSED
 ```
 
