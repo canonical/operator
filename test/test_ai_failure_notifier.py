@@ -428,11 +428,32 @@ class SchemaValidationTests(unittest.TestCase):
         errors = afn.validate_envelope(envelope)
         self.assertTrue(any('action' in e for e in errors))
 
+    def test_envelope_with_also_is_valid(self):
+        # Regression: `also` is legal on the top-level envelope, and the model
+        # emits it routinely because the schema it is given declares it. The
+        # top-level unknown-field check used to reject every envelope carrying
+        # it, so the LLM path always fell back to the plain body. The three
+        # tests below did not catch it: they assert invalidity and match on the
+        # substring "also", which the spurious error also contained.
+        base = dict(FIXTURE_ENVELOPE)
+        base['also'] = [dict(FIXTURE_ENVELOPE)]
+        self.assertEqual(afn.validate_envelope(base), [])
+
+    def test_envelope_with_empty_also_is_valid(self):
+        base = dict(FIXTURE_ENVELOPE)
+        base['also'] = []
+        self.assertEqual(afn.validate_envelope(base), [])
+
+    def test_genuinely_unknown_top_level_field_is_still_invalid(self):
+        base = dict(FIXTURE_ENVELOPE)
+        base['nonsense'] = 1
+        self.assertTrue(any('nonsense' in e for e in afn.validate_envelope(base)))
+
     def test_also_capped_at_two_entries(self):
         base = dict(FIXTURE_ENVELOPE)
         base['also'] = [dict(FIXTURE_ENVELOPE) for _ in range(3)]
         errors = afn.validate_envelope(base)
-        self.assertTrue(any('also' in e for e in errors))
+        self.assertTrue(any('at most two entries' in e for e in errors), errors)
 
     def test_nested_also_is_invalid(self):
         base = dict(FIXTURE_ENVELOPE)
@@ -440,7 +461,7 @@ class SchemaValidationTests(unittest.TestCase):
         inner['also'] = [dict(FIXTURE_ENVELOPE)]
         base['also'] = [inner]
         errors = afn.validate_envelope(base)
-        self.assertTrue(any('also' in e for e in errors))
+        self.assertTrue(any("nested 'also'" in e for e in errors), errors)
 
     def test_also_entries_individually_validated(self):
         base = dict(FIXTURE_ENVELOPE)

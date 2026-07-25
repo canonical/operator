@@ -668,8 +668,14 @@ _ENTRY_KNOWN_KEYS = {
 }
 
 
-def validate_entry(entry: Any, *, path: str) -> list[str]:
-    """Validate one envelope entry (top-level or an `also[i]`) against the schema."""
+def validate_entry(entry: Any, *, path: str, allow_also: bool = False) -> list[str]:
+    """Validate one envelope entry (top-level or an `also[i]`) against the schema.
+
+    `also` is only legal on the top-level envelope, so the caller says whether
+    this is that. Without it the top-level check rejected every envelope that
+    carried `also` -- which the model emits routinely, since the schema it is
+    given declares the field.
+    """
     errors: list[str] = []
     if not isinstance(entry, dict):
         return [f'{path}: expected an object, got {type(entry).__name__}']
@@ -678,7 +684,8 @@ def validate_entry(entry: Any, *, path: str) -> list[str]:
         if field not in entry:
             errors.append(f"{path}: missing required field '{field}'")
 
-    unknown = set(entry) - _ENTRY_KNOWN_KEYS
+    known = _ENTRY_KNOWN_KEYS | {'also'} if allow_also else _ENTRY_KNOWN_KEYS
+    unknown = set(entry) - known
     if unknown:
         errors.append(f'{path}: unknown field(s) {sorted(unknown)}')
 
@@ -731,7 +738,7 @@ def validate_envelope(envelope: Any) -> list[str]:
     if not isinstance(envelope, dict):
         return ['envelope: expected a JSON object']
 
-    errors = validate_entry(envelope, path='envelope')
+    errors = validate_entry(envelope, path='envelope', allow_also=True)
 
     also = envelope.get('also')
     if also is not None:
@@ -742,10 +749,6 @@ def validate_envelope(envelope: Any) -> list[str]:
                 if isinstance(entry, dict) and 'also' in entry:
                     errors.append(f"envelope.also[{i}]: nested 'also' is not allowed")
                 errors.extend(validate_entry(entry, path=f'envelope.also[{i}]'))
-
-    unknown_top = set(envelope) - _ENTRY_KNOWN_KEYS - {'also'}
-    if unknown_top:
-        errors.append(f'envelope: unknown field(s) {sorted(unknown_top)}')
 
     return errors
 
