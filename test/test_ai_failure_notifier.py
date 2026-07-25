@@ -449,6 +449,61 @@ class SchemaValidationTests(unittest.TestCase):
         base['nonsense'] = 1
         self.assertTrue(any('nonsense' in e for e in afn.validate_envelope(base)))
 
+    def test_new_envelope_with_null_target_issue_is_valid(self):
+        # The schema sent to OpenRouter is `strict`, so models return every
+        # declared property and null the inapplicable ones. Rejecting on mere
+        # presence discarded good output; only a real value is a conflict.
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'b',
+            'labels': ['tests'],
+            'issue_type': None,
+            'target_issue': None,
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        self.assertEqual(afn.validate_envelope(envelope), [])
+
+    def test_new_envelope_with_a_real_target_issue_is_still_invalid(self):
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'b',
+            'labels': [],
+            'issue_type': None,
+            'target_issue': 7,
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        self.assertTrue(
+            any('target_issue' in e for e in afn.validate_envelope(envelope)),
+        )
+
+    def test_comment_envelope_with_null_new_only_fields_is_valid(self):
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': 7,
+            'body': 'b',
+            'title': None,
+            'labels': None,
+            'issue_type': None,
+            'dedup_reason': 'd',
+            'confidence': 'high',
+        }
+        self.assertEqual(afn.validate_envelope(envelope), [])
+
+    def test_comment_envelope_with_a_real_title_is_still_invalid(self):
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': 7,
+            'body': 'b',
+            'title': 'nope',
+            'dedup_reason': 'd',
+            'confidence': 'high',
+        }
+        self.assertTrue(any('title' in e for e in afn.validate_envelope(envelope)))
+
     def test_also_capped_at_two_entries(self):
         base = dict(FIXTURE_ENVELOPE)
         base['also'] = [dict(FIXTURE_ENVELOPE) for _ in range(3)]
@@ -665,6 +720,64 @@ class GhCallShapeTests(unittest.TestCase):
         args = gh_calls.call_args.args
         self.assertEqual(args[:2], ('label', 'list'))
         self.assertEqual(args[args.index('--json') + 1], 'name')
+
+
+class CandidatePoolTests(unittest.TestCase):
+    """The issue the notifier commented on stays in the candidate pool.
+
+    Found by dogfooding. The origin issue was excluded unconditionally. When
+    the notifier had commented on a pre-existing issue -- the case for every
+    recurrence after the first -- that issue is the most likely duplicate, and
+    removing it left the model with an empty candidate list. It answered "new",
+    and a duplicate issue was opened: the exact outcome this path exists to
+    prevent.
+    """
+
+    def _run_main(self, *, origin_kind: str, candidates: list[afn.CandidateIssue]) -> str:
+        captured: dict[str, str] = {}
+
+        def fake_build_prompt(
+            workflow_name: str, run_url: str, signature: Any, candidates_block: str
+        ) -> tuple[str, str]:
+            captured['block'] = candidates_block
+            return 'sys', 'user'
+
+        env = {
+            'REPO': 'canonical/operator',
+            'RUN_ID': '28141163589',
+            'WORKFLOW_NAME': 'Broad Charm Compatibility Tests',
+            'RUN_URL': 'https://example.invalid/run',
+            'OPENROUTER_API_KEY': 'test-key',
+        }
+        with (
+            mock.patch.dict(os.environ, env, clear=True),
+            mock.patch.object(afn, 'locate_run_markers', return_value=(None, origin_kind, 9010)),
+            mock.patch.object(afn, 'fetch_failed_jobs', return_value=[]),
+            mock.patch.object(afn, 'fetch_run_meta', return_value={'createdAt': ''}),
+            mock.patch.object(afn, 'search_candidates', return_value=(candidates, [])),
+            mock.patch.object(afn, 'existing_labels', return_value=set()),
+            mock.patch.object(afn, 'build_prompt', side_effect=fake_build_prompt),
+            mock.patch.object(afn, 'call_openrouter', return_value={'action': 'bogus'}),
+            mock.patch.object(afn, 'gh'),
+            mock.patch.object(afn, 'write_step_summary'),
+            mock.patch.object(afn, 'set_output'),
+        ):
+            afn.main()
+        return captured['block']
+
+    def test_commented_origin_issue_is_offered_as_a_candidate(self):
+        candidate = afn.CandidateIssue(
+            number=9010, title='the tracked one', body='x', closed_at=None
+        )
+        block = self._run_main(origin_kind='comment', candidates=[candidate])
+        self.assertIn('#9010', block)
+
+    def test_freshly_created_placeholder_is_not_offered_as_a_candidate(self):
+        candidate = afn.CandidateIssue(
+            number=9010, title='the placeholder', body='x', closed_at=None
+        )
+        block = self._run_main(origin_kind='new', candidates=[candidate])
+        self.assertNotIn('#9010', block)
 
 
 class BodyFooterTests(unittest.TestCase):

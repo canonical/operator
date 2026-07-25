@@ -703,11 +703,15 @@ def validate_entry(entry: Any, *, path: str, allow_also: bool = False) -> list[s
             f'{path}.confidence: must be one of high/medium/low, got {entry.get("confidence")!r}'
         )
 
+    # A field present but null counts as absent. The schema sent to OpenRouter
+    # is `strict`, so models routinely return every declared property and use
+    # null for the ones that do not apply to the action they chose; rejecting on
+    # mere presence threw away otherwise good output.
     if action == 'new':
         for field in ('title', 'labels', 'issue_type'):
             if field not in entry:
                 errors.append(f"{path}: action='new' requires '{field}'")
-        if 'target_issue' in entry:
+        if entry.get('target_issue') is not None:
             errors.append(f"{path}: action='new' must not include 'target_issue'")
         labels = entry.get('labels')
         if labels is not None and (
@@ -724,7 +728,7 @@ def validate_entry(entry: Any, *, path: str, allow_also: bool = False) -> list[s
         elif not isinstance(entry['target_issue'], int) or entry['target_issue'] < 1:
             errors.append(f'{path}.target_issue: must be a positive integer')
         for field in ('title', 'labels', 'issue_type'):
-            if field in entry:
+            if entry.get(field) is not None:
                 errors.append(f"{path}: action='comment' must not include '{field}'")
 
     return errors
@@ -1190,7 +1194,14 @@ def main() -> int:
     except Exception as exc:  # as above: degrade to "no candidates", don't crash.
         write_step_summary(f'Candidate search failed ({exc}); proceeding with no candidates.')
         open_candidates, closed_candidates = [], []
-    open_candidates = [c for c in open_candidates if c.number != origin_issue]
+    if origin_kind == 'new':
+        # The placeholder this run just created is not a candidate to dedupe
+        # against. An issue the notifier *commented* on is a different matter:
+        # it already existed, the coarse search matched it, and it is the most
+        # likely duplicate -- dropping it left the model blind to the very
+        # issue it should have been comparing against, so it answered "new"
+        # and produced the duplicate this whole path exists to avoid.
+        open_candidates = [c for c in open_candidates if c.number != origin_issue]
     candidates_block = build_candidates_block(
         open_candidates, closed_candidates, datetime.datetime.now(datetime.timezone.utc)
     )
