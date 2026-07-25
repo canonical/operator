@@ -734,6 +734,48 @@ def validate_entry(entry: Any, *, path: str, allow_also: bool = False) -> list[s
     return errors
 
 
+# Fields that only mean something for one of the two actions. The model is
+# given a `strict` schema, so it tends to return every declared property and
+# fill in the ones that do not apply to the action it chose. Those are dropped
+# rather than treated as an error: we would not act on them either way, and
+# rejecting the envelope threw away a usable body and fell back to the plain
+# notice.
+_ACTION_ONLY_FIELDS = {
+    'comment': ('title', 'labels', 'issue_type'),
+    'new': ('target_issue',),
+}
+
+
+def drop_inapplicable_fields(entry: Any) -> tuple[Any, list[str]]:
+    """Strip fields that do not apply to `entry`'s action; report what went."""
+    if not isinstance(entry, dict):
+        return entry, []
+    fields = _ACTION_ONLY_FIELDS.get(entry.get('action'))
+    if not fields:
+        return entry, []
+    dropped = [f for f in fields if f in entry]
+    if not dropped:
+        return entry, []
+    return {k: v for k, v in entry.items() if k not in dropped}, dropped
+
+
+def normalise_envelope(envelope: Any) -> tuple[Any, list[str]]:
+    """Drop inapplicable fields from the envelope and each `also` entry."""
+    if not isinstance(envelope, dict):
+        return envelope, []
+    cleaned, dropped = drop_inapplicable_fields(envelope)
+    notes = [f'envelope: {f}' for f in dropped]
+    also = cleaned.get('also')
+    if isinstance(also, list):
+        entries: list[Any] = []
+        for i, entry in enumerate(also):
+            entry, entry_dropped = drop_inapplicable_fields(entry)
+            notes += [f'envelope.also[{i}]: {f}' for f in entry_dropped]
+            entries.append(entry)
+        cleaned = {**cleaned, 'also': entries}
+    return cleaned, notes
+
+
 def validate_envelope(envelope: Any) -> list[str]:
     """Validate a top-level envelope (may carry `also`).
 
@@ -1232,6 +1274,14 @@ def main() -> int:
         )
         set_output('handled', 'true')
         return 0
+
+    envelope, dropped_fields = normalise_envelope(envelope)
+    if dropped_fields:
+        write_step_summary(
+            'Ignored fields that do not apply to the chosen action: '
+            + ', '.join(dropped_fields)
+            + '.'
+        )
 
     errors = validate_envelope(envelope)
     if errors:

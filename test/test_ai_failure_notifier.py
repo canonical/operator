@@ -722,6 +722,78 @@ class GhCallShapeTests(unittest.TestCase):
         self.assertEqual(args[args.index('--json') + 1], 'name')
 
 
+class NormalisationTests(unittest.TestCase):
+    """Fields that do not apply to the chosen action are dropped, not fatal.
+
+    Found by dogfooding: the model is given a `strict` schema, so it returns
+    every declared property and fills the ones irrelevant to the action it
+    chose. Treating those as validation errors discarded a perfectly good
+    comment body and fell back to the plain notice.
+    """
+
+    def test_comment_loses_new_only_fields(self):
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': 9010,
+            'body': 'Another occurrence.',
+            'title': 'a title it should not have',
+            'labels': ['tests'],
+            'issue_type': 'bug',
+            'dedup_reason': 'd',
+            'confidence': 'high',
+        }
+        cleaned, dropped = afn.normalise_envelope(envelope)
+        self.assertEqual(
+            sorted(dropped), ['envelope: issue_type', 'envelope: labels', 'envelope: title']
+        )
+        self.assertNotIn('title', cleaned)
+        self.assertEqual(cleaned['body'], 'Another occurrence.')
+        self.assertEqual(afn.validate_envelope(cleaned), [])
+
+    def test_new_loses_target_issue(self):
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'b',
+            'labels': [],
+            'issue_type': None,
+            'target_issue': 7,
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        cleaned, dropped = afn.normalise_envelope(envelope)
+        self.assertEqual(dropped, ['envelope: target_issue'])
+        self.assertEqual(afn.validate_envelope(cleaned), [])
+
+    def test_also_entries_are_normalised_too(self):
+        inner: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': 1,
+            'body': 'b',
+            'title': 'nope',
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'b',
+            'labels': [],
+            'issue_type': None,
+            'dedup_reason': 'd',
+            'confidence': 'low',
+            'also': [inner],
+        }
+        cleaned, dropped = afn.normalise_envelope(envelope)
+        self.assertEqual(dropped, ['envelope.also[0]: title'])
+        self.assertEqual(afn.validate_envelope(cleaned), [])
+
+    def test_nothing_dropped_leaves_the_envelope_alone(self):
+        cleaned, dropped = afn.normalise_envelope(FIXTURE_ENVELOPE)
+        self.assertEqual(dropped, [])
+        self.assertIs(cleaned, FIXTURE_ENVELOPE)
+
+
 class CandidatePoolTests(unittest.TestCase):
     """The issue the notifier commented on stays in the candidate pool.
 
