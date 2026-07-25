@@ -65,9 +65,9 @@ GO_FAIL = re.compile(r'^--- FAIL: (\S+)')
 TRACEBACK_END = re.compile(r'^([A-Z][A-Za-z_.]*(?:Error|Exception|Warning)): (.*)$')
 
 # Matches markers stamped by either stage:
-#   notifier (stage 1):  <!-- ai-failure-notifications:run=123:origin=new -->
+#   notifier:  <!-- ai-failure-notifications:run=123:origin=new -->
 #                         <!-- ai-failure-notifications:run=123:origin=comment -->
-#   enricher (stage 2):   <!-- ai-failure-notifications:run=123:sig=abcdef0123456789 -->
+#   enricher:  <!-- ai-failure-notifications:run=123:sig=abcdef0123456789 -->
 MARKER_RE = re.compile(
     r'<!--\s*'
     + re.escape(MARKER_PREFIX)
@@ -191,9 +191,9 @@ def signature_hash(signature: dict) -> str:
 
 
 def render_notifier_marker(run_id: str, origin: str) -> str:
-    """Render the marker stage 1 (the notifier) stamps.
+    """Render the marker the notifier stamps.
 
-    `origin` is "new" or "comment", telling stage 2 which artefact it
+    `origin` is "new" or "comment", telling the enricher which artefact it
     touched.
     """
     assert origin in ('new', 'comment')
@@ -201,9 +201,9 @@ def render_notifier_marker(run_id: str, origin: str) -> str:
 
 
 def render_enriched_marker(run_id: str, signature: dict) -> str:
-    """Render the marker stage 2 (this script) stamps once fully processed.
+    """Render the marker this script stamps once it has fully processed a run.
 
-    Presence of :sig= is what makes rung 0 (find_run_markers) treat a later
+    Presence of :sig= is what makes rung zero (find_run_markers) treat a later
     same-run-id trigger as "already enriched, just note the re-run".
     """
     return f'<!-- {MARKER_PREFIX}:run={run_id}:sig={signature_hash(signature)} -->'
@@ -216,7 +216,7 @@ def find_run_markers(
 
     Returns (enriched_issue, origin_kind, origin_issue):
     - enriched_issue: an issue number carrying a :sig= marker for this run
-      (rung 0 -- this run was already fully enriched once), else None.
+      (rung zero -- this run was already fully enriched once), else None.
     - origin_kind / origin_issue: the "new"/"comment" marker the notifier
       stamped for this run (identifies which artefact to upgrade), else
       (None, None).
@@ -405,7 +405,7 @@ issue (or what's new/different), and nothing else.
 
 ## Deciding comment vs new
 
-You are given up to 3 candidate existing issues (title + excerpt), already
+You are given up to three candidate existing issues (title + excerpt), already
 pre-filtered to the same workflow by a coarser deterministic search. Some
 candidates may be marked "(closed ...)" -- these are recently-closed
 issues included for context only; never target a closed issue with
@@ -564,7 +564,7 @@ def validate_envelope(envelope: Any) -> list[str]:
     also = envelope.get('also')
     if also is not None:
         if not isinstance(also, list) or len(also) > 2:
-            errors.append('envelope.also: must be an array of at most 2 entries')
+            errors.append('envelope.also: must be an array of at most two entries')
         else:
             for i, entry in enumerate(also):
                 if isinstance(entry, dict) and 'also' in entry:
@@ -901,7 +901,7 @@ def main() -> int:
         enriched_issue, origin_kind, origin_issue = None, None, None
 
     if enriched_issue is not None:
-        # Rung 0: this run id was already fully enriched once -- a re-run of
+        # Rung zero: this run id was already fully enriched once -- a re-run of
         # the same failing jobs re-triggered us. Comment, don't skip and don't
         # redo the full LLM pass. On a corpus of past scheduled failures this
         # rung accounted for half the real duplicate pairs, making it the
@@ -916,7 +916,8 @@ def main() -> int:
             f'Re-run attempt still failing: {run_url}\n\n<!-- {MARKER_PREFIX}:run={run_id} -->',
         )
         write_step_summary(
-            f'Rung 0: run {run_id} already enriched on #{enriched_issue}; commented re-run note.'
+            f'Rung zero: run {run_id} already enriched on #{enriched_issue}; '
+            'commented re-run note.'
         )
         set_output('handled', 'true')
         return 0

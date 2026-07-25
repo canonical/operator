@@ -1,10 +1,10 @@
 name: AI-enrich scheduled-failure notification
 
-# Stage 2 of two. Stage 1 is
-# .github/workflows/notify-scheduled-failure.yaml, which always creates or
-# comments on a placeholder issue with no LLM involved. This workflow fires
-# after a scheduled-workflow caller of stage 1 completes, and tries to
-# rewrite whatever stage 1 produced into a triaged, deduplicated artefact.
+# The second of two stages. The first,
+# .github/workflows/notify-scheduled-failure.yaml, always creates or comments
+# on a placeholder issue with no LLM involved. This workflow fires after a
+# scheduled-workflow caller of that notifier completes, and tries to rewrite
+# whatever it produced into a triaged, deduplicated artefact.
 #
 # `workflow_run` cannot target notify-scheduled-failure.yaml directly --
 # reusable workflows invoked via `workflow_call` don't get an independent run
@@ -34,7 +34,7 @@ name: AI-enrich scheduled-failure notification
 #     trigger this at all. Every run that reaches it originates from
 #     `schedule:` on the default branch.
 #
-# `workflow_run` is also not substitutable here: stage 1 is a *reusable*
+# `workflow_run` is also not substitutable here: the notifier is a *reusable*
 # workflow invoked via `workflow_call`, which gets no independent run for
 # `workflow_run` to subscribe to, so this subscribes to its callers instead.
 # The alternative is splicing an enrichment call into all seven callers, which

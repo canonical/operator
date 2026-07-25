@@ -5,13 +5,13 @@ name: Notify on scheduled failure
 # `if: failure() && github.event_name == 'schedule'` and pass
 # `permissions: issues: write`.
 #
-# This is stage 1 of two: a cheap, deterministic, always-works dedup
-# pre-check, with no LLM dependency and no secrets. Stage 2 is
-# .github/workflows/ai-failure-enrich.yaml, triggered separately by
-# `workflow_run` on this workflow's callers, which rewrites whatever this
-# stage produced into a triaged artefact. Keeping the two separate is what
-# lets this stage keep its guarantee: if stage 2 is unprovisioned or broken,
-# a notification still happens.
+# This is the first of two stages: a cheap, deterministic, always-works
+# dedup pre-check, with no LLM dependency and no secrets. The second,
+# .github/workflows/ai-failure-enrich.yaml, is triggered separately by
+# `workflow_run` on this workflow's callers, and rewrites whatever this one
+# produced into a triaged artefact. Keeping them separate is what lets this
+# workflow keep its guarantee: if the enricher is unprovisioned or broken, a
+# notification still happens.
 
 on:
   workflow_call:
@@ -43,7 +43,7 @@ jobs:
           fi
 
           # Match on the workflow name alone, not the full placeholder
-          # sentence: stage 2 (the enricher) rewrites title/body, but always
+          # sentence: the enricher rewrites title and body, but always
           # preserves a "Workflow: <name>" footer line specifically so this
           # search keeps working after enrichment. Deliberately not an
           # `in:title` search either -- on a corpus of past scheduled
