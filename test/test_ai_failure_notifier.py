@@ -37,8 +37,10 @@ import datetime
 import email.message
 import io
 import json
+import os
 import pathlib
 import sys
+import tempfile
 import unittest
 import urllib.error
 from typing import Any
@@ -642,6 +644,68 @@ class GhCallShapeTests(unittest.TestCase):
         args = gh_calls.call_args.args
         self.assertEqual(args[:2], ('label', 'list'))
         self.assertEqual(args[args.index('--json') + 1], 'name')
+
+
+class BodyFooterTests(unittest.TestCase):
+    """Every body carries the footer the notifier's coarse search matches on.
+
+    Found by dogfooding: the footer was described in the design and in the
+    notifier's own comment, but only ever existed in the prompt template, so
+    enriched issues went out without it. The coarse search then depended on
+    the model happening to leave the workflow name in the title.
+    """
+
+    def test_render_body_has_footer_and_marker(self):
+        body = afn.render_body('Some detail.', 'Example Charm Tests', '<!-- m -->')
+        self.assertEqual(body, 'Some detail.\n\nWorkflow: Example Charm Tests\n\n<!-- m -->')
+
+    def test_applied_comment_body_has_the_footer(self):
+        gh_calls = mock.Mock(return_value=mock.Mock(returncode=0, stdout='', stderr=''))
+        entry: dict[str, Any] = {'action': 'comment', 'body': 'Another occurrence.'}
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            afn.apply_entry(
+                'canonical/operator', entry, '<!-- m -->', 'ops Smoke Tests', default_target=7
+            )
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:3], ('issue', 'comment', '7'))
+        self.assertIn('Workflow: ops Smoke Tests', args[args.index('--body') + 1])
+
+    def test_applied_new_issue_body_has_the_footer(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=0, stdout='https://x/issues/9', stderr='')
+        )
+        entry: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'Detail.',
+            'labels': [],
+            'issue_type': None,
+        }
+        with (
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'existing_labels', return_value=set()),
+        ):
+            afn.apply_entry('canonical/operator', entry, '<!-- m -->', 'ops Smoke Tests')
+        args = gh_calls.call_args.args
+        self.assertIn('Workflow: ops Smoke Tests', args[args.index('--body') + 1])
+
+
+class StepSummaryTests(unittest.TestCase):
+    """Fallback reporting reaches the job log, not only the step summary."""
+
+    def test_message_goes_to_stderr_even_with_a_summary_file(self):
+        with tempfile.NamedTemporaryFile('w+', suffix='.md', delete=False) as handle:
+            summary_path = handle.name
+        self.addCleanup(os.unlink, summary_path)
+        stderr = io.StringIO()
+        with (
+            mock.patch.dict(os.environ, {'GITHUB_STEP_SUMMARY': summary_path}, clear=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            afn.write_step_summary('OpenRouter call failed (boom)')
+        self.assertIn('OpenRouter call failed (boom)', stderr.getvalue())
+        with open(summary_path, encoding='utf-8') as handle:
+            self.assertIn('OpenRouter call failed (boom)', handle.read())
 
 
 class MainDegradationTests(unittest.TestCase):

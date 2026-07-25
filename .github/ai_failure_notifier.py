@@ -1007,13 +1007,17 @@ def call_openrouter(
 
 
 def write_step_summary(message: str) -> None:
-    """Append a line to the job's step summary (or stderr, outside Actions)."""
+    """Report a line to the job's step summary and to the log.
+
+    Always goes to stderr as well as the summary: every fallback path in this
+    script reports through here, and a fallback that only shows up in the
+    summary is invisible to anyone reading the job log or the API.
+    """
+    print(message, file=sys.stderr)
     path = os.environ.get('GITHUB_STEP_SUMMARY')
-    if not path:
-        print(message, file=sys.stderr)
-        return
-    with open(path, 'a', encoding='utf-8') as f:
-        f.write(message + '\n')
+    if path:
+        with open(path, 'a', encoding='utf-8') as f:
+            f.write(message + '\n')
 
 
 def set_output(name: str, value: str) -> None:
@@ -1030,11 +1034,27 @@ def plain_fallback_body(workflow_name: str, run_url: str) -> str:
     return f"Scheduled workflow '{workflow_name}' failed: {run_url}"
 
 
+def render_body(body: str, workflow_name: str, marker: str) -> str:
+    """Assemble an issue or comment body, footer and marker included.
+
+    The `Workflow: <name>` footer is what keeps the notifier's coarse search
+    working after enrichment has rewritten the title and body: the search
+    matches on the workflow name, and without the footer it would depend on
+    the model happening to leave the name in the title.
+    """
+    return f'{body.rstrip()}\n\nWorkflow: {workflow_name}\n\n{marker}'
+
+
 def apply_entry(
-    repo: str, entry: dict[str, Any], marker: str, *, default_target: int | None = None
+    repo: str,
+    entry: dict[str, Any],
+    marker: str,
+    workflow_name: str,
+    *,
+    default_target: int | None = None,
 ) -> str:
     """Create or comment on an issue per one envelope entry, stamping `marker`."""
-    body = entry['body'].rstrip() + f'\n\n{marker}'
+    body = render_body(entry['body'], workflow_name, marker)
     if entry['action'] == 'new':
         # The repo's label set is centrally managed, so anything the model
         # asked for that doesn't exist is dropped rather than created.
@@ -1156,6 +1176,7 @@ def main() -> int:
                 'target_issue': origin_issue,
             },
             enriched_marker,
+            workflow_name,
             default_target=origin_issue,
         )
         set_output('handled', 'true')
@@ -1192,6 +1213,7 @@ def main() -> int:
                 'target_issue': origin_issue,
             },
             enriched_marker,
+            workflow_name,
             default_target=origin_issue,
         )
         set_output('handled', 'true')
@@ -1218,6 +1240,7 @@ def main() -> int:
                 'target_issue': origin_issue,
             },
             enriched_marker,
+            workflow_name,
             default_target=origin_issue,
         )
         set_output('handled', 'true')
@@ -1236,16 +1259,16 @@ def main() -> int:
             '--title',
             envelope['title'],
             '--body',
-            envelope['body'].rstrip() + f'\n\n{enriched_marker}',
+            render_body(envelope['body'], workflow_name, enriched_marker),
         ]
         for label in labels:
             edit_args += ['--add-label', label]
         gh(*edit_args)
     elif envelope['action'] == 'comment' and envelope.get('target_issue') == origin_issue:
-        apply_entry(repo, envelope, enriched_marker, default_target=origin_issue)
+        apply_entry(repo, envelope, enriched_marker, workflow_name, default_target=origin_issue)
     elif envelope['action'] == 'comment':
         # LLM picked a different candidate than the notifier's coarse match.
-        apply_entry(repo, envelope, enriched_marker)
+        apply_entry(repo, envelope, enriched_marker, workflow_name)
         if origin_kind == 'comment':
             gh(
                 'issue',
@@ -1260,7 +1283,7 @@ def main() -> int:
     else:
         # action == "new" but origin_kind == "comment": the coarse title
         # match landed on an unrelated older issue; this is genuinely new.
-        apply_entry(repo, envelope, enriched_marker)
+        apply_entry(repo, envelope, enriched_marker, workflow_name)
         gh(
             'issue',
             'comment',
@@ -1273,7 +1296,7 @@ def main() -> int:
         )
 
     for also_entry in envelope.get('also') or []:
-        apply_entry(repo, also_entry, enriched_marker)
+        apply_entry(repo, also_entry, enriched_marker, workflow_name)
 
     set_output('handled', 'true')
     return 0
