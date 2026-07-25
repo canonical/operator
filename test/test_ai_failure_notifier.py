@@ -204,13 +204,15 @@ class SignatureExtractionTests(unittest.TestCase):
         )
 
     def test_parse_job_log_pytest_failures_and_summary_bound(self):
-        log = '\n'.join([
-            '2026-06-25T01:40:15.0000000Z ============ short test summary info ============',
-            '2026-06-25T01:40:15.0000000Z FAILED tests/unit/test_x.py::test_a - AssertionError: x',
-            '2026-06-25T01:40:15.0000000Z ERROR tests/unit/test_x.py::test_b - PendingDeprecat...',
-            '2026-06-25T01:40:15.0000000Z ============ 2 failed in 1.23s ============',
-            '2026-06-25T01:40:15.0000000Z some trailing noise, not part of the summary',
-        ])
+        log = '\n'.join(
+            [
+                '2026-06-25T01:40:15.0000000Z ============ short test summary info ============',
+                '2026-06-25T01:40:15.0000000Z FAILED tests/unit/test_x.py::test_a - AssertionError: x',
+                '2026-06-25T01:40:15.0000000Z ERROR tests/unit/test_x.py::test_b - PendingDeprecat...',
+                '2026-06-25T01:40:15.0000000Z ============ 2 failed in 1.23s ============',
+                '2026-06-25T01:40:15.0000000Z some trailing noise, not part of the summary',
+            ]
+        )
         pytest_failures, go_failures, _tb, _tail = afn.parse_job_log(log)
         self.assertEqual(
             pytest_failures,
@@ -227,21 +229,25 @@ class SignatureExtractionTests(unittest.TestCase):
         self.assertEqual(go_failures, ['TestFoo', 'TestBar'])
 
     def test_parse_job_log_traceback_top_error_prefers_last_match(self):
-        log = '\n'.join([
-            'ValueError: first, ignored',
-            'some other output',
-            'AttributeError: the real one',
-        ])
+        log = '\n'.join(
+            [
+                'ValueError: first, ignored',
+                'some other output',
+                'AttributeError: the real one',
+            ]
+        )
         _, _, tb, _ = afn.parse_job_log(log)
         self.assertEqual(tb, 'AttributeError: the real one')
 
     def test_parse_job_log_tail_excerpt_stops_before_first_error_marker(self):
-        log = '\n'.join([
-            'line before 1',
-            'line before 2',
-            '##[error]something broke',
-            'line after (should not appear in tail)',
-        ])
+        log = '\n'.join(
+            [
+                'line before 1',
+                'line before 2',
+                '##[error]something broke',
+                'line after (should not appear in tail)',
+            ]
+        )
         _, _, _, tail = afn.parse_job_log(log)
         self.assertEqual(tail, ['line before 1', 'line before 2'])
 
@@ -315,12 +321,14 @@ class CandidateBlockTests(unittest.TestCase):
     def test_recently_closed_candidate_is_labelled_and_capped_at_medium(self):
         now = datetime.datetime(2026, 6, 25, tzinfo=datetime.timezone.utc)
         closed = [
-            afn.CandidateIssue.from_gh({
-                'number': 42,
-                'title': 'old thing',
-                'body': 'x',
-                'closedAt': '2026-06-20T00:00:00Z',
-            })
+            afn.CandidateIssue.from_gh(
+                {
+                    'number': 42,
+                    'title': 'old thing',
+                    'body': 'x',
+                    'closedAt': '2026-06-20T00:00:00Z',
+                }
+            )
         ]
         block = afn.build_candidates_block([], closed, now)
         self.assertIn('#42', block)
@@ -330,24 +338,28 @@ class CandidateBlockTests(unittest.TestCase):
     def test_closed_candidate_outside_window_is_dropped(self):
         now = datetime.datetime(2026, 6, 25, tzinfo=datetime.timezone.utc)
         closed = [
-            afn.CandidateIssue.from_gh({
-                'number': 42,
-                'title': 'ancient',
-                'body': 'x',
-                'closedAt': '2026-01-01T00:00:00Z',
-            })
+            afn.CandidateIssue.from_gh(
+                {
+                    'number': 42,
+                    'title': 'ancient',
+                    'body': 'x',
+                    'closedAt': '2026-01-01T00:00:00Z',
+                }
+            )
         ]
         block = afn.build_candidates_block([], closed, now)
         self.assertEqual(block, '(no open issues found for this workflow)')
 
     def test_candidates_capped_at_three(self):
         opens = [
-            afn.CandidateIssue.from_gh({
-                'number': n,
-                'title': f'issue {n}',
-                'body': 'x',
-                'closedAt': None,
-            })
+            afn.CandidateIssue.from_gh(
+                {
+                    'number': n,
+                    'title': f'issue {n}',
+                    'body': 'x',
+                    'closedAt': None,
+                }
+            )
             for n in range(5)
         ]
         block = afn.build_candidates_block(opens, [], datetime.datetime.now(datetime.timezone.utc))
@@ -720,6 +732,109 @@ class GhCallShapeTests(unittest.TestCase):
         args = gh_calls.call_args.args
         self.assertEqual(args[:2], ('label', 'list'))
         self.assertEqual(args[args.index('--json') + 1], 'name')
+
+
+class MarkerLookupConsistencyTests(unittest.TestCase):
+    """The notifier's marker must be found without depending on the search index.
+
+    `gh search issues` is not read-your-writes: the notifier stamps its marker
+    seconds before the enricher runs, and an unindexed marker reads as "no
+    notifier marker found", which makes main() open a *second* issue for a run
+    that already has one. The issue list endpoint has no such lag, so it is
+    consulted first and search is only a fallback.
+    """
+
+    def _gh(self, responses: list[str]) -> mock.Mock:
+        return mock.Mock(
+            side_effect=[mock.Mock(returncode=0, stdout=out, stderr='') for out in responses]
+        )
+
+    def test_marker_in_a_body_is_found_without_any_search_call(self):
+        listing = json.dumps(
+            [
+                {'number': 2700, 'body': 'unrelated', 'comments': []},
+                {
+                    'number': 2658,
+                    'body': 'placeholder\n\n<!-- ai-failure-notifications:run=999:origin=new -->',
+                    'comments': [],
+                },
+            ]
+        )
+        gh_calls = self._gh([listing])
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            enriched, kind, number = afn.locate_run_markers('canonical/operator', '999')
+        self.assertEqual((enriched, kind, number), (None, 'new', 2658))
+        # Exactly one call, and it is the list endpoint -- not search.
+        self.assertEqual(gh_calls.call_count, 1)
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:2], ('issue', 'list'))
+        self.assertEqual(args[args.index('--repo') + 1], 'canonical/operator')
+        self.assertEqual(args[args.index('--state') + 1], 'all')
+        self.assertEqual(args[args.index('--json') + 1], 'number,body,comments')
+
+    def test_marker_in_a_comment_is_found_too(self):
+        comment = 'failed again\n\n<!-- ai-failure-notifications:run=999:origin=comment -->'
+        listing = json.dumps(
+            [
+                {
+                    'number': 2601,
+                    'body': 'an older failure thread',
+                    'comments': [{'body': comment}],
+                }
+            ]
+        )
+        with mock.patch.object(afn, 'gh', side_effect=self._gh([listing])):
+            enriched, kind, number = afn.locate_run_markers('canonical/operator', '999')
+        self.assertEqual((enriched, kind, number), (None, 'comment', 2601))
+
+    def test_search_is_a_fallback_when_the_listing_misses(self):
+        listing = json.dumps([{'number': 2700, 'body': 'unrelated', 'comments': []}])
+        search = json.dumps([{'number': 2658}])
+        view = json.dumps(
+            {
+                'body': 'placeholder\n\n<!-- ai-failure-notifications:run=999:origin=new -->',
+                'comments': [],
+            }
+        )
+        gh_calls = self._gh([listing, search, view])
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            enriched, kind, number = afn.locate_run_markers('canonical/operator', '999')
+        self.assertEqual((enriched, kind, number), (None, 'new', 2658))
+        self.assertEqual(gh_calls.call_args_list[1].args[:2], ('search', 'issues'))
+
+    def test_an_unindexed_marker_still_resolves(self):
+        """The regression this change exists for.
+
+        Search returns nothing (the marker is not indexed yet) but the issue is
+        right there in the listing. Before the fix this returned all-None and
+        main() opened a duplicate issue.
+        """
+        listing = json.dumps(
+            [
+                {
+                    'number': 2658,
+                    'body': 'placeholder\n\n<!-- ai-failure-notifications:run=999:origin=new -->',
+                    'comments': [],
+                }
+            ]
+        )
+        with mock.patch.object(afn, 'gh', side_effect=self._gh([listing, '[]'])):
+            enriched, kind, number = afn.locate_run_markers('canonical/operator', '999')
+        self.assertEqual((enriched, kind, number), (None, 'new', 2658))
+
+    def test_rung_zero_sig_marker_is_found_in_the_listing(self):
+        listing = json.dumps(
+            [
+                {
+                    'number': 2658,
+                    'body': 'enriched body\n\n<!-- ai-failure-notifications:run=999:sig=abc123 -->',
+                    'comments': [],
+                }
+            ]
+        )
+        with mock.patch.object(afn, 'gh', side_effect=self._gh([listing])):
+            enriched, _, _ = afn.locate_run_markers('canonical/operator', '999')
+        self.assertEqual(enriched, 2658)
 
 
 class NormalisationTests(unittest.TestCase):

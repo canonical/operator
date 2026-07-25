@@ -57,6 +57,10 @@ MARKER_PREFIX = 'ai-failure-notifications'
 DEFAULT_MODEL = 'deepseek/deepseek-chat'  # DeepSeek V3 on OpenRouter.
 CLOSED_CANDIDATE_WINDOW_DAYS = 14
 MAX_CANDIDATES = 3
+# How many recently-updated issues to scan for the notifier's marker. The
+# artefact we are looking for was touched minutes ago, so this only has to
+# cover issue churn in that window; 50 is far more than `operator` sees.
+RECENT_ISSUE_SCAN = 50
 
 # Colour escapes, which Actions logs are full of. Two alternatives, because
 # the logs contain both the real thing and a mangled form where the ESC byte
@@ -951,8 +955,58 @@ def fetch_issue_texts(repo: str, number: int) -> list[str]:
     return texts
 
 
+def recent_issue_texts(repo: str, limit: int = RECENT_ISSUE_SCAN) -> list[tuple[int, str]]:
+    """Return (number, text) pairs for the `limit` most recently updated issues.
+
+    Bodies and comment bodies both, since a notifier marker with
+    `origin=comment` lives in a comment rather than the body.
+    """
+    data = (
+        gh_json(
+            'issue',
+            'list',
+            '--repo',
+            repo,
+            '--state',
+            'all',
+            '--limit',
+            str(limit),
+            '--json',
+            'number,body,comments',
+        )
+        or []
+    )
+    texts: list[tuple[int, str]] = []
+    for issue in data:
+        number = issue['number']
+        texts.append((number, issue.get('body') or ''))
+        for comment in issue.get('comments') or []:
+            texts.append((number, comment.get('body') or ''))
+    return texts
+
+
 def locate_run_markers(repo: str, run_id: str) -> tuple[int | None, str | None, int | None]:
-    """Search `repo` for markers belonging to `run_id` and classify them."""
+    """Find the markers belonging to `run_id` and classify them.
+
+    Scans the most recently updated issues first, and only falls back to
+    `gh search issues` if that finds nothing.
+
+    The ordering matters, and is the whole point of doing it this way. The
+    notifier stamps its marker moments before this workflow runs, and GitHub's
+    issue *search* index is not read-your-writes -- a marker that has not been
+    indexed yet reads as "no notifier marker found", and main() responds by
+    opening a *second* issue for a run that already has one. The issue *list*
+    endpoint has no such lag, and the artefact the notifier just touched is by
+    construction among the most recently updated issues in the repo.
+
+    Search remains as a fallback for the one case the list cannot cover: a repo
+    busy enough that more than `RECENT_ISSUE_SCAN` issues were updated in
+    between, where a stale index still beats no lookup at all.
+    """
+    markers = find_run_markers(recent_issue_texts(repo), run_id)
+    if markers != (None, None, None):
+        return markers
+
     hits = search_issue_numbers(repo, f'{MARKER_PREFIX}:run={run_id}')
     texts: list[tuple[int, str]] = []
     for number in hits:
