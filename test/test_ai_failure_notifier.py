@@ -204,13 +204,14 @@ class SignatureExtractionTests(unittest.TestCase):
         )
 
     def test_parse_job_log_pytest_failures_and_summary_bound(self):
+        ts = '2026-06-25T01:40:15.0000000Z '
         log = '\n'.join(
             [
-                '2026-06-25T01:40:15.0000000Z ============ short test summary info ============',
-                '2026-06-25T01:40:15.0000000Z FAILED tests/unit/test_x.py::test_a - AssertionError: x',
-                '2026-06-25T01:40:15.0000000Z ERROR tests/unit/test_x.py::test_b - PendingDeprecat...',
-                '2026-06-25T01:40:15.0000000Z ============ 2 failed in 1.23s ============',
-                '2026-06-25T01:40:15.0000000Z some trailing noise, not part of the summary',
+                f'{ts}============ short test summary info ============',
+                f'{ts}FAILED tests/unit/test_x.py::test_a - AssertionError: x',
+                f'{ts}ERROR tests/unit/test_x.py::test_b - PendingDeprecat...',
+                f'{ts}============ 2 failed in 1.23s ============',
+                f'{ts}some trailing noise, not part of the summary',
             ]
         )
         pytest_failures, go_failures, _tb, _tail = afn.parse_job_log(log)
@@ -827,7 +828,7 @@ class MarkerLookupConsistencyTests(unittest.TestCase):
             [
                 {
                     'number': 2658,
-                    'body': 'enriched body\n\n<!-- ai-failure-notifications:run=999:sig=abc123 -->',
+                    'body': 'enriched\n\n<!-- ai-failure-notifications:run=999:sig=abc123 -->',
                     'comments': [],
                 }
             ]
