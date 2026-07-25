@@ -1,8 +1,17 @@
 name: Notify on scheduled failure
 
-# Reusable workflow: opens an issue when a scheduled workflow fails.
-# Callers gate the invocation with `if: failure() && github.event_name == 'schedule'`
-# and pass `permissions: issues: write`.
+# Reusable workflow: opens (or comments on) an issue when a scheduled
+# workflow fails. Callers gate the invocation with
+# `if: failure() && github.event_name == 'schedule'` and pass
+# `permissions: issues: write`.
+#
+# This is the first of two stages: a cheap, deterministic, always-works
+# dedup pre-check, with no LLM dependency and no secrets. The second,
+# .github/workflows/ai-failure-enrich.yaml, is triggered separately by
+# `workflow_run` on this workflow's callers, and rewrites whatever this one
+# produced into a triaged artefact. Keeping them separate is what lets this
+# workflow keep its guarantee: if the enricher is unprovisioned or broken, a
+# notification still happens.
 
 on:
   workflow_call:
@@ -13,14 +22,45 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Create issue on failure
+      - name: Create or comment on issue, deduping coarsely by workflow name
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that called this one.
           REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh issue create \
-            --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
+          set -euo pipefail
+          marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
+
+          # Prefer the scheduled-failure label once it exists in this repo
+          # (creating it is a separate, centrally-managed change); an
+          # unlabelled title/body search still works fine as the pre-check in
+          # the meantime.
+          label_filter=()
+          if gh label list --repo "$REPO" --json name -q '.[].name' | grep -qx 'scheduled-failure'; then
+            label_filter=(--label scheduled-failure)
+          fi
+
+          # Match on the workflow name alone, not the full placeholder
+          # sentence: the enricher rewrites title and body, but always
+          # preserves a "Workflow: <name>" footer line specifically so this
+          # search keeps working after enrichment. Deliberately not an
+          # `in:title` search either -- on a corpus of past scheduled
+          # failures, issues that a human had retitled kept the workflow name
+          # in the body but had lost it from the title.
+          match=$(gh issue list --repo "$REPO" --state open "${label_filter[@]}" \
+            --search "\"$WORKFLOW_NAME\"" \
+            --json number --limit 1 -q '.[0].number // empty')
+
+          if [[ -n "$match" ]]; then
+            comment_body="Scheduled workflow '$WORKFLOW_NAME' failed again: $RUN_URL"$'\n\n'"${marker}comment -->"
+            gh issue comment "$match" --repo "$REPO" --body "$comment_body"
+          else
+            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"${marker}new -->"
+            create_args=(--repo "$REPO" --title "Scheduled workflow '$WORKFLOW_NAME' failed" --body "$issue_body")
+            if [[ ${#label_filter[@]} -gt 0 ]]; then
+              create_args+=(--label scheduled-failure)
+            fi
+            gh issue create "${create_args[@]}"
+          fi

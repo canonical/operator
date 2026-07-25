@@ -1,0 +1,119 @@
+name: AI-enrich scheduled-failure notification
+
+# The second of two stages. The first,
+# .github/workflows/notify-scheduled-failure.yaml, always creates or comments
+# on a placeholder issue with no LLM involved. This workflow fires after a
+# scheduled-workflow caller of that notifier completes, and tries to rewrite
+# whatever it produced into a triaged, deduplicated artefact.
+#
+# `workflow_run` cannot target notify-scheduled-failure.yaml directly --
+# reusable workflows invoked via `workflow_call` don't get an independent run
+# for `workflow_run` to subscribe to. Instead this targets the *callers* (the
+# scheduled workflows that `uses:` it); their overall conclusion is
+# `failure` whenever the job that triggered notify-scheduled-failure.yaml
+# failed, which is the same condition those callers gate the notifier call
+# on. Keep this list in sync with any workflow whose
+# `open-issue-on-failure-if-scheduled` job calls notify-scheduled-failure.yaml
+# (grep .github/workflows/ for `notify-scheduled-failure` to check).
+
+# zizmor flags every `workflow_run` trigger as dangerous, because the usual
+# uses of it are: download an artifact from the triggering (potentially
+# fork-controlled) run and trust it, or check out
+# `github.event.workflow_run.head_sha` and execute it with this workflow's
+# secrets and write token. Neither happens here:
+#
+#   - no artifact is downloaded;
+#   - `actions/checkout` takes no `ref`, so it checks out `GITHUB_SHA`, which
+#     for `workflow_run` is the default branch tip, never the triggering run's
+#     ref, and it uses `persist-credentials: false`;
+#   - every `github.event.workflow_run.*` value reaches the script through
+#     `env:`, never interpolated into a `run:` block, so there is no template
+#     injection surface;
+#   - the jobs gate on `github.event.workflow_run.event == 'schedule'`, and a
+#     fork pull request produces `event == 'pull_request'`, so a fork cannot
+#     trigger this at all. Every run that reaches it originates from
+#     `schedule:` on the default branch.
+#
+# `workflow_run` is also not substitutable here: the notifier is a *reusable*
+# workflow invoked via `workflow_call`, which gets no independent run for
+# `workflow_run` to subscribe to, so this subscribes to its callers instead.
+# The alternative is splicing an enrichment call into all seven callers, which
+# is what the two-stage design exists to avoid.
+#
+on:  # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows:
+      - "Example Charm charmcraft test"
+      - "Example Charm Integration Tests"
+      - "ops Integration Tests"
+      - "ops Smoke Tests"
+      - "TIOBE Quality Checks"
+      - "Update Best Practices Doc"
+      - "Update Charm Pins"
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  enrich:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'schedule' }}
+    runs-on: ubuntu-latest
+    environment: ai-failure-triage
+    permissions:
+      issues: write
+    outputs:
+      handled: ${{ steps.enrich.outputs.handled }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - name: Extract signature, dedupe, ask the LLM, apply
+        id: enrich
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.event.workflow_run.repository.full_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          # Secret and variable come from the `ai-failure-triage`
+          # environment, scoped to this workflow so the OpenRouter key is not
+          # readable by anything else in the repo. Each repo adopting this
+          # provisions its own. Absent key -> the script uses the plain
+          # fallback body without calling OpenRouter (see
+          # ai_failure_notifier.py main()).
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: uv run .github/scripts/ai_failure_notifier.py
+
+  # Last-resort fallback, so a failure notification is never lost. The
+  # `enrich` job has its own internal fallbacks for a missing API key, an
+  # OpenRouter error or invalid model output; this covers the case where it
+  # never gets far enough to use them -- network fully down, `uv run` itself
+  # failing, an unhandled exception. Deliberately the simplest thing that
+  # can work: one `gh issue create`, no script, no secrets.
+  #
+  # `always()` plus checking `needs.enrich.outputs.handled` (rather than
+  # `needs.enrich`'s job status) means this fires both when `enrich` goes red
+  # AND when it somehow succeeds without having handled anything.
+  plain-fallback:
+    needs: [enrich]
+    if: >-
+      ${{ always() && github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'schedule' &&
+      needs.enrich.outputs.handled != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create a plain issue (fallback)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          REPO: ${{ github.event.workflow_run.repository.full_name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          gh issue create \
+            --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
