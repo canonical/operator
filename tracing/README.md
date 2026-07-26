@@ -18,7 +18,7 @@ Please add `ops[tracing]` to your charm's dependencies, rather than this package
 ## Documentation
 
 Comprehensive documentation for the Ops library, including the tracing feature, is available at:
-[Ops documentation](https://documentation.ubuntu.com/ops/latest/).
+[Ops documentation](https://canonical.com/juju/docs/ops/latest/).
 
 You’ll find setup instructions, usage examples, and best practices for leveraging the tracing functionality.
 

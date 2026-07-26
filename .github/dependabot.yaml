@@ -1,0 +1,119 @@
+# Routine version-update sweeps only. CVE patches are raised by the
+# repo-level "Dependabot security updates" toggle (managed in
+# canonical-repo-automation: features.dependabot_security_updates = true),
+# which is event-driven and does not honour the schedule below.
+version: 2
+
+updates:
+  # ===================================================================
+  # GitHub Actions: routine lane (monthly, single grouped PR)
+  # ===================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 100
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # ===================================================================
+  # Python (uv), root: routine lane (monthly, grouped along three seams)
+  # ===================================================================
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 100
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      # Charm Tech's own releases (we trust the release).
+      charm-tech:
+        patterns:
+          - "jubilant"
+          - "pytest-jubilant"
+      # Linters / type-checkers / formatters / dev tooling. Majors ride along;
+      # we do not pin these and a major bump is low-risk to review in a batch.
+      dev-tooling:
+        patterns:
+          - "ruff"
+          - "pyright"
+          - "ty"
+          - "codespell"
+          - "coverage"
+          - "pre-commit"
+          - "types-*"
+          - "zizmor"
+          - "mypy"
+          - "flake8"
+          - "pylint"
+      # Test runner + other shared test deps.
+      test-deps:
+        patterns:
+          - "pytest"
+          - "pytest-*"
+      # Everything else, minor + patch only. A runtime MAJOR falls through
+      # to its own ungrouped PR so it never silently rides a patch bundle.
+      runtime:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ===================================================================
+  # Python (uv), examples/httpbin-demo: routine lane (same shape as root)
+  # ===================================================================
+  - package-ecosystem: "uv"
+    directory: "/examples/httpbin-demo"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 100
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      charm-tech:
+        patterns:
+          - "ops"
+          - "ops-scenario"
+          - "ops-tracing"
+          - "jubilant"
+          - "pytest-jubilant"
+      dev-tooling:
+        patterns:
+          - "ruff"
+          - "pyright"
+          - "ty"
+          - "codespell"
+          - "coverage"
+          - "pre-commit"
+          - "types-*"
+          - "zizmor"
+      test-deps:
+        patterns:
+          - "pytest"
+          - "pytest-*"
+      runtime:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

@@ -7,9 +7,8 @@ import dataclasses
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-import jsonpatch  # type: ignore
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
 from scenario.state import _Event
 
@@ -58,7 +57,29 @@ def trigger(
     return state_out
 
 
-def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
+def _escape(key: str) -> str:
+    # RFC 6902 JSON Pointer escaping: ~ -> ~0, / -> ~1 (order matters).
+    return key.replace('~', '~0').replace('/', '~1')
+
+
+def _dict_diff(a: Any, b: Any, path: str, out: list[dict[str, Any]]) -> None:
+    # Emit RFC 6902-shaped patch ops describing how to transform `a` into `b`.
+    # Recurses into dicts; treats list / scalar differences as whole-value replaces.
+    if isinstance(a, dict) and isinstance(b, dict):
+        ad = cast('dict[str, Any]', a)
+        bd = cast('dict[str, Any]', b)
+        for key in ad.keys() - bd.keys():
+            out.append({'op': 'remove', 'path': f'{path}/{_escape(key)}'})
+        for key in bd.keys() - ad.keys():
+            out.append({'op': 'add', 'path': f'{path}/{_escape(key)}', 'value': bd[key]})
+        for key in ad.keys() & bd.keys():
+            _dict_diff(ad[key], bd[key], f'{path}/{_escape(key)}', out)
+        return
+    if a != b:
+        out.append({'op': 'replace', 'path': path, 'value': b})
+
+
+def state_delta(self: State, other: State) -> list[dict[str, Any]]:
     dict_other = dataclasses.asdict(other)
     dict_self = dataclasses.asdict(self)
     for attr in (
@@ -73,7 +94,6 @@ def jsonpatch_delta(self: State, other: State) -> list[dict[str, Any]]:
     ):
         dict_other[attr] = [dataclasses.asdict(o) for o in dict_other[attr]]
         dict_self[attr] = [dataclasses.asdict(o) for o in dict_self[attr]]
-    # The jsonpatch library is untyped.
-    # See: https://github.com/stefankoegl/python-json-patch/issues/158
-    patch = jsonpatch.make_patch(dict_other, dict_self).patch  # type: ignore
-    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])  # type: ignore
+    patch: list[dict[str, Any]] = []
+    _dict_diff(dict_other, dict_self, '', patch)
+    return sorted(patch, key=lambda obj: obj['path'] + obj['op'])

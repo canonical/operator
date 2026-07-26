@@ -35,7 +35,8 @@ from .state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .context import Context
+    from opentelemetry.sdk.trace import ReadableSpan
+
     from .state import State, _CharmSpec, _Event
 
 EVENT_REGEX = re.compile(_event_regex)
@@ -112,6 +113,8 @@ class UnitStateDB:
 class Ops(_Manager, Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
+    charm: CharmType
+
     def __init__(
         self,
         state: State,
@@ -126,7 +129,7 @@ class Ops(_Manager, Generic[CharmType]):
         self.charm_spec = charm_spec
         self.store = None
         self.captured_events: list[ops.EventBase] = []
-        self.trace_data = []
+        self.trace_data: Sequence[ReadableSpan] = ()
 
         try:
             import ops_tracing._mock  # break circular import
@@ -250,7 +253,7 @@ class Ops(_Manager, Generic[CharmType]):
                 obj = getattr(obj, step)
         except AttributeError:
             raise BadOwnerPath(
-                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
+                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from None
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
@@ -271,11 +274,13 @@ class Ops(_Manager, Generic[CharmType]):
         super().destroy()
         # _Manager.run() closes the framework in its finally block, but tests
         # often use `with runtime.exec(...) as mgr:` without calling
-        # `mgr.run()`. Close defensively so the SQLite storage is released;
-        # framework.close() is idempotent.
-        framework = getattr(self, 'framework', None)
-        if framework is not None:
-            framework.close()
+        # `mgr.run()`. Close defensively so the SQLite storage is released.
+        # Only close if it hasn't already happened: Framework.close() itself
+        # is idempotent, but charm libraries (for example tempo's
+        # charm_tracing) replace the instance's close with a wrapper that is
+        # not safe to invoke twice.
+        if not self.framework._closed:
+            self.framework.close()
         if self._tracing_mock:
             assert self._tracing_exporter
             self.trace_data = self._tracing_exporter.get_finished_spans()

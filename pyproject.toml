@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.7.1",
+    "ops-scenario==8.9.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.7.1",
+    "ops-tracing==3.9.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -37,9 +37,9 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.14",
-    "codespell==2.4.1",
-    "zizmor==1.11.0",
+    "ruff==0.15.20",
+    "codespell==2.4.2",
+    "zizmor==1.26.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -51,7 +51,6 @@ mypy = [  # used to type check example charms in CI
 unit = [
     "ops[testing,tracing]",
     "pytest~=9.0",
-    "jsonpatch~=1.33",
     "pydantic~=2.10",
 ]
 xdist = [
@@ -72,20 +71,20 @@ integration = [
     "httpx~=0.28",
 ]
 release = [
-    "packaging~=24.0",
+    "packaging>=24,<27",
     "pygithub~=2.6",
-    "rich~=14.1",
+    "rich>=14.1,<16.0",
 ]
 tiobe = [
     "flake8==7.3.0",
-    "pylint==4.0.5",
+    "pylint==4.0.6",
 ]
 
 [project.urls]
-"Homepage" = "https://documentation.ubuntu.com/ops/latest/"
+"Homepage" = "https://canonical.com/juju/docs/ops/latest/"
 "Repository" = "https://github.com/canonical/operator"
 "Issues" = "https://github.com/canonical/operator/issues"
-"Documentation" = "https://documentation.ubuntu.com/ops/latest/"
+"Documentation" = "https://canonical.com/juju/docs/ops/latest/"
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
@@ -285,7 +284,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
 ]

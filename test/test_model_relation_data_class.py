@@ -502,6 +502,34 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
     }
 
 
+@pytest.mark.parametrize('charm_class', [c for c in _test_classes if c is not MyCharm])
+def test_relation_load_unit_data_ignores_juju_keys(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            saved = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
+            event.relation.save(saved, self.unit, encoder=self.encoder)
+            assert 'ingress-address' in event.relation.data[self.unit]
+            assert 'private-address' in event.relation.data[self.unit]
+            self.data = event.relation.load(self.databag_class, self.unit, decoder=self.decoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db',
+        local_unit_data={
+            'egress-subnets': '192.0.2.0',
+            'ingress-address': '192.0.2.0',
+            'private-address': '192.0.2.0',
+        },
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.foo == 'value'
+    assert obj.bar == 1
+    assert obj.baz == ['a', 'b']
+
+
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_invalid(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')

@@ -275,7 +275,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cosl", specifier = ">=1.9.1" },
+    { name = "cosl", specifier = ">=1.9.1,<2" },
     { name = "ops", specifier = "~=3.7" },
 ]
 

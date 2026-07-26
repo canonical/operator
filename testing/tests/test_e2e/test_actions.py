@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from scenario import Context
+from scenario.errors import StateValidationError
 from scenario.state import State, _Action, _next_action_id
 
 from ops._private.harness import ActionFailed
@@ -216,6 +217,20 @@ def test_two_actions_same_context():
 def test_positional_arguments():
     with pytest.raises(TypeError):
         _Action('foo', {})  # type: ignore
+
+
+@pytest.mark.parametrize('name', ('do-backup', 'a', '0', 'do-backup-2', '00-7'))
+def test_action_name_valid(name: str):
+    assert _Action(name).name == name
+
+
+@pytest.mark.parametrize('name', ('do_backup', 'Backup', '-backup', 'backup-', '', 'bäckup'))
+def test_action_name_invalid(name: str):
+    # Juju rejects actions.yaml entries whose names are not lowercase
+    # alphanumeric-and-hyphen, starting and ending alphanumeric (notably,
+    # underscores are not allowed).
+    with pytest.raises(StateValidationError):
+        _Action(name)
 
 
 def test_default_arguments():

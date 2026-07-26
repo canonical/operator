@@ -11,12 +11,12 @@ jobs:
   TICS:
     runs-on: [self-hosted, reactive, amd64, tiobe, noble]
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
         with:
           persist-credentials: false
 
         # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       - run: uv tool install tox --with tox-uv
 
       - name: Generate coverage report
@@ -35,3 +35,10 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: operator
           installTics: true
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [TICS]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

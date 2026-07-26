@@ -62,6 +62,35 @@ def test_event_type(evt: str, expected_type: _EventType):
     assert event._is_builtin_event(spec) is (expected_type is not _EventType.CUSTOM)
 
 
+@pytest.mark.parametrize(
+    'evt, expected_juju_name',
+    (
+        # For events tied to a named entity (a relation endpoint, storage, or
+        # container), Juju keeps the entity name -- the prefix -- exactly as it
+        # is declared in the charm metadata, and only uses dashes in the
+        # event-type suffix. So an entity declared with dashes keeps its
+        # dashes, and one declared with underscores keeps its underscores.
+        ('foo_relation_changed', 'foo-relation-changed'),
+        ('receive-ca-cert_relation_changed', 'receive-ca-cert-relation-changed'),
+        ('receive_ca_cert_relation_changed', 'receive_ca_cert-relation-changed'),
+        ('my-storage_storage_attached', 'my-storage-storage-attached'),
+        ('my_storage_storage_detaching', 'my_storage-storage-detaching'),
+        ('my-container_pebble_ready', 'my-container-pebble-ready'),
+        ('my_container_pebble_ready', 'my_container-pebble-ready'),
+        # Events that are not tied to such an entity use dashes throughout.
+        ('config_changed', 'config-changed'),
+        ('update_status', 'update-status'),
+        ('pre_series_upgrade', 'pre-series-upgrade'),
+        ('secret_changed', 'secret-changed'),
+        ('start', 'start'),
+    ),
+)
+def test_event_juju_name(evt: str, expected_juju_name: str):
+    # See #2511.
+    event = _Event(evt)
+    assert event._juju_name == expected_juju_name
+
+
 def test_emitted_framework():
     ctx = Context(ops.CharmBase, meta={'name': 'joop'}, capture_framework_events=True)
     ctx.run(ctx.on.update_status(), State())

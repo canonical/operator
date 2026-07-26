@@ -13,10 +13,12 @@ import copy
 import functools
 import pathlib
 import shutil
+import sys
 import tempfile
 import weakref
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Generic
 
 from typing_extensions import deprecated
@@ -85,6 +87,7 @@ class Manager(Generic[CharmType]):
         self._state_in = state_in
 
         self._emitted: bool = False
+        self._wrapped_ctx_exited: bool = False
 
         self.ops: Ops[CharmType] | None = None
 
@@ -121,23 +124,49 @@ class Manager(Generic[CharmType]):
                 'you should __enter__ this context manager before running it',
             )
         self._emitted = True
-        self.ops.run()
-
-        # wrap up Runtime.exec() so that we can gather the output state
-        self._wrapped_ctx.__exit__(None, None, None)
+        try:
+            self.ops.run()
+        except BaseException:
+            # On failure, hand the in-flight exception to Runtime.exec()'s
+            # __exit__ so it can tear down the env snapshot, then propagate.
+            self._exit_wrapped_ctx(*sys.exc_info())
+            raise
+        # On success we must pass (None, None, None) explicitly — not
+        # sys.exc_info(). When run() is invoked from Manager.__exit__ (the
+        # implicit-run path), sys.exc_info() reports the *outer* exception
+        # that triggered __exit__, and leaking that into Runtime.exec()'s
+        # happy-path teardown would mask the real result (e.g. ActionFailed
+        # raised on normal exit when the charm called evt.fail()).
+        self._exit_wrapped_ctx(None, None, None)
 
         assert self._ctx._output_state is not None
         return self._ctx._output_state
 
+    def _exit_wrapped_ctx(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Close the Runtime.exec() context exactly once."""
+        if self._wrapped_ctx_exited:
+            return
+        self._wrapped_ctx_exited = True
+        self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
-        if not self._emitted:
-            logger.debug(
-                "user didn't emit the event within the context manager scope. "
-                'Doing so implicitly upon exit...',
-            )
-            self.run()
-        if exc_type is not None:
-            self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+        try:
+            if not self._emitted:
+                logger.debug(
+                    "user didn't emit the event within the context manager scope. "
+                    'Doing so implicitly upon exit...',
+                )
+                self.run()
+        finally:
+            # Always tear down Runtime.exec(), even if run() raised. Leaving it
+            # open leaks the env snapshot (including OPERATOR_DISPATCH) into
+            # subsequent tests in the same process.
+            self._exit_wrapped_ctx(exc_type, exc_val, exc_tb)
 
 
 def _copy_doc(original_func: Callable[..., Any]):
@@ -693,7 +722,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # pyright: ignore[reportAssignmentType]
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
@@ -724,8 +753,13 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self._charm_spec.meta.get('name')
-        self.unit_id = unit_id
+        # If neither ``app_name`` nor a ``name`` in the charm metadata is
+        # provided, fall back to an empty string. Raising here would prevent
+        # tests from asserting on the downstream failure that Ops raises when
+        # it later looks up the missing metadata (see
+        # ``test_init_and_run_with_bad_meta``).
+        self.app_name = app_name or self._charm_spec.meta.get('name', '')
+        self.unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
@@ -870,11 +904,11 @@ class Context(Generic[CharmType]):
                 'leader_elected',
                 'collect_app_status',
                 'collect_unit_status',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}()'
-            elif event in ('secret_changed', 'secret_rotate'):  # type: ignore
+            elif event in ('secret_changed', 'secret_rotate'):
                 suggested = f'{event}(my_secret)'
-            elif event in ('secret_expired', 'secret_remove'):  # type: ignore
+            elif event in ('secret_expired', 'secret_remove'):
                 suggested = f'{event}(my_secret, revision=1)'
             elif event in (
                 'relation_created',
@@ -882,9 +916,9 @@ class Context(Generic[CharmType]):
                 'relation_changed',
                 'relation_departed',
                 'relation_broken',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}(my_relation)'
-            elif event in ('storage_attached', 'storage_detaching'):  # type: ignore
+            elif event in ('storage_attached', 'storage_detaching'):
                 suggested = f'{event}(my_storage)'
             elif event == 'pebble_ready':
                 suggested = f'{event}(my_container)'

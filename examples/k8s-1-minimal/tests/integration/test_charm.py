@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # The integration tests use the Jubilant library and the pytest-jubilant plugin.
-# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+# See https://canonical.com/juju/docs/ops/latest/howto/write-integration-tests-for-a-charm/
 #
 # pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
 # The `charm` fixture is defined in conftest.py.
@@ -39,3 +39,9 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     }
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_active)
+
+
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
+    expected_version = "2.1.0"  # Hardcoded for simplicity.
+    juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)

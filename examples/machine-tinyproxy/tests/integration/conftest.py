@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # The integration tests use the Jubilant library and the pytest-jubilant plugin.
-# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+# See https://canonical.com/juju/docs/ops/latest/howto/write-integration-tests-for-a-charm/
 
 import os
 import pathlib

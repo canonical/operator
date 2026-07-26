@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 
 import jubilant
@@ -58,15 +59,26 @@ def test_relation_units(build_relation_charm: Callable[[], str], juju: jubilant.
     peer_units.remove(f'{charm_name}/0')
     db_units = set(status.get_units(db))
     ingress_units = set(status.get_units(ingress))
-    task = juju.run(f'{charm_name}/0', 'get-units')
-    assert task.success, task.message
-    ops_units = json.loads(task.results['units'])
 
-    # The keys in the action results are the endpoint names, and the values are
-    # the unit names received from Juju.
-    assert all(unit.startswith('test-db/') for unit in ops_units['db'])
-    assert all(unit.startswith('test-ingress/') for unit in ops_units['ingress'])
-    assert all(unit.startswith('test-relation/') for unit in ops_units['peer'])
-    assert set(ops_units['db']) == db_units
-    assert set(ops_units['ingress']) == ingress_units
-    assert set(ops_units['peer']) == peer_units
+    # Relation membership propagates to each unit asynchronously, even after
+    # all units report active, so retry until Juju has caught up.
+    deadline = time.time() + 300
+    while True:
+        task = juju.run(f'{charm_name}/0', 'get-units')
+        assert task.success, task.message
+        # The keys in the action results are the endpoint names, and the
+        # values are the unit names received from Juju. An endpoint whose
+        # relation has no remote units yet is absent entirely.
+        ops_units: dict[str, list[str]] = json.loads(task.results['units'])
+        complete = (
+            set(ops_units.get('db', [])) == db_units
+            and set(ops_units.get('ingress', [])) == ingress_units
+            and set(ops_units.get('peer', [])) == peer_units
+        )
+        if complete or time.time() > deadline:
+            break
+        time.sleep(10)
+
+    assert set(ops_units.get('db', [])) == db_units
+    assert set(ops_units.get('ingress', [])) == ingress_units
+    assert set(ops_units.get('peer', [])) == peer_units

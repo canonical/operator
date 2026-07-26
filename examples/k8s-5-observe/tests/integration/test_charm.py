@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # The integration tests use the Jubilant library and the pytest-jubilant plugin.
-# See https://documentation.ubuntu.com/ops/latest/howto/write-integration-tests-for-a-charm/
+# See https://canonical.com/juju/docs/ops/latest/howto/write-integration-tests-for-a-charm/
 #
 # pytest-jubilant provides a module-scoped `juju` fixture that creates a temporary Juju model.
 # The `charm` fixture is defined in conftest.py.
@@ -31,7 +31,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
@@ -48,6 +48,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     # Deploy the charm and wait for it to report blocked, as it needs Postgres.
     juju.deploy(charm, app=APP_NAME, resources=resources)
     juju.wait(jubilant.all_blocked)
+
+
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
+    expected_version = "2.1.0"  # Hardcoded for simplicity.
+    juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)
 
 
 @pytest.mark.juju_setup
@@ -99,7 +105,7 @@ def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
 
 def _get_loki_logs(loki_api_url: str) -> list[str] | None:
     """Wait for logs to be available from Loki and return them."""
-    for attempt in range(60):
+    for attempt in range(3 * 60):
         if attempt:  # If not the first attempt, wait before retrying.
             time.sleep(1)
         response = requests.get(loki_api_url)

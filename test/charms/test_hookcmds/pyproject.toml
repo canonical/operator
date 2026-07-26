@@ -1,0 +1,11 @@
+[project]
+name = "test-hookcmds"
+version = "0.0.0.dev0"
+description = "A charm to integration-test ops.hookcmds."
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+]
+
+[tool.uv.sources]
+ops = { path = "ops.tar.gz" }

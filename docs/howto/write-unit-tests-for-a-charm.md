@@ -220,6 +220,29 @@ def test_charm_reports_workload_ready():
         ...
 ```
 
+## Treat warnings as errors
+
+Configure pytest to treat warnings as errors, so that your tests fail when code raises a warning. Warnings tell you about problems before they bite in production: a deprecation warning means an API your charm relies on is going away, and a resource warning often points to a real cleanup bug. With the default settings, these only appear in the test output, where they're easy to miss. In `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+]
+```
+
+This catches warnings raised in the test process: from your charm code, from Ops, and from your dependencies. Ops uses `DeprecationWarning` when an API is scheduled for removal, and `ResourceWarning` for cleanup bugs (for example, leaked Pebble connections), so failing on those gives you early notice. The same `filterwarnings` setting is used for unit and integration tests (and any others you might have), since pytest (or anything else driving the tests in-process, like Jubilant) can also surface warnings. Note that, when Juju is executing the charm in an integration test, warnings raised (from your charm code, Ops, and your non-test dependencies) will go to the Juju log, and not be test errors.
+
+If a dependency raises a warning that you can't do anything about, add an ignore filter for that specific warning, keeping `"error"` for everything else. For example:
+
+```toml
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+]
+```
+
 ## Run your tests
 
 Run all your tests with:

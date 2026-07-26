@@ -6,7 +6,7 @@ The `ops` library is a Python framework for developing and testing Kubernetes an
 
 > - `ops` is  [available on PyPI](https://pypi.org/project/ops/).
 > - The latest version of `ops` requires Python 3.10 or above.
-> - Read our [docs](https://documentation.ubuntu.com/ops/latest/) for tutorials, how-to guides, the library reference, and more.
+> - Read our [docs](https://canonical.com/juju/docs/ops/latest/) for tutorials, how-to guides, the library reference, and more.
 
 ## Give it a try
 
@@ -74,7 +74,7 @@ class OpsExampleCharm(ops.CharmBase):
         environment configuration for your specific workload.
 
         Learn more about interacting with Pebble at
-            https://documentation.ubuntu.com/ops/latest/reference/pebble/
+            https://canonical.com/juju/docs/ops/latest/reference/pebble/
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
@@ -87,7 +87,7 @@ class OpsExampleCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 ```
 
-> See more: [`ops.PebbleReadyEvent`](https://documentation.ubuntu.com/ops/latest/reference/ops/#ops.PebbleReadyEvent)
+> See more: [`ops.PebbleReadyEvent`](https://canonical.com/juju/docs/ops/latest/reference/ops/#ops.PebbleReadyEvent)
 
 - The `tests/unit/test_charm.py` file imports `ops.testing` and uses it to set up a unit test:
 
@@ -128,7 +128,7 @@ def test_httpbin_pebble_ready():
     assert state_out.unit_status == testing.ActiveStatus()
 ```
 
-> See more: [`ops.testing`](https://documentation.ubuntu.com/ops/latest/reference/ops-testing/)
+> See more: [`ops.testing`](https://canonical.com/juju/docs/ops/latest/reference/ops-testing/)
 
 
 Explore further, start editing the files, or skip ahead and pack the charm:
@@ -151,6 +151,6 @@ Congratulations, you’ve just built your first Kubernetes charm using `ops`!
 
 ## Next steps
 
-- Read the [docs](https://documentation.ubuntu.com/ops/latest/).
+- Read the [docs](https://canonical.com/juju/docs/ops/latest/).
 - Read our [Code of conduct](https://ubuntu.com/community/code-of-conduct) and join our [chat](https://matrix.to/#/#charmhub-ops:ubuntu.com) and [forum](https://discourse.charmhub.io/) or [open an issue](https://github.com/canonical/operator/issues).
 - Read our [CONTRIBUTING guide](https://github.com/canonical/operator/blob/main/HACKING.md) and contribute!

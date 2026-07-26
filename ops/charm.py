@@ -1347,6 +1347,11 @@ class CharmEvents(ObjectEvents):
 
         framework.observe(self.on["db"].relation_created, self._on_db_relation_created)
         framework.observe(self.on.workload_pebble_ready, self._on_workload_pebble_ready)
+
+    In the prefixed form, any hyphens in the metadata name are replaced by
+    underscores (a container named ``my-workload`` has a
+    ``my_workload_pebble_ready`` event), while the indexed form uses the
+    name exactly as it appears in the metadata (``self.on["my-workload"]``).
     """
 
     # NOTE: The one-line docstrings below are copied from the first line of

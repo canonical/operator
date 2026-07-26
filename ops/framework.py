@@ -120,22 +120,22 @@ class Handle:
 
     @property
     def parent(self) -> Handle | None:
-        """Return own parent handle."""
+        """The handle of the handle's parent."""
         return self._parent
 
     @property
     def kind(self) -> str:
-        """Return the handle's kind."""
+        """The handle's kind."""
         return self._kind
 
     @property
     def key(self) -> str | None:
-        """Return the handle's key."""
+        """The handle's key."""
         return self._key
 
     @property
     def path(self) -> str:
-        """Return the handle's path."""
+        """The handle's path."""
         return self._path
 
     @classmethod
@@ -647,6 +647,12 @@ class Framework(Object):
         self._breakpoint_welcomed: bool = False
         self._juju_debug_at = juju_debug_at or set()
 
+        # Set to True once close() has run. Callers that close defensively
+        # check this rather than calling close() again: charm libraries (for
+        # example tempo's charm_tracing) replace the instance's close with a
+        # wrapper that is not safe to invoke twice.
+        self._closed: bool = False
+
     def set_breakpointhook(self) -> Any | None:
         """Hook into ``sys.breakpointhook`` so the builtin ``breakpoint()`` works as expected.
 
@@ -669,6 +675,7 @@ class Framework(Object):
     def close(self) -> None:
         """Close the underlying backends."""
         self._storage.close()
+        self._closed = True
 
     def _track(self, obj: Serializable):
         """Track object and ensure it is the only object created using its handle path."""

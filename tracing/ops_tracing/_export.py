@@ -26,8 +26,8 @@ from typing import Sequence
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
+from . import _otlp_json
 from ._buffer import Buffer
-from .vendor import otlp_json
 
 EXPORT_TIMEOUT: int | float = 1  # seconds
 """How much time to give OTLP span exporter to push traces to the backend."""
@@ -80,7 +80,7 @@ class BufferingSpanExporter(SpanExporter):
             deadline = time.monotonic() + 6
 
             assert spans  # noqa: S101  # The BatchSpanProcessor won't call us if there's no data.
-            rv = self.buffer.pushpop((otlp_json.encode_spans(spans), otlp_json.CONTENT_TYPE))
+            rv = self.buffer.pushpop((_otlp_json.encode_spans(spans), _otlp_json.CONTENT_TYPE))
             assert rv  # noqa: S101  # We've just pushed something in.
             self.do_export(*rv)
 

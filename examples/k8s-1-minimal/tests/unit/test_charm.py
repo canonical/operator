@@ -12,35 +12,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# To learn more about testing, see https://documentation.ubuntu.com/ops/latest/explanation/testing/
+# To learn more about testing, see https://canonical.com/juju/docs/ops/latest/explanation/testing/
 
 import ops
+import pytest
 from ops import testing
 
 from charm import FastAPIDemoCharm
 
+# The default Pebble layer in the application image.
+# Defined in https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml
+ROCK_LAYER = ops.pebble.Layer(
+    {
+        "services": {
+            "fastapi": {
+                "override": "replace",
+                "summary": "FastAPI demo server",
+                "command": "/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000",
+                "startup": "enabled",
+                "environment": {"DEMO_SERVER_LOGFILE": "/tmp/demo_server.log"},
+                "on-success": "shutdown",
+                "on-failure": "shutdown",
+            }
+        },
+    }
+)
 
-def test_pebble_layer():
+
+def mock_get_version(port: int):
+    """Get a mock version string without executing the workload code."""
+    return "0.0.1"
+
+
+@pytest.fixture
+def mock_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("fastapi_demo.get_version", mock_get_version)
+
+
+def test_pebble_layer(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,
     )
     state_out = ctx.run(ctx.on.pebble_ready(container), state_in)
-    # Expected plan after Pebble ready with default config
-    expected_plan = {
-        "services": {
-            "fastapi-service": {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": "uvicorn api_demo_server.app:app --host=0.0.0.0 --port=8000",
-                "startup": "enabled",
-                # Since the environment is empty, Layer.to_dict() will not
-                # include it.
-            }
-        }
-    }
+    # Expected plan after Pebble ready (our charm doesn't add any layers).
+    expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
 
     # Check that we have the plan we expected:
     assert state_out.get_container(container.name).plan == expected_plan
@@ -48,6 +68,8 @@ def test_pebble_layer():
     assert state_out.unit_status == testing.ActiveStatus()
     # Check the service was started:
     assert (
-        state_out.get_container(container.name).service_statuses["fastapi-service"]
+        state_out.get_container(container.name).service_statuses["fastapi"]
         == ops.pebble.ServiceStatus.ACTIVE
     )
+    # Check the workload version is set:
+    assert state_out.workload_version == "0.0.1"

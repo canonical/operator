@@ -81,7 +81,7 @@ def _on_get_db_info_action(self, event: ops.ActionEvent) -> None:
 
     If the PostgreSQL charm is not integrated, the output is set to "No database connected".
 
-    Learn more about actions at https://documentation.ubuntu.com/ops/latest/howto/manage-actions/
+    Learn more about actions at https://canonical.com/juju/docs/ops/latest/howto/manage-actions/
     """
     params = event.load_params(GetDbInfoAction, errors="fail")
     db_data = self.fetch_database_relation_data()
@@ -110,7 +110,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, test that the basic action invocation works:
@@ -168,7 +168,9 @@ def test_get_db_info_action():
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -198,7 +200,9 @@ def test_get_db_info_action_show_password():
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},

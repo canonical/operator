@@ -164,6 +164,55 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
     assert isinstance(start, ops.StartEvent)
 
 
+def test_deferred_workload_event_hyphenated_container_name():
+    """A deferred event for a hyphenated container name must be re-emitted.
+
+    Regression test: the deferred handle path must use the Python-attribute
+    form of the event name (``workload_a_pebble_ready``), not the verbatim
+    container name, or ops silently drops the notice.
+    """
+    captured: list[ops.EventBase] = []
+
+    class HyphenatedCharm(ops.CharmBase):
+        META: typing.ClassVar[dict[str, typing.Any]] = {
+            'name': 'dashcharm',
+            'containers': {'workload-a': {}},
+            'requires': {'foo-bar': {'interface': 'baz'}},
+        }
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['workload-a'].pebble_ready, self._on_event)
+            framework.observe(self.on['foo-bar'].relation_changed, self._on_event)
+            framework.observe(self.on.update_status, self._on_event)
+
+        def _on_event(self, event: ops.EventBase):
+            captured.append(event)
+
+    ctx = Context(HyphenatedCharm, meta=HyphenatedCharm.META)
+    container = Container('workload-a', can_connect=True)
+    relation = Relation('foo-bar')
+    deferred_ready = ctx.on.pebble_ready(container).deferred(handler=HyphenatedCharm._on_event)
+    assert deferred_ready.handle_path == 'HyphenatedCharm/on/workload_a_pebble_ready[1]'
+    deferred_changed = ctx.on.relation_changed(relation).deferred(
+        handler=HyphenatedCharm._on_event
+    )
+    state_in = State(
+        containers={container},
+        relations={relation},
+        deferred=[deferred_ready, deferred_changed],
+    )
+
+    state_out = ctx.run(ctx.on.update_status(), state_in)
+
+    assert [e.handle.kind for e in captured] == [
+        'workload_a_pebble_ready',
+        'foo_bar_relation_changed',
+        'update_status',
+    ]
+    assert not state_out.deferred
+
+
 def test_defer_reemit_lifecycle_event(mycharm: type[ops.CharmBase]):
     ctx = Context(mycharm, meta=mycharm.META, capture_deferred_events=True)  # type: ignore
 

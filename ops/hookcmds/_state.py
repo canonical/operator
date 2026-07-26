@@ -54,7 +54,10 @@ def state_get(key: str | None) -> dict[str, str] | str:
     if key is not None:
         key_result: str = json.loads(stdout)
         return key_result
-    result: dict[str, str] = json.loads(stdout)
+    # On Juju 4, `state-get --format=json` returns `null` rather than `{}` when
+    # no state has been set. Remove the `or {}` once that is fixed upstream.
+    # See https://github.com/juju/juju/issues/22523.
+    result: dict[str, str] = json.loads(stdout) or {}
     return result
 
 

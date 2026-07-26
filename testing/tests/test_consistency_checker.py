@@ -83,14 +83,16 @@ def test_workload_event_without_container():
         _CharmSpec(MyCharm, {}),
     )
     notice = Notice('example.com/foo')
+    container = Container('foo', notices=[notice])
     assert_consistent(
-        State(containers={Container('foo', notices=[notice])}),
-        _Event('foo-pebble-custom-notice', container=Container('foo'), notice=notice),
+        State(containers={container}),
+        _Event('foo-pebble-custom-notice', container=container, notice=notice),
         _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
     )
+    container = Container('foo')
     assert_inconsistent(
-        State(containers={Container('foo')}),
-        _Event('foo-pebble-custom-notice', container=Container('foo'), notice=notice),
+        State(containers={container}),
+        _Event('foo-pebble-custom-notice', container=container, notice=notice),
         _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
     )
 
@@ -104,22 +106,33 @@ def test_check_info_container_matches_event():
     )
     layer = ops.pebble.Layer({'checks': {'http-check': {'override': 'replace', 'threshold': 3}}})
     for event in ('foo-pebble-check-failed', 'foo-pebble-check-recovered'):
+        container = Container('foo', check_infos={check}, layers={'base': layer})
         assert_consistent(
-            State(containers={Container('foo', check_infos={check}, layers={'base': layer})}),
-            _Event(event, container=Container('foo'), check_info=check),
+            State(containers={container}),
+            _Event(event, container=container, check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
         )
         # The check used in the event is missing from the input state.
+        container = Container('foo', layers={'base': layer})
         assert_inconsistent(
-            State(containers={Container('foo', layers={'base': layer})}),
-            _Event(event, container=Container('foo'), check_info=check),
+            State(containers={container}),
+            _Event(event, container=container, check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
         )
         # The check is in the wrong container.
+        container = Container('bar')
         assert_inconsistent(
-            State(containers={Container('foo', check_infos={check}), Container('bar')}),
-            _Event(event, container=Container('bar'), check_info=check),
+            State(containers={Container('foo', check_infos={check}), container}),
+            _Event(event, container=container, check_info=check),
             _CharmSpec(MyCharm, {'containers': {'foo': {}, 'bar': {}}}),
+        )
+        # The container name contains a hyphen.
+        hyphenated_event = event.replace('foo', 'foo-bar')
+        container = Container('foo-bar', check_infos={check}, layers={'base': layer})
+        assert_consistent(
+            State(containers={container}),
+            _Event(hyphenated_event, container=container, check_info=check),
+            _CharmSpec(MyCharm, {'containers': {'foo-bar': {}}}),
         )
 
 
@@ -230,11 +243,34 @@ def test_checkinfo_matches_layer(check: CheckInfo, consistent: bool):
             }
         }
     })
-    state = State(containers={Container('foo', check_infos={check}, layers={'base': layer})})
+    container = Container('foo', check_infos={check}, layers={'base': layer})
+    state = State(containers={container})
     asserter = assert_consistent if consistent else assert_inconsistent
     asserter(
         state,
-        _Event('foo-pebble-ready', container=Container('foo')),
+        _Event('foo-pebble-ready', container=container),
+        _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
+    )
+
+
+def test_checkinfo_matches_layer_with_defaults():
+    # Pebble fills in default values for attributes the plan omits, so a
+    # CheckInfo reporting the Pebble defaults must be considered consistent
+    # with a layer that does not specify them. See #2566.
+    layer = ops.pebble.Layer({
+        'checks': {'chk1': {'override': 'replace', 'exec': {'command': 'echo'}}}
+    })
+    check = CheckInfo(
+        'chk1',
+        level=ops.pebble.CheckLevel.UNSET,
+        startup=ops.pebble.CheckStartup.ENABLED,
+        threshold=3,
+    )
+    container = Container('foo', check_infos={check}, layers={'base': layer})
+    state = State(containers={container})
+    assert_consistent(
+        state,
+        _Event('foo-pebble-ready', container=container),
         _CharmSpec(MyCharm, {'containers': {'foo': {}}}),
     )
 

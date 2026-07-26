@@ -1,9 +1,12 @@
 # Leave a blank line at the end of this file to support concatenation
 backoff
 balancer's
+Borescope
+borescope
 breakpoint
 callables
 Canonical's
+configurator
 cosl
 databag
 databags
@@ -20,6 +23,7 @@ lightkube
 liveness
 manpages
 misconfiguration
+mitigations
 pathops
 Parca
 protobuf
@@ -31,12 +35,14 @@ replan
 repo
 requirers
 reusability
+sidecar
 snappass
 stderr
 stdout
 storages
 systemd
 subprocess
+teardown
 tinyproxy
 traceback
 tracebacks
