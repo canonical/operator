@@ -90,12 +90,19 @@ jobs:
   # `enrich` job has its own internal fallbacks for a missing API key, an
   # OpenRouter error or invalid model output; this covers the case where it
   # never gets far enough to use them -- network fully down, `uv run` itself
-  # failing, an unhandled exception. Deliberately the simplest thing that
-  # can work: one `gh issue create`, no script, no secrets.
+  # failing, an unhandled exception. Deliberately kept to `gh` alone, with no
+  # script and no secrets.
   #
   # `always()` plus checking `needs.enrich.outputs.handled` (rather than
   # `needs.enrich`'s job status) means this fires both when `enrich` goes red
   # AND when it somehow succeeds without having handled anything.
+  #
+  # By the time this can run, the notifier has already produced a
+  # notification: `workflow_run: completed` only fires once the caller's run,
+  # including its `open-issue` job, has finished. So creating an issue
+  # unconditionally means two issues for one failure. The only case that
+  # genuinely needs a new issue is the notifier itself having failed, and
+  # that is exactly what the absence of its marker says.
   plain-fallback:
     needs: [enrich]
     if: >-
@@ -106,14 +113,39 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Create a plain issue (fallback)
+      - name: Comment on this run's issue, or create one (fallback)
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           REPO: ${{ github.event.workflow_run.repository.full_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          gh issue create \
-            --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
+          set -euo pipefail
+
+          # The notifier runs inside the triggering run, so the run id it
+          # stamped is the one we are handed here. The trailing colon matches
+          # both the notifier's `:origin=` and the enricher's `:sig=`, so this
+          # also covers `enrich` having applied its result and then died before
+          # setting `handled`.
+          #
+          # Listing rather than `gh search issues` is the same read-your-writes
+          # point made at locate_run_markers() in ai_failure_notifier.py: the
+          # marker is minutes old and may not be indexed, and reading a stale
+          # index as "no issue exists" is precisely the duplicate this avoids.
+          # An issue the notifier just touched is by construction among the
+          # most recently updated ones.
+          marker="<!-- ai-failure-notifications:run=$RUN_ID:"
+          existing=$(gh issue list --repo "$REPO" --state all --limit 30 \
+            --json number,body,comments \
+            -q "[.[] | select((([.body] + [.comments[].body]) | join(\"\n\")) | contains(\"$marker\")) | .number] | first // empty")
+
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Automated triage failed for this run, so this notice is all there is: $RUN_URL"
+          else
+            gh issue create \
+              --repo "$REPO" \
+              --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+              --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
+          fi
