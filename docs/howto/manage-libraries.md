@@ -183,9 +183,17 @@ def endpoint(request):
 @pytest.fixture
 def my_charm_type(endpoint: str):
     class MyTestCharm(ops.CharmBase):
+        # 'database' is declared as well as the custom endpoint, so that a
+        # requirer that ignored the endpoint argument and hard-coded
+        # 'database' would still construct -- the test then fails because no
+        # DatabaseReadyEvent is emitted, rather than because the charm
+        # couldn't observe a relation it never declared.
         META = {
             'name': 'my-charm',
-            'requires': {endpoint: {'interface': 'my_interface'}},
+            'requires': {
+                endpoint: {'interface': 'my_interface'},
+                'database': {'interface': 'my_interface'},
+            },
         }
 
         def __init__(self, framework: ops.Framework):
