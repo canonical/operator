@@ -152,7 +152,9 @@ def test_charm_runs(event):
     ctx.run(getattr(ctx.on, event)(), state_in)
     # The Juju event itself is always emitted; what matters is that the library
     # doesn't emit any of its own events when the database isn't ready.
-    assert not any(isinstance(e, DatabaseReadyEvent) for e in ctx.emitted_events)
+    assert not any(
+        isinstance(e, DatabaseReadyEvent) for e in ctx.emitted_events
+    )
 ```
 
 ### Test custom endpoint names
