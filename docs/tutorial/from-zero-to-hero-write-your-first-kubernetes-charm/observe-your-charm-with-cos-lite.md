@@ -231,7 +231,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
@@ -484,7 +484,7 @@ First, in `tests/integration/test_charm.py`, import `json` and `time` from the s
 
 ```text
 uv add --group integration requests
-``` 
+```
 
 Your imports should now look like this:
 

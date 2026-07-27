@@ -246,30 +246,20 @@ We removed three `self.unit.status = ` lines from this version of the method. We
 Next, update `_get_pebble_layer()` to put the environment variables in the Pebble layer:
 
 ```python
-def _get_pebble_layer(self, port: int, environment: dict[str, str]) -> ops.pebble.Layer:
+def _get_pebble_layer(self, port: int, env: dict[str, str]) -> ops.pebble.Layer:
     """Pebble layer for the FastAPI demo services."""
-    command = " ".join(
-        [
-            "uvicorn",
-            "api_demo_server.app:app",
-            "--host=0.0.0.0",
-            f"--port={port}",
-        ]
-    )
-    pebble_layer: ops.pebble.LayerDict = {
+    cmd = f"/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port {port}"
+    service: ops.pebble.ServiceDict = {
+        "override": "merge",
+        "command": cmd,
+        "environment": env,
+    }
+    layer: ops.pebble.LayerDict = {
         "summary": "FastAPI demo service",
         "description": "pebble config layer for FastAPI demo server",
-        "services": {
-            self.pebble_service_name: {
-                "override": "replace",
-                "summary": "fastapi demo",
-                "command": command,
-                "startup": "enabled",
-                "environment": environment,
-            }
-        },
+        "services": {self.pebble_service_name: service},
     }
-    return ops.pebble.Layer(pebble_layer)
+    return ops.pebble.Layer(layer)
 ```
 
 With these changes, we've made sure that our application knows how to access the database.
@@ -277,7 +267,11 @@ With these changes, we've made sure that our application knows how to access the
 When Pebble starts or restarts the service:
 
 * If there's a database relation and database authentication data is available from the relation, our application can get the database authentication data from environment variables.
-* Otherwise, the service environment is empty, so our application can't get database authentication data. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+* If there's no database relation or database authentication data, our application can't connect to the database. In this case, we'd like the unit to show `blocked` or `maintenance` status, depending on whether the Juju user needs to take action.
+
+```{note}
+The service defined in [rockcraft.yaml](https://github.com/canonical/api_demo_server/blob/master/rockcraft.yaml) has an environment variable related to logging. When Pebble combines the rock's layer with our constructed layer, the final service has environment variables from both layers (because our constructed layer sets `override` to `merge`).
+```
 
 We'll now make sure that the unit status is set correctly.
 
@@ -344,7 +338,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -434,7 +428,9 @@ def test_relation_data(mock_version):
             "password": "bar",
         },
     )
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         relations={relation},
@@ -443,9 +439,8 @@ def test_relation_data(mock_version):
 
     state_out = ctx.run(ctx.on.relation_changed(relation), state_in)
 
-    assert state_out.get_container(container.name).layers["fastapi_demo"].services[
-        "fastapi-service"
-    ].environment == {
+    assert state_out.get_container(container.name).plan.services["fastapi"].environment == {
+        **ROCK_LAYER.services["fastapi"].environment,
         "DEMO_SERVER_DB_HOST": "example.com",
         "DEMO_SERVER_DB_PORT": "5432",
         "DEMO_SERVER_DB_USER": "foo",
@@ -458,7 +453,9 @@ In this chapter, we also defined a new method `_on_collect_status` that checks v
 ```python
 def test_no_database_blocked(mock_version):
     ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(name="demo-server", can_connect=True)
+    container = testing.Container(
+        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
+    )
     state_in = testing.State(
         containers={container},
         leader=True,
@@ -549,7 +546,7 @@ INFO     jubilant.wait:_juju.py:1491 wait: status changed:
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
 + .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
-+ .apps['fastapi-demo'].version = '1.0.4'
++ .apps['fastapi-demo'].version = '2.1.0'
 PASSED
 ```
 

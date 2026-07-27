@@ -474,15 +474,17 @@ Jubilant logs at three levels:
 
 ### Example of brief logging
 
+In `pyproject.toml`:
+
 ```toml
 [tool.pytest.ini_options]
 ...
-log_cli = true
-log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 ```
 
-Sample output:
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
+Sample output of `tox -e integration`:
 
 ```text
 INFO jubilant cli: juju deploy --model jubilant-b3578475-test-charm ...
@@ -494,11 +496,11 @@ INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -
 
 ### Example of verbose logging
 
+In `pyproject.toml`:
+
 ```toml
 [tool.pytest.ini_options]
 ...
-log_cli = true
-log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
 ```
@@ -507,7 +509,9 @@ The timestamp format follows ISO 8601.
 
 See more: {external+python:ref}`strftime() and strptime() behavior <strftime-strptime-behavior>`
 
-Sample output:
+Also modify the `[testenv:integration]` environment in `tox.ini` so that the pytest command has `--log-cli-level=DEBUG`.
+
+Sample output of `tox -e integration`:
 
 ```text
 2026-07-15T09:42:15Z INFO jubilant cli: juju deploy --model jubilant-6966ceb1-test-charm ...
@@ -569,14 +573,19 @@ This is an ideal configuration for long-running integration tests (for example, 
 # Otherwise, that section will have DEBUG logs (coming from log_file_level).
 log_level = "INFO"
 
-log_cli = true
-log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(name)s %(message)s"
 
-log_file = "logs/verbose.log"
 log_file_level = "DEBUG"
 log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
 log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
+```
+
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
+Use the `--log-file` option from pytest to enable file logging:
+
+```text
+tox -e integration -- --log-file logs/verbose.log
 ```
 
 If you run the integration tests multiple times, `logs/verbose.log` only contains logs from the last pytest session. To use a separate file for each session, override `log_file` for each pytest invocation:
@@ -602,7 +611,7 @@ In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` availabl
 
 ```yaml
   # In your integration test job
-  - run: tox -e integration
+  - run: tox -e integration -- --log-file logs/verbose.log
   - name: Upload logs
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
@@ -624,7 +633,7 @@ In CI, you can use `--juju-dump-logs` with `actions/upload-artifact` to make `ju
 
 ```yaml
   # In your integration test job
-  - run: tox -e integration -- --juju-dump-logs logs
+  - run: tox -e integration -- --log-file logs/verbose.log --juju-dump-logs logs
   - name: Upload logs
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
