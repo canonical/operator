@@ -6,6 +6,7 @@ borescope
 breakpoint
 callables
 Canonical's
+Charmlibs
 configurator
 cosl
 databag
