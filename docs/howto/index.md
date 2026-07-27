@@ -141,6 +141,16 @@ Ops enables you to trace your charm code and send data to sources such as the [C
 Trace your charm <trace-your-charm>
 ```
 
+## Security
+
+To harden your charm and produce security documentation for operators, work through the [Security](#security) explanation and then follow the concrete actions below.
+
+```{toctree}
+:maxdepth: 1
+
+Secure your charm <secure-your-charm>
+```
+
 % TOC only. Nothing shown on the page.
 
 ```{toctree}
