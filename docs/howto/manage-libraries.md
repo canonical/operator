@@ -158,7 +158,7 @@ def test_charm_runs(event):
 If `DatabaseRequirer` is a relation endpoint wrapper, a frequent pattern is to
 allow customising the name of the endpoint that the object is wrapping.
 
-> Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
+Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
 
 In your `tests/unit/test_my_lib.py` file, add a test that validates that custom
 names are supported:

@@ -7,7 +7,11 @@ myst:
 (debug-a-kubernetes-charm)=
 # How to debug a Kubernetes charm
 
-See first: {ref}`debug-your-charm`, {ref}`workload-containers`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
+See first:
+
+- {ref}`debug-your-charm`
+- {ref}`workload-containers`
+- {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 A Kubernetes charm runs as a sidecar: each unit is a pod with a *charm container* (running your charm code) alongside zero or more *workload containers*. Juju injects {external+pebble:doc}`Pebble <index>` into each workload container as its service manager. Your charm talks to each workload's Pebble over an HTTP-on-Unix-socket API.
 

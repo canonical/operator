@@ -1,6 +1,10 @@
 (manage-configuration)=
 # How to manage configuration
-See first: {external+juju:ref}`Juju | <application-configuration>`, {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`, {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
+See first:
+
+- {external+juju:ref}`Juju | <application-configuration>`
+- {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`
+- {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
 
 
 ## Implement the feature

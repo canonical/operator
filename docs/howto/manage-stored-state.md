@@ -71,7 +71,7 @@ def _on_install(self, event: ops.InstallEvent):
     logger.info('Current value: %s', self._stored.expensive_value)
 ```
 
-> Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
+Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
 
 ### Test the feature
 

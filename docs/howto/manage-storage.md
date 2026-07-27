@@ -1,6 +1,10 @@
 (manage-storage)=
 # How to manage storage
-See first: {external+juju:ref}`Juju | Storage <storage>`, {external+juju:ref}`Juju | Manage storage <manage-storage>`, {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
+See first:
+
+- {external+juju:ref}`Juju | Storage <storage>`
+- {external+juju:ref}`Juju | Manage storage <manage-storage>`
+- {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
 
 ## Manage storage for a machine charm
 
@@ -108,7 +112,7 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
     )
 ```
 
-> Examples: [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
+Examples: [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
 
 ## Manage storage for a Kubernetes charm
 
@@ -192,7 +196,7 @@ Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `
 
 On Kubernetes, `juju detach-storage` isn't supported, so storage is only detached during unit teardown. Juju emits a [storage-detaching](ops.StorageDetachingEvent) event during teardown, along with `stop`, `remove`, and other teardown events.
 
-> Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
+Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
 
 ## Write unit tests
 

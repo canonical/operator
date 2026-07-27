@@ -1,6 +1,10 @@
 (manage-actions)=
 # How to manage actions
-See first: {external+juju:ref}`Juju | Charm <action>`, {external+juju:ref}`Juju | Manage actions <manage-actions>`, {external+charmcraft:ref}`Charmcraft | Manage actions <manage-actions>`
+See first:
+
+- {external+juju:ref}`Juju | Charm <action>`
+- {external+juju:ref}`Juju | Manage actions <manage-actions>`
+- {external+charmcraft:ref}`Charmcraft | Manage actions <manage-actions>`
 
 ## Implement the feature
 
@@ -111,7 +115,13 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
     event.set_results({'result': msg})
 ```
 
-See more: [](ops.ActionEvent.load_params), [](ops.ActionEvent.params), [](ops.ActionEvent.fail), [](ops.ActionEvent.set_results), [](ops.ActionEvent.log)
+See more:
+
+- [](ops.ActionEvent.load_params)
+- [](ops.ActionEvent.params)
+- [](ops.ActionEvent.fail)
+- [](ops.ActionEvent.set_results)
+- [](ops.ActionEvent.log)
 
 #### Record the ID of an action task
 
@@ -175,7 +185,11 @@ def test_backup_action_failed():
     assert ctx.action_results == {'foo': 'bar'}
 ```
 
-See more: [](ops.testing.Context.action_logs), [](ops.testing.Context.action_results), [](ops.testing.ActionFailed)
+See more:
+
+- [](ops.testing.Context.action_logs)
+- [](ops.testing.Context.action_results)
+- [](ops.testing.ActionFailed)
 
 ### Write integration tests
 
