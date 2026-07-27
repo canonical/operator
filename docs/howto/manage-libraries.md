@@ -124,7 +124,7 @@ the library, and that no events are unexpectedly emitted.
 import pytest
 import ops
 from ops import testing
-from lib.charms.my_Charm.v0.my_lib import DatabaseRequirer
+from lib.charms.my_charm.v0.my_lib import DatabaseReadyEvent, DatabaseRequirer
 
 
 class MyTestCharm(ops.CharmBase):
@@ -142,16 +142,17 @@ class MyTestCharm(ops.CharmBase):
         'install',
         'stop',
         'remove',
-        'update-status',  # ...
+        'update_status',  # ...
     ),
 )
 def test_charm_runs(event):
     """Verify that the charm can create the library object, and doesn't see unexpected events."""
     ctx = testing.Context(MyTestCharm, meta=MyTestCharm.META)
     state_in = testing.State()
-    ctx.run(getattr(ctx.on, event), state_in)
-    assert len(ctx.emitted_events) == 0
-    assert isinstance(ctx.emitted_events[0], ops.StartEvent)
+    ctx.run(getattr(ctx.on, event)(), state_in)
+    # The Juju event itself is always emitted; what matters is that the library
+    # doesn't emit any of its own events when the database isn't ready.
+    assert not any(isinstance(e, DatabaseReadyEvent) for e in ctx.emitted_events)
 ```
 
 ### Test custom endpoint names
