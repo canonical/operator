@@ -1,3 +1,18 @@
+# 2.23.4 - 30 July 2026
+
+## Fixes
+
+* Cherry-pick fixes from main into the 2.23-maintenance branch (#2588)
+
+## Documentation
+
+* Move 2.x docs to canonical.com/juju/docs/ops (#2546)
+
+## CI
+
+* Fix ops-tracing release for 2.23-maintenance (#2324)
+* Test Ops 2.23 with Python 3.14 (#2576)
+
 # 2.23.2 - 11 February 2026
 
 ## Fixes
