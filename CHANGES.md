@@ -1,3 +1,49 @@
+# 2.23.4 - 30 July 2026
+
+## Fixes
+
+* If an event ends with `_Abort(0)`, tests behave as if it ended successfully (#1887)
+* Only add the remote unit for departed and broken relation events, and fix the ordering (#1918)
+* Add the remote unit to `Relation.data` but not `Relation.units` (#1925)
+* `_MockModelBackend.relation_get` returns a copy of the relation data (#2052)
+* Ensure `ops.pebble.Client.pull` cleans up temporary files if it errors (#2087)
+* Ensure that the testing context manager is exited when an exception occurs (#2117)
+* Raise `ActionFailed` when using `Context` as a context manager (#2121)
+* Normalise `Secret.owner` to `'app'` for `ops[testing]` output state (#2127)
+* Correct the value of `additional_properties` in the action meta in Juju 4 (#2250)
+* Use `parse_rfc3339` for datetime parsing to support Python 3.10 (#2264)
+* `_checks_action` returns an empty list when there are no changes (#2270)
+* Make `testing.CheckInfo` level argument type match `pebble.CheckInfo.level` (#2274)
+* Support the Pydantic MISSING sentinel in `ops.Relation.save` (#2306)
+* `credential-get` is available on Kubernetes in newer Juju (#2307)
+* Correct the `Model.get_binding()` return type (#2329)
+* Only show the executable in `ExecError.__str__`, not the full command line (#2336)
+* Move the `testing.Container` compatibility import so that mypy-style checkers understand it (#2343)
+* Correct the type annotation for `StorageMeta.properties` (#2348)
+* Hold only copies of user provided dicts in `testing.Context` (#2349)
+* Warn before clearing a non-empty container in testing (#2365)
+* Use timezone-aware datetimes in expiry calculation (#2378)
+* Return copies from Scenario `secret_get` and `action_get` (#2379)
+* Deep-copy layer objects during Scenario plan rendering (#2380)
+* Pass the endpoint name through to `relation-get` (#2499)
+* Ensure resources are cleaned up in `testing.Context` (#2506)
+* Close SQLite storage in `Harness.cleanup()` (#2507)
+* Restore `sys.breakpointhook` on `_Manager` teardown (#2542)
+* Avoid errors in finalisation due to an already-closed websocket (#2548)
+* Don't leak exec I/O threads when waiting on the change fails (#2558)
+* Drop the unused `importlib-metadata` dependency declaration (#2521)
+* Take Pebble defaults into consideration when consistency checking `Check`s (#2567)
+* Pin `pydantic` to 2-3 (#2583)
+
+## Documentation
+
+* Move 2.x docs to canonical.com/juju/docs/ops (#2546)
+
+## CI
+
+* Fix ops-tracing release for 2.23-maintenance (#2324)
+* Test Ops 2.23 with Python 3.14 (#2576)
+
 # 2.23.2 - 11 February 2026
 
 ## Fixes
