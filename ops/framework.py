@@ -849,7 +849,7 @@ class Framework(Object):
                 # The notices all have paths that include [id] at the end. If one
                 # was somehow missing, then the split would be the empty string and
                 # match anyway.
-                or existing_event_path.split('[')[0] != event_path.split('[')[0]
+                or existing_event_path.rsplit('[', 1)[0] != event_path.rsplit('[', 1)[0]
             ):
                 continue
             # Check if the snapshot for this notice is the same.
