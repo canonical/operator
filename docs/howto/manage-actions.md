@@ -189,7 +189,7 @@ def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
     )
     assert action.status == 'completed'
-    assert action.results['result'] == 'Stored snapshot in db-snapshot.tar.gz.'
+    assert action.results['result'].startswith('Stored snapshot in')
 ```
 
 See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run)
