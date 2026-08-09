@@ -112,7 +112,7 @@ def test_short_wiki_name():
 
 ### Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 You can set a configuration option in your application and check its results.
 
@@ -130,7 +130,7 @@ def test_config_valid_name(juju: jubilant.Juju):
 
 See also: [](jubilant.Juju.config)
 
-Examples of changing configuration with Jubilant: [`kafka-k8s-operator` enables DEBUG log and check the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py#L170).
+Examples of changing configuration with Jubilant: [`kafka-k8s-operator` changes the log-evel configuration and checks the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py).
 
 ### Manually test
 
