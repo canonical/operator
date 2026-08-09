@@ -230,7 +230,7 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
 
 ### Deploy your charm with resources
 
-> See: {ref}`manage-resources-integration-tests`
+See: {ref}`Manage resources | Write integration tests <manage-resources-integration-tests>`
 
 ### Interact with the workload
 

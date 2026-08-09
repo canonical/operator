@@ -128,9 +128,9 @@ def test_config_valid_name(juju: jubilant.Juju):
     juju.wait(jubilant.all_active)
 ```
 
-> See also: [](jubilant.Juju.config)
+See also: [](jubilant.Juju.config)
 
-> Examples of changing configuration with Jubilant: [`kafka-k8s-operator` enables DEBUG log and check the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py#L170).
+Examples of changing configuration with Jubilant: [`kafka-k8s-operator` enables DEBUG log and check the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py#L170).
 
 ### Manually test
 

@@ -192,6 +192,6 @@ def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
     assert action.results['result'] == 'Stored snapshot in db-snapshot.tar.gz.'
 ```
 
-> See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run)
+See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run)
 
-> Examples: [`discourse-k8s` runs the create-user action and asserts on the result](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)
+Examples: [`discourse-k8s` runs the create-user action and asserts on the result](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)
