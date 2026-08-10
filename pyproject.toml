@@ -25,10 +25,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==7.23.4",
+    "ops-scenario==7.23.5.dev0",
 ]
 tracing = [
-    "ops-tracing==2.23.4",
+    "ops-tracing==2.23.5.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
