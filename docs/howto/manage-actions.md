@@ -113,12 +113,12 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
 
 > See more: [](ops.ActionEvent.load_params), [](ops.ActionEvent.params), [](ops.ActionEvent.fail), [](ops.ActionEvent.set_results), [](ops.ActionEvent.log)
 
-#### Record the ID of an action task
+### Record the ID of an action task
 
 When a unique ID is needed for the action task - for example, for logging or creating temporary files, use the `.id` attribute of the action event. For example:
 
 ```python
-def _on_snapshot(self, event: ops.ActionEvent):
+def _on_snapshot_action(self, event: ops.ActionEvent):
     temp_filename = f'backup-{event.id}.tar.gz'
     logger.info(
         'Using %s as the temporary backup filename in task %s',
@@ -129,6 +129,8 @@ def _on_snapshot(self, event: ops.ActionEvent):
     ...
 ```
 > See more: [](ops.ActionEvent.id)
+
+## Test the feature
 
 ### Write unit tests
 
@@ -181,17 +183,14 @@ def test_backup_action_failed():
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
-
 ```python
 def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
-    action = juju.run(
+    task = juju.run(
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
     )
-    assert action.status == 'completed'
-    assert action.results['result'].startswith('Stored snapshot in')
+    assert task.results['result'].startswith('Stored snapshot in')
 ```
 
-See also: {external+juju:ref}`Action <action>`, [](jubilant.Juju.run)
+See also: [](jubilant.Juju.run)
 
-Examples: [`discourse-k8s` runs the create-user action and asserts on the result](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)
+Examples: [`discourse-k8s`](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)

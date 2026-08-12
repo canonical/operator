@@ -90,6 +90,8 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
 - Configuration cannot be changed from within the charm code. Charms, by design, aren't able to mutate their own configuration by themselves (e.g., in order to ignore an admin-provided configuration), or to configure other applications. In Ops, one typically interacts with config via a read-only facade.
 ```
 
+## Test the feature
+
 ### Write unit tests
 
 > See first: {ref}`write-unit-tests-for-a-charm`
@@ -114,8 +116,6 @@ def test_short_wiki_name():
 
 See first: {ref}`write-integration-tests-for-a-charm`
 
-You can set a configuration option in your application and check its results.
-
 ```python
 def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config('your-app', {'name': 'invalid name has spaces'})
@@ -130,12 +130,4 @@ def test_config_valid_name(juju: jubilant.Juju):
 
 See also: [](jubilant.Juju.config)
 
-Examples of changing configuration with Jubilant: [`kafka-k8s-operator` changes the log-evel configuration and checks the logs from all units](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py).
-
-### Manually test
-
-To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `name` key defined above, you could try:
-
-```text
-juju config <name of application deployed by your charm> name=charming-wiki
-```
+Examples: [`kafka-k8s-operator` (`test_log_level_change`)](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py).

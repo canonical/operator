@@ -5,10 +5,6 @@
 
 ## Implement the feature
 
-<!--COMMENT: MOVE TO HOW TO UPLOAD
-Because resources are defined in a charm’s `charmcraft.yaml`, they are intrinsically linked to a charm. As such, there is no need to register them separately in Charmhub. Other charms may have resources with the same name, but this is not a problem; references to resources always contain the charm name and resource name.
--->
-
 In your charm's `src/charm.py` file, use `ops` to fetch the path to the resource and then manipulate it as needed.
 
 For example, suppose your `charmcraft.yaml` file contains this simple resource definition:
@@ -97,9 +93,9 @@ with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
+During development and testing, it's useful to specify resource locations when deploying the charm.
 
-In `charmcraft.yaml`'s `resources` section, the `upstream-source` field is, by convention, a usable default image or file that can be used in testing:
+The conventional place to specify resource locations for testing is the `upstream-source` field in `charmcraft.yaml`'s `resources` section:
 
 ```python
 import pathlib
@@ -124,4 +120,4 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 
 See also: [](jubilant.Juju.deploy)
 
-Examples of deploying with resources using Jubilant: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)
+Examples: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)
