@@ -5,7 +5,7 @@
 
 ## Implement the feature
 
-In your charm's `src/charm.py` file, use `ops` to fetch the path to the resource and then manipulate it as needed.
+A charm can require file or oci-image resources, defined in charmcraft.yaml. You'll upload the resources to Charmhub as one of the charm publishing steps. Then when a user deploys your charm from Charmhub, the resources will be available to your charm code.
 
 For example, suppose your `charmcraft.yaml` file contains this simple resource definition:
 
@@ -97,25 +97,7 @@ During development and testing, it's useful to specify resource locations when d
 
 The conventional place to specify resource locations for testing is the `upstream-source` field in `charmcraft.yaml`'s `resources` section:
 
-```python
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-
-METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    resources = {
-        name: res['upstream-source']
-        for name, res in METADATA['resources'].items()
-    }
-    juju.deploy(charm, resources=resources)
-    juju.wait(jubilant.all_active)
+```{include} /reuse/manage-resources-integration-test-example.md
 ```
 
 See also: [](jubilant.Juju.deploy)

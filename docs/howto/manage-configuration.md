@@ -140,4 +140,4 @@ def test_config_valid_name(juju: jubilant.Juju):
 
 See also: [](jubilant.Juju.config)
 
-Examples: [`kafka-k8s-operator` (`test_log_level_change`)](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_charm.py).
+Examples: [`cassandra-operator`](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_config.py).

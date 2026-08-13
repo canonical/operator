@@ -192,6 +192,11 @@ This test deploys your charm and waits for all applications and units to be acti
 
 Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
 
+For a Kubernetes charm, you will deploy it with a resource. See the modified example (from {ref}`Manage resources | Write integration tests <manage-resources-integration-tests>`):
+
+```{include} /reuse/manage-resources-integration-test-example.md
+```
+
 For more examples of tests that deploy charms, see:
 
 - [cassandra-operator](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_charm.py)
