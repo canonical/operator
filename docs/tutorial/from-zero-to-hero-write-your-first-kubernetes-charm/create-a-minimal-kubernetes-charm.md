@@ -209,7 +209,7 @@ The `fastapi` service has `startup: enabled`, so why does our charm need to star
 
 The workload version is available after the workload starts, which happens after Pebble starts the `fastapi` service. We'll use the `src/fastapi_demo.py` helper module for this step.
 
-In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function before the final `self.unit.status = ops.ActiveStatus()`:
+In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function after the `container.replan()` line:
 
 ```python
 # Set the workload version of this charm.
@@ -218,6 +218,8 @@ self.unit.set_workload_version(version)
 ```
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
+
+For a general workload, the `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, which in our case is enough time for the `fastapi` service to fully start.
 
 ### Add logger functionality
 
