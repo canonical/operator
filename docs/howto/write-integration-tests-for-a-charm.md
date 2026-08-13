@@ -226,7 +226,12 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     assert charm_operates_correctly()
 ```
 
-> See more: {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+See more:
+
+- {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+- {ref}`Manage relations | Write integration tests <manage-relations-integration-tests>`
+- {ref}`Manage actions | Write integration tests <manage-actions-integration-tests>`
+- {ref}`Manage configuration | Write integration tests <manage-configuration-integration-tests>`
 
 ### Deploy your charm with resources
 

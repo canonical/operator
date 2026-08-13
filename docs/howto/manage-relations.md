@@ -360,6 +360,7 @@ relation = testing.SubordinateRelation(
 relation.remote_unit_name  # 'zookeeper/42'
 ```
 
+(manage-relations-integration-tests)=
 ### Write integration tests
 
 > See first: {ref}`write-integration-tests-for-a-charm`

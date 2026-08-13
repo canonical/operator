@@ -112,6 +112,7 @@ def test_short_wiki_name():
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
 ```
 
+(manage-configuration-integration-tests)=
 ### Write integration tests
 
 See first: {ref}`write-integration-tests-for-a-charm`

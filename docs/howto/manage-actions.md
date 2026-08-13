@@ -179,6 +179,7 @@ def test_backup_action_failed():
 
 > See more: [](ops.testing.Context.action_logs), [](ops.testing.Context.action_results), [](ops.testing.ActionFailed)
 
+(manage-actions-integration-tests)=
 ### Write integration tests
 
 > See first: {ref}`write-integration-tests-for-a-charm`
