@@ -118,16 +118,25 @@ def test_short_wiki_name():
 See first: {ref}`write-integration-tests-for-a-charm`
 
 ```python
+import pathlib
+
+import jubilant
+
+
 def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config('your-app', {'name': 'invalid name has spaces'})
     # A name with spaces should put the charm into blocked status.
-    juju.wait(jubilant.all_blocked, timeout=60)
+    # Setting an invalid name should be caught by the charm and rejected
+    # immediately. The timeout is overridden to test this fail-fast behavior.
+    juju.wait(jubilant.all_blocked, timeout=10)
 
 
 def test_config_valid_name(juju: jubilant.Juju):
     juju.config('your-app', {'name': 'charming-wiki'})
     juju.wait(jubilant.all_active)
 ```
+
+`test_config_invalid_name` leaves the config in an invalid state. Reset the config to its previous known-good state so that subsequent tests start from a valid configuration. In this example, `test_config_valid_name` performs that reset.
 
 See also: [](jubilant.Juju.config)
 

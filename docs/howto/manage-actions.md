@@ -185,6 +185,11 @@ def test_backup_action_failed():
 > See first: {ref}`write-integration-tests-for-a-charm`
 
 ```python
+import pathlib
+
+import jubilant
+
+
 def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
     task = juju.run(
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}

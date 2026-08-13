@@ -368,6 +368,11 @@ relation.remote_unit_name  # 'zookeeper/42'
 To verify that a charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
 
 ```python
+import pathlib
+
+import jubilant
+
+
 # This assumes that your integration tests already include the standard
 # build and deploy test.
 
@@ -376,6 +381,7 @@ def test_active_with_another_app(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy('another-app')
     juju.integrate('your-app:endpoint', 'another-app:endpoint')
     juju.wait(jubilant.all_active)
+
 ```
 
 See more: [](jubilant.Juju.integrate)
