@@ -213,6 +213,7 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 
 ```python
 # Set the workload version of this charm.
+# For a production workload, wrap get_version() in a retry loop.
 version = fastapi_demo.get_version(port=8000)
 self.unit.set_workload_version(version)
 ```
