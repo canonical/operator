@@ -238,10 +238,6 @@ See more:
 - {ref}`Manage actions | Write integration tests <manage-actions-integration-tests>`
 - {ref}`Manage configuration | Write integration tests <manage-configuration-integration-tests>`
 
-### Deploy your charm with resources
-
-See: {ref}`Manage resources | Write integration tests <manage-resources-integration-tests>`
-
 ### Interact with the workload
 
 To interact with the workload, you need to have access to it. This is dependent on many aspects of your application, environment and network topology.
