@@ -127,7 +127,7 @@ In `src/charm.py`, create a class that defines the schema for the relation data.
 For example:
 
 ```python
-class SMTPProviderUnitData(pydantic.BaseMode):
+class SMTPProviderUnitData(pydantic.BaseModel):
     smtp_credentials: str = pydantic.Field(description='A Juju secret ID')
 ```
 
@@ -222,7 +222,7 @@ def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
 Or the peer unit databags:
 
 ```python
-def _on_database_relation_changed(self, e: ops.RelationChangedEvent):
+def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
     peer_units_databags = {
         event.relation.data[unit]
         for unit in event.relation.units
@@ -343,7 +343,7 @@ that, `SubordinateRelation`, compared to `Relation`, always talks in terms of
 `remote`:
 
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data`
-  taking a single `dict[str:str]`. The remote unit ID can be provided as a
+  taking a single `dict[str, str]`. The remote unit ID can be provided as a
   separate argument.
 - `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id`
   (a single ID instead of a list of IDs)
