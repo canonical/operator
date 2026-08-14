@@ -40,7 +40,7 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Start the service defined by the Pebble layer in the application image.
         container.replan()
         # Set the workload version of this charm.
-        # For a production workload, wrap get_version() in a retry loop.
+        # For a general workload, wrap get_version() in a retry loop.
         version = fastapi_demo.get_version(port=8000)
         self.unit.set_workload_version(version)
         # Learn more about statuses at
