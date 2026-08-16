@@ -25,6 +25,7 @@ charm code that will run with the Python version of the oldest base you support.
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-requires-python
 
 Set the [`requires-python`](https://packaging.python.org/en/latest/specifications/pyproject-toml/#requires-python)
 version in your `pyproject.toml` so that tooling will detect any use of Python
@@ -79,6 +80,7 @@ We recommend that you use `uv add` and `uv remove` instead of editing dependenci
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-automated-dependency-updates
 
 Ensure that tooling is configured to automatically detect new versions,
 particularly security releases, for all your dependencies.
@@ -86,6 +88,7 @@ particularly security releases, for all your dependencies.
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-commit-lock-file
 
 Ensure that the `pyproject.toml` *and* the lock file are committed to version
 control, so that exact versions of charms can be reproduced.
@@ -93,6 +96,7 @@ control, so that exact versions of charms can be reproduced.
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-avoid-charm-plugin
 
 Avoid using Charmcraft's `charm` plugin if possible. Instead, {external+charmcraft:ref}`migrate to the uv plugin <howto-migrate-to-uv>` or the {external+charmcraft:ref}`poetry plugin <howto-migrate-to-poetry>`.
 ```
