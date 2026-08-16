@@ -103,3 +103,5 @@ The conventional place to specify resource locations for testing is the `upstrea
 See also: [](jubilant.Juju.deploy)
 
 Examples: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.

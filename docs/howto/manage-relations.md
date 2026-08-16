@@ -10,15 +10,15 @@ To add relation capabilities to a charm, you’ll have to define the relation in
 
 To integrate with another charm, or with itself (to communicate with other units of the same charm), declare the required and optional relations in your charm's `charmcraft.yaml` file.
 
-```{caution}
+```{note}
 
 **If you're using an existing interface:**
 
-Make sure to consult {external+charmlibs:doc}`how-to/design-relation-interfaces` for guidance about how to implement them correctly.
+Make sure to consult {ref}`manage-interfaces` and {external+charmlibs:doc}`how-to/manage-libraries` for guidance about how to implement them correctly.
 
 **If you're defining a new interface:**
 
-Make sure to add your interface to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/python-package`.
+Make sure to add your interface to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/design-relation-interfaces`, {external+charmlibs:doc}`how-to/python-package`.
 ```
 
 To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).
@@ -365,7 +365,7 @@ relation.remote_unit_name  # 'zookeeper/42'
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that a charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
+Use Jubilant to verify that your charm behaves correctly when integrated with another charm:
 
 ```python
 import pathlib
@@ -387,7 +387,7 @@ See more: [](jubilant.Juju.integrate)
 
 Examples: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/clients/test_client_relation.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_provider_v1.py).
 
-This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available.
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.
 
 (generate-tests-from-a-deployed-model)=
 ### Generate tests from a deployed model

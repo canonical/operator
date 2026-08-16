@@ -141,3 +141,5 @@ def test_config_valid_name(juju: jubilant.Juju):
 See also: [](jubilant.Juju.config)
 
 Examples: [`cassandra-operator`](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_config.py).
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.

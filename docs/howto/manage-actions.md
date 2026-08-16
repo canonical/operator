@@ -200,3 +200,5 @@ def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
 See also: [](jubilant.Juju.run)
 
 Examples: [`discourse-k8s`](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.
