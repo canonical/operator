@@ -9,6 +9,17 @@ body {
     mask-image: var(--icon-star);
 }
 
+/* Reveal a permalink anchor when hovering a best-practice admonition. The
+   anchor itself is injected by best-practice-anchors.js. */
+div.admonition[id^="best-practice-"] > .admonition-title > a.headerlink {
+    visibility: hidden;
+    margin-left: 0.5em;
+}
+div.admonition[id^="best-practice-"]:hover > .admonition-title > a.headerlink,
+div.admonition[id^="best-practice-"] > .admonition-title > a.headerlink:focus {
+    visibility: visible;
+}
+
 /* Vertically align text in table cells and add an initial horizontal line */
 table.docutils.top-aligned td {
     vertical-align: top;
