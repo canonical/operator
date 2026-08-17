@@ -574,12 +574,11 @@ class TestFramework:
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)
                 self.seen: list[str] = []
-                self.defer_next = 0
 
             def on_any(self, event: ops.EventBase):
+                first = len(self.seen) == 0
                 self.seen.append(event.handle.path)
-                if self.defer_next:
-                    self.defer_next -= 1
+                if first:
                     event.defer()
 
         pub1 = MyNotifier(framework, 'db1')
@@ -590,7 +589,6 @@ class TestFramework:
         framework.observe(pub1.gone, obs.on_any)
 
         # Defer the first event so that its notice stays in the queue.
-        obs.defer_next = 1
         pub1.ready.emit()
 
         # An event from a different (keyed) emitter instance and an event of a
