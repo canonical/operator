@@ -1498,6 +1498,13 @@ class Secret:
         """
         return self._backend.secret_info_get(id=self.id, label=self.label)
 
+    def _ensure_id(self) -> str:
+        # Mutating methods need the locator ID rather than a label; fetch it once
+        # from Juju via get_info() and cache it on the instance for later calls.
+        if self._id is None:
+            self._id = self.get_info().id
+        return self._id
+
     def set_content(self, content: dict[str, str]):
         """Update the content of this secret.
 
@@ -1518,10 +1525,7 @@ class Secret:
                 for example :code:`{"password": "foo123"}`.
         """
         self._validate_content(content)
-        if self._id is None:
-            self._id = self.get_info().id
-
-        self._backend.secret_set(typing.cast('str', self.id), content=content)
+        self._backend.secret_set(self._ensure_id(), content=content)
         # We do not need to invalidate the cache here, as the content is the
         # same until `refresh` is used, at which point the cache is invalidated.
 
@@ -1553,11 +1557,8 @@ class Secret:
             raise TypeError(
                 'Must provide a label, description, expiration time, or rotation policy'
             )
-        if self._id is None:
-            self._id = self.get_info().id
-
         self._backend.secret_set(
-            typing.cast('str', self.id),
+            self._ensure_id(),
             label=label,
             description=description,
             expire=_calculate_expiry(expire),
@@ -1575,10 +1576,8 @@ class Secret:
             unit: If specified, grant access to only this unit, rather than
                 all units in the application.
         """
-        if self._id is None:
-            self._id = self.get_info().id
         self._backend.secret_grant(
-            typing.cast('str', self.id), relation.id, unit=unit.name if unit is not None else None
+            self._ensure_id(), relation.id, unit=unit.name if unit is not None else None
         )
 
     def revoke(self, relation: Relation, *, unit: Unit | None = None):
@@ -1592,10 +1591,8 @@ class Secret:
             unit: If specified, revoke access to only this unit, rather than
                 all units in the application.
         """
-        if self._id is None:
-            self._id = self.get_info().id
         self._backend.secret_revoke(
-            typing.cast('str', self.id), relation.id, unit=unit.name if unit is not None else None
+            self._ensure_id(), relation.id, unit=unit.name if unit is not None else None
         )
 
     def remove_revision(self, revision: int):
@@ -1613,9 +1610,7 @@ class Secret:
             revision: The secret revision to remove. This should usually be set to
                 :attr:`SecretRemoveEvent.revision` or :attr:`SecretExpiredEvent.revision`.
         """
-        if self._id is None:
-            self._id = self.get_info().id
-        self._backend.secret_remove(typing.cast('str', self.id), revision=revision)
+        self._backend.secret_remove(self._ensure_id(), revision=revision)
 
     def remove_all_revisions(self) -> None:
         """Remove all revisions of this secret.
@@ -1627,9 +1622,7 @@ class Secret:
         longer exists, this method will succeed, but the unit will go into error
         state on completion of the current Juju hook.
         """
-        if self._id is None:
-            self._id = self.get_info().id
-        self._backend.secret_remove(typing.cast('str', self.id))
+        self._backend.secret_remove(self._ensure_id())
 
 
 @dataclasses.dataclass(frozen=True)
@@ -2373,9 +2366,10 @@ class Resources:
         """
         if name not in self._paths:
             raise NameError(f'invalid resource name: {name}')
-        if self._paths[name] is None:
-            self._paths[name] = Path(self._backend.resource_get(name))
-        return typing.cast('Path', self._paths[name])
+        path = self._paths[name]
+        if path is None:
+            path = self._paths[name] = Path(self._backend.resource_get(name))
+        return path
 
 
 class Pod:
@@ -3729,20 +3723,16 @@ class _ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         now = time.monotonic()
-        if self._leader_check_time is None:
-            check = True
-        else:
+        if self._leader_check_time is not None and self._is_leader is not None:
             time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-            check = time_since_check > self.LEASE_RENEWAL_PERIOD or self._is_leader is None
-        if check:
-            # Current time MUST be saved before running is-leader to ensure the cache
-            # is only used inside the window that is-leader itself asserts.
-            self._leader_check_time = now
-            with self._wrap_hookcmd('is-leader'):
-                self._is_leader = hookcmds.is_leader()
-
-        # We can cast to bool now since if we're here it means we checked.
-        return typing.cast('bool', self._is_leader)
+            if time_since_check <= self.LEASE_RENEWAL_PERIOD:
+                return self._is_leader
+        # Current time MUST be saved before running is-leader to ensure the cache
+        # is only used inside the window that is-leader itself asserts.
+        self._leader_check_time = now
+        with self._wrap_hookcmd('is-leader'):
+            self._is_leader = hookcmds.is_leader()
+        return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:
         with self._wrap_hookcmd('resource-get', resource_name=resource_name):
