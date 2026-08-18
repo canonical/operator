@@ -576,9 +576,8 @@ class TestFramework:
                 self.seen: list[str] = []
 
             def on_any(self, event: ops.EventBase):
-                first = len(self.seen) == 0
                 self.seen.append(event.handle.path)
-                if first:
+                if len(self.seen) == 1:
                     event.defer()
 
         pub1 = MyNotifier(framework, 'db1')
@@ -597,7 +596,11 @@ class TestFramework:
         pub2.ready.emit()
         pub1.gone.emit()
 
-        assert len(obs.seen) == 3, obs.seen
+        assert obs.seen == [
+            'MyNotifier[db1]/ready[1]',
+            'MyNotifier[db2]/ready[2]',
+            'MyNotifier[db1]/gone[3]',
+        ]
 
     def test_two_observers_one_deferring(self, request: pytest.FixtureRequest):
         framework = create_framework(request)

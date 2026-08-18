@@ -846,9 +846,7 @@ class Framework(Object):
             if (
                 existing_observer_path != observer_path
                 or existing_method_name != method_name
-                # The notices all have paths that include [id] at the end. If one
-                # was somehow missing, then the split would be the empty string and
-                # match anyway.
+                # The notices all have paths that include [id] at the end.
                 or existing_event_path.rsplit('[', 1)[0] != event_path.rsplit('[', 1)[0]
             ):
                 continue
