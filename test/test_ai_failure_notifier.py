@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.11"
-# ///
-#
 # Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -184,13 +179,17 @@ FIXTURE_CANDIDATES = [
 FIXTURE_ENVELOPE: dict[str, Any] = {
     'action': 'comment',
     'target_issue': 9010,
-    'body': 'Another occurrence: '
-    'https://github.com/canonical/operator/actions/runs/28141163589\n'
-    '\n'
-    '4 of the 5 failing charms match #9010 unchanged. New this run: '
-    'canonical/charm-ubuntu is now also failing its unit tests.',
-    'dedup_reason': "4 of 5 failing charms match #9010's signature; charm-ubuntu is a "
-    'new failure not present in #9010',
+    'body': (
+        'Another occurrence: '
+        'https://github.com/canonical/operator/actions/runs/28141163589\n'
+        '\n'
+        '4 of the 5 failing charms match #9010 unchanged. New this run: '
+        'canonical/charm-ubuntu is now also failing its unit tests.'
+    ),
+    'dedup_reason': (
+        "4 of 5 failing charms match #9010's signature; charm-ubuntu is a "
+        'new failure not present in #9010'
+    ),
     'confidence': 'medium',
 }
 
@@ -1130,7 +1129,3 @@ class OpenRouterCallTests(unittest.TestCase):
         with mock.patch.object(afn.urllib.request, 'urlopen', side_effect=error):
             with self.assertRaises(urllib.error.HTTPError):
                 afn.call_openrouter('sys', 'user', 'm', 'k')
-
-
-if __name__ == '__main__':
-    unittest.main()
