@@ -556,7 +556,6 @@ class MainFlowTests(unittest.TestCase):
             mock.patch.object(afn, 'existing_labels', return_value={'tests', 'docs'}),
             mock.patch.object(afn, 'gh', side_effect=gh_calls),
             mock.patch.object(afn, 'write_step_summary'),
-            mock.patch.object(afn, 'set_output'),
         ]
         return patches
 
@@ -925,7 +924,6 @@ class CandidatePoolTests(unittest.TestCase):
             mock.patch.object(afn, 'call_openrouter', return_value={'action': 'bogus'}),
             mock.patch.object(afn, 'gh'),
             mock.patch.object(afn, 'write_step_summary'),
-            mock.patch.object(afn, 'set_output'),
         ):
             afn.main()
         return captured['block']
@@ -1037,11 +1035,9 @@ class MainDegradationTests(unittest.TestCase):
             mock.patch.object(afn, 'existing_labels', return_value=set()),
             mock.patch.object(afn, 'gh', side_effect=gh_calls),
             mock.patch.object(afn, 'write_step_summary') as summary,
-            mock.patch.object(afn, 'set_output') as set_output,
         ):
             rc = afn.main()
         self.assertEqual(rc, 0)
-        set_output.assert_called_with('handled', 'true')
         self.assertTrue(
             any('Marker lookup failed' in c.args[0] for c in summary.call_args_list),
             'the failure should be reported in the step summary',
@@ -1062,7 +1058,6 @@ class MainDegradationTests(unittest.TestCase):
             ),
             mock.patch.object(afn, 'gh', side_effect=gh_calls),
             mock.patch.object(afn, 'write_step_summary') as summary,
-            mock.patch.object(afn, 'set_output'),
         ):
             rc = afn.main()
         self.assertEqual(rc, 0)

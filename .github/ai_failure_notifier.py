@@ -1123,15 +1123,6 @@ def write_step_summary(message: str) -> None:
             f.write(message + '\n')
 
 
-def set_output(name: str, value: str) -> None:
-    """Write a `name=value` line to $GITHUB_OUTPUT, if set."""
-    path = os.environ.get('GITHUB_OUTPUT')
-    if not path:
-        return
-    with open(path, 'a', encoding='utf-8') as f:
-        f.write(f'{name}={value}\n')
-
-
 def plain_fallback_body(workflow_name: str, run_url: str) -> str:
     """The plain, generic body text used whenever enrichment is unavailable."""
     return f"Scheduled workflow '{workflow_name}' failed: {run_url}"
@@ -1227,7 +1218,6 @@ def main() -> int:
             f'Rung zero: run {run_id} already enriched on #{enriched_issue}; '
             'commented re-run note.'
         )
-        set_output('handled', 'true')
         return 0
 
     if origin_issue is None:
@@ -1282,7 +1272,6 @@ def main() -> int:
             workflow_name,
             default_target=origin_issue,
         )
-        set_output('handled', 'true')
         return 0
 
     try:
@@ -1326,7 +1315,6 @@ def main() -> int:
             workflow_name,
             default_target=origin_issue,
         )
-        set_output('handled', 'true')
         return 0
 
     envelope, dropped_fields = normalise_envelope(envelope)
@@ -1361,7 +1349,6 @@ def main() -> int:
             workflow_name,
             default_target=origin_issue,
         )
-        set_output('handled', 'true')
         return 0
 
     if envelope['action'] == 'new' and origin_kind == 'new':
@@ -1416,7 +1403,6 @@ def main() -> int:
     for also_entry in envelope.get('also') or []:
         apply_entry(repo, also_entry, enriched_marker, workflow_name)
 
-    set_output('handled', 'true')
     return 0
 
 

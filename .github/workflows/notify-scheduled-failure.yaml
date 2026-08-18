@@ -67,3 +67,30 @@ jobs:
     permissions:
       issues: write
     uses: ./.github/workflows/ai-failure-enrich.yaml
+
+  # If stage 1 failed *and* the enricher never got far enough to use its own
+  # fallback, nothing has notified anyone -- the one case here that needs an
+  # issue created. An un-enriched placeholder is a red job, not a lost
+  # notification, so `enrich` failing on its own is deliberately left alone.
+  # Both stages run in this same run, so `needs.*.result` says directly
+  # whether a notification exists; no marker search is needed to find out.
+  plain-fallback:
+    needs: [open-issue, enrich]
+    if: >-
+      ${{ always() && needs.open-issue.result != 'success' &&
+      needs.enrich.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create an issue (last resort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh issue create --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
