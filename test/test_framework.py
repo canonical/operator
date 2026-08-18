@@ -557,6 +557,51 @@ class TestFramework:
         assert len(notices_for_observer(1)) == 0
         assert len(notices_for_observer(2)) == 4
 
+    def test_repeated_defer_distinct_events_not_skipped(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class ReadyEvent(ops.EventBase):
+            pass
+
+        class GoneEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            ready = ops.EventSource(ReadyEvent)
+            gone = ops.EventSource(GoneEvent)
+
+        class MyObserver(ops.Object):
+            def __init__(self, parent: ops.Object, key: str):
+                super().__init__(parent, key)
+                self.seen: list[str] = []
+
+            def on_any(self, event: ops.EventBase):
+                self.seen.append(event.handle.path)
+                if len(self.seen) == 1:
+                    event.defer()
+
+        pub1 = MyNotifier(framework, 'db1')
+        pub2 = MyNotifier(framework, 'db2')
+        obs = MyObserver(framework, 'obs')
+        framework.observe(pub1.ready, obs.on_any)
+        framework.observe(pub2.ready, obs.on_any)
+        framework.observe(pub1.gone, obs.on_any)
+
+        # Defer the first event so that its notice stays in the queue.
+        pub1.ready.emit()
+
+        # An event from a different (keyed) emitter instance and an event of a
+        # different kind share the observer method and an empty snapshot, but
+        # they are not duplicates of the queued notice and must be delivered.
+        pub2.ready.emit()
+        pub1.gone.emit()
+
+        assert obs.seen == [
+            'MyNotifier[db1]/ready[1]',
+            'MyNotifier[db2]/ready[2]',
+            'MyNotifier[db1]/gone[3]',
+        ]
+
     def test_two_observers_one_deferring(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
 
