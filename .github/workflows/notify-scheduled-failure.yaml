@@ -6,12 +6,13 @@ name: Notify on scheduled failure
 # `permissions: issues: write`.
 #
 # This is the first of two stages: a cheap, deterministic, always-works
-# dedup pre-check, with no LLM dependency and no secrets. The second,
-# .github/workflows/ai-failure-enrich.yaml, is triggered separately by
-# `workflow_run` on this workflow's callers, and rewrites whatever this one
-# produced into a triaged artefact. Keeping them separate is what lets this
-# workflow keep its guarantee: if the enricher is unprovisioned or broken, a
-# notification still happens.
+# dedup pre-check, with no LLM dependency and no secrets. The `open-issue`
+# job below is the whole of that guarantee -- once it has run, a
+# notification exists. The second stage,
+# .github/workflows/ai-failure-enrich.yaml, is called afterwards from here
+# and rewrites what this one produced into a triaged artefact. It needs an
+# API key and an environment, and if it is unprovisioned or broken the
+# notification has already happened regardless.
 
 on:
   workflow_call:
@@ -53,3 +54,16 @@ jobs:
               --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
               --body "$issue_body"
           fi
+
+  # Stage 2. Called from here, rather than subscribing to this workflow's
+  # callers with `workflow_run`, so that there is no list of caller workflow
+  # names to keep in sync and no `dangerous-triggers` suppression to justify.
+  # `needs: [open-issue]` is what orders it after the placeholder exists;
+  # `always()` runs it even if stage 1 failed, since the enricher's own
+  # fallback handles a missing marker by creating the issue itself.
+  enrich:
+    needs: [open-issue]
+    if: ${{ always() }}
+    permissions:
+      issues: write
+    uses: ./.github/workflows/ai-failure-enrich.yaml
