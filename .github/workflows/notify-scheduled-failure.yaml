@@ -6,13 +6,12 @@ name: Notify on scheduled failure
 # `permissions: issues: write`.
 #
 # This is the first of two stages: a cheap, deterministic, always-works
-# dedup pre-check, with no LLM dependency and no secrets. The `open-issue`
-# job below is the whole of that guarantee -- once it has run, a
-# notification exists. The second stage,
-# .github/workflows/ai-failure-enrich.yaml, is called afterwards from here
-# and rewrites what this one produced into a triaged artefact. It needs an
-# API key and an environment, and if it is unprovisioned or broken the
-# notification has already happened regardless.
+# dedup pre-check, with no LLM dependency and no secrets. The second,
+# .github/workflows/ai-failure-enrich.yaml, is triggered separately by
+# `workflow_run` on this workflow's callers, and rewrites whatever this one
+# produced into a triaged artefact. Keeping them separate is what lets this
+# workflow keep its guarantee: if the enricher is unprovisioned or broken, a
+# notification still happens.
 
 on:
   workflow_call:
@@ -54,43 +53,3 @@ jobs:
               --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
               --body "$issue_body"
           fi
-
-  # Stage 2. Called from here, rather than subscribing to this workflow's
-  # callers with `workflow_run`, so that there is no list of caller workflow
-  # names to keep in sync and no `dangerous-triggers` suppression to justify.
-  # `needs: [open-issue]` is what orders it after the placeholder exists;
-  # `always()` runs it even if stage 1 failed, since the enricher's own
-  # fallback handles a missing marker by creating the issue itself.
-  enrich:
-    needs: [open-issue]
-    if: ${{ always() }}
-    permissions:
-      issues: write
-    uses: ./.github/workflows/ai-failure-enrich.yaml
-
-  # If stage 1 failed *and* the enricher never got far enough to use its own
-  # fallback, nothing has notified anyone -- the one case here that needs an
-  # issue created. An un-enriched placeholder is a red job, not a lost
-  # notification, so `enrich` failing on its own is deliberately left alone.
-  # Both stages run in this same run, so `needs.*.result` says directly
-  # whether a notification exists; no marker search is needed to find out.
-  plain-fallback:
-    needs: [open-issue, enrich]
-    if: >-
-      ${{ always() && needs.open-issue.result != 'success' &&
-      needs.enrich.result != 'success' }}
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Create an issue (last resort)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WORKFLOW_NAME: ${{ github.workflow }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          gh issue create --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
