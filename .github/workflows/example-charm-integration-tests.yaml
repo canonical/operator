@@ -66,6 +66,7 @@ jobs:
         # regularly fails on slow GHA runners with `unable to contact api server
         # after 60 attempts` because the default --bootstrap-timeout is too short.
         run: sudo concierge prepare -c .github/integration/concierge-k8s.yaml
+        timeout-minutes: 90
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
