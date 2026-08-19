@@ -28,6 +28,7 @@ jobs:
         run: sudo snap install --classic concierge
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
@@ -66,7 +67,7 @@ jobs:
         # regularly fails on slow GHA runners with `unable to contact api server
         # after 60 attempts` because the default --bootstrap-timeout is too short.
         run: sudo concierge prepare -c .github/integration/concierge-k8s.yaml
-        timeout-minutes: 90
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
