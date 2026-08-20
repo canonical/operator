@@ -1,7 +1,7 @@
 (manage-libraries)=
 # How to manage libraries
 
-> See first: {external+charmcraft:ref}`Charmcraft | Manage libraries <manage-libraries>`
+See first: {external+charmcraft:ref}`Charmcraft | Manage libraries <manage-libraries>`
 
 ## Use a library
 
@@ -108,6 +108,7 @@ class DatabaseRequirer(ops.Object):
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-libraries-no-status-mutation
 
 Libraries should never mutate the status of a unit or application. Instead, use
 return values, or raise exceptions and let them bubble back up to the charm for
@@ -158,7 +159,7 @@ def test_charm_runs(event):
 If `DatabaseRequirer` is a relation endpoint wrapper, a frequent pattern is to
 allow customising the name of the endpoint that the object is wrapping.
 
-> Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
+Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
 
 In your `tests/unit/test_my_lib.py` file, add a test that validates that custom
 names are supported:
@@ -232,7 +233,7 @@ populate its local data with a request, and the providing charm will use that to
 provide a suitable response. In more complex cases, this conversation might have
 multiple stages.
 
-> See more: {ref}`manage-interfaces`
+See more: {ref}`manage-interfaces`
 
 If the library is implementing an existing interface, find the interface documentation by following links from the Integrations tab on Charmhub, or by navigating to `https://charmhub.io/integrations/{integration-name}`.
 Alternatively, the interface documentation can be found in the
@@ -350,4 +351,4 @@ def _publish_provider(
     relation.save(data, self._charm.app)
 ```
 
-> See more: [](ops.Relation.save)
+See more: [](ops.Relation.save)
