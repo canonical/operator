@@ -79,9 +79,9 @@ class BufferingSpanExporter(SpanExporter):
             # We'll limit the running time of each export to (10 - 4) seconds.
             deadline = time.monotonic() + 6
 
-            assert spans  # noqa: S101  # The BatchSpanProcessor won't call us if there's no data.
+            assert spans  # ruff: ignore[assert]  # The BatchSpanProcessor won't call us if there's no data.
             rv = self.buffer.pushpop((_otlp_json.encode_spans(spans), _otlp_json.CONTENT_TYPE))
-            assert rv  # noqa: S101  # We've just pushed something in.
+            assert rv  # ruff: ignore[assert]  # We've just pushed something in.
             self.do_export(*rv)
 
             for _ in range(SENDOUT_FACTOR - 1):
@@ -131,8 +131,8 @@ class BufferingSpanExporter(SpanExporter):
         context = self.ssl_context(config.ca) if config.url.startswith('https://') else None
 
         try:
-            with urllib.request.urlopen(  # noqa: S310
-                urllib.request.Request(  # noqa: S310
+            with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage]
+                urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
                     config.url,
                     data=data,
                     headers={'Content-Type': mime},

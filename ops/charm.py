@@ -1306,7 +1306,7 @@ class CollectStatusEvent(LifecycleEvent):
                     event.add_status(ops.BlockedStatus('please set "port" config'))
                     return
                 event.add_status(ops.ActiveStatus())
-    """  # noqa: D405, D214, D411, D416  Final return confuses docstyle.
+    """  # ruff: ignore[non-capitalized-section-name, overindented-section, no-blank-line-before-section, missing-section-name-colon]  Final return confuses docstyle.
 
     def add_status(self, status: model.StatusBase):
         """Add a status for evaluation.
@@ -1490,7 +1490,7 @@ class CharmBase(Object):
     if TYPE_CHECKING:
         # to help the type checker and IDEs:
         @property
-        def on(self) -> CharmEvents: ...  # noqa
+        def on(self) -> CharmEvents: ...  # ruff: ignore[undocumented-public-method]
 
     def __init__(self, framework: Framework):
         super().__init__(framework, None)

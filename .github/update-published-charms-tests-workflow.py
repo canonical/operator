@@ -115,7 +115,7 @@ def get_source_url(charm: str):
     """Get the source URL for a charm."""
     logger.info("Looking for a 'source' URL for %s", charm)
     try:
-        with urllib.request.urlopen(  # noqa: S310 (unsafe URL)
+        with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] (unsafe URL)
             f'{URL_BASE}/{charm}?fields=result.links', timeout=30
         ) as response:
             data = json.loads(response.read().decode())
@@ -124,7 +124,7 @@ def get_source_url(charm: str):
         pass
     logger.info("Looking for a 'bugs-url' URL for %s", charm)
     try:
-        with urllib.request.urlopen(  # noqa: S310 (unsafe URL)
+        with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] (unsafe URL)
             f'{URL_BASE}/{charm}?fields=result.bugs-url', timeout=30
         ) as response:
             data = json.loads(response.read().decode())

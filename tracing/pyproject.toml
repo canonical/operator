@@ -75,7 +75,7 @@ select = [
     "E",
     "W",
     # isort
-    "I001",
+    "unsorted-imports",
     # pep8-naming
     "N",
     # flake8-builtins
@@ -101,11 +101,11 @@ select = [
 ]
 ignore = [
     # `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible.
-    "D203",
+    "incorrect-blank-line-before-class",
     # `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible.
-    "D213",
+    "multi-line-summary-second-line",
     # we don't add a blank line after Args: in a function docstring
-    "D413",
+    "missing-blank-line-after-last-section",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -113,7 +113,7 @@ ignore = [
     # no need for docstring
     "D",
     # asserts are OK in tests
-    "S101",
+    "assert",
 ]
 
 [tool.pyright]

@@ -57,7 +57,7 @@ def fake_script(test_case: unittest.TestCase, name: str, content: str):
 {{ printf {name}; printf "\\036%s" "$@"; printf "\\034"; }} >> {path}/calls.txt
 {content}""".format_map(template_args)
         )
-    os.chmod(str(path), 0o755)  # type: ignore  # noqa: S103
+    os.chmod(str(path), 0o755)  # type: ignore  # ruff: ignore[bad-file-permissions]
 
 
 def fake_script_calls(test_case: unittest.TestCase, clear: bool = False) -> list[list[str]]:

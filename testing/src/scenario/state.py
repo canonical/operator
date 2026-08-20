@@ -157,7 +157,7 @@ class JujuLogLine:
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True, init=False)
-class CloudCredential:  # noqa: D101
+class CloudCredential:  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
@@ -196,7 +196,7 @@ class CloudCredential:  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, init=False)
-class CloudSpec:  # noqa: D101
+class CloudSpec:  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.CloudSpec.__doc__
 
     type: str
@@ -276,7 +276,7 @@ class CloudSpec:  # noqa: D101
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # noqa: S311
+    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
     return f'secret:{secret_id}'
 
 
@@ -856,7 +856,7 @@ class PeerRelation(RelationBase):
 
 def _random_model_name():
     space = string.ascii_letters + string.digits
-    return ''.join(random.choice(space) for _ in range(20))  # noqa: S311
+    return ''.join(random.choice(space) for _ in range(20))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1498,7 +1498,7 @@ class _EntityStatus:
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
+class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.UnknownStatus.__doc__
 
     name: Literal['unknown'] = 'unknown'
@@ -1508,7 +1508,7 @@ class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
+class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.ErrorStatus.__doc__
 
     name: Literal['error'] = 'error'
@@ -1518,7 +1518,7 @@ class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
+class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.ActiveStatus.__doc__
 
     name: Literal['active'] = 'active'
@@ -1528,7 +1528,7 @@ class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
+class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.BlockedStatus.__doc__
 
     name: Literal['blocked'] = 'blocked'
@@ -1538,7 +1538,7 @@ class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
+class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.MaintenanceStatus.__doc__
 
     name: Literal['maintenance'] = 'maintenance'
@@ -1548,7 +1548,7 @@ class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # noqa: D101
+class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.WaitingStatus.__doc__
 
     name: Literal['waiting'] = 'waiting'
@@ -2363,7 +2363,7 @@ class _EventType(str, Enum):
     BUILTIN = 'builtin'
     RELATION = 'relation'
     ACTION = 'action'
-    SECRET = 'secret'  # noqa: S105  # This is not an actual secret.
+    SECRET = 'secret'  # ruff: ignore[hardcoded-password-string]  # This is not an actual secret.
     STORAGE = 'storage'
     WORKLOAD = 'workload'
     CUSTOM = 'custom'

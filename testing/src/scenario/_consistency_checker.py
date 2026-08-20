@@ -795,7 +795,7 @@ def check_storedstate_consistency(
         # This is the same "only simple types" check that ops does.
         try:
             marshal.dumps(ss.content)  # pyright: ignore[reportArgumentType]
-        except ValueError:  # noqa: PERF203
+        except ValueError:  # ruff: ignore[try-except-in-loop]
             errors.append(
                 f'The StoredState object {ss.owner_path}.{ss.name} '
                 f'should contain only simple types.',
