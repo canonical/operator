@@ -7,7 +7,7 @@ Like all software, charms continually evolve and should increase in maturity and
 
 Anyone can pack a charm from source and deploy it by passing the `.charm` file to `juju deploy`. This is frequently done during development and testing, but can also be used for private charms.
 
-> See more: {external+juju:ref}`Juju | How to manage applications | Deploy an application <deploy-an-application>`
+See more: {external+juju:ref}`Juju | How to manage applications | Deploy an application <deploy-an-application>`
 
 ## Phase 2: Private listing on Charmhub
 
@@ -15,7 +15,7 @@ Anyone can publish a charm to Charmhub (you'll need to create an account, and th
 
 Privately-listed charms will not show up in searches on Charmhub, or general web searches.
 
-> See more: [](#publish-your-charm)
+See more: [](#publish-your-charm)
 
 ## Phase 3: Public listing on Charmhub
 
@@ -23,7 +23,7 @@ When an author is satisfied that the charm is suitable for wider production use,
 
 After passing review, the charm will show up in searches on Charmhub, and web searches leading to Charmhub.
 
-> See more: [How to request Charmhub public listing](#make-your-charm-discoverable)
+See more: [How to request Charmhub public listing](#make-your-charm-discoverable)
 
 Reviewing charms encourages the involvement of the community. 'Community' refers to individuals and organisations creating or contributing to charms, Juju and the wider charming ecosystem. Reviews take place in public GitHub issues so that anyone from the community can participate.
 
@@ -57,7 +57,7 @@ Submit any newly-proposed public interfaces for review, to ensure that:
 - Interface names and structure are consistent with the charming ecosystem.
 - Tests cover integration with the applications consuming or providing the relations.
 
-> See more: [Charmlibs documentation](https://canonical.com/juju/docs/charmlibs/)
+See more: [Charmlibs documentation](https://canonical.com/juju/docs/charmlibs/)
 
 ### The charm respects the Juju proxy options
 

@@ -1,6 +1,6 @@
 (turn-a-hooks-based-charm-into-an-ops-charm)=
 # How to migrate from a hooks-based charm
-> See first: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
+See first: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
 
 Suppose you have a hooks-based charm and you decide to rewrite it using the Ops framework in Python.
 
@@ -312,7 +312,7 @@ The fact is, hooks charms can be written in Assembly, or any other language, so 
 
 Ops charms, on the other hand, are Python charms. As such, even though Ops is not especially large in and of itself, Ops charms bring a virtual environment with them. That makes the resulting charm package somewhat heavier. That might be a consideration when the charm target is a resource-constrained system.
 
-### Todo's / disclaimers
+### Remaining work and disclaimers
 
 
 Above, the `website` relation has not been tested; implementing the `Requires` part of it is also left as an exercise to the reader.
