@@ -28,9 +28,7 @@ Use Charmcraft to quickly initialise your charm project. This generates the
 folder structure, creates placeholder configuration and code files, and
 configures development tooling.
 
-See more:
-
-- {ref}`init-charm`
+See more: {ref}`init-charm`
 
 (develop-your-charm)=
 ## Develop your charm
@@ -103,9 +101,7 @@ See more:
 
 When you're ready, you'll publish your charm on Charmhub.
 
-See more:
-
-* [](#publish-your-charm)
+See more: [](#publish-your-charm)
 
 A charm is software: while there can be milestones, there is never a finish
 line. So, keep investing in every bit of your charm so that it looks and feels

@@ -68,20 +68,14 @@ Ops does not encrypt the state database or buffered trace data at rest. Ops rest
 
 Ops communicates with Juju by reading environment variables and running processes in the charm environment (hook commands).
 
-See also:
-
-- {external+juju:ref}`Juju | Hook <hook>`
-- {external+juju:ref}`Juju | Hook command <list-of-hook-commands>`
+See also: {external+juju:ref}`Juju | Hook <hook>`, {external+juju:ref}`Juju | Hook command <list-of-hook-commands>`
 
 (ops-charm-unit-databases)=
 ## Charm unit databases
 
 Ops stores state in a sqlite3 database named `.unit-state.db`. This database includes [](ops.StoredState) objects and the defer notice queue.
 
-See also:
-
- - [](#storedstate-uses-limitations)
- - [](#how-and-when-to-defer-events)
+See also: [](#storedstate-uses-limitations), [](#how-and-when-to-defer-events)
 
 The state database is in the charm directory, which is set by Juju in the `JUJU_CHARM_DIR` environment variable and typically looks like `/var/lib/juju/agents/unit-my-unit-0/charm`. For a machine charm, this directory is on the unit's machine. For a Kubernetes charm, this directory is in the charm container.
 
