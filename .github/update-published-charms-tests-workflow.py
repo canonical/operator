@@ -48,8 +48,7 @@ SKIP = {
     # Handled by db-charm-tests.yaml
     'postgresql-operator',
     'postgresql-k8s-operator',
-    'mysql-operator',
-    'mysql-k8s-operator',
+    'mysql-operators',
     # Handled by hello-charm-tests.yaml
     'hello-kubecon',  # Not in the canonical org anyway (jnsgruk).
     'hello-juju-charm',  # Not in the canonical org anyway (juju).
@@ -94,6 +93,7 @@ CHARM_ROOTS = {
         'charms/kfp-viewer',
         'charms/kfp-viz',
     ],
+    'mysql-operators': ['machines', 'kubernetes'],
     'mysql-router-operators': ['machines', 'kubernetes'],
     'notebook-operators': ['charms/jupyter-controller', 'charms/jupyter-ui'],
     'tempo-operators': ['coordinator', 'worker'],

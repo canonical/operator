@@ -3,7 +3,7 @@
 
 Charms should have tests to verify that they are functioning correctly. This page describes the types of testing that you should consider.
 
-> See also: [](#set-up-ci)
+See also: [](#set-up-ci)
 
 ## Unit testing
 
@@ -20,7 +20,7 @@ A charm acts like a function, taking event context (always present), configurati
 
 Unit tests focus on mapping these inputs to expected outputs. For example, a unit test could verify a system call, the contents of a file, or the contents of a relation databag.
 
-> See also: {ref}`write-unit-tests-for-a-charm`
+See also: {ref}`write-unit-tests-for-a-charm`
 
 ### Coverage
 
@@ -55,7 +55,7 @@ Interface tests validate charm library behavior against mock Juju APIs, ensuring
 
 Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface. For information about how to create an interface, see {ref}`register-an-interface`.
 
-> See also: {ref}`write-tests-for-an-interface`
+See also: {ref}`write-tests-for-an-interface`
 
 ### Coverage
 
@@ -93,7 +93,7 @@ Integration tests should be focused on a single charm. Sometimes an integration 
 
 Integration tests typically take significantly longer to run than unit tests.
 
-> See also: {ref}`write-integration-tests-for-a-charm`
+See also: {ref}`write-integration-tests-for-a-charm`
 
 ### Coverage
 

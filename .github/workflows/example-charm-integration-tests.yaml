@@ -17,17 +17,18 @@ jobs:
         dir:
           - examples/machine-tinyproxy
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
         run: sudo snap install --classic concierge
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
@@ -51,17 +52,22 @@ jobs:
           - examples/k8s-4-action
           - examples/k8s-5-observe
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
         run: sudo snap install --classic concierge
       - name: Prepare for deploying K8s charms
-        run: sudo concierge prepare -p microk8s
+        # .github/integration/concierge-k8s.yaml mirrors the upstream concierge
+        # k8s preset and adds juju.extra-bootstrap-args: `juju bootstrap`
+        # regularly fails on slow GHA runners with `unable to contact api server
+        # after 60 attempts` because the default --bootstrap-timeout is too short.
+        run: sudo concierge prepare -c .github/integration/concierge-k8s.yaml
+        timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}

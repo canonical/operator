@@ -93,10 +93,11 @@ The password of the Pebble identity is stored as a hash, which we generate using
 
 When Pebble receives a request to access the metrics endpoint, Pebble will verify that the basic authentication credentials in the request match the identity's username and password.
 
-> See more:
-> - {ref}`make-your-charm-configurable`
-> - {ref}`manage-configuration`
-> - {ref}`manage-secrets`
+See more:
+
+- {ref}`make-your-charm-configurable`
+- {ref}`manage-configuration`
+- {ref}`manage-secrets`
 
 ## Deploy the charm and grant access to the user secret
 
@@ -135,7 +136,7 @@ my-charm-endpoints.test.svc.cluster.local:38813/v1/metrics
 
 You'll need to use HTTP basic authentication with the username and password that you specified in the `juju add-secret` command.
 
-> See more: [Service discovery within a Kubernetes cluster](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+See more: [Service discovery within a Kubernetes cluster](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 
 ### Through an Ingress
 
