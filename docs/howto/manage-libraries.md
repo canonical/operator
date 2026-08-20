@@ -62,7 +62,9 @@ Custom events must inherit from `EventBase`, but not from an Ops subclass of
 any data needed from Juju from the originating event, and explicitly pass that
 to the custom event object.
 
-For example, suppose you have a charm library wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm. In this example, you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. Take an `endpoint` argument so that the charm using the library can name the relation whatever they like in `charmcraft.yaml` and pass the name through to the requirer -- the library then observes the caller-supplied endpoint rather than a hard-coded one. In your `lib/charms/my_charm/v0/my_lib.py` file, the `DatabaseRequirer` then will be:
+For example, suppose you have a charm library wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm.
+
+In this example, you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. Take an `endpoint` argument in `DatabaseRequirer` so that the charm using the library can name the relation whatever they like in `charmcraft.yaml` and pass the name through to the requirer. Then have `DatabaseRequirer` observe the caller-supplied endpoint rather than a hard-coded one. Your `lib/charms/my_charm/v0/my_lib.py` file will be:
 
 ```python
 class DatabaseReadyEvent(ops.EventBase):
@@ -166,9 +168,9 @@ allow customising the name of the endpoint that the object is wrapping.
 
 In your `tests/unit/test_my_lib.py` file, add a test that validates that custom
 names are supported. Trigger a `relation_changed` event on the custom-named
-relation and assert that the library's custom event fires -- if the library
+relation and assert that the library's custom event fires. If the library
 had hard-coded the endpoint name and ignored the `endpoint` argument, no
-`DatabaseReadyEvent` would be emitted and the test would fail:
+`DatabaseReadyEvent` would be emitted and the test would fail.
 
 ```python
 import pytest
