@@ -1,7 +1,7 @@
 (write-unit-tests-for-a-charm)=
 # How to write unit tests for a charm
 
-> See also: [](#testing)
+See also: [](#testing)
 
 ## Set up your environment
 
@@ -90,9 +90,7 @@ If you prefer to use unittest, you should rewrite this as a method of a `TestCas
 
 ```
 
-> See more:
->  - [`State`](ops.testing.State)
->  - [`Context`](ops.testing.Context)
+See more: [`State`](ops.testing.State), [`Context`](ops.testing.Context)
 
 To start with a `State` that has components based on the charm's metadata, use the `State.from_context` method. For example, with this `charmcraft.yaml` file:
 
@@ -119,7 +117,7 @@ def test_peer_changed():
     assert rel_out.peers_data...
 ```
 
-> See more: [](ops.testing.State.from_context)
+See more: [](ops.testing.State.from_context)
 
 ```{note}
 If your `charmcraft.yaml` uses a charmcraft extension (e.g.

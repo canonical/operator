@@ -1,6 +1,6 @@
 (manage-opened-ports)=
 # How to manage opened ports
-> See first: {external+juju:ref}`Juju | Hook Commands | open-port <hook-command-open-port>`
+See first: {external+juju:ref}`Juju | Hook Commands | open-port <hook-command-open-port>`
 
 Juju manages the IP of each unit, so you need to instruct Juju
 if you want the charm to have a stable address. Typically, charms manage this
@@ -19,9 +19,9 @@ def _on_holistic_handler(self, _: ops.EventBase):
     self.unit.set_ports(port)
 ```
 
-> See more: [](ops.Unit.set_ports)
+See more: [](ops.Unit.set_ports)
 
-> Examples: [mysql-k8s opens the MySQL ports](https://github.com/canonical/mysql-k8s-operator/blob/a68147d0fbf66386ab087f4cfcc19784fcc2be6e/src/charm.py#L648), [tempo-coordinator-k8s opens both server and receiver ports](https://github.com/canonical/tempo-coordinator-k8s-operator/blob/ece268eae1158760513807a02972c138fd39afcf/src/charm.py#L95)
+Examples: [mysql-k8s opens the MySQL ports](https://github.com/canonical/mysql-k8s-operator/blob/a68147d0fbf66386ab087f4cfcc19784fcc2be6e/src/charm.py#L648), [tempo-coordinator-k8s opens both server and receiver ports](https://github.com/canonical/tempo-coordinator-k8s-operator/blob/ece268eae1158760513807a02972c138fd39afcf/src/charm.py#L95)
 
 `ops` also offers [](ops.Unit.open_port) and [](ops.Unit.close_port) methods,
 but the declarative approach is typically simpler.
@@ -32,7 +32,7 @@ You'll want to add unit and integration tests.
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 In your unit tests, use the [](ops.testing.State.opened_ports) component of the
 input `State` to specify which ports are already open when the event is
@@ -52,7 +52,7 @@ def test_open_port():
 
 ### Write integration tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`, {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`, {ref}`write-integration-tests-for-a-charm`
 
 To verify that the correct ports are open in an integration test, deploy your
 charm as usual, and then try to connect to the appropriate ports.

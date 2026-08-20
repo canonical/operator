@@ -195,7 +195,7 @@ units_data : {
 
 ### 6. Add interface tests
 
-> See more: {ref}`write-tests-for-an-interface`
+See more: {ref}`write-tests-for-an-interface`
 
 ### 7. Open a PR to [the `charm-relation-interfaces` repo](https://github.com/canonical/charm-relation-interfaces)
 
@@ -211,7 +211,7 @@ For an example of a registered interface, see [`ingress`](https://github.com/can
 (write-tests-for-an-interface)=
 ## Write tests for an interface
 
-> See also: {ref}`interface-tests`
+See also: {ref}`interface-tests`
 
 Suppose you have an interface specification in [`charm-relation-interfaces`](#charm-relation-interfaces), or you are working on one, and you want to add interface tests. These are the steps you need to take.
 
@@ -469,7 +469,7 @@ requirers:
 ```
 Remember, however, to merge the changes first in the operator repository before merging the pull request to `charm-relation-interfaces`.
 
-> See more:
->
-> - [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the `ingress` interface defined in `charm-relation-interfaces`.
-> - [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) for the [`traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator) charm.
+See more:
+
+- [`test_provider.py`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v1/interface_tests/test_provider.py) for the `ingress` interface defined in `charm-relation-interfaces`.
+- [`conftest.py`](https://github.com/canonical/traefik-k8s-operator/blob/main/tests/interface/conftest.py) for the [`traefik-k8s-operator`](https://github.com/canonical/traefik-k8s-operator) charm.

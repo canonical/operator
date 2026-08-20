@@ -7,7 +7,7 @@ myst:
 (debug-your-charm)=
 # How to debug your charm
 
-> See first: {ref}`log-from-your-charm`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
+See first: {ref}`log-from-your-charm`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 When your charm isn't behaving as expected, Juju and the broader charming ecosystem provide several tools to help you investigate. This guide covers how to get a shell on a running unit, read charm logs, interactively debug hook execution, and use third-party tools to accelerate your debugging workflow.
 
@@ -50,7 +50,7 @@ juju import-ssh-key gh:<your-github-username>
 ```
 ````
 
-> See more: {external+juju:ref}`Juju | juju ssh <command-juju-ssh>`
+See more: {external+juju:ref}`Juju | juju ssh <command-juju-ssh>`
 
 (debug-with-pebble)=
 ## Inspect the workload with Pebble (Kubernetes charms)
@@ -171,7 +171,7 @@ This tells Juju to store DEBUG-level messages from charm units while keeping eve
 If you raise the stored log level for debugging (e.g. to DEBUG or TRACE), remember to restore it to the default once you are done. Verbose logs consume storage in the Juju database and can affect controller performance.
 ```
 
-> See more: {external+juju:ref}`Juju | logging-config <model-config-logging-config>`
+See more: {external+juju:ref}`Juju | logging-config <model-config-logging-config>`
 
 (use-jhack)=
 ## Use jhack for a faster debugging workflow

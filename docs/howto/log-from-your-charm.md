@@ -1,7 +1,7 @@
 (log-from-your-charm)=
 # How to log from your charm
 
-> See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
+See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 Ops configures Python logging and warnings to end up in the Juju log, and the
 Charmcraft profiles provide a `logger` object for your charm to use at the top
@@ -43,7 +43,7 @@ juju debug-log --debug --include-module juju.worker.uniter.operation --include-m
 
 ````
 
-> See more: [`logging`](https://docs.python.org/3/library/logging.html)
+See more: [`logging`](https://docs.python.org/3/library/logging.html)
 
 ```{admonition} Best practice
 :class: hint
