@@ -9,6 +9,7 @@ myst:
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-automated-ci
 
 The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system.
 ```
@@ -102,7 +103,7 @@ If your charm is a Kubernetes charm, add the following job to `.github/workflows
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: juju-dump-logs
+          name: integration-test-logs
           path: logs
 ```
 
