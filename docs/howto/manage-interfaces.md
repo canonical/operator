@@ -354,8 +354,10 @@ cd path/to/my-fancy-database-operator
 
 Create a `conftest.py` file under `tests/interface`:
 
-> mkdir ./tests/interface
-> touch ./tests/interface/conftest.py
+```shell
+mkdir ./tests/interface
+touch ./tests/interface/conftest.py
+```
 
 Write in `conftest.py`:
 
