@@ -170,50 +170,34 @@ select = [
     "TC",
 ]
 ignore = [
-    # Move application import into a type-checking block
     "typing-only-first-party-import",
-    # Move third-party import into a type-checking block
     "typing-only-third-party-import",
-    # Move standard library import into a type-checking block
     "typing-only-standard-library-import",
-    # Use of `assert` detected
     "assert",
-    # Do not `assert False`
     "assert-false",
-    # `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
     "suspicious-pickle-import",
-    # `subprocess` module is possibly insecure
     "suspicious-subprocess-import",
 
-    # No explicit `stacklevel` keyword argument found
     "no-explicit-stacklevel",
 
-    # Return condition directly, prefer readability.
+    # We prefer the readability of returning the condition explicitly.
     "needless-bool",
-    # Use contextlib.suppress() instead of try/except: pass
     "suppressible-exception",
-    # Use a single `with` statement with multiple contexts instead of nested `with` statements
     "multiple-with-statements",
 
-    # Missing docstring in magic method
     "undocumented-magic-method",
-    # Missing docstring in `__init__`
     "undocumented-public-init",
 
-    # Manual list comprehension.
     "manual-list-comprehension",
-    # Manual dict comprehension.
     "manual-dict-comprehension",
 
-    # Convert {} from `TypedDict` functional to class syntax
-    # Note that since we have some `TypedDict`s that cannot use the class
-    # syntax, we're currently choosing to be consistent in syntax even though
-    # some can be moved to the class syntax.
+    # Since we have some `TypedDict`s that cannot use the class syntax, we're
+    # currently choosing to be consistent in syntax even though some can be
+    # moved to the class syntax.
     "convert-typed-dict-functional-to-class",
 
     ## Likely worth doing, but later.
 
-    # `subprocess` call: check for execution of untrusted input
     "subprocess-without-shell-equals-true",
 ]
 exclude = ["tracing/ops_tracing/vendor/*"]
@@ -223,16 +207,13 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 
-    # Hard-coded password string.
     "hardcoded-password-string",
-    # Hard-coded password function argument.
     "hardcoded-password-func-arg",
 
-    # "Useless" expression.
     "useless-expression",
 
-    # Unreliable floating point equality comparison. Tests check round-tripped
-    # exact-literal config values; pytest.approx isn't appropriate here.
+    # Tests check round-tripped exact-literal config values; pytest.approx
+    # isn't appropriate here.
     "float-equality-comparison",
 ]
 "testing/tests/*" = [
@@ -246,8 +227,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "start-process-with-partial-path",  # Intentionally calls charmcraft/tox by name.
 ]
 "ops/_private/timeconv.py" = [
-    "ambiguous-unicode-character-string",  # String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
-    "ambiguous-unicode-character-docstring",  # Docstring contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+    # `µ` (MICRO SIGN) rather than `μ` (GREEK SMALL LETTER MU).
+    "ambiguous-unicode-character-string",
+    "ambiguous-unicode-character-docstring",
 ]
 "ops/__init__.py" = [
     "non-empty-init-module",  # Wraps main() and imports ops_tracing at the bottom.
@@ -259,22 +241,23 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     "non-empty-init-module",  # Legacy library loader.
 ]
 "test/test_helpers.py" = [
-    "start-process-with-a-shell",  # Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
-    "start-process-with-partial-path",  # Starting a process with a partial executable path
+    # Seems safe, but may be changed in the future.
+    "start-process-with-a-shell",
+    "start-process-with-partial-path",
 ]
 ".github/patch-charm-deps.py" = [
-    "start-process-with-partial-path",  # Starting a process with a partial executable path
+    "start-process-with-partial-path",
 ]
 "docs/custom_conf.py" = [
-    "undocumented-public-module",  # Missing docstring in public module
-    "undocumented-public-class",  # Missing docstring in public class
-    "undocumented-public-method",  # Missing docstring in public method
-    "undocumented-public-function",  # Missing docstring in public function
-    "multiple-leading-hashes-for-block-comment",  # Too many leading `#` before block comment
-    "unsorted-imports",  # Import block is un-sorted or un-formatted
-    "ambiguous-unicode-character-comment",  # Comment contains ambiguous unicode characters (EN DASH, RIGHT SINGLE QUOTATION MARK)
-    "mutable-class-default",  # Mutable class attributes should be annotated with `typing.ClassVar`
-    "printf-string-formatting",  # Use format specifiers instead of percent format
+    "undocumented-public-module",
+    "undocumented-public-class",
+    "undocumented-public-method",
+    "undocumented-public-function",
+    "multiple-leading-hashes-for-block-comment",
+    "unsorted-imports",
+    "ambiguous-unicode-character-comment",  # EN DASH, RIGHT SINGLE QUOTATION MARK
+    "mutable-class-default",
+    "printf-string-formatting",
 ]
 
 [tool.ruff.lint.pydocstyle]

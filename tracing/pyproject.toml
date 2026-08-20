@@ -100,11 +100,11 @@ select = [
     "D",
 ]
 ignore = [
-    # `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible.
+    # Incompatible with `blank-line-before-class`.
     "incorrect-blank-line-before-class",
-    # `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible.
+    # Incompatible with `multi-line-summary-first-line`.
     "multi-line-summary-second-line",
-    # we don't add a blank line after Args: in a function docstring
+    # We don't add a blank line after Args: in a function docstring.
     "missing-blank-line-after-last-section",
 ]
 
@@ -112,7 +112,6 @@ ignore = [
 "test/*" = [
     # no need for docstring
     "D",
-    # asserts are OK in tests
     "assert",
 ]
 
