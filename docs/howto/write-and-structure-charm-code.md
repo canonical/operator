@@ -21,7 +21,7 @@ As you work on your charm, commit your changes after every significant change. Y
 Charms run using the Python version provided by the base Ubuntu version. Write
 charm code that will run with the Python version of the oldest base you support.
 
-> See also: {external+juju:ref}`Juju | Roadmap and releases <releasenotes>`
+See also: {external+juju:ref}`Juju | Roadmap and releases <releasenotes>`
 
 ```{admonition} Best practice
 :class: hint
@@ -222,7 +222,7 @@ def get_version() -> str:
 (handle-status)=
 ## Handle status
 
-> See first: {external+juju:ref}`Juju | Status <status>`
+See first: {external+juju:ref}`Juju | Status <status>`
 
 ### Unit status
 

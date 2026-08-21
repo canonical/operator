@@ -278,7 +278,7 @@ class SnappassTestCharm(ops.CharmBase):
 
 `ops` provides a way to ensure that your container is healthy. In the `Container` class, `Container.can_connect()` can be used if you only need to know that Pebble is responding at a specific point in time - for example to update a status message. This should *not* be used to guard against later Pebble operations, because that introduces a race condition where Pebble might be responsive when `can_connect()` is called, but is not when the later operation is executed. Instead, charms should always include `try`/`except` statements around Pebble operations, to avoid the unit going into error state.
 
-> See more: [](ops.Container)
+See more: [](ops.Container)
 
 (run-workloads-with-a-charm-kubernetes-start-and-stop)=
 ### Start and stop
@@ -654,4 +654,4 @@ def test_add_layer():
     assert ...  # Verify that the plan contains changes made in pebble-ready.
 ```
 
-> See more: [](testing.layer_from_rockcraft)
+See more: [](testing.layer_from_rockcraft)

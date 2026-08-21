@@ -1,7 +1,11 @@
 (manage-resources)=
 # How to manage resources
 
-> See also: {external+juju:ref}`Juju | Charm resource <charm-resource>`, {external+juju:ref}`Juju | Manage charm resources <manage-charm-resources>`, {external+charmcraft:ref}`Charmcraft | Manage resources <manage-resources>`
+See also:
+
+- {external+juju:ref}`Juju | Charm resource <charm-resource>`
+- {external+juju:ref}`Juju | Manage charm resources <manage-charm-resources>`
+- {external+charmcraft:ref}`Charmcraft | Manage resources <manage-resources>`
 
 ## Implement the feature
 
@@ -68,7 +72,7 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 If your charm requires access to resources, you can make them available to it
 through ``State.resources``. For example, to make a ``foo`` resource that is a

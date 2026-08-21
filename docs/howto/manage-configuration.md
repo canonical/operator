@@ -1,6 +1,10 @@
 (manage-configuration)=
 # How to manage configuration
-> See first: {external+juju:ref}`Juju | <application-configuration>`, {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`, {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
+See first:
+
+- {external+juju:ref}`Juju | <application-configuration>`
+- {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`
+- {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
 
 
 ## Implement the feature
@@ -82,7 +86,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
     self.set_wiki_name(name)
 ```
 
-> See more: [](ops.CharmBase.load_config), [](ops.CharmBase.config)
+See more: [](ops.CharmBase.load_config), [](ops.CharmBase.config)
 
 ```{caution}
 
@@ -95,7 +99,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the `config-changed` event validates the port, pass the new config to the `State`, and, after running the event, check the unit status. For example, in your `tests/unit/test_charm.py` file, add the following test function:
 

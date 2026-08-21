@@ -257,9 +257,7 @@ def test_workload_connectivity(charm: pathlib.Path, juju: jubilant.Juju):
 
 How you can connect to a private or public address is dependent on your configuration, so you may need a different approach.
 
-> See more:
-> - [](jubilant.Juju.status)
-> - {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
+See more: [](jubilant.Juju.status), {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
 
 ### Run a subprocess command within Juju context
 
@@ -275,9 +273,7 @@ stdout = juju.cli(*command, include_model=True)
 ...
 ```
 
-> See more:
-> - [](jubilant.Juju.run)
-> - [](jubilant.Juju.cli)
+See more: [](jubilant.Juju.run), [](jubilant.Juju.cli)
 
 ### Use several models
 
@@ -295,9 +291,7 @@ def other_model(juju_factory: pytest_jubilant.JujuFactory):
 
 Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios. For example integrating machine charms with Kubernetes charms, or integrating with the [Canonical Observability Stack](https://charmhub.io/cos-lite).
 
-> See more:
-> - {external+juju:ref}`Juju offers <manage-offers>`
-> - {external+juju:ref}`How to manage clouds <manage-clouds>`
+See more: {external+juju:ref}`Juju offers <manage-offers>`, {external+juju:ref}`How to manage clouds <manage-clouds>`
 
 ### Deploy a bundle
 
@@ -373,9 +367,7 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
-> See more:
-> - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
-> - [](#validate-your-charm-with-every-change)
+See more: [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html), [](#validate-your-charm-with-every-change)
 
 (write-integration-tests-for-a-charm-configure-jubilant-logs)=
 ## Configure Jubilant logs
@@ -565,5 +557,4 @@ To generate crash dumps, you need the `juju-crashdump` tool .
 
 You can install it with `sudo snap install --classic juju-crashdump`.
 
-> See more:
-> - [`juju-crashdump`](https://github.com/juju/juju-crashdump)
+See more: [`juju-crashdump`](https://github.com/juju/juju-crashdump)

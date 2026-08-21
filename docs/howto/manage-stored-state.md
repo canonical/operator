@@ -1,7 +1,7 @@
 (manage-stored-state)=
 # How to manage stored state
 
-> See first: {ref}`storedstate-uses-limitations`
+See first: {ref}`storedstate-uses-limitations`
 
 Data stored on a charm instance will not persist beyond the current Juju event,
 because a new charm instance is created to handle each event. In general, charms
@@ -54,7 +54,7 @@ class MyCharm(ops.CharmBase):
         self._stored.set_default(expensive_value=None)
 ```
 
-> See more: [](ops.StoredState)
+See more: [](ops.StoredState)
 
 Now, in any event handler, you can read or write data to the object you are
 storing, and it will be persisted across Juju events.
@@ -71,7 +71,7 @@ def _on_install(self, event: ops.InstallEvent):
     logger.info('Current value: %s', self._stored.expensive_value)
 ```
 
-> Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
+Examples: [Kubernetes-Dashboard stores core settings](https://github.com/charmed-kubernetes/kubernetes-dashboard-operator/blob/03bf0f64d943e39176c804cd796a7a9838bf13ab/src/charm.py#L42)
 
 ### Test the feature
 
@@ -84,7 +84,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 Add `StoredState` objects to the `State` with any content that you want to mock
 having persisted from a previous event. For example, in your
@@ -157,7 +157,7 @@ to wait until later events, like `start`, to store and retrieve data.
 
 ### Test the feature
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 You'll want to add unit tests.
 
@@ -168,7 +168,7 @@ an integration test: just trigger multiple Juju events.
 
 #### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 In your `tests/unit/test_charm.py` file, add tests that have an initial state
 that includes a [](ops.testing.PeerRelation) object.
