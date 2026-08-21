@@ -125,19 +125,23 @@ import jubilant
 
 
 def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
-    juju.config('your-app', {'name': 'invalid name has spaces'})
-    # A name with spaces should put the charm into blocked status.
-    # Setting an invalid name should be caught by the charm and rejected
-    # immediately. The timeout is overridden to test this fail-fast behavior.
-    juju.wait(jubilant.all_blocked, timeout=10)
+    original_name = juju.config('your-app')['name']
+    try:
+        juju.config('your-app', {'name': 'invalid name has spaces'})
+        # A name with spaces should put the charm into blocked status.
+        # Setting an invalid name should be caught by the charm and rejected
+        # immediately. The timeout is overridden to test this fail-fast behavior.
+        juju.wait(jubilant.all_blocked, timeout=10)
+    finally:
+        # Reset the config to bring the charm out of blocked status.
+        juju.config('your-app', {'name': original_name})
+        juju.wait(jubilant.all_active)
 
 
-def test_config_valid_name(juju: jubilant.Juju):
+def test_config_valid_name(charm: pathlib.Path, juju: jubilant.Juju):
     juju.config('your-app', {'name': 'charming-wiki'})
     juju.wait(jubilant.all_active)
 ```
-
-`test_config_invalid_name` leaves the config in an invalid state. Reset the config to its previous known-good state so that subsequent tests start from a valid configuration. In this example, `test_config_valid_name` performs that reset.
 
 See also: [](jubilant.Juju.config)
 

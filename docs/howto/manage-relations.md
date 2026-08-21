@@ -18,7 +18,7 @@ Make sure to consult {ref}`manage-interfaces` and {external+charmlibs:doc}`how-t
 
 **If you're defining a new interface:**
 
-Make sure to add your interface to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/design-relation-interfaces`, {external+charmlibs:doc}`how-to/python-package`.
+If this is an interface that other charms should use, add it to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/design-relation-interfaces`, {external+charmlibs:doc}`how-to/python-package`.
 ```
 
 To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).

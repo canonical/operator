@@ -192,7 +192,7 @@ This test deploys your charm and waits for all applications and units to be acti
 
 Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
 
-For a Kubernetes charm, deploy with a resource. See this modified example (from {ref}`Manage resources <manage-resources-integration-tests>`):
+For a Kubernetes charm, deploy with a resource. See this example (from {ref}`Manage resources <manage-resources-integration-tests>`):
 
 ```{include} /reuse/manage-resources-integration-test-example.md
 ```
