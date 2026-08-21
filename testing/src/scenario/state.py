@@ -1483,7 +1483,10 @@ class _EntityStatus:
         message: str = '',
     ) -> _EntityStatus:
         """Convert the status name, such as 'active', to the class, such as ActiveStatus."""
-        # Note that this won't work for UnknownStatus.
+        if name == 'unknown':
+            # Like ops.StatusBase.from_name, unknown is special: it has no
+            # message, so it must not be passed one.
+            return UnknownStatus()
         # All subclasses have a default 'name' attribute, but the type checker can't tell that.
         return cls._entity_statuses[name](message=message)  # type:ignore
 
