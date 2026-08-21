@@ -14,7 +14,7 @@ The first argument to `pebble notify` is the key, which must be in the format `<
 
 The `pebble notify` command has an optional `--repeat-after` flag, which tells Pebble to only allow the notice to repeat after the specified duration (the default is to repeat for every occurrence). If the caller says `--repeat-after=1h`, Pebble will prevent the notice with the same type and key from repeating within an hour -- useful to avoid the charm waking up too often when a notice occurs frequently.
 
-> See more: [Pebble | `pebble notify`](inv:pebble:std:label#reference_pebble_notify_command)
+See more: [Pebble | `pebble notify`](inv:pebble:std:label#reference_pebble_notify_command)
 
 ## Respond to a notice
 

@@ -1,6 +1,10 @@
 (manage-relations)=
 # How to manage relations
-> See first: {external+juju:ref}`Juju | Relation <relation>`, {external+juju:ref}`Juju | Manage relations <manage-relations>`, {external+charmcraft:ref}`Charmcraft | Manage relations <manage-relations>`
+See first:
+
+- {external+juju:ref}`Juju | Relation <relation>`
+- {external+juju:ref}`Juju | Manage relations <manage-relations>`
+- {external+charmcraft:ref}`Charmcraft | Manage relations <manage-relations>`
 
 To add relation capabilities to a charm, you’ll have to define the relation in your charm's `charmcraft.yaml` file and then add relation event handlers in your charm's `src/charm.py` file.
 
@@ -59,7 +63,7 @@ requires:
 
 Other than this, implement a subordinate relation in the same way as any other relation. Note however that subordinate units cannot see each other's peer data.
 
-> See also: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
+See also: {external+juju:ref}`Juju | Charm taxonomy <charm-taxonomy>`
 
 ### Add code to use a relation
 
@@ -69,13 +73,13 @@ For most relations, you will now want to progress with using the charm library r
 
 In most cases, the charm library will handle observing the Juju relation events, and your charm will only need to interact with the library's custom API. Come back to this guide when you are ready to add tests.
 
-> See more: [Charmhub](https://charmhub.io)
+See more: [Charmhub](https://charmhub.io)
 
 #### Implementing your own interface
 
 If you are developing your own interface - most commonly for charm-specific peer data exchange, then you will need to observe the Juju relation events and add appropriate handlers.
 
-> See more: [](manage-libraries-write-a-library)
+See more: [](manage-libraries-write-a-library)
 
 (set-up-a-relation)=
 ##### Set up a relation
@@ -111,11 +115,11 @@ def _on_db_relation_created(self, event: ops.RelationCreatedEvent):
     relation.save(data, event.app)
 ```
 
-> See more: [](ops.Relation.save)
+See more: [](ops.Relation.save)
 
 The event object that is passed to the handler has a `relation` property, which contains an [](ops.Relation) object. Your charm uses this object to find out about the relation (such as which units are included, in the [`.units` attribute](ops.Relation.units), or whether the relation is broken, in the [`.active` attribute](ops.Relation.active)) and to get and set data in the relation databag.
 
-> See more: [](ops.RelationCreatedEvent)
+See more: [](ops.RelationCreatedEvent)
 
 To do additional setup work when each unit joins the relation (both when the charms are first integrated and when additional units are added to the charm), your charm will need to observe the `relation-joined` event. For example, to provide SMTP credentials to each unit that joins the `smtp` relation: in the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-joined` event observers for the relevant relations and pair those with an event handler. For example:
 
@@ -140,7 +144,7 @@ def _on_smtp_relation_joined(self, event: ops.RelationJoinedEvent):
     relation.save(data, event.unit)
 ```
 
-> See more: [](ops.RelationJoinedEvent)
+See more: [](ops.RelationJoinedEvent)
 
 ##### Exchange data with other units
 
@@ -150,11 +154,11 @@ To use data received through the relation, have your charm observe the `relation
 framework.observe(self.on.replicas_relation_changed, self._update_configuration)
 ```
 
-> See more: [](ops.RelationChangedEvent), {external+juju:ref}`Juju | Relation (integration) <relation>`
+See more: [](ops.RelationChangedEvent), {external+juju:ref}`Juju | Relation (integration) <relation>`
 
 Most of the time, you should use the same holistic handler as when receiving other data, such as `secret-changed` and `config-changed`. To access the relation(s) in your holistic handler, use the [](ops.Model.get_relation) method or [](ops.Model.relations) attribute.
 
-> See also: [](/explanation/holistic-vs-delta-charms)
+See also: [](/explanation/holistic-vs-delta-charms)
 
 If your change will have at most one relation on the endpoint, to get the `Relation` object use `Model.get_relation`; for example:
 
@@ -271,7 +275,7 @@ def _on_smtp_relation_departed(self, event: ops.RelationDepartedEvent):
         self.remove_smtp_user(event.unit.name)
 ```
 
-> See more: [](ops.RelationDepartedEvent)
+See more: [](ops.RelationDepartedEvent)
 
 To clean up after a relation is entirely removed, have your charm observe the `relation-broken` event. In the `src/charm.py` file, in the `__init__` function of your charm, set up `relation-broken` events for the relevant relations and pair those with an event handler. For example:
 
@@ -288,7 +292,7 @@ def _on_db_relation_broken(self, event: ops.RelationBrokenEvent):
     self.drop_database(event.app.name)
 ```
 
-> See more: [](ops.RelationBrokenEvent)
+See more: [](ops.RelationBrokenEvent)
 
 (manage-relations-test-the-feature)=
 ## Test the feature
@@ -315,7 +319,7 @@ assert (
 )
 ```
 
-> See more: [](ops.testing.RelationBase)
+See more: [](ops.testing.RelationBase)
 
 To declare a peer relation, you should use [](ops.testing.PeerRelation). The
 core difference with regular relations is that peer relations do not have a
@@ -362,7 +366,7 @@ relation.remote_unit_name  # 'zookeeper/42'
 
 ### Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 To verify that charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
 

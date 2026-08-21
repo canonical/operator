@@ -1,6 +1,10 @@
 (manage-actions)=
 # How to manage actions
-> See first: {external+juju:ref}`Juju | Charm <action>`, {external+juju:ref}`Juju | Manage actions <manage-actions>`, {external+charmcraft:ref}`Charmcraft | Manage actions <manage-actions>`
+See first:
+
+- {external+juju:ref}`Juju | Charm <action>`
+- {external+juju:ref}`Juju | Manage actions <manage-actions>`
+- {external+charmcraft:ref}`Charmcraft | Manage actions <manage-actions>`
 
 ## Implement the feature
 
@@ -111,7 +115,13 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
     event.set_results({'result': msg})
 ```
 
-> See more: [](ops.ActionEvent.load_params), [](ops.ActionEvent.params), [](ops.ActionEvent.fail), [](ops.ActionEvent.set_results), [](ops.ActionEvent.log)
+See more:
+
+- [](ops.ActionEvent.load_params)
+- [](ops.ActionEvent.params)
+- [](ops.ActionEvent.fail)
+- [](ops.ActionEvent.set_results)
+- [](ops.ActionEvent.log)
 
 #### Record the ID of an action task
 
@@ -128,11 +138,11 @@ def _on_snapshot(self, event: ops.ActionEvent):
     self.create_backup(temp_filename)
     ...
 ```
-> See more: [](ops.ActionEvent.id)
+See more: [](ops.ActionEvent.id)
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the charm state is as expected after executing an action, use the `run` method of the `Context` object, with `ctx.on.action`. The context contains any logs and results that the charm set.
 
@@ -175,11 +185,15 @@ def test_backup_action_failed():
     assert ctx.action_results == {'foo': 'bar'}
 ```
 
-> See more: [](ops.testing.Context.action_logs), [](ops.testing.Context.action_results), [](ops.testing.ActionFailed)
+See more:
+
+- [](ops.testing.Context.action_logs)
+- [](ops.testing.Context.action_results)
+- [](ops.testing.ActionFailed)
 
 ### Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 
