@@ -98,7 +98,6 @@ class DatabaseRequirer(ops.Object):
 
     def __init__(self, charm: ops.CharmBase, endpoint: str = 'database'):
         super().__init__(charm, endpoint)
-        self._endpoint = endpoint
         self.framework.observe(
             charm.on[endpoint].relation_changed, self._on_db_changed
         )
@@ -130,11 +129,14 @@ from lib.charms.my_charm.v0.my_lib import DatabaseReadyEvent, DatabaseRequirer
 
 
 class MyTestCharm(ops.CharmBase):
-    META = {'name': 'my-charm'}
+    META = {
+        'name': 'my-charm',
+        'requires': {'my-relation': {'interface': 'database'}},
+    }
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.db = DatabaseRequirer(self, 'my-relation')
+        self.db = DatabaseRequirer(self, endpoint='my-relation')
 
 
 @pytest.mark.parametrize(
