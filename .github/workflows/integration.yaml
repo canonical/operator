@@ -54,14 +54,10 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo snap install --classic concierge
-      # .github/integration/concierge-*.yaml mirrors the upstream concierge
-      # preset and adds juju.extra-bootstrap-args: `juju bootstrap` regularly
-      # fails on slow GHA runners with `unable to contact api server after
-      # 60 attempts` because the default --bootstrap-timeout is too short.
       - run: >
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}
-          -c .github/integration/concierge-${{ matrix.preset }}.yaml
+          -p ${{ matrix.preset }}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s "$MATRIX_TEST"
