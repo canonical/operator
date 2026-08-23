@@ -676,10 +676,48 @@ class GhCallShapeTests(unittest.TestCase):
         with mock.patch.object(afn, 'gh', side_effect=gh_calls):
             log = afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
         self.assertIn('some log line', log)
+        # Without --allow-escape-sequences, gh 2.9x+ writes nothing at all for
+        # a log with terminal escapes in it, which is every Actions log.
         self.assertEqual(
             gh_calls.call_args.args,
-            ('api', 'repos/canonical/operator/actions/jobs/88693036489/logs'),
+            (
+                'api',
+                'repos/canonical/operator/actions/jobs/88693036489/logs',
+                '--allow-escape-sequences',
+            ),
         )
+
+    def test_fetch_job_log_retries_without_the_flag_on_an_older_gh(self):
+        results = [
+            mock.Mock(returncode=1, stdout='', stderr='unknown flag: --allow-escape-sequences'),
+            mock.Mock(returncode=0, stdout='2026-07-21T16:17:04Z some log line\n', stderr=''),
+        ]
+        gh_calls = mock.Mock(side_effect=results)
+        with mock.patch.object(afn, 'gh', side_effect=gh_calls):
+            log = afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        self.assertIn('some log line', log)
+        self.assertEqual(
+            [call.args for call in gh_calls.call_args_list],
+            [
+                (
+                    'api',
+                    'repos/canonical/operator/actions/jobs/88693036489/logs',
+                    '--allow-escape-sequences',
+                ),
+                ('api', 'repos/canonical/operator/actions/jobs/88693036489/logs'),
+            ],
+        )
+
+    def test_fetch_job_log_does_not_retry_when_the_flag_was_accepted(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=1, stdout='', stderr='gh: Not Found (HTTP 404)')
+        )
+        with (
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary'),
+        ):
+            afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        self.assertEqual(gh_calls.call_count, 1)
 
     def test_fetch_job_log_reports_an_empty_log_instead_of_swallowing_it(self):
         gh_calls = self._capture('')

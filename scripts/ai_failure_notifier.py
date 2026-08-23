@@ -905,8 +905,22 @@ def fetch_job_log(repo: str, run_id: str, job_id: int) -> str:
     exits 0 with empty stdout on some `gh` builds (reproduced on 2.45.0), which
     silently degrades the extracted signature to nothing. An empty log here is
     reported rather than swallowed.
+
+    `--allow-escape-sequences` is not optional. From gh 2.9x, `gh api` refuses
+    to write a response containing terminal escapes -- "the response contains
+    terminal escape sequences; pass --allow-escape-sequences to output it
+    anyway" -- and returns nothing at all. Actions logs are full of them; ANSI
+    above exists to strip them. Runners carry a gh new enough to refuse (2.97.0
+    when this was measured, in fork run 32673538357), so without the flag every
+    fetch comes back empty and the signature degrades to the job name.
+
+    Older builds have no such check and no such flag, and reject it as unknown
+    rather than ignoring it, so those retry without.
     """
-    result = gh('api', f'repos/{repo}/actions/jobs/{job_id}/logs', check=False)
+    endpoint = f'repos/{repo}/actions/jobs/{job_id}/logs'
+    result = gh('api', endpoint, '--allow-escape-sequences', check=False)
+    if 'unknown flag' in (result.stderr or ''):
+        result = gh('api', endpoint, check=False)
     if not result.stdout.strip():
         # `gh` puts the status on stderr ("gh: Not Found (HTTP 404)"), and the
         # exit code alone is 1 for all of them. Without the status there is no
