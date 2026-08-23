@@ -37,7 +37,7 @@ run. This script:
 
 The functions above the `--- I/O ---` marker are pure and unit-tested in
 `scripts/test/test_ai_failure_notifier.py`. Everything below it talks to `gh`
-OpenRouter and is exercised only by mocking in tests.
+or OpenRouter and is exercised only by mocking in tests.
 """
 
 from __future__ import annotations
@@ -908,9 +908,15 @@ def fetch_job_log(repo: str, run_id: str, job_id: int) -> str:
     """
     result = gh('api', f'repos/{repo}/actions/jobs/{job_id}/logs', check=False)
     if not result.stdout.strip():
+        # `gh` puts the status on stderr ("gh: Not Found (HTTP 404)"), and the
+        # exit code alone is 1 for all of them. Without the status there is no
+        # telling a log that is not ready yet from a token that has lost
+        # `actions: read`, and the two want opposite fixes.
+        detail = ' '.join((result.stderr or '').split())[:200] or 'no stderr'
         write_step_summary(
             f'Warning: no log text for job {job_id} of run {run_id} '
-            f'(gh exit {result.returncode}); signature will be based on the job name alone.'
+            f'(gh exit {result.returncode}: {detail}); '
+            f'signature will be based on the job name alone.'
         )
     return result.stdout
 

@@ -692,6 +692,28 @@ class GhCallShapeTests(unittest.TestCase):
         summary.assert_called_once()
         self.assertIn('no log text', summary.call_args.args[0])
 
+    def test_fetch_job_log_reports_the_status_gh_put_on_stderr(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=1, stdout='', stderr='gh: Not Found (HTTP 404)\n')
+        )
+        with (
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary') as summary,
+        ):
+            afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        # A 404 (log not ready) and a 403 (no `actions: read`) are both exit 1,
+        # so the status has to reach the summary for either to be diagnosable.
+        self.assertIn('HTTP 404', summary.call_args.args[0])
+
+    def test_fetch_job_log_says_so_when_gh_was_silent(self):
+        gh_calls = self._capture('')
+        with (
+            mock.patch.object(afn, 'gh', side_effect=gh_calls),
+            mock.patch.object(afn, 'write_step_summary') as summary,
+        ):
+            afn.fetch_job_log('canonical/operator', '29847889218', 88693036489)
+        self.assertIn('no stderr', summary.call_args.args[0])
+
     def test_fetch_failed_jobs_requests_the_jobs_field(self):
         gh_calls = self._capture(
             '{"jobs": [{"databaseId": 1, "name": "j", "conclusion": "failure",'
