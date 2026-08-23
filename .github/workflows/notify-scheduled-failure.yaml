@@ -3,15 +3,19 @@ name: Notify on scheduled failure
 # Reusable workflow: opens (or comments on) an issue when a scheduled
 # workflow fails. Callers gate the invocation with
 # `if: failure() && github.event_name == 'schedule'` and pass
-# `permissions: issues: write`.
+# `permissions: issues: write` plus `actions: read`, and `secrets: inherit`.
+# The last two are for stage 2, which this workflow calls in turn: a called
+# workflow holds no scope and sees no secret that its caller did not hand
+# down, so both have to be granted at every level to reach it.
 #
 # This is the first of two stages: a cheap, deterministic, always-works
-# dedup pre-check, with no LLM dependency and no secrets. The second,
-# .github/workflows/ai-failure-enrich.yaml, is triggered separately by
-# `workflow_run` on this workflow's callers, and rewrites whatever this one
-# produced into a triaged artefact. Keeping them separate is what lets this
-# workflow keep its guarantee: if the enricher is unprovisioned or broken, a
-# notification still happens.
+# dedup pre-check, with no LLM dependency and no secrets. The `open-issue`
+# job below is the whole of that guarantee -- once it has run, a
+# notification exists. The second stage,
+# .github/workflows/ai-failure-enrich.yaml, is called afterwards from here
+# and rewrites what this one produced into a triaged artefact. It needs an
+# API key and an environment, and if it is unprovisioned or broken the
+# notification has already happened regardless.
 
 on:
   workflow_call:
@@ -53,3 +57,63 @@ jobs:
               --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
               --body "$issue_body"
           fi
+
+  # Stage 2. Called from here, rather than subscribing to this workflow's
+  # callers with `workflow_run`, so that there is no list of caller workflow
+  # names to keep in sync -- renaming a scheduled workflow would silently
+  # have stopped enrichment -- and no `dangerous-triggers` suppression to
+  # justify.
+  #
+  # That trade is not free. `workflow_run` would give stage 2 an independent
+  # run, where `environment:` delivers its own secrets and no caller needs
+  # touching; calling it from here means the OpenRouter key has to be
+  # inherited down the chain instead, which is a `secrets-inherit`
+  # suppression in each of the seven callers and hands stage 2 every secret
+  # its caller can see rather than just the one it needs.
+  #
+  # `needs: [open-issue]` is what orders it after the placeholder exists;
+  # `always()` runs it even if stage 1 failed, since the enricher's own
+  # fallback handles a missing marker by creating the issue itself.
+  enrich:
+    needs: [open-issue]
+    if: ${{ always() }}
+    permissions:
+      issues: write
+      # A called workflow cannot hold a scope its caller did not grant, so
+      # `actions: read` has to be repeated at every level of the chain for
+      # the enricher's log fetch to have it.
+      actions: read
+    # Same rule for secrets, and the reason for the suppression below: the
+    # enricher's `environment: ai-failure-triage` names where the OpenRouter
+    # key lives but does not deliver it, because a called workflow sees only
+    # what it is passed. Without inheritance at every level the key arrives
+    # empty and the enricher silently degrades to the plain fallback body.
+    secrets: inherit
+    uses: ./.github/workflows/ai-failure-enrich.yaml  # zizmor: ignore[secrets-inherit]
+
+  # If stage 1 failed *and* the enricher never got far enough to use its own
+  # fallback, nothing has notified anyone -- the one case here that needs an
+  # issue created. An un-enriched placeholder is a red job, not a lost
+  # notification, so `enrich` failing on its own is deliberately left alone.
+  # Both stages run in this same run, so `needs.*.result` says directly
+  # whether a notification exists; no marker search is needed to find out.
+  plain-fallback:
+    needs: [open-issue, enrich]
+    if: >-
+      ${{ always() && needs.open-issue.result != 'success' &&
+      needs.enrich.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create an issue (last resort)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh issue create --repo "$REPO" \
+            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"

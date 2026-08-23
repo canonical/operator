@@ -82,4 +82,13 @@ jobs:
     needs: [machine-examples-integration, k8s-examples-integration]
     permissions:
       issues: write
-    uses: ./.github/workflows/notify-scheduled-failure.yaml
+      # Stage 2 reads this run's job logs, and a called workflow cannot hold
+      # a scope its caller withheld, so `actions: read` has to be granted
+      # here even though nothing in this file uses it.
+      actions: read
+    # Likewise for the OpenRouter key: it is configured on stage 2's
+    # `ai-failure-triage` environment, but a called workflow only sees the
+    # secrets passed to it, so without inheriting here it arrives empty and
+    # enrichment silently degrades to a plain notice.
+    secrets: inherit
+    uses: ./.github/workflows/notify-scheduled-failure.yaml  # zizmor: ignore[secrets-inherit]
