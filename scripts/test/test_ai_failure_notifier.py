@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for .github/ai_failure_notifier.py.
-
-Lives here, rather than beside the script, so `tox -e unit` collects it --
-pytest skips dot-directories, so anything under .github/ never runs in CI.
+"""Unit tests for scripts/ai_failure_notifier.py.
 
 No network calls and no `gh` calls happen in this file -- OpenRouter and gh
 I/O are mocked. FIXTURE below is the extracted signature, candidate issue and
@@ -33,15 +30,11 @@ import email.message
 import io
 import json
 import os
-import pathlib
-import sys
 import tempfile
 import unittest
 import urllib.error
 from typing import Any
 from unittest import mock
-
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / '.github'))
 
 import ai_failure_notifier as afn
 

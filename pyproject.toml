@@ -108,6 +108,11 @@ include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
 version = {attr = "ops.version.version"}
 
 # Testing tools configuration
+[tool.pytest.ini_options]
+# The workflow scripts in scripts/ are standalone files, not a package, so
+# their tests in scripts/test/ import them by bare module name.
+pythonpath = ["scripts"]
+
 [tool.coverage.run]
 branch = true
 
@@ -235,6 +240,10 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # exact-literal config values; pytest.approx isn't appropriate here.
     "RUF069",
 ]
+"scripts/test/*" = [
+    # All documentation linting.
+    "D",
+]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
@@ -284,11 +293,11 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py", "scripts/test/*.py"]
 exclude = [
     "tracing/*",
 ]
-extraPaths = ["testing", "tracing", ".github"]  # .github: workflow scripts under test
+extraPaths = ["testing", "tracing", "scripts"]  # scripts: workflow scripts under test
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
 typeCheckingMode = "strict"

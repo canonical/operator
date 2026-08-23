@@ -36,7 +36,7 @@ run. This script:
    OpenRouter is unreachable, misconfigured, or returns invalid JSON.
 
 The functions above the `--- I/O ---` marker are pure and unit-tested in
-`test_ai_failure_notifier.py`. Everything below it talks to `gh` or
+`scripts/test/test_ai_failure_notifier.py`. Everything below it talks to `gh`
 OpenRouter and is exercised only by mocking in tests.
 """
 
