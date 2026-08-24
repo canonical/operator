@@ -149,6 +149,17 @@ if __name__ == "__main__":  # pragma: nocover
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
 
+### Add logger functionality
+
+In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
+
+```python
+import logging
+
+# Log messages can be retrieved using juju debug-log
+logger = logging.getLogger(__name__)
+```
+
 ### Handle the pebble-ready event
 
 In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
@@ -233,17 +244,6 @@ We get the workload version over port 8000 because the `fastapi` service runs th
 The `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, but this isn't necessarily enough time for the `fastapi` service to fully start.
 
 If `get_version` hasn't succeeded after three attempts, the charm will go into error status. The Juju logs will show the error message, to help you debug the error. The error message is for you, the charm developer, not for the user of the charm. It tells you there's a bug in the charm.
-
-### Add logger functionality
-
-In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
-
-```python
-import logging
-
-# Log messages can be retrieved using juju debug-log
-logger = logging.getLogger(__name__)
-```
 
 ## Try your charm
 
