@@ -213,30 +213,26 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 
 ```python
 # Set the workload version of this charm.
-# For a general workload, wrap get_version() in a retry loop.
-version = fastapi_demo.get_version(port=8000)
+# The workload may not be ready immediately after replan(), so try get_version() in a loop.
+for attempt in range(3):
+    if attempt:
+        time.sleep(1)  # If not the first attempt, wait before retrying.
+    try:
+        version = fastapi_demo.get_version(port=8000)
+        break
+    except urllib.error.URLError:
+        continue
+else:
+    logger.error("The workload was not available within the expected time")
+    raise RuntimeError("workload is not available")
 self.unit.set_workload_version(version)
 ```
 
-We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
+We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
-For a general workload, the `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, which in our case is enough time for the `fastapi` service to fully start.
+The `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, but this isn't necessarily enough time for the `fastapi` service to fully start.
 
-In general, use a retry loop if your charm interacts with the workload after calling `container.replan()`. For example:
-
-```python
-container.replan()
-# Interact with the workload.
-for attempt in range(3):
-    if attempt:
-        time.sleep(1)
-    response = workload_module.contact_workload()
-    if response:  # Alternatively, use try/except to catch a request error.
-        break
-else:
-    logger.error("the workload was not available within the expected time")
-    raise RuntimeError("workload is not available")
-```
+If `get_version` hasn't succeeded after three attempts, the charm will go into error status. The Juju logs will show the error message, to help you debug the error. The error message is for you, the charm developer, not for the user of the charm. It tells you there's a bug in the charm.
 
 ### Add logger functionality
 
