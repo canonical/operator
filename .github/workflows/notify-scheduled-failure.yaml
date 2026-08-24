@@ -69,16 +69,17 @@ jobs:
   # have stopped enrichment -- and no `dangerous-triggers` suppression to
   # justify.
   #
-  # That trade is not free. `workflow_run` would give stage 2 an independent
-  # run, where `environment:` delivers its own secrets and no caller needs
-  # touching; calling it from here means the OpenRouter key has to be
-  # inherited down the chain instead, which is a `secrets-inherit`
-  # suppression in each of the seven callers and hands stage 2 every secret
-  # its caller can see rather than just the one it needs.
+  # The cost is that the seven callers have to hand down what stage 2 needs,
+  # `actions: read` and the OpenRouter key, where `workflow_run` would have
+  # given it an independent run needing nothing from them.
   #
   # `needs: [open-issue]` is what orders it after the placeholder exists;
   # `always()` runs it even if stage 1 failed, since the enricher's own
-  # fallback handles a missing marker by creating the issue itself.
+  # fallback creates the issue itself when it finds no marker. That is the
+  # last line of defence: there is deliberately no workflow-level fallback
+  # job behind it, because reaching one would mean `gh issue create` had
+  # already failed in `open-issue`, and a third attempt in a third job is
+  # not a reason to believe the fourth would work.
   enrich:
     needs: [open-issue]
     if: ${{ always() }}
@@ -97,30 +98,3 @@ jobs:
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     uses: ./.github/workflows/ai-failure-enrich.yaml
-
-  # If stage 1 failed *and* the enricher never got far enough to use its own
-  # fallback, nothing has notified anyone -- the one case here that needs an
-  # issue created. An un-enriched placeholder is a red job, not a lost
-  # notification, so `enrich` failing on its own is deliberately left alone.
-  # Both stages run in this same run, so `needs.*.result` says directly
-  # whether a notification exists; no marker search is needed to find out.
-  plain-fallback:
-    needs: [open-issue, enrich]
-    if: >-
-      ${{ always() && needs.open-issue.result != 'success' &&
-      needs.enrich.result != 'success' }}
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Create an issue (last resort)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          WORKFLOW_NAME: ${{ github.workflow }}
-          REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          gh issue create --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
