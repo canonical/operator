@@ -16,6 +16,11 @@ name: AI-enrich scheduled-failure notification
 
 on:
   workflow_call:
+    secrets:
+      # Declared, and passed by every level of the chain, even though what
+      # each level passes is empty. See the OPENROUTER_API_KEY comment below.
+      OPENROUTER_API_KEY:
+        required: false
 
 permissions: {}
 
@@ -41,14 +46,25 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that failed.
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          # `environment:` above names where the key is configured, but it
-          # is not what delivers it. A called workflow sees only the secrets
-          # passed to it, so an environment secret reaches this job empty
-          # unless every level of the chain inherits -- measured both ways in
-          # fork runs 32102193223 (inherited, arrives) and 32673883720 (not
-          # inherited, empty). Each repo adopting this provisions its own.
-          # Absent key -> the script uses the plain fallback body without
-          # calling OpenRouter (see scripts/ai_failure_notifier.py main()).
+          # Two things deliver this key, and both are load-bearing, so do
+          # not tidy either away:
+          #
+          #   - `environment:` on this job, which is what holds the real
+          #     value. No caller can see it: a job without an `environment:`
+          #     resolves `secrets.OPENROUTER_API_KEY` to an empty string.
+          #   - the chain naming the secret at every call site, which passes
+          #     precisely that empty string, and declaring it here.
+          #
+          # Drop the second and this arrives empty despite the first. Fork
+          # runs: 32681905277 names it and gets the key, 32682872399 does not
+          # and gets nothing, 32682645113 shows the caller holding 0 while
+          # this job holds the real length. That is measured rather than
+          # documented, so treat a silent loss of enrichment as a suspect
+          # here first.
+          #
+          # Each repo adopting this provisions its own. Absent key -> the
+          # script uses the plain fallback body without calling OpenRouter
+          # (see scripts/ai_failure_notifier.py main()).
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
         run: uv run scripts/ai_failure_notifier.py

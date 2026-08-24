@@ -3,10 +3,10 @@ name: Notify on scheduled failure
 # Reusable workflow: opens (or comments on) an issue when a scheduled
 # workflow fails. Callers gate the invocation with
 # `if: failure() && github.event_name == 'schedule'` and pass
-# `permissions: issues: write` plus `actions: read`, and `secrets: inherit`.
-# The last two are for stage 2, which this workflow calls in turn: a called
-# workflow holds no scope and sees no secret that its caller did not hand
-# down, so both have to be granted at every level to reach it.
+# `permissions: issues: write` plus `actions: read`, and pass
+# `OPENROUTER_API_KEY` through. The last two are for stage 2, which this
+# workflow calls in turn: a called workflow holds no scope its caller
+# withheld, and cannot use a secret no call site named.
 #
 # This is the first of two stages: a cheap, deterministic, always-works
 # dedup pre-check, with no LLM dependency and no secrets. The `open-issue`
@@ -19,6 +19,11 @@ name: Notify on scheduled failure
 
 on:
   workflow_call:
+    secrets:
+      # Passed straight through to stage 2, which is the only thing that
+      # uses it. See the comment at the call below.
+      OPENROUTER_API_KEY:
+        required: false
 
 jobs:
   open-issue:
@@ -83,13 +88,15 @@ jobs:
       # `actions: read` has to be repeated at every level of the chain for
       # the enricher's log fetch to have it.
       actions: read
-    # Same rule for secrets, and the reason for the suppression below: the
-    # enricher's `environment: ai-failure-triage` names where the OpenRouter
-    # key lives but does not deliver it, because a called workflow sees only
-    # what it is passed. Without inheritance at every level the key arrives
-    # empty and the enricher silently degrades to the plain fallback body.
-    secrets: inherit
-    uses: ./.github/workflows/ai-failure-enrich.yaml  # zizmor: ignore[secrets-inherit]
+    # This passes an empty string, and is still required. Nothing in this
+    # chain can read the OpenRouter key: it lives on stage 2's
+    # `ai-failure-triage` environment, and only the job declaring that
+    # environment resolves it. But unless the secret is named at each call
+    # site, stage 2's own environment does not fill it in either, and
+    # enrichment degrades to a plain notice with nothing failing loudly.
+    secrets:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    uses: ./.github/workflows/ai-failure-enrich.yaml
 
   # If stage 1 failed *and* the enricher never got far enough to use its own
   # fallback, nothing has notified anyone -- the one case here that needs an
