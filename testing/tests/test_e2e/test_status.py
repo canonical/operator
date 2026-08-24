@@ -13,6 +13,7 @@ from scenario.state import (
     MaintenanceStatus,
     UnknownStatus,
     WaitingStatus,
+    _EntityStatus,
 )
 
 import ops
@@ -183,8 +184,6 @@ def test_status_comparison(status: ops.StatusBase):
     ),
 )
 def test_status_from_ops_round_trip(status: ops.StatusBase):
-    from scenario.state import _EntityStatus
-
     assert _EntityStatus.from_ops(status._to_ops()) == status  # type: ignore[attr-defined]
 
 
