@@ -195,7 +195,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
+We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier.
 
 The `api_demo_server` application is packaged as a [rock](https://documentation.ubuntu.com/rockcraft/1.19/explanation/rocks/), which is an OCI-compliant container image. The image has a Pebble layer that defines how to run the app. Since our minimal charm doesn't need to change how the app runs, our charm just needs to call `replan()` to start the service defined in the Pebble layer.
 
@@ -238,6 +238,8 @@ else:
     raise RuntimeError("workload is not available")
 self.unit.set_workload_version(version)
 ```
+
+Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
