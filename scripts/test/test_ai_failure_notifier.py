@@ -239,10 +239,8 @@ class SignatureExtractionTests(unittest.TestCase):
         self.assertEqual(tail, ['line before 1', 'line before 2'])
 
     def test_parse_job_log_ignores_the_step_script_the_runner_echoes(self):
-        # A multi-line `run:` puts every branch into the log, executed or not.
-        # Taken from the fork canary, which carries a sample traceback per
-        # shape: before this was skipped, a pytest-shape run reported the
-        # traceback-only shape's KeyError as its top error.
+        # A multi-line `run:` puts every branch into the log, executed or not,
+        # so an unexecuted branch must not contribute to the signature.
         log = '\n'.join([
             '##[group]Run case "$SHAPE" in',
             'case "$SHAPE" in',
