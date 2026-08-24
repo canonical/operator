@@ -238,6 +238,60 @@ class SignatureExtractionTests(unittest.TestCase):
         _, _, _, tail = afn.parse_job_log(log)
         self.assertEqual(tail, ['line before 1', 'line before 2'])
 
+    def test_parse_job_log_ignores_the_step_script_the_runner_echoes(self):
+        # A multi-line `run:` puts every branch into the log, executed or not.
+        # Taken from the fork canary, which carries a sample traceback per
+        # shape: before this was skipped, a pytest-shape run reported the
+        # traceback-only shape's KeyError as its top error.
+        log = '\n'.join([
+            '##[group]Run case "$SHAPE" in',
+            'case "$SHAPE" in',
+            '  traceback-only)',
+            "KeyError: 'loki/0'",
+            '    ;;',
+            'esac',
+            '##[endgroup]',
+            'short test summary info',
+            "FAILED test/test_model.py::TestModel::test_thing - KeyError: 'host'",
+        ])
+        pytest_failures, _go, tb, _tail = afn.parse_job_log(log)
+        self.assertIsNone(tb)
+        self.assertEqual([f.error for f in pytest_failures], ["KeyError: 'host'"])
+
+    def test_parse_job_log_counts_a_failure_once_not_twice(self):
+        # The same summary line appears in the echoed script and again in the
+        # output; only the output one is a failure that happened.
+        log = '\n'.join([
+            '##[group]Run tox -e unit',
+            'FAILED test/test_model.py::TestModel::test_thing - KeyError',
+            '##[endgroup]',
+            'short test summary info',
+            'FAILED test/test_model.py::TestModel::test_thing - KeyError',
+        ])
+        pytest_failures, _go, _tb, _tail = afn.parse_job_log(log)
+        self.assertEqual(len(pytest_failures), 1)
+
+    def test_parse_job_log_keeps_groups_the_step_itself_opened(self):
+        # `::group::` from inside a step is output, not the runner's header;
+        # only "##[group]Run " starts an echoed script.
+        log = '\n'.join([
+            '##[group]my own section',
+            'AttributeError: this is real output',
+            '##[endgroup]',
+        ])
+        _, _, tb, _ = afn.parse_job_log(log)
+        self.assertEqual(tb, 'AttributeError: this is real output')
+
+    def test_strip_log_drops_the_env_dump_with_the_script(self):
+        log = '\n'.join([
+            '##[group]Run uv run scripts/ai_failure_notifier.py',
+            'env:',
+            '  OPENROUTER_API_KEY: ***',
+            '##[endgroup]',
+            'real output',
+        ])
+        self.assertEqual(afn.strip_log(log), ['real output'])
+
     def test_build_run_signature_matches_fixture_shape(self):
         jobs = [
             afn.build_job_signature(j.job_id, j.job_name, j.failed_step, '')

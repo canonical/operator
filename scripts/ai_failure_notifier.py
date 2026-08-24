@@ -88,6 +88,21 @@ TS = re.compile(
 # Actions' own annotation for a failing step.
 ERROR_MARKER = re.compile(r'##\[error\]')
 
+# The runner opens every step with "##[group]Run <script>", echoes the whole
+# `run:` block a line at a time, dumps the step's env, and closes with
+# "##[endgroup]". None of that is output: it is the step's own source. A
+# multi-line `run:` therefore puts its every branch into the log, including
+# the ones that did not execute, and parsing it produces failures the run
+# never had. Measured on the fork canary, whose `case` statement carries a
+# sample traceback per shape: a pytest-shape run reported the
+# traceback-only shape's `KeyError: 'loki/0'` as its top error.
+#
+# Colour is not a usable signal here -- the runner marks echoed lines cyan-
+# bold, but ANSI above strips that before anything is matched -- so the
+# group boundary is what separates a step's script from its output.
+GROUP_RUN_START = re.compile(r'^##\[group\]Run ')
+GROUP_END = re.compile(r'^##\[endgroup\]')
+
 # A line from pytest's short summary, for example
 # "FAILED tests/integration/test_charm.py::test_deploy - TimeoutError: ...".
 PYTEST_SUMMARY = re.compile(
@@ -231,6 +246,27 @@ def strip_line(line: str) -> str:
     return line.rstrip('\r\n')
 
 
+def strip_log(text: str) -> list[str]:
+    """Split a raw job log into output lines, dropping each step's own script.
+
+    Everything between "##[group]Run ..." and "##[endgroup]" is the runner
+    echoing the step's `run:` block and env, not anything the step printed.
+    See GROUP_RUN_START above for why that matters.
+    """
+    lines: list[str] = []
+    in_step_header = False
+    for raw in text.splitlines():
+        line = strip_line(raw)
+        if GROUP_RUN_START.match(line):
+            in_step_header = True
+            continue
+        if in_step_header:
+            in_step_header = not GROUP_END.match(line)
+            continue
+        lines.append(line)
+    return lines
+
+
 def parse_job_log(
     text: str,
 ) -> tuple[list[PytestFailure], list[str], str | None, list[str]]:
@@ -238,7 +274,7 @@ def parse_job_log(
 
     Returns (pytest_failures, go_failures, traceback_top_error, tail_excerpt).
     """
-    lines = [strip_line(line) for line in text.splitlines()]
+    lines = strip_log(text)
 
     pytest_failures: list[PytestFailure] = []
     go_failures: list[str] = []
