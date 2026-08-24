@@ -1,24 +1,12 @@
 name: AI-enrich scheduled-failure notification
 
-# The second of two stages. The first,
-# .github/workflows/notify-scheduled-failure.yaml, always creates or comments
-# on a placeholder issue with no LLM involved, then calls this workflow to
-# rewrite whatever it produced into a triaged, deduplicated artefact.
-#
-# Both stages run inside the caller's run, so the run this reads logs from is
-# `github.run_id` and the workflow whose name it reports is `github.workflow`
-# -- inside a reusable workflow both refer to the original caller, which is
-# the scheduled workflow that failed.
-#
-# Keeping this in its own file, rather than as another job in the notifier,
-# keeps stage 1's guarantee legible: `notify` needs no secrets, no LLM
-# and no network beyond `gh`, and everything that does need them lives here.
+# Called by notify-scheduled-failure.yaml, which is called by scheduled workflows on failure.
+# - notify-scheduled-failure.yaml creates or comments on an issue before calling this workflow.
+# - github.workflow and github.run_id refer to the scheduled workflow that failed. 
 
 on:
   workflow_call:
     secrets:
-      # Declared, and passed by every level of the chain, even though what
-      # each level passes is empty. See the OPENROUTER_API_KEY comment below.
       OPENROUTER_API_KEY:
         required: false
 
@@ -27,12 +15,13 @@ permissions: {}
 jobs:
   enrich:
     runs-on: ubuntu-latest
-    environment: ai-failure-triage
+    environment: ai-failure-triage  # Required to access secrets.OPENROUTER_API_KEY
     permissions:
       issues: write
       # Reading the failing run's job logs is an `actions: read` call, and a
       # `permissions:` block sets every scope it does not name to `none`.
-      actions: read
+      issues: write  # Write to the workflow failure issue.
+      actions: read  # Read the failing workflow's logs.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:

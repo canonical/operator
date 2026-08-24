@@ -20,8 +20,7 @@ name: Notify on scheduled failure
 on:
   workflow_call:
     secrets:
-      # Passed straight through to stage 2, which is the only thing that
-      # uses it. See the comment at the call below.
+      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
       OPENROUTER_API_KEY:
         required: false
 
@@ -42,13 +41,7 @@ jobs:
           set -euo pipefail
           marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
 
-          # Match on the workflow name alone, not the full placeholder
-          # sentence: the enricher rewrites title and body, but always
-          # preserves a "Workflow: <name>" footer line specifically so this
-          # search keeps working after enrichment. Deliberately not an
-          # `in:title` search either -- on a corpus of past scheduled
-          # failures, issues that a human had retitled kept the workflow name
-          # in the body but had lost it from the title.
+          # Search for the workflow name in issue bodies or titles.
           match=$(gh issue list --repo "$REPO" --state open \
             --search "\"$WORKFLOW_NAME\"" \
             --json number --limit 1 -q '.[0].number // empty')
@@ -63,23 +56,6 @@ jobs:
               --body "$issue_body"
           fi
 
-  # Stage 2. Called from here, rather than subscribing to this workflow's
-  # callers with `workflow_run`, so that there is no list of caller workflow
-  # names to keep in sync -- renaming a scheduled workflow would silently
-  # have stopped enrichment -- and no `dangerous-triggers` suppression to
-  # justify.
-  #
-  # The cost is that the seven callers have to hand down what stage 2 needs,
-  # `actions: read` and the OpenRouter key, where `workflow_run` would have
-  # given it an independent run needing nothing from them.
-  #
-  # `needs: [notify]` is what orders it after the placeholder exists;
-  # `always()` runs it even if stage 1 failed, since the enricher's own
-  # fallback creates the issue itself when it finds no marker. That is the
-  # last line of defence: there is deliberately no workflow-level fallback
-  # job behind it, because reaching one would mean `gh issue create` had
-  # already failed in `notify`, and a third attempt in a third job is
-  # not a reason to believe the fourth would work.
   enrich:
     needs: [notify]
     if: ${{ always() }}
