@@ -1,7 +1,7 @@
 (log-from-your-charm)=
 # How to log from your charm
 
-> See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
+See first: {external+juju:ref}`Juju | Log <log>`, {external+juju:ref}`Juju | How to manage logs <manage-logs>`
 
 Ops configures Python logging and warnings to end up in the Juju log, and the
 Charmcraft profiles provide a `logger` object for your charm to use at the top
@@ -43,10 +43,11 @@ juju debug-log --debug --include-module juju.worker.uniter.operation --include-m
 
 ````
 
-> See more: [`logging`](https://docs.python.org/3/library/logging.html)
+See more: [`logging`](https://docs.python.org/3/library/logging.html)
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-use-logging-not-print
 
 Capture output to `stdout` and `stderr` in your charm and use the logging and
 warning functionality to send messages to the charm user, rather than rely on
@@ -72,12 +73,14 @@ logger.info(f"Got some more information {more_info}")
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-meaningful-log-messages
 
 Ensure that log messages are clear, meaningful, and provide enough information for the user to troubleshoot any issues. Avoid spurious logging. For instance, try not to log when event handlers are called, as the Juju controller does this automatically.
 ```
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-no-sensitive-data-in-logs
 
 Never log credentials or other sensitive information.
 ```

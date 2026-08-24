@@ -7,7 +7,7 @@ Observability transforms a Juju deployment from a black box to a real-time syste
 
 The responsibility to instrument the Python code is divided between Ops, charm libraries, and charms.
 
-> See also: [](#tracing)
+See also: [](#tracing)
 
 ## Summary
 
