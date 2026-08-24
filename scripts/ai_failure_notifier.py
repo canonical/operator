@@ -90,9 +90,7 @@ ERROR_MARKER = re.compile(r'##\[error\]')
 # "##[endgroup]". None of that is output: it is the step's own source. A
 # multi-line `run:` therefore puts its every branch into the log, including
 # the ones that did not execute, and parsing it produces failures the run
-# never had. Measured on the fork canary, whose `case` statement carries a
-# sample traceback per shape: a pytest-shape run reported the
-# traceback-only shape's `KeyError: 'loki/0'` as its top error.
+# never had.
 #
 # Colour is not a usable signal here -- the runner marks echoed lines cyan-
 # bold, but ANSI above strips that before anything is matched -- so the
