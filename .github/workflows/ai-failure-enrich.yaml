@@ -11,7 +11,7 @@ name: AI-enrich scheduled-failure notification
 # the scheduled workflow that failed.
 #
 # Keeping this in its own file, rather than as another job in the notifier,
-# keeps stage 1's guarantee legible: `open-issue` needs no secrets, no LLM
+# keeps stage 1's guarantee legible: `notify` needs no secrets, no LLM
 # and no network beyond `gh`, and everything that does need them lives here.
 
 on:

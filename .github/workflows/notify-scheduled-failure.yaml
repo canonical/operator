@@ -9,7 +9,7 @@ name: Notify on scheduled failure
 # withheld, and cannot use a secret no call site named.
 #
 # This is the first of two stages: a cheap, deterministic, always-works
-# dedup pre-check, with no LLM dependency and no secrets. The `open-issue`
+# dedup pre-check, with no LLM dependency and no secrets. The `notify`
 # job below is the whole of that guarantee -- once it has run, a
 # notification exists. The second stage,
 # .github/workflows/ai-failure-enrich.yaml, is called afterwards from here
@@ -26,7 +26,7 @@ on:
         required: false
 
 jobs:
-  open-issue:
+  notify:
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -73,15 +73,15 @@ jobs:
   # `actions: read` and the OpenRouter key, where `workflow_run` would have
   # given it an independent run needing nothing from them.
   #
-  # `needs: [open-issue]` is what orders it after the placeholder exists;
+  # `needs: [notify]` is what orders it after the placeholder exists;
   # `always()` runs it even if stage 1 failed, since the enricher's own
   # fallback creates the issue itself when it finds no marker. That is the
   # last line of defence: there is deliberately no workflow-level fallback
   # job behind it, because reaching one would mean `gh issue create` had
-  # already failed in `open-issue`, and a third attempt in a third job is
+  # already failed in `notify`, and a third attempt in a third job is
   # not a reason to believe the fourth would work.
   enrich:
-    needs: [open-issue]
+    needs: [notify]
     if: ${{ always() }}
     permissions:
       issues: write
