@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.11"
-# ///
 #
 # Copyright 2026 Canonical Ltd.
 #
