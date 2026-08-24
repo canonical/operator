@@ -1482,10 +1482,19 @@ class _EntityStatus:
         name: _RawStatusLiteral,
         message: str = '',
     ) -> _EntityStatus:
-        """Convert the status name, such as 'active', to the class, such as ActiveStatus."""
+        """Convert the status name, such as 'active', to the class, such as ActiveStatus.
+
+        If ``name`` is "unknown", ``message`` is ignored, because unknown status
+        does not have an associated message, and a warning is issued if it is
+        not empty.
+        """
         if name == 'unknown':
-            # Like ops.StatusBase.from_name, unknown is special: it has no
-            # message, so it must not be passed one.
+            # UnknownStatus has no message. We ignore message, following ops.StatusBase.from_name.
+            if message:
+                warnings.warn(
+                    f'Unknown status has no message; ignoring {message!r}.',
+                    stacklevel=2,
+                )
             return UnknownStatus()
         # All subclasses have a default 'name' attribute, but the type checker can't tell that.
         return cls._entity_statuses[name](message=message)  # type:ignore
