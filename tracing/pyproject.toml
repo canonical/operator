@@ -44,7 +44,7 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.20",
+    "ruff==0.16.0",
     "codespell==2.4.2",
     "pyright~=1.1",
 ]
@@ -106,6 +106,13 @@ ignore = [
     "D213",
     # we don't add a blank line after Args: in a function docstring
     "D413",
+
+    # `noqa` comment used instead of `ruff: ignore`: we prefer the `noqa`
+    # convention, which other tools also understand.
+    "RUF105",
+    # Rule code used instead of name in selectors: we use codes, with a
+    # comment naming the rule, throughout this configuration.
+    "RUF201",
 ]
 
 [tool.ruff.lint.per-file-ignores]

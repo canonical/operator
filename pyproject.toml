@@ -37,9 +37,9 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.15.20",
+    "ruff==0.16.0",
     "codespell==2.4.2",
-    "zizmor==1.26.1",
+    "zizmor==1.28.0",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -215,6 +215,13 @@ ignore = [
 
     # `subprocess` call: check for execution of untrusted input
     "S603",
+
+    # `noqa` comment used instead of `ruff: ignore`: we prefer the `noqa`
+    # convention, which other tools also understand.
+    "RUF105",
+    # Rule code used instead of name in selectors: we use codes, with a
+    # comment naming the rule, throughout this configuration.
+    "RUF201",
 ]
 exclude = ["tracing/ops_tracing/vendor/*"]
 
