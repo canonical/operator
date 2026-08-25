@@ -26,13 +26,13 @@ jobs:
             commit: 9251d5db4504081ba906c71056c6abae9981ba18  # 2026-08-13T22:44:01Z
           - charm-repo: canonical/postgresql-k8s-operator
             charm-root: .
-            commit: 52fb679609684c73b2d6e686b75446c5a96b56ec  # 2026-08-19T11:19:48Z
+            commit: e384b83ea3102876a679fc4e571a173bd215cae4  # 2026-08-24T20:04:39Z
           - charm-repo: canonical/mysql-operators
             charm-root: machines
-            commit: 30c271b9ce4a161ddadb9e5c152c506ade2df665  # v8.4/1.81.0 2026-08-17T09:34:23Z
+            commit: c357f39dbbed80b2ae123766d68a5201d0b7f15a  # v8.4/1.83.0 2026-08-24T13:44:56Z
           - charm-repo: canonical/mysql-operators
             charm-root: kubernetes
-            commit: 30c271b9ce4a161ddadb9e5c152c506ade2df665  # v8.4/1.81.0 2026-08-17T09:34:23Z
+            commit: c357f39dbbed80b2ae123766d68a5201d0b7f15a  # v8.4/1.83.0 2026-08-24T13:44:56Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
