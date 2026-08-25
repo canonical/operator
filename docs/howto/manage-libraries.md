@@ -62,7 +62,9 @@ Custom events must inherit from `EventBase`, but not from an Ops subclass of
 any data needed from Juju from the originating event, and explicitly pass that
 to the custom event object.
 
-For example, suppose you have a charm library wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm. In this example, you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. In your `lib/charms/my_charm/v0/my_lib.py` file, the `DatabaseRequirer` then will be:
+For example, suppose you have a charm library wrapping a relation endpoint. The wrapper might want to check that the remote end has sent valid data and, if that is the case, communicate it to the charm.
+
+In this example, you have a `DatabaseRequirer` object, and the charm using it is interested in knowing when the database is ready. Take an `endpoint` argument in `DatabaseRequirer` so that the charm using the library can name the relation whatever they like in `charmcraft.yaml` and pass the name through to the requirer. Then have `DatabaseRequirer` observe the caller-supplied endpoint rather than a hard-coded one. Your `lib/charms/my_charm/v0/my_lib.py` file will be:
 
 ```python
 class DatabaseReadyEvent(ops.EventBase):
@@ -94,10 +96,10 @@ class DatabaseRequirerEvents(ops.ObjectEvents):
 class DatabaseRequirer(ops.Object):
     on = DatabaseRequirerEvents()
 
-    def __init__(self, charm: ops.CharmBase, relation_name: str):
-        super().__init__(charm, relation_name)
+    def __init__(self, charm: ops.CharmBase, endpoint: str = 'database'):
+        super().__init__(charm, endpoint)
         self.framework.observe(
-            charm.on['database'].relation_changed, self._on_db_changed
+            charm.on[endpoint].relation_changed, self._on_db_changed
         )
 
     def _on_db_changed(self, event: ops.RelationChangedEvent):
@@ -124,15 +126,18 @@ the library, and that no events are unexpectedly emitted.
 import pytest
 import ops
 from ops import testing
-from lib.charms.my_Charm.v0.my_lib import DatabaseRequirer
+from lib.charms.my_charm.v0.my_lib import DatabaseReadyEvent, DatabaseRequirer
 
 
 class MyTestCharm(ops.CharmBase):
-    META = {'name': 'my-charm'}
+    META = {
+        'name': 'my-charm',
+        'requires': {'my-relation': {'interface': 'database'}},
+    }
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.db = DatabaseRequirer(self, 'my-relation')
+        self.db = DatabaseRequirer(self, endpoint='my-relation')
 
 
 @pytest.mark.parametrize(
@@ -142,16 +147,19 @@ class MyTestCharm(ops.CharmBase):
         'install',
         'stop',
         'remove',
-        'update-status',  # ...
+        'update_status',  # ...
     ),
 )
 def test_charm_runs(event):
     """Verify that the charm can create the library object, and doesn't see unexpected events."""
     ctx = testing.Context(MyTestCharm, meta=MyTestCharm.META)
     state_in = testing.State()
-    ctx.run(getattr(ctx.on, event), state_in)
-    assert len(ctx.emitted_events) == 0
-    assert isinstance(ctx.emitted_events[0], ops.StartEvent)
+    ctx.run(getattr(ctx.on, event)(), state_in)
+    # The Juju event itself is always emitted; what matters is that the library
+    # doesn't emit any of its own events when the database isn't ready.
+    assert not any(
+        isinstance(e, DatabaseReadyEvent) for e in ctx.emitted_events
+    )
 ```
 
 ### Test custom endpoint names
@@ -162,13 +170,16 @@ allow customising the name of the endpoint that the object is wrapping.
 Examples: Traefik's [`ingress-per-unit`](https://github.com/canonical/traefik-k8s-operator/blob/main/lib/charms/traefik_k8s/v1/ingress_per_unit.py) lib
 
 In your `tests/unit/test_my_lib.py` file, add a test that validates that custom
-names are supported:
+names are supported. Trigger a `relation_changed` event on the custom-named
+relation and assert that the library's custom event fires. If the library
+had hard-coded the endpoint name and ignored the `endpoint` argument, no
+`DatabaseReadyEvent` would be emitted and the test would fail.
 
 ```python
 import pytest
 import ops
 from ops import testing
-from lib.charms.my_charm.v0.my_lib import DatabaseRequirer
+from lib.charms.my_charm.v0.my_lib import DatabaseReadyEvent, DatabaseRequirer
 
 
 @pytest.fixture(params=['foo', 'bar'])
@@ -179,30 +190,36 @@ def endpoint(request):
 @pytest.fixture
 def my_charm_type(endpoint: str):
     class MyTestCharm(ops.CharmBase):
+        # 'database' is declared as well as the custom endpoint, so that a
+        # requirer that ignored the endpoint argument and hard-coded
+        # 'database' would still construct -- the test then fails because no
+        # DatabaseReadyEvent is emitted, rather than because the charm
+        # couldn't observe a relation it never declared.
         META = {
             'name': 'my-charm',
-            'requires': {endpoint: {'interface': 'my_interface'}},
+            'requires': {
+                endpoint: {'interface': 'my_interface'},
+                'database': {'interface': 'my_interface'},
+            },
         }
 
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.db = DatabaseRequirer(self, endpoint=endpoint)
-            framework.observe(self.on.start, self._on_start)
-            self.saw_start = False
-
-        def _on_start(self, _):
-            self.saw_start = True
 
     return MyTestCharm
 
 
-def test_charm_runs(my_charm_type):
-    """Verify that the charm executes regardless of how we name the requirer endpoint."""
-    state_in = testing.State()
+def test_custom_endpoint_name(my_charm_type, endpoint: str):
+    """Verify that the requirer observes the caller-supplied endpoint."""
     ctx = testing.Context(my_charm_type, meta=my_charm_type.META)
-    with ctx(ctx.on.start(), state_in) as mgr:
-        mgr.run()
-        assert mgr.charm.saw_start
+    relation = testing.Relation(endpoint)
+    secret = testing.Secret({'username': 'admin', 'password': 'admin'})
+    state_in = testing.State(relations={relation}, secrets={secret})
+    ctx.run(ctx.on.relation_changed(relation), state_in)
+    assert any(
+        isinstance(event, DatabaseReadyEvent) for event in ctx.emitted_events
+    )
 ```
 
 ### Test that the custom event is emitted
