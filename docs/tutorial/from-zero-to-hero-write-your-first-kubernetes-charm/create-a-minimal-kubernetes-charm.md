@@ -540,7 +540,7 @@ The Juju model is destroyed at the end of the tests. If you want to run the test
 
 For a real charm, we recommend running integration tests with [spread](https://github.com/canonical/spread), so that each test module runs as its own task. Charmcraft has an experimental `charmcraft test` command that wraps spread and installs it for you, which is what we use here.
 
-If you're interested in trying `charmcraft test`, run the following command in your project directory:
+Run the following command in your project directory:
 
 ```text
 charmcraft init --profile test-kubernetes --force
