@@ -62,11 +62,7 @@ jobs:
       - name: Install Concierge
         run: sudo snap install --classic concierge
       - name: Prepare for deploying K8s charms
-        # .github/integration/concierge-k8s.yaml mirrors the upstream concierge
-        # k8s preset and adds juju.extra-bootstrap-args: `juju bootstrap`
-        # regularly fails on slow GHA runners with `unable to contact api server
-        # after 60 attempts` because the default --bootstrap-timeout is too short.
-        run: sudo concierge prepare -c .github/integration/concierge-k8s.yaml
+        run: sudo concierge prepare -p k8s
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Fetch any charmlibs
         run: |
