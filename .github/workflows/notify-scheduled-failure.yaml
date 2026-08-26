@@ -75,9 +75,6 @@ jobs:
     needs: [notify]
     permissions:
       issues: write
-      # A called workflow cannot hold a scope its caller did not grant, so
-      # `actions: read` has to be repeated at every level of the chain for
-      # the enricher's log fetch to have it.
       actions: read
     # This passes an empty string, and is still required. Nothing in this
     # chain can read the OpenRouter key: it lives on stage 2's

@@ -29,10 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: ai-failure-triage  # Required to access secrets.OPENROUTER_API_KEY
     permissions:
-      issues: write  # Write to the workflow failure issue.
-      # Reading the failing run's job logs is an `actions: read` call, and a
-      # `permissions:` block sets every scope it does not name to `none`.
-      actions: read  # Read the failing workflow's logs.
+      issues: write
+      actions: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
