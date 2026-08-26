@@ -141,7 +141,7 @@ select = [
     "E",
     "W",
     # isort
-    "unsorted-imports",
+    "unsorted-imports",  # I001
     # pep8-naming
     "N",
     # flake8-builtins
@@ -170,35 +170,35 @@ select = [
     "TC",
 ]
 ignore = [
-    "typing-only-first-party-import",
-    "typing-only-third-party-import",
-    "typing-only-standard-library-import",
-    "assert",
-    "assert-false",
-    "suspicious-pickle-import",
-    "suspicious-subprocess-import",
+    "typing-only-first-party-import",  # TC001
+    "typing-only-third-party-import",  # TC002
+    "typing-only-standard-library-import",  # TC003
+    "assert",  # S101
+    "assert-false",  # B011
+    "suspicious-pickle-import",  # S403
+    "suspicious-subprocess-import",  # S404
 
-    "no-explicit-stacklevel",
+    "no-explicit-stacklevel",  # B028
 
     # We prefer the readability of returning the condition explicitly.
-    "needless-bool",
-    "suppressible-exception",
-    "multiple-with-statements",
+    "needless-bool",  # SIM103
+    "suppressible-exception",  # SIM105
+    "multiple-with-statements",  # SIM117
 
-    "undocumented-magic-method",
-    "undocumented-public-init",
+    "undocumented-magic-method",  # D105
+    "undocumented-public-init",  # D107
 
-    "manual-list-comprehension",
-    "manual-dict-comprehension",
+    "manual-list-comprehension",  # PERF401
+    "manual-dict-comprehension",  # PERF403
 
     # Since we have some `TypedDict`s that cannot use the class syntax, we're
     # currently choosing to be consistent in syntax even though some can be
     # moved to the class syntax.
-    "convert-typed-dict-functional-to-class",
+    "convert-typed-dict-functional-to-class",  # UP013
 
     ## Likely worth doing, but later.
 
-    "subprocess-without-shell-equals-true",
+    "subprocess-without-shell-equals-true",  # S603
 ]
 exclude = ["tracing/ops_tracing/vendor/*"]
 
@@ -207,57 +207,57 @@ exclude = ["tracing/ops_tracing/vendor/*"]
     # All documentation linting.
     "D",
 
-    "hardcoded-password-string",
-    "hardcoded-password-func-arg",
+    "hardcoded-password-string",  # S105
+    "hardcoded-password-func-arg",  # S106
 
-    "useless-expression",
+    "useless-expression",  # B018
 
     # Tests check round-tripped exact-literal config values; pytest.approx
     # isn't appropriate here.
-    "float-equality-comparison",
+    "float-equality-comparison",  # RUF069
 ]
 "testing/tests/*" = [
     # All documentation linting.
     "D",
 ]
 "testing/src/scenario/_charmcraft_extensions.py" = [
-    "line-too-long",  # Auto-generated file; long description strings are unavoidable.
+    "line-too-long",  # E501: Auto-generated file; long description strings are unavoidable.
 ]
 ".github/generate_charmcraft_extensions.py" = [
-    "start-process-with-partial-path",  # Intentionally calls charmcraft/tox by name.
+    "start-process-with-partial-path",  # S607: Intentionally calls charmcraft/tox by name.
 ]
 "ops/_private/timeconv.py" = [
     # `µ` (MICRO SIGN) rather than `μ` (GREEK SMALL LETTER MU).
-    "ambiguous-unicode-character-string",
-    "ambiguous-unicode-character-docstring",
+    "ambiguous-unicode-character-string",  # RUF001
+    "ambiguous-unicode-character-docstring",  # RUF002
 ]
 "ops/__init__.py" = [
-    "non-empty-init-module",  # Wraps main() and imports ops_tracing at the bottom.
+    "non-empty-init-module",  # RUF067: Wraps main() and imports ops_tracing at the bottom.
 ]
 "ops/_private/__init__.py" = [
-    "non-empty-init-module",  # Exposes a module-level tracer.
+    "non-empty-init-module",  # RUF067: Exposes a module-level tracer.
 ]
 "ops/lib/__init__.py" = [
-    "non-empty-init-module",  # Legacy library loader.
+    "non-empty-init-module",  # RUF067: Legacy library loader.
 ]
 "test/test_helpers.py" = [
     # Seems safe, but may be changed in the future.
-    "start-process-with-a-shell",
-    "start-process-with-partial-path",
+    "start-process-with-a-shell",  # S605
+    "start-process-with-partial-path",  # S607
 ]
 ".github/patch-charm-deps.py" = [
-    "start-process-with-partial-path",
+    "start-process-with-partial-path",  # S607
 ]
 "docs/custom_conf.py" = [
-    "undocumented-public-module",
-    "undocumented-public-class",
-    "undocumented-public-method",
-    "undocumented-public-function",
-    "multiple-leading-hashes-for-block-comment",
-    "unsorted-imports",
-    "ambiguous-unicode-character-comment",  # EN DASH, RIGHT SINGLE QUOTATION MARK
-    "mutable-class-default",
-    "printf-string-formatting",
+    "undocumented-public-module",  # D100
+    "undocumented-public-class",  # D101
+    "undocumented-public-method",  # D102
+    "undocumented-public-function",  # D103
+    "multiple-leading-hashes-for-block-comment",  # E266
+    "unsorted-imports",  # I001
+    "ambiguous-unicode-character-comment",  # RUF003: EN DASH, RIGHT SINGLE QUOTATION MARK
+    "mutable-class-default",  # RUF012
+    "printf-string-formatting",  # UP031
 ]
 
 [tool.ruff.lint.pydocstyle]
