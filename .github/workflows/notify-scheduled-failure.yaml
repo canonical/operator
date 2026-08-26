@@ -29,8 +29,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+    # Handed to `enrich` below, so that stage 2 is told which artefact to
+    # upgrade instead of searching for the marker this job just stamped.
+    # GitHub's issue search index is not read-your-writes, so that search
+    # could miss a marker written seconds earlier and open a second issue for
+    # a run that already has one.
+    outputs:
+      issue: ${{ steps.notify.outputs.issue }}
+      origin: ${{ steps.notify.outputs.origin }}
     steps:
       - name: Create or comment on issue, deduping coarsely by workflow name
+        id: notify
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that called this one.
@@ -49,11 +58,17 @@ jobs:
           if [[ -n "$match" ]]; then
             comment_body="Scheduled workflow '$WORKFLOW_NAME' failed again: $RUN_URL"$'\n\n'"${marker}comment -->"
             gh issue comment "$match" --repo "$REPO" --body "$comment_body"
+            echo "issue=$match" >> "$GITHUB_OUTPUT"
+            echo "origin=comment" >> "$GITHUB_OUTPUT"
           else
             issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"${marker}new -->"
-            gh issue create --repo "$REPO" \
+            # `gh issue create` prints the new issue's URL; the number is its
+            # last path segment.
+            issue_url=$(gh issue create --repo "$REPO" \
               --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-              --body "$issue_body"
+              --body "$issue_body")
+            echo "issue=${issue_url##*/}" >> "$GITHUB_OUTPUT"
+            echo "origin=new" >> "$GITHUB_OUTPUT"
           fi
 
   enrich:
@@ -73,4 +88,9 @@ jobs:
     # enrichment degrades to a plain notice with nothing failing loudly.
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    # Empty when `notify` failed before it opened anything -- this job still
+    # runs (`always()`), and the script falls back to looking the issue up.
+    with:
+      issue: ${{ needs.notify.outputs.issue }}
+      origin: ${{ needs.notify.outputs.origin }}
     uses: ./.github/workflows/ai-failure-enrich.yaml

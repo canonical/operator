@@ -2,10 +2,22 @@ name: AI-enrich scheduled-failure notification
 
 # Called by notify-scheduled-failure.yaml, which is called by scheduled workflows on failure.
 # - notify-scheduled-failure.yaml creates or comments on an issue before calling this workflow.
-# - github.workflow and github.run_id refer to the scheduled workflow that failed. 
+# - github.workflow and github.run_id refer to the scheduled workflow that failed.
 
 on:
   workflow_call:
+    inputs:
+      # What the notifier did, when it got that far. Optional: an empty value
+      # means the script looks the issue up itself, which is what happened
+      # before these were passed and what still happens if `notify` fails.
+      issue:
+        description: The issue the notifier created or commented on.
+        required: false
+        type: string
+      origin:
+        description: Either "new" or "comment", matching what the notifier did.
+        required: false
+        type: string
     secrets:
       OPENROUTER_API_KEY:
         required: false
@@ -17,10 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ai-failure-triage  # Required to access secrets.OPENROUTER_API_KEY
     permissions:
-      issues: write
+      issues: write  # Write to the workflow failure issue.
       # Reading the failing run's job logs is an `actions: read` call, and a
       # `permissions:` block sets every scope it does not name to `none`.
-      issues: write  # Write to the workflow failure issue.
       actions: read  # Read the failing workflow's logs.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -34,6 +45,8 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that failed.
+          NOTIFY_ISSUE: ${{ inputs.issue }}
+          NOTIFY_ORIGIN: ${{ inputs.origin }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Two things deliver this key, and both are load-bearing, so do
           # not tidy either away:
