@@ -3,19 +3,13 @@ name: Notify on scheduled failure
 # Reusable workflow: opens (or comments on) an issue when a scheduled
 # workflow fails. Callers gate the invocation with
 # `if: failure() && github.event_name == 'schedule'` and pass
-# `permissions: issues: write` plus `actions: read`, and pass
-# `OPENROUTER_API_KEY` through. The last two are for stage 2, which this
-# workflow calls in turn: a called workflow holds no scope its caller
-# withheld, and cannot use a secret no call site named.
+# `permissions: issues: write` plus `actions: read`, and grant access to
+# `secrets.OPENROUTER_API_KEY`.
 #
-# This is the first of two stages: a cheap, deterministic, always-works
-# dedup pre-check, with no LLM dependency and no secrets. The `notify`
-# job below is the whole of that guarantee -- once it has run, a
-# notification exists. The second stage,
-# .github/workflows/ai-failure-enrich.yaml, is called afterwards from here
-# and rewrites what this one produced into a triaged artefact. It needs an
-# API key and an environment, and if it is unprovisioned or broken the
-# notification has already happened regardless.
+# 1. `notify` opens or comments on an issue. No LLM and no secrets: once it
+#    has run, a notification exists.
+# 2. `enrich` (ai-failure-enrich.yaml) rewrites that into a triaged
+#    artefact. If its key or environment is missing, 1 has already happened.
 
 on:
   workflow_call:
