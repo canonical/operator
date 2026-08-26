@@ -59,15 +59,8 @@ jobs:
     needs: [update-pins]
     permissions:
       issues: write
-      # Stage 2 reads this run's job logs, and a called workflow cannot hold
-      # a scope its caller withheld, so `actions: read` has to be granted
-      # here even though nothing in this file uses it.
-      actions: read
-    # This passes an empty string, and is still required. The OpenRouter key
-    # lives on stage 2's `ai-failure-triage` environment, which no job here
-    # can read, but unless each call site names the secret, stage 2's own
-    # environment does not fill it in either and enrichment quietly degrades
-    # to a plain notice.
+      actions: read  # for ai-failure-enrich.yaml
     secrets:
+      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     uses: ./.github/workflows/notify-scheduled-failure.yaml
