@@ -555,7 +555,7 @@ When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (
 
 Because `charmcraft test` is experimental, its interface may still change. The `spread.yaml` and `task.yaml` files are the durable part: you can run them with spread directly, and they'll keep working if the wrapper changes.
 
-It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-charmcraft-test`.
+It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-spread`.
 
 ## Review the final code
 

@@ -115,7 +115,7 @@ The "Upload logs" step assumes that your integration tests use Jubilant together
 
 This single job runs every integration test module sequentially. As your suite grows, split tests across modules and run each module in its own CI job — see {ref}`write-integration-tests-for-a-charm-split-across-modules`.
 
-(set-up-ci-charmcraft-test)=
+(set-up-ci-spread)=
 ## Run integration tests in parallel with spread
 
 We recommend running integration tests with [spread](https://github.com/canonical/spread), which runs each test module as its own job. Total wall-clock time is then bounded by the slowest module rather than the sum of all modules.
