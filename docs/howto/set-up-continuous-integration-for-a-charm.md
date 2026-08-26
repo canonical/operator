@@ -116,14 +116,20 @@ The "Upload logs" step assumes that your integration tests use Jubilant together
 This single job runs every integration test module sequentially. As your suite grows, split tests across modules and run each module in its own CI job — see {ref}`write-integration-tests-for-a-charm-split-across-modules`.
 
 (set-up-ci-charmcraft-test)=
-## Run integration tests in parallel with `charmcraft test`
+## Run integration tests in parallel with spread
 
-If you initialised your charm with `charmcraft init --profile test-machine` or `--profile test-kubernetes` (both currently experimental), your charm includes extra testing machinery:
+We recommend running integration tests with [spread](https://github.com/canonical/spread), which runs each test module as its own job. Total wall-clock time is then bounded by the slowest module rather than the sum of all modules.
 
-- A [spread](https://github.com/canonical/spread) configuration file called `spread.yaml`.
+Your charm needs two things:
+
+- A spread configuration file called `spread.yaml`.
 - One file `spread/integration/<module>/task.yaml` per test module.
 
-You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
+Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
+
+`charmcraft init --profile test-machine` and `--profile test-kubernetes` generate both files for you, but you don't need those profiles: any charm can add a `spread.yaml` and a `spread` directory by hand. For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
+
+Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around spread. It's not finalised yet, so we suggest using spread directly for now, and moving to the wrapper when it's stable. The workflow below uses `charmcraft test` because it installs and configures spread for you.
 
 A minimal workflow looks like:
 
