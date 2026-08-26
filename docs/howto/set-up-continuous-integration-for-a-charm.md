@@ -16,6 +16,8 @@ The quality assurance pipeline of a charm should be automated using a continuous
 
 This guide demonstrates how to automatically run your charm's tests against any PR into the main branch of your GitHub repository.
 
+The sample integration testing job includes a packing step, but this guide doesn't demonstrate how to pack your charm for multiple architectures. If you need to pack for multiple architectures, consider {external+charmcraft:ref}`building the charm remotely <how-to-build-remotely>` on Canonical's infrastructure.
+
 You might also want to automatically publish your charm on Charmhub or publish charm libraries on PyPI. [charming-actions](https://github.com/canonical/charming-actions) has some useful GitHub actions for publishing on Charmhub. For guidance about publishing libraries on PyPI, see {external+charmlibs:ref}`How to distribute charm libraries <python-package-distribution-pypi>`.
 
 (set-up-ci-linting-unit)=
