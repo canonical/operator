@@ -125,8 +125,6 @@ Your charm needs two things:
 - A spread configuration file called `spread.yaml`.
 - One file `spread/integration/<module>/task.yaml` per test module.
 
-Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
-
 For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
 
 Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around spread. It's not finalised yet, so we suggest using spread directly for now, and moving to the wrapper when it's stable. The workflow below uses `charmcraft test` because it installs and configures spread for you.
