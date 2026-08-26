@@ -291,7 +291,7 @@ We'll now make sure that the unit status is set correctly.
 
 Now that the charm is getting more complex, there are many more cases where the unit status needs to be set. It's often convenient to do this in a more declarative fashion, which is where the collect-status event can be used.
 
-> Read more: [](ops.CollectStatusEvent)
+Read more: [](ops.CollectStatusEvent)
 
 In your charm's `__init__` add a new observer:
 
@@ -364,7 +364,7 @@ Now,  integrate our charm with the newly deployed `postgresql-k8s` charm:
 juju integrate postgresql-k8s fastapi-demo
 ```
 
-> Read more: {external+juju:ref}`Juju | Relation (integration) <relation>`, [`juju integrate`](inv:juju:std:label#command-juju-integrate)
+Read more: {external+juju:ref}`Juju | Relation (integration) <relation>`, [`juju integrate`](inv:juju:std:label#command-juju-integrate)
 
 Finally, run:
 

@@ -46,11 +46,11 @@ class Serializable(typing.Protocol):
     handle_kind = ''
 
     @property
-    def handle(self) -> 'Handle': ...  # noqa
+    def handle(self) -> 'Handle': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
     @handle.setter
     def handle(self, val: Handle): ...
-    def snapshot(self) -> dict[str, Any]: ...  # noqa
-    def restore(self, snapshot: dict[str, Any]) -> None: ...  # noqa
+    def snapshot(self) -> dict[str, Any]: ...  # ruff: ignore[undocumented-public-method]
+    def restore(self, snapshot: dict[str, Any]) -> None: ...  # ruff: ignore[undocumented-public-method]
 
 
 class _StoredObject(Protocol):
@@ -376,7 +376,7 @@ class Object:
         # to help the type checker and IDEs:
         # all these are guaranteed to be set at runtime.
         @property
-        def on(self) -> 'ObjectEvents': ...  # noqa
+        def on(self) -> 'ObjectEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(self, parent: Framework | Object, key: str | None):
         self.framework: Framework = None  # type: ignore
@@ -588,7 +588,7 @@ class Framework(Object):
     if TYPE_CHECKING:
 
         @property
-        def on(self) -> 'FrameworkEvents': ...  # noqa
+        def on(self) -> 'FrameworkEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(
         self,
@@ -846,10 +846,8 @@ class Framework(Object):
             if (
                 existing_observer_path != observer_path
                 or existing_method_name != method_name
-                # The notices all have paths that include [id] at the end. If one
-                # was somehow missing, then the split would be the empty string and
-                # match anyway.
-                or existing_event_path.split('[')[0] != event_path.split('[')[0]
+                # The notices all have paths that include [id] at the end.
+                or existing_event_path.rsplit('[', 1)[0] != event_path.rsplit('[', 1)[0]
             ):
                 continue
             # Check if the snapshot for this notice is the same.
