@@ -76,12 +76,8 @@ jobs:
     permissions:
       issues: write
       actions: read
-    # This passes an empty string, and is still required. Nothing in this
-    # chain can read the OpenRouter key: it lives on stage 2's
-    # `ai-failure-triage` environment, and only the job declaring that
-    # environment resolves it. But unless the secret is named at each call
-    # site, stage 2's own environment does not fill it in either, and
-    # enrichment degrades to a plain notice with nothing failing loudly.
+    # Passes an empty string, and is still required -- see the note on
+    # OPENROUTER_API_KEY in ai-failure-enrich.yaml.
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     # `notify` has to have succeeded to get here, so these are always set for
