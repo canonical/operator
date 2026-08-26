@@ -73,7 +73,6 @@ jobs:
 
   enrich:
     needs: [notify]
-    if: ${{ always() }}
     permissions:
       issues: write
       # A called workflow cannot hold a scope its caller did not grant, so
@@ -88,8 +87,10 @@ jobs:
     # enrichment degrades to a plain notice with nothing failing loudly.
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    # Empty when `notify` failed before it opened anything -- this job still
-    # runs (`always()`), and the script falls back to looking the issue up.
+    # `notify` has to have succeeded to get here, so these are always set for
+    # this repo. The script keeps a lookup fallback for the empty case anyway:
+    # other repositories adopt this at their own pace, and a caller that has
+    # not been migrated yet passes nothing.
     with:
       issue: ${{ needs.notify.outputs.issue }}
       origin: ${{ needs.notify.outputs.origin }}
