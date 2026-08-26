@@ -54,7 +54,7 @@ from __future__ import annotations
 
 # The "from .X import Y" imports below don't explicitly tell Pyright (or MyPy)
 # that those symbols are part of the public API, so we have to add __all__.
-__all__ = [  # noqa: RUF022 `__all__` is not sorted
+__all__ = [  # ruff: ignore[unsorted-dunder-all]
     '__version__',
     'main',
     'tracing',

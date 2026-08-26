@@ -54,7 +54,7 @@ def kubectl_port_forward(namespace: str, target: str, port: int) -> Iterator[tup
         sock.bind(('127.0.0.1', 0))
         local_port = sock.getsockname()[1]
     proc = subprocess.Popen(
-        [  # noqa: S607
+        [  # ruff: ignore[start-process-with-partial-path]
             'kubectl',
             '--namespace',
             namespace,
@@ -159,7 +159,7 @@ def _deploy_tracing_stack(juju: jubilant.Juju) -> None:
     # Kubernetes; resolve it from k8s directly. In-cluster consumers (Tempo
     # pods, via s3-integrator) still need the ClusterIP, not the Pod IP.
     cluster_ip = subprocess.check_output(
-        [  # noqa: S607
+        [  # ruff: ignore[start-process-with-partial-path]
             'kubectl',
             '--namespace',
             juju.model,
@@ -267,7 +267,7 @@ def _prepare_generic_charm_dir(
 
     try:
         subprocess.run(
-            [  # noqa: S607
+            [  # ruff: ignore[start-process-with-partial-path]
                 'uv',
                 'build',
                 '--sdist',
@@ -285,7 +285,7 @@ def _prepare_generic_charm_dir(
 
         if build_tracing:
             subprocess.run(
-                [  # noqa: S607
+                [  # ruff: ignore[start-process-with-partial-path]
                     'uv',
                     'build',
                     '--sdist',
@@ -302,7 +302,7 @@ def _prepare_generic_charm_dir(
             sdist.rename(charm_dir / 'ops_tracing.tar.gz')
 
         subprocess.run(
-            ['uv', 'lock'],  # noqa: S607
+            ['uv', 'lock'],  # ruff: ignore[start-process-with-partial-path]
             cwd=charm_dir,
             text=True,
             check=True,
@@ -359,7 +359,7 @@ def build_hookcmds_charm(hookcmds_charm_dir: pathlib.Path) -> Generator[Callable
 
 def _build_charm(charm_dir: pathlib.Path, expected_artifact: str) -> Generator[Callable[[], str]]:
     proc = subprocess.Popen(
-        ['charmcraft', 'pack', '--verbose'],  # noqa: S607
+        ['charmcraft', 'pack', '--verbose'],  # ruff: ignore[start-process-with-partial-path]
         cwd=str(charm_dir),
         text=True,
         stdout=subprocess.PIPE,

@@ -1559,7 +1559,7 @@ class TestMultipartParser:
             ),
             MultipartParserTestCase(
                 'incomplete body terminator',
-                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # noqa
+                b'\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\rhello my name is joe and I work in a button factory',  # ruff: ignore[line-too-long]
                 [b'header foo\r\n\r\n'],
                 [b'foo bar\r\n--qwerty\rhello my name is joe and I work in a '],
                 want_bodies_done=[False],
@@ -1573,7 +1573,7 @@ class TestMultipartParser:
             ),
             MultipartParserTestCase(
                 'ignore leading garbage',
-                b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # noqa
+                b'hello my name is joe\r\n\n\n\n\r\n--qwerty\r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\n',  # ruff: ignore[line-too-long]
                 [b'header foo\r\n\r\n'],
                 [b'foo bar'],
                 want_bodies_done=[True],
@@ -1603,14 +1603,14 @@ class TestMultipartParser:
             ),
             MultipartParserTestCase(
                 'multiple parts',
-                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # ruff: ignore[line-too-long]
                 [b'header foo\r\n\r\n', b'header bar\r\n\r\n'],
                 [b'foo bar', b'foo baz'],
                 want_bodies_done=[True, True],
             ),
             MultipartParserTestCase(
                 'ignore after terminal boundary',
-                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # noqa
+                b'\r\n--qwerty \t \r\nheader foo\r\n\r\nfoo bar\r\n--qwerty--\r\nheader bar\r\n\r\nfoo baz\r\n--qwerty--\r\n',  # ruff: ignore[line-too-long]
                 [b'header foo\r\n\r\n'],
                 [b'foo bar'],
                 want_bodies_done=[True],
@@ -1625,17 +1625,17 @@ class TestMultipartParser:
             bodies: list[bytes] = []
             bodies_done: list[bool] = []
 
-            # All of the "noqa: B023" here are due to a ruff bug:
-            # https://github.com/astral-sh/ruff/issues/7847
-            # ruff should tell us when the 'noqa's are no longer required.
+            # All of the "ruff: ignore[function-uses-loop-variable]" here are
+            # due to a ruff bug: https://github.com/astral-sh/ruff/issues/7847
+            # ruff should tell us when the ignores are no longer required.
             def handle_header(data: typing.Any):
-                headers.append(bytes(data))  # noqa: B023
-                bodies.append(b'')  # noqa: B023
-                bodies_done.append(False)  # noqa: B023
+                headers.append(bytes(data))  # ruff: ignore[function-uses-loop-variable]
+                bodies.append(b'')  # ruff: ignore[function-uses-loop-variable]
+                bodies_done.append(False)  # ruff: ignore[function-uses-loop-variable]
 
             def handle_body(data: bytearray, done: bool = False):
-                bodies[-1] += data  # noqa: B023
-                bodies_done[-1] = done  # noqa: B023
+                bodies[-1] += data  # ruff: ignore[function-uses-loop-variable]
+                bodies_done[-1] = done  # ruff: ignore[function-uses-loop-variable]
 
             parser = pebble._MultipartParser(
                 marker,
@@ -3923,9 +3923,9 @@ class TestExec:
         assert io_ws.sends == []
 
     def test_wait_file_io(self, client: MockClient):
-        fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
-        out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
-        err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # noqa: SIM115
+        fin = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # ruff: ignore[open-file-with-context-handler]
+        out = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # ruff: ignore[open-file-with-context-handler]
+        err = tempfile.TemporaryFile(mode='w+', encoding='utf-8')  # ruff: ignore[open-file-with-context-handler]
         try:
             fin.write('foo\n')
             fin.seek(0)

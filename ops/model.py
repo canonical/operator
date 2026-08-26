@@ -3880,7 +3880,7 @@ class _ModelBackend:
                     line,
                     level=level,  # type: ignore[arg-type]
                 )
-            except hookcmds.Error as e:  # noqa: PERF203
+            except hookcmds.Error as e:  # ruff: ignore[try-except-in-loop]
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
                 raise ModelError(e.stderr) from e
 

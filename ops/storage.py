@@ -162,7 +162,7 @@ class SQLiteStorage:
             # by the charm itself into its own SQLite database, so the data source
             # is trusted. Switching to a different serialisation format would be a
             # breaking change for existing charms with persisted state.
-            return pickle.loads(row[0])  # noqa: S301
+            return pickle.loads(row[0])  # ruff: ignore[suspicious-pickle-usage]
         raise NoSnapshotError(handle_path)
 
     def drop_snapshot(self, handle_path: str):
