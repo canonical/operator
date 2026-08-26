@@ -127,7 +127,7 @@ Your charm needs two things:
 
 Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
 
-`charmcraft init --profile test-machine` and `--profile test-kubernetes` generate both files for you, but you don't need those profiles: any charm can add a `spread.yaml` and a `spread` directory by hand. For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
+For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
 
 Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around spread. It's not finalised yet, so we suggest using spread directly for now, and moving to the wrapper when it's stable. The workflow below uses `charmcraft test` because it installs and configures spread for you.
 
