@@ -245,7 +245,7 @@ We get the workload version over port 8000 because the `fastapi` service runs th
 
 The `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, but this isn't necessarily enough time for the `fastapi` service to fully start.
 
-If `get_version` hasn't succeeded after three attempts, the charm will go into error status. The Juju logs will show the error message, to help you debug the error. The error message is for you, the charm developer, not for the user of the charm. It tells you there's a bug in the charm.
+If `get_version` hasn't succeeded after three attempts, the charm will go into error status. The Juju logs (from `juju debug-log`) will show the error message, to help you debug the error. The error message is for you, the charm developer, not for the user of the charm. It tells you there's a bug in the charm.
 
 ## Try your charm
 
