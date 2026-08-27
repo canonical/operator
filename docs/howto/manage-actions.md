@@ -96,23 +96,22 @@ def _on_snapshot_action(self, event: ops.ActionEvent):
     # This is sent back to the Juju user in real-time, and appears in the output
     # of the `juju run` command.
     event.log(f'Generating snapshot into {params.filename}')
-    # Do the snapshot.
-    success = self.do_snapshot(
+    # Do the snapshot. This returns the size of the snapshot in bytes.
+    size = self.do_snapshot(
         filename=params.filename,
         kind=params.compression.kind,
         quality=params.compression.quality,
     )
-    if not success:
+    if size is None:
         # Report to the user that the action has failed.
         event.fail(
             'Failed to generate snapshot.'
         )  # Ideally, include more details than this!
         # Note that `fail()` doesn't interrupt code, so is typically followed by a `return`.
         return
-    # Set the results of the action.
-    msg = f'Stored snapshot in {params.filename}.'
-    # These will be displayed in the `juju run` output.
-    event.set_results({'result': msg})
+    # Set the results of the action. These will be displayed in the
+    # `juju run` output.
+    event.set_results({'snapshot-size': str(size)})
 ```
 
 See more:
@@ -123,12 +122,12 @@ See more:
 - [](ops.ActionEvent.set_results)
 - [](ops.ActionEvent.log)
 
-#### Record the ID of an action task
+### Record the ID of an action task
 
 When a unique ID is needed for the action task - for example, for logging or creating temporary files, use the `.id` attribute of the action event. For example:
 
 ```python
-def _on_snapshot(self, event: ops.ActionEvent):
+def _on_snapshot_action(self, event: ops.ActionEvent):
     temp_filename = f'backup-{event.id}.tar.gz'
     logger.info(
         'Using %s as the temporary backup filename in task %s',
@@ -139,6 +138,8 @@ def _on_snapshot(self, event: ops.ActionEvent):
     ...
 ```
 See more: [](ops.ActionEvent.id)
+
+## Test the feature
 
 ### Write unit tests
 
@@ -191,17 +192,26 @@ See more:
 - [](ops.testing.Context.action_results)
 - [](ops.testing.ActionFailed)
 
+(manage-actions-integration-tests)=
 ### Write integration tests
 
 See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that an action works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
-
 ```python
-def test_logger(juju: jubilant.Juju):
-    action = juju.run(
+import pathlib
+
+import jubilant
+
+
+def test_snapshot_action(charm: pathlib.Path, juju: jubilant.Juju):
+    task = juju.run(
         'your-app/0', 'snapshot', {'filename': 'db-snapshot.tar.gz'}
     )
-    assert action.status == 'completed'
     assert action.results['snapshot-size'].isdigit()
 ```
+
+See also: [](jubilant.Juju.run)
+
+Examples: [`discourse-k8s`](https://github.com/canonical/discourse-k8s-operator/blob/main/tests/integration/test_users.py)
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.

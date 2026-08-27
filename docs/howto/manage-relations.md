@@ -14,15 +14,15 @@ To add relation capabilities to a charm, you’ll have to define the relation in
 
 To integrate with another charm, or with itself (to communicate with other units of the same charm), declare the required and optional relations in your charm's `charmcraft.yaml` file.
 
-```{caution}
+```{note}
 
 **If you're using an existing interface:**
 
-Make sure to consult [the `charm-relations-interfaces` repository](https://github.com/canonical/charm-relation-interfaces) for guidance about how to implement them correctly.
+Make sure to consult {ref}`manage-interfaces` and {external+charmlibs:doc}`how-to/manage-libraries` for guidance about how to implement them correctly.
 
 **If you're defining a new interface:**
 
-Make sure to add your interface to [the `charm-relations-interfaces` repository](https://github.com/canonical/charm-relation-interfaces).
+If this is an interface that other charms should use, add it to [the `charmlibs` repository](https://github.com/canonical/charmlibs). See {external+charmlibs:doc}`how-to/design-relation-interfaces`, {external+charmlibs:doc}`how-to/python-package`.
 ```
 
 To exchange data with other units of the same charm, define one or more `peers` endpoints including an interface name for each. Each peer relation must have an endpoint, which your charm will use to refer to the relation (as [](ops.Relation.name)).
@@ -131,7 +131,7 @@ In `src/charm.py`, create a class that defines the schema for the relation data.
 For example:
 
 ```python
-class SMTPProviderUnitData(pydantic.BaseMode):
+class SMTPProviderUnitData(pydantic.BaseModel):
     smtp_credentials: str = pydantic.Field(description='A Juju secret ID')
 ```
 
@@ -226,7 +226,7 @@ def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
 Or the peer unit databags:
 
 ```python
-def _on_database_relation_changed(self, e: ops.RelationChangedEvent):
+def _on_database_relation_changed(self, event: ops.RelationChangedEvent):
     peer_units_databags = {
         event.relation.data[unit]
         for unit in event.relation.units
@@ -347,7 +347,7 @@ that, `SubordinateRelation`, compared to `Relation`, always talks in terms of
 `remote`:
 
 - `Relation.remote_units_data` becomes `SubordinateRelation.remote_unit_data`
-  taking a single `dict[str:str]`. The remote unit ID can be provided as a
+  taking a single `dict[str, str]`. The remote unit ID can be provided as a
   separate argument.
 - `Relation.remote_unit_ids` becomes `SubordinateRelation.remote_unit_id`
   (a single ID instead of a list of IDs)
@@ -364,23 +364,34 @@ relation = testing.SubordinateRelation(
 relation.remote_unit_name  # 'zookeeper/42'
 ```
 
+(manage-relations-integration-tests)=
 ### Write integration tests
 
 See first: {ref}`write-integration-tests-for-a-charm`
 
-To verify that charm behaves correctly when integrated with another in a real Juju environment, write an integration test with `jubilant` that deploys another application and relates your charm to it.
+Use Jubilant to verify that your charm behaves correctly when integrated with another charm:
 
 ```python
+import pathlib
+
+import jubilant
+
+
 # This assumes that your integration tests already include the standard
 # build and deploy test.
 
 
-def test_active_with_another_app(juju: jubilant.Juju):
+def test_active_with_another_app(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy('another-app')
     juju.integrate('your-app:endpoint', 'another-app:endpoint')
-
     juju.wait(jubilant.all_active)
 ```
+
+See more: [](jubilant.Juju.integrate)
+
+Examples: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/clients/test_client_relation.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_provider_v1.py).
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.
 
 (generate-tests-from-a-deployed-model)=
 ### Generate tests from a deployed model

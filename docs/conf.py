@@ -159,6 +159,7 @@ sitemap_excludes = [
     "py-modindex/",
     "_modules/*",
     "search/",
+    "reuse/*",
 ]
 
 ################################
