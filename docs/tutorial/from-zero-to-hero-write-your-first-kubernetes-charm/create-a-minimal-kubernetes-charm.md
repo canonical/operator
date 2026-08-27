@@ -536,9 +536,9 @@ The result should be similar to the following output:
 
 The Juju model is destroyed at the end of the tests. If you want to run the tests and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
 
-### Run tests with spread
+### Run tests with Spread
 
-For a real charm, we recommend running integration tests with [spread](https://github.com/canonical/spread), so that each test module runs as its own task. Charmcraft has an experimental `charmcraft test` command that wraps spread and installs it for you, which is what we use here.
+For a real charm, we recommend running integration tests with [Spread](https://github.com/canonical/spread), so that each test module runs as its own task. Charmcraft has an experimental `charmcraft test` command that wraps Spread and installs it for you, which is what we use here.
 
 Run the following command in your project directory:
 
@@ -546,16 +546,16 @@ Run the following command in your project directory:
 charmcraft init --profile test-kubernetes --force
 ```
 
-This creates the scaffolding of a spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
+This creates the scaffolding of a Spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
 
-- `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
+- `spread.yaml` - Tells Spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
 - The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
 
 When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
 
-Because `charmcraft test` is experimental, its interface may still change. The `spread.yaml` and `task.yaml` files are the durable part: you can run them with spread directly, and they'll keep working if the wrapper changes.
+Because `charmcraft test` is experimental, its interface may still change. However, even if `charmcraft test` changes, you can continue to run your tests with Spread directly, using the same `spread.yaml` and `task.yaml`.
 
-It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-spread`.
+It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own Spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-spread`.
 
 ## Review the final code
 

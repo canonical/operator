@@ -116,18 +116,18 @@ The "Upload logs" step assumes that your integration tests use Jubilant together
 This single job runs every integration test module sequentially. As your suite grows, split tests across modules and run each module in its own CI job — see {ref}`write-integration-tests-for-a-charm-split-across-modules`.
 
 (set-up-ci-spread)=
-## Run integration tests in parallel with spread
+## Run integration tests in parallel with Spread
 
-We recommend running integration tests with [spread](https://github.com/canonical/spread), which runs each test module as its own job. Total wall-clock time is then bounded by the slowest module rather than the sum of all modules.
+We recommend running integration tests with [Spread](https://github.com/canonical/spread), which runs each test module as its own job. Total time is then bounded by the slowest module rather than the sum of all modules.
 
 Your charm needs two things:
 
-- A spread configuration file called `spread.yaml`.
+- A Spread configuration file called `spread.yaml`.
 - One file `spread/integration/<module>/task.yaml` per test module.
 
 For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
 
-Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around spread. It's not finalised yet, so we suggest using spread directly for now, and moving to the wrapper when it's stable. The workflow below uses `charmcraft test` because it installs and configures spread for you.
+Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around Spread. We suggest using Spread directly until `charmcraft test` is finalised. The workflow below uses `charmcraft test` as a convenient way to install and configure Spread.
 
 A minimal workflow looks like:
 
