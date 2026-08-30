@@ -20,7 +20,7 @@ git clone https://github.com/canonical/charmlibs
 cd /path/to/charmlibs
 ```
 
-### 2. Run the interface initialiser
+### 2. Scaffold the interface
 
 From the repository root, run `just init --interface` and answer the prompts. The project name should be the canonical interface name, as it appears in `charmcraft.yaml` files -- for example `my_fancy_database`. You'll also be asked for the minimum Python version and the PyPI author field; press enter to accept the defaults shown in brackets.
 

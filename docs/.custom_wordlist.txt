@@ -25,6 +25,7 @@ liveness
 manpages
 misconfiguration
 mitigations
+monorepo
 pathops
 Parca
 protobuf
