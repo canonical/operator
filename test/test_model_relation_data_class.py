@@ -56,8 +56,8 @@ class DatabagProtocol(Protocol):
         *,
         foo: str,
         bar: int = 0,
-        baz: list[str] = [],  # noqa: B006
-        quux: Nested = Nested(),  # noqa: B008
+        baz: list[str] = [],  # ruff: ignore[mutable-argument-default]
+        quux: Nested = Nested(),  # ruff: ignore[function-call-in-default-argument]
     ): ...
 
 
@@ -317,7 +317,7 @@ class _AliasProtocol(Protocol):
     other: str
 
 
-class _Alias:  # noqa: B903
+class _Alias:  # ruff: ignore[class-as-data-structure]
     # This is pretty quirky, but we need `fooBar` to be in the type annotations
     # and we need it to return the value of `foo_bar` to correctly save back to
     # Juju. Other than being ugly to look at, this means that the class offers
@@ -325,11 +325,11 @@ class _Alias:  # noqa: B903
     # charms that need aliases like this should use dataclasses or pydantic.
     # We have this here so that we can still have the standard set of four
     # classes being tested.
-    fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # noqa: N815
+    fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # ruff: ignore[mixed-case-variable-in-class-scope]
 
     other: str
 
-    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # ruff: ignore[invalid-argument-name]
         self.foo_bar = fooBar
         self.other = other
 
@@ -556,7 +556,7 @@ class _OneStringProtocol(Protocol):
     def __init__(self, foo: str): ...
 
 
-class _OneString:  # noqa: B903
+class _OneString:  # ruff: ignore[class-as-data-structure]
     foo: str
 
     def __init__(self, foo: str):
@@ -752,7 +752,7 @@ def json_ip_hook(dct: dict[str, Any]) -> dict[str, Any]:
                 dct[key] = ipaddress.ip_network(value, strict=False)
             else:
                 dct[key] = ipaddress.ip_address(value)
-        except ValueError:  # noqa: PERF203
+        except ValueError:  # ruff: ignore[try-except-in-loop]
             pass
     return dct
 

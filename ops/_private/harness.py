@@ -168,7 +168,7 @@ class ActionOutput:
     """The action's results, as set or updated by :meth:`ops.ActionEvent.set_results`."""
 
 
-class ActionFailed(Exception):  # noqa: N818 (name doesn't end with "Error")
+class ActionFailed(Exception):  # ruff: ignore[error-suffix-on-exception-name]
     """Raised when :code:`event.fail()` is called during an action handler."""
 
     message: str

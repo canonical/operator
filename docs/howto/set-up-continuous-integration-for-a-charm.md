@@ -9,6 +9,7 @@ myst:
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-automated-ci
 
 The quality assurance pipeline of a charm should be automated using a continuous integration (CI) system.
 ```
@@ -114,15 +115,19 @@ The "Upload logs" step assumes that your integration tests use Jubilant together
 
 This single job runs every integration test module sequentially. As your suite grows, split tests across modules and run each module in its own CI job — see {ref}`write-integration-tests-for-a-charm-split-across-modules`.
 
-(set-up-ci-charmcraft-test)=
-## Run integration tests in parallel with `charmcraft test`
+(set-up-ci-spread)=
+## Run integration tests in parallel with Spread
 
-If you initialised your charm with `charmcraft init --profile test-machine` or `--profile test-kubernetes` (both currently experimental), your charm includes extra testing machinery:
+We recommend running integration tests with [Spread](https://github.com/canonical/spread), which runs each test module as its own job. Total time is then bounded by the slowest module rather than the sum of all modules.
 
-- A [spread](https://github.com/canonical/spread) configuration file called `spread.yaml`.
+Your charm needs two things:
+
+- A Spread configuration file called `spread.yaml`.
 - One file `spread/integration/<module>/task.yaml` per test module.
 
-You can use `charmcraft test` in CI to run each module as its own matrix job, so total wall-clock time is bounded by the slowest module rather than the sum of all modules. Adding a new `task.yaml`, which should run a single new `test_*.py` module, automatically adds a new CI job.
+For a configuration you can copy, see the [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo).
+
+Charmcraft also has an experimental `charmcraft test` command, which is a wrapper around Spread. We suggest using Spread directly until `charmcraft test` is finalised. The workflow below uses `charmcraft test` as a convenient way to install and configure Spread.
 
 A minimal workflow looks like:
 

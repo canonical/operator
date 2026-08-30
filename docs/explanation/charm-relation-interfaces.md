@@ -1,7 +1,7 @@
 (charm-relation-interfaces)=
 # Charm-relation-interfaces
 
-> See also: {ref}`manage-interfaces`
+See also: {ref}`manage-interfaces`
 
 [`charm-relation-interfaces`](https://github.com/canonical/charm-relation-interfaces) is a repository containing specifications, databag schemas and interface tests for Juju relation interfaces. In other words, it is the source of truth for data and behavior of providers and requirers of relations.
 

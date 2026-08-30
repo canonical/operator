@@ -1630,7 +1630,7 @@ class MyAction:
     my_bool: bool = False
     my_int: int = 42
     my_float: float = 3.14
-    my_list: list[str] = []  # noqa: RUF012
+    my_list: list[str] = []  # ruff: ignore[mutable-class-default]
 
     def __init__(
         self,
@@ -1876,8 +1876,8 @@ my-action:
         harness.run_action('my-action', params={'my-str': 'foo', 'my-int': -1})
 
 
-class _Alias:  # noqa: B903
-    def __init__(self, fooBar: int, other: str):  # noqa: N803
+class _Alias:  # ruff: ignore[class-as-data-structure]
+    def __init__(self, fooBar: int, other: str):  # ruff: ignore[invalid-argument-name]
         self.foo_bar = fooBar
         self.other = other
 
