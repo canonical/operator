@@ -40,7 +40,7 @@ import pytest
 
 pydantic = pytest.importorskip('pydantic')
 
-from ops_tracing import _tracing_models  # noqa: E402
+from ops_tracing import _tracing_models  # ruff: ignore[module-import-not-at-top-of-file]
 
 TRACING_SCHEMA_URL = (
     'https://raw.githubusercontent.com/canonical/charmlibs/main/'
@@ -54,7 +54,7 @@ CERT_TRANSFER_SCHEMA_URL = (
 
 def _fetch(url: str) -> str:
     assert url.startswith('https://'), url
-    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=30) as resp:  # ruff: ignore[suspicious-url-open-usage]
         return resp.read().decode('utf-8')
 
 
@@ -77,7 +77,7 @@ def _load_upstream(url: str) -> dict[str, typing.Any]:
     sys.modules['interface_tester.schema_base'] = stub
 
     ns: dict[str, typing.Any] = {'__name__': f'upstream_{url.rsplit("/", 3)[-3]}'}
-    exec(compile(_fetch(url), url, 'exec'), ns)  # noqa: S102
+    exec(compile(_fetch(url), url, 'exec'), ns)  # ruff: ignore[exec-builtin]
     # ``Json[T]`` annotations are stored as ForwardRefs at class-construction
     # time; resolve them now so ``model_fields`` and ``__init__`` work.
     for value in list(ns.values()):
