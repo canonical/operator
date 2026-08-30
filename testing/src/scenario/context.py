@@ -200,57 +200,57 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.InstallEvent)
-    def install():  # noqa: D102
+    def install():  # ruff: ignore[undocumented-public-method]
         return _Event('install')
 
     @staticmethod
     @_copy_doc(ops.StartEvent)
-    def start():  # noqa: D102
+    def start():  # ruff: ignore[undocumented-public-method]
         return _Event('start')
 
     @staticmethod
     @_copy_doc(ops.StopEvent)
-    def stop():  # noqa: D102
+    def stop():  # ruff: ignore[undocumented-public-method]
         return _Event('stop')
 
     @staticmethod
     @_copy_doc(ops.RemoveEvent)
-    def remove():  # noqa: D102
+    def remove():  # ruff: ignore[undocumented-public-method]
         return _Event('remove')
 
     @staticmethod
     @_copy_doc(ops.UpdateStatusEvent)
-    def update_status():  # noqa: D102
+    def update_status():  # ruff: ignore[undocumented-public-method]
         return _Event('update_status')
 
     @staticmethod
     @_copy_doc(ops.ConfigChangedEvent)
-    def config_changed():  # noqa: D102
+    def config_changed():  # ruff: ignore[undocumented-public-method]
         return _Event('config_changed')
 
     @staticmethod
     @_copy_doc(ops.UpgradeCharmEvent)
-    def upgrade_charm():  # noqa: D102
+    def upgrade_charm():  # ruff: ignore[undocumented-public-method]
         return _Event('upgrade_charm')
 
     @staticmethod
     @_copy_doc(ops.PreSeriesUpgradeEvent)
-    def pre_series_upgrade():  # noqa: D102
+    def pre_series_upgrade():  # ruff: ignore[undocumented-public-method]
         return _Event('pre_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.PostSeriesUpgradeEvent)
-    def post_series_upgrade():  # noqa: D102
+    def post_series_upgrade():  # ruff: ignore[undocumented-public-method]
         return _Event('post_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.LeaderElectedEvent)
-    def leader_elected():  # noqa: D102
+    def leader_elected():  # ruff: ignore[undocumented-public-method]
         return _Event('leader_elected')
 
     @staticmethod
     @_copy_doc(ops.SecretChangedEvent)
-    def secret_changed(secret: Secret):  # noqa: D102
+    def secret_changed(secret: Secret):  # ruff: ignore[undocumented-public-method]
         if secret.owner:
             raise ValueError(
                 'This unit will never receive secret-changed for a secret it owns.',
@@ -259,7 +259,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretExpiredEvent)
-    def secret_expired(secret: Secret, *, revision: int):  # noqa: D102
+    def secret_expired(secret: Secret, *, revision: int):  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-expire for a secret it does not own.',
@@ -268,7 +268,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRotateEvent)
-    def secret_rotate(secret: Secret):  # noqa: D102
+    def secret_rotate(secret: Secret):  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-rotate for a secret it does not own.',
@@ -277,7 +277,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRemoveEvent)
-    def secret_remove(secret: Secret, *, revision: int):  # noqa: D102
+    def secret_remove(secret: Secret, *, revision: int):  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-removed for a secret it does not own.',
@@ -296,12 +296,12 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
-    def relation_created(relation: RelationBase):  # noqa: D102
+    def relation_created(relation: RelationBase):  # ruff: ignore[undocumented-public-method]
         return _Event(f'{relation.endpoint}_relation_created', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
-    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):  # noqa: D102
+    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{relation.endpoint}_relation_joined',
             relation=relation,
@@ -310,7 +310,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationChangedEvent)
-    def relation_changed(  # noqa: D102
+    def relation_changed(  # ruff: ignore[undocumented-public-method]
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -323,7 +323,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationDepartedEvent)
-    def relation_departed(  # noqa: D102
+    def relation_departed(  # ruff: ignore[undocumented-public-method]
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
@@ -338,27 +338,27 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
-    def relation_broken(relation: RelationBase):  # noqa: D102
+    def relation_broken(relation: RelationBase):  # ruff: ignore[undocumented-public-method]
         return _Event(f'{relation.endpoint}_relation_broken', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.StorageAttachedEvent)
-    def storage_attached(storage: Storage):  # noqa: D102
+    def storage_attached(storage: Storage):  # ruff: ignore[undocumented-public-method]
         return _Event(f'{storage.name}_storage_attached', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.StorageDetachingEvent)
-    def storage_detaching(storage: Storage):  # noqa: D102
+    def storage_detaching(storage: Storage):  # ruff: ignore[undocumented-public-method]
         return _Event(f'{storage.name}_storage_detaching', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.PebbleReadyEvent)
-    def pebble_ready(container: Container):  # noqa: D102
+    def pebble_ready(container: Container):  # ruff: ignore[undocumented-public-method]
         return _Event(f'{container.name}_pebble_ready', container=container)
 
     @staticmethod
     @_copy_doc(ops.PebbleCustomNoticeEvent)
-    def pebble_custom_notice(container: Container, notice: Notice):  # noqa: D102
+    def pebble_custom_notice(container: Container, notice: Notice):  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_custom_notice',
             container=container,
@@ -367,7 +367,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckFailedEvent)
-    def pebble_check_failed(container: Container, info: CheckInfo):  # noqa: D102
+    def pebble_check_failed(container: Container, info: CheckInfo):  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_check_failed',
             container=container,
@@ -376,7 +376,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckRecoveredEvent)
-    def pebble_check_recovered(container: Container, info: CheckInfo):  # noqa: D102
+    def pebble_check_recovered(container: Container, info: CheckInfo):  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_check_recovered',
             container=container,
@@ -385,7 +385,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.ActionEvent)
-    def action(  # noqa: D102
+    def action(  # ruff: ignore[undocumented-public-method]
         name: str,
         params: Mapping[str, AnyJson] | None = None,
         id: str | None = None,
@@ -722,7 +722,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # pyright: ignore[reportAssignmentType]
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
@@ -753,8 +753,13 @@ class Context(Generic[CharmType]):
                 'Juju 2.x is closed and unsupported. You may encounter inconsistencies.',
             )
 
-        self.app_name = app_name or self._charm_spec.meta.get('name')
-        self.unit_id = unit_id
+        # If neither ``app_name`` nor a ``name`` in the charm metadata is
+        # provided, fall back to an empty string. Raising here would prevent
+        # tests from asserting on the downstream failure that Ops raises when
+        # it later looks up the missing metadata (see
+        # ``test_init_and_run_with_bad_meta``).
+        self.app_name = app_name or self._charm_spec.meta.get('name', '')
+        self.unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
@@ -899,11 +904,11 @@ class Context(Generic[CharmType]):
                 'leader_elected',
                 'collect_app_status',
                 'collect_unit_status',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}()'
-            elif event in ('secret_changed', 'secret_rotate'):  # type: ignore
+            elif event in ('secret_changed', 'secret_rotate'):
                 suggested = f'{event}(my_secret)'
-            elif event in ('secret_expired', 'secret_remove'):  # type: ignore
+            elif event in ('secret_expired', 'secret_remove'):
                 suggested = f'{event}(my_secret, revision=1)'
             elif event in (
                 'relation_created',
@@ -911,9 +916,9 @@ class Context(Generic[CharmType]):
                 'relation_changed',
                 'relation_departed',
                 'relation_broken',
-            ):  # type: ignore
+            ):
                 suggested = f'{event}(my_relation)'
-            elif event in ('storage_attached', 'storage_detaching'):  # type: ignore
+            elif event in ('storage_attached', 'storage_detaching'):
                 suggested = f'{event}(my_storage)'
             elif event == 'pebble_ready':
                 suggested = f'{event}(my_container)'

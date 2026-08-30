@@ -13,10 +13,10 @@ jobs:
     outputs:
       tests: ${{ steps.tests.outputs.result }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - name: Collect integration test files
         id: tests
         run: |
@@ -50,19 +50,15 @@ jobs:
             test: test/integration/test_tracing.py
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
       - run: sudo snap install --classic concierge
-      # .github/integration/concierge-*.yaml mirrors the upstream concierge
-      # preset and adds juju.extra-bootstrap-args: `juju bootstrap` regularly
-      # fails on slow GHA runners with `unable to contact api server after
-      # 60 attempts` because the default --bootstrap-timeout is too short.
       - run: >
           sudo concierge prepare
           --juju-channel=${{ matrix.juju-channel }}
-          -c .github/integration/concierge-${{ matrix.preset }}.yaml
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+          -p ${{ matrix.preset }}
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - run: uv tool install tox --with tox-uv
       - run: tox -e integration -- --log-cli-level=INFO -s "$MATRIX_TEST"
         env:
@@ -71,3 +67,10 @@ jobs:
         # tracing tests each deploy the tempo stack into their own fresh
         # model, so that file needs longer than the others.
         timeout-minutes: ${{ matrix.test == 'test/integration/test_tracing.py' && 40 || 20 }}
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [integration]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

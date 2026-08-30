@@ -27,19 +27,19 @@ jobs:
             commit: 046b8ce758660d5aa9cf05207e2370fcbab688d0  # 2021-12-16T10:10:24Z
     steps:
       - name: Set up Python 3.10
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.10'
 
       - name: Checkout the ${{ matrix.charm-repo }} repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           repository: ${{ matrix.charm-repo }}
           persist-credentials: false
           ref: ${{ matrix.commit }}
 
       - name: Download operator wheels
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
         with:
           name: ${{ needs.build-wheels.outputs.artifact-name }}
           path: operator-wheels

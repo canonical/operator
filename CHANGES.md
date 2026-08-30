@@ -1,3 +1,42 @@
+# 3.8.1 - 30 July 2026
+
+## Fixes
+
+* Align Juju naming rules with testing class rules (#2570)
+* Do not attempt to mutate secret data in grant/revoke during tests (#2614)
+* Allow `IdentityDict` to be assigned `IdentityAccess` (#2628)
+* Only decode fields used by the data class in `Relation.load()` (#2636)
+* Use `juju.wait` for workload version tests in Kubernetes tutorial (#2650)
+
+## Documentation
+
+* Wait longer for Loki data in Kubernetes tutorial integration tests (#2611)
+* Add more guidance about charm naming (#2610)
+* Fix tempo test_deploy URL (#2631)
+* Add how-to guide for debugging Kubernetes charms (#2498)
+* Revert to installed charmcraft for initing charms (#2635)
+* Grab workload version in Kubernetes tutorial (#2559)
+* Separate test_workload_version_is_set in Kubernetes tutorial chapter 3 (#2638)
+* Add how-to guide to configure jubilant logs (#2619)
+* Use autofunction for `layer_from_rockcraft` (#2648)
+* Remove log_cli and log_file ini options; keep them as CLI arguments for integration tests (#2654)
+* Fix typo in explanation of mock_version fixture usage (#2647)
+* Switch Kubernetes tutorial charms to rock version of demo server (#2649)
+
+## Tests
+
+* Type-check testing/src/scenario and fix uncovered errors (#2615)
+
+## CI
+
+* Add dependency-review-action on PRs (#2587)
+* Re-enable the tracing integration tests (#2586)
+* Adopt new dependabot conventions (#2609)
+* Drop unsupported cooldown.semver-major-days from github-actions block (#2617)
+* Open an issue if a scheduled workflow fails (#2627)
+* Hash-pin actions and drop zizmor config (#2612)
+* Use uv-venv-lock-runner in tracing tox, align deps (#2651)
+
 # 3.8.0 - 30 June 2026
 
 ## Features

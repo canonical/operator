@@ -17,10 +17,10 @@ jobs:
       contents: read
     environment: publish-pypi
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
           enable-cache: false
       - run: uv build --all
@@ -28,10 +28,10 @@ jobs:
         run: |
           set -xueo pipefail
           uvx --with "$(echo -n dist/ops-*.whl)[testing,tracing]" --with dist/ops_scenario-*.whl --with dist/ops_tracing-*.whl python -c 'import ops, scenario, ops_tracing; print("OK")'
-      - uses: actions/attest-build-provenance@v4.1.0
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
         with:
           subject-path: 'dist/*'
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
 
   secscan:
     uses: ./.github/workflows/sbom-secscan.yaml

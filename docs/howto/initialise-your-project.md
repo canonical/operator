@@ -56,6 +56,7 @@ Create a repository with your source control of choice.
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-repository-naming
 
 If your charm operates a workload, name the repository `<charm name>-operator`. For advice about the charm name, see [](#decide-your-charms-name). If your charm doesn't operate a workload (as in the case of integrator charms and configurator charms), the `-operator` suffix isn't needed. For example, `foo-integrator` and `bar-configurator`.
 
@@ -85,17 +86,6 @@ Or for a machine charm:
 ```text
 charmcraft init --name mega-calendar --profile machine
 ```
-
-<!-- Remove this tip when the charmcraft stable version is up-to-date. -->
-````{tip}
-The `charmcraft` version that you have installed may come with older versions of the profiles.
-
-To use the latest profile versions, initialise your charm using `charmcraft` directly from Github, like this:
-
-```text
-uvx git+https://github.com/canonical/charmcraft@74d12bc init --name <name> --profile <profile>
-```
-````
 
 If you don't specify `--name` when running `charmcraft init`, Charmcraft uses the parent directory name for your charm. For example, `mega-calendar-k8s-operator`, from the name of the repository. So we recommend specifying `--name` to ensure that your charm's name doesn't end with `-operator`.
 

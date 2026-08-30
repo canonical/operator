@@ -1,9 +1,12 @@
 # Leave a blank line at the end of this file to support concatenation
 backoff
 balancer's
+Borescope
+borescope
 breakpoint
 callables
 Canonical's
+Charmlibs
 configurator
 cosl
 databag
@@ -33,6 +36,7 @@ replan
 repo
 requirers
 reusability
+sidecar
 snappass
 stderr
 stdout

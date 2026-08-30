@@ -56,8 +56,8 @@ class DatabagProtocol(Protocol):
         *,
         foo: str,
         bar: int = 0,
-        baz: list[str] = [],  # noqa: B006
-        quux: Nested = Nested(),  # noqa: B008
+        baz: list[str] = [],  # ruff: ignore[mutable-argument-default]
+        quux: Nested = Nested(),  # ruff: ignore[function-call-in-default-argument]
     ): ...
 
 
@@ -317,7 +317,7 @@ class _AliasProtocol(Protocol):
     other: str
 
 
-class _Alias:  # noqa: B903
+class _Alias:  # ruff: ignore[class-as-data-structure]
     # This is pretty quirky, but we need `fooBar` to be in the type annotations
     # and we need it to return the value of `foo_bar` to correctly save back to
     # Juju. Other than being ugly to look at, this means that the class offers
@@ -325,11 +325,11 @@ class _Alias:  # noqa: B903
     # charms that need aliases like this should use dataclasses or pydantic.
     # We have this here so that we can still have the standard set of four
     # classes being tested.
-    fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # noqa: N815
+    fooBar: int = property(lambda self: self.foo_bar)  # type: ignore  # ruff: ignore[mixed-case-variable-in-class-scope]
 
     other: str
 
-    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # noqa: N803
+    def __init__(self, fooBar: int = 42, other: str = 'baz'):  # ruff: ignore[invalid-argument-name]
         self.foo_bar = fooBar
         self.other = other
 
@@ -502,6 +502,34 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
     }
 
 
+@pytest.mark.parametrize('charm_class', [c for c in _test_classes if c is not MyCharm])
+def test_relation_load_unit_data_ignores_juju_keys(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            saved = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
+            event.relation.save(saved, self.unit, encoder=self.encoder)
+            assert 'ingress-address' in event.relation.data[self.unit]
+            assert 'private-address' in event.relation.data[self.unit]
+            self.data = event.relation.load(self.databag_class, self.unit, decoder=self.decoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db',
+        local_unit_data={
+            'egress-subnets': '192.0.2.0',
+            'ingress-address': '192.0.2.0',
+            'private-address': '192.0.2.0',
+        },
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.foo == 'value'
+    assert obj.bar == 1
+    assert obj.baz == ['a', 'b']
+
+
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_invalid(charm_class: type[BaseTestCharm], monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
@@ -528,7 +556,7 @@ class _OneStringProtocol(Protocol):
     def __init__(self, foo: str): ...
 
 
-class _OneString:  # noqa: B903
+class _OneString:  # ruff: ignore[class-as-data-structure]
     foo: str
 
     def __init__(self, foo: str):
@@ -724,7 +752,7 @@ def json_ip_hook(dct: dict[str, Any]) -> dict[str, Any]:
                 dct[key] = ipaddress.ip_network(value, strict=False)
             else:
                 dct[key] = ipaddress.ip_address(value)
-        except ValueError:  # noqa: PERF203
+        except ValueError:  # ruff: ignore[try-except-in-loop]
             pass
     return dct
 

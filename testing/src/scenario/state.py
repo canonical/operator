@@ -48,12 +48,13 @@ if TYPE_CHECKING:  # pragma: no cover
 
     from . import Context
 
-    class _StateKwargs(TypedDict, total=False):
-        config: Mapping[str, str | int | float | bool]
-        relations: Iterable[RelationBase]
+    # Fields that from_context() forwards through **kwargs to State.__init__.
+    # These are the State fields that from_context() does not accept as
+    # explicit parameters — the explicit ones (config, relations, containers,
+    # storages, stored_states) merge with or replace metadata-derived
+    # defaults; these have no metadata equivalent and pass straight through.
+    class _StateKwargsRest(TypedDict, total=False):
         networks: Iterable[Network]
-        containers: Iterable[Container]
-        storages: Iterable[Storage]
         opened_ports: Iterable[Port]
         leader: bool
         model: Model
@@ -61,7 +62,6 @@ if TYPE_CHECKING:  # pragma: no cover
         resources: Iterable[Resource]
         planned_units: int
         deferred: Iterable[DeferredEvent]
-        stored_states: Iterable[StoredState]
         app_status: _EntityStatus
         unit_status: _EntityStatus
         workload_version: str
@@ -157,7 +157,7 @@ class JujuLogLine:
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True, init=False)
-class CloudCredential:  # noqa: D101
+class CloudCredential:  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.CloudCredential.__doc__
 
     auth_type: str
@@ -186,15 +186,17 @@ class CloudCredential:  # noqa: D101
         object.__setattr__(self, 'redacted', _list_of_str(redacted, 'redacted'))
 
     def _to_ops(self) -> CloudCredential_Ops:
+        # ops.model.CloudCredential is frozen with concrete dict/list types;
+        # we convert here rather than widening the ops annotations.
         return CloudCredential_Ops(
             auth_type=self.auth_type,
-            attributes=self.attributes,
-            redacted=self.redacted,
+            attributes=dict(self.attributes),
+            redacted=list(self.redacted),
         )
 
 
 @dataclasses.dataclass(frozen=True, init=False)
-class CloudSpec:  # noqa: D101
+class CloudSpec:  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.CloudSpec.__doc__
 
     type: str
@@ -255,6 +257,8 @@ class CloudSpec:  # noqa: D101
         object.__setattr__(self, 'is_controller_cloud', is_controller_cloud)
 
     def _to_ops(self) -> CloudSpec_Ops:
+        # ops.model.CloudSpec is frozen with concrete list typing;
+        # we convert here rather than widening the ops annotations.
         return CloudSpec_Ops(
             type=self.type,
             name=self.name,
@@ -263,7 +267,7 @@ class CloudSpec:  # noqa: D101
             identity_endpoint=self.identity_endpoint,
             storage_endpoint=self.storage_endpoint,
             credential=self.credential._to_ops() if self.credential else None,
-            ca_certificates=self.ca_certificates,
+            ca_certificates=list(self.ca_certificates),
             skip_tls_verify=self.skip_tls_verify,
             is_controller_cloud=self.is_controller_cloud,
         )
@@ -272,7 +276,7 @@ class CloudSpec:  # noqa: D101
 def _generate_secret_id():
     # This doesn't account for collisions, but the odds are so low that it
     # should not be possible in any realistic test run.
-    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # noqa: S311
+    secret_id = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(20))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
     return f'secret:{secret_id}'
 
 
@@ -379,7 +383,7 @@ class Secret:
         return hash(self.id)
 
     @staticmethod
-    def _validate_content(content: dict[str, str], name: str):
+    def _validate_content(content: Mapping[str, str], name: str):
         if not isinstance(content, dict):
             raise StateValidationError(
                 f'Secret.{name} should be a dict, not {type(content)}',
@@ -515,9 +519,7 @@ class Address:
 class BindAddress:
     """An address bound to a network interface in a Juju space."""
 
-    # This has the 'ops.testing.' prefix so that Sphinx knows which
-    # 'Address' class it is (it's not the one from 'hookcmds').
-    addresses: Sequence[ops.testing.Address]
+    addresses: Sequence[Address]
     """The addresses in the space."""
 
     _: dataclasses.KW_ONLY
@@ -649,7 +651,7 @@ class RelationBase:
     """Juju relation ID. Every new Relation instance gets a unique one,
     if there's trouble, override."""
 
-    local_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
+    local_app_data: RawDataBagContents = dataclasses.field(default_factory=dict[str, str])
     """This application's databag for this relation."""
 
     local_unit_data: RawDataBagContents = dataclasses.field(
@@ -698,12 +700,12 @@ class RelationBase:
         # Deepcopy mutable fields to disassociate from the caller's objects.
         for attr, value in self.__dict__.items():
             if isinstance(value, (dict, list)):
-                object.__setattr__(self, attr, copy.deepcopy(value))
+                object.__setattr__(self, attr, copy.deepcopy(value))  # pyright: ignore[reportUnknownArgumentType]
 
     def __hash__(self) -> int:
         return hash(self.id)
 
-    def _validate_databag(self, databag: dict[str, str]):
+    def _validate_databag(self, databag: Mapping[str, str]):
         if not isinstance(databag, dict):
             raise StateValidationError(
                 f'all databags should be dicts, not {type(databag)}',
@@ -721,7 +723,7 @@ _DEFAULT_IP = '192.0.2.0'
 # time, before the test's `juju_version` is known, so we always include
 # `private-address` here and strip it later in `_strip_juju4_defaults` if the
 # `Context.juju_version` is 4.0 or later.
-_DEFAULT_JUJU_DATABAG = {
+_DEFAULT_JUJU_DATABAG: dict[str, str] = {
     'egress-subnets': _DEFAULT_IP,
     'ingress-address': _DEFAULT_IP,
     'private-address': _DEFAULT_IP,
@@ -757,7 +759,7 @@ class Relation(RelationBase):
     limit: int = 1
     """The maximum number of relations on this endpoint."""
 
-    remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
+    remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict[str, str])
     """The current content of the application databag."""
     remote_units_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
         default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
@@ -797,7 +799,7 @@ class Relation(RelationBase):
 class SubordinateRelation(RelationBase):
     """A relation to share data between a subordinate and a principal charm."""
 
-    remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict)
+    remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict[str, str])
     """The current content of the remote application databag."""
     remote_unit_data: RawDataBagContents = dataclasses.field(
         default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
@@ -844,7 +846,9 @@ class SubordinateRelation(RelationBase):
 class PeerRelation(RelationBase):
     """A relation to share data between units of the charm."""
 
-    peers_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(default_factory=dict)
+    peers_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
+        default_factory=dict[UnitID, RawDataBagContents],
+    )
     """Current contents of the peer databags.
 
     Note that this does not include data for the unit being tested. Data for
@@ -875,7 +879,7 @@ class PeerRelation(RelationBase):
 
 def _random_model_name():
     space = string.ascii_letters + string.digits
-    return ''.join(random.choice(space) for _ in range(20))  # noqa: S311
+    return ''.join(random.choice(space) for _ in range(20))  # ruff: ignore[suspicious-non-cryptographic-random-usage]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1112,7 +1116,7 @@ class Notice:
             last_occurred=self.last_occurred,
             last_repeated=self.last_repeated,
             occurrences=self.occurrences,
-            last_data=self.last_data,
+            last_data=dict(self.last_data),
             repeat_after=self.repeat_after,
             expire_after=self.expire_after,
         )
@@ -1187,7 +1191,7 @@ class CheckInfo:
         object.__setattr__(self, 'threshold', threshold)
         if change_id is None:
             if self.status == pebble.CheckStatus.INACTIVE:
-                change_id = ''
+                change_id = pebble.ChangeID('')
             else:
                 change_id = pebble.ChangeID(_generate_new_change_id())
         object.__setattr__(self, 'change_id', change_id)
@@ -1432,10 +1436,10 @@ def layer_from_rockcraft(path: pathlib.Path | str) -> pebble.Layer:
     """Create a layer from a `rockcraft.yaml` file.
 
     This is a convenience function to create a Pebble layer from a
-    rockcraft.yaml file, that can then be passed to :class:`testing.Container`,
+    rockcraft.yaml file, that can then be passed to :class:`Container`,
     rather than duplicating the layer content in the test code. For example::
 
-        container = Container(
+        container = testing.Container(
             name='my-container',
             layers={'rock': layer_from_rockcraft(pathlib.Path('rockcraft.yaml'))},
         )
@@ -1501,8 +1505,20 @@ class _EntityStatus:
         name: _RawStatusLiteral,
         message: str = '',
     ) -> _EntityStatus:
-        """Convert the status name, such as 'active', to the class, such as ActiveStatus."""
-        # Note that this won't work for UnknownStatus.
+        """Convert the status name, such as 'active', to the class, such as ActiveStatus.
+
+        If ``name`` is "unknown", ``message`` is ignored, because unknown status
+        does not have an associated message, and a warning is issued if it is
+        not empty.
+        """
+        if name == 'unknown':
+            # UnknownStatus has no message. We ignore message, following ops.StatusBase.from_name.
+            if message:
+                warnings.warn(
+                    f'Unknown status has no message; ignoring {message!r}.',
+                    stacklevel=2,
+                )
+            return UnknownStatus()
         # All subclasses have a default 'name' attribute, but the type checker can't tell that.
         return cls._entity_statuses[name](message=message)  # type:ignore
 
@@ -1517,7 +1533,7 @@ class _EntityStatus:
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
+class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.UnknownStatus.__doc__
 
     name: Literal['unknown'] = 'unknown'
@@ -1527,7 +1543,7 @@ class UnknownStatus(_EntityStatus, ops.UnknownStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
+class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.ErrorStatus.__doc__
 
     name: Literal['error'] = 'error'
@@ -1537,7 +1553,7 @@ class ErrorStatus(_EntityStatus, ops.ErrorStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
+class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.ActiveStatus.__doc__
 
     name: Literal['active'] = 'active'
@@ -1547,7 +1563,7 @@ class ActiveStatus(_EntityStatus, ops.ActiveStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
+class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.BlockedStatus.__doc__
 
     name: Literal['blocked'] = 'blocked'
@@ -1557,7 +1573,7 @@ class BlockedStatus(_EntityStatus, ops.BlockedStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
+class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.MaintenanceStatus.__doc__
 
     name: Literal['maintenance'] = 'maintenance'
@@ -1567,7 +1583,7 @@ class MaintenanceStatus(_EntityStatus, ops.MaintenanceStatus):  # noqa: D101
 
 
 @dataclasses.dataclass(frozen=True, eq=False, repr=False)
-class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # noqa: D101
+class WaitingStatus(_EntityStatus, ops.WaitingStatus):  # ruff: ignore[undocumented-public-class]
     __doc__ = ops.WaitingStatus.__doc__
 
     name: Literal['waiting'] = 'waiting'
@@ -2074,7 +2090,7 @@ class State:
         containers: Iterable[Container] | None = None,
         storages: Iterable[Storage] | None = None,
         stored_states: Iterable[StoredState] | None = None,
-        **kwargs: Unpack[_StateKwargs],
+        **kwargs: Unpack[_StateKwargsRest],
     ) -> State:
         """Create a State from the charm context.
 
@@ -2105,7 +2121,7 @@ class State:
         """
         meta = ctx._charm_spec.meta
         spec_config = ctx._charm_spec.config
-        config = {} if config is None else config
+        config = dict(config) if config is not None else {}
         if spec_config:
             options = spec_config.get('options', {})
             for option, details in options.items():
@@ -2196,20 +2212,22 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
             if key not in meta:
                 meta[key] = copy.deepcopy(ext_value)
             elif isinstance(ext_value, dict) and isinstance(meta[key], dict):
-                overlap = set(ext_value) & set(meta[key])
+                ext_dict = cast('dict[str, Any]', ext_value)
+                overlap = set(ext_dict) & set(meta[key])
                 if overlap:
                     raise ValueError(
                         f'overlapping keys {overlap} in {key} of '
                         f'charmcraft.yaml which conflict with the '
                         f'{ext_name} extension, please rename or remove them'
                     )
-                merged = copy.deepcopy(ext_value)
-                merged.update(meta[key])
-                meta[key] = merged
+                merged_dict: dict[str, Any] = copy.deepcopy(ext_dict)
+                merged_dict.update(meta[key])
+                meta[key] = merged_dict
             elif isinstance(ext_value, list) and isinstance(meta[key], list):
-                merged = copy.deepcopy(ext_value)
-                merged.extend(i for i in meta[key] if i not in merged)
-                meta[key] = merged
+                ext_list = cast('list[Any]', ext_value)
+                merged_list: list[Any] = copy.deepcopy(ext_list)
+                merged_list.extend(i for i in meta[key] if i not in merged_list)
+                meta[key] = merged_list
             else:
                 raise ValueError(
                     'Conflict between local and extension metadata. '
@@ -2250,7 +2268,7 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
 class _CharmSpec(Generic[CharmType]):
     """Charm spec."""
 
-    charm_type: type[CharmBase]
+    charm_type: type[CharmType]
     meta: Mapping[str, Any]
     actions: Mapping[str, Any] | None = None
     config: Mapping[str, Any] | None = None
@@ -2361,7 +2379,7 @@ class DeferredEvent:
     observer: str
 
     # needs to be marshal.dumps-able.
-    snapshot_data: dict[Any, Any] = dataclasses.field(default_factory=dict)
+    snapshot_data: dict[Any, Any] = dataclasses.field(default_factory=dict[Any, Any])
 
     # It would be nicer if people could do something like:
     #   `isinstance(state.deferred[0], ops.StartEvent)`
@@ -2380,7 +2398,7 @@ class _EventType(str, Enum):
     BUILTIN = 'builtin'
     RELATION = 'relation'
     ACTION = 'action'
-    SECRET = 'secret'  # noqa: S105  # This is not an actual secret.
+    SECRET = 'secret'  # ruff: ignore[hardcoded-password-string]  # This is not an actual secret.
     STORAGE = 'storage'
     WORKLOAD = 'workload'
     CUSTOM = 'custom'
@@ -2501,10 +2519,10 @@ class _Event:  # type: ignore
     custom_event_args: Iterable[Any] = dataclasses.field(default_factory=tuple)
     """If this is a custom event, the arguments to pass to the event."""
 
-    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    custom_event_kwargs: Mapping[str, Any] = dataclasses.field(default_factory=dict[str, Any])
     """If this is a custom event, the keyword arguments to pass to the event."""
 
-    _owner_path: list[str] = dataclasses.field(default_factory=list)
+    _owner_path: list[str] = dataclasses.field(default_factory=list[str])
 
     # The event name as Juju provides it. Set in __post_init__ via
     # object.__setattr__ (frozen dataclass), so it's excluded from init.
@@ -2769,7 +2787,7 @@ class _Action:
 
     _: dataclasses.KW_ONLY
 
-    params: Mapping[str, AnyJson] = dataclasses.field(default_factory=dict)
+    params: Mapping[str, AnyJson] = dataclasses.field(default_factory=dict[str, AnyJson])
     """Parameter values passed to the action."""
 
     id: str = dataclasses.field(default_factory=_next_action_id)

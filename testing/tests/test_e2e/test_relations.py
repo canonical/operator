@@ -43,7 +43,7 @@ class Charm(ops.CharmBase):
             Charm._call(event)
 
 
-@pytest.fixture(autouse=True)  # noqa: RUF076  # class-level state must be reset for every test
+@pytest.fixture(autouse=True)
 def reset_charm_state():
     """Reset class-level state before each test."""
     Charm._call = None

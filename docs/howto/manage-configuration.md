@@ -1,6 +1,10 @@
 (manage-configuration)=
 # How to manage configuration
-> See first: {external+juju:ref}`Juju | <application-configuration>`, {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`, {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
+See first:
+
+- {external+juju:ref}`Juju | <application-configuration>`
+- {external+juju:ref}`Juju | Manage applications > Configure <configure-an-application>`
+- {external+charmcraft:ref}`Charmcraft | Manage the app configuration <manage-the-app-configuration>`
 
 
 ## Implement the feature
@@ -12,6 +16,7 @@ In the `charmcraft.yaml` file of the charm, under `config.options`, add a config
 
 ```{admonition} Best practice
 :class: hint
+:name: best-practice-no-duplicate-model-config
 
 Don't duplicate model-level configuration options that are controlled by {external+juju:ref}`juju model-config <command-juju-model-config>`.
 ```
@@ -81,7 +86,7 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
     self.set_wiki_name(name)
 ```
 
-> See more: [](ops.CharmBase.load_config), [](ops.CharmBase.config)
+See more: [](ops.CharmBase.load_config), [](ops.CharmBase.config)
 
 ```{caution}
 
@@ -90,9 +95,11 @@ def _on_config_changed(self, event: ops.ConfigChangedEvent):
 - Configuration cannot be changed from within the charm code. Charms, by design, aren't able to mutate their own configuration by themselves (e.g., in order to ignore an admin-provided configuration), or to configure other applications. In Ops, one typically interacts with config via a read-only facade.
 ```
 
+## Test the feature
+
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the `config-changed` event validates the port, pass the new config to the `State`, and, after running the event, check the unit status. For example, in your `tests/unit/test_charm.py` file, add the following test function:
 
@@ -110,10 +117,38 @@ def test_short_wiki_name():
     assert isinstance(state_out.unit_status, testing.BlockedStatus)
 ```
 
-### Manually test
+(manage-configuration-integration-tests)=
+### Write integration tests
 
-To verify that the configuration option works as intended, pack your charm, update it in the Juju model, and run `juju config` followed by the name of the application deployed by your charm and then your newly defined configuration option key set to some value. For example, given the `name` key defined above, you could try:
+See first: {ref}`write-integration-tests-for-a-charm`
 
-```text
-juju config <name of application deployed by your charm> name=charming-wiki
+```python
+import pathlib
+
+import jubilant
+
+
+def test_config_invalid_name(charm: pathlib.Path, juju: jubilant.Juju):
+    original_name = juju.config('your-app')['name']
+    try:
+        juju.config('your-app', {'name': 'invalid name has spaces'})
+        # A name with spaces should put the charm into blocked status.
+        # Setting an invalid name should be caught by the charm and rejected
+        # immediately. The timeout is overridden to test this fail-fast behavior.
+        juju.wait(jubilant.all_blocked, timeout=10)
+    finally:
+        # Reset the config to bring the charm out of blocked status.
+        juju.config('your-app', {'name': original_name})
+        juju.wait(jubilant.all_active)
+
+
+def test_config_valid_name(charm: pathlib.Path, juju: jubilant.Juju):
+    juju.config('your-app', {'name': 'charming-wiki'})
+    juju.wait(jubilant.all_active)
 ```
+
+See also: [](jubilant.Juju.config)
+
+Examples: [`cassandra-operator`](https://github.com/canonical/cassandra-operator/blob/main/tests/integration/test_config.py).
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.

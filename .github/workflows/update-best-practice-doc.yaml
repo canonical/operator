@@ -11,19 +11,19 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           token: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
           path: operator
           persist-credentials: true
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           repository: canonical/charmcraft
           path: charmcraft
           persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - run: python .github/update-best-practice-table.py --path-to-charmcraft='${{ github.workspace }}/charmcraft' > docs/reuse/best-practices.txt
@@ -56,3 +56,10 @@ jobs:
         working-directory: operator
         env:
             GITHUB_TOKEN: ${{ secrets.UPDATE_DOCS_ACCESS_TOKEN }}
+
+  open-issue-on-failure-if-scheduled:
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    needs: [update-docs]
+    permissions:
+      issues: write
+    uses: ./.github/workflows/notify-scheduled-failure.yaml

@@ -13,6 +13,7 @@ from scenario.state import (
     MaintenanceStatus,
     UnknownStatus,
     WaitingStatus,
+    _EntityStatus,
 )
 
 import ops
@@ -169,6 +170,42 @@ def test_status_comparison(status: ops.StatusBase):
     assert isinstance(status, type(ops_status))
     # The repr of the scenario and ops classes should be identical.
     assert repr(status) == repr(ops_status)
+
+
+@pytest.mark.parametrize(
+    'status',
+    (
+        ActiveStatus('foo'),
+        WaitingStatus('bar'),
+        BlockedStatus('baz'),
+        MaintenanceStatus('qux'),
+        ErrorStatus('fiz'),
+        UnknownStatus(),
+    ),
+)
+def test_status_from_ops_round_trip(status: ops.StatusBase):
+    assert _EntityStatus.from_ops(status._to_ops()) == status  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ('name', 'message', 'expected'),
+    (
+        ('active', 'foo', ActiveStatus('foo')),
+        ('waiting', 'bar', WaitingStatus('bar')),
+        ('blocked', 'baz', BlockedStatus('baz')),
+        ('maintenance', 'qux', MaintenanceStatus('qux')),
+        ('error', 'fiz', ErrorStatus('fiz')),
+        ('unknown', '', UnknownStatus()),
+    ),
+)
+def test_from_status_name(name: str, message: str, expected: ops.StatusBase):
+    assert _EntityStatus.from_status_name(name, message) == expected  # type: ignore[arg-type]
+
+
+def test_unknown_status_from_name_with_message_warns():
+    with pytest.warns(UserWarning, match='no message'):
+        status = _EntityStatus.from_status_name('unknown', 'ignored')
+    assert status == UnknownStatus()
 
 
 @pytest.mark.parametrize(

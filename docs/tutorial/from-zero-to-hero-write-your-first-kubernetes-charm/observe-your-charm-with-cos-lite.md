@@ -231,7 +231,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.4
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
@@ -480,18 +480,21 @@ Let's write some integration tests to check that our application works correctly
 
 The existing integration tests use a model that is created by the `juju` fixture. We'll define a similar fixture that creates a separate model for COS Lite.
 
-First, in `tests/integration/test_charm.py`, import `json` and `time` from the standard library. Then import `pytest`, `pytest_jubilant`, and `requests`. Your imports should now look like this:
+First, in `tests/integration/test_charm.py`, import `json`, `time`, `urllib.error`, and `urllib.request` from the standard library. Then import `pytest` and `pytest_jubilant`, which are already dependencies of the integration tests.
+
+Your imports should now look like this:
 
 ```python
 import json
 import logging
 import pathlib
 import time
+import urllib.error
+import urllib.request
 
 import jubilant
 import pytest
 import pytest_jubilant
-import requests
 import yaml
 ```
 
@@ -513,14 +516,14 @@ Add two test functions to `tests/integration/test_charm.py`:
 
 ```python
 @pytest.mark.juju_setup
-def test_deploy_cos(cos: jubilant.Juju):
+def test_deploy_cos(charm: pathlib.Path, cos: jubilant.Juju):
     """Deploy COS Lite in a separate model."""
     cos.deploy("cos-lite", trust=True)
     cos.wait(jubilant.all_active, timeout=10 * 60)  # Allow time for the bundle to deploy.
 
 
 @pytest.mark.juju_setup
-def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
+def test_integrate_loki(charm: pathlib.Path, juju: jubilant.Juju, cos: jubilant.Juju):
     """Integrate our app with Loki from COS Lite."""
     cos.offer("loki", endpoint="logging")
     juju.integrate(APP_NAME, f"{cos.model}.loki")
@@ -533,7 +536,7 @@ def test_integrate_loki(juju: jubilant.Juju, cos: jubilant.Juju):
 Add a test function to `tests/integration/test_charm.py`:
 
 ```python
-def test_loki_data(cos: jubilant.Juju):
+def test_loki_data(charm: pathlib.Path, cos: jubilant.Juju):
     """Use Loki's HTTP API to verify that Loki has a label for our app.
 
     COS Lite exposes Loki's API through the Traefik load balancer. Traefik comes with an action
@@ -553,11 +556,13 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
     for attempt in range(3 * 60):
         if attempt:  # If not the first attempt, wait before retrying.
             time.sleep(1)
-        response = requests.get(loki_api_url)
-        if response.status_code == 200:
-            response_decoded = response.json()
-            if "data" in response_decoded:
-                return response_decoded["data"]
+        try:
+            response = urllib.request.urlopen(loki_api_url)
+        except urllib.error.URLError:
+            continue
+        response_decoded = json.loads(response.read())
+        if "data" in response_decoded:
+            return response_decoded["data"]
     return None
 ```
 
@@ -570,7 +575,7 @@ For more information, see:
 
 Run the following command from anywhere in the `~/fastapi-demo` directory:
 
-```text
+```shell
 tox -e integration
 ```
 

@@ -10,7 +10,7 @@ import dataclasses
 import os
 import tempfile
 import typing
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic
@@ -63,7 +63,7 @@ class Runtime(Generic[CharmType]):
         self._charm_root = charm_root
 
         self._app_name = app_name
-        self._unit_id = unit_id
+        self._unit_id = 0 if unit_id is None else unit_id
         self._machine_id = machine_id
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
@@ -286,9 +286,9 @@ class Runtime(Generic[CharmType]):
             else:
                 # charm_virtual_root is a tempdir
                 typing.cast(
-                    'tempfile.TemporaryDirectory',
+                    'tempfile.TemporaryDirectory[str]',
                     charm_virtual_root,
-                ).cleanup()  # type: ignore
+                ).cleanup()
 
     @contextmanager
     def exec(
@@ -296,7 +296,7 @@ class Runtime(Generic[CharmType]):
         state: State,
         event: _Event,
         context: Context[CharmType],
-    ) -> Iterator[Ops[CharmType]]:
+    ) -> Generator[Ops[CharmType]]:
         """Runs an event with this state as initial state on a charm.
 
         Returns the 'output state', that is, the state as mutated by the charm during the
@@ -365,7 +365,7 @@ class Runtime(Generic[CharmType]):
                     raise
                 # The following is intentionally on one long line, so that the last line of pdb
                 # output shows the error message (pdb shows the "raise" line).
-                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip  # noqa: E501
+                raise UncaughtCharmError(f'Uncaught {type(e).__name__} in charm, try "exceptions [n]" if using pdb on Python 3.13+. Details: {e!r}') from e  # fmt: skip  # ruff: ignore[line-too-long]
 
             finally:
                 if ops:
@@ -378,4 +378,5 @@ class Runtime(Generic[CharmType]):
                 logger.info(' - exited ops.main')
 
         logger.info('event dispatched. done.')
+        assert ops is not None
         context._set_output_state(ops.state)

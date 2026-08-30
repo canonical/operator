@@ -159,6 +159,7 @@ sitemap_excludes = [
     "py-modindex/",
     "_modules/*",
     "search/",
+    "reuse/*",
 ]
 
 ################################
@@ -281,6 +282,7 @@ html_css_files = [
 # Adds custom JavaScript files, located remotely or in 'html_static_path'.
 html_js_files = [
     "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
+    "best-practice-anchors.js",
     "overwrite_links.js",
 ]
 
@@ -397,7 +399,7 @@ nitpick_ignore = [
     ("py:class", "_RawPortProtocolLiteral"),
     ("py:class", "_RelationMetaDict"),
     ("py:class", "_ResourceMetaDict"),
-    ("py:class", "_StateKwargs"),
+    ("py:class", "_StateKwargsRest"),
     ("py:class", "_StorageMetaDict"),
     ("py:class", "_TaskDict"),
     ("py:class", "_TextOrBinaryIO"),

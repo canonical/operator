@@ -35,6 +35,8 @@ from .state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from opentelemetry.sdk.trace import ReadableSpan
+
     from .state import State, _CharmSpec, _Event
 
 EVENT_REGEX = re.compile(_event_regex)
@@ -111,6 +113,8 @@ class UnitStateDB:
 class Ops(_Manager, Generic[CharmType]):
     """Class to manage stepping through ops setup, event emission and framework commit."""
 
+    charm: CharmType
+
     def __init__(
         self,
         state: State,
@@ -125,7 +129,7 @@ class Ops(_Manager, Generic[CharmType]):
         self.charm_spec = charm_spec
         self.store = None
         self.captured_events: list[ops.EventBase] = []
-        self.trace_data = []
+        self.trace_data: Sequence[ReadableSpan] = ()
 
         try:
             import ops_tracing._mock  # break circular import
@@ -249,7 +253,7 @@ class Ops(_Manager, Generic[CharmType]):
                 obj = getattr(obj, step)
         except AttributeError:
             raise BadOwnerPath(
-                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',
+                f'event_owner_path {path!r} invalid: {step!r} leads to nowhere.',  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from None
         if not isinstance(obj, ops.ObjectEvents):
             raise BadOwnerPath(
