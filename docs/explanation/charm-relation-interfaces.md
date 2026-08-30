@@ -7,12 +7,12 @@ Interface definitions live in the [`interfaces` directory of the `charmlibs` mon
 
 ```{note}
 
-Interface definitions used to live in a standalone repository, `canonical/charm-relation-interfaces`, which was archived in November 2025. All interfaces have been migrated into the [`charmlibs` monorepo](https://github.com/canonical/charmlibs), where new interfaces and updates should now be contributed. The rendered interface reference is published at https://canonical.com/juju/docs/charmlibs/.
+Interface definitions used to live in a standalone repository, `canonical/charm-relation-interfaces`, which was archived in November 2025. All interfaces have been migrated into the [`charmlibs` monorepo](https://github.com/canonical/charmlibs), where new interfaces and updates should now be contributed. See https://canonical.com/juju/docs/charmlibs/ for more information.
 ```
 
-The purpose of consolidating interface definitions is to provide uniformity in the landscape of all possible relations and promote charm interoperability.
+The purpose of consolidating interface definitions is to provide and promote charm interoperability.
 
-Juju interfaces are untyped, which means that for Juju to think two charms can be integrated all it looks at is whether the interface names of the two endpoints you're trying to connect are the same string. But it might be that the two charms have different, incompatible implementations of two different relations that happen to have the same name.
+Juju interfaces are untyped, which means that for Juju to think two charms can be integrated all that is required is for the interface names of the two endpoints you're trying to connect to be the same string. But it might be that the two charms have different, incompatible implementations of two different relations that happen to have the same name.
 
 In order to prevent two separate charms from rolling their own relation with the same name, and prevent a sprawl of many subtly different interfaces with similar semantics and similar purposes, interface definitions are kept in a single, canonical location.
 
@@ -25,7 +25,7 @@ Conversely, if the charm you are developing needs some service (a database, an i
 There are three actors in play:
 
 * **the owner of the specification** of the interface, which also owns the tests that can be used to verify "does charm X 'really' support this interface?". This is the relevant interface directory in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs).
-* **the owner of the implementation** of an interface. In practice, this often is the charm that owns the charm library with the reference implementation for an interface.
+* **the owner of the implementation** of an interface. In practice, this often is the team whose charm provides a workload implementing one side of the interface.
 * **the interface user**: a charm that wants to use the interface (either as requirer or as provider).
 
 The interface user needs the implementation (typically, the provider also happens to be the owner and so it already has the implementation). Interface libraries are published on PyPI as `charmlibs-interfaces-<interface name>` and can be imported as `charmlibs.interfaces.<interface name>`.
@@ -42,5 +42,3 @@ For each interface, the [`interfaces` directory in `charmlibs`](https://github.c
 - the **interface tests**: Python tests that can be run to verify that a charm complies with the interface specification (`interface/v<N>/tests/`).
 
 
-## Interface definitions on Charmhub
-Charmhub will, for all charms using the interface, verify that they implement it correctly (regardless of whether they use the 'official' implementation or they roll their own) in order to give the charm a happy checkmark on `charmhub.io`. In order to do that it will need to fetch the specification (from the `charmlibs` monorepo) *and* the charm repo, because we can't know what implementation they are using: we need the source code.
