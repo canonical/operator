@@ -3,7 +3,7 @@
 
 When you're deciding which version of tools to use within the charming ecosystem, the base is the key constraint. Once you have selected the base, use the latest supported version of each tool whenever possible.
 
-The base is the Ubuntu release that the charm runs on. The bases listed below are all Long Term Support (LTS) releases, which receive security updates from Canonical for at least five years (and ten years with [Ubuntu Pro](https://ubuntu.com/pro)). Charms are expected to target LTS bases; interim Ubuntu releases (such as 25.10) are not listed here and are not recommended for production charms.
+The base is the Ubuntu release that the charm runs on. The bases listed below are all Long Term Support (LTS) releases, which receive security updates from Canonical for at least five years (and ten or more years with [Ubuntu Pro](https://ubuntu.com/pro)). Charms are expected to target LTS bases; interim Ubuntu releases (such as 25.10) are not listed here and are not recommended for production charms.
 
 ## Tool versions by base
 
