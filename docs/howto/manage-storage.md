@@ -1,6 +1,10 @@
 (manage-storage)=
 # How to manage storage
-> See first: {external+juju:ref}`Juju | Storage <storage>`, {external+juju:ref}`Juju | Manage storage <manage-storage>`, {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
+See first:
+
+- {external+juju:ref}`Juju | Storage <storage>`
+- {external+juju:ref}`Juju | Manage storage <manage-storage>`
+- {external+charmcraft:ref}`Charmcraft | Manage storage <manage-storage>`
 
 ## Manage storage for a machine charm
 
@@ -56,7 +60,7 @@ The length of `cache_paths` matches the number of storage instances currently at
 
 If we hadn't specified `multiple` in the storage definition, `cache` would either be a singleton list or empty, depending on whether a storage instance is attached.
 
-> See more: [](ops.Model.storages)
+See more: [](ops.Model.storages)
 
 To access the storage instances in charm code, use {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations. For example:
 
@@ -108,7 +112,7 @@ def _on_storage_detaching(self, event: ops.StorageDetachingEvent):
     )
 ```
 
-> Examples: [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
+Examples: [MongoDB updating the set before storage is removed](https://github.com/canonical/mongodb-operator/blob/b33d036173f47c68823e08a9f03189dc534d38dc/src/charm.py#L596)
 
 ## Manage storage for a Kubernetes charm
 
@@ -174,7 +178,7 @@ def _update_configuration(self, event: ops.EventBase):
     web_container.replan()
 ```
 
-> See more: [](ops.Model.storages), [](ops.ContainerMeta.mounts)
+See more: [](ops.Model.storages), [](ops.ContainerMeta.mounts)
 
 To access the storage instance in charm code, use {external+charmlibs:ref}`pathops <charmlibs-pathops>` or standard file operations in the charm container. For example:
 
@@ -192,11 +196,11 @@ Alternatively, use {external+charmlibs:class}`pathops.ContainerPath` to access `
 
 On Kubernetes, `juju detach-storage` isn't supported, so storage is only detached during unit teardown. Juju emits a [storage-detaching](ops.StorageDetachingEvent) event during teardown, along with `stop`, `remove`, and other teardown events.
 
-> Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
+Examples: [MySQL handling cluster management](https://github.com/canonical/mysql-k8s-operator/blob/4c575b478b7ae2a28b09dde9cade2d3370dd4db6/src/charm.py#L823)
 
 ## Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify that the charm state is as expected after storage changes, use the `run` method of the `Context` object. For example, to provide the charm with mock storage:
 
@@ -255,11 +259,11 @@ foo_1 = testing.Storage('foo')
 ctx.run(ctx.on.storage_attached(foo_1), testing.State(storages={foo_0, foo_1}))
 ```
 
-> See more: [](ops.testing.Storage)
+See more: [](ops.testing.Storage)
 
 ## Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 To verify that adding and removing storage works correctly against a real Juju instance, write an integration test with `jubilant`. For example:
 

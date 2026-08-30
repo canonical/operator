@@ -848,7 +848,7 @@ class Plan:
     """
 
     def __init__(self, raw: str | PlanDict | None = None):
-        if isinstance(raw, str):  # noqa: SIM108
+        if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
             d = yaml.safe_load(raw) or {}  # type: ignore
         else:
             d = raw or {}
@@ -938,7 +938,7 @@ class Layer:
     log_targets: dict[str, LogTarget]
 
     def __init__(self, raw: str | LayerDict | None = None):
-        if isinstance(raw, str):  # noqa: SIM108
+        if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
             d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
         else:
             d = raw or {}
@@ -2340,7 +2340,7 @@ class Client:
 
         if headers is None:
             headers = {}
-        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # noqa: S310
+        request = urllib.request.Request(url, method=method, data=data, headers=headers)  # ruff: ignore[suspicious-url-open-usage]
 
         try:
             response = self.opener.open(request, timeout=self.timeout)
@@ -3676,7 +3676,7 @@ class _FilesParser:
         self._parser.feed(data)
 
     def _prepare_tempfile(self, filename: str):
-        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        tf = tempfile.NamedTemporaryFile(delete=False)  # ruff: ignore[open-file-with-context-handler]
         self._files[filename] = tf  # type: ignore # we have a custom protocol for it
         self.current_filename = filename
 
@@ -3698,7 +3698,7 @@ class _FilesParser:
         # We're using text-based file I/O purely for file encoding purposes, not for
         # newline normalization.  newline='' serves the line endings as-is.
         newline = '' if encoding else None
-        file_io = open(  # noqa: SIM115
+        file_io = open(  # ruff: ignore[open-file-with-context-handler]
             self._files[path].name,
             mode,
             encoding=encoding,

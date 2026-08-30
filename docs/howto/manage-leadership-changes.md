@@ -1,6 +1,6 @@
 (manage-leadership-changes)=
 # How to manage leadership changes
-> See first: {external+juju:ref}`Juju | Leader unit <leader-unit>`
+See first: {external+juju:ref}`Juju | Leader unit <leader-unit>`
 
 ## Implement response to leadership changes
 
@@ -12,7 +12,7 @@ In the `src/charm.py` file, in the `__init__` function of your charm, set up an 
 self.framework.observe(self.on.leader_elected, self._on_leader_elected)
 ```
 
-> See more: [](ops.LeaderElectedEvent)
+See more: [](ops.LeaderElectedEvent)
 
 Now, in the body of the charm definition, define the event handler. For example, the handler below will update a configuration file:
 
@@ -21,11 +21,11 @@ def _on_leader_elected(self, event: ops.LeaderElectedEvent):
     self.reconfigure(leader=self.unit)
 ```
 
-> Examples: [Tempo reconfiguring ingress on leadership change](https://github.com/canonical/tempo-k8s-operator/blob/3f94027b6173f436968a4736a1f2d89a1f17b2e1/src/charm.py#L263), [Kubeflow Dashboard using a holistic handler to configure on leadership change and other events](https://github.com/canonical/kubeflow-dashboard-operator/blob/02caa736a6ea8986b8cba23b63c08a12aaedb86c/src/charm.py#L82)
+Examples: [Tempo reconfiguring ingress on leadership change](https://github.com/canonical/tempo-k8s-operator/blob/3f94027b6173f436968a4736a1f2d89a1f17b2e1/src/charm.py#L263), [Kubeflow Dashboard using a holistic handler to configure on leadership change and other events](https://github.com/canonical/kubeflow-dashboard-operator/blob/02caa736a6ea8986b8cba23b63c08a12aaedb86c/src/charm.py#L82)
 
 To have the leader notify other units about leadership changes, change data in a peer relation.
 
-> See more: {external+juju:ref}`Juju | Relation <relation>`
+See more: {external+juju:ref}`Juju | Relation <relation>`
 
 ```{note}
 In the past, this was done by observing a `leader-setting-changed` event, which is now deprecated.
@@ -47,7 +47,7 @@ event or an `is-leader` check. If the charm code may run longer, then extra
 
 ### Write unit tests
 
-> See first: {ref}`write-unit-tests-for-a-charm`
+See first: {ref}`write-unit-tests-for-a-charm`
 
 To verify behaviour when leadership has changed, pass the leadership status to the `State`. For example:
 
@@ -75,7 +75,7 @@ def test_status_leader(leader):
 
 ## Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 Juju is in sole control over which unit is the leader, so leadership changes are
 not usually tested with integration tests. If this is required, then the test
@@ -97,4 +97,4 @@ def get_leader_unit(juju: jubilant.Juju) -> str | None:
     return None
 ```
 
-> See more: [](jubilant.Juju.status)
+See more: [](jubilant.Juju.status)

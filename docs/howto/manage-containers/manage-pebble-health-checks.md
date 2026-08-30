@@ -149,7 +149,7 @@ the check may have started passing again. If your charm needs to act based on th
 rather than the fact that the check state changed, then the charm code must get the current check
 state (and you would use the same handler for both failed and recovered events).
 
-> See more: [](ops.PebbleCheckRecoveredEvent), [](ops.PebbleCheckFailedEvent)
+See more: [](ops.PebbleCheckRecoveredEvent), [](ops.PebbleCheckFailedEvent)
 
 ## Services with long startup time
 

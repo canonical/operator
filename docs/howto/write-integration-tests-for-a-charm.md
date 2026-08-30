@@ -161,7 +161,7 @@ A common split:
 
 There are two main benefits to splitting. Firstly, it makes it easier to investigate test failures when they are more isolated. Secondly, it's much simpler to have parallel test execution, where each module runs as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules.
 
-`tox -e integration` runs every module sequentially on a single machine. `charmcraft test` will automatically run each task separately on your local machine, and you can set up a CI matrix (see {ref}`set-up-ci-integration`) that has the same behaviour in CI. Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job — no workflow changes needed.
+`tox -e integration` runs every module sequentially on a single machine. [Spread](https://github.com/canonical/spread) runs each module as a separate task, whether on your local machine or in a CI matrix (see {ref}`set-up-ci-spread`). Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job, with no workflow changes needed.
 
 For real-world examples of split tests, see:
 
@@ -191,6 +191,11 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 This test deploys your charm and waits for all applications and units to be active.
 
 Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
+
+For a Kubernetes charm, deploy with a resource. See this example (from {ref}`Manage resources <manage-resources-integration-tests>`):
+
+```{include} /reuse/manage-resources-integration-test-example.md
+```
 
 For more examples of tests that deploy charms, see:
 
@@ -226,100 +231,12 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     assert charm_operates_correctly()
 ```
 
-> See more: {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+See more:
 
-### Deploy your charm with resources
-
-> See first: {ref}`manage-resources`
-
-A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
-
-```python
-...
-resources = {'resource_name': 'localhost:32000/image_name:latest'}
-juju.deploy(charm, resources=resources)
-...
-```
-
-In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
-
-```python
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-
-METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    resources = {
-        name: res['upstream-source']
-        for name, res in METADATA['resources'].items()
-    }
-
-    juju.deploy(charm, resources=resources)
-    juju.wait(jubilant.all_active)
-```
-
-### Test a relation
-
-To test a relation between two applications, integrate them through
-the model. Both applications have to be deployed beforehand.
-
-```python
-def test_my_integration(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    # Both applications have to be deployed at this point.
-    # This could be done above in the current test or in a previous one.
-    juju.integrate('your-app:endpoint1', 'another:relation_name_2')
-    juju.wait(jubilant.all_active)
-    # check any assertion here
-    ...
-```
-
-> See more: [](jubilant.Juju.integrate)
-
-This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available. If all your tests depend on the same charm being deployed, you could make `charm` an `autouse` fixture.
-
-### Test a configuration
-
-> See first: {ref}`manage-configuration`
-
-You can set a configuration option in your application and check its results.
-
-```python
-def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    juju.config('your-app', {'server_name': 'invalid_name'})
-    # In this case, when setting server_name to "invalid_name"
-    # we could for example expect a blocked status.
-    juju.wait(jubilant.all_blocked, timeout=60)
-    ...
-```
-
-> See also: [](jubilant.Juju.config)
-
-### Test an action
-
-> See also: {external+juju:ref}`Action <action>`
-
-You can execute an action on a unit and get its results.
-
-```python
-def test_run_action(charm: pathlib.Path, juju: jubilant.Juju):
-    action_register_user = juju.run(
-        'your-app/0', 'register-user', {'username': 'ubuntu'}
-    )
-    assert action_register_user.status == 'completed'
-    password = action_register_user.results['user-password']
-    # We could for example check here that we can login with the new user
-```
-
-> See also: [](jubilant.Juju.run)
+- {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+- {ref}`Manage relations | Write integration tests <manage-relations-integration-tests>`
+- {ref}`Manage actions | Write integration tests <manage-actions-integration-tests>`
+- {ref}`Manage configuration | Write integration tests <manage-configuration-integration-tests>`
 
 ### Interact with the workload
 
@@ -340,9 +257,7 @@ def test_workload_connectivity(charm: pathlib.Path, juju: jubilant.Juju):
 
 How you can connect to a private or public address is dependent on your configuration, so you may need a different approach.
 
-> See more:
-> - [](jubilant.Juju.status)
-> - {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
+See more: [](jubilant.Juju.status), {external+juju:ref}`juju CLI commands > juju expose <command-juju-expose>`
 
 ### Run a subprocess command within Juju context
 
@@ -358,9 +273,7 @@ stdout = juju.cli(*command, include_model=True)
 ...
 ```
 
-> See more:
-> - [](jubilant.Juju.run)
-> - [](jubilant.Juju.cli)
+See more: [](jubilant.Juju.run), [](jubilant.Juju.cli)
 
 ### Use several models
 
@@ -378,9 +291,7 @@ def other_model(juju_factory: pytest_jubilant.JujuFactory):
 
 Each call to `get_juju` creates a separate model. You can then use both `juju` and `other_model` in the same test. This is useful for cross-model scenarios. For example integrating machine charms with Kubernetes charms, or integrating with the [Canonical Observability Stack](https://charmhub.io/cos-lite).
 
-> See more:
-> - {external+juju:ref}`Juju offers <manage-offers>`
-> - {external+juju:ref}`How to manage clouds <manage-clouds>`
+See more: {external+juju:ref}`Juju offers <manage-offers>`, {external+juju:ref}`How to manage clouds <manage-clouds>`
 
 ### Deploy a bundle
 
@@ -456,26 +367,187 @@ There are different ways of specifying a subset of tests to run using `pytest`. 
 tox -e integration -- tests/integration/test_charm.py -k "not test_one"
 ```
 
-> See more:
-> - [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html)
-> - [](#validate-your-charm-with-every-change)
+See more: [`pytest | How to invoke pytest`](https://docs.pytest.org/en/7.1.x/how-to/usage.html), [](#validate-your-charm-with-every-change)
 
+(write-integration-tests-for-a-charm-configure-jubilant-logs)=
+## Configure Jubilant logs
 
-(write-integration-tests-for-a-charm-view-juju-logs)=
-## View Juju logs
+Jubilant emits logs during the integration tests. These logs are captured and displayed by pytest. You can configure the logging behaviour in the `[tool.pytest.ini_options]` table in `pyproject.toml`.
 
-If any tests fail, `pytest-jubilant` automatically prints the last 1000 lines of `juju debug-log` to stderr. You can also save the complete logs to disk with the `--juju-dump-logs` option.
+### Logging levels
 
-Use `--juju-dump-logs` in CI with `actions/upload-artifact` to make debug logs available as build artifacts:
+Jubilant logs at three levels:
+- `INFO` — Brief progress updates, including Juju commands, the test model's bootstrap status, and any application or unit status changes during `juju.wait()`.
+- `DEBUG` — Verbose model status changes during `juju.wait()`.
+- `ERROR` — Application or unit status changes during `juju.wait()` whenever the state becomes "error".
+
+### Example of brief logging
+
+In `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+...
+log_cli_format = "%(levelname)s %(name)s %(message)s"
+```
+
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
+Sample output of `tox -e integration`:
+
+```text
+INFO jubilant cli: juju deploy --model jubilant-b3578475-test-charm ...
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+```
+
+### Example of verbose logging
+
+In `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+...
+log_cli_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
+log_cli_date_format = "%Y-%m-%dT%H:%M:%SZ"
+```
+
+The timestamp format follows ISO 8601.
+
+See more: {external+python:ref}`strftime() and strptime() behavior <strftime-strptime-behavior>`
+
+Also modify the `[testenv:integration]` environment in `tox.ini` so that the pytest command has `--log-cli-level=DEBUG`.
+
+Sample output of `tox -e integration`:
+
+```text
+2026-07-15T09:42:15Z INFO jubilant cli: juju deploy --model jubilant-6966ceb1-test-charm ...
+2026-07-15T09:42:17Z INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent)
+2026-07-15T09:42:17Z INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent)
+2026-07-15T09:42:17Z DEBUG jubilant.wait wait: status changed:
++ .model.name = 'jubilant-6966ceb1-test-charm'
++ .model.controller = 'concierge-k8s'
++ .model.cloud = 'k8s'
++ .model.model_status.current = 'available'
++ .apps['fastapi-demo'].charm = 'local:fastapi-demo-0'
++ .apps['fastapi-demo'].charm_name = 'fastapi-demo'
++ .apps['fastapi-demo'].charm_rev = 0
++ .apps['fastapi-demo'].scale = 1
++ .apps['fastapi-demo'].app_status.current = 'waiting'
++ .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.current = 'waiting'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'allocating'
+2026-07-15T09:42:21Z DEBUG jubilant.wait wait: status changed:
++ .apps['fastapi-demo'].provider_id = '310fb924-1932-4242-aeea-abb14a2b0cbe'
++ .apps['fastapi-demo'].address = '10.152.183.180'
+2026-07-15T09:42:23Z DEBUG jubilant.wait wait: status changed:
++ .apps['fastapi-demo'].units['fastapi-demo/0'].provider_id = 'fastapi-demo-0'
+2026-07-15T09:42:24Z INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+2026-07-15T09:42:24Z INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+2026-07-15T09:42:24Z DEBUG jubilant.wait wait: status changed:
+- .apps['fastapi-demo'].app_status.message = 'installing agent'
++ .apps['fastapi-demo'].app_status.message = 'agent initialising'
+- .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'installing agent'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].workload_status.message = 'agent initialising'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.version = '3.6.23'
++ .apps['fastapi-demo'].units['fastapi-demo/0'].leader = True
++ .apps['fastapi-demo'].units['fastapi-demo/0'].address = '10.1.0.108'
+```
+
+You can also configure pytest logging options on the command line.
+
+See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+
+### Default behaviour
+
+If no logging configuration is set by `tool.pytest.ini_options` or pytest CLI arguments, pytest captures all log messages at `WARNING` level or above. You will still see messages from:
+
+- pytest. For example, `tests/integration/test_charm.py::test_deploy PASSED`.
+- Other modules if the messages are at `WARNING` or above.
+- `pytest-jubilant`. For example, `Models were torn down...`.
+
+(write-integration-tests-log-to-a-file)=
+### Log to a file
+
+This is an ideal configuration for long-running integration tests (for example, in CI). It outputs brief logs to the console and verbose logs to a local file.
+
+```toml
+[tool.pytest.ini_options]
+...
+
+# Retain INFO logs in the "Captured log call" section when run interactively.
+# Otherwise, that section will have DEBUG logs (coming from log_file_level).
+log_level = "INFO"
+
+log_cli_format = "%(levelname)s %(name)s %(message)s"
+
+log_file_level = "DEBUG"
+log_file_format = "%(asctime)s %(levelname)s %(name)s %(message)s"
+log_file_date_format = "%Y-%m-%dT%H:%M:%SZ"
+```
+
+Also check the `[testenv:integration]` environment in `tox.ini` to make sure the pytest command has `--log-cli-level=INFO`.
+
+Use the `--log-file` option from pytest to enable file logging:
+
+```text
+tox -e integration -- --log-file logs/verbose.log
+```
+
+If you run the integration tests multiple times, `logs/verbose.log` only contains logs from the last pytest session. To use a separate file for each session, override `log_file` for each pytest invocation:
+
+```
+pytest --log-file "run1.log" ...
+pytest --log-file "run2.log" ...
+```
+
+Alternatively, you can set `log_file_mode` to `append`. pytest will put verbose logs from all invocations into one file:
+
+```toml
+[tool.pytest.ini_options]
+log_file_mode = "a"
+...
+```
+
+You can also configure these options on the command line.
+
+See more: [pytest | How to manage logging](https://docs.pytest.org/en/stable/how-to/logging.html)
+
+In CI, you can use `actions/upload-artifact` to make `logs/verbose.log` available as a build artifact:
 
 ```yaml
   # In your integration test job
-  - run: tox -e integration -- --juju-dump-logs logs
+  - run: tox -e integration -- --log-file logs/verbose.log
   - name: Upload logs
     if: ${{ !cancelled() }}
     uses: actions/upload-artifact@v7
     with:
-      name: juju-dump-logs
+      name: integration-test-logs
+      path: logs
+```
+
+(write-integration-tests-for-a-charm-view-juju-logs)=
+## View `juju debug-log` logs
+
+Use the `--juju-dump-logs` option from [pytest-jubilant](https://github.com/canonical/pytest-jubilant#--juju-dump-logs) to save the complete `juju debug-log` logs to disk:
+
+```text
+tox -e integration -- --juju-dump-logs logs
+```
+
+In CI, you can use `--juju-dump-logs` with `actions/upload-artifact` to make `juju debug-log` files available as build artifacts:
+
+```yaml
+  # In your integration test job
+  - run: tox -e integration -- --log-file logs/verbose.log --juju-dump-logs logs
+  - name: Upload logs
+    if: ${{ !cancelled() }}
+    uses: actions/upload-artifact@v7
+    with:
+      name: integration-test-logs
       path: logs
 ```
 
@@ -485,5 +557,4 @@ To generate crash dumps, you need the `juju-crashdump` tool .
 
 You can install it with `sudo snap install --classic juju-crashdump`.
 
-> See more:
-> - [`juju-crashdump`](https://github.com/juju/juju-crashdump)
+See more: [`juju-crashdump`](https://github.com/juju/juju-crashdump)

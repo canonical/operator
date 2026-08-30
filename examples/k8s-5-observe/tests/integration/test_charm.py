@@ -22,16 +22,17 @@ import json
 import logging
 import pathlib
 import time
+import urllib.error
+import urllib.request
 
 import jubilant
 import pytest
 import pytest_jubilant
-import requests
 import yaml
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(pathlib.Path("charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
@@ -50,6 +51,12 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     juju.wait(jubilant.all_blocked)
 
 
+def test_workload_version_is_set(charm: pathlib.Path, juju: jubilant.Juju):
+    """Verify that the workload version has been set."""
+    expected_version = "2.1.0"  # Hardcoded for simplicity.
+    juju.wait(lambda status: status.apps[APP_NAME].version == expected_version)
+
+
 @pytest.mark.juju_setup
 def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """Verify that the charm integrates with the database.
@@ -59,9 +66,6 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
     juju.wait(jubilant.all_active)
-
-    version = juju.status().apps[APP_NAME].version
-    assert version == "1.0.4"  # Hardcoded for simplicity.
 
 
 @pytest.fixture(scope="module")
@@ -105,9 +109,11 @@ def _get_loki_logs(loki_api_url: str) -> list[str] | None:
     for attempt in range(3 * 60):
         if attempt:  # If not the first attempt, wait before retrying.
             time.sleep(1)
-        response = requests.get(loki_api_url)
-        if response.status_code == 200:
-            response_decoded = response.json()
-            if "data" in response_decoded:
-                return response_decoded["data"]
+        try:
+            response = urllib.request.urlopen(loki_api_url)
+        except urllib.error.URLError:
+            continue
+        response_decoded = json.loads(response.read())
+        if "data" in response_decoded:
+            return response_decoded["data"]
     return None
