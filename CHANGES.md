@@ -1,3 +1,9 @@
+# 2.23.5 - 31 August 2026
+
+## Fixes
+
+* Compare full event paths when skipping duplicate notices (#2717)
+
 # 2.23.4 - 30 July 2026
 
 ## Fixes
