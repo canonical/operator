@@ -3,17 +3,17 @@
 ## Fixes
 
 * Compare full event paths when skipping duplicate notices (#2684)
-* Don't pass a message when converting an unknown status by name (#2700)
+* In `ops.testing`, don't pass a message when converting an unknown status by name (#2700)
 
 ## Documentation
 
-* Give each best-practice admonition a stable :name: anchor (#2524)
+* Give each best-practice admonition a stable anchor (#2524)
 * Reword text that vale 3.17 flags as misspelled (#2695)
 * Stop styling page references as blockquotes (#2666)
 * Make the custom-endpoint-name sample test actually test something (#2664)
 * Replace `requests` by `urllib` in K8s tutorial integration tests (#2687)
 * Recommend spread directly, rather than charmcraft test (#2706)
-* Extract sections in how to write integration tests to their own howto guide (#2662)
+* Extract sections in "how to write integration tests" to their own how-to guide (#2662)
 
 ## CI
 
