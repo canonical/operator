@@ -1500,7 +1500,7 @@ class Secret:
 
     def _ensure_id(self) -> str:
         # Mutating methods need the locator ID rather than a label; fetch it once
-        # from Juju via get_info() and cache it on the instance for later calls.
+        # and cache it.
         if self._id is None:
             self._id = self.get_info().id
         return self._id
