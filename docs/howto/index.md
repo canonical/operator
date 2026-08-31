@@ -143,7 +143,7 @@ Trace your charm <trace-your-charm>
 
 ## Security
 
-To harden your charm and produce security documentation for operators, work through the [Security](#security) explanation and then follow the concrete actions below.
+To harden your charm and produce security documentation for users, work through the [Security](#security) explanation and then follow the concrete actions below.
 
 ```{toctree}
 :maxdepth: 1
