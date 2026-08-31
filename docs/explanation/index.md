@@ -97,7 +97,7 @@ storedstate-guidance
 
 ## Tool versions
 
-When you're deciding which version of Python, Juju, Ops, or Charmcraft to use, the Ubuntu base is the main constraint. The tool versions page lists the supported combinations for each LTS base, and the support commitments for Juju and Ops releases.
+When you're deciding which version of Python, Juju, Ops, or Charmcraft to use, the Ubuntu base is the main constraint. Review the supported combinations for each LTS base, and the support commitments for Juju and Ops releases.
 
 ```{toctree}
 :maxdepth: 1
