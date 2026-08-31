@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import email.message
 import io
 import logging
 import pathlib
@@ -101,7 +102,7 @@ def test_exporter_http_error_log_format(tmp_path: pathlib.Path, caplog: pytest.L
         url,
         503,
         'Service Unavailable',
-        {},
+        email.message.Message(),
         io.BytesIO(long_body),  # type: ignore[arg-type]
     )
 
