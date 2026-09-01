@@ -69,7 +69,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
   - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful.
 * - **{external+charmlibs:doc}`Charmlibs <index>`**
   - A listing of charm libraries and guidance on how to distribute your own libraries.
-* - **[Concierge](https://github.com/canonical/concierge)**
+* - **{external+concierge:doc}`Concierge <index>`**
   - A CLI tool for setting up charm development environments.
 * - **{external+jubilant:doc}`Jubilant <index>`**
   - A Python library that wraps the Juju CLI. Use Jubilant together with [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) for your integration tests.

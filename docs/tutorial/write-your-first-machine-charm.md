@@ -84,7 +84,7 @@ Now that you have a virtual machine, you need to install the following tools on 
 - **uv** - Your charm will be a Python project. You'll use [uv](https://docs.astral.sh/uv/) to manage your charm's runtime and development dependencies.
 - **tox** - You'll use [tox](https://tox.wiki/en/) to run your charm's checks and tests.
 
-Instead of manually installing and configuring each tool, we recommend using [Concierge](https://github.com/canonical/concierge), Canonical's tool for setting up charm development environments.
+Instead of manually installing and configuring each tool, we recommend using {external+concierge:doc}`Concierge <index>`, Canonical's tool for setting up charm development environments.
 
 In your virtual machine, run:
 
