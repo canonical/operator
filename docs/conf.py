@@ -324,7 +324,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "jubilant": ("https://canonical.com/juju/docs/jubilant", None),
     "juju": ("https://canonical.com/juju/docs/juju-cli/3.6", None),
-    "charmcraft": ("https://documentation.ubuntu.com/charmcraft/latest", None),
+    "charmcraft": ("https://canonical.com/juju/docs/charmcraft/latest", None),
     "charmlibs": ("https://canonical.com/juju/docs/charmlibs/", None),
     "concierge": ("https://canonical.com/juju/docs/concierge/", None),
     "multipass": ("https://documentation.ubuntu.com/multipass/latest", None),
