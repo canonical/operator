@@ -72,7 +72,7 @@ RawSecretRevisionContents = RawDataBagContents = Mapping[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
-# Covariant variant used by :class:`_CharmSpec` so that, for example,
+# Covariant version used by :class:`_CharmSpec` so that, for example,
 # ``_CharmSpec[MyCharm]`` is assignable to ``_CharmSpec[CharmBase]``.
 # ``_CharmSpec`` is a frozen dataclass, so covariance is sound here.
 _CharmTypeCo = TypeVar('_CharmTypeCo', bound=CharmBase, covariant=True)
