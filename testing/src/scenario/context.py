@@ -722,7 +722,7 @@ class Context(Generic[CharmType]):
         if not any((meta, actions, config)):
             logger.debug('Autoloading charmspec...')
             try:
-                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)  # pyright: ignore[reportAssignmentType]
+                spec: _CharmSpec[CharmType] = _CharmSpec.autoload(charm_type)
             except MetadataNotFoundError as e:
                 raise ContextSetupError(
                     f'Cannot setup scenario with `charm_type`={charm_type}. '
