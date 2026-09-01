@@ -548,7 +548,7 @@ charmcraft init --profile test-kubernetes --force
 
 This creates the scaffolding of a Spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
 
-- `spread.yaml` - Tells Spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
+- `spread.yaml` - Tells Spread how to provision a clean environment for each run, using {external+concierge:doc}`Concierge <index>` to bootstrap Juju and the cloud substrate.
 - The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
 
 When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.

@@ -14,7 +14,7 @@ You'll need the following tools:
 
 To deploy your charm locally and to run integration tests, you'll also need a Juju controller.
 
-[Concierge](https://github.com/canonical/concierge) can automatically install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
+{external+concierge:doc}`Concierge <index>` can automatically install and configure most of the tools that you'll need. Instead of installing everything on your host machine, consider using a [Multipass](https://canonical.com/multipass/install) virtual machine.
 
 See more:
 
@@ -52,7 +52,7 @@ command names and meanings that the profile provides.
 
 The following tools can also be useful during development:
 
-- To prepare an environment for running integration tests, such as in continuous integration, use [Concierge](https://github.com/canonical/concierge) or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
+- To prepare an environment for running integration tests, such as in continuous integration, use {external+concierge:doc}`Concierge <index>` or [`actions-operator`](https://github.com/charmed-kubernetes/actions-operator).
 - The [`charming-actions`](https://github.com/canonical/charming-actions) repository includes actions to ensure that libraries are up-to-date, publish charms and libraries, and more.
 
 The essence of a charm is the ``src/charm.py`` file. This is the entry point for
