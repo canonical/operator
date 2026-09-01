@@ -3554,7 +3554,7 @@ class _ModelBackend:
         self.app_name: str = self.unit_name.split('/')[0]
 
         self._is_leader: bool | None = None
-        self._leader_check_time = None
+        self._leader_check_time: float | None = None
         self._hook_is_running = ''
         self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
 
