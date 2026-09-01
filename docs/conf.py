@@ -327,7 +327,7 @@ intersphinx_mapping = {
     "charmcraft": ("https://canonical.com/juju/docs/charmcraft/latest", None),
     "charmlibs": ("https://canonical.com/juju/docs/charmlibs/", None),
     "concierge": ("https://canonical.com/juju/docs/concierge/", None),
-    "multipass": ("https://documentation.ubuntu.com/multipass/latest", None),
+    "multipass": ("https://canonical.com/multipass/docs/latest", None),
     "pebble": ("https://ubuntu.com/docs/pebble", None),
     "otel": ("https://opentelemetry-python.readthedocs.io/en/latest/", None),
 }
