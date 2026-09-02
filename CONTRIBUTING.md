@@ -38,7 +38,7 @@ If you need to bring in the latest changes from `main` after the review has star
 
 ## Coding style
 
-We have a team [Python style guide](./STYLE.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://canonical.com/juju/docs/ops/latest/reference/) is automatically generated from Python docstrings.
+We have a team [Python style guide](https://github.com/canonical/charm-tech/blob/main/style/python.md), most of which is enforced by CI checks. Please be complete with docstrings and keep them informative for _users_, as the [Ops library reference](https://canonical.com/juju/docs/ops/latest/reference/) is automatically generated from Python docstrings.
 
 ## Dependencies
 
