@@ -104,25 +104,14 @@ class RequirerSchema(DataBagSchema):
     # we can omit `unit` because the requirer makes no use of the unit databags
 ```
 
-To verify that things work as they should, you can `pip install pytest-interface-tester` and then run `interface_tester discover --include my_fancy_database` from the `charmlibs` root.
+To verify that the schema is valid, run it the same way `charmlibs` CI does, from the `charmlibs` root:
 
-You should see:
-
-```yaml
-- my_fancy_database:
-  - v0:
-   - provider:
-     - <no tests>
-     - schema OK
-     - charms:
-       - my_fancy_database_charm (https://github.com/your-github-slug/my-fancy-database-operator) custom_test_setup=no
-   - requirer:
-     - <no tests>
-     - schema OK
-     - <no charms>
+```bash
+uv run --no-project --with-requirements schema-requirements.txt \
+  interfaces/my_fancy_database/interface/v0/schema.py
 ```
 
-In particular pay attention to `schema`. If it says `NOT OK` then there is something wrong with the pydantic model.
+The command exits successfully if the module imports and the pydantic models are well formed. If it fails, there is something wrong with the models.
 
 ### 5. Edit `README.md`
 
@@ -308,32 +297,7 @@ def test_contract_happy_path():
 
 This test verifies that the databags of the 'my-fancy-database' relation are valid according to the pydantic schema you have specified in `schema.py`.
 
-To check that things work as they should, you can run `interface_tester discover --include my_fancy_database` from the `charmlibs` root.
-
-```{note}
-
-Note that the `interface_tester` is installed in {ref}`Register an interface <register-an-interface>`. If you haven't done it yet, install it by running: `pip install pytest-interface-tester `.
-
-```
-
-You should see:
-
-```yaml
-- my_fancy_database:
-  - v0:
-   - provider:
-       - test_contract_happy_path
-       - test_nothing_happens_if_remote_empty
-     - schema OK
-     - charms:
-       - my_fancy_database_charm (https://github.com/your-github-slug/my-fancy-database-operator) custom_test_setup=no
-   - requirer:
-     - <no tests>
-     - schema OK
-     - <no charms>
-```
-
-In particular, pay attention to the `provider` field. If it says `<no tests>` then there is something wrong with your setup, and the collector isn't able to find your test or identify it as a valid test.
+These tests are collected and run from the charm side, so the way to check that they work is to run them against a charm that implements the interface, as described in {ref}`prepare-the-charm`.
 
 Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/interface/v0/tests/test_requirer.py`. Don't forget to [edit the `interface.yaml`](#edit-interface-yaml) file in the "requirers" section to add the name of the charm and the URL.
 
@@ -341,6 +305,7 @@ Similarly, you can add tests for requirer in `./interfaces/my_fancy_database/int
 
 You are ready to merge these files in the `charmlibs` repository. Open a PR and drive it to completion.
 
+(prepare-the-charm)=
 #### Prepare the charm
 
 In order to be testable from `charmlibs`, the charm needs to expose and configure a fixture.
@@ -356,6 +321,12 @@ Go to the Fancy Database charm repository root.
 
 ```text
 cd path/to/my-fancy-database-operator
+```
+
+Install the interface tester:
+
+```shell
+pip install pytest-interface-tester
 ```
 
 Create a `conftest.py` file under `tests/interface`:
@@ -378,6 +349,12 @@ from scenario.state import State
 def interface_tester(interface_tester: InterfaceTester):
     interface_tester.configure(
         charm_type=MyFancyDatabaseCharm,
+        # `pytest-interface-tester` still defaults to the archived
+        # `charm-relation-interfaces` repo and its layout, so point it at `charmlibs`.
+        repo='https://github.com/canonical/charmlibs',
+        base_path='interfaces',
+        interface_subdir='interface',
+        tests_dir='tests',
         state_template=State(
             leader=True,  # we need leadership
         ),
@@ -410,28 +387,29 @@ providers:
 
 #### Verifying the `interface_tester` configuration
 
-To verify that the fixture is good enough to pass the interface tests, run the interface tests from the `charmlibs` repo. First, list the targets that will be tested:
+To verify that the fixture is good enough to pass the interface tests, run them from the charm repository. Add a test that drives the fixture:
 
-```bash
-cd path/to/charmlibs
-.scripts/get-interface-test-targets.py interfaces/my_fancy_database
+```python
+# ./tests/interface/test_interfaces.py
+from interface_tester import InterfaceTester
+
+
+def test_my_fancy_database_interface(interface_tester: InterfaceTester):
+    interface_tester.configure(
+        interface_name='my_fancy_database',
+        interface_version=0,
+    )
+    interface_tester.run()
 ```
 
-Each entry in the output gives you the arguments for one test run: the interface version, the role, the charm name, and the endpoint. Run one of them with:
+Then run it:
 
 ```bash
-.scripts/run-interface-tests.py my_fancy_database v0 provide my-fancy-database-provider my-fancy-database
+cd path/to/my-fancy-database-operator
+pytest ./tests/interface
 ```
 
-The charm repository and branch come from the `interface.yaml` you edited above, so unless you have already merged your interface tests to `charmlibs`, point the run at your own charm branch instead:
-
-```bash
-.scripts/run-interface-tests.py my_fancy_database v0 provide my-fancy-database-provider my-fancy-database \
-  --charm-repo https://github.com/your-github-slug/my-fancy-database-operator \
-  --charm-branch branch-with-my-conftest-changes
-```
-
-Pass `--keep` if you want to inspect the charm that was cloned to run the tests.
+The tester clones `charmlibs` and collects the tests and schema for the interface, so unless you have already merged your interface tests, point it at your own branch by adding `branch='my-fancy-database'` to the `configure()` call in `conftest.py`.
 
 ### Troubleshooting and debugging the tests
 
@@ -442,7 +420,7 @@ Essentially, you need to make it so that the charm runtime 'thinks' that everyth
 This may mean mocking the presence and connectivity of a container, system calls, substrate API calls, and more.
 If you have unit tests in your codebase, you most likely already have all the necessary patches scattered around and it's a matter of collecting them.
 
-Remember that if you run the tests locally, in your troubleshooting you need to point `interface.yaml` to the branch where you committed your changes (or pass `--charm-repo` and `--charm-branch`), because the test runner clones the charm repositories in order to run the charms:
+Remember that if you run the tests locally, in your troubleshooting you need to point `interface.yaml` to the branch where you committed your changes, because the test runner clones the charm repositories in order to run the charms:
 
 ```text
 requirers:
