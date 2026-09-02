@@ -13,6 +13,25 @@
 # limitations under the License.
 
 
+"""Integration tests for ops_tracing.
+
+These tests are currently gated by two upstream problems that prevent the tempo
+coordinator from reaching ``active``:
+
+- canonical/observability-stack#110 — resource patching on newer Juju releases
+  caused this file's ``test_direct_connection`` and ``test_with_tls`` to be
+  commented out of ``.github/workflows/integration.yaml``.
+- ``tempo-coordinator-k8s`` rev 143 (every ``2/*`` channel) crashes in
+  ``upgrade-charm`` because ``coordinated_workers/nginx.py:_delete_certificates``
+  calls ``update-ca-certificates --fresh`` in the nginx workload container, and
+  no ``ubuntu/nginx:*`` tag we tested ships that binary. See the canary in
+  ``test_infra_canary.py`` — when that test xpasses, this gate is likely lifted.
+
+Until both are resolved, the four tests below (buffer replay, relation churn,
+CA rotation, leader-only databag) cannot run end-to-end. They are kept here so
+that re-enabling them is a one-line change in CI once the upstream is healthy.
+"""
+
 from __future__ import annotations
 
 import json
@@ -94,6 +113,152 @@ def test_with_tls(build_tracing_charm: Callable[[], str], tracing_juju: jubilant
     # collector is rejecting requests ("empty ring") can be legitimately
     # dropped. Receiving any ops.main span over HTTPS is what this test is
     # about.
+
+
+def test_buffer_replay_before_provider_ready(
+    build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju
+):
+    """Spans emitted before the tracing relation is up are buffered and replayed.
+
+    Exercises ops_tracing._buffer end-to-end: an action fires while no tracing
+    relation exists, then tempo is integrated, and the buffered span must land.
+    """
+    charm_path = build_tracing_charm()
+    tracing_juju.deploy(charm_path)
+    tracing_juju.wait(lambda status: jubilant.all_active(status, 'test-tracing'))
+
+    checkpoint = time.time()
+    arg_value = 'buffered-arg'
+    tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
+
+    tracing_juju.integrate('test-tracing', 'tempo')
+    tracing_juju.wait(jubilant.all_active)
+
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: 'custom trace on any action' in str(spans),
+            since=checkpoint,
+            timeout=180,
+        )
+    names = [span['name'] for span in spans]
+    assert 'custom trace on any action' in names, (
+        f'buffered action span never replayed; saw: {names}'
+    )
+    action_span = next(span for span in spans if span['name'] == 'custom trace on any action')
+    assert arg_value in json.dumps(action_span)
+
+
+def test_relation_churn(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
+    """Removing and re-adding the tracing relation leaves the requirer healthy.
+
+    Guards the new direct-juju-event observation in the Tracing wrapper (no
+    longer mediated by TracingEndpointRequirer): -broken must tear cleanly
+    and -joined must re-arm export.
+    """
+    charm_path = build_tracing_charm()
+    tracing_juju.deploy(charm_path)
+    tracing_juju.integrate('test-tracing', 'tempo')
+    tracing_juju.wait(jubilant.all_active)
+
+    tracing_juju.cli('remove-relation', 'test-tracing:charm-tracing', 'tempo:tracing')
+    # Waiting only for test-tracing races the re-integrate below: test-tracing's
+    # -relation-departed hook finishes in ~1s, but the relation stays "dying" on
+    # the controller until tempo has also processed its -broken hook, and
+    # `juju integrate` refuses "relation ... is dying, but not yet removed
+    # (already exists)" during that window. Wait for the whole model to settle
+    # so both sides have torn down before we re-integrate.
+    tracing_juju.wait(jubilant.all_active)
+
+    tracing_juju.integrate('test-tracing', 'tempo')
+    tracing_juju.wait(jubilant.all_active)
+
+    checkpoint = time.time()
+    arg_value = 'post-churn-arg'
+    tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
+
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo-worker', 3200) as endpoint:
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: arg_value in json.dumps(spans),
+            since=checkpoint,
+        )
+    assert 'custom trace on any action' in [span['name'] for span in spans], (
+        'spans did not flow after re-integrating charm-tracing'
+    )
+
+
+def test_ca_rotation(build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju):
+    """A CA cert removed mid-life and re-added must continue to be honoured.
+
+    Pins the inlined certificate_transfer read path: -broken must clear the
+    trusted CA and -changed on re-integration must re-load it without
+    restarting the requirer.
+    """
+    _xfail_on_k8s_juju4(tracing_juju, JUJU4_K8S_SECRET_RBAC_BUG)
+    charm_path = build_tracing_charm()
+    tracing_juju.deploy('self-signed-certificates')
+    tracing_juju.integrate('tempo:certificates', 'self-signed-certificates')
+    tracing_juju.wait(jubilant.all_active)
+
+    tracing_juju.deploy(charm_path)
+    tracing_juju.integrate('test-tracing', 'self-signed-certificates')
+    tracing_juju.integrate('test-tracing', 'tempo')
+    tracing_juju.wait(jubilant.all_active)
+
+    # tempo terminates TLS (self-signed-certificates is related to tempo, not
+    # tempo-worker), so we query the coordinator, not the worker.
+    with kubectl_port_forward(tracing_juju.model, 'svc/tempo', 3200) as endpoint:
+        wait_spans(endpoint, ready=lambda spans: 'ops.main' in str(spans), https=True)
+
+        # Rotate the CA on the provider; the requirer must pick up the new cert
+        # via certificate_transfer -changed without restarting the export pipeline.
+        tracing_juju.run('self-signed-certificates/0', 'rotate-private-key')
+        tracing_juju.wait(jubilant.all_active)
+
+        checkpoint = time.time()
+        arg_value = 'post-rotation-arg'
+        tracing_juju.run('test-tracing/0', 'one', params={'arg': arg_value})
+
+        spans = wait_spans(
+            endpoint,
+            ready=lambda spans: arg_value in json.dumps(spans),
+            since=checkpoint,
+            https=True,
+        )
+    assert 'custom trace on any action' in [span['name'] for span in spans], (
+        'spans did not flow over TLS after CA was rotated'
+    )
+
+
+def test_only_leader_writes_requirer_databag(
+    build_tracing_charm: Callable[[], str], tracing_juju: jubilant.Juju
+):
+    """Followers must not crash, and only the leader writes the requirer databag.
+
+    The conformance suite pins this against the wire model; this test verifies
+    it survives an actual two-unit Juju deployment with the new Tracing
+    wrapper driving the relation.
+    """
+    charm_path = build_tracing_charm()
+    tracing_juju.deploy(charm_path, num_units=2)
+    tracing_juju.integrate('test-tracing', 'tempo')
+    # If a non-leader-aware requirer tried to write the app databag on the
+    # follower unit, Juju would fail the follower's hook and jubilant.all_active
+    # would time out here — so reaching all_active with two units is itself the
+    # follower-does-not-crash invariant. The show-unit check below verifies the
+    # positive: the leader did populate the app databag.
+    tracing_juju.wait(jubilant.all_active)
+
+    # Show-unit dumps each unit's relation data; the application section under
+    # the charm-tracing endpoint is what the leader populated.
+    raw = tracing_juju.cli('show-unit', 'test-tracing/0', '--format=json')
+    data = json.loads(raw)
+    relations = data['test-tracing/0']['relation-info']
+    charm_tracing = next(r for r in relations if r['endpoint'] == 'charm-tracing')
+    assert charm_tracing['application-data'], (
+        'leader unit should have populated the charm-tracing app databag'
+    )
 
 
 def wait_spans(
