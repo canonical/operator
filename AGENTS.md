@@ -20,8 +20,7 @@ This is a mature, production framework used by thousands of charms. Changes requ
 | `ops/model.py` | Juju model abstractions |
 | `ops/pebble.py` | Pebble API for container workload management |
 | `ops/__init__.py` | Public API exports |
-| `CONTRIBUTING.md` | PR and contribution process |
-| `HACKING.md` | Detailed development setup and workflow |
+| `CONTRIBUTING.md` | Contribution process and development setup |
 
 ## Important Notes
 

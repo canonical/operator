@@ -120,7 +120,7 @@ constructive feedback.
   Meet us in the #charmhub-charmdev channel on Matrix.
 * [Report bugs](https://github.com/canonical/operator/issues): We want to know
   about the problems so we can fix them.
-* [Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation):
+* [Contribute docs](https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#documentation):
   Get started on GitHub.
 
 ## Contributing and developing
