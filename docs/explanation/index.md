@@ -5,7 +5,7 @@ These guides explain how Ops works.
 
 ## Interface definitions
 
-The [`charmlibs` monorepo](https://github.com/canonical/charmlibs/tree/main/interfaces) contains specifications, schemas, and tests for Juju interfaces.
+Juju interface definitions are maintained in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs).
 
 ```{toctree}
 :maxdepth: 1
@@ -15,7 +15,7 @@ charm-relation-interfaces
 
 ## Testing
 
-Your charm should have unit tests and integration tests. If your charm uses relations, it should also have interface tests.
+Your charm should have unit tests and integration tests.
 
 ```{toctree}
 :maxdepth: 1

@@ -3,11 +3,13 @@
 
 See also: {ref}`manage-interfaces`
 
-Interface definitions live in the [`interfaces` directory of the `charmlibs` monorepo](https://github.com/canonical/charmlibs/tree/main/interfaces). For each interface they record specifications, databag schemas, and interface tests for Juju relation interfaces. In other words, they are the source of truth for the data and behaviour of providers and requirers of relations.
+An interface definition records what a Juju relation interface means: the semantics that providers and requirers of the interface are expected to implement, and the schema of the data they exchange. In other words, it is the source of truth for the data and behaviour of both sides of a relation.
+
+Interface definitions are maintained in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs). To browse the interfaces that already exist, see the [`charmlibs` documentation](https://canonical.com/juju/docs/charmlibs/).
 
 ```{note}
 
-Interface definitions used to live in a standalone repository, `canonical/charm-relation-interfaces`, which was archived in November 2025. All interfaces have been migrated into the [`charmlibs` monorepo](https://github.com/canonical/charmlibs), where new interfaces and updates should now be contributed. See https://canonical.com/juju/docs/charmlibs/ for more information.
+Interface definitions used to live in a standalone repository, `canonical/charm-relation-interfaces`, which was archived in November 2025. All interfaces have been migrated into `charmlibs`, where new interfaces and updates should now be contributed.
 ```
 
 The purpose of consolidating interface definitions is to provide and promote charm interoperability.
@@ -18,13 +20,11 @@ In order to prevent two separate charms from rolling their own relation with the
 
 ## Using interface definitions
 
-If you have a charm that provides a service, you should search the [`interfaces` directory in `charmlibs`](https://github.com/canonical/charmlibs/tree/main/interfaces) (or directly Charmhub in the future) and see if an interface exists already, or perhaps a similar one exists that lacks the semantics you need and can be extended to support it.
-
-Conversely, if the charm you are developing needs some service (a database, an ingress URL, an authentication endpoint...)  you should search the interface definitions to see if there is an interface you can use, and to find existing charms that provide it.
+If you have a charm that provides a service, you should check whether an interface for it exists already, or whether a similar one exists that lacks the semantics you need and can be extended to support it. Conversely, if the charm you are developing needs some service (a database, an ingress URL, an authentication endpoint...) you should check whether there is an interface you can use, and which charms provide it.
 
 There are three actors in play:
 
-* **the owner of the specification** of the interface, which also owns the tests that can be used to verify "does charm X 'really' support this interface?". This is the relevant interface directory in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs).
+* **the owner of the specification** of the interface. This is the relevant interface definition in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs).
 * **the owner of the implementation** of an interface. In practice, this often is the team whose charm provides a workload implementing one side of the interface.
 * **the interface user**: a charm that wants to use the interface (either as requirer or as provider).
 
@@ -32,13 +32,10 @@ The interface user needs the implementation (typically, the provider also happen
 
 The owner of the implementation needs the specification, to help check that the implementation is in fact compliant.
 
-## Repository structure
+## What an interface definition contains
 
-For each interface, the [`interfaces` directory in `charmlibs`](https://github.com/canonical/charmlibs/tree/main/interfaces) hosts a per-interface folder (for example, `interfaces/ingress/`), with the per-version specification under `interface/v<N>/`:
+For each interface, `charmlibs` records:
 
-- the **specification**: a semi-formal definition of the interface's semantics and what its implementations are expected to do, in terms of both the provider and the requirer (`interface/v<N>/README.md`).
-- a list of **reference charms**: the charms that implement this interface, typically the owner of the charm library providing the original implementation (`interface/v<N>/interface.yaml`).
-- the **schema**: pydantic models unambiguously defining the accepted unit and application databag contents for provider and requirer (`interface/v<N>/schema.py`).
-- the **interface tests**: Python tests that can be run to verify that a charm complies with the interface specification (`interface/v<N>/tests/`).
-
-
+- the **specification**: a semi-formal definition of the interface's semantics and what its implementations are expected to do, in terms of both the provider and the requirer.
+- a list of **reference charms**: the charms that implement this interface, typically the owner of the charm library providing the original implementation.
+- the **schema**: pydantic models unambiguously defining the accepted unit and application databag contents for provider and requirer.

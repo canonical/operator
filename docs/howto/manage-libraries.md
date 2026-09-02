@@ -258,7 +258,7 @@ Alternatively, the interface documentation can be found in the
 
 In the interface documentation, find the description of the various
 databags. For example, for
-[v2 of the `tracing` interface](https://github.com/canonical/charmlibs/blob/main/interfaces/tracing/interface/v2/README.md):
+[the `tracing` interface](https://github.com/canonical/charmlibs/tree/main/interfaces/tracing):
 
 ```yaml
 # unit_data: <empty>
