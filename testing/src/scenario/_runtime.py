@@ -28,6 +28,8 @@ from .state import (
     PeerRelation,
     Relation,
     SubordinateRelation,
+    _inject_juju_default_databag_keys,
+    _remove_juju_default_databag_keys,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -313,6 +315,10 @@ class Runtime(Generic[CharmType]):
 
         # we make a copy to avoid mutating the input state
         output_state = copy.deepcopy(state)
+        # Mirror Juju: populate the keys that Juju manages itself in every
+        # relation unit databag before the charm observes them. They're removed
+        # again below, so that they only exist while the charm is running.
+        injected_databag_keys = _inject_juju_default_databag_keys(output_state, self._juju_version)
 
         logger.info(' - generating virtual charm root')
         with self._virtual_charm_root() as temporary_charm_root:
@@ -377,4 +383,5 @@ class Runtime(Generic[CharmType]):
 
         logger.info('event dispatched. done.')
         assert ops is not None
+        _remove_juju_default_databag_keys(injected_databag_keys)
         context._set_output_state(ops.state)

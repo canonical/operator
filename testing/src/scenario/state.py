@@ -659,9 +659,16 @@ class RelationBase:
     """This application's databag for this relation."""
 
     local_unit_data: RawDataBagContents = dataclasses.field(
-        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
+        default_factory=dict[str, str],
     )
-    """This unit's databag for this relation."""
+    """This unit's databag for this relation.
+
+    Defaults to an empty dict. While the charm is running, the keys that Juju
+    manages itself (``egress-subnets``, ``ingress-address``, and on Juju 3 also
+    ``private-address``) are present, filled in from the :class:`Network` for
+    this endpoint. They are removed again before the output state is returned,
+    so that the output state has the same shape as the input one.
+    """
 
     @property
     def relation_id(self) -> NoReturn:
@@ -675,6 +682,11 @@ class RelationBase:
     def _databags(self):
         """All databags in this relation."""
         yield self.local_app_data
+        yield self.local_unit_data
+
+    @property
+    def _unit_databags(self):
+        """All unit-scope databags in this relation (excludes app databags)."""
         yield self.local_unit_data
 
     @property
@@ -722,11 +734,82 @@ class RelationBase:
 
 
 _DEFAULT_IP = '192.0.2.0'
+_DEFAULT_EGRESS_SUBNET = '192.0.2.0/24'
+
+# The unit databag contents that Juju 3 provides for a relation that uses the
+# default network. Provided as a convenience for tests that assert on the
+# databag contents while the charm is running.
 _DEFAULT_JUJU_DATABAG: dict[str, str] = {
-    'egress-subnets': _DEFAULT_IP,
+    'egress-subnets': _DEFAULT_EGRESS_SUBNET,
     'ingress-address': _DEFAULT_IP,
     'private-address': _DEFAULT_IP,
 }
+
+
+def _juju_default_databag(state: State, endpoint: str, juju_version: str) -> dict[str, str]:
+    """The keys and values that Juju itself puts in a unit databag.
+
+    Juju fills these in from the unit's network for the relation's endpoint, so
+    we do the same, using the :class:`Network` from the state for that endpoint,
+    or the default network if the state doesn't have one.
+
+    ``private-address`` is not included for Juju 4 and later, where Juju no
+    longer provides it.
+    """
+    try:
+        network = state.get_network(endpoint)
+    except KeyError:
+        network = Network(endpoint)
+    databag: dict[str, str] = {}
+    if network.egress_subnets:
+        databag['egress-subnets'] = ','.join(network.egress_subnets)
+    if network.ingress_addresses:
+        databag['ingress-address'] = network.ingress_addresses[0]
+        if ops.JujuVersion(juju_version).major < 4:
+            # Juju 4 no longer provides private-address.
+            databag['private-address'] = network.ingress_addresses[0]
+    return databag
+
+
+def _inject_juju_default_databag_keys(  # pyright: ignore[reportUnusedFunction]
+    state: State,
+    juju_version: str,
+) -> list[tuple[dict[str, str], str, str]]:
+    """Populate the Juju-managed keys in every relation unit databag.
+
+    Mirrors Juju's own behaviour: before the charm runs, Juju sets
+    ``egress-subnets``, ``ingress-address``, and (on Juju 3) ``private-address``
+    in each unit's databag if the key is not already present. Values that the
+    test author has set are left untouched, and app databags are not affected.
+
+    Returns the (databag, key, value) triples that were injected, so that they
+    can be removed again with :func:`_remove_juju_default_databag_keys`.
+    """
+    injected: list[tuple[dict[str, str], str, str]] = []
+    for relation in state.relations:
+        defaults = _juju_default_databag(state, relation.endpoint, juju_version)
+        for raw_databag in relation._unit_databags:
+            databag = cast('dict[str, str]', raw_databag)
+            for key, value in defaults.items():
+                if key not in databag:
+                    databag[key] = value
+                    injected.append((databag, key, value))
+    return injected
+
+
+def _remove_juju_default_databag_keys(  # pyright: ignore[reportUnusedFunction]
+    injected: Iterable[tuple[dict[str, str], str, str]],
+) -> None:
+    """Remove the keys that :func:`_inject_juju_default_databag_keys` added.
+
+    The keys are only meant to exist while the charm is running, so that the
+    output state has the same shape as the input one. A key that the charm
+    changed while it was running is left alone, so that the charm's own writes
+    are visible in the output state.
+    """
+    for databag, key, value in injected:
+        if databag.get(key) == value:
+            del databag[key]
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -743,9 +826,14 @@ class Relation(RelationBase):
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict[str, str])
     """The current content of the application databag."""
     remote_units_data: Mapping[UnitID, RawDataBagContents] = dataclasses.field(
-        default_factory=lambda: {0: _DEFAULT_JUJU_DATABAG.copy()},  # dedup
+        default_factory=lambda: {0: {}},
     )
-    """The current content of the databag for each unit in the relation."""
+    """The current content of the databag for each unit in the relation.
+
+    Each unit's databag defaults to an empty dict. The keys that Juju manages
+    itself are only present while the charm is running - see
+    :attr:`RelationBase.local_unit_data`.
+    """
 
     remote_model_uuid: str | None = None
     """The remote model's UUID; uses the main model's UUID if not specified."""
@@ -775,6 +863,12 @@ class Relation(RelationBase):
         yield self.remote_app_data
         yield from self.remote_units_data.values()
 
+    @property
+    def _unit_databags(self):  # type: ignore
+        """All unit-scope databags in this relation (excludes app databags)."""
+        yield self.local_unit_data
+        yield from self.remote_units_data.values()
+
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class SubordinateRelation(RelationBase):
@@ -783,9 +877,14 @@ class SubordinateRelation(RelationBase):
     remote_app_data: RawDataBagContents = dataclasses.field(default_factory=dict[str, str])
     """The current content of the remote application databag."""
     remote_unit_data: RawDataBagContents = dataclasses.field(
-        default_factory=lambda: _DEFAULT_JUJU_DATABAG.copy(),
+        default_factory=dict[str, str],
     )
-    """The current content of the remote unit databag."""
+    """The current content of the remote unit databag.
+
+    Defaults to an empty dict. The keys that Juju manages itself are only
+    present while the charm is running - see
+    :attr:`RelationBase.local_unit_data`.
+    """
 
     remote_app_name: str = 'remote'
     """The name of the remote application that *this unit* is attached to."""
@@ -818,6 +917,12 @@ class SubordinateRelation(RelationBase):
         yield self.remote_unit_data
 
     @property
+    def _unit_databags(self):
+        """All unit-scope databags in this relation (excludes app databags)."""
+        yield self.local_unit_data
+        yield self.remote_unit_data
+
+    @property
     def remote_unit_name(self) -> str:
         """The full name of the remote unit, in the form ``remote/0``."""
         return f'{self.remote_app_name}/{self.remote_unit_id}'
@@ -845,6 +950,12 @@ class PeerRelation(RelationBase):
     def _databags(self):  # type: ignore
         """All databags in this relation."""
         yield self.local_app_data
+        yield self.local_unit_data
+        yield from self.peers_data.values()
+
+    @property
+    def _unit_databags(self):  # type: ignore
+        """All unit-scope databags in this relation (excludes app databags)."""
         yield self.local_unit_data
         yield from self.peers_data.values()
 
