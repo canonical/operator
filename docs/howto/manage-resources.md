@@ -24,43 +24,41 @@ resources:
 In your charm's `src/charm.py` you can now use [`Model.resources.fetch(<resource_name>)`](ops.Resources.fetch) to get the path to the resource, then manipulate it as needed. For example:
 
 ```python
-# ...
 import logging
+
 import ops
 
-# ...
 logger = logging.getLogger(__name__)
 
 
-def _on_config_changed(self, event):
-    # Get the path to the file resource named 'my-resource'
-    try:
-        resource_path = self.model.resources.fetch('my-resource')
-    except ops.ModelError as e:
-        self.unit.status = ops.BlockedStatus(
-            "Something went wrong when claiming resource 'my-resource; "
-            "run `juju debug-log` for more info'"
-        )
-        # might actually be worth it to just reraise this exception and let the charm error out;
-        # depends on whether we can recover from this.
-        logger.error(e)
-        return
-    except NameError as e:
-        self.unit.status = ops.BlockedStatus(
-            "Resource 'my-resource' not found; did you forget to declare it in charmcraft.yaml?"
-        )
-        logger.error(e)
-        return
+class MyCharm(ops.CharmBase):
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        # Get the path to the file resource named 'my-resource'.
+        try:
+            resource_path = self.model.resources.fetch('my-resource')
+        except NameError:
+            logger.exception('Resource my-resource is not declared.')
+            self.unit.status = ops.BlockedStatus(
+                "Resource 'my-resource' not found; did you forget to "
+                'declare it in charmcraft.yaml?'
+            )
+            return
+        except ops.ModelError:
+            logger.exception('Could not claim resource my-resource.')
+            self.unit.status = ops.BlockedStatus(
+                "Could not claim resource 'my-resource'; run "
+                '`juju debug-log` for more information'
+            )
+            return
 
-    # Open the file and read it
-    with open(resource_path, 'r') as f:
-        content = f.read()
-    # do something
+        with resource_path.open() as f:
+            content = f.read()
+        # Do something with the content.
 ```
 
-The [`fetch()`](ops.Resources.fetch) method will raise a [`NameError`](https://docs.python.org/3/library/exceptions.html#NameError) if the resource does not exist, and returns a Python [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) object to the resource if it does.
+[`fetch()`](ops.Resources.fetch) raises [`NameError`](https://docs.python.org/3/library/exceptions.html#NameError) if the resource isn't declared in `charmcraft.yaml`, and [`ops.ModelError`](ops.ModelError) if it is declared but Juju can't provide it. Otherwise it returns a [`pathlib.Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path) pointing at the resource.
 
-Note: During development, it may be useful to specify the resource at deploy time to facilitate faster testing without the need to publish a new charm/resource in between minor fixes. In the below snippet, we create a simple file with some text content, and pass it to the Juju controller to use in place of any published `my-resource` resource:
+During development it's often useful to specify the resource at deploy time, so that you can test a change without publishing a new charm or resource for every minor fix. In the snippet below, we create a file with some text content and pass it to the Juju controller to use in place of any published `my-resource` resource:
 
 ```text
 echo "TEST" > /tmp/somefile.txt
@@ -74,9 +72,7 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 
 See first: {ref}`write-unit-tests-for-a-charm`
 
-If your charm requires access to resources, you can make them available to it
-through ``State.resources``. For example, to make a ``foo`` resource that is a
-path to an OCI image available:
+If your charm needs access to a resource, make it available with [`ops.testing.State.resources`](ops.testing.State.resources), passing an [`ops.testing.Resource`](ops.testing.Resource) for each one. For example, to make the `my-resource` file resource available:
 
 ```python
 import pathlib
@@ -84,18 +80,22 @@ import pathlib
 from ops import testing
 
 ctx = testing.Context(
-    MyCharm, meta={'name': 'julie', 'resources': {'foo': {'type': 'oci-image'}}}
+    MyCharm,
+    meta={
+        'name': 'julie',
+        'resources': {'my-resource': {'type': 'file'}},
+    },
 )
-resource = testing.Resource(name='foo', path='/path/to/resource.tar')
+resource = testing.Resource(name='my-resource', path='/path/to/somefile.txt')
 with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
-    path = mgr.charm.model.resources.fetch('foo')
-    assert path == pathlib.Path('/path/to/resource.tar')
+    path = mgr.charm.model.resources.fetch('my-resource')
+    assert path == pathlib.Path('/path/to/somefile.txt')
 ```
 
 (manage-resources-integration-tests)=
 ### Write integration tests
 
-> See first: {ref}`write-integration-tests-for-a-charm`
+See first: {ref}`write-integration-tests-for-a-charm`
 
 During development and testing, it's useful to specify resource locations when deploying the charm.
 
