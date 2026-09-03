@@ -268,15 +268,11 @@ def test_relation_set(mycharm: type[CharmBase]):
         replace(
             relation,
             local_app_data={'a': 'b'},
-            local_unit_data={'c': 'd', **_DEFAULT_JUJU_DATABAG},
-            remote_units_data={1: _DEFAULT_JUJU_DATABAG, 4: _DEFAULT_JUJU_DATABAG},
+            local_unit_data={'c': 'd'},
         )
     )
     assert out.get_relation(relation.id).local_app_data == {'a': 'b'}
-    assert out.get_relation(relation.id).local_unit_data == {
-        'c': 'd',
-        **_DEFAULT_JUJU_DATABAG,
-    }
+    assert out.get_relation(relation.id).local_unit_data == {'c': 'd'}
 
 
 def test_checkinfo_changeid_none():
@@ -706,7 +702,7 @@ def test_state_immutable_with_changed_data_relation(
     relation_out = state_out.get_relation(relation_in.id)
     assert not relation_in.local_app_data
     assert relation_out.local_app_data == {'a': 'b'}
-    assert relation_out.local_unit_data == {'c': 'd', **_DEFAULT_JUJU_DATABAG}
+    assert relation_out.local_unit_data == {'c': 'd'}
 
 
 def test_state_immutable_with_changed_data_container(mycharm: type[CharmBase]):

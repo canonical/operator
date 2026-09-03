@@ -7,7 +7,16 @@ from collections.abc import Callable
 from typing import Any, ClassVar
 
 import pytest
-from scenario import Context, PeerRelation, Relation, State, SubordinateRelation
+from scenario import (
+    Address,
+    BindAddress,
+    Context,
+    Network,
+    PeerRelation,
+    Relation,
+    State,
+    SubordinateRelation,
+)
 from scenario.errors import StateValidationError, UncaughtCharmError
 from scenario.state import (
     _DEFAULT_JUJU_DATABAG,
@@ -186,7 +195,6 @@ def test_relation_set_single_add_del_change():
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
     assert rel_out.local_unit_data == {
-        **_DEFAULT_JUJU_DATABAG,
         'to-ignore-key': 'to-ignore-val',
         'to-change-key': 'to-change-val-new',
         'new-key': 'new-val',
@@ -320,7 +328,7 @@ def test_relation_set_bulk_update(
     rel_in = PeerRelation(endpoint=relation_name, local_unit_data=original_data)
     state = ctx.run(ctx.on.update_status(), State(relations={rel_in}))
     rel_out = state.get_relation(rel_in.id)
-    assert rel_out.local_unit_data == {**_DEFAULT_JUJU_DATABAG, **result_data}
+    assert rel_out.local_unit_data == result_data
 
 
 @pytest.mark.parametrize(
@@ -492,8 +500,10 @@ def test_relation_default_unit_data_peer():
     'juju_version,expect_private_address',
     [('3.6.14', True), ('4.0.0', False), ('4.1.0', False)],
 )
-def test_juju_default_databag_injected_at_exec(juju_version: str, expect_private_address: bool):
-    """Scenario mirrors Juju: default databag keys are injected at exec time.
+def test_juju_default_databag_present_while_charm_runs(
+    juju_version: str, expect_private_address: bool
+):
+    """Scenario mirrors Juju: the keys Juju manages are set while the charm runs.
 
     On Juju 3, `private-address`, `egress-subnets`, and `ingress-address` are
     all populated; on Juju 4, `private-address` is not.
@@ -512,29 +522,101 @@ def test_juju_default_databag_injected_at_exec(juju_version: str, expect_private
     peer = PeerRelation('p')
     sub = SubordinateRelation('sub')
     state_in = State(leader=True, relations={relation, peer, sub})
+    expected = dict(_DEFAULT_JUJU_DATABAG)
+    if not expect_private_address:
+        del expected['private-address']
 
+    def check_databags(event: ops.EventBase):
+        model = event.framework.model
+        seen = 0
+        for endpoint in ('foo', 'p', 'sub'):
+            for rel in model.relations[endpoint]:
+                for entity in {model.unit, *rel.units}:
+                    assert dict(rel.data[entity]) == expected
+                    seen += 1
+        assert seen == 5
+
+    Charm._call = check_databags
     state_out = ctx.run(ctx.on.start(), state_in)
+    assert Charm.called
 
-    rel = state_out.get_relation(relation.id)
-    peer_rel = state_out.get_relation(peer.id)
-    sub_rel = state_out.get_relation(sub.id)
-    assert isinstance(rel, Relation)
-    assert isinstance(peer_rel, PeerRelation)
-    assert isinstance(sub_rel, SubordinateRelation)
-    for databag in (
-        rel.local_unit_data,
-        rel.remote_units_data[0],
-        peer_rel.local_unit_data,
-        sub_rel.local_unit_data,
-        sub_rel.remote_unit_data,
-    ):
-        assert databag['egress-subnets'] == '192.0.2.0'
-        assert databag['ingress-address'] == '192.0.2.0'
-        assert ('private-address' in databag) is expect_private_address
+    # The keys only exist while the charm is running: the output state has the
+    # same (empty) databags as the input one.
+    rel_out = state_out.get_relation(relation.id)
+    peer_out = state_out.get_relation(peer.id)
+    sub_out = state_out.get_relation(sub.id)
+    assert isinstance(rel_out, Relation)
+    assert isinstance(peer_out, PeerRelation)
+    assert isinstance(sub_out, SubordinateRelation)
+    assert rel_out.local_unit_data == {}
+    assert rel_out.remote_units_data == {0: {}}
+    assert peer_out.local_unit_data == {}
+    assert sub_out.local_unit_data == {}
+    assert sub_out.remote_unit_data == {}
+
+
+def test_juju_default_databag_uses_network_from_state():
+    """The values match what Juju would provide, based on the state's network."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+        juju_version='3.6.14',
+    )
+    network = Network(
+        'foo',
+        [BindAddress([Address('10.0.0.10', hostname='foo.example.com')])],
+        ingress_addresses=['10.0.0.10', '10.0.0.11'],
+        egress_subnets=['10.0.0.0/24', '10.1.0.0/24'],
+    )
+    relation = Relation('foo')
+    seen: dict[str, str] = {}
+
+    def check_databag(event: ops.EventBase):
+        model = event.framework.model
+        rel = model.get_relation('foo')
+        assert rel is not None
+        seen.update(rel.data[model.unit])
+
+    Charm._call = check_databag
+    ctx.run(
+        ctx.on.start(),
+        State(leader=True, relations={relation}, networks={network}),
+    )
+    assert seen == {
+        'egress-subnets': '10.0.0.0/24,10.1.0.0/24',
+        'ingress-address': '10.0.0.10',
+        'private-address': '10.0.0.10',
+    }
+
+
+def test_juju_default_databag_with_empty_network():
+    """A network with no addresses means Juju has no values to provide."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+        juju_version='3.6.14',
+    )
+    network = Network('foo', [], ingress_addresses=[], egress_subnets=[])
+    relation = Relation('foo')
+    seen: dict[str, str] = {'not': 'empty'}
+
+    def check_databag(event: ops.EventBase):
+        model = event.framework.model
+        rel = model.get_relation('foo')
+        assert rel is not None
+        seen.clear()
+        seen.update(rel.data[model.unit])
+
+    Charm._call = check_databag
+    ctx.run(
+        ctx.on.start(),
+        State(leader=True, relations={relation}, networks={network}),
+    )
+    assert seen == {}
 
 
 def test_juju_default_databag_preserves_explicit_values():
-    """Explicit user-set values must not be overwritten by injection."""
+    """Explicit user-set values must not be overwritten, or removed afterwards."""
     ctx = Context(
         Charm,
         meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
@@ -544,15 +626,49 @@ def test_juju_default_databag_preserves_explicit_values():
         'foo',
         local_unit_data={'private-address': '10.0.0.5', 'extra': 'kept'},
     )
+
+    def check_databag(event: ops.EventBase):
+        model = event.framework.model
+        rel = model.get_relation('foo')
+        assert rel is not None
+        # The missing keys are filled in, and the provided ones are left alone.
+        assert dict(rel.data[model.unit]) == {
+            'private-address': '10.0.0.5',
+            'extra': 'kept',
+            'egress-subnets': '192.0.2.0/24',
+            'ingress-address': '192.0.2.0',
+        }
+
+    Charm._call = check_databag
+    state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
+    assert Charm.called
+
+    rel_out = state_out.get_relation(relation.id)
+    assert isinstance(rel_out, Relation)
+    assert rel_out.local_unit_data == {'private-address': '10.0.0.5', 'extra': 'kept'}
+
+
+def test_juju_default_databag_keeps_values_the_charm_changed():
+    """A key the charm wrote to is kept in the output state."""
+    ctx = Context(
+        Charm,
+        meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
+        juju_version='3.6.14',
+    )
+    relation = Relation('foo')
+
+    def set_databag(event: ops.EventBase):
+        model = event.framework.model
+        rel = model.get_relation('foo')
+        assert rel is not None
+        rel.data[model.unit]['ingress-address'] = '10.0.0.5'
+
+    Charm._call = set_databag
     state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
 
-    rel = state_out.get_relation(relation.id)
-    assert isinstance(rel, Relation)
-    assert rel.local_unit_data['private-address'] == '10.0.0.5'
-    assert rel.local_unit_data['extra'] == 'kept'
-    # Missing defaults are still filled in.
-    assert rel.local_unit_data['egress-subnets'] == '192.0.2.0'
-    assert rel.local_unit_data['ingress-address'] == '192.0.2.0'
+    rel_out = state_out.get_relation(relation.id)
+    assert isinstance(rel_out, Relation)
+    assert rel_out.local_unit_data == {'ingress-address': '10.0.0.5'}
 
 
 def test_juju_default_databag_does_not_touch_input_state():
@@ -572,17 +688,27 @@ def test_juju_default_databag_does_not_touch_input_state():
 
 
 def test_juju_default_databag_not_added_to_app_databags():
-    """App databags are not touched — Juju only sets these on unit databags."""
+    """App databags are not touched: Juju only sets these on unit databags."""
     ctx = Context(
         Charm,
         meta={'name': 'foo', 'requires': {'foo': {'interface': 'foo'}}},
     )
     relation = Relation('foo')
+
+    def check_app_databags(event: ops.EventBase):
+        model = event.framework.model
+        rel = model.get_relation('foo')
+        assert rel is not None
+        assert dict(rel.data[model.app]) == {}
+        assert dict(rel.data[rel.app]) == {}
+
+    Charm._call = check_app_databags
     state_out = ctx.run(ctx.on.start(), State(leader=True, relations={relation}))
-    rel = state_out.get_relation(relation.id)
-    assert isinstance(rel, Relation)
-    assert rel.local_app_data == {}
-    assert rel.remote_app_data == {}
+    assert Charm.called
+    rel_out = state_out.get_relation(relation.id)
+    assert isinstance(rel_out, Relation)
+    assert rel_out.local_app_data == {}
+    assert rel_out.remote_app_data == {}
 
 
 @pytest.mark.parametrize('evt_name', ('broken', 'created'))

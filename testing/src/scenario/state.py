@@ -663,10 +663,11 @@ class RelationBase:
     )
     """This unit's databag for this relation.
 
-    Defaults to an empty dict. The Juju-managed keys (``egress-subnets``,
-    ``ingress-address``, and on Juju 3 also ``private-address``) are injected
-    at event exec time and appear in the output state, mirroring how Juju
-    populates the databag before the charm runs.
+    Defaults to an empty dict. While the charm is running, the keys that Juju
+    manages itself (``egress-subnets``, ``ingress-address``, and on Juju 3 also
+    ``private-address``) are present, filled in from the :class:`Network` for
+    this endpoint. They are removed again before the output state is returned,
+    so that the output state has the same shape as the input one.
     """
 
     @property
@@ -733,40 +734,82 @@ class RelationBase:
 
 
 _DEFAULT_IP = '192.0.2.0'
-# Keys Juju auto-populates in every relation unit databag before the charm
-# runs. `private-address` was dropped in Juju 4.0.
-_JUJU_DEFAULT_UNIT_DATABAG_KEYS_JUJU3 = ('egress-subnets', 'ingress-address', 'private-address')
-_JUJU_DEFAULT_UNIT_DATABAG_KEYS_JUJU4 = ('egress-subnets', 'ingress-address')
+_DEFAULT_EGRESS_SUBNET = '192.0.2.0/24'
 
-# The Juju-3 default unit databag as it appears in the *output* state after
-# Scenario has injected the auto-managed keys. Kept as a convenience for test
-# assertions; construction defaults are now empty dicts.
+# The unit databag contents that Juju 3 provides for a relation that uses the
+# default network. Provided as a convenience for tests that assert on the
+# databag contents while the charm is running.
 _DEFAULT_JUJU_DATABAG: dict[str, str] = {
-    key: _DEFAULT_IP for key in _JUJU_DEFAULT_UNIT_DATABAG_KEYS_JUJU3
+    'egress-subnets': _DEFAULT_EGRESS_SUBNET,
+    'ingress-address': _DEFAULT_IP,
+    'private-address': _DEFAULT_IP,
 }
 
 
-def _juju_default_unit_databag_keys(juju_version: str) -> tuple[str, ...]:
-    """Return the keys Juju auto-populates in unit databags for this version."""
-    if ops.JujuVersion(juju_version).major < 4:
-        return _JUJU_DEFAULT_UNIT_DATABAG_KEYS_JUJU3
-    return _JUJU_DEFAULT_UNIT_DATABAG_KEYS_JUJU4
+def _juju_default_databag(state: State, endpoint: str, juju_version: str) -> dict[str, str]:
+    """The keys and values that Juju itself puts in a unit databag.
+
+    Juju fills these in from the unit's network for the relation's endpoint, so
+    we do the same, using the :class:`Network` from the state for that endpoint,
+    or the default network if the state doesn't have one.
+
+    ``private-address`` is not included for Juju 4 and later, where Juju no
+    longer provides it.
+    """
+    try:
+        network = state.get_network(endpoint)
+    except KeyError:
+        network = Network(endpoint)
+    databag: dict[str, str] = {}
+    if network.egress_subnets:
+        databag['egress-subnets'] = ','.join(network.egress_subnets)
+    if network.ingress_addresses:
+        databag['ingress-address'] = network.ingress_addresses[0]
+        if ops.JujuVersion(juju_version).major < 4:
+            # Juju 4 no longer provides private-address.
+            databag['private-address'] = network.ingress_addresses[0]
+    return databag
 
 
-def _inject_juju_default_databag_keys(state: State, juju_version: str) -> None:  # pyright: ignore[reportUnusedFunction]
-    """Populate Juju-managed default keys in every relation unit databag.
+def _inject_juju_default_databag_keys(  # pyright: ignore[reportUnusedFunction]
+    state: State,
+    juju_version: str,
+) -> list[tuple[dict[str, str], str, str]]:
+    """Populate the Juju-managed keys in every relation unit databag.
 
     Mirrors Juju's own behaviour: before the charm runs, Juju sets
     ``egress-subnets``, ``ingress-address``, and (on Juju 3) ``private-address``
-    in each unit's databag if the key is not already present. Existing values
-    set by the test author are left untouched. App databags are not affected.
+    in each unit's databag if the key is not already present. Values that the
+    test author has set are left untouched, and app databags are not affected.
+
+    Returns the (databag, key, value) triples that were injected, so that they
+    can be removed again with :func:`_remove_juju_default_databag_keys`.
     """
-    keys = _juju_default_unit_databag_keys(juju_version)
+    injected: list[tuple[dict[str, str], str, str]] = []
     for relation in state.relations:
-        for databag in relation._unit_databags:
-            for key in keys:
+        defaults = _juju_default_databag(state, relation.endpoint, juju_version)
+        for raw_databag in relation._unit_databags:
+            databag = cast('dict[str, str]', raw_databag)
+            for key, value in defaults.items():
                 if key not in databag:
-                    cast('dict[str, str]', databag)[key] = _DEFAULT_IP
+                    databag[key] = value
+                    injected.append((databag, key, value))
+    return injected
+
+
+def _remove_juju_default_databag_keys(  # pyright: ignore[reportUnusedFunction]
+    injected: Iterable[tuple[dict[str, str], str, str]],
+) -> None:
+    """Remove the keys that :func:`_inject_juju_default_databag_keys` added.
+
+    The keys are only meant to exist while the charm is running, so that the
+    output state has the same shape as the input one. A key that the charm
+    changed while it was running is left alone, so that the charm's own writes
+    are visible in the output state.
+    """
+    for databag, key, value in injected:
+        if databag.get(key) == value:
+            del databag[key]
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -787,8 +830,9 @@ class Relation(RelationBase):
     )
     """The current content of the databag for each unit in the relation.
 
-    Each unit's databag defaults to an empty dict; Juju-managed keys are
-    injected at event exec time.
+    Each unit's databag defaults to an empty dict. The keys that Juju manages
+    itself are only present while the charm is running - see
+    :attr:`RelationBase.local_unit_data`.
     """
 
     remote_model_uuid: str | None = None
@@ -837,7 +881,9 @@ class SubordinateRelation(RelationBase):
     )
     """The current content of the remote unit databag.
 
-    Defaults to an empty dict; Juju-managed keys are injected at event exec time.
+    Defaults to an empty dict. The keys that Juju manages itself are only
+    present while the charm is running - see
+    :attr:`RelationBase.local_unit_data`.
     """
 
     remote_app_name: str = 'remote'
