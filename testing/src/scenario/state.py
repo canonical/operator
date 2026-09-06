@@ -72,6 +72,10 @@ RawSecretRevisionContents = RawDataBagContents = Mapping[str, str]
 UnitID = int
 
 CharmType = TypeVar('CharmType', bound=CharmBase)
+# Covariant version used by :class:`_CharmSpec` so that, for example,
+# ``_CharmSpec[MyCharm]`` is assignable to ``_CharmSpec[CharmBase]``.
+# ``_CharmSpec`` is a frozen dataclass, so covariance is sound here.
+_CharmTypeCo = TypeVar('_CharmTypeCo', bound=CharmBase, covariant=True)
 _RelationType = TypeVar('_RelationType', bound='RelationBase')
 
 logger = scenario_logger.getChild('state')
@@ -2242,10 +2246,10 @@ def _apply_extensions(meta: dict[str, Any], extensions: list[str]) -> None:
 
 
 @dataclasses.dataclass(frozen=True)
-class _CharmSpec(Generic[CharmType]):
+class _CharmSpec(Generic[_CharmTypeCo]):
     """Charm spec."""
 
-    charm_type: type[CharmType]
+    charm_type: type[_CharmTypeCo]
     meta: Mapping[str, Any]
     actions: Mapping[str, Any] | None = None
     config: Mapping[str, Any] | None = None
@@ -2297,7 +2301,7 @@ class _CharmSpec(Generic[CharmType]):
         return meta, config, actions
 
     @staticmethod
-    def autoload(charm_type: type[CharmBase]) -> _CharmSpec[CharmBase]:
+    def autoload(charm_type: type[CharmType]) -> _CharmSpec[CharmType]:
         """Construct a ``_CharmSpec`` object by looking up the metadata from the charm's repo root.
 
         Will attempt to load the metadata off the ``charmcraft.yaml`` file
