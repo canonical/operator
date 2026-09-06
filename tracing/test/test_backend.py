@@ -103,7 +103,7 @@ def test_exporter_http_error_log_format(tmp_path: pathlib.Path, caplog: pytest.L
         503,
         'Service Unavailable',
         email.message.Message(),
-        io.BytesIO(long_body),  # type: ignore[arg-type]
+        io.BytesIO(long_body),
     )
 
     with patch('urllib.request.urlopen', side_effect=http_error), caplog.at_level(
