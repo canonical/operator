@@ -558,7 +558,7 @@ The name of the `.charm` file depends on your computer's architecture. For examp
 
 ```{tip}
 
-**If packing fails with `OSError: [Errno 40] Too many levels of symbolic links`:** delete the `.tox` and `.venv` directories from your project and run `charmcraft pack` again. Tools like `tox` and `uv` create these virtual environments, and Charmcraft trips over the symbolic links inside them. Most of the reports so far are from people working in a VM on a Mac, and packing in destructive mode avoids the problem for some of them but not all. If you run into this, please add your environment details to [canonical/charmcraft#2661](https://github.com/canonical/charmcraft/issues/2661), which is where the bug is being tracked.
+**If packing fails with `OSError: [Errno 40] Too many levels of symbolic links`:** delete the `.tox` and `.venv` directories from your project and run `charmcraft pack` again. These virtual environments are created by tox and uv, and Charmcraft trips over the symbolic links inside them. If you see this error, please add your operating system details to [canonical/charmcraft#2661](https://github.com/canonical/charmcraft/issues/2661), which is where the bug is being tracked.
 
 ```
 
