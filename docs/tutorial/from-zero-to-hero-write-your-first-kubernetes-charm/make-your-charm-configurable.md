@@ -30,13 +30,10 @@ To begin with, let's define the option that will be available for configuration.
 
 In `charmcraft.yaml`, replace the `config` block with:
 
-```yaml
-config:
-  options:
-    server-port:
-      default: 8000
-      description: Default port on which FastAPI is available
-      type: int
+```{literalinclude} ../../../examples/k8s-2-configurable/charmcraft.yaml
+:language: yaml
+:start-at: 'config:'
+:end-at: 'type: int'
 ```
 
 This defines a configuration option called `server-port`. The `default` value is `8000` -- this is the value you're trying to allow a charm user to configure.
@@ -45,18 +42,9 @@ This defines a configuration option called `server-port`. The `default` value is
 
 Open your `src/charm.py` file, and add a configuration class that matches the configuration you added in `charmcraft.yaml`:
 
-```python
-@dataclasses.dataclass(frozen=True, kw_only=True)
-class FastAPIConfig:
-    """Configuration for the FastAPI demo charm."""
-
-    server_port: int = 8000
-    """Default port on which FastAPI is available."""
-
-    def __post_init__(self):
-        """Validate the configuration."""
-        if self.server_port == 22:
-            raise ValueError("Invalid port number, 22 is reserved for SSH")
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:pyobject: FastAPIConfig
 ```
 
 Then, still in `src/charm.py`, add `import dataclasses` in the imports at the top of the file.
@@ -69,15 +57,19 @@ Open your `src/charm.py` file.
 
 In the `__init__` function, add an observer for the `config_changed` event and pair it with an `_on_config_changed` handler:
 
-```python
-framework.observe(self.on.config_changed, self._on_config_changed)
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:start-at: framework.observe(self.on.config_changed
+:end-at: framework.observe(self.on.config_changed
+:dedent:
 ```
 
 Now, define the handler, as below. Since configuring something like a port affects the way we call our workload application, we need to update our Pebble configuration.
 
-```python
-def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
-    self._replan_workload()
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._on_config_changed
+:dedent:
 ```
 
 We'll define `_replan_workload` shortly.
@@ -89,10 +81,11 @@ A charm does not know which configuration option has been changed. Thus, make su
 
 In the `__init__` function, add attributes for the workload container and the name of the application service in the workload container:
 
-```python
-# See 'containers' in charmcraft.yaml.
-self.container = self.unit.get_container("demo-server")
-self.pebble_service_name = "fastapi"
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:start-at: "# See 'containers' in charmcraft.yaml."
+:end-at: self.pebble_service_name = "fastapi"
+:dedent:
 ```
 
 As we saw in the previous chapter, the `fastapi` service exposes the app on port 8000. To be able to configure the port, our charm needs to add a Pebble layer that overrides the definition of the `fastapi` service.
@@ -119,53 +112,20 @@ This method defines a service with `override` set to `merge`, which means that u
 
 Next, create the `_replan_workload` method, as below. This method will add our constructed layer to the workload container and restart the `fastapi` service if the service definition has changed.
 
-```python
-def _replan_workload(self) -> None:
-    """Define and start a workload using the Pebble API.
-
-    You'll need to specify the right entrypoint and environment
-    configuration for your specific workload. Tip: you can see the
-    standard entrypoint of an existing container using docker inspect
-    Learn more about interacting with Pebble at
-        https://canonical.com/juju/docs/ops/latest/reference/pebble/
-    Learn more about Pebble layers at
-        https://ubuntu.com/docs/pebble/how-to/use-layers/
-    """
-    # Learn more about statuses at
-    # https://documentation.ubuntu.com/juju/3.6/reference/status/
-    self.unit.status = ops.MaintenanceStatus("Assembling Pebble layers")
-    try:
-        config = self.load_config(FastAPIConfig)
-    except ValueError as e:
-        logger.error("Configuration error: %s", e)
-        self.unit.status = ops.BlockedStatus(str(e))
-        return
-    try:
-        self.container.add_layer(
-            "fastapi_demo", self._get_pebble_layer(config.server_port), combine=True
-        )
-        logger.info("Added updated layer 'fastapi_demo' to Pebble plan")
-
-        # Tell Pebble to incorporate the changes, including restarting the
-        # service if required.
-        self.container.replan()
-        logger.info(f"Replanned with '{self.pebble_service_name}' service")
-    except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
-        logger.info("Unable to connect to Pebble: %s", e)
-        self.unit.status = ops.MaintenanceStatus("Waiting for Pebble in workload container")
-        return
-    version = fastapi_demo.get_version(config.server_port)
-    self.unit.set_workload_version(version)
-    self.unit.status = ops.ActiveStatus()
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._replan_workload
+:dedent:
 ```
 
 If the loaded config is invalid (in our case, if the port is set to 22), we set the status of the unit to blocked. This lets the Juju user know that they need to take action.
 
 As you may have noticed, `_replan_workload` looks like a more advanced variant of the existing `_on_demo_server_pebble_ready` method. Update the `_on_demo_server_pebble_ready` method to call `_replan_workload` instead:
 
-```python
-def _on_demo_server_pebble_ready(self, _: ops.PebbleReadyEvent) -> None:
-    self._replan_workload()
+```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
+:language: python
+:pyobject: FastAPIDemoCharm._on_demo_server_pebble_ready
+:dedent:
 ```
 
 ## Validate your charm
@@ -238,51 +198,29 @@ Since we added a new feature to configure `server-port` and use it in the Pebble
 
 First, in `tests/unit/test_charm.py`, find the `expected_plan = ` line then add a line that sets `override` for the `fastapi` service:
 
-```python
-# Expected plan after Pebble ready with default config.
-expected_plan = ops.pebble.Plan(ROCK_LAYER.to_dict())
-expected_plan.services["fastapi"].override = "merge"
+```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
+:language: python
+:start-at: "# Expected plan after Pebble ready with default config."
+:end-at: expected_plan.services["fastapi"].override = "merge"
+:dedent:
 ```
 
 This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.
 
 Next, we'll add a test that sets the port in the input state and asserts that the port is used in the service's command in the Pebble layer:
 
-```python
-def test_config_changed(mock_version):
-    ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(
-        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
-    )
-    state_in = testing.State(
-        containers={container},
-        config={"server-port": 8080},
-        leader=True,
-    )
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-    command = state_out.get_container(container.name).plan.services["fastapi"].command
-    assert "--port 8080" in command
+```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
+:language: python
+:pyobject: test_config_changed
 ```
 
 We need the `mock_version` fixture because `_on_config_changed` calls `_replan_workload`, which gets the workload version using `fastapi_demo.get_version`. The fixture patches `get_version` to avoid making a real HTTP call, so that the unit test stays deterministic.
 
 In `_on_config_changed`, we specifically don't allow port 22 to be used. If port 22 is configured, we set the unit status to `blocked`. So, we can add a test to cover this behaviour by setting the port to 22 in the input state and asserting that the unit status is blocked:
 
-```python
-def test_config_changed_invalid_port(mock_version):
-    ctx = testing.Context(FastAPIDemoCharm)
-    container = testing.Container(
-        name="demo-server", can_connect=True, layers={"rock": ROCK_LAYER}
-    )
-    state_in = testing.State(
-        containers={container},
-        config={"server-port": 22},
-        leader=True,
-    )
-    state_out = ctx.run(ctx.on.config_changed(), state_in)
-    assert state_out.unit_status == testing.BlockedStatus(
-        "Invalid port number, 22 is reserved for SSH"
-    )
+```{literalinclude} ../../../examples/k8s-2-configurable/tests/unit/test_charm.py
+:language: python
+:pyobject: test_config_changed_invalid_port
 ```
 
 Run `tox -e unit` to check that all tests pass.
