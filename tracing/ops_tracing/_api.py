@@ -24,6 +24,7 @@ from charmlibs.interfaces.certificate_transfer import CertificateTransferRequire
 from charmlibs.interfaces.tracing import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
+    ReceiverProtocol,
     TracingEndpointRequirer,
 )
 
@@ -31,6 +32,64 @@ from ._buffer import Destination
 
 logger = logging.getLogger(__name__)
 tracer = opentelemetry.trace.get_tracer('ops.tracing')
+
+
+class _CertificateTransferRequires(CertificateTransferRequires):
+    """CertificateTransferRequires with an internal handle prefix.
+
+    The upstream library registers its Object handle as
+    ``{relationship_name}_v1``. When a charm also instantiates its own
+    ``CertificateTransferRequires`` on the same relation, both objects claim
+    the same handle path and the framework raises a RuntimeError. The
+    vendored library avoided this by prefixing the handle with
+    ``"internal: "``; this subclass restores that behaviour.
+    """
+
+    def __init__(self, charm: ops.CharmBase, relationship_name: str):
+        ops.Object.__init__(self, charm, f'internal: {relationship_name}_v1')
+        self.relationship_name = relationship_name
+        self.charm = charm
+        self.framework.observe(
+            charm.on[relationship_name].relation_changed, self._on_relation_changed
+        )
+        self.framework.observe(
+            charm.on[relationship_name].relation_broken, self._on_relation_broken
+        )
+        self.framework.observe(
+            charm.on[relationship_name].relation_created, self._on_relation_created
+        )
+
+
+class _TracingEndpointRequirer(TracingEndpointRequirer):
+    """TracingEndpointRequirer with an internal handle prefix.
+
+    As with ``_CertificateTransferRequires``, this avoids handle collisions
+    when a charm also instantiates its own ``TracingEndpointRequirer`` on the
+    same relation name.
+    """
+
+    def __init__(
+        self,
+        charm: ops.CharmBase,
+        relation_name: str,
+        protocols: list[ReceiverProtocol] | None = None,
+    ):
+        ops.Object.__init__(self, charm, f'internal: {relation_name}')
+        self._is_single_endpoint = charm.meta.relations[relation_name].limit == 1
+        self._charm = charm
+        self._relation_name = relation_name
+        events = self._charm.on[self._relation_name]
+        self.framework.observe(events.relation_changed, self._on_tracing_relation_changed)
+        self.framework.observe(events.relation_broken, self._on_tracing_relation_broken)
+        if protocols and self._charm.unit.is_leader():
+            try:
+                self.request_protocols(protocols)
+            except ops.ModelError as e:
+                logger.error(
+                    'encountered error %s while attempting to request_protocols.'
+                    'The relation must be gone.',
+                    e,
+                )
 
 
 class Tracing(ops.Object):
@@ -117,7 +176,7 @@ class Tracing(ops.Object):
                     f' expected'
                 )
 
-            self._tracing = TracingEndpointRequirer(
+            self._tracing = _TracingEndpointRequirer(
                 self.charm,
                 tracing_relation_name,
                 protocols=['otlp_http'],
@@ -146,7 +205,7 @@ class Tracing(ops.Object):
                         f" 'certificate_transfer' is expected"
                     )
 
-                self._certificate_transfer = CertificateTransferRequires(charm, ca_relation_name)
+                self._certificate_transfer = _CertificateTransferRequires(charm, ca_relation_name)
 
                 for event in (
                     self._certificate_transfer.on.certificate_set_updated,
