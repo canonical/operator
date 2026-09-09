@@ -785,6 +785,52 @@ class TestModel:
             ]
             self.assertBackendCalls(harness, expected_backend_calls)
 
+    def test_relation_local_app_data_readability_follower_no_getitem(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """A follower can't read its own app databag by any route, not only __getitem__."""
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(False)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            databag = rel_db1.data[local_app]
+            with pytest.raises(ops.RelationDataError):
+                _ = 'local' in databag
+            with pytest.raises(ops.RelationDataError):
+                len(databag)
+            with pytest.raises(ops.RelationDataError):
+                list(databag)
+            with pytest.raises(ops.RelationDataError):
+                dict(databag)
+
+    def test_relation_update_follower_app_data_reports_write_error(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """update() reports the failed write, not the read that change detection needs."""
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(False)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            with pytest.raises(ops.RelationDataError) as excinfo:
+                rel_db1.data[local_app].update({'local': 'other'})
+            assert 'cannot write application data' in str(excinfo.value)
+
     def test_relation_no_units(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.add_relation('db1', 'remoteapp1')
         rel = self.ensure_relation(harness, 'db1')
