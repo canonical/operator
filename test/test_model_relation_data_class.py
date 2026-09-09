@@ -523,6 +523,29 @@ def test_relation_load_heterogeneous_tuple():
     assert isinstance(obj.pair, tuple)
 
 
+def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():
+    """The pydantic guard must key off __pydantic_validator__, not __is_pydantic_dataclass__.
+
+    __is_pydantic_dataclass__ only exists from pydantic 2.11; older pydantic
+    dataclasses (as old as 2.0.3) have __pydantic_validator__ in their
+    __dict__ instead. Simulate that older shape on a plain dataclass, without
+    needing multiple installed pydantic versions, and confirm Relation.load
+    still treats it as a pydantic target: ops's own recursive coercion must
+    not run, so a nested-dataclass-typed field stays a plain decoded dict
+    rather than being (mis-)coerced ahead of pydantic's own validation.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        nested: Nested
+
+    # Simulate pydantic < 2.11's shape.
+    Data.__pydantic_validator__ = object()  # pyright: ignore[reportAttributeAccessIssue]
+
+    obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
+    assert isinstance(obj.nested, dict)
+
+
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_simple(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):

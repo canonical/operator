@@ -1825,10 +1825,13 @@ class Relation:
                 data[fields[key]] = decoder(value)
         # For plain (non-pydantic) dataclass targets, recursively coerce nested
         # dataclass / enum / list / set fields. Pydantic handles its own coercion.
+        # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
+        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
+        # 2.11, so relying on it missed every earlier 2.x pydantic dataclass.
         if (
             not args
             and dataclasses.is_dataclass(cls)
-            and not getattr(cls, '__is_pydantic_dataclass__', False)
+            and '__pydantic_validator__' not in cls.__dict__
         ):
             return _charm._build_dataclass(cls, data)
         return cls(*args, **data)
