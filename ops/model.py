@@ -2171,7 +2171,11 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __repr__(self):
         try:
+            # If the data is already cached, validate the read here; otherwise
+            # force the load, which validates it. Either way the access is
+            # checked exactly once, and the error doesn't escape from repr().
             self._validate_cached_read()
+            _ = self._data
         except RelationDataAccessError:
             return '<n/a>'
         return super().__repr__()
