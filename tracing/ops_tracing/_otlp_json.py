@@ -49,8 +49,8 @@ def encode_spans(spans: Sequence[ReadableSpan]) -> bytes:
         if r not in resource_cache:
             resource_cache[r] = (r.schema_url, tuple(r.attributes.items()))
         s = span.instrumentation_scope
-        assert s  # noqa: S101  # OpenTelemetry SDK invariant: spans have a scope.
-        assert s.attributes is not None  # noqa: S101  # SDK invariant.
+        assert s  # ruff: ignore[assert]  # OpenTelemetry SDK invariant: spans have a scope.
+        assert s.attributes is not None  # ruff: ignore[assert]  # SDK invariant.
         if s not in scope_cache:
             scope_cache[s] = (
                 s.schema_url,
@@ -64,8 +64,8 @@ def encode_spans(spans: Sequence[ReadableSpan]) -> bytes:
     rv = {'resourceSpans': []}
     last_resource = last_scope = None
     for span in spans:
-        assert span.resource  # noqa: S101  # SDK invariant: spans have a resource.
-        assert span.instrumentation_scope  # noqa: S101  # SDK invariant.
+        assert span.resource  # ruff: ignore[assert]  # SDK invariant: spans have a resource.
+        assert span.instrumentation_scope  # ruff: ignore[assert]  # SDK invariant.
         if span.resource != last_resource:
             last_resource = span.resource
             last_scope = None
@@ -93,7 +93,7 @@ def _attributes(
 ) -> dict[str, Any]:
     rv = {'attributes': [], 'dropped_attributes_count': 0}
 
-    assert thing.attributes is not None  # noqa: S101  # SDK invariant.
+    assert thing.attributes is not None  # ruff: ignore[assert]  # SDK invariant.
     for k, v in thing.attributes.items():
         with contextlib.suppress(ValueError):
             rv['attributes'].append({'key': k, 'value': _value(v)})
@@ -154,7 +154,7 @@ _LOCAL = 0x100
 
 
 def _span(span: ReadableSpan):
-    assert span.context  # noqa: S101  # SDK invariant: ReadableSpan has a context.
+    assert span.context  # ruff: ignore[assert]  # SDK invariant: ReadableSpan has a context.
     rv = {
         'name': span.name,
         'kind': span.kind.value or 1,  # unspecified -> internal

@@ -95,11 +95,20 @@ Charms can track state in several ways, including using `ops.StoredState`. You s
 storedstate-guidance
 ```
 
+## Tool versions
+
+When you're deciding which version of Python, Juju, Ops, or Charmcraft to use, the Ubuntu base is the main constraint. Review the supported combinations for each LTS base, and the support commitments for Juju and Ops releases.
+
+```{toctree}
+:maxdepth: 1
+
+versions
+```
+
 % TOC only. Nothing shown on the page.
 
 ```{toctree}
 :hidden:
 
 state-transition-testing
-versions
 ```

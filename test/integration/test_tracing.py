@@ -121,7 +121,7 @@ def get_spans(endpoint: tuple[str, int], since: float = 0, https: bool = False):
     host, port = endpoint
     base_url = f'{"https" if https else "http"}://{host}:{port}/api/'
     # Insecure HTTPS because we don't want to fetch CA list from self-signed-certificates
-    with httpx.Client(base_url=base_url, timeout=5, verify=False) as client:  # noqa: S501
+    with httpx.Client(base_url=base_url, timeout=5, verify=False) as client:  # ruff: ignore[request-with-no-cert-validation]
         response = client.get('search?tags=service.name=test-tracing')
         response.raise_for_status()
         for trace in response.json()['traces']:

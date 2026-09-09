@@ -41,8 +41,8 @@ def fake_script(request: pytest.FixtureRequest):
 
 
 class StoragePermutations(abc.ABC):
-    assertEqual = unittest.TestCase.assertEqual  # noqa
-    assertRaises = unittest.TestCase.assertRaises  # noqa
+    assertEqual = unittest.TestCase.assertEqual  # ruff: ignore[mixed-case-variable-in-class-scope]
+    assertRaises = unittest.TestCase.assertRaises  # ruff: ignore[mixed-case-variable-in-class-scope]
 
     def create_framework(
         self,
@@ -413,17 +413,17 @@ class TestSimpleLoader:
 
     def test_handles_tuples(self):
         raw = yaml.dump((1, 'tuple'), Dumper=ops.storage._SimpleDumper)
-        parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
+        parsed = yaml.load(raw, Loader=ops.storage._SimpleLoader)  # ruff: ignore[unsafe-yaml-load]
         assert parsed == (1, 'tuple')
 
-    def assertRefused(self, obj: typing.Any):  # noqa: N802
+    def assertRefused(self, obj: typing.Any):  # ruff: ignore[invalid-function-name]
         # We shouldn't allow them to be written
         with pytest.raises(yaml.representer.RepresenterError):
             yaml.dump(obj, Dumper=ops.storage._SimpleDumper)
         # If they did somehow end up written, we shouldn't be able to load them
         raw = yaml.dump(obj, Dumper=yaml.Dumper)
         with pytest.raises(yaml.constructor.ConstructorError):
-            yaml.load(raw, Loader=ops.storage._SimpleLoader)  # noqa: S506
+            yaml.load(raw, Loader=ops.storage._SimpleLoader)  # ruff: ignore[unsafe-yaml-load]
 
     def test_forbids_some_types(self):
         self.assertRefused(1 + 2j)
@@ -449,7 +449,7 @@ class TestJujuStateBackend:
         assert fake_script.calls(clear=True) == []
 
     def test_set_encodes_args(self, fake_script: FakeScript):
-        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
+        t = tempfile.NamedTemporaryFile()  # ruff: ignore[open-file-with-context-handler]
         try:
             fake_script.write(
                 'state-set',
@@ -486,7 +486,7 @@ class TestJujuStateBackend:
         ]
 
     def test_set_and_get_complex_value(self, fake_script: FakeScript):
-        t = tempfile.NamedTemporaryFile()  # noqa: SIM115
+        t = tempfile.NamedTemporaryFile()  # ruff: ignore[open-file-with-context-handler]
         try:
             fake_script.write(
                 'state-set',
@@ -514,7 +514,7 @@ class TestJujuStateBackend:
         outer = yaml.safe_load(content)
         key = 'Class[foo]/_stored'
         assert list(outer.keys()) == [key]
-        inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)  # noqa: S506
+        inner = yaml.load(outer[key], Loader=ops.storage._SimpleLoader)  # ruff: ignore[unsafe-yaml-load]
         assert complex_val == inner
         assert content.decode('utf-8') == dedent("""\
             "Class[foo]/_stored": |

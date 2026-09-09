@@ -390,7 +390,7 @@ class TestRealPebble:
             'web': pebble.Identity.from_dict({
                 'access': 'metrics',
                 'basic': {
-                    'password': '$6$et3kBQywmQQ./htQ$MuUHB8DyxOzZT//NXas0aT.P0j0DJA8fCWvpOJ9kn9O0HIlAvEcAJVGQ6OVr23ndtK9kiNgCnMs2NJtDe/nhC1'  # noqa: E501
+                    'password': '$6$et3kBQywmQQ./htQ$MuUHB8DyxOzZT//NXas0aT.P0j0DJA8fCWvpOJ9kn9O0HIlAvEcAJVGQ6OVr23ndtK9kiNgCnMs2NJtDe/nhC1'  # ruff: ignore[line-too-long]
                 },
             }),
             'alice': pebble.Identity.from_dict({
@@ -425,7 +425,7 @@ class TestRealPebble:
         monkeypatch: pytest.MonkeyPatch,
     ):
         client.push(f'{tmp_path}/test', os.urandom(1024 * 1024))  # chunk size is 16 * 2014
-        tf = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        tf = tempfile.NamedTemporaryFile(delete=False)  # ruff: ignore[open-file-with-context-handler]
         # Patch get_response to force a ProtocolError exception.
         monkeypatch.setattr(pebble._FilesParser, 'get_response', lambda self: None)  # type: ignore
         # Use our previously created temp dir so we can verify that it gets cleaned up.

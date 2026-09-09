@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
@@ -56,17 +56,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
       - name: Set up tox and tox-uv
         run: uv tool install tox --with tox-uv
       - name: Install Concierge
         run: sudo snap install --classic concierge
       - name: Prepare for deploying K8s charms
-        # .github/integration/concierge-k8s.yaml mirrors the upstream concierge
-        # k8s preset and adds juju.extra-bootstrap-args: `juju bootstrap`
-        # regularly fails on slow GHA runners with `unable to contact api server
-        # after 60 attempts` because the default --bootstrap-timeout is too short.
-        run: sudo concierge prepare -c .github/integration/concierge-k8s.yaml
+        run: sudo concierge prepare -p k8s
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
       - name: Fetch any charmlibs
         run: |

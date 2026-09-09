@@ -434,7 +434,7 @@ def update_versions_doc(version: str):
 
 def update_uv_lock():
     """Update the uv.lock file with the new versions."""
-    subprocess.run(['uv', 'lock'], check=True)  # noqa: S607
+    subprocess.run(['uv', 'lock'], check=True)  # ruff: ignore[start-process-with-partial-path]
 
 
 def get_scenario_version() -> packaging.version.Version:
