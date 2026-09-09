@@ -556,6 +556,12 @@ Packed tinyproxy_amd64.charm
 
 The name of the `.charm` file depends on your computer's architecture. For example, if your computer has an ARM-based architecture, the file is called `tinyproxy_arm64.charm`.
 
+```{tip}
+
+**If packing fails with `OSError: [Errno 40] Too many levels of symbolic links`:** delete the `.tox` and `.venv` directories from your project and run `charmcraft pack` again. These virtual environments are created by tox and uv, and Charmcraft trips over the symbolic links inside them. If you see this error, please add your operating system details to [canonical/charmcraft#2661](https://github.com/canonical/charmcraft/issues/2661), which is where the bug is being tracked.
+
+```
+
 ### Deploy your charm
 
 As you deploy your charm to Juju, it will be helpful to watch Juju status in real time.
