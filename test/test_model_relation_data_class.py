@@ -432,6 +432,68 @@ def test_relation_load_extra_args():
     assert obj.c == 'foo'
 
 
+def _load_into(cls: type[Any], remote_app_data: dict[str, str]) -> Any:
+    """Load ``remote_app_data`` into ``cls`` via ``Relation.load`` and return the result."""
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(cls, event.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data=remote_app_data)
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        return mgr.charm.data
+
+
+def test_relation_load_optional_nested_dataclass():
+    """Optional[X] (a Union with one concrete member) is coerced against X."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | None = None
+
+    obj = _load_into(Data, {'inner': json.dumps({'sub': 1})})
+    assert isinstance(obj.inner, Nested)
+    assert obj.inner.sub == 1
+
+    obj = _load_into(Data, {})
+    assert obj.inner is None
+
+
+def test_relation_load_dict_of_nested_dataclass():
+    """dict[str, X] fields are coerced against X for each value."""
+
+    @dataclasses.dataclass
+    class Data:
+        by_name: dict[str, Nested]
+
+    obj = _load_into(Data, {'by_name': json.dumps({'a': {'sub': 1}, 'b': {'sub': 2}})})
+    assert obj.by_name == {'a': Nested(sub=1), 'b': Nested(sub=2)}
+    assert all(isinstance(v, Nested) for v in obj.by_name.values())
+
+
+def test_relation_load_union_of_two_concrete_types_passes_through():
+    """A Union with more than one concrete member is passed through as-is.
+
+    There is no way to tell which member to coerce against, so this is a
+    regression check that such fields keep working uncoerced rather than
+    raising.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        value: int | str
+
+    obj = _load_into(Data, {'value': json.dumps('x')})
+    assert obj.value == 'x'
+
+
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_simple(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):

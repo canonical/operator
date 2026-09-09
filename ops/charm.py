@@ -21,6 +21,7 @@ import enum
 import logging
 import os
 import pathlib
+import types
 import typing
 import warnings
 from collections.abc import Mapping
@@ -1705,16 +1706,28 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     """Coerce a decoded ``value`` into the dataclass field type ``tp``.
 
     Used by :meth:`ops.Relation.load` to recursively construct nested
-    dataclasses and enum values from JSON-decoded relation data.
+    dataclasses and enum values from JSON-decoded relation data. An
+    ``Optional``/``Union`` field is coerced against its single non-``None``
+    member; ``dict``/``Mapping`` fields are coerced against their value type.
     """
     origin = typing.get_origin(tp)
     if origin is not None:
         args = typing.get_args(tp)
+        if origin is typing.Union or origin is types.UnionType:
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                # Optional[X]: coerce against the one concrete member.
+                return _coerce_field(non_none[0], value)
+            # A Union of more than one concrete type: no way to tell which
+            # member to coerce against, so accept the value as-is.
+            return value
         if origin in (list, tuple) and args:
             return [_coerce_field(args[0], v) for v in value]
         if origin in (set, frozenset) and args:
             return {_coerce_field(args[0], v) for v in value}
-        # Literal, Union, Optional, Dict, etc.: accept the value as-is.
+        if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
+            return {k: _coerce_field(args[1], v) for k, v in value.items()}
+        # Literal and other constructed generics: accept the value as-is.
         return value
     if isinstance(tp, type):
         if dataclasses.is_dataclass(tp):
