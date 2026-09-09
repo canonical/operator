@@ -23,7 +23,7 @@ multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 multipass shell juju-sandbox  # Switch to your virtual machine.
 ```
 
-Then use [Concierge](https://github.com/canonical/concierge) to set up a Juju controller inside your virtual machine:
+Then use {external+concierge:doc}`Concierge <index>` to set up a Juju controller inside your virtual machine:
 
 ```text
 sudo snap install --classic concierge
@@ -161,7 +161,7 @@ A common split:
 
 There are two main benefits to splitting. Firstly, it makes it easier to investigate test failures when they are more isolated. Secondly, it's much simpler to have parallel test execution, where each module runs as a separate job, so total wall-clock time is governed by the slowest module rather than the sum of all modules.
 
-`tox -e integration` runs every module sequentially on a single machine. `charmcraft test` will automatically run each task separately on your local machine, and you can set up a CI matrix (see {ref}`set-up-ci-integration`) that has the same behaviour in CI. Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job — no workflow changes needed.
+`tox -e integration` runs every module sequentially on a single machine. [Spread](https://github.com/canonical/spread) runs each module as a separate task, whether on your local machine or in a CI matrix (see {ref}`set-up-ci-spread`). Once done, adding a new `test_*.py` file and corresponding task.yaml then automatically adds a new CI job, with no workflow changes needed.
 
 For real-world examples of split tests, see:
 
@@ -191,6 +191,11 @@ def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
 This test deploys your charm and waits for all applications and units to be active.
 
 Jubilant provides several other helpers, in case you need to change the `wait` condition. See {external+jubilant:ref}`Use a custom wait condition <use_a_custom_wait_condition>`.
+
+For a Kubernetes charm, deploy with a resource. See this example (from {ref}`Manage resources <manage-resources-integration-tests>`):
+
+```{include} /reuse/manage-resources-integration-test-example.md
+```
 
 For more examples of tests that deploy charms, see:
 
@@ -226,100 +231,12 @@ def test_integrate(charm: pathlib.Path, juju: jubilant.Juju):
     assert charm_operates_correctly()
 ```
 
-See more: {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+See more:
 
-### Deploy your charm with resources
-
-See first: {ref}`manage-resources`
-
-A charm can require `file` or `oci-image` resources to work, which have revision numbers on Charmhub. OCI images can be referenced directly, while file resources are typically built during packing.
-
-```python
-...
-resources = {'resource_name': 'localhost:32000/image_name:latest'}
-juju.deploy(charm, resources=resources)
-...
-```
-
-In `charmcraft.yaml`'s `resources` section, the `upstream-source` is, by convention, a usable resource that can be used in testing, allowing your integration test to look like this:
-
-```python
-import pathlib
-
-import jubilant
-import pytest
-import yaml
-
-
-METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
-
-
-@pytest.mark.juju_setup
-def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
-    resources = {
-        name: res['upstream-source']
-        for name, res in METADATA['resources'].items()
-    }
-
-    juju.deploy(charm, resources=resources)
-    juju.wait(jubilant.all_active)
-```
-
-### Test a relation
-
-To test a relation between two applications, integrate them through
-the model. Both applications have to be deployed beforehand.
-
-```python
-def test_my_integration(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    # Both applications have to be deployed at this point.
-    # This could be done above in the current test or in a previous one.
-    juju.integrate('your-app:endpoint1', 'another:relation_name_2')
-    juju.wait(jubilant.all_active)
-    # check any assertion here
-    ...
-```
-
-See more: [](jubilant.Juju.integrate)
-
-This test (and subsequent tests) don't need to depend on the `charm` fixture. However, it's helpful for each test to depend on `charm`, so that each test fails immediately if a `.charm` file isn't available. If all your tests depend on the same charm being deployed, you could make `charm` an `autouse` fixture.
-
-### Test a configuration
-
-See first: {ref}`manage-configuration`
-
-You can set a configuration option in your application and check its results.
-
-```python
-def test_config_changed(charm: pathlib.Path, juju: jubilant.Juju):
-    ...
-    juju.config('your-app', {'server_name': 'invalid_name'})
-    # In this case, when setting server_name to "invalid_name"
-    # we could for example expect a blocked status.
-    juju.wait(jubilant.all_blocked, timeout=60)
-    ...
-```
-
-See also: [](jubilant.Juju.config)
-
-### Test an action
-
-See also: {external+juju:ref}`Action <action>`
-
-You can execute an action on a unit and get its results.
-
-```python
-def test_run_action(charm: pathlib.Path, juju: jubilant.Juju):
-    action_register_user = juju.run(
-        'your-app/0', 'register-user', {'username': 'ubuntu'}
-    )
-    assert action_register_user.status == 'completed'
-    password = action_register_user.results['user-password']
-    # We could for example check here that we can login with the new user
-```
-
-See also: [](jubilant.Juju.run)
+- {external+jubilant:doc}`Jubilant API reference <reference/jubilant>`
+- {ref}`Manage relations | Write integration tests <manage-relations-integration-tests>`
+- {ref}`Manage actions | Write integration tests <manage-actions-integration-tests>`
+- {ref}`Manage configuration | Write integration tests <manage-configuration-integration-tests>`
 
 ### Interact with the workload
 

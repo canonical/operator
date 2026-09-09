@@ -9,11 +9,7 @@ See also:
 
 ## Implement the feature
 
-<!--COMMENT: MOVE TO HOW TO UPLOAD
-Because resources are defined in a charm’s `charmcraft.yaml`, they are intrinsically linked to a charm. As such, there is no need to register them separately in Charmhub. Other charms may have resources with the same name, but this is not a problem; references to resources always contain the charm name and resource name.
--->
-
-In your charm's `src/charm.py` file, use `ops` to fetch the path to the resource and then manipulate it as needed.
+A charm can require file or oci-image resources, defined in charmcraft.yaml. You'll upload the resources to Charmhub as one of the charm publishing steps. Then when a user deploys your charm from Charmhub, the resources will be available to your charm code.
 
 For example, suppose your `charmcraft.yaml` file contains this simple resource definition:
 
@@ -74,6 +70,8 @@ juju deploy ./my-charm.charm --resource my-resource=/tmp/somefile.txt
 
 ## Test the feature
 
+### Write unit tests
+
 See first: {ref}`write-unit-tests-for-a-charm`
 
 If your charm requires access to resources, you can make them available to it
@@ -93,3 +91,21 @@ with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('foo')
     assert path == pathlib.Path('/path/to/resource.tar')
 ```
+
+(manage-resources-integration-tests)=
+### Write integration tests
+
+> See first: {ref}`write-integration-tests-for-a-charm`
+
+During development and testing, it's useful to specify resource locations when deploying the charm.
+
+The conventional place to specify resource locations for testing is the `upstream-source` field in `charmcraft.yaml`'s `resources` section:
+
+```{include} /reuse/manage-resources-integration-test-example.md
+```
+
+See also: [](jubilant.Juju.deploy)
+
+Examples: [`valkey-operator`](https://github.com/canonical/valkey-operator/blob/9/edge/tests/integration/test_charm.py), [`kafka-k8s-operator`](https://github.com/canonical/kafka-k8s-operator/blob/main/tests/integration/test_balancer.py)
+
+We recommend including the `charm` fixture (even though it's not used) so that the test fails immediately if a `.charm` file isn't available.
