@@ -20,16 +20,14 @@ import logging
 
 import opentelemetry.trace
 import ops
-
-from ._buffer import Destination
-from .vendor.charms.certificate_transfer_interface.v1.certificate_transfer import (
-    CertificateTransferRequires,
-)
-from .vendor.charms.tempo_coordinator_k8s.v0.tracing import (
+from charmlibs.interfaces.certificate_transfer import CertificateTransferRequires
+from charmlibs.interfaces.tracing import (
     AmbiguousRelationUsageError,
     ProtocolNotRequestedError,
     TracingEndpointRequirer,
 )
+
+from ._buffer import Destination
 
 logger = logging.getLogger(__name__)
 tracer = opentelemetry.trace.get_tracer('ops.tracing')
