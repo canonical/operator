@@ -1708,7 +1708,9 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     Used by :meth:`ops.Relation.load` to recursively construct nested
     dataclasses and enum values from JSON-decoded relation data. An
     ``Optional``/``Union`` field is coerced against its single non-``None``
-    member; ``dict``/``Mapping`` fields are coerced against their value type.
+    member; ``dict``/``Mapping`` fields are coerced against their value type;
+    a variable-length ``tuple[X, ...]`` is coerced element-wise against ``X``
+    and a fixed-length ``tuple[X, Y, ...]`` is coerced positionally.
     """
     origin = typing.get_origin(tp)
     if origin is not None:
@@ -1721,8 +1723,12 @@ def _coerce_field(tp: Any, value: Any) -> Any:
             # A Union of more than one concrete type: no way to tell which
             # member to coerce against, so accept the value as-is.
             return value
-        if origin in (list, tuple) and args:
+        if origin is list and args:
             return [_coerce_field(args[0], v) for v in value]
+        if origin is tuple and args:
+            if args[-1] is Ellipsis:
+                return tuple(_coerce_field(args[0], v) for v in value)
+            return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
         if origin in (set, frozenset) and args:
             return {_coerce_field(args[0], v) for v in value}
         if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:

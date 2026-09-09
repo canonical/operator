@@ -45,6 +45,11 @@ class Nested:
     sub: int = 28
 
 
+class _Colour(enum.Enum):
+    RED = 'red'
+    BLUE = 'blue'
+
+
 class DatabagProtocol(Protocol):
     foo: str
     bar: int
@@ -492,6 +497,30 @@ def test_relation_load_union_of_two_concrete_types_passes_through():
 
     obj = _load_into(Data, {'value': json.dumps('x')})
     assert obj.value == 'x'
+
+
+def test_relation_load_variable_length_tuple():
+    """tuple[X, ...] is coerced element-wise against X and stays a tuple."""
+
+    @dataclasses.dataclass
+    class Data:
+        items: tuple[Nested, ...]
+
+    obj = _load_into(Data, {'items': json.dumps([{'sub': 1}, {'sub': 2}])})
+    assert obj.items == (Nested(sub=1), Nested(sub=2))
+    assert isinstance(obj.items, tuple)
+
+
+def test_relation_load_heterogeneous_tuple():
+    """A fixed-length tuple[X, Y] is coerced positionally against each type."""
+
+    @dataclasses.dataclass
+    class Data:
+        pair: tuple[int, _Colour]
+
+    obj = _load_into(Data, {'pair': json.dumps([1, 'red'])})
+    assert obj.pair == (1, _Colour.RED)
+    assert isinstance(obj.pair, tuple)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
