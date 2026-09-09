@@ -1746,10 +1746,19 @@ def _coerce_field(tp: Any, value: Any) -> Any:
 def _build_dataclass(cls: Any, data: Mapping[str, Any]) -> Any:
     """Construct dataclass ``cls`` from ``data``, recursively coercing nested fields.
 
+    Falls back to the un-coerced ``cls(**data)`` if ``cls``'s type hints can't
+    be resolved, for example a ``TYPE_CHECKING``-only import with no runtime
+    name: ``get_type_hints`` resolves every field's annotation eagerly, so one
+    unresolvable field would otherwise break construction even when the
+    relation data at hand doesn't touch it.
+
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
     missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
     """
-    hints = get_type_hints(cls)
+    try:
+        hints = get_type_hints(cls)
+    except NameError:
+        return cls(**data)
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
         if field.name not in data:

@@ -21,9 +21,15 @@ import ipaddress
 import json
 import urllib.parse
 from collections.abc import Callable, Iterable
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    # Used only by test_relation_load_falls_back_when_type_hints_unresolvable,
+    # which needs an annotation naming a type that is never actually imported
+    # at runtime.
+    import decimal
 
 try:
     import pydantic
@@ -544,6 +550,26 @@ def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():
 
     obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
     assert isinstance(obj.nested, dict)
+
+
+def test_relation_load_falls_back_when_type_hints_unresolvable():
+    """get_type_hints raises NameError on a TYPE_CHECKING-only annotation.
+
+    ops's own ruff config disables TC001/2/3, so charms following ops's
+    conventions are the ones most likely to hit this. Relation.load must
+    fall back to the un-coerced constructor rather than raising, matching
+    what main's cls(**data) path already did before recursive coercion
+    existed.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        amount: decimal.Decimal | None = None
+        name: str = ''
+
+    obj = _load_into(Data, {'name': json.dumps('x')})
+    assert obj.name == 'x'
+    assert obj.amount is None
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
