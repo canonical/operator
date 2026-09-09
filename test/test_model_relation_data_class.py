@@ -572,6 +572,39 @@ def test_relation_load_falls_back_when_type_hints_unresolvable():
     assert obj.amount is None
 
 
+def test_relation_load_extra_args_still_coerces_remaining_fields():
+    """A positional arg must not silently disable coercion for other fields.
+
+    relation.load(cls, src, *args) matches args to cls's leading fields by
+    position; any fields filled that way are left uncoerced (there's nothing
+    to coerce them against without knowing which field each arg is for), but
+    fields still supplied from the relation data should keep being coerced.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        b: Nested
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, 10)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'b': json.dumps({'sub': 1})})
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.a == 10
+    assert isinstance(obj.b, Nested)
+    assert obj.b.sub == 1
+
+
 @pytest.mark.parametrize('charm_class', _test_classes)
 def test_relation_save_simple(charm_class: type[BaseTestCharm]):
     class Charm(charm_class):

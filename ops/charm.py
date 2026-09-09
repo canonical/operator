@@ -1743,14 +1743,19 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     return value
 
 
-def _build_dataclass(cls: Any, data: Mapping[str, Any]) -> Any:
-    """Construct dataclass ``cls`` from ``data``, recursively coercing nested fields.
+def _build_dataclass(cls: Any, data: Mapping[str, Any], *args: Any) -> Any:
+    """Construct dataclass ``cls`` from ``data`` and any positional ``args``.
 
-    Falls back to the un-coerced ``cls(**data)`` if ``cls``'s type hints can't
-    be resolved, for example a ``TYPE_CHECKING``-only import with no runtime
-    name: ``get_type_hints`` resolves every field's annotation eagerly, so one
-    unresolvable field would otherwise break construction even when the
-    relation data at hand doesn't touch it.
+    Recursively coerces nested dataclass / enum / list / set / tuple / dict
+    fields supplied via ``data``. Any leading fields already filled
+    positionally by ``args`` are matched by position, not by name, so they are
+    passed through as given rather than coerced.
+
+    Falls back to the un-coerced ``cls(*args, **data)`` if ``cls``'s type hints
+    can't be resolved, for example a ``TYPE_CHECKING``-only import with no
+    runtime name: ``get_type_hints`` resolves every field's annotation
+    eagerly, so one unresolvable field would otherwise break construction even
+    when the relation data at hand doesn't touch it.
 
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
     missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
@@ -1758,13 +1763,13 @@ def _build_dataclass(cls: Any, data: Mapping[str, Any]) -> Any:
     try:
         hints = get_type_hints(cls)
     except NameError:
-        return cls(**data)
+        return cls(*args, **data)
     kwargs: dict[str, Any] = {}
-    for field in dataclasses.fields(cls):
+    for field in dataclasses.fields(cls)[len(args) :]:
         if field.name not in data:
             continue
         kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
-    return cls(**kwargs)
+    return cls(*args, **kwargs)
 
 
 class CharmMeta:
