@@ -225,9 +225,9 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 ```python
 # Set the workload version of this charm.
 # The workload may not be ready immediately after replan(), so try get_version() in a loop.
-for attempt in range(3):
+for attempt in range(3):  # In general, allow more attempts for a complex workload.
     if attempt:
-        time.sleep(1)  # If not the first attempt, wait before retrying.
+        time.sleep(2**attempt)  # If not first attempt, retry with exponential back-off.
     try:
         version = fastapi_demo.get_version(port=8000)
         break
