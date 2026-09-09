@@ -2179,9 +2179,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
     def __repr__(self):
         try:
             self._validate_cached_read()
-            return super().__repr__()
         except RelationDataAccessError:
             return '<n/a>'
+        return super().__repr__()
 
 
 class ConfigData(_GenericLazyMapping['bool | int | float | str']):
