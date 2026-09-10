@@ -22,7 +22,7 @@ them. It is not part of the default ``unit`` tox env; run it via::
 
 The intent is to detect drift: if the canonical schemas under
 ``interfaces/{tracing,certificate_transfer}/`` change shape, this test should
-fail and force a conscious decision about whether to follow upstream.
+fail and force an explicit decision about whether to follow upstream.
 """
 
 from __future__ import annotations
