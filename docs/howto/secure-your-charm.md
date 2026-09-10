@@ -13,7 +13,7 @@ See first:
 - {external+juju:ref}`Juju | Harden your deployment <harden-your-deployment>`
 - {external+pebble:ref}`Pebble | Security <security>`
 
-This guide walks through the actions a charm author takes to harden a charm that uses Ops. Not every charm needs every step.
+This guide covers how to harden a charm that uses Ops. Not every charm needs every step.
 
 ## Keep sensitive data out of the observable surface
 
