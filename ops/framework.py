@@ -1026,11 +1026,7 @@ class Framework(Object):
                                 event_is_from_juju or event_is_action
                             ) and self._juju_debug_at.intersection({'all', 'hook'}):
                                 # Present the welcome message and run under PDB.
-                                # `pdb` is imported here rather than at the top of the
-                                # module because it's expensive (it pulls in asyncio,
-                                # among other things) and is only needed when the user
-                                # has asked for a debugger via JUJU_DEBUG_AT.
-                                import pdb
+                                import pdb  # Import expensive module only when needed.
 
                                 self._show_debug_code_message()
                                 pdb.runcall(custom_handler, event)
@@ -1092,10 +1088,9 @@ class Framework(Object):
             return
 
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
-            self._show_debug_code_message()
+            import pdb  # Import expensive module only when needed.
 
-            # As above, `pdb` is only imported when a debugger is actually wanted.
-            import pdb
+            self._show_debug_code_message()
 
             # If we call set_trace() directly it will open the debugger *here*, so indicating
             # it to use our caller's frame
