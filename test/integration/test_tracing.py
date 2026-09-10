@@ -15,19 +15,12 @@
 
 """Integration tests for ops_tracing.
 
-These tests are currently gated by two upstream problems that prevent the tempo
-coordinator from reaching ``active``:
+These tests are gated by canonical/observability-stack#110: resource patching
+on newer Juju releases prevents the tempo coordinator from reaching ``active``,
+which is why this file's ``test_direct_connection`` and ``test_with_tls`` are
+commented out of ``.github/workflows/integration.yaml``.
 
-- canonical/observability-stack#110 — resource patching on newer Juju releases
-  caused this file's ``test_direct_connection`` and ``test_with_tls`` to be
-  commented out of ``.github/workflows/integration.yaml``.
-- ``tempo-coordinator-k8s`` rev 143 (every ``2/*`` channel) crashes in
-  ``upgrade-charm`` because ``coordinated_workers/nginx.py:_delete_certificates``
-  calls ``update-ca-certificates --fresh`` in the nginx workload container, and
-  no ``ubuntu/nginx:*`` tag we tested ships that binary. A strict-xfail canary
-  for the image ships separately; when it xpasses, this gate is likely lifted.
-
-Until both are resolved, the four tests below (buffer replay, relation churn,
+Until that is resolved, the four tests below (buffer replay, relation churn,
 CA rotation, leader-only databag) cannot run end-to-end. They are kept here so
 that re-enabling them is a one-line change in CI once the upstream is healthy.
 """
