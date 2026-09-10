@@ -1766,9 +1766,9 @@ class Relation:
     ) -> _T:
         """Load the data for this relation into an instance of a data class.
 
-        The raw Juju relation data is passed to the data class's ``__init__``
-        method as keyword arguments, with values decoded using the provided
-        decoder function, or :func:`json.loads` if no decoder is provided.
+        The raw Juju relation data is decoded using the provided decoder
+        function, or :func:`json.loads` if no decoder is provided, and passed
+        to the data class's ``__init__`` method as keyword arguments.
 
         For example::
 
@@ -1792,8 +1792,41 @@ class Relation:
                 data = event.relation.load(Data, event.app)
                 secret = self.model.get_secret(data.secret_id)
 
-        Any additional positional or keyword arguments will be passed through to
-        the data class ``__init__``.
+        For a Pydantic ``BaseModel`` or pydantic dataclass, the decoded values
+        are passed straight through as keyword arguments and Pydantic
+        performs its own coercion and validation.
+
+        For any other :func:`dataclasses.dataclass`, the decoded values are
+        also recursively coerced to match each field's type hint before being
+        passed to ``__init__``:
+
+        - A nested dataclass or :class:`enum.Enum` field is constructed from
+          its decoded value.
+        - ``list``, ``set``, and ``frozenset`` fields coerce each element
+          against the type argument.
+        - A variable-length ``tuple[X, ...]`` coerces every element against
+          ``X``; a fixed-length ``tuple[X, Y, ...]`` coerces each position
+          against its own type, and stays a ``tuple``.
+        - A ``dict``/``Mapping`` field coerces its values against the value
+          type.
+        - An ``Optional``/``Union`` field is coerced against its single
+          non-``None`` member; a ``Union`` of more than one concrete type is
+          passed through as-is, since there is no way to tell which member to
+          coerce against.
+        - ``Literal`` fields, and any other constructed generic not listed
+          above, are passed through unchanged.
+
+        If the class's type hints can't be resolved at all - for example, a
+        ``TYPE_CHECKING``-only import with no runtime name - the values are
+        passed through uncoerced instead of raising.
+
+        Any additional positional or keyword arguments will be passed through
+        to the data class ``__init__``. For a non-pydantic dataclass target,
+        positional arguments are matched to the class's leading fields by
+        position; those fields are passed through as given rather than
+        coerced, since there is no field name to coerce them against, but any
+        remaining fields supplied from the relation data are still coerced as
+        above.
 
         Args:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
@@ -1823,6 +1856,15 @@ class Relation:
                 data[key] = decoder(value)
             elif key in fields:
                 data[fields[key]] = decoder(value)
+        # For plain (non-pydantic) dataclass targets, recursively coerce nested
+        # dataclass / enum / list / set fields. Pydantic handles its own coercion.
+        # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
+        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
+        # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
+        # Any fields filled positionally by args are left uncoerced, since args
+        # are matched to the class's leading fields by position, not by name.
+        if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
+            return _charm._build_dataclass(cls, data, *args)
         return cls(*args, **data)
 
     def save(

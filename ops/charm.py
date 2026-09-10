@@ -21,6 +21,8 @@ import enum
 import logging
 import os
 import pathlib
+import types
+import typing
 import warnings
 from collections.abc import Mapping
 from typing import (
@@ -33,6 +35,7 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
+    get_type_hints,
 )
 
 from . import model
@@ -1697,6 +1700,76 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
         return class_fields
     # It's not clear, so give up.
     raise ValueError('Unable to find class fields')
+
+
+def _coerce_field(tp: Any, value: Any) -> Any:
+    """Coerce a decoded ``value`` into the dataclass field type ``tp``.
+
+    Used by :meth:`ops.Relation.load` to recursively construct nested
+    dataclasses and enum values from JSON-decoded relation data. An
+    ``Optional``/``Union`` field is coerced against its single non-``None``
+    member; ``dict``/``Mapping`` fields are coerced against their value type;
+    a variable-length ``tuple[X, ...]`` is coerced element-wise against ``X``
+    and a fixed-length ``tuple[X, Y, ...]`` is coerced positionally.
+    """
+    origin = typing.get_origin(tp)
+    if origin is not None:
+        args = typing.get_args(tp)
+        if origin is typing.Union or origin is types.UnionType:
+            non_none = [a for a in args if a is not type(None)]
+            if len(non_none) == 1:
+                # Optional[X]: coerce against the one concrete member.
+                return _coerce_field(non_none[0], value)
+            # A Union of more than one concrete type: no way to tell which
+            # member to coerce against, so accept the value as-is.
+            return value
+        if origin is list and args:
+            return [_coerce_field(args[0], v) for v in value]
+        if origin is tuple and args:
+            if args[-1] is Ellipsis:
+                return tuple(_coerce_field(args[0], v) for v in value)
+            return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
+        if origin in (set, frozenset) and args:
+            return {_coerce_field(args[0], v) for v in value}
+        if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
+            return {k: _coerce_field(args[1], v) for k, v in value.items()}
+        # Literal and other constructed generics: accept the value as-is.
+        return value
+    if isinstance(tp, type):
+        if dataclasses.is_dataclass(tp):
+            return _build_dataclass(tp, value)
+        if issubclass(tp, enum.Enum):
+            return tp(value)
+    return value
+
+
+def _build_dataclass(cls: Any, data: Mapping[str, Any], *args: Any) -> Any:
+    """Construct dataclass ``cls`` from ``data`` and any positional ``args``.
+
+    Recursively coerces nested dataclass / enum / list / set / tuple / dict
+    fields supplied via ``data``. Any leading fields already filled
+    positionally by ``args`` are matched by position, not by name, so they are
+    passed through as given rather than coerced.
+
+    Falls back to the un-coerced ``cls(*args, **data)`` if ``cls``'s type hints
+    can't be resolved, for example a ``TYPE_CHECKING``-only import with no
+    runtime name: ``get_type_hints`` resolves every field's annotation
+    eagerly, so one unresolvable field would otherwise break construction even
+    when the relation data at hand doesn't touch it.
+
+    Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
+    missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
+    """
+    try:
+        hints = get_type_hints(cls)
+    except NameError:
+        return cls(*args, **data)
+    kwargs: dict[str, Any] = {}
+    for field in dataclasses.fields(cls)[len(args) :]:
+        if field.name not in data:
+            continue
+        kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
+    return cls(*args, **kwargs)
 
 
 class CharmMeta:
