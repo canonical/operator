@@ -24,8 +24,8 @@ coordinator from reaching ``active``:
 - ``tempo-coordinator-k8s`` rev 143 (every ``2/*`` channel) crashes in
   ``upgrade-charm`` because ``coordinated_workers/nginx.py:_delete_certificates``
   calls ``update-ca-certificates --fresh`` in the nginx workload container, and
-  no ``ubuntu/nginx:*`` tag we tested ships that binary. See the canary in
-  ``test_infra_canary.py`` — when that test xpasses, this gate is likely lifted.
+  no ``ubuntu/nginx:*`` tag we tested ships that binary. A strict-xfail canary
+  for the image ships separately; when it xpasses, this gate is likely lifted.
 
 Until both are resolved, the four tests below (buffer replay, relation churn,
 CA rotation, leader-only databag) cannot run end-to-end. They are kept here so
