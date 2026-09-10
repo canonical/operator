@@ -35,7 +35,7 @@ The module includes:
     on testing charms, see `Testing <https://canonical.com/juju/docs/ops/latest/explanation/testing/>`_.
 """
 
-# ruff: noqa: F401 (unused import)
+# ruff: file-ignore[unused-import] (unused import)
 # pyright: reportUnusedImport=false
 
 from __future__ import annotations

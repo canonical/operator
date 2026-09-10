@@ -1193,10 +1193,10 @@ class TestModel:
         with pytest.raises(AttributeError):
             harness.model.storages = {}  # type: ignore
 
-    def resetBackendCalls(self, harness: ops.testing.Harness[ops.CharmBase]):  # noqa: N802
+    def resetBackendCalls(self, harness: ops.testing.Harness[ops.CharmBase]):  # ruff: ignore[invalid-function-name]
         harness._get_backend_calls(reset=True)
 
-    def assertBackendCalls(  # noqa: N802
+    def assertBackendCalls(  # ruff: ignore[invalid-function-name]
         self,
         harness: ops.testing.Harness[ops.CharmBase],
         expected: list[tuple[typing.Any, ...]],

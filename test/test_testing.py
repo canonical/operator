@@ -2465,8 +2465,8 @@ class TestHarness:
         harness.set_can_connect('foo', True)
         c = harness.model.unit.containers['foo']
 
-        dir_path = '/tmp/foo/dir'  # noqa: S108
-        file_path = '/tmp/foo/file'  # noqa: S108
+        dir_path = '/tmp/foo/dir'  # ruff: ignore[hardcoded-temp-file]
+        file_path = '/tmp/foo/file'  # ruff: ignore[hardcoded-temp-file]
 
         assert not c.isdir(dir_path)
         assert not c.exists(dir_path)
@@ -5655,7 +5655,7 @@ class TestFilesystem:
             (tempdir / 'foo/test').write_text('test')
             (tempdir / 'foo/bar/foobar').write_text('foobar')
             (tempdir / 'foo/baz').mkdir(parents=True)
-            container.push_path(tempdir / 'foo', '/tmp')  # noqa: S108
+            container.push_path(tempdir / 'foo', '/tmp')  # ruff: ignore[hardcoded-temp-file]
 
             assert (container_fs_root / 'tmp').is_dir()
             assert (container_fs_root / 'tmp/foo').is_dir()
@@ -5665,7 +5665,7 @@ class TestFilesystem:
             assert (container_fs_root / 'tmp/foo/bar/foobar').read_text() == 'foobar'
 
     def test_make_dir(self, container: ops.Container, container_fs_root: pathlib.Path):
-        container.make_dir('/tmp')  # noqa: S108
+        container.make_dir('/tmp')  # ruff: ignore[hardcoded-temp-file]
         assert (container_fs_root / 'tmp').is_dir()
         container.make_dir('/foo/bar/foobar', make_parents=True)
         assert (container_fs_root / 'foo/bar/foobar').is_dir()
@@ -6618,7 +6618,7 @@ class TestHandleExec:
     ):
         service: ops.pebble.ServiceDict = {
             'command': 'test',
-            'working-dir': '/tmp',  # noqa: S108
+            'working-dir': '/tmp',  # ruff: ignore[hardcoded-temp-file]
             'user': 'foo',
             'user-id': 1,
             'group': 'bar',
@@ -6640,7 +6640,7 @@ class TestHandleExec:
         harness.handle_exec(container, ['ls'], handler=handler)
 
         container.exec(['ls'], service_context='test').wait()
-        assert args_history[-1].working_dir == '/tmp'  # noqa: S108
+        assert args_history[-1].working_dir == '/tmp'  # ruff: ignore[hardcoded-temp-file]
         assert args_history[-1].user == 'foo'
         assert args_history[-1].user_id == 1
         assert args_history[-1].group == 'bar'

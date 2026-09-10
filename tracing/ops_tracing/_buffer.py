@@ -76,10 +76,10 @@ def retry(f: Callable[P, R]) -> Callable[P, R]:
         for _ in range(DB_RETRY):
             try:
                 return f(*args, **kwargs)
-            except sqlite3.Error as e:  # noqa: PERF203
+            except sqlite3.Error as e:  # ruff: ignore[try-except-in-loop]
                 exc = e
 
-        assert exc  # noqa: S101  # we'd have returned otherwise
+        assert exc  # ruff: ignore[assert]  # we'd have returned otherwise
         raise exc
 
     return wrapper
@@ -195,7 +195,7 @@ class Buffer:
                 UPDATE tracing
                 SET priority = ?
                 WHERE id IN ({','.join(('?',) * len(self.ids))})
-                """,  # noqa: S608
+                """,  # ruff: ignore[hardcoded-sql-expression]
                 (OBSERVED_PRIORITY, *tuple(self.ids)),
             )
         self.observed = True
@@ -244,7 +244,7 @@ class Buffer:
                         f"""
                         DELETE FROM tracing
                         WHERE id IN ({collected_template})
-                        """,  # noqa: S608
+                        """,  # ruff: ignore[hardcoded-sql-expression]
                         tuple(collected_ids),
                     )
 
@@ -258,7 +258,7 @@ class Buffer:
                     (priority, data, mime),
                 )
 
-                assert cursor.lastrowid is not None  # noqa: S101  # Just inserted.
+                assert cursor.lastrowid is not None  # ruff: ignore[assert]  # Just inserted.
                 if not self.observed:
                     self.ids.add(cursor.lastrowid)
 

@@ -149,6 +149,17 @@ if __name__ == "__main__":  # pragma: nocover
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
 
+### Add logger functionality
+
+In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
+
+```python
+import logging
+
+# Log messages can be retrieved using juju debug-log
+logger = logging.getLogger(__name__)
+```
+
 ### Handle the pebble-ready event
 
 In the `__init__` function of your charm class, we'll tell Ops which method of your charm class to run for each event. Let's start with when the Juju controller tells us that the workload container's Pebble is up and running.
@@ -184,7 +195,7 @@ def _on_demo_server_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
     self.unit.status = ops.ActiveStatus()
 ```
 
-We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier - there's no need to add additional imports.
+We're using the `ActiveStatus` class to set the charm status to active. Note that almost everything you need to define your charm is in the `ops` package that you imported earlier.
 
 The `api_demo_server` application is packaged as a [rock](https://documentation.ubuntu.com/rockcraft/1.19/explanation/rocks/), which is an OCI-compliant container image. The image has a Pebble layer that defines how to run the app. Since our minimal charm doesn't need to change how the app runs, our charm just needs to call `replan()` to start the service defined in the Pebble layer.
 
@@ -209,26 +220,32 @@ The `fastapi` service has `startup: enabled`, so why does our charm need to star
 
 The workload version is available after the workload starts, which happens after Pebble starts the `fastapi` service. We'll use the `src/fastapi_demo.py` helper module for this step.
 
-In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function before the final `self.unit.status = ops.ActiveStatus()`:
+In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready` function after the `container.replan()` line:
 
 ```python
 # Set the workload version of this charm.
-version = fastapi_demo.get_version(port=8000)
+# The workload may not be ready immediately after replan(), so try get_version() in a loop.
+for attempt in range(3):  # In general, allow more attempts for a complex workload.
+    if attempt:
+        time.sleep(2**attempt)  # If not first attempt, retry with exponential back-off.
+    try:
+        version = fastapi_demo.get_version(port=8000)
+        break
+    except urllib.error.URLError:
+        continue
+else:
+    logger.error("The workload was not available within the expected time")
+    raise RuntimeError("workload is not available")
 self.unit.set_workload_version(version)
 ```
 
-We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.
+Then, still in `src/charm.py`, add `import time` and `import urllib.error` in the imports at the top of the file.
 
-### Add logger functionality
+We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju.
 
-In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
+The `get_version` call could fail because the workload's service hasn't fully started. `container.replan()` tells Pebble to start the service, but doesn't wait to confirm that the service has finished starting up. Pebble actually waits one second to check that the service didn't crash on startup, but this isn't necessarily enough time for the `fastapi` service to fully start.
 
-```python
-import logging
-
-# Log messages can be retrieved using juju debug-log
-logger = logging.getLogger(__name__)
-```
+If `get_version` hasn't succeeded after three attempts, the charm will go into error status. The Juju logs (from `juju debug-log`) will show the error message, to help you debug the error. The error message is for you, the charm developer, not for the user of the charm. It tells you there's a bug in the charm.
 
 ## Try your charm
 
@@ -536,24 +553,26 @@ The result should be similar to the following output:
 
 The Juju model is destroyed at the end of the tests. If you want to run the tests and keep the model for further exploration, see the example commands in [](#write-integration-tests-for-a-charm-run-your-tests). The `@pytest.mark.juju_setup` marker on `test_deploy` gives you the option of skipping this test on subsequent runs, for iterative testing on a deployed application.
 
-### Run tests with `charmcraft test`
+### Run tests with Spread
 
-Charmcraft has an experimental command `charmcraft test` that uses [spread](https://github.com/canonical/spread) to run tests.
+For a real charm, we recommend running integration tests with [Spread](https://github.com/canonical/spread), so that each test module runs as its own task. Charmcraft has an experimental `charmcraft test` command that wraps Spread and installs it for you, which is what we use here.
 
-If you're interested in trying `charmcraft test`, run the following command in your project directory:
+Run the following command in your project directory:
 
 ```text
 charmcraft init --profile test-kubernetes --force
 ```
 
-This creates the scaffolding of a spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
+This creates the scaffolding of a Spread configuration; the `--force` argument is needed because there are already files in the directory. Our [httpbin-demo charm](https://github.com/canonical/operator/tree/main/examples/httpbin-demo) has a more complete configuration, which you can replicate in your charm. Pay particular attention to:
 
-- `spread.yaml` - Tells spread how to provision a clean environment for each run, using [Concierge](https://github.com/canonical/concierge) to bootstrap Juju and the cloud substrate.
+- `spread.yaml` - Tells Spread how to provision a clean environment for each run, using {external+concierge:doc}`Concierge <index>` to bootstrap Juju and the cloud substrate.
 - The `spread` directory - Contains a file `integration/test_charm/task.yaml` that corresponds to `tests/integration/test_charm.py`.
 
 When you run `charmcraft test`, Charmcraft packs the charm, launches an LXD VM (or configures a CI runner), then invokes your pytest integration tests inside the VM.
 
-It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-charmcraft-test`.
+Because `charmcraft test` is experimental, its interface may still change. However, even if `charmcraft test` changes, you can continue to run your tests with Spread directly, using the same `spread.yaml` and `task.yaml`.
+
+It's also possible to set up CI so that each `tests/integration/test_*.py` module becomes its own Spread job (fanned out as a parallel matrix). Adding a new test module automatically adds a new job. See {ref}`set-up-ci-spread`.
 
 ## Review the final code
 

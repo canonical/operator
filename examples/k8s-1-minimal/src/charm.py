@@ -17,6 +17,8 @@
 """Kubernetes charm for a demo app."""
 
 import logging
+import time
+import urllib.error
 
 import ops
 
@@ -40,7 +42,18 @@ class FastAPIDemoCharm(ops.CharmBase):
         # Start the service defined by the Pebble layer in the application image.
         container.replan()
         # Set the workload version of this charm.
-        version = fastapi_demo.get_version(port=8000)
+        # The workload may not be ready immediately after replan(), so try get_version() in a loop.
+        for attempt in range(3):  # In general, allow more attempts for a complex workload.
+            if attempt:
+                time.sleep(2**attempt)  # If not first attempt, retry with exponential back-off.
+            try:
+                version = fastapi_demo.get_version(port=8000)
+                break
+            except urllib.error.URLError:
+                continue
+        else:
+            logger.error("The workload was not available within the expected time")
+            raise RuntimeError("workload is not available")
         self.unit.set_workload_version(version)
         # Learn more about statuses at
         # https://documentation.ubuntu.com/juju/3.6/reference/status/

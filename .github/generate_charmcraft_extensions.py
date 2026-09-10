@@ -150,7 +150,7 @@ def generate_module(
     return '\n'.join(lines)
 
 
-def main() -> int:  # noqa: D103
+def main() -> int:  # ruff: ignore[undocumented-public-function]
     extensions = get_extensions()
     print(f'Found extensions: {", ".join(extensions)}')
 

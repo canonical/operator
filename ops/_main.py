@@ -244,7 +244,7 @@ def _should_use_controller_storage(
         return False
 
 
-class _Abort(Exception):  # noqa: N818
+class _Abort(Exception):  # ruff: ignore[error-suffix-on-exception-name]
     """Raised when something happens that should interrupt ops execution."""
 
     def __init__(self, exit_code: int):
