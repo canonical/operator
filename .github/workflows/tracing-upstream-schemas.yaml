@@ -2,7 +2,7 @@ name: Tracing upstream schema drift
 
 # Opt-in drift check: compares ``ops_tracing``'s de-pydantic'd dataclasses
 # against the canonical/charmlibs schemas at HEAD. Needs network access and
-# pydantic, so it's gated to PRs/pushes that touch the tracing tree.
+# pydantic, so it's limited to PRs/pushes that touch the tracing tree.
 
 on:
   push:
