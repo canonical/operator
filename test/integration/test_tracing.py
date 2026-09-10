@@ -13,17 +13,7 @@
 # limitations under the License.
 
 
-"""Integration tests for ops_tracing.
-
-These tests are gated by canonical/observability-stack#110: resource patching
-on newer Juju releases prevents the tempo coordinator from reaching ``active``,
-which is why this file's ``test_direct_connection`` and ``test_with_tls`` are
-commented out of ``.github/workflows/integration.yaml``.
-
-Until that is resolved, the four tests below (buffer replay, relation churn,
-CA rotation, leader-only databag) cannot run end-to-end. They are kept here so
-that re-enabling them is a one-line change in CI once the upstream is healthy.
-"""
+"""Integration tests for ops_tracing."""
 
 from __future__ import annotations
 
