@@ -1860,7 +1860,7 @@ class Relation:
         # dataclass / enum / list / set fields. Pydantic handles its own coercion.
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
         # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
-        # 2.11, so relying on it missed every earlier 2.x pydantic dataclass.
+        # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
         # Any fields filled positionally by args are left uncoerced, since args
         # are matched to the class's leading fields by position, not by name.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
