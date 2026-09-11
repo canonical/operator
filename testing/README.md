@@ -120,7 +120,7 @@ constructive feedback.
   Meet us in the #charmhub-charmdev channel on Matrix.
 * [Report bugs](https://github.com/canonical/operator/issues): We want to know
   about the problems so we can fix them.
-* [Contribute docs](https://github.com/canonical/operator/blob/main/HACKING.md#contributing-documentation):
+* [Contribute docs](https://github.com/canonical/operator/blob/main/CONTRIBUTING.md#documentation):
   Get started on GitHub.
 
 ## Contributing and developing
@@ -130,7 +130,7 @@ Anyone can contribute to ops and `ops-scenario`. It's best to start by
 description of the problem or feature request, but you can also
 [open a pull request](https://github.com/canonical/operator/pulls) directly.
 
-Read our [guide](./CONTRIBUTING.md) for more details on how to work on and
+Read our [guide](../CONTRIBUTING.md) for more details on how to work on and
 contribute to `ops-scenario`.
 
 Currently, releases of `ops-scenario` are done in lockstep with releases of ops
