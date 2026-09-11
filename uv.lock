@@ -237,6 +237,32 @@ wheels = [
 ]
 
 [[package]]
+name = "charmlibs-interfaces-certificate-transfer"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/e815e2c9d8ad8e091b31301af54d1cc626bdaf4f25b6e60f33ed52cf7cd7/charmlibs_interfaces_certificate_transfer-1.0.0.tar.gz", hash = "sha256:53f230abb2b42e7c23929a2d99321b1f0e226f20595609105fbd0528fcc3cf24", size = 42167, upload-time = "2026-02-23T18:34:18.971Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/bb/f5ed4a41c154723bd6ea4b983395d6db67d4a3c7dd87bde8ea6848159e63/charmlibs_interfaces_certificate_transfer-1.0.0-py3-none-any.whl", hash = "sha256:21cef05199a9efa459be43207e042be6792605b70e742d8b0fed6f09c0cb232d", size = 8435, upload-time = "2026-02-23T18:34:17.876Z" },
+]
+
+[[package]]
+name = "charmlibs-interfaces-tracing"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/39/18672ebcf2e84cc25c9a8f023a9a3240949e2a8b865afe31e00b9f9b1e84/charmlibs_interfaces_tracing-1.0.0.tar.gz", hash = "sha256:b82d5b3a600f157f362cf1753b42f5a60cfdc03ef9b3b3ca60186cbfe0a7970a", size = 46463, upload-time = "2026-09-09T03:35:50.233Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5d/91/a603416f7027dd873107dfd7f8aa280f841da6f19a404c6e418bf3d6f95b/charmlibs_interfaces_tracing-1.0.0-py3-none-any.whl", hash = "sha256:65decc89bf62837e12299d5150c9fd5469b17f1f86f4efa6f785a63ac66f7a54", size = 12744, upload-time = "2026-09-09T03:35:49.007Z" },
+]
+
+[[package]]
 name = "charset-normalizer"
 version = "3.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1001,6 +1027,8 @@ name = "ops-tracing"
 version = "3.9.0.dev0"
 source = { editable = "tracing" }
 dependencies = [
+    { name = "charmlibs-interfaces-certificate-transfer" },
+    { name = "charmlibs-interfaces-tracing" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-sdk" },
     { name = "ops" },
@@ -1020,6 +1048,8 @@ unit = [
 
 [package.metadata]
 requires-dist = [
+    { name = "charmlibs-interfaces-certificate-transfer", specifier = "~=1.0" },
+    { name = "charmlibs-interfaces-tracing", specifier = "~=1.0" },
     { name = "opentelemetry-api", specifier = "~=1.0" },
     { name = "opentelemetry-sdk", specifier = "~=1.30" },
     { name = "ops", editable = "." },
