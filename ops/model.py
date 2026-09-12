@@ -1993,6 +1993,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
+        # Validate here as well as in __getitem__, so that read paths that don't
+        # go via __getitem__ (such as __contains__, __iter__ and __len__) also
+        # raise RelationDataAccessError rather than a bare ModelError from Juju.
+        self._validate_read()
         try:
             return self._backend.relation_get(
                 self.relation.id,
@@ -2120,8 +2124,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def _validate_cached_read(self) -> None:
+        """Validate a read of data that may already be cached.
+
+        When the data hasn't been loaded yet, ``_load`` validates the read, so
+        validating here as well would mean a redundant leadership check.
+        """
+        if self._lazy_data is not None:
+            self._validate_read()
+
     def __getitem__(self, key: str) -> str:
-        self._validate_read()
+        self._validate_cached_read()
         return super().__getitem__(key)
 
     def update(
@@ -2137,12 +2150,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 self[k] = v
         """
         data = dict(data, **kwargs)
+        # Always check permissions, and do so before reading the current content, so
+        # that a unit that can't write gets an error naming the write, rather than one
+        # about the read that change detection happens to require.
+        self._validate_write(data)
         changes = {
             key: val
             for key, val in data.items()
             if (key not in self and val != '') or (key in self and val != self[key])
         }
-        self._validate_write(changes)  # always check permissions
         if not changes:  # return early if there are no changes required
             return
         self._commit(changes)
@@ -2155,7 +2171,11 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __repr__(self):
         try:
-            self._validate_read()
+            # If the data is already cached, validate the read here; otherwise
+            # force the load, which validates it. Either way the access is
+            # checked exactly once, and the error doesn't escape from repr().
+            self._validate_cached_read()
+            _ = self._data
         except RelationDataAccessError:
             return '<n/a>'
         return super().__repr__()

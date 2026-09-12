@@ -533,6 +533,9 @@ class TestHarness:
         )
         request.addfinalizer(harness.cleanup)
         harness.begin()
+        # The charm records every databag, including its own application one, so it
+        # needs to be the leader to read them all.
+        harness.set_leader(True)
         harness.charm.observe_relation_events('db')
         # First add a relation and unit
         rel_id = harness.add_relation('db', 'postgresql')
