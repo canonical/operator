@@ -1,0 +1,70 @@
+name: AI-enrich scheduled-failure notification
+
+# Called by notify-scheduled-failure.yaml, which is called by scheduled workflows on failure.
+# - notify-scheduled-failure.yaml creates or comments on an issue before calling this workflow.
+# - github.workflow and github.run_id refer to the scheduled workflow that failed.
+
+on:
+  workflow_call:
+    inputs:
+      # What the notifier did, when it got that far. Optional: an empty value
+      # means the script looks the issue up itself, which is what happens when
+      # `notify` fails before it can create one.
+      issue:
+        description: The issue the notifier created or commented on.
+        required: false
+        type: string
+      origin:
+        description: Either "new" or "comment", matching what the notifier did.
+        required: false
+        type: string
+    secrets:
+      OPENROUTER_API_KEY:
+        required: false
+
+permissions: {}
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    environment: ai-failure-triage  # Required to access secrets.OPENROUTER_API_KEY
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - name: Extract signature, dedupe, ask the LLM, apply
+        id: enrich
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that failed.
+          NOTIFY_ISSUE: ${{ inputs.issue }}
+          NOTIFY_ORIGIN: ${{ inputs.origin }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # It takes two things to get this key here, and it's tempting to
+          # remove the second one, so please don't:
+          #
+          #   - `environment:` on this job holds the real value. A caller
+          #     can't see it, because a job without an `environment:` gets
+          #     an empty string for `secrets.OPENROUTER_API_KEY`.
+          #   - every call site in the chain names the secret, and it's
+          #     declared above. That only ever passes the empty string, which
+          #     is why it looks like it does nothing.
+          #
+          # Take the second one out and the key arrives empty, and nothing
+          # complains: we just get a plain notice instead of an enriched one.
+          # If enrichment stops happening for no obvious reason, look here.
+          #
+          # Each repo that adopts this provisions its own key. Without one,
+          # the script writes the plain fallback body and never calls
+          # OpenRouter (see the package's cli.main()).
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: >-
+          uvx --from "git+https://github.com/canonical/charm-tech-code@3702a80516503509a0472f62dcffbcf022654925#subdirectory=ai-failure-notifier"
+          ai-failure-notifier

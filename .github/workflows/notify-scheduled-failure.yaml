@@ -1,26 +1,84 @@
 name: Notify on scheduled failure
 
-# Reusable workflow: opens an issue when a scheduled workflow fails.
-# Callers gate the invocation with `if: failure() && github.event_name == 'schedule'`
-# and pass `permissions: issues: write`.
+# Reusable workflow: opens (or comments on) an issue when a scheduled
+# workflow fails. Callers gate the invocation with
+# `if: failure() && github.event_name == 'schedule'` and pass
+# `permissions: issues: write` plus `actions: read`, and grant access to
+# `secrets.OPENROUTER_API_KEY`.
+#
+# 1. `notify` opens or comments on an issue. No LLM and no secrets: once it
+#    has run, a notification exists.
+# 2. `enrich` (ai-failure-enrich.yaml) rewrites that issue into something
+#    worth reading. If its key or environment is missing, we still have 1.
 
 on:
   workflow_call:
+    secrets:
+      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
+      OPENROUTER_API_KEY:
+        required: false
 
 jobs:
-  open-issue:
+  notify:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+    # Handed to `enrich` below, so that it's told which issue to rewrite
+    # rather than searching for the marker this job has just stamped.
+    # GitHub's issue search index doesn't necessarily show you what you have
+    # only just written, so that search can miss a marker from seconds ago
+    # and open a second issue for a run that already has one.
+    outputs:
+      issue: ${{ steps.notify.outputs.issue }}
+      origin: ${{ steps.notify.outputs.origin }}
     steps:
-      - name: Create issue on failure
+      - name: Create or comment on issue, deduping coarsely by workflow name
+        id: notify
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that called this one.
           REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh issue create \
-            --repo "$REPO" \
-            --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
-            --body "Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"
+          set -euo pipefail
+          marker="<!-- ai-failure-notifications:run=$RUN_ID:origin="
+
+          # Search for the workflow name in issue bodies or titles.
+          match=$(gh issue list --repo "$REPO" --state open \
+            --search "\"$WORKFLOW_NAME\"" \
+            --json number --limit 1 -q '.[0].number // empty')
+
+          if [[ -n "$match" ]]; then
+            comment_body="Scheduled workflow '$WORKFLOW_NAME' failed again: $RUN_URL"$'\n\n'"${marker}comment -->"
+            gh issue comment "$match" --repo "$REPO" --body "$comment_body"
+            echo "issue=$match" >> "$GITHUB_OUTPUT"
+            echo "origin=comment" >> "$GITHUB_OUTPUT"
+          else
+            issue_body="Scheduled workflow '$WORKFLOW_NAME' failed: $RUN_URL"$'\n\n'"${marker}new -->"
+            # `gh issue create` prints the new issue's URL; the number is its
+            # last path segment.
+            issue_url=$(gh issue create --repo "$REPO" \
+              --title "Scheduled workflow '$WORKFLOW_NAME' failed" \
+              --body "$issue_body")
+            echo "issue=${issue_url##*/}" >> "$GITHUB_OUTPUT"
+            echo "origin=new" >> "$GITHUB_OUTPUT"
+          fi
+
+  enrich:
+    needs: [notify]
+    permissions:
+      issues: write
+      actions: read
+    # Passes an empty string, and is still required -- see the note on
+    # OPENROUTER_API_KEY in ai-failure-enrich.yaml.
+    secrets:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    # `notify` has to have succeeded to get here, so these are always set for
+    # this repo. The script can still look the issue up if they're empty,
+    # which is what a repo that adopts the enricher before it passes these
+    # will get.
+    with:
+      issue: ${{ needs.notify.outputs.issue }}
+      origin: ${{ needs.notify.outputs.origin }}
+    uses: ./.github/workflows/ai-failure-enrich.yaml
