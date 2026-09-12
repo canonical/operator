@@ -8,6 +8,7 @@ callables
 Canonical's
 Charmlibs
 configurator
+cooldown
 cosl
 databag
 databags
