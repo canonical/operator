@@ -48,42 +48,6 @@ The `ops.testing` framework provides `State`, which mocks inputs and outputs. Th
 
 - [Ubuntu manpages charm unit tests](https://github.com/canonical/ubuntu-manpages-operator/blob/main/tests/unit/test_charm.py)
 
-(interface-tests)=
-## Interface testing
-
-Interface tests validate charm library behavior against mock Juju APIs, ensuring compliance with an interface specification without requiring individual charm code.
-
-Interface specifications, stored in {ref}`charm-relation-interfaces <charm-relation-interfaces>`, are contract definitions that mandate how a charm should behave when integrated with another charm over a registered interface. For information about how to create an interface, see {ref}`register-an-interface`.
-
-See also: {ref}`write-tests-for-an-interface`
-
-### Coverage
-
-Interface tests enable Charmhub to validate the relations of a charm and verify that your charm supports the registered interface. For example, if your charm supports an interface called "ingress", interface tests enable Charmhub to verify that your charm supports the [registered `ingress` interface](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2).
-
-Interface tests also:
-- Enable alternative implementations of an interface to validate themselves against the contractual specification stored in `charm-relation-interfaces`.
-- Help verify compliance with multiple versions of an interface.
-
-An interface test has the following pattern:
-
-1) **Given** - An initial state of the relation over the interface under test.
-2) **When** - A specific relation event fires.
-3) **Then** - The state of the databags is valid. For example, the state satisfies a [pydantic](https://docs.pydantic.dev/latest/) schema.
-
-In addition to checking that the databag state is valid, we could check for more elaborate conditions.
-
-### Tools
-
-- [`ops.testing`](ops_testing)
-- A pytest plugin called [`pytest-interface-tester`](https://github.com/canonical/pytest-interface-tester)
-
-### Examples
-
-- [Ingress interface tests](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/ingress/v2/interface_tests/test_provider.py)
-
-Interface tests enable us to check whether our charm complies with the behavioural specification of the interface, independently from whichever charm is integrated with our charm.
-
 (integration-testing)=
 ## Integration testing
 
