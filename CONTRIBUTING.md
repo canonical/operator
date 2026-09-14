@@ -66,7 +66,7 @@ First, make sure to install [uv](https://docs.astral.sh/uv/), for example:
 sudo snap install astral-uv --classic
 ```
 
-Then install `tox` with extensions, as well as a range of Python versions:
+Then install `tox` with the `tox-uv` extension:
 
 ```sh
 uv tool install tox --with tox-uv
@@ -103,13 +103,8 @@ and extends the Python 3.10 type hinting support through the
 
 Formatting uses [Ruff](https://docs.astral.sh/ruff/).
 
-All tool configuration is kept in [project.toml](pyproject.toml). The list of
+All tool configuration is kept in [pyproject.toml](pyproject.toml). The list of
 dependencies can be found in the relevant `tox.ini` environment `deps` field.
-
-## Building
-
-The build backend is [setuptools](https://pypi.org/project/setuptools/), and
-the build frontend is [build](https://pypi.org/project/build/).
 
 
 # Tests
