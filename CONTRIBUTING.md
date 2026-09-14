@@ -76,15 +76,6 @@ uv tool update-shell
 Optionally, to run checks automatically before each commit, install
 [pre-commit](https://pre-commit.com/#install) and run `pre-commit install`.
 
-You can validate that you have a working installation by running:
-
-```sh
-tox --version
-4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
-registered plugins:
-    tox-uv-1.26.0 at /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox_uv/plugin.py with uv==0.7.12
-```
-
 For improved performance on the tests, install the library that allows
 PyYAML to use C speedups:
 
@@ -94,17 +85,11 @@ sudo apt-get install libyaml-dev
 
 ## Formatting and Checking
 
-Test environments are managed with [tox](https://tox.wiki/) and executed with
-[pytest](https://pytest.org), with coverage measured by
-[coverage](https://coverage.readthedocs.io/).
-Static type checking is done using [pyright](https://github.com/microsoft/pyright),
-and extends the Python 3.10 type hinting support through the
-[typing_extensions](https://pypi.org/project/typing-extensions/) package.
-
-Formatting uses [Ruff](https://docs.astral.sh/ruff/).
-
-All tool configuration is kept in [pyproject.toml](pyproject.toml). The list of
-dependencies can be found in the relevant `tox.ini` environment `deps` field.
+We use [Ruff](https://docs.astral.sh/ruff/) for formatting and linting,
+[pyright](https://github.com/microsoft/pyright) for type checking, and
+[pytest](https://pytest.org) with [coverage](https://coverage.readthedocs.io/) for tests.
+See [pyproject.toml](pyproject.toml) for tool configuration and [tox.ini](tox.ini)
+for environments, commands, and dependencies.
 
 
 # Tests
@@ -129,12 +114,6 @@ tox -e unit -- test/test_charm.py
 
 # Format the code using Ruff
 tox -e format
-
-# Generate a local copy of the Sphinx docs in docs/_build
-make -C docs html
-
-# Check spelling in the doc source files
-make -C docs spelling
 
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
@@ -286,24 +265,11 @@ When you create the pull request, GitHub automatically builds a preview of the d
 
 ## How to write great documentation
 
-- Use short sentences, ideally with one or two clauses.
-- Use headings to split the doc into sections. Make sure that the purpose of each section is clear from its heading.
-- Avoid a long introduction. Assume that the reader is only going to scan the first paragraph and the headings.
-- Avoid background context unless it's essential for the reader to understand.
-
-Recommended tone:
-
-- Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
-- Use "we" to include the reader in what you're explaining.
-- Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+Follow the team's [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md).
 
 ## How to build the documentation locally
 
-Before you start, make sure that you've [installed uv](https://docs.astral.sh/uv/getting-started/installation/). On Ubuntu, you can run:
-
-```sh
-sudo snap install astral-uv --classic
-```
+Install `uv` as described in [Setting up a dev environment](#setting-up-a-dev-environment).
 
 To build the docs:
 
@@ -320,6 +286,12 @@ make -C docs run
 ```
 
 This serves the docs locally and automatically refreshes them whenever you edit a file.
+
+To check spelling in the doc source files:
+
+```sh
+make -C docs spelling
+```
 
 ## How to document version dependencies
 
