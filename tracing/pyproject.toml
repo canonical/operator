@@ -29,6 +29,8 @@ classifiers = [
     "Framework :: OpenTelemetry",
 ]
 dependencies = [
+    "charmlibs-interfaces-certificate-transfer~=1.0",
+    "charmlibs-interfaces-tracing~=1.0",
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.30",
     "ops==3.9.0.dev0",
@@ -64,10 +66,8 @@ target-version = "py38"
 
 [tool.ruff.format]
 quote-style = "single"
-exclude = ["ops_tracing/vendor/*"]
 
 [tool.ruff.lint]
-exclude = ["ops_tracing/vendor/*"]
 select = [
     # Pyflakes
     "F",
@@ -116,7 +116,7 @@ ignore = [
 ]
 
 [tool.pyright]
-exclude = [".tox", ".venv", "ops_tracing/vendor"]
+exclude = [".tox", ".venv"]
 extraPaths = ["..", "../testing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used
 pythonPlatform = "All"
