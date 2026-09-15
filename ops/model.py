@@ -1996,7 +1996,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # Validate here as well as in __getitem__, so that read paths that don't
         # go via __getitem__ (such as __contains__, __iter__ and __len__) also
         # raise RelationDataAccessError rather than a bare ModelError from Juju.
-        self._validate_read()
+        self._check_read()
         try:
             return self._backend.relation_get(
                 self.relation.id,
@@ -2008,8 +2008,24 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
+    def _check_read(self) -> None:
+        """Validate a read, except on a relation that is already gone.
+
+        Dead relations tell no tales: reading a broken relation's databag gives
+        `{}` rather than raising, and that has to hold whether or not this unit
+        could have read the databag while the relation was alive. Without this,
+        validating before the read turns the empty dict `_load` returns for a
+        `RelationNotFoundError` into an access error -- and for a follower's own
+        app databag, into one that talks about a remote application.
+        """
+        try:
+            self._validate_read()
+        except RelationDataAccessError:
+            if self.relation.active:
+                raise
+
     def _validate_read(self):
-        """Return if the data content can be read."""
+        """Raise if the data content cannot be read."""
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -2026,23 +2042,18 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # leaders have no read restrictions
             return
 
-        # type guard; we should not be accessing relation data
-        # if the remote app does not exist.
         app = self.relation.app
-        if app is None:
-            raise RelationDataAccessError(
-                f'Remote application instance cannot be retrieved for {self.relation}.'
-            )
 
         # is this a peer relation?
-        if app.name == self._entity.name:
+        if app is not None and app.name == self._entity.name:
             # peer relation data is always publicly readable
             return
 
-        # if we're here it means: this is not a peer relation,
-        # this is an app databag, and we don't have leadership.
-
-        # is this a LOCAL app databag?
+        # is this a LOCAL app databag? Asked before the remote-app type guard
+        # below, because a follower reading its own app databag should be told
+        # that, rather than told about a remote application it never mentioned
+        # -- `relation.app` is None on a broken relation (see Relation.__init__
+        # and LP#1960934), which is exactly when the two overlap.
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
@@ -2050,7 +2061,16 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 f'application databag'
             )
 
-        return True
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        if app is None:
+            raise RelationDataAccessError(
+                f'Remote application instance cannot be retrieved for {self.relation}.'
+            )
+
+        # if we're here it means: this is not a peer relation, this is a remote
+        # app databag, and we don't have leadership -- which is readable.
+        return
 
     def _validate_write(self, data: Mapping[str, str]) -> None:
         """Validate writing key:value pairs to this databag.
@@ -2131,11 +2151,30 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         validating here as well would mean a redundant leadership check.
         """
         if self._lazy_data is not None:
-            self._validate_read()
+            self._check_read()
 
     def __getitem__(self, key: str) -> str:
         self._validate_cached_read()
         return super().__getitem__(key)
+
+    # `_GenericLazyMapping` serves these three from `_data`, which only calls
+    # `_load` while the cache is empty. Without them, a databag that loaded
+    # while the unit was leader stays readable through `in`, `len()` and
+    # iteration after leadership is lost, while `__getitem__` raises: the same
+    # read/no-read split this class exists to remove, moved to the warm path.
+    # The extra check is a comparison against `_ModelBackend.is_leader`'s
+    # 30-second lease cache, not another hook-tool call.
+    def __contains__(self, key: str) -> bool:
+        self._validate_cached_read()
+        return super().__contains__(key)
+
+    def __iter__(self):
+        self._validate_cached_read()
+        return super().__iter__()
+
+    def __len__(self) -> int:
+        self._validate_cached_read()
+        return super().__len__()
 
     def update(
         self, data: Mapping[str, str] | Iterable[tuple[str, str]] = (), /, **kwargs: str
@@ -2153,6 +2192,11 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # Always check permissions, and do so before reading the current content, so
         # that a unit that can't write gets an error naming the write, rather than one
         # about the read that change detection happens to require.
+        #
+        # This validates everything passed in, not only the pairs that turn out
+        # to be changes, so a bad key or value is now reported even when the
+        # write would have been a no-op: `update({1: ''})` and `del bag[1]`
+        # raise RelationDataTypeError rather than silently doing nothing.
         self._validate_write(data)
         changes = {
             key: val
@@ -2171,14 +2215,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __repr__(self):
         try:
-            # If the data is already cached, validate the read here; otherwise
-            # force the load, which validates it. Either way the access is
-            # checked exactly once, and the error doesn't escape from repr().
+            # `super().__repr__()` reads `_data`, which validates the read when
+            # it loads; this covers the case where it is already cached.
             self._validate_cached_read()
-            _ = self._data
+            return super().__repr__()
         except RelationDataAccessError:
             return '<n/a>'
-        return super().__repr__()
 
 
 class ConfigData(_GenericLazyMapping['bool | int | float | str']):

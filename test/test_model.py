@@ -811,6 +811,82 @@ class TestModel:
             with pytest.raises(ops.RelationDataError):
                 dict(databag)
 
+    def test_relation_local_app_data_readability_follower_after_caching(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """Leadership lost after a successful read: every path stops, not just __getitem__.
+
+        The cold path validates inside `_load`, so a databag whose first read
+        failed re-validates on every access. This is the other half: a databag
+        that loaded while the unit was leader is served from the cache, and
+        `in`, `len()` and iteration would keep answering from it.
+        """
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(True)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            databag = rel_db1.data[local_app]
+            assert databag['local'] == 'data'  # Populates the cache.
+
+            harness.set_leader(False)
+
+            with pytest.raises(ops.RelationDataError):
+                _ = 'local' in databag
+            with pytest.raises(ops.RelationDataError):
+                len(databag)
+            with pytest.raises(ops.RelationDataError):
+                list(databag)
+            with pytest.raises(ops.RelationDataError):
+                databag['local']
+            assert repr(databag) == '<n/a>'
+
+    def test_relation_broken_app_data_reads_as_empty_for_a_follower(self):
+        """A dead relation's databag is empty rather than an access error.
+
+        `_load` returns {} for a relation Juju no longer knows about, and
+        validating before the read must not turn that into a raise -- least of
+        all into one about a remote application, which is what a broken
+        relation's `app` being None would otherwise produce.
+        """
+
+        class Backend:
+            app_name = 'myapp'
+            unit_name = 'myapp/0'
+            _hook_is_running = 'db1-relation-broken'
+
+            def is_leader(self):
+                return False
+
+            def relation_get(self, *args: typing.Any, **kwargs: typing.Any):
+                raise ops.model.RelationNotFoundError()
+
+        class DeadRelation:
+            id = 0
+            name = 'db1'
+            app = None  # See Relation.__init__ and LP#1960934.
+            active = False
+
+            def __repr__(self):
+                return '<Relation db1:0>'
+
+        backend = typing.cast('ops.model._ModelBackend', Backend())
+        app = ops.Application('myapp', typing.cast('typing.Any', None), backend, None)  # type: ignore[arg-type]
+        databag = ops.model.RelationDataContent(
+            typing.cast('typing.Any', DeadRelation()), app, backend
+        )
+
+        assert 'local' not in databag
+        assert len(databag) == 0
+        assert list(databag) == []
+
     def test_relation_update_follower_app_data_reports_write_error(
         self,
         harness: ops.testing.Harness[ops.CharmBase],
