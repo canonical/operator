@@ -2866,7 +2866,7 @@ class TestModelBindings:
 
         relation = model.relations['db1'][0]
         assert relation.app is not None
-        # Dead relations tell no tales, and have no data.
+        # Dead relations have no data.
         assert dict(relation.data[relation.app]) == {}
         assert dict(relation.data[model.unit]) == {}
         assert dict(relation.data[model.app]) == {}
