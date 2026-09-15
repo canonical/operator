@@ -22,7 +22,6 @@ import keyword
 import logging
 import marshal
 import pathlib
-import pdb
 import re
 import sys
 import types
@@ -1027,6 +1026,8 @@ class Framework(Object):
                                 event_is_from_juju or event_is_action
                             ) and self._juju_debug_at.intersection({'all', 'hook'}):
                                 # Present the welcome message and run under PDB.
+                                import pdb  # Import expensive module only when needed.
+
                                 self._show_debug_code_message()
                                 pdb.runcall(custom_handler, event)
                             else:
@@ -1087,6 +1088,8 @@ class Framework(Object):
             return
 
         if 'all' in indicated_breakpoints or name in indicated_breakpoints:
+            import pdb  # Import expensive module only when needed.
+
             self._show_debug_code_message()
 
             # If we call set_trace() directly it will open the debugger *here*, so indicating
