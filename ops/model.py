@@ -3523,6 +3523,9 @@ def _format_action_result_dict(
     return output_
 
 
+_RELATION_NOT_FOUND_RE = re.compile(r'relation (\d+ )?not found')
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -3584,15 +3587,40 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield
         except hookcmds.Error as e:
-            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
-            if (
-                cmd.startswith(('relation-', 'network-'))
-                and 'relation not found' in e.stderr.lower()
+            stderr = e.stderr.lower()
+            if cmd.startswith(('relation-', 'network-')) and (
+                # Juju words this as "relation not found" for most hook commands
+                # and "relation 2 not found" for `network-get`.
+                _RELATION_NOT_FOUND_RE.search(stderr)
+                or ('permission denied' in stderr and self._relation_is_gone(cmd, kwargs))
             ):
+                # A relation that Juju has forgotten about isn't an
+                # authorisation failure, so it isn't a security event.
                 raise RelationNotFoundError() from e
-            elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+            if cmd.startswith('secret-') and 'not found' in stderr:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
+
+    def _relation_is_gone(self, cmd: str, kwargs: Mapping[str, Any]) -> bool:
+        """Whether "permission denied" from this hook command means a gone relation.
+
+        Juju deliberately reports "permission denied" rather than "relation not
+        found" for a relation that has gone from its state, so that the reply
+        doesn't say whether the relation ever existed. A charm can't do anything
+        with a relation that Juju has forgotten about, so ops treats that the
+        same way as a relation Juju reports as not found.
+
+        The one relation hook command that Juju refuses on a relation that does
+        still exist is a follower reading its own application databag, so that
+        case keeps the original error (and is reported as a security event).
+        """
+        if cmd != 'relation-get' or not kwargs.get('app'):
+            return True
+        # Reading the *remote* application databag is not restricted.
+        if kwargs.get('unit') != self.app_name:
+            return True
+        return self.is_leader()
 
     def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
         authz_messages = (
