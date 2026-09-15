@@ -477,6 +477,28 @@ def test_relation_load_optional_nested_dataclass():
     assert obj.inner is None
 
 
+def test_relation_load_optional_explicit_null():
+    """An Optional[X] field whose databag value is null stays None.
+
+    The value is not coerced against X, which would reject None: building a
+    nested dataclass, iterating a list, or calling an enum all fail on it.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | None = None
+        items: list[str] | None = None
+        colour: _Colour | None = None
+
+    obj = _load_into(
+        Data,
+        {'inner': json.dumps(None), 'items': json.dumps(None), 'colour': json.dumps(None)},
+    )
+    assert obj.inner is None
+    assert obj.items is None
+    assert obj.colour is None
+
+
 def test_relation_load_dict_of_nested_dataclass():
     """dict[str, X] fields are coerced against X for each value."""
 
@@ -527,6 +549,68 @@ def test_relation_load_heterogeneous_tuple():
     obj = _load_into(Data, {'pair': json.dumps([1, 'red'])})
     assert obj.pair == (1, _Colour.RED)
     assert isinstance(obj.pair, tuple)
+
+
+def test_relation_load_set_and_frozenset():
+    """set[X] and frozenset[X] coerce their elements and keep their own type."""
+
+    @dataclasses.dataclass
+    class Data:
+        mutable: set[_Colour]
+        immutable: frozenset[_Colour]
+
+    obj = _load_into(
+        Data, {'mutable': json.dumps(['red']), 'immutable': json.dumps(['red', 'blue'])}
+    )
+    assert obj.mutable == {_Colour.RED}
+    assert type(obj.mutable) is set
+    assert obj.immutable == frozenset({_Colour.RED, _Colour.BLUE})
+    assert type(obj.immutable) is frozenset
+
+
+def test_relation_load_sequence_field_rejects_string_or_mapping(monkeypatch: pytest.MonkeyPatch):
+    """A str, bytes or mapping value for a sequence field raises, rather than being iterated.
+
+    All three are iterable, so coercing element-wise would silently produce a
+    list of characters, or of the mapping's keys, instead of failing.
+    """
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        tags: list[str]
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(Data, {'tags': json.dumps('hello')})
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(Data, {'tags': json.dumps({'a': 1})})
+
+    @dataclasses.dataclass
+    class SetData:
+        tags: set[str]
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(SetData, {'tags': json.dumps('hello')})
+
+    # A genuine sequence is still coerced.
+    obj = _load_into(Data, {'tags': json.dumps(['hello'])})
+    assert obj.tags == ['hello']
+
+
+def test_relation_load_mapping_field_rejects_non_mapping(monkeypatch: pytest.MonkeyPatch):
+    """A non-mapping value for a dict field raises a clear error."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        by_name: dict[str, int]
+
+    with pytest.raises(TypeError, match='expected a mapping'):
+        _load_into(Data, {'by_name': json.dumps([1, 2])})
+
+    obj = _load_into(Data, {'by_name': json.dumps({'a': 1})})
+    assert obj.by_name == {'a': 1}
 
 
 def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():

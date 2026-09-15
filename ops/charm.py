@@ -1711,6 +1711,11 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     member; ``dict``/``Mapping`` fields are coerced against their value type;
     a variable-length ``tuple[X, ...]`` is coerced element-wise against ``X``
     and a fixed-length ``tuple[X, Y, ...]`` is coerced positionally.
+
+    Raises ``TypeError`` if the value for a sequence field is a string, bytes
+    or a mapping, or if the value for a mapping field is not a mapping: those
+    are all iterable, so coercing them element-wise would quietly produce a
+    wrong answer rather than fail.
     """
     origin = typing.get_origin(tp)
     if origin is not None:
@@ -1718,21 +1723,42 @@ def _coerce_field(tp: Any, value: Any) -> Any:
         if origin is typing.Union or origin is types.UnionType:
             non_none = [a for a in args if a is not type(None)]
             if len(non_none) == 1:
-                # Optional[X]: coerce against the one concrete member.
+                # Optional[X]: coerce against the one concrete member, unless
+                # the value really is None, which X itself won't accept.
+                if value is None:
+                    return None
                 return _coerce_field(non_none[0], value)
             # A Union of more than one concrete type: no way to tell which
             # member to coerce against, so accept the value as-is.
             return value
+        # A str, bytes or mapping is iterable, so coercing element-wise would
+        # silently succeed with nonsense: a list of characters, or of the
+        # mapping's keys. None of those is a sequence the charm meant, so
+        # refuse rather than hand back the wrong answer.
+        if (
+            origin in (list, tuple, set, frozenset)
+            and args
+            and isinstance(value, (str, bytes, Mapping))
+        ):
+            given = cast('Any', value)
+            raise TypeError(f'expected a sequence for {tp}, got {type(given).__name__}: {given!r}')
         if origin is list and args:
             return [_coerce_field(args[0], v) for v in value]
         if origin is tuple and args:
             if args[-1] is Ellipsis:
                 return tuple(_coerce_field(args[0], v) for v in value)
             return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
-        if origin in (set, frozenset) and args:
+        if origin is set and args:
             return {_coerce_field(args[0], v) for v in value}
+        if origin is frozenset and args:
+            return frozenset(_coerce_field(args[0], v) for v in value)
         if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
-            return {k: _coerce_field(args[1], v) for k, v in value.items()}
+            if not isinstance(value, Mapping):
+                raise TypeError(
+                    f'expected a mapping for {tp}, got {type(value).__name__}: {value!r}'
+                )
+            mapping = cast('Mapping[Any, Any]', value)
+            return {k: _coerce_field(args[1], v) for k, v in mapping.items()}
         # Literal and other constructed generics: accept the value as-is.
         return value
     if isinstance(tp, type):
