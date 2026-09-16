@@ -2,13 +2,11 @@ We welcome contributions to Ops!
 
 Before working on changes, please consider [opening an issue](https://github.com/canonical/operator/issues) explaining your use case. If you would like to chat with us about your use cases or proposed implementation, you can reach us at [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) or [Discourse](https://discourse.charmhub.io/).
 
-
 # AI
 
-You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. If you are not capable of reviewing the PR (for example, if you are not fluent in Python, or are not familiar with Ops), please do not submit the PR (maybe you'd like to open an issue instead). PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
+You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
 
-Please do not use tools (such as GitHub Copilot) to provide PR reviews. The Charm Tech team also has access to these tools, and will use them when appropriate.
-
+Please do not use tools (such as GitHub Copilot) to provide PR reviews.
 
 # Pull requests
 
@@ -17,16 +15,7 @@ Changes are proposed as [pull requests on GitHub](https://github.com/canonical/o
 - Work on a branch in your own fork.
 - Sequence your commits logically if possible. But don't worry too much -- we'll squash to `main` after review.
 - Don't force-push after review has started.
-- Follow [conventional commit style](https://www.conventionalcommits.org/en/) for the PR title (not required for individual commits).
-
-Examples of PR titles:
-
-- feat: add the ability to observe change-updated events
-- fix!: correct the type hinting for config data
-- docs: clarify how to use mounts in ops.testing.Container
-- ci: adjust the workflow that publishes ops-scenario
-
-We consider Ops too small a project to use scopes, so we don't use them.
+- Follow [conventional commit style](https://www.conventionalcommits.org/en/) for the PR title (not required for individual commits). We consider Ops too small a project to use scopes, so we don't use them.
 
 ## Branch updates
 
@@ -54,7 +43,6 @@ it into the right update PR:
 - `test-deps`: `pytest` and its plugins.
 - `runtime`: catch-all for everything else; minor and patch bumps only.
 
-
 # Setting up a dev environment
 
 To work in the framework itself you will need Python >= 3.10. Linting, testing,
@@ -76,14 +64,7 @@ uv tool update-shell
 Optionally, to run checks automatically before each commit, install
 [pre-commit](https://pre-commit.com/#install) and run `pre-commit install`.
 
-You can validate that you have a working installation by running:
-
-```sh
-tox --version
-4.26.0 from /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox/__init__.py
-registered plugins:
-    tox-uv-1.26.0 at /home/<your-user>/.local/share/uv/tools/tox/lib/python3.13/site-packages/tox_uv/plugin.py with uv==0.7.12
-```
+You can validate that you have a working installation by running `tox --version`.
 
 For improved performance on the tests, install the library that allows
 PyYAML to use C speedups:
@@ -92,20 +73,13 @@ PyYAML to use C speedups:
 sudo apt-get install libyaml-dev
 ```
 
-## Formatting and Checking
+## Formatting and checking
 
-Test environments are managed with [tox](https://tox.wiki/) and executed with
-[pytest](https://pytest.org), with coverage measured by
-[coverage](https://coverage.readthedocs.io/).
-Static type checking is done using [pyright](https://github.com/microsoft/pyright),
-and extends the Python 3.10 type hinting support through the
-[typing_extensions](https://pypi.org/project/typing-extensions/) package.
-
-Formatting uses [Ruff](https://docs.astral.sh/ruff/).
-
-All tool configuration is kept in [pyproject.toml](pyproject.toml). The list of
-dependencies can be found in the relevant `tox.ini` environment `deps` field.
-
+- Test environments are managed with [tox](https://tox.wiki/), and tests are run with [pytest](https://pytest.org), with coverage measured by [coverage](https://coverage.readthedocs.io/).
+- Static type checking uses [pyright](https://github.com/microsoft/pyright), extending Python 3.10 type hinting via the [typing_extensions](https://pypi.org/project/typing-extensions/) package.
+- Formatting uses [Ruff](https://docs.astral.sh/ruff/).
+- All tool configuration is kept in [pyproject.toml](pyproject.toml). The list of
+  dependencies can be found in the relevant `tox.ini` environment's `deps` field.
 
 # Tests
 
@@ -130,12 +104,6 @@ tox -e unit -- test/test_charm.py
 # Format the code using Ruff
 tox -e format
 
-# Generate a local copy of the Sphinx docs in docs/_build
-make -C docs html
-
-# Check spelling in the doc source files
-make -C docs spelling
-
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
 ```
@@ -154,31 +122,17 @@ you use an editor from the console or specify it as interpreter path in an IDE.
 
 ## Pebble tests
 
-The framework has some tests that interact with a real/live Pebble server.  To
+The framework has some tests that interact with a real/live Pebble server. To
 run these tests, you must have [pebble](https://github.com/canonical/pebble)
-installed and available in your path.  If you have the Go toolchain installed,
-you can run `go install github.com/canonical/pebble/cmd/pebble@master`.  This will
-install pebble to `$GOBIN` if it is set or `$HOME/go/bin` otherwise.  Add
+installed and available in your path. If you have the Go toolchain installed,
+you can run `go install github.com/canonical/pebble/cmd/pebble@master`. This will
+install pebble to `$GOBIN` if it is set or `$HOME/go/bin` otherwise. Add
 `$GOBIN` to your path (e.g. `export PATH=$PATH:$GOBIN` or `export
 PATH=$PATH:$HOME/go/bin` in your `.bashrc`) and you are ready to run the real
 Pebble tests:
 
 ```sh
 tox -e pebble
-```
-
-To do this even more manually, you could start the Pebble server yourself:
-
-```sh
-export PEBBLE=$HOME/pebble
-export RUN_REAL_PEBBLE_TESTS=1
-pebble run --create-dirs --http=:4000 &>pebble.log &
-
-# Then
-tox -e unit -- test/test_real_pebble.py
-# or
-source .tox/unit/bin/activate
-pytest -v test/test_real_pebble.py
 ```
 
 ## Using an `ops` branch in a charm
@@ -211,54 +165,22 @@ parts:
 
 If your changes are only on your local device, you can inject your local `ops`
 into the charm after it has packed, and before you deploy it, by unzipping the
-`.charm` file and replacing the `ops` folder in the virtualenv. This small
-script will handle that for you:
+`.charm` file and replacing the `ops` folder in the virtualenv.
 
-```shell-script
-#!/usr/bin/env bash
+You can also test your local changes against hundreds of charms using [canonical/hyrum](https://github.com/canonical/hyrum):
 
-if [ "$#" -lt 2 ]
-then
-    echo "Inject local copy of Python Operator Framework source into charm"
-    echo
-    echo "usage: inject-ops.sh file.charm /path/to/ops/dir" >&2
-    exit 1
-fi
-
-if [ ! -f "$2/framework.py" ]; then
-    echo "$2/framework.py not found; arg 2 should be path to 'ops' directory"
-    exit 1
-fi
-
-set -ex
-
-mkdir inject-ops-tmp
-unzip -q $1 -d inject-ops-tmp
-rm -rf inject-ops-tmp/venv/ops
-cp -r $2 inject-ops-tmp/venv/ops
-cd inject-ops-tmp
-zip -q -r ../inject-ops-new.charm .
-cd ..
-rm -rf inject-ops-tmp
-rm $1
-mv inject-ops-new.charm $1
+```sh
+hyrum check unit --workers $(nproc) --patch 'ops @ file:///path/to/operator'
 ```
 
 ### Using a Juju branch
 
-If your `ops` change relies on a change in a Juju branch, you'll need to deploy
-your charm to a controller using that version of Juju. For example, with microk8s:
-
-1. [Build Juju and its dependencies](https://github.com/juju/juju/blob/3.4/CONTRIBUTING.md#build-juju-and-its-dependencies)
-2. Run `make microk8s-operator-update`
-3. Run `GOBIN=/path/to/your/juju/_build/linux_amd64/bin:$GOBIN /path/to/your/juju bootstrap`
-4. Add a model and deploy your charm as normal
+If your `ops` change relies on a change in a Juju branch, [build Juju and its dependencies](https://github.com/juju/juju/blob/main/CONTRIBUTING.md#build-and-install-juju), bootstrap a controller with it, then deploy your charm as normal.
 
 ### Regression testing against existing charms
 
 We rely on automation to [update charm pins](.github/actions/update-charm-pins/) of
 a bunch of charms that use the operator framework. The script can be run locally too.
-
 
 # Documentation
 
@@ -286,16 +208,7 @@ When you create the pull request, GitHub automatically builds a preview of the d
 
 ## How to write great documentation
 
-- Use short sentences, ideally with one or two clauses.
-- Use headings to split the doc into sections. Make sure that the purpose of each section is clear from its heading.
-- Avoid a long introduction. Assume that the reader is only going to scan the first paragraph and the headings.
-- Avoid background context unless it's essential for the reader to understand.
-
-Recommended tone:
-
-- Use a casual tone, but avoid idioms. Common contractions such as "it's" and "doesn't" are great.
-- Use "we" to include the reader in what you're explaining.
-- Avoid passive descriptions. If you expect the reader to do something, give a direct instruction.
+See the [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md#charm-tech-documentation-style-guide).
 
 ## How to build the documentation locally
 
@@ -312,6 +225,12 @@ make -C docs html
 ```
 
 This generates HTML docs in the `docs/_build` directory.
+
+To check spelling in the doc source files:
+
+```sh
+make -C docs spelling
+```
 
 To view the docs, you'll need to serve the docs locally. The easiest way is to run the following command instead of `make -C docs html`:
 
@@ -344,7 +263,6 @@ Summary
 ````
 
 Unmarked features are assumed to work and be available in the current LTS version of Juju.
-
 
 # Releases
 
@@ -432,7 +350,7 @@ Then, check out the main branch of your forked operator repo and pull upstream t
     > publish them to PyPI ([ops](https://pypi.org/project/ops/)
     > ,[ops-scenario](https://pypi.org/project/ops-scenario), and
     > [ops-tracing](https://pypi.org/project/ops-tracing/)).
-    > Note that it sometimes take a bit of time for the new releases to show up.
+    > Note that it sometimes takes a bit of time for the new releases to show up.
     >
     > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
     >
@@ -456,7 +374,6 @@ Then, check out the main branch of your forked operator repo and pull upstream t
 8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
 
 If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
-
 
 # Updating the Charmcraft profiles
 
@@ -502,7 +419,6 @@ Then run `./generate.sh <dir>` where `<dir>` is the location of your Charmcraft 
 Use a conventional commit type **for each commit**. For example, `chore(templates):`.
 
 After your PR has merged and Charmcraft has released to `latest/stable`, make sure that the Ops tutorials and example charms are consistent with your profile changes.
-
 
 # Copyright
 
