@@ -2,6 +2,10 @@ name: Example Charm Integration Tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/example-charm-integration-tests.yaml'
+      - 'examples/**'
   schedule:
     - cron: '50 15 * * 2'  # 15:50 UTC Tuesdays
 
