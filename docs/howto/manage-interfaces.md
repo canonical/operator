@@ -22,16 +22,18 @@ cd /path/to/charmlibs
 
 ### 2. Create the interface directory
 
-Registering an interface means adding its definition to `charmlibs`; you don't need to publish a Python package to do that. Create a directory for the interface under `interfaces/`, named with the canonical interface name as it appears in `charmcraft.yaml` files -- for example `my_fancy_database` -- and add the three files that make up the definition:
+Registering an interface means adding its definition to `charmlibs`; you don't need to publish a Python package to do that. Create a directory for the interface under `interfaces/`, named with the canonical interface name as it appears in `charmcraft.yaml` files -- for example `my_fancy_database` -- and add the three files that make up the definition inside an `interface/v0/` subdirectory:
 
 ```bash
-mkdir -p ./interfaces/my_fancy_database
-touch ./interfaces/my_fancy_database/{README.md,interface.yaml,schema.py}
+mkdir -p ./interfaces/my_fancy_database/interface/v0
+touch ./interfaces/my_fancy_database/interface/v0/{README.md,interface.yaml,schema.py}
 ```
+
+The `interface/` level is what marks the directory as an interface definition: `charmlibs`' own tooling looks for it, and a directory without one is skipped when the interface index is generated, so the interface never appears in the docs or on Charmhub. The version below it is the interface version, starting at `v0`; a later incompatible revision is added alongside as `v1` rather than replacing it.
 
 ```{note}
 
-If you also want to ship a charm library implementing the interface, run `just init --interface` from the repository root instead, and answer the prompts. That scaffolds a full `charmlibs.interfaces.<name>` package, which is published to PyPI. See the [`charmlibs` documentation](https://canonical.com/juju/docs/charmlibs/) for how to develop and release one.
+If you also want to ship a charm library implementing the interface, run `just init --interface` from the repository root and answer the prompts. That scaffolds a full `charmlibs.interfaces.<name>` package, which is published to PyPI. It scaffolds the library only -- you still add the definition files above. See the [`charmlibs` documentation](https://canonical.com/juju/docs/charmlibs/) for how to develop and release one.
 ```
 
 (edit-interface-yaml)=
@@ -92,7 +94,7 @@ class RequirerSchema(DataBagSchema):
     # we can omit `unit` because the requirer makes no use of the unit databags
 ```
 
-`DataBagSchema` currently comes from `pytest-interface-tester`; `charmlibs` intends to replace it, so check the schemas of existing interfaces for the current base class before you write yours.
+`DataBagSchema` comes from `pytest-interface-tester`, which every interface in `charmlibs` currently uses, although `charmlibs` intends to replace it.
 
 ### 5. Edit `README.md`
 
@@ -175,7 +177,7 @@ Finally, open a pull request to the `charmlibs` repo and drive it to completion,
 
 ## Example
 
-For an example of a registered interface, see [`ingress`](https://github.com/canonical/charmlibs/tree/main/interfaces/ingress):
-   - As you can see from its `interface.yaml` file, the [`canonical/traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) plays the provider role in the interface.
-   - The schema of this interface is defined in `schema.py`.
-   - You can find out more information about this interface in its `README.md`.
+For an example of a registered interface, see [`ingress`](https://github.com/canonical/charmlibs/tree/main/interfaces/ingress), which has two versions, `interface/v1` and `interface/v2`. Taking v2:
+   - As you can see from its [`interface.yaml`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/interface.yaml), the [`canonical/traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) plays the provider role in the interface.
+   - The schema of this interface is defined in [`schema.py`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/schema.py).
+   - You can find out more information about this interface in its [`README.md`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/README.md).
