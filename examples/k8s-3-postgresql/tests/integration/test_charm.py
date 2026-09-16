@@ -71,6 +71,7 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     interval = 15
     start = time.monotonic()
     last_status = None
+    last_diag = 0.0
 
     while time.monotonic() - start < timeout:
         status = juju.status()
@@ -95,9 +96,16 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
             )
             last_status = current
 
-            # When the unit is waiting, run diagnostics to understand the delay.
-            if unit_current == "waiting" and "primary endpoint" in (unit_message or ""):
-                _log_diagnostics(juju, elapsed)
+        # Run diagnostics periodically while waiting for the primary endpoint,
+        # not just on status change, to track what the pod is doing over time.
+        elapsed = time.monotonic() - start
+        if (
+            unit_current == "waiting"
+            and "primary endpoint" in (unit_message or "")
+            and elapsed - last_diag >= 60
+        ):
+            _log_diagnostics(juju, elapsed)
+            last_diag = elapsed
 
         if jubilant.all_active(status):
             logger.info(
@@ -116,17 +124,35 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
 
 def _log_diagnostics(juju: jubilant.Juju, elapsed: float):
     """Log diagnostic information about the postgresql-k8s pod and Patroni."""
-    # Show the pod status and recent events.
-    _run_and_log(elapsed, "kubectl get pods -A", timeout=10)
+    # Show the pod status with wide output to see container states.
+    _run_and_log(elapsed, "kubectl get pods -A -o wide", timeout=10)
+    # Show pod events (image pulls, scheduling, etc.).
+    _run_and_log(
+        elapsed,
+        "kubectl get pods -n $(kubectl get pods -A --no-headers "
+        "| grep postgresql-k8s-0 | awk '{print $1}') postgresql-k8s-0 "
+        "-o jsonpath='{range .status.containerStatuses[*]}{.name}: state={.state} "
+        "ready={.ready} image={.image}{\"\\n\"}{end}' 2>&1 || true",
+        timeout=10,
+    )
+    # Show recent events for the postgresql-k8s pod.
+    _run_and_log(
+        elapsed,
+        "kubectl describe pod -n $(kubectl get pods -A --no-headers "
+        "| grep postgresql-k8s-0 | awk '{print $1}') postgresql-k8s-0 2>&1 "
+        "| grep -A30 '^Events:' || true",
+        timeout=15,
+    )
+    # Show services and endpoints.
     _run_and_log(elapsed, "kubectl get svc -A | grep -i postgres", timeout=10)
     _run_and_log(elapsed, "kubectl get endpoints -A | grep -i postgres", timeout=10)
 
     # Check if the postgresql-k8s Patroni REST API is responding.
     _run_and_log(
         elapsed,
-        "kubectl exec -n $(juju models --format=json | "
-        "python3 -c 'import json,sys; print(json.load(sys.stdin)[\"models\"][0][\"short-name\"])') "
-        "postgresql-k8s-0 -- curl -s http://localhost:8008/health 2>&1 || true",
+        "kubectl exec -n $(kubectl get pods -A --no-headers "
+        "| grep postgresql-k8s-0 | awk '{print $1}') postgresql-k8s-0 "
+        "-- curl -s http://localhost:8008/health 2>&1 || true",
         timeout=15,
     )
 
