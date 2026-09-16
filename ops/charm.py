@@ -1683,10 +1683,13 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
         for field in dataclasses.fields(cls):
             alias = field.metadata.get('alias', field.name)
             # If this a Pydantic dataclass, then it handles the alias.
-            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
-            # best here, but we don't want to import pydantic in ops, so
-            # we look more explicitly.
-            if getattr(cls, '__is_pydantic_dataclass__', False):
+            # Using pydantic.dataclasses.is_pydantic_dataclass() would be best
+            # here, but we don't want to import pydantic in ops, so we check
+            # for the attribute that function itself checks for. Note that
+            # '__is_pydantic_dataclass__' only exists from pydantic 2.11, so
+            # relying on that one misses every earlier 2.x pydantic dataclass,
+            # which reads the aliases back under their field names instead.
+            if '__pydantic_validator__' in cls.__dict__:
                 juju_to_arg[alias] = alias
             else:
                 juju_to_arg[alias] = field.name
@@ -1763,7 +1766,20 @@ def _coerce_field(tp: Any, value: Any) -> Any:
         return value
     if isinstance(tp, type):
         if dataclasses.is_dataclass(tp):
-            return _build_dataclass(tp, value)
+            if isinstance(value, tp):
+                # Already the class we want: a caller's keyword argument passed
+                # through to `Relation.load`, rather than anything from a
+                # databag, so there is nothing to coerce.
+                return value
+            if not isinstance(value, Mapping):
+                # Without this, a remote app writing a string or a list where a
+                # nested dataclass belongs gets a default-constructed object
+                # that corresponds to nothing in the databag: `field.name not in
+                # 'oops'` is False for every field, so every one is skipped.
+                raise TypeError(
+                    f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
+                )
+            return _build_dataclass(tp, cast('Mapping[str, Any]', value))
         if issubclass(tp, enum.Enum):
             return tp(value)
     return value

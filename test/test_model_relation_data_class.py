@@ -636,6 +636,66 @@ def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():
     assert isinstance(obj.nested, dict)
 
 
+@pytest.mark.parametrize(
+    'written',
+    [
+        pytest.param(json.dumps('oops'), id='string'),
+        pytest.param(json.dumps([1, 2]), id='list'),
+        pytest.param(json.dumps(3), id='int'),
+        # A string that happens to contain every field name: the membership
+        # test that skips absent fields passes for the wrong reason.
+        pytest.param(json.dumps('subscribe'), id='string-containing-field-name'),
+    ],
+)
+def test_relation_load_rejects_a_non_mapping_for_a_nested_dataclass(written: str):
+    """A remote app can write anything, and ops must not invent an object from it.
+
+    `_build_dataclass` decides which fields to fill with `field.name not in
+    data`, which is False for every field of a string or a list, so without
+    this guard the charm is handed a confidently default-constructed object
+    corresponding to nothing in the databag - or a TypeError from inside ops,
+    depending on the value.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        nested: Nested | None = None
+
+    # The charm doesn't catch it, so ops.testing reports it as an uncaught error.
+    with pytest.raises(testing.errors.UncaughtCharmError, match='expected a mapping for Nested'):
+        _load_into(Data, {'nested': written})
+
+
+def test_relation_load_passes_through_an_already_built_keyword_argument():
+    """`kwargs` are documented as passed through to the data class.
+
+    They go through the same coercion as the databag, so an argument that is
+    already the nested class has to be recognised rather than treated as data
+    to build one from.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        name: str = ''
+        nested: Nested | None = None
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, nested=Nested(sub=5))
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'name': json.dumps('x')})
+    with ctx(ctx.on.relation_changed(rel), testing.State(relations={rel})) as mgr:
+        mgr.run()
+        data = mgr.charm.data
+
+    assert data == Data(name='x', nested=Nested(sub=5))
+
+
 def test_relation_load_falls_back_when_type_hints_unresolvable():
     """get_type_hints raises NameError on a TYPE_CHECKING-only annotation.
 
