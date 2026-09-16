@@ -68,8 +68,8 @@ jobs:
       - name: Prepare for deploying K8s charms
         run: sudo concierge prepare -p k8s
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
-      - name: Pin k8s snap to v1.32.11 (rev 4740) for experiment
-        run: sudo snap refresh k8s --revision=4740 --classic
+      - name: Pin k8s snap to v1.32.11 (rev 4970, amd64) for experiment
+        run: sudo snap refresh k8s --revision=4970 --classic
       - name: Fetch any charmlibs
         run: |
           cd ${{ matrix.dir }}
