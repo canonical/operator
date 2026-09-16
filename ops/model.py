@@ -3611,10 +3611,28 @@ class _ModelBackend:
         with a relation that Juju has forgotten about, so ops treats that the
         same way as a relation Juju reports as not found.
 
-        The one relation hook command that Juju refuses on a relation that does
-        still exist is a follower reading its own application databag, so that
-        case keeps the original error (and is reported as a security event).
+        Juju refuses two relation hook commands on a relation that does still
+        exist, and both are a follower touching its own application databag:
+        reading it, and writing it. Those keep the original error, and are
+        reported as security events, because swallowing a real authorisation
+        failure is the thing this function must not do.
+
+        A follower can be refused while ops believes it is the leader:
+        :meth:`is_leader` caches for the lease renewal period, and a write from
+        outside an observed event handler isn't checked for leadership at all.
+
+        Known limitation: a *peer* relation's application databag is readable by
+        every unit, so "permission denied" from reading one can only mean the
+        relation is gone -- but ``relation-get``'s kwargs don't say whether the
+        relation is a peer relation, so a follower reading a peer app databag
+        still gets the original error and a security event. That is issue #2709
+        in the one case this function carves out.
         """
+        if cmd == 'relation-set' and kwargs.get('app'):
+            # Writing an app databag is a leader-only operation, and the only
+            # app databag a unit can write is its own, so there is no `unit`
+            # kwarg to compare against.
+            return self.is_leader()
         if cmd != 'relation-get' or not kwargs.get('app'):
             return True
         # Reading the *remote* application databag is not restricted.

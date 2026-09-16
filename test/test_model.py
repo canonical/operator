@@ -3024,6 +3024,9 @@ class TestModelBackend:
             lambda: backend.relation_get(2, 'myapp', is_app=True),
             lambda: backend.relation_get(2, 'myapp/0', is_app=False),
             lambda: backend.relation_set(2, {'foo': 'bar'}, is_app=False),
+            # `relation-set --app` is in this list only because `is-leader` says
+            # true above: as a follower it is a real authorisation failure. See
+            # test_follower_writing_own_app_databag.
             lambda: backend.relation_set(2, {'foo': 'bar'}, is_app=True),
             lambda: backend.network_get('db1', 2),
         ]
@@ -3074,6 +3077,51 @@ class TestModelBackend:
             backend.relation_get(2, 'myapp', is_app=True)
         assert not isinstance(excinfo.value, ops.RelationNotFoundError)
         assert [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_follower_writing_own_app_databag(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """A follower writing its own app databag is a real authorisation failure.
+
+        The same carve-out as reading it: Juju refuses this on a relation that
+        still exists, so reporting it as a gone relation would swallow an
+        authorisation failure and lose the security event.
+
+        A follower can get here while ops believes it is the leader -
+        `is_leader` caches for the lease renewal period, and a write from
+        outside an observed event handler isn't checked for leadership at all -
+        so the model-level guard passing doesn't mean Juju will accept it.
+        """
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('relation-set', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.relation_set(2, {'foo': 'bar'}, is_app=True)
+        assert not isinstance(excinfo.value, ops.RelationNotFoundError)
+        assert [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_follower_writing_own_unit_databag_on_a_gone_relation(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """Only the *app* write is leader-only; a unit write is still a gone relation."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('relation-set', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.RelationNotFoundError):
+            backend.relation_set(2, {'foo': 'bar'}, is_app=False)
+        assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
 
     def test_non_relation_permission_denied_logs_security_event(
         self,
