@@ -77,13 +77,14 @@ If your charm needs access to a resource, make it available with [`ops.testing.S
 ```python
 import pathlib
 
+import pytest
 from ops import testing
 
 ctx = testing.Context(
     MyCharm,
     meta={
-        'name': 'julie',
-        'resources': {'my-resource': {'type': 'file'}},
+        'name': 'my-charm',
+        'resources': {'my-resource': {'type': 'file', 'filename': 'somefile.txt'}},
     },
 )
 resource = testing.Resource(name='my-resource', path='/path/to/somefile.txt')
@@ -91,6 +92,21 @@ with ctx(ctx.on.start(), testing.State(resources={resource})) as mgr:
     path = mgr.charm.model.resources.fetch('my-resource')
     assert path == pathlib.Path('/path/to/somefile.txt')
 ```
+
+To test what your charm does when the resource isn't declared, leave it out of
+`meta`, and `fetch()` raises `NameError` as it would in a real charm:
+
+```python
+ctx = testing.Context(MyCharm, meta={'name': 'my-charm'})
+with ctx(ctx.on.start(), testing.State()) as mgr:
+    with pytest.raises(NameError):
+        mgr.charm.model.resources.fetch('my-resource')
+```
+
+The `ops.ModelError` branch has no equivalent: a resource that is declared in
+`meta` but missing from `State.resources` is an inconsistent state rather than
+a Juju failure, so `ops.testing` raises `RuntimeError` instead. Cover that
+branch in an integration test, or by calling the handler directly.
 
 (manage-resources-integration-tests)=
 ### Write integration tests
