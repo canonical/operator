@@ -20,6 +20,7 @@
 
 import logging
 import pathlib
+import time
 
 import jubilant
 import pytest
@@ -60,4 +61,7 @@ def test_database_integration(charm: pathlib.Path, juju: jubilant.Juju):
     """
     juju.deploy("postgresql-k8s", channel="14/stable", trust=True)
     juju.integrate(APP_NAME, "postgresql-k8s")
-    juju.wait(jubilant.all_active)
+    start = time.monotonic()
+    logger.info("Waiting for postgresql-k8s to become active (20 min timeout)")
+    juju.wait(jubilant.all_active, timeout=20 * 60)
+    logger.info("postgresql-k8s became active after %.1f seconds", time.monotonic() - start)
