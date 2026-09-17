@@ -70,14 +70,9 @@ jobs:
     permissions:
       issues: write
       actions: read
-    # Passes an empty string, and is still required -- see the note on
-    # OPENROUTER_API_KEY in ai-failure-enrich.yaml.
     secrets:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    # `notify` has to have succeeded to get here, so these are always set for
-    # this repo. The script can still look the issue up if they're empty,
-    # which is what a repo that adopts the enricher before it passes these
-    # will get.
+    # `notify` has to have succeeded to get here, so these are always set.
     with:
       issue: ${{ needs.notify.outputs.issue }}
       origin: ${{ needs.notify.outputs.origin }}

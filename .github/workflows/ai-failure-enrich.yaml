@@ -7,20 +7,17 @@ name: AI-enrich scheduled-failure notification
 on:
   workflow_call:
     inputs:
-      # What the notifier did, when it got that far. Optional: an empty value
-      # means the script looks the issue up itself, which is what happens when
-      # `notify` fails before it can create one.
       issue:
         description: The issue the notifier created or commented on.
-        required: false
+        required: true
         type: string
       origin:
         description: Either "new" or "comment", matching what the notifier did.
-        required: false
+        required: true
         type: string
     secrets:
       OPENROUTER_API_KEY:
-        required: false
+        required: true
 
 permissions: {}
 
@@ -46,23 +43,6 @@ jobs:
           NOTIFY_ISSUE: ${{ inputs.issue }}
           NOTIFY_ORIGIN: ${{ inputs.origin }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          # It takes two things to get this key here, and it's tempting to
-          # remove the second one, so please don't:
-          #
-          #   - `environment:` on this job holds the real value. A caller
-          #     can't see it, because a job without an `environment:` gets
-          #     an empty string for `secrets.OPENROUTER_API_KEY`.
-          #   - every call site in the chain names the secret, and it's
-          #     declared above. That only ever passes the empty string, which
-          #     is why it looks like it does nothing.
-          #
-          # Take the second one out and the key arrives empty, and nothing
-          # complains: we just get a plain notice instead of an enriched one.
-          # If enrichment stops happening for no obvious reason, look here.
-          #
-          # Each repo that adopts this provisions its own key. Without one,
-          # the script writes the plain fallback body and never calls
-          # OpenRouter (see the package's cli.main()).
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
         run: >-
