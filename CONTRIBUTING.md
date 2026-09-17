@@ -4,7 +4,7 @@ Before working on changes, please consider [opening an issue](https://github.com
 
 # AI
 
-You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
+You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. If you are not capable of reviewing the PR, please open an issue instead. PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
 
 Please do not use tools (such as GitHub Copilot) to provide PR reviews.
 
@@ -64,7 +64,7 @@ uv tool update-shell
 Optionally, to run checks automatically before each commit, install
 [pre-commit](https://pre-commit.com/#install) and run `pre-commit install`.
 
-You can validate that you have a working installation by running `tox --version`.
+You can validate that you have a working installation by running `tox`, which will run the lint checks and unit tests.
 
 For improved performance on the tests, install the library that allows
 PyYAML to use C speedups:
@@ -72,14 +72,6 @@ PyYAML to use C speedups:
 ```sh
 sudo apt-get install libyaml-dev
 ```
-
-## Formatting and checking
-
-- Test environments are managed with [tox](https://tox.wiki/), and tests are run with [pytest](https://pytest.org), with coverage measured by [coverage](https://coverage.readthedocs.io/).
-- Static type checking uses [pyright](https://github.com/microsoft/pyright), extending Python 3.10 type hinting via the [typing_extensions](https://pypi.org/project/typing-extensions/) package.
-- Formatting uses [Ruff](https://docs.astral.sh/ruff/).
-- All tool configuration is kept in [pyproject.toml](pyproject.toml). The list of
-  dependencies can be found in the relevant `tox.ini` environment's `deps` field.
 
 # Tests
 
@@ -101,20 +93,11 @@ tox
 tox -e unit
 tox -e unit -- test/test_charm.py
 
-# Format the code using Ruff
+# Format the code
 tox -e format
 
 # run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
-```
-
-For more in depth debugging, you can enter the virtualenv so that you can run
-`pytest` or other tools directly:
-
-```sh
-uv sync --all-groups
-source .venv/bin/activate
-pytest
 ```
 
 Likewise, use this virtualenv to enable Python type hints and language server if
@@ -122,14 +105,7 @@ you use an editor from the console or specify it as interpreter path in an IDE.
 
 ## Pebble tests
 
-The framework has some tests that interact with a real/live Pebble server. To
-run these tests, you must have [pebble](https://github.com/canonical/pebble)
-installed and available in your path. If you have the Go toolchain installed,
-you can run `go install github.com/canonical/pebble/cmd/pebble@master`. This will
-install pebble to `$GOBIN` if it is set or `$HOME/go/bin` otherwise. Add
-`$GOBIN` to your path (e.g. `export PATH=$PATH:$GOBIN` or `export
-PATH=$PATH:$HOME/go/bin` in your `.bashrc`) and you are ready to run the real
-Pebble tests:
+The framework has some tests that interact with a real/live Pebble server, which can be installed as a snap. To run these tests, you must have [pebble](https://github.com/canonical/pebble) installed and available in your path.
 
 ```sh
 tox -e pebble
@@ -167,13 +143,7 @@ If your changes are only on your local device, you can inject your local `ops`
 into the charm after it has packed, and before you deploy it, by unzipping the
 `.charm` file and replacing the `ops` folder in the virtualenv.
 
-You can also test your local changes against hundreds of charms using [canonical/hyrum](https://github.com/canonical/hyrum):
-
-```sh
-hyrum check unit --workers $(nproc) --patch 'ops @ file:///path/to/operator'
-```
-
-
+The [canonical/hyrum](https://github.com/canonical/hyrum) tool is useful for automating this, and allows you to test using a large number of different charms.
 
 ### Regression testing against existing charms
 
@@ -204,15 +174,7 @@ See the [documentation style guide](https://github.com/canonical/charm-tech/blob
 2. [Build the documentation locally](#how-to-build-the-documentation-locally), to check that everything looks right
 3. [Propose your changes using a pull request](#pull-requests)
 
-When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
-
-## How to build the documentation locally
-
-Before you start, make sure that you've [installed uv](https://docs.astral.sh/uv/getting-started/installation/). On Ubuntu, you can run:
-
-```sh
-sudo snap install astral-uv --classic
-```
+When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.com:canonical-juju-ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
 
 To build the docs:
 
@@ -248,7 +210,7 @@ In docstrings:
 
 - Use `.. jujuadded:: x.y` to indicate that the feature is only available when using version x.y (or higher) of Juju.
 - Use `.. jujuchanged:: x.y` when the feature's behaviour changed in version x.y of Juju.
-- Use `.. jujuremoved:: x.y` when the feature's behaviour changed in version x.y of Juju.
+- Use `.. jujuremoved:: x.y` when the feature was removed in version x.y of Juju.
 
 Similar directives also work in MyST Markdown. For example:
 
@@ -258,7 +220,7 @@ Summary
 ```
 ````
 
-Unmarked features are assumed to work and be available in the current LTS version of Juju.
+Unmarked features are assumed to work and be available in the latest LTS version of Juju.
 
 # Releases
 
