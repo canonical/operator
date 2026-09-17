@@ -173,9 +173,7 @@ You can also test your local changes against hundreds of charms using [canonical
 hyrum check unit --workers $(nproc) --patch 'ops @ file:///path/to/operator'
 ```
 
-### Using a Juju branch
 
-If your `ops` change relies on a change in a Juju branch, [build Juju and its dependencies](https://github.com/juju/juju/blob/main/CONTRIBUTING.md#build-and-install-juju), bootstrap a controller with it, then deploy your charm as normal.
 
 ### Regression testing against existing charms
 
@@ -196,6 +194,8 @@ Keep these customisations in mind when upgrading Sphinx Stack. To upgrade Sphinx
 
 ## Contributing docs
 
+See the [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md).
+
 1. Fork this repo and edit the relevant source files:
     - Tutorials - [`/docs/tutorial`](./docs/tutorial)
     - How-to guides - [`/docs/howto`](./docs/howto)
@@ -205,10 +205,6 @@ Keep these customisations in mind when upgrading Sphinx Stack. To upgrade Sphinx
 3. [Propose your changes using a pull request](#pull-requests)
 
 When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.org:ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
-
-## How to write great documentation
-
-See the [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md#charm-tech-documentation-style-guide).
 
 ## How to build the documentation locally
 
