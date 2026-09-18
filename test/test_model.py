@@ -2982,7 +2982,7 @@ class TestModelBackend:
         fake_script.write(cmd, f"echo 'ERROR {failure}' >&2; exit 1")
         fake_script.write('juju-log', 'exit 0')
 
-        with pytest.raises(ops.RelationDataAccessError) as excinfo:
+        with pytest.raises(ops.ModelError) as excinfo:
             if cmd == 'relation-get':
                 backend.relation_get(1117, 'myapp', True, relation_name='receive-otlp')
             else:
@@ -2991,11 +2991,13 @@ class TestModelBackend:
                 )
 
         error = excinfo.value
-        assert isinstance(error, ops.ModelError)
+        assert type(error) is ops.ModelError
         message = str(error)
-        for detail in (failure, cmd, 'receive-otlp-relation-changed', '1117', '1305'):
+        for detail in (failure, cmd, 'receive-otlp:1117', '--app'):
             assert detail in message
-        assert f'leader={is_leader}' in message
+        if cmd == 'relation-get':
+            assert 'myapp' in message
+        assert f'{is_leader} -> {is_leader}' in message
         assert 'private-value' not in message
         assert isinstance(error.__cause__, hookcmds.Error)
         assert error.__cause__.stderr == f'ERROR {failure}\n'
@@ -3004,11 +3006,11 @@ class TestModelBackend:
         assert [call[0] for call in fake_script.calls() if call[0] != 'juju-log'] == [cmd]
 
     @pytest.mark.parametrize(
-        'env,expected',
+        'env',
         [
-            ({'JUJU_ACTION_NAME': 'backup'}, 'backup'),
-            ({'JUJU_DISPATCH_PATH': 'hooks/config-changed'}, 'hooks/config-changed'),
-            ({}, None),
+            {'JUJU_ACTION_NAME': 'backup'},
+            {'JUJU_DISPATCH_PATH': 'hooks/config-changed'},
+            {},
         ],
     )
     def test_hook_command_error_event(
@@ -3016,7 +3018,6 @@ class TestModelBackend:
         fake_script: FakeScript,
         monkeypatch: pytest.MonkeyPatch,
         env: dict[str, str],
-        expected: str | None,
     ):
         for name in (
             'JUJU_HOOK_NAME',
@@ -3035,9 +3036,8 @@ class TestModelBackend:
         message = str(excinfo.value)
         assert 'ERROR config unavailable' in message
         assert 'config-get' in message
-        if expected is not None:
-            assert expected in message
-        assert 'leader=' not in message
+        assert 'None -> None' in message
+        assert 'lease' not in message
         assert [call[0] for call in fake_script.calls()] == ['config-get']
 
     @pytest.mark.parametrize('cached', [True, False, None])
@@ -3057,11 +3057,10 @@ class TestModelBackend:
             backend._leader_check_time -= 31
         fake_script.calls(clear=True)
         fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
-        with pytest.raises(ops.RelationDataAccessError) as excinfo:
+        with pytest.raises(ops.ModelError) as excinfo:
             backend.relation_get(0, 'remote/0', False)
-        assert 'relation_id=0' in str(excinfo.value)
-        assert 'app=False' in str(excinfo.value)
-        assert 'leader=' not in str(excinfo.value)
+        assert "'-r', '0'" in str(excinfo.value)
+        assert f'{cached} -> {cached}' in str(excinfo.value)
         commands = [call[0] for call in fake_script.calls() if call[0] != 'juju-log']
         assert commands == ['relation-get']
 
@@ -3083,16 +3082,16 @@ class TestModelBackend:
             raise original
 
         monkeypatch.setattr(hookcmds, 'relation_get', relation_get)
-        with pytest.raises(ops.RelationDataAccessError) as excinfo:
+        with pytest.raises(ops.ModelError) as excinfo:
             backend.relation_get(0, 'remote/0', False)
-        assert 'leader=True' in str(excinfo.value)
+        assert 'True -> False' in str(excinfo.value)
         assert excinfo.value.__cause__ is original
         security_log = [call for call in fake_script.calls() if call[0] == 'juju-log']
         assert len(security_log) == 1
         assert '(as leader)' in json.loads(security_log[0][-1])['description']
 
     @pytest.mark.parametrize('cached', [True, False])
-    @pytest.mark.parametrize('age', [0, 30, 30.1])
+    @pytest.mark.parametrize('age', [0, 27.55, 30, 30.1])
     def test_error_leadership_cache_boundary(
         self,
         backend: _ModelBackend,
@@ -3107,14 +3106,13 @@ class TestModelBackend:
         with pytest.raises(ops.ModelError) as excinfo:
             with backend._wrap_hookcmd('config-get'):
                 raise error
-        if age <= backend.LEASE_RENEWAL_PERIOD.total_seconds():
-            assert f'leader={cached}' in str(excinfo.value)
-        else:
-            assert 'leader=' not in str(excinfo.value)
+        remaining = backend.LEASE_RENEWAL_PERIOD.total_seconds() - age
+        assert f'{remaining:.2f}s' in str(excinfo.value)
+        assert f'{cached} -> {cached}' in str(excinfo.value)
         assert excinfo.value.__cause__ is error
 
     @pytest.mark.parametrize(
-        'stderr', ['', '\n', 'ERROR unavailable\ntry again\n', 'ERROR \N{SNOWMAN}']
+        'stderr', ['', '\n', 'ERROR unavailable\ntry again\n', 'ERROR \N{SNOWMAN}', "can't read"]
     )
     def test_hook_command_error_preserves_stderr(self, backend: _ModelBackend, stderr: str):
         error = hookcmds.Error(returncode=1, cmd=['config-get'], stderr=stderr)
@@ -3122,7 +3120,7 @@ class TestModelBackend:
             with backend._wrap_hookcmd('config-get'):
                 raise error
         assert 'config-get' in str(excinfo.value)
-        assert stderr.rstrip() in str(excinfo.value)
+        assert repr(stderr.rstrip()) in str(excinfo.value)
         assert excinfo.value.__cause__ is error
         assert error.stderr == stderr
 
@@ -3133,6 +3131,8 @@ class TestModelBackend:
             ('secret-get', 'secret not found: permission denied', ops.SecretNotFoundError),
             ('secret-get', 'permission denied', ops.ModelError),
             ('relation-list', 'permission denied', ops.ModelError),
+            ('relation-get', 'permission denied', ops.ModelError),
+            ('relation-set', 'permission denied', ops.ModelError),
             ('relation-get', 'unexpected failure', ops.ModelError),
             ('is-leader', 'permission denied', ops.ModelError),
         ],
@@ -3156,23 +3156,68 @@ class TestModelBackend:
         assert isinstance(excinfo.value.__cause__, hookcmds.Error)
         assert [call[0] for call in fake_script.calls() if call[0] != 'juju-log'] == [cmd]
 
-    def test_hook_command_context_excludes_values(self, backend: _ModelBackend):
+    def test_hook_command_context_excludes_stdout(self, backend: _ModelBackend):
         error = hookcmds.Error(
             returncode=1,
-            cmd=['secret-add', 'token=private-value'],
+            cmd=['config-get', '--format=json'],
             stdout='private-output',
             stderr='unavailable',
         )
         with pytest.raises(ops.ModelError) as excinfo:
-            with backend._wrap_hookcmd(
-                'secret-add', 'private-arg', content={'token': 'private-content'}
-            ):
+            with backend._wrap_hookcmd('config-get'):
                 raise error
-        assert 'secret-add' in str(excinfo.value)
+        assert str(error) in str(excinfo.value)
         assert 'private-' not in str(excinfo.value)
         assert excinfo.value.__cause__ is error
 
-    def test_failed_leadership_refresh_has_no_leadership_context(
+    def test_hook_command_error_includes_command(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
+        fake_script.write('action-set', 'echo "ERROR unavailable" >&2; exit 7')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.action_set({'result': 'done'})
+        cause = excinfo.value.__cause__
+        assert isinstance(cause, hookcmds.Error)
+        assert cause.returncode == 7
+        assert list(cause.cmd) == ['action-set', 'result=done']
+        assert str(cause) in str(excinfo.value)
+        assert repr(cause.stderr.rstrip()) in str(excinfo.value)
+
+    def test_hook_command_error_excludes_secret_contents(
+        self, fake_script: FakeScript, backend: _ModelBackend
+    ):
+        fake_script.write('secret-add', 'echo "ERROR unavailable" >&2; exit 1')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.secret_add({'password': 'private-content'}, owner='application')
+        assert 'secret-add' in str(excinfo.value)
+        assert 'password#file=' in str(excinfo.value)
+        assert 'private-content' not in str(excinfo.value)
+        assert isinstance(excinfo.value.__cause__, hookcmds.Error)
+
+    @pytest.mark.parametrize('cached', [True, False, None])
+    @pytest.mark.parametrize('age', [0, 30, 30.1])
+    def test_error_security_log_uses_valid_leadership_snapshot(
+        self,
+        fake_script: FakeScript,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+        cached: bool | None,
+        age: float,
+    ):
+        monkeypatch.setattr('ops.model.time.monotonic', lambda: 100)
+        backend._is_leader = cached
+        backend._leader_check_time = 100 - age if cached is not None else None
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError):
+            backend.relation_get(0, 'remote/0', False)
+        security_log = [call for call in fake_script.calls() if call[0] == 'juju-log']
+        assert len(security_log) == 1
+        description = json.loads(security_log[0][-1])['description']
+        assert ('(as leader)' in description) == (cached is True and age <= 30)
+
+    def test_failed_leadership_refresh_preserves_original_error(
         self,
         fake_script: FakeScript,
         backend: _ModelBackend,
@@ -3186,16 +3231,66 @@ class TestModelBackend:
         fake_script.write('juju-log', 'exit 0')
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        assert 'leader=' not in str(excinfo.value)
+        assert 'True -> True' in str(excinfo.value)
+        assert 'lease' not in str(excinfo.value)
         assert isinstance(excinfo.value.__cause__, hookcmds.Error)
         assert [call[0] for call in fake_script.calls() if call[0] != 'juju-log'] == ['is-leader']
 
         fake_script.write('config-get', 'echo "ERROR unavailable" >&2; exit 1')
         with pytest.raises(ops.ModelError) as next_error:
             backend.config_get()
-        assert 'leader=' not in str(next_error.value)
+        assert 'True -> True' in str(next_error.value)
+        assert 'lease' not in str(next_error.value)
         fake_script.write('is-leader', 'echo false')
         assert backend.is_leader() is False
+
+    @pytest.mark.parametrize('cached', [True, False, None])
+    def test_failed_leadership_refresh_preserves_lease(
+        self,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        cached: bool | None,
+    ):
+        monkeypatch.setattr('ops.model.time.monotonic', lambda: 100)
+        backend._is_leader = cached
+        last_check = 50 if cached is not None else None
+        backend._leader_check_time = last_check
+        original = hookcmds.Error(returncode=1, cmd=['is-leader'], stderr='unavailable')
+        query = mock.Mock(side_effect=[original, False])
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        assert excinfo.value.__cause__ is original
+        assert backend._is_leader is cached
+        assert backend._leader_check_time == last_check
+
+        assert backend.is_leader() is False
+        assert backend._leader_check_time == 100
+        assert query.call_count == 2
+
+    def test_leadership_lease_starts_before_successful_query(
+        self, backend: _ModelBackend, monkeypatch: pytest.MonkeyPatch
+    ):
+        now = 100.0
+        monkeypatch.setattr('ops.model.time.monotonic', lambda: now)
+
+        def is_leader():
+            nonlocal now
+            now += 5
+            return True
+
+        query = mock.Mock(side_effect=is_leader)
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+        assert backend.is_leader() is True
+        assert backend._leader_check_time == 100
+        now = 130
+        assert backend.is_leader() is True
+        assert query.call_count == 1
+        now = 131
+        assert backend.is_leader() is True
+        assert query.call_count == 2
+        assert backend._leader_check_time == 131
 
     @pytest.mark.parametrize('write', [False, True])
     def test_relation_data_error_from_model(
@@ -3227,13 +3322,13 @@ class TestModelBackend:
         relation = model.get_relation('database', 7)
         assert relation is not None
         assert relation.app is not None
-        with pytest.raises(ops.RelationDataAccessError) as excinfo:
+        with pytest.raises(ops.ModelError) as excinfo:
             if write:
                 relation.data[model.unit]['password'] = 'private-value'
             else:
                 dict(relation.data[relation.app])
         command = 'relation-set' if write else 'relation-get'
-        for detail in (command, 'database-relation-changed', 'database', '7'):
+        for detail in (command, 'database:7'):
             assert detail in str(excinfo.value)
         assert 'private-value' not in str(excinfo.value)
         assert isinstance(excinfo.value.__cause__, hookcmds.Error)

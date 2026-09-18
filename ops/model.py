@@ -3571,18 +3571,12 @@ class _ModelBackend:
         if self._is_recursive.get():
             # Either `juju-log` hook command failed or there's a bug in ops.
             return
-        # Do not refresh leadership after a failure: it may have changed, and a
-        # failed is-leader command would hide the original error.
-        is_leader = self._is_leader
-        if (
-            cmd == 'is-leader'
-            or self._leader_check_time is None
-            or (
+        leader_before = self._is_leader
+        leader_lease_remaining = None
+        if self._leader_check_time is not None:
+            leader_lease_remaining = self.LEASE_RENEWAL_PERIOD.total_seconds() - (
                 time.monotonic() - self._leader_check_time
-                > self.LEASE_RENEWAL_PERIOD.total_seconds()
             )
-        ):
-            is_leader = None
         # Logs are collected via log integration, omit the subprocess calls that push
         # the same content to juju from telemetry.
         mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
@@ -3596,10 +3590,19 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield
         except hookcmds.Error as e:
-            authz_failure = self._check_for_security_event(
-                e.cmd[0], e.returncode, e.stderr, is_leader=is_leader
-            )
-            message = self._hookcmd_error_message(cmd, kwargs, e.stderr, is_leader)
+            # Report the cached state without another hook command that could
+            # fail and obscure the original error.
+            leader_info = f'leader {leader_before} -> {self._is_leader}'
+            is_leader = None
+            if leader_lease_remaining is not None:
+                leader_info = (
+                    f'leader (lease {leader_lease_remaining:.2f}s) '
+                    f'{leader_before} -> {self._is_leader}'
+                )
+                if leader_lease_remaining >= 0:
+                    is_leader = leader_before
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr, is_leader=is_leader)
+            message = f'{e} [{leader_info}]: {e.stderr.rstrip()!r}'
             if (
                 cmd.startswith(('relation-', 'network-'))
                 and 'relation not found' in e.stderr.lower()
@@ -3607,46 +3610,23 @@ class _ModelBackend:
                 raise RelationNotFoundError(message) from e
             elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
                 raise SecretNotFoundError(message) from e
-            elif authz_failure and cmd in ('relation-get', 'relation-set'):
-                raise RelationDataAccessError(message) from e
             raise ModelError(message) from e
 
-    def _hookcmd_error_message(
-        self, cmd: str, kwargs: Mapping[str, Any], stderr: str, is_leader: bool | None
-    ) -> str:
-        context = [f'Juju operation {cmd!r}']
-        juju_context = self._juju_context
-        if juju_context.action_name:
-            context.append(f'action {juju_context.action_name!r}')
-        elif juju_context.hook_name:
-            context.append(f'hook {juju_context.hook_name!r}')
-        elif juju_context.dispatch_path:
-            context.append(f'event {juju_context.dispatch_path!r}')
-        # Only include identifiers, not command arguments that may contain
-        # relation data, secret contents, or action results.
-        for name in ('relation_id', 'endpoint', 'relation_name', 'unit', 'app'):
-            value = kwargs.get(name)
-            if value is not None:
-                context.append(f'{name}={value!r}')
-        if juju_context.relation_id is not None:
-            context.append(f'event relation_id={juju_context.relation_id}')
-        if juju_context.relation_name:
-            context.append(f'event relation_name={juju_context.relation_name!r}')
-        if is_leader is not None:
-            context.append(f'leader={is_leader}')
-        return f'{stderr.rstrip()} ({", ".join(context)})'
-
-    def _check_for_security_event(
-        self, cmd: str, returncode: int, stderr: str, *, is_leader: bool | None = None
-    ) -> bool:
+    @staticmethod
+    def _is_authz_message(stderr: str) -> bool:
         authz_messages = (
             'access denied',
             'permission denied',
             'not the leader',
             'cannot write relation settings',
         )
-        if not any(message in stderr.lower() for message in authz_messages):
-            return False
+        return any(message in stderr.lower() for message in authz_messages)
+
+    def _check_for_security_event(
+        self, cmd: str, returncode: int, stderr: str, *, is_leader: bool | None = None
+    ) -> None:
+        if not self._is_authz_message(stderr):
+            return
         base_cmd = os.path.basename(cmd)
         leadership = ' (as leader)' if is_leader else ''
         description = (
@@ -3659,7 +3639,6 @@ class _ModelBackend:
             base_cmd,
             description=description,
         )
-        return True
 
     def relation_ids(self, relation_name: str) -> list[int]:
         with self._wrap_hookcmd('relation-ids', relation_name=relation_name):
@@ -3772,13 +3751,10 @@ class _ModelBackend:
             time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
             if time_since_check <= self.LEASE_RENEWAL_PERIOD:
                 return self._is_leader
-        # Current time MUST be saved before running is-leader to ensure the cache
-        # is only used inside the window that is-leader itself asserts.
-        self._leader_check_time = now
-        # A failed refresh must not give the previous result a new lease.
-        self._is_leader = None
         with self._wrap_hookcmd('is-leader'):
             self._is_leader = hookcmds.is_leader()
+        # Only store the refreshed lease on success, using the time before the call.
+        self._leader_check_time = now
         return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:
