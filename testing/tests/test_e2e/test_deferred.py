@@ -13,7 +13,6 @@ from scenario import Context
 from scenario.state import Container, Relation, State, _Event
 
 import ops
-import ops.testing
 
 from ..helpers import trigger
 
