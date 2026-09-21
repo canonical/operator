@@ -2397,15 +2397,6 @@ class EventProtocol(Protocol):
     """
 
     @property
-    def path(self) -> str:
-        """The name of the event, as it was provided to the framework.
-
-        For example: ``start``, ``config_changed``, ``my_relation_joined``, or
-        ``custom.MyConsumer.lib_changed``.
-        """
-        ...
-
-    @property
     def name(self) -> str:
         """Full event name, in Python-attribute form (as ops names the event).
 
