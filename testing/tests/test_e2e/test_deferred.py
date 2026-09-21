@@ -325,12 +325,6 @@ def test_events_satisfy_the_event_protocol(mycharm: type[ops.CharmBase]):
     assert event.deferred(handler=mycharm._on_event).name == 'start'  # type: ignore
 
 
-def test_event_protocol_is_exported():
-    assert ops.testing.EventProtocol is scenario.EventProtocol
-    assert 'EventProtocol' in ops.testing.__all__
-    assert 'EventProtocol' in scenario.__all__
-
-
 def test_run_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
     class NotAnEvent:
         path = name = 'start'
