@@ -24,6 +24,7 @@ from typing import (
     Generic,
     Literal,
     NoReturn,
+    Protocol,
     TypeVar,
     cast,
     overload,
@@ -2372,6 +2373,55 @@ class DeferredEvent:
     def name(self):
         """A comparable name for the event."""
         return self.handle_path.split('/')[-1].split('[')[0]
+
+
+class EventProtocol(Protocol):
+    """The shape of the event objects that :class:`CharmEvents` produces.
+
+    Get an event by calling the appropriate method of the ``on`` attribute of
+    the :class:`Context`, and pass it to :meth:`Context.run`. For example::
+
+        ctx = Context(MyCharm)
+        ctx.run(ctx.on.start(), State())
+
+    Tests should not implement this protocol, or construct event objects any
+    other way: the methods of :class:`CharmEvents` make sure that the event is
+    consistent with the component (relation, container, secret, and so on) that
+    it is about.
+    """
+
+    @property
+    def path(self) -> str:
+        """The name of the event, as it was provided to the framework.
+
+        For example: ``start``, ``config_changed``, ``my_relation_joined``, or
+        ``custom.MyConsumer.lib_changed``.
+        """
+        ...
+
+    @property
+    def name(self) -> str:
+        """Full event name, in Python-attribute form (as ops names the event).
+
+        Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of
+        the event, the prefix the name of the entity the event is about.
+        Hyphens in the entity name are translated to underscores, so an event
+        for relation endpoint ``foo-bar`` has the name ``foo_bar_relation_changed``.
+        """
+        ...
+
+    def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
+        """Construct a deferred event from this event.
+
+        See :meth:`DeferredEvent` for how deferred events are used in a
+        :class:`State`.
+
+        Args:
+            handler: the method of the charm class that would have handled the
+                event, for example ``MyCharm._on_start``.
+            event_id: the position of the event in the simulated notice queue.
+        """
+        ...
 
 
 class _EventType(str, Enum):
