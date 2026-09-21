@@ -71,7 +71,55 @@ def _as_event(event: EventProtocol) -> _Event:
     :class:`CharmEvents` is the only supported way to make an event, and it
     always makes an ``_Event``. Anything else is a test that has built its own
     object, which won't carry the information the framework needs.
+
+    Both entry points (:meth:`Context.run` and ``Context.__call__``) narrow
+    here, so the same mistake gets the same message whichever one is used.
     """
+    # Help people transition from Scenario 6:
+    if isinstance(event, str):
+        name = event.replace('-', '_')
+        if name in (
+            'install',
+            'start',
+            'stop',
+            'remove',
+            'update_status',
+            'config_changed',
+            'upgrade_charm',
+            'pre_series_upgrade',
+            'post_series_upgrade',
+            'leader_elected',
+            'collect_app_status',
+            'collect_unit_status',
+        ):
+            suggested = f'{name}()'
+        elif name in ('secret_changed', 'secret_rotate'):
+            suggested = f'{name}(my_secret)'
+        elif name in ('secret_expired', 'secret_remove'):
+            suggested = f'{name}(my_secret, revision=1)'
+        elif name in (
+            'relation_created',
+            'relation_joined',
+            'relation_changed',
+            'relation_departed',
+            'relation_broken',
+        ):
+            suggested = f'{name}(my_relation)'
+        elif name in ('storage_attached', 'storage_detaching'):
+            suggested = f'{name}(my_storage)'
+        elif name == 'pebble_ready':
+            suggested = f'{name}(my_container)'
+        elif name == 'pebble_custom_notice':
+            suggested = f'{name}(my_container, my_notice)'
+        else:
+            suggested = 'event()'
+        raise TypeError(
+            f'call with an event from `ctx.on`, like `ctx.on.{suggested}`',
+        )
+    if callable(event):
+        raise TypeError(
+            'You should call the event method. Did you forget to add parentheses?',
+        )
     if not isinstance(event, _Event):
         raise TypeError(
             f'expected an event from `ctx.on`, like `ctx.on.start()`, not {event!r}',
@@ -907,52 +955,6 @@ class Context(Generic[CharmType]):
         :arg state: the :class:`State` instance to use as data source for the hook command
             calls that the charm will invoke when handling the event.
         """
-        # Help people transition from Scenario 6:
-        if isinstance(event, str):
-            event = event.replace('-', '_')  # type: ignore
-            if event in (
-                'install',
-                'start',
-                'stop',
-                'remove',
-                'update_status',
-                'config_changed',
-                'upgrade_charm',
-                'pre_series_upgrade',
-                'post_series_upgrade',
-                'leader_elected',
-                'collect_app_status',
-                'collect_unit_status',
-            ):
-                suggested = f'{event}()'
-            elif event in ('secret_changed', 'secret_rotate'):
-                suggested = f'{event}(my_secret)'
-            elif event in ('secret_expired', 'secret_remove'):
-                suggested = f'{event}(my_secret, revision=1)'
-            elif event in (
-                'relation_created',
-                'relation_joined',
-                'relation_changed',
-                'relation_departed',
-                'relation_broken',
-            ):
-                suggested = f'{event}(my_relation)'
-            elif event in ('storage_attached', 'storage_detaching'):
-                suggested = f'{event}(my_storage)'
-            elif event == 'pebble_ready':
-                suggested = f'{event}(my_container)'
-            elif event == 'pebble_custom_notice':
-                suggested = f'{event}(my_container, my_notice)'
-            else:
-                suggested = 'event()'
-            raise TypeError(
-                f'call with an event from `ctx.on`, like `ctx.on.{suggested}`',
-            )
-        if callable(event):
-            raise TypeError(
-                'You should call the event method. Did you forget to add parentheses?',
-            )
-
         with self._run(event=_as_event(event), state=state) as ops:
             ops.run()
         # We know that the output state will have been set by this point,

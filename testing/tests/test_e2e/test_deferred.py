@@ -337,4 +337,6 @@ def test_run_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
 
     ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
     with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
-        ctx.run(typing.cast('scenario.EventProtocol', NotAnEvent()), State())
+        # NotAnEvent satisfies EventProtocol, so this type-checks, but ctx.on
+        # is the only place an event can come from.
+        ctx.run(NotAnEvent(), State())

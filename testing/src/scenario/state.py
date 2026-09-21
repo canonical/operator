@@ -2388,6 +2388,12 @@ class EventProtocol(Protocol):
     other way: the methods of :class:`CharmEvents` make sure that the event is
     consistent with the component (relation, container, secret, and so on) that
     it is about.
+
+    That restriction is enforced, not only advice: :meth:`Context.run` raises
+    :class:`TypeError` for any object it did not create itself, including one
+    that satisfies this protocol. The protocol is here to document and to type
+    what :class:`CharmEvents` returns, rather than to describe something for
+    tests to implement.
     """
 
     @property
