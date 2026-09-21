@@ -50,7 +50,7 @@ Configure your project to run checks before every merge:
 - **ruff** for Python lint rules, including [ruff's Bandit-derived security rules](https://docs.astral.sh/ruff/rules/#flake8-bandit-s). Enable the `S` rule set in `pyproject.toml`.
 - **zizmor** for GitHub Actions workflow audits. Configure it to run on every push against the workflow files in `.github/workflows/`.
 
-See more: [](#set-up-ci-integration)
+See more: [](#set-up-ci-linting-unit)
 
 ## Keep dependencies patched
 
@@ -58,10 +58,10 @@ Charms pick up security fixes for their dependencies (including Ops itself) at r
 
 1. Restrict the version of `ops` in `pyproject.toml` in a way that allows compatible releases to be picked up on the next re-lock, for example `ops~=3.0` (or `ops~=2.23` if you support Ubuntu 20.04). See [](#ops-supported-versions) for the current list of supported releases.
 2. Commit a lock file (`uv.lock`, `poetry.lock`, or equivalent) so every rebuild produces a reproducible dependency set.
-3. Enable automated dependency updates -- for example, [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/) -- for Python dependencies and any workflow actions your charm uses. Consider configuring a short cooldown, so that a compromised release has time to be withdrawn before your charm picks it up. Keep the cooldown short enough that security fixes are not held back for long.
-4. Rebuild and release the charm through your risk channels to `stable` on a regular cadence, so that picked-up fixes actually reach deployed units.
+3. Enable automated dependency updates -- for example, [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/) -- for Python dependencies and any workflow actions your charm uses. Consider configuring a cooldown, so that a compromised release has time to be withdrawn before your charm picks it up. Dependabot applies a 3-day cooldown to version updates by default; Renovate's cooldown is opt-in.
+4. Rebuild and release the charm to its `stable` channel on a regular cadence, so that picked-up fixes actually reach deployed units.
 
-Keep the list of runtime dependencies small. Every dependency you add is a dependency you take on responsibility for updating.
+Avoid unnecessary or low-value runtime dependencies. Every dependency you add is a dependency you take on responsibility for updating.
 
 ## Restrict what the charm can do on its host
 
@@ -73,7 +73,7 @@ Machine charms and Kubernetes charms manage permissions in different ways.
 
 ## Harden the workload
 
-The workload is separate from Ops and typically has its own security hardening story. Follow the guidance for your workload upstream; if there is no upstream hardening guide, produce one and link to it from the charm's documentation. Existing charm-side examples to model on include:
+The workload is separate from Ops and typically has its own security hardening story. Follow the guidance for your workload upstream; if there is no upstream hardening guide, produce one and link to it from the charm's documentation. For example:
 
 - [Charmed PostgreSQL on Kubernetes](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/security/)
 - [Charmed Kubeflow](https://discourse.charmhub.io/t/security/15935)
@@ -81,7 +81,7 @@ The workload is separate from Ops and typically has its own security hardening s
 
 ## Verify the version deployed in a unit
 
-To confirm that a running unit has picked up the version of Ops you expect (for example, after a security release):
+To confirm which version of Ops is installed in a unit, for example after re-releasing your charm to pick up an Ops security fix:
 
 ```text
 juju exec --unit <unit> -- bash -c '/var/lib/juju/agents/unit-*/charm/venv/bin/python -c "import ops; print(ops.__version__)"'
@@ -93,12 +93,12 @@ Compare the result to the [version on PyPI](https://pypi.org/project/ops/). See 
 
 Include a security section in your charm's own documentation that covers, at a minimum:
 
-- Which workload the charm manages and where its upstream hardening guide lives.
+- Which workload the charm manages and where to find its upstream hardening guide.
 - Which relations the charm requires for a secure deployment (for example, a certificate authority provider for TLS).
 - Any configuration options that materially change the security posture (for example, opening extra ports, or relaxing authentication).
 - How to report vulnerabilities to you. If your charm repository has a `SECURITY.md`, link to it.
 
-The security explanation for Ops itself lives at [](#security). Following a similar structure for your charm's security documentation may help users reason about the deployment.
+Follow a similar structure to [](#security).
 
 ## Report vulnerabilities in Ops
 
