@@ -15,27 +15,27 @@ See first:
 
 This guide covers how to harden a charm that uses Ops. Not every charm needs every step.
 
-## Keep sensitive data out of the observable surface
+## Avoid leaking sensitive data
 
-Ops calls the `juju-log` hook command to send charm logs to Juju, and buffers trace data locally. The charm also surfaces information through hook commands and events -- statuses, relation data, and action results -- including anything it has read from the workload. Any of these can end up in places visible to Juju users, like `juju debug-log`, `juju status`, trace receivers, crash reports, or the state database on disk.
+Ops calls the `juju-log` hook command to send charm logs to Juju, and buffers trace data locally. The charm itself also exposes data to Juju: statuses, relation data, and action results -- including anything it has read from the workload. Any of these can end up in places visible to Juju users, like `juju debug-log`, `juju status`, trace receivers, crash reports, or the state database on disk.
 
-To avoid leaking sensitive data:
+To avoid this:
 
 - Do not include secrets, tokens, or other sensitive values in log messages, exception messages, or trace attributes.
 - Do not pass sensitive values on the command line of processes you run from the charm; they typically end up in logs, traces, or exceptions. Pass them through the environment, a file, or standard input instead.
-- Do not put sensitive values into `ops.StoredState`. The state database is not encrypted at rest (see [](#ops-charm-unit-databases)).
+- Do not put sensitive values into `ops.StoredState`. Ops restricts the state database to the charm user, but the database is not encrypted at rest (see [](#ops-charm-unit-databases)).
 
 Ops does not mask sensitive values for you.
 
-## Store and share sensitive data with Juju secrets
+## Use Juju secrets for sensitive data
 
 Use {external+juju:ref}`Juju secrets <secret>` for anything that a charm needs to keep confidential, such as credentials, tokens, or TLS material. Juju stores the value, controls which units can read it, and rotates access when relations change.
 
 See more: {ref}`manage-secrets`
 
-If your charm accepts a user-provided secret through configuration, define the config option with `type: secret` in `charmcraft.yaml` rather than a plain string.
+If your charm accepts a user-provided secret through configuration, define the config option with `type: secret` in `charmcraft.yaml` rather than `type: string`.
 
-## Send trace data over HTTPS
+## Require TLS for trace data
 
 When a charm has the `ops[tracing]` extra installed and is integrated with a trace receiver, Ops sends buffered trace data over the network. This is the only outbound network connection Ops makes on the charm's behalf.
 
@@ -45,20 +45,20 @@ See more: [](#ops-cryptographic-technology)
 
 ## Add static security checks to your project
 
-Configure the checks that your charm project runs before every merge:
+Configure your project to run checks before every merge:
 
-- **`ruff`** for Python lint rules, including [`ruff`'s Bandit-derived security rules](https://docs.astral.sh/ruff/rules/#flake8-bandit-s). Enable the `S` rule set in `pyproject.toml`.
-- **`zizmor`** for GitHub Actions workflow audits. Configure it to run on every push against the workflow files in `.github/workflows/`.
+- **ruff** for Python lint rules, including [ruff's Bandit-derived security rules](https://docs.astral.sh/ruff/rules/#flake8-bandit-s). Enable the `S` rule set in `pyproject.toml`.
+- **zizmor** for GitHub Actions workflow audits. Configure it to run on every push against the workflow files in `.github/workflows/`.
 
 See more: [](#set-up-ci-integration)
 
 ## Keep dependencies patched
 
-Charms pick up security fixes for their dependencies (including Ops itself) at rebuild time, so the release pipeline needs to see new versions promptly. To make that happen:
+Charms pick up security fixes for their dependencies (including Ops itself) at rebuild time, so your charm's release pipeline needs to see new versions promptly. To make that happen:
 
 1. Restrict the version of `ops` in `pyproject.toml` in a way that allows compatible releases to be picked up on the next re-lock, for example `ops~=3.0` (or `ops~=2.23` if you support Ubuntu 20.04). See [](#ops-supported-versions) for the current list of supported releases.
 2. Commit a lock file (`uv.lock`, `poetry.lock`, or equivalent) so every rebuild produces a reproducible dependency set.
-3. Enable automated dependency updates -- for example, [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/) -- for both Python dependencies and any workflow actions your charm uses. Consider configuring a short cooldown, so that a compromised release has time to be withdrawn before your charm picks it up. Keep the cooldown short enough that security fixes are not held back for long.
+3. Enable automated dependency updates -- for example, [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/) -- for Python dependencies and any workflow actions your charm uses. Consider configuring a short cooldown, so that a compromised release has time to be withdrawn before your charm picks it up. Keep the cooldown short enough that security fixes are not held back for long.
 4. Rebuild and release the charm through your risk channels to `stable` on a regular cadence, so that picked-up fixes actually reach deployed units.
 
 Keep the list of runtime dependencies small. Every dependency you add is a dependency you take on responsibility for updating.
