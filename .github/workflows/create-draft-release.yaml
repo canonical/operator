@@ -1,0 +1,179 @@
+---
+name: Create the draft release
+
+# The second of the three release workflows: turn the merge of the
+# version-bump pull request into a draft GitHub release, whose body is the
+# release notes from that pull request's description followed by this
+# version's section of CHANGES.md.
+#
+# Four things are worth knowing before reading the steps:
+#
+# - The release is a draft, and that is the design rather than a caution to
+#   be lifted later. Publishing it is the second of this pipeline's two
+#   human gates: the pull request review reads the diff, and the draft is
+#   where somebody reads the notes as a reader will see them. There is no
+#   auto-publish path here and no input for one.
+# - A draft release does not create its tag. Nothing here tags anything.
+#   The tag appears when a human publishes the draft, which is the event the
+#   third workflow hangs off.
+# - Almost every push to these branches is not a release. The path filter
+#   keeps most of them from starting a run at all, and the first step exits
+#   quietly on the rest - the post-release .dev0 bump among them.
+# - Neither half of the release body is written here. The notes are lifted
+#   out of the merged pull request as a human left them, and the changelog
+#   is copied out of CHANGES.md rather than generated again.
+#
+# If a step fails on a merge that really was a release - a description whose
+# markers somebody removed, say - fix the cause and re-run the failed job. A
+# pull request description can still be edited after the merge, and every
+# step reads what it needs fresh from the branch or the API, so re-running
+# the same push works.
+
+"on":
+  push:
+    branches:
+      - main
+      - '*-maintenance'  # A glob: a list would go stale the next time a branch is cut.
+    paths:
+      # Every release changes this file, and nearly nothing else does, so
+      # most merges never start a run at all.
+      - ops/version.py
+
+permissions: {}
+
+# One release at a time per branch. Two runs of this would race to create
+# the same release, and the loser's error would be the confusing one.
+concurrency:
+  group: create-draft-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Create the draft release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # To create the draft release.
+      pull-requests: read  # To read the merged pull request's description.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          fetch-depth: 0  # The push's own `before` commit has to be here to compare against.
+          persist-credentials: false
+
+      - name: Is this merge a release?
+        id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          # A force push, or a branch created by this push, can leave
+          # `before` pointing at something this checkout does not have. The
+          # script treats a missing "before" as "not a release", which is
+          # the right answer for both.
+          before=()
+          if git cat-file -e "$BEFORE:ops/version.py" 2>/dev/null; then
+            git show "$BEFORE:ops/version.py" > "$RUNNER_TEMP/version-before.py"
+            before=(--before "$RUNNER_TEMP/version-before.py")
+          fi
+
+          python3 .github/detect-release-bump.py "${before[@]}" --after ops/version.py \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Find the pull request the notes are in
+        id: pull-request
+        if: ${{ steps.detect.outputs.version }}
+        env:
+          BEFORE: ${{ github.event.before }}
+          VERSION: ${{ steps.detect.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # The commit that changed the version, rather than the tip of the
+          # push: under this repository's squash merges they are the same
+          # commit, and when they are not, it is the version bump whose pull
+          # request carries the notes.
+          commit=$(git log -1 --format=%H "$BEFORE..$GITHUB_SHA" -- ops/version.py)
+          number=$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit/pulls" \
+            --jq '[.[] | select(.merged_at != null) | .number] | first // empty')
+
+          if [ -z "$number" ]; then
+            echo "::error::$VERSION was released by $commit, which belongs to no merged pull" \
+              "request, so there are no release notes to put in the release. Create the release" \
+              "by hand this time."
+            exit 1
+          fi
+
+          echo "The release notes come from #$number."
+          gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
+            > "$RUNNER_TEMP/pr-description.md"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble the release body
+        if: ${{ steps.detect.outputs.version }}
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 .github/build-release-body.py \
+            --version "$VERSION" \
+            --description "$RUNNER_TEMP/pr-description.md" \
+            --changelog CHANGES.md \
+            --output "$RUNNER_TEMP/release-body.md"
+
+      - name: Create the draft release
+        id: release
+        if: ${{ steps.detect.outputs.version }}
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+          PRERELEASE: ${{ steps.detect.outputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Checked here for the sake of the message: `gh release create`
+          # would fail on its own, but a re-run of this workflow after the
+          # release was already made is worth naming as such.
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::There is already a release for $VERSION. If it needs to be rebuilt," \
+              "delete it first; if it is already published, there is nothing to do here."
+            exit 1
+          fi
+
+          flags=()
+          if [ "$PRERELEASE" = true ]; then
+            flags=(--prerelease)
+          fi
+
+          # --draft is the point of this workflow, and --notes-file is what
+          # keeps GitHub from generating a second, differently grouped
+          # changelog underneath ours. The tag named here does not exist and
+          # is not created: GitHub creates it against --target when somebody
+          # publishes the draft.
+          url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --draft --target "$GITHUB_SHA" --title "$VERSION" \
+            --notes-file "$RUNNER_TEMP/release-body.md" "${flags[@]}")
+          echo "Drafted $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Summarise the draft
+        if: ${{ steps.detect.outputs.version }}
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+          NUMBER: ${{ steps.pull-request.outputs.number }}
+          URL: ${{ steps.release.outputs.url }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## Draft release for %s\n\n' "$VERSION"
+            printf '%s\n\n' "$URL"
+            printf 'Notes from #%s, changelog from `CHANGES.md`. Nothing is published and the' \
+              "$NUMBER"
+            printf ' `%s` tag does not exist yet: publishing the draft is a human step, and it' \
+              "$VERSION"
+            printf ' is what creates the tag.\n\n'
+            printf '<details><summary>Release body</summary>\n\n'
+            cat "$RUNNER_TEMP/release-body.md"
+            printf '\n</details>\n'
+          } >> "$GITHUB_STEP_SUMMARY"
