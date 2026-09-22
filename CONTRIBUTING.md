@@ -176,13 +176,13 @@ See the [documentation style guide](https://github.com/canonical/charm-tech/blob
 
 When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.com:canonical-juju-ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
 
-To build the docs:
+To build the docs and serve them locally:
 
 ```sh
-make -C docs html
+make -C docs run
 ```
 
-This generates HTML docs in the `docs/_build` directory.
+The docs automatically rebuild whenever you edit a file.
 
 To check spelling in the doc source files:
 
@@ -190,13 +190,11 @@ To check spelling in the doc source files:
 make -C docs spelling
 ```
 
-To view the docs, you'll need to serve the docs locally. The easiest way is to run the following command instead of `make -C docs html`:
+To list all doc commands:
 
 ```sh
-make -C docs run
+make -C docs help
 ```
-
-This serves the docs locally and automatically refreshes them whenever you edit a file.
 
 ## How to document version dependencies
 
