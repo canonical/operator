@@ -3588,12 +3588,7 @@ class _ModelBackend:
                 yield
         except hookcmds.Error as e:
             stderr = e.stderr.lower()
-            if cmd.startswith(('relation-', 'network-')) and (
-                # Juju words this as "relation not found" for most hook commands
-                # and "relation 2 not found" for `network-get`.
-                _RELATION_NOT_FOUND_RE.search(stderr)
-                or ('permission denied' in stderr and self._relation_is_gone(cmd, kwargs))
-            ):
+            if self._relation_is_gone(cmd, stderr, kwargs):
                 # A relation that Juju has forgotten about isn't an
                 # authorisation failure, so it isn't a security event.
                 raise RelationNotFoundError() from e
@@ -3602,8 +3597,8 @@ class _ModelBackend:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
 
-    def _relation_is_gone(self, cmd: str, kwargs: Mapping[str, Any]) -> bool:
-        """Whether "permission denied" from this hook command means a gone relation.
+    def _relation_is_gone(self, cmd: str, stderr: str, kwargs: Mapping[str, Any]) -> bool:
+        """Whether this hook command's failure means Juju has forgotten the relation.
 
         Juju deliberately reports "permission denied" rather than "relation not
         found" for a relation that has gone from its state, so that the reply
@@ -3627,18 +3622,40 @@ class _ModelBackend:
         relation is a peer relation, so a follower reading a peer app databag
         still gets the original error and a security event. That is issue #2709
         in the one case this function carves out.
+
+        Args:
+            cmd: The hook command that failed.
+            stderr: The command's standard error, lowercased.
+            kwargs: The arguments the command was called with.
         """
+        if cmd not in (
+            'relation-ids',
+            'relation-list',
+            'relation-get',
+            'relation-set',
+            'relation-model-get',
+            'network-get',
+        ):
+            return False
+        # Juju words this as "relation not found" for most hook commands and
+        # "relation 2 not found" for `network-get`.
+        if _RELATION_NOT_FOUND_RE.search(stderr):
+            return True
+        if 'permission denied' not in stderr:
+            return False
+        if cmd == 'relation-get' and kwargs.get('app') and kwargs.get('unit') == self.app_name:
+            # Reading the *remote* application databag is not restricted, and
+            # neither is reading a unit databag, so our own application databag
+            # is the only read that can be a genuine authorisation failure.
+            return self.is_leader()
         if cmd == 'relation-set' and kwargs.get('app'):
             # Writing an app databag is a leader-only operation, and the only
             # app databag a unit can write is its own, so there is no `unit`
             # kwarg to compare against.
             return self.is_leader()
-        if cmd != 'relation-get' or not kwargs.get('app'):
-            return True
-        # Reading the *remote* application databag is not restricted.
-        if kwargs.get('unit') != self.app_name:
-            return True
-        return self.is_leader()
+        # Juju refuses nothing else while the relation exists, including
+        # `network-get`, which 3.6 words as "permission denied".
+        return True
 
     def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
         authz_messages = (
