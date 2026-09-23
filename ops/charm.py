@@ -1680,10 +1680,13 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
         for field in dataclasses.fields(cls):
             alias = field.metadata.get('alias', field.name)
             # If this a Pydantic dataclass, then it handles the alias.
-            # Using pydantic.dataclasses.is_pydantic_dataclass() would be
-            # best here, but we don't want to import pydantic in ops, so
-            # we look more explicitly.
-            if getattr(cls, '__is_pydantic_dataclass__', False):
+            # Using pydantic.dataclasses.is_pydantic_dataclass() would be best
+            # here, but we don't want to import pydantic in ops, so we check
+            # for the attribute that function itself checks for. Note that
+            # '__is_pydantic_dataclass__' only exists from pydantic 2.11, so
+            # relying on that one misses every earlier 2.x pydantic dataclass,
+            # which reads the aliases back under their field names instead.
+            if '__pydantic_validator__' in cls.__dict__:
                 juju_to_arg[alias] = alias
             else:
                 juju_to_arg[alias] = field.name
