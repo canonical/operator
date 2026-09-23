@@ -8,6 +8,7 @@ callables
 Canonical's
 Charmlibs
 configurator
+cooldown
 cosl
 databag
 databags
@@ -31,6 +32,7 @@ protobuf
 pydantic
 pytest
 README
+Renovate's
 reinstantiate
 replan
 repo
