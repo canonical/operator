@@ -1,24 +1,49 @@
 ---
 name: Publish
+
+# Publishing a release is what puts the packages on PyPI. The manual job
+# below builds and publishes to Test PyPI instead.
+#
+# Three things are worth knowing:
+#
+# - Trusted publishing is configured on PyPI and on Test PyPI against this
+#   file's *name*, so renaming it breaks both.
+# - Every published release goes to PyPI, whatever its version. The checks
+#   before that are a human publishing the draft release, and the
+#   `publish-pypi` environment.
+# - `published` rather than `released`, so that a pre-release publishes too.
+
 "on":
-  push:
-    tags:
-      - '[1-3].*'
+  release:
+    types: [published]
+  # Build and publish to Test PyPI instead. Dispatch it from whichever branch
+  # or tag you want built.
+  workflow_dispatch:
 
 permissions: {}
+
+# One publish at a time per release, and one manual run at a time. Two runs
+# would build the same thing and race each other to the index.
+concurrency:
+  group: publish-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
     name: Build and publish to PyPI
+    if: ${{ github.event_name == 'release' }}
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      attestations: write
+      id-token: write  # To mint the trusted-publishing token for PyPI.
+      attestations: write  # To attest the built artefacts.
       contents: read
     environment: publish-pypi
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
+          # The commit the release's tag points at, named rather than left to
+          # whatever the event's default checkout would be.
+          ref: ${{ github.event.release.tag_name }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
         with:
@@ -33,5 +58,25 @@ jobs:
           subject-path: 'dist/*'
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
 
+  test-build-and-publish:
+    name: Build and publish to Test PYPI
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # To mint the trusted-publishing token for Test PyPI.
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: false
+      - run: uv build --all
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
   secscan:
+    if: ${{ github.event_name == 'release' }}
     uses: ./.github/workflows/sbom-secscan.yaml
