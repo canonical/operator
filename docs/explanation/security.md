@@ -4,6 +4,8 @@
 
 When producing security documentation for your charm, it's important to consider the security aspects of the charm's dependencies. If there are any security questions that aren't answered here in terms of the use of cryptographic technology, security risks, hardening, and good practice, with regards to Ops, please reach out to the Charm Tech team, and we'll do our best to assist.
 
+See also: [](#secure-your-charm)
+
 (ops-product-architecture)=
 ## Product architecture
 
