@@ -1996,7 +1996,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         # Validate here as well as in __getitem__, so that read paths that don't
         # go via __getitem__ (such as __contains__, __iter__ and __len__) also
         # raise RelationDataAccessError rather than a bare ModelError from Juju.
-        self._check_read()
+        self._validate_read_if_active()
         try:
             return self._backend.relation_get(
                 self.relation.id,
@@ -2008,7 +2008,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _check_read(self) -> None:
+    def _validate_read_if_active(self) -> None:
         """Validate a read, except on a relation that is already gone.
 
         Dead relations tell no tales: reading a broken relation's databag gives
@@ -2018,13 +2018,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         `RelationNotFoundError` into an access error -- and for a follower's own
         app databag, into one that talks about a remote application.
         """
-        try:
+        if self.relation.active:
             self._validate_read()
-        except RelationDataAccessError:
-            if self.relation.active:
-                raise
 
-    def _validate_read(self):
+    def _validate_read(self) -> None:
         """Raise if the data content cannot be read."""
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
@@ -2049,11 +2046,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # peer relation data is always publicly readable
             return
 
-        # is this a LOCAL app databag? Asked before the remote-app type guard
-        # below, because a follower reading its own app databag should be told
-        # that, rather than told about a remote application it never mentioned
-        # -- `relation.app` is None on a broken relation (see Relation.__init__
-        # and LP#1960934), which is exactly when the two overlap.
+        # Check for the local app databag before the remote-app type guard below,
+        # so that a follower reading its own app databag is told that, rather than
+        # told about a remote application. The two overlap on a broken relation,
+        # where `relation.app` can be None (https://bugs.launchpad.net/juju/+bug/1960934).
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
@@ -2151,7 +2147,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         validating here as well would mean a redundant leadership check.
         """
         if self._lazy_data is not None:
-            self._check_read()
+            self._validate_read_if_active()
 
     def __getitem__(self, key: str) -> str:
         self._validate_cached_read()
@@ -2189,14 +2185,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 self[k] = v
         """
         data = dict(data, **kwargs)
-        # Always check permissions, and do so before reading the current content, so
-        # that a unit that can't write gets an error naming the write, rather than one
-        # about the read that change detection happens to require.
-        #
-        # This validates everything passed in, not only the pairs that turn out
-        # to be changes, so a bad key or value is now reported even when the
-        # write would have been a no-op: `update({1: ''})` and `del bag[1]`
-        # raise RelationDataTypeError rather than silently doing nothing.
+        # Validate writes before checking what's changed, so a permission error names the operation
+        # the user was attempting, rather than the read that change detection happens to require.
+        # This also validates malformed keys and values that would otherwise be a no-op (for
+        # example, `del bag[1]`).
         self._validate_write(data)
         changes = {
             key: val
