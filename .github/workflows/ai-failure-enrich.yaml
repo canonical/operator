@@ -1,0 +1,50 @@
+name: AI-enrich scheduled-failure notification
+
+# Called by notify-scheduled-failure.yaml, which is called by scheduled workflows on failure.
+# - notify-scheduled-failure.yaml creates or comments on an issue before calling this workflow.
+# - github.workflow and github.run_id refer to the scheduled workflow that failed.
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        description: The issue the notifier created or commented on.
+        required: true
+        type: string
+      origin:
+        description: Either "new" or "comment", matching what the notifier did.
+        required: true
+        type: string
+    secrets:
+      OPENROUTER_API_KEY:
+        required: true
+
+permissions: {}
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    environment: ai-failure-triage  # Required to access secrets.OPENROUTER_API_KEY
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - name: Extract signature, dedupe, ask the LLM, apply
+        id: enrich
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}  # The workflow that failed.
+          NOTIFY_ISSUE: ${{ inputs.issue }}
+          NOTIFY_ORIGIN: ${{ inputs.origin }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: >-
+          uvx --from "git+https://github.com/canonical/charm-tech-code@3702a80516503509a0472f62dcffbcf022654925#subdirectory=ai-failure-notifier"
+          ai-failure-notifier
