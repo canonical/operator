@@ -1993,9 +1993,9 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
-        # Validate here as well as in __getitem__, so that read paths that don't
-        # go via __getitem__ (such as __contains__, __iter__ and __len__) also
-        # raise RelationDataAccessError rather than a bare ModelError from Juju.
+        # Validate every uncached read here, so that all read paths raise
+        # RelationDataAccessError rather than a bare ModelError from Juju. Reads
+        # served from the cache are validated in _validate_cached_read.
         self._validate_read_if_active()
         try:
             return self._backend.relation_get(
