@@ -4,10 +4,11 @@
 """Rewrite the version strings across the repository for a release.
 
 Called by the propose-release workflow, which has already worked out which
-version is being released. This script only writes files: it does not decide
-the version, run git, or talk to GitHub, and it deliberately does not run
-`uv lock` either, so that the lockfile update is a visible workflow step
-rather than something buried in here.
+version is being released, and again by the post-release workflow, which has
+worked out which development version the branch goes back to. This script only
+writes files: it does not decide the version, run git, or talk to GitHub, and
+it deliberately does not run `uv lock` either, so that the lockfile update is
+a visible workflow step rather than something buried in here.
 
 The ops-to-scenario relationship and the fan-out over the four packages are
 the parts of the release that are specific to this repository, so they stay
@@ -16,6 +17,13 @@ here rather than moving to the shared changelog package.
 Reads nothing but the files it rewrites:
 
     python3 .github/update-release-versions.py --version 3.9.0
+    python3 .github/update-release-versions.py --version 3.9.0.dev0 --post-release
+
+The two differ in one thing: `--post-release` leaves the tool-versions table
+alone. That table records when a major.minor was released and when it goes
+out of support, and a post-release bump is neither - it is the tree saying it
+is no longer the version that just shipped. Writing a row for a development
+version would put a release date on a release that has not happened.
 """
 
 from __future__ import annotations
@@ -148,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
         metavar='YYYY-MM-DD',
         help="The release date for the versions doc. Defaults to today's date, in UTC.",
     )
+    parser.add_argument(
+        '--post-release',
+        action='store_true',
+        help='Bump back to a development version: the same fan-out, without the versions doc.',
+    )
     args = parser.parse_args(argv)
 
     released = args.date or datetime.datetime.now(datetime.timezone.utc).date()
@@ -156,7 +169,10 @@ def main(argv: list[str] | None = None) -> int:
         update_ops(args.version, testing_version)
         update_testing(args.version, testing_version)
         update_tracing(args.version)
-        update_versions_doc(args.version, released)
+        if args.post_release:
+            print(f'{VERSION_FILES["versions_doc"]}: post-release, leaving it alone')
+        else:
+            update_versions_doc(args.version, released)
     except ValueError as exc:
         print(f'update-release-versions: {exc}', file=sys.stderr)
         return 1
