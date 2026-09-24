@@ -24,7 +24,7 @@ import pathlib
 import types
 import typing
 import warnings
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1740,81 +1740,102 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     matches the shape of none of a ``Union`` field's members.
     """
     origin = typing.get_origin(tp)
-    if origin is not None:
-        args = typing.get_args(tp)
-        if origin is typing.Union or origin is types.UnionType:
-            # None is only ever the None member, and the other members won't
-            # accept it.
-            if value is None:
-                return None
-            members = [a for a in args if a is not type(None)]
-            # Pick the member by the shape of the decoded value alone. Where
-            # more than one member fits (an enum and a str both take a string,
-            # for example), there's no principled way to choose, so accept the
-            # value as-is.
-            if len(members) > 1:
-                fits = [m for m in members if _union_member_fits(m, value)]
-                if not fits:
-                    raise TypeError(
-                        f'expected a value matching one of {tp}, '
-                        f'got {type(value).__name__}: {value!r}'
-                    )
-                members = fits
-            if len(members) == 1:
-                return _coerce_field(members[0], value)
-            return value
-        # A str, bytes or mapping is iterable, so coercing element-wise would
-        # silently succeed with nonsense: a list of characters, or of the
-        # mapping's keys. None of those is a sequence the charm meant, so
-        # refuse rather than hand back the wrong answer.
-        if (
-            origin in (list, tuple, set, frozenset)
-            and args
-            and isinstance(value, (str, bytes, Mapping))
-        ):
-            given = cast('Any', value)
-            raise TypeError(f'expected a sequence for {tp}, got {type(given).__name__}: {given!r}')
-        if origin is list and args:
-            return [_coerce_field(args[0], v) for v in value]
-        if origin is tuple and args:
-            if args[-1] is Ellipsis:
-                return tuple(_coerce_field(args[0], v) for v in value)
-            return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
-        if origin is set and args:
-            return {_coerce_field(args[0], v) for v in value}
-        if origin is frozenset and args:
-            return frozenset(_coerce_field(args[0], v) for v in value)
-        if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
-            if not isinstance(value, Mapping):
-                raise TypeError(
-                    f'expected a mapping for {tp}, got {type(value).__name__}: {value!r}'
-                )
-            mapping = cast('Mapping[Any, Any]', value)
-            return {k: _coerce_field(args[1], v) for k, v in mapping.items()}
-        # Literal and other constructed generics: accept the value as-is.
-        return value
-    if isinstance(tp, type):
-        if dataclasses.is_dataclass(tp):
-            if isinstance(value, tp):
-                # Already the class we want, for example built by a custom
-                # decoder, so there is nothing to coerce.
-                return value
-            if not isinstance(value, Mapping):
-                # Without this, a remote app writing a string or a list where a
-                # nested dataclass belongs gets a default-constructed object
-                # that corresponds to nothing in the databag: `field.name not in
-                # 'oops'` is False for every field, so every one is skipped.
-                raise TypeError(
-                    f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
-                )
-            return _build_dataclass(tp, cast('Mapping[str, Any]', value), extra_kwargs={})
-        if issubclass(tp, enum.Enum):
-            return tp(value)
+    if origin is None:
+        return _coerce_class(tp, value)
+    args = typing.get_args(tp)
+    if origin is typing.Union or origin is types.UnionType:
+        return _coerce_union(tp, args, value)
+    if origin in _SEQUENCE_TYPES and args:
+        return _coerce_sequence(tp, origin, args, value)
+    if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
+        return _coerce_mapping(tp, args[1], value)
+    # Literal and other constructed generics: accept the value as-is.
     return value
 
 
+def _coerce_class(tp: Any, value: Any) -> Any:
+    """Coerce ``value`` against a bare class ``tp`` (no type arguments).
+
+    Builds a dataclass or enum; any other class is passed through as-is.
+    """
+    if not isinstance(tp, type):
+        return value
+    if dataclasses.is_dataclass(tp):
+        if isinstance(value, tp):
+            # Already the class we want, for example built by a custom
+            # decoder, so there is nothing to coerce.
+            return value
+        if not isinstance(value, Mapping):
+            # Without this, a remote app writing a string or a list where a
+            # nested dataclass belongs gets a default-constructed object
+            # that corresponds to nothing in the databag: `field.name not in
+            # 'oops'` is False for every field, so every one is skipped.
+            raise TypeError(
+                f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
+            )
+        return _build_dataclass(tp, cast('Mapping[str, Any]', value))
+    if issubclass(tp, enum.Enum):
+        return tp(value)
+    return value
+
+
+def _coerce_union(tp: Any, args: tuple[Any, ...], value: Any) -> Any:
+    """Coerce ``value`` against the member of union ``tp`` that its shape matches."""
+    # None is only ever the None member, and the other members won't
+    # accept it.
+    if value is None:
+        return None
+    members = [a for a in args if a is not type(None)]
+    # Pick the member by the shape of the decoded value alone. Where
+    # more than one member fits (an enum and a str both take a string,
+    # for example), there's no principled way to choose, so accept the
+    # value as-is.
+    if len(members) > 1:
+        fits = [m for m in members if _union_member_fits(m, value)]
+        if not fits:
+            raise TypeError(
+                f'expected a value matching one of {tp}, got {type(value).__name__}: {value!r}'
+            )
+        members = fits
+    if len(members) == 1:
+        return _coerce_field(members[0], value)
+    return value
+
+
+def _coerce_sequence(tp: Any, origin: type, args: tuple[Any, ...], value: Any) -> Any:
+    """Coerce the elements of ``value`` against sequence type ``tp``."""
+    # A str, bytes or mapping is iterable, so coercing element-wise would
+    # silently succeed with nonsense: a list of characters, or of the
+    # mapping's keys. None of those is a sequence the charm meant, so
+    # refuse rather than hand back the wrong answer.
+    if isinstance(value, (str, bytes, Mapping)):
+        raise TypeError(
+            f'expected a sequence for {tp}, got {type(value).__name__}: {value!r}'  # pyright: ignore[reportUnknownArgumentType]
+        )
+    if origin is tuple:
+        if args[-1] is Ellipsis:
+            return tuple(_coerce_field(args[0], v) for v in value)
+        return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
+    if origin is set:
+        return {_coerce_field(args[0], v) for v in value}
+    if origin is frozenset:
+        return frozenset(_coerce_field(args[0], v) for v in value)
+    return [_coerce_field(args[0], v) for v in value]
+
+
+def _coerce_mapping(tp: Any, value_type: Any, value: Any) -> Any:
+    """Coerce the values of ``value`` against ``value_type``, the value type of ``tp``."""
+    if not isinstance(value, Mapping):
+        raise TypeError(f'expected a mapping for {tp}, got {type(value).__name__}: {value!r}')
+    mapping = cast('Mapping[Any, Any]', value)
+    return {k: _coerce_field(value_type, v) for k, v in mapping.items()}
+
+
 def _build_dataclass(
-    cls: Any, data: Mapping[str, Any], *args: Any, extra_kwargs: Mapping[str, Any]
+    cls: Any,
+    data: Mapping[str, Any],
+    args: Sequence[Any] = (),
+    extra_kwargs: Mapping[str, Any] | None = None,
 ) -> Any:
     """Construct dataclass ``cls`` from ``data``, ``args``, and ``extra_kwargs``.
 
@@ -1833,6 +1854,7 @@ def _build_dataclass(
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
     missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
     """
+    extra_kwargs = extra_kwargs or {}
     try:
         hints = get_type_hints(cls)
     except NameError as e:

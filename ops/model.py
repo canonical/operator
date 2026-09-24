@@ -1876,7 +1876,7 @@ class Relation:
         # Keyword arguments are passed through uncoerced, the same as positional
         # ones.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
-            return _charm._build_dataclass(cls, data, *args, extra_kwargs=kwargs)
+            return _charm._build_dataclass(cls, data, args, kwargs)
         return cls(*args, **kwargs, **data)
 
     def save(
