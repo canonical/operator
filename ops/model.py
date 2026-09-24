@@ -1828,13 +1828,13 @@ class Relation:
         none of the values are coerced, and they are passed to the class
         as-is instead of raising.
 
-        Any additional positional or keyword arguments will be passed through
-        to the data class ``__init__``. For a non-pydantic dataclass target,
+        Any additional positional or keyword arguments are passed through to
+        the data class ``__init__`` as given, without coercion; a keyword
+        argument with the same name as a field in the relation data is
+        overridden by that data. For a non-pydantic dataclass target,
         positional arguments are matched to the class's leading fields by
-        position; those fields are passed through as given rather than
-        coerced, since there is no field name to coerce them against, but any
-        remaining fields supplied from the relation data are still coerced as
-        above.
+        position, and any remaining fields supplied from the relation data are
+        still coerced as above.
 
         Args:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
@@ -1856,7 +1856,7 @@ class Relation:
             fields = _charm._juju_fields(cls)
         except ValueError:
             fields = None
-        data: dict[str, Any] = copy.deepcopy(kwargs)
+        data: dict[str, Any] = {}
         if decoder is None:
             decoder = json.loads
         for key, value in sorted(self.data[src].items()):
@@ -1864,6 +1864,8 @@ class Relation:
                 data[key] = decoder(value)
             elif key in fields:
                 data[fields[key]] = decoder(value)
+        # Relation data wins over a keyword argument of the same name.
+        kwargs = {k: v for k, v in copy.deepcopy(kwargs).items() if k not in data}
         # For plain (non-pydantic) dataclass targets, recursively coerce nested
         # dataclass / enum / list / set fields. Pydantic handles its own coercion.
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
@@ -1871,9 +1873,11 @@ class Relation:
         # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
         # Any fields filled positionally by args are left uncoerced, since args
         # are matched to the class's leading fields by position, not by name.
+        # Keyword arguments are passed through uncoerced, the same as positional
+        # ones.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
-            return _charm._build_dataclass(cls, data, *args)
-        return cls(*args, **data)
+            return _charm._build_dataclass(cls, data, *args, extra_kwargs=kwargs)
+        return cls(*args, **kwargs, **data)
 
     def save(
         self,

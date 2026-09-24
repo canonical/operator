@@ -737,12 +737,7 @@ def test_relation_load_rejects_a_non_mapping_for_a_nested_dataclass(written: str
 
 
 def test_relation_load_passes_through_an_already_built_keyword_argument():
-    """`kwargs` are documented as passed through to the data class.
-
-    They go through the same coercion as the databag, so an argument that is
-    already the nested class has to be recognised rather than treated as data
-    to build one from.
-    """
+    """`kwargs` are passed through to the data class as given."""
 
     @dataclasses.dataclass
     class Data:
@@ -764,6 +759,31 @@ def test_relation_load_passes_through_an_already_built_keyword_argument():
         data = mgr.charm.data
 
     assert data == Data(name='x', nested=Nested(sub=5))
+
+
+def test_relation_load_does_not_coerce_keyword_arguments():
+    """A keyword argument is passed through uncoerced, like a positional one."""
+
+    @dataclasses.dataclass
+    class Data:
+        name: str = ''
+        nested: Nested | None = None
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, nested={'sub': 5})
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'name': json.dumps('x')})
+    with ctx(ctx.on.relation_changed(rel), testing.State(relations={rel})) as mgr:
+        mgr.run()
+        data = mgr.charm.data
+
+    assert data.nested == {'sub': 5}
 
 
 def test_relation_load_falls_back_when_type_hints_unresolvable():

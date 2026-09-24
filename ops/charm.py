@@ -1796,9 +1796,8 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     if isinstance(tp, type):
         if dataclasses.is_dataclass(tp):
             if isinstance(value, tp):
-                # Already the class we want: a caller's keyword argument passed
-                # through to `Relation.load`, rather than anything from a
-                # databag, so there is nothing to coerce.
+                # Already the class we want, for example built by a custom
+                # decoder, so there is nothing to coerce.
                 return value
             if not isinstance(value, Mapping):
                 # Without this, a remote app writing a string or a list where a
@@ -1808,25 +1807,28 @@ def _coerce_field(tp: Any, value: Any) -> Any:
                 raise TypeError(
                     f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
                 )
-            return _build_dataclass(tp, cast('Mapping[str, Any]', value))
+            return _build_dataclass(tp, cast('Mapping[str, Any]', value), extra_kwargs={})
         if issubclass(tp, enum.Enum):
             return tp(value)
     return value
 
 
-def _build_dataclass(cls: Any, data: Mapping[str, Any], *args: Any) -> Any:
-    """Construct dataclass ``cls`` from ``data`` and any positional ``args``.
+def _build_dataclass(
+    cls: Any, data: Mapping[str, Any], *args: Any, extra_kwargs: Mapping[str, Any]
+) -> Any:
+    """Construct dataclass ``cls`` from ``data``, ``args``, and ``extra_kwargs``.
 
     Recursively coerces nested dataclass / enum / list / set / tuple / dict
-    fields supplied via ``data``. Any leading fields already filled
-    positionally by ``args`` are matched by position, not by name, so they are
-    passed through as given rather than coerced.
+    fields supplied via ``data``. The caller's ``args`` and ``extra_kwargs``
+    are passed through as given rather than coerced; ``extra_kwargs`` must not
+    share any names with ``data``.
 
-    Falls back to the un-coerced ``cls(*args, **data)`` if ``cls``'s type hints
-    can't be resolved, for example a ``TYPE_CHECKING``-only import with no
-    runtime name: ``get_type_hints`` resolves every field's annotation
-    eagerly, so one unresolvable field would otherwise break construction even
-    when the relation data at hand doesn't touch it.
+    Falls back to the un-coerced ``cls(*args, **extra_kwargs, **data)`` if
+    ``cls``'s type hints can't be resolved, for example a
+    ``TYPE_CHECKING``-only import with no runtime name: ``get_type_hints``
+    resolves every field's annotation eagerly, so one unresolvable field would
+    otherwise break construction even when the relation data at hand doesn't
+    touch it.
 
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
     missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
@@ -1839,13 +1841,13 @@ def _build_dataclass(cls: Any, data: Mapping[str, Any], *args: Any) -> Any:
             cls.__name__,
             e,
         )
-        return cls(*args, **data)
+        return cls(*args, **extra_kwargs, **data)
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls)[len(args) :]:
         if field.name not in data:
             continue
         kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
-    return cls(*args, **kwargs)
+    return cls(*args, **extra_kwargs, **kwargs)
 
 
 class CharmMeta:
