@@ -6,7 +6,7 @@ Before working on changes, please consider [opening an issue](https://github.com
 
 You're welcome to submit pull requests that are partly or entirely generated using generative AI tools. However, you must review the code yourself before moving the PR out of draft -- by submitting the PR, you are claiming personal responsibility for its quality and suitability. If you are not capable of reviewing the PR, please open an issue instead. PRs that are clearly (co-)authored by tools will be closed without review unless there is a human author that claims responsibility for the PR.
 
-Please do not use tools (such as GitHub Copilot) to provide PR reviews.
+Please do not use tools such as GitHub Copilot to provide PR reviews.
 
 # Pull requests
 
@@ -64,7 +64,9 @@ uv tool update-shell
 Optionally, to run checks automatically before each commit, install
 [pre-commit](https://pre-commit.com/#install) and run `pre-commit install`.
 
-You can validate that you have a working installation by running `tox`, which will run the lint checks and unit tests.
+You can validate that you have a working installation by running `tox`, which will run a linter, type checker, and unit tests.
+
+To enable Python type hints and language server support in your editor or IDE, set your interpreter path to the `.tox/lint` virtual environment created by tox.
 
 For improved performance on the tests, install the library that allows
 PyYAML to use C speedups:
@@ -86,7 +88,7 @@ Tests for [`ops-scenario`](https://github.com/canonical/operator/tree/main/testi
 The following are likely to be useful during development:
 
 ```sh
-# Run linting and unit tests
+# Run the linter, type checker, and unit tests
 tox
 
 # Run tests, specifying whole suite or specific files
@@ -96,14 +98,9 @@ tox -e unit -- test/test_charm.py
 # Format the code
 tox -e format
 
-# run only tests matching a certain pattern
+# Run only tests matching a certain pattern
 tox -e unit -- -k <pattern>
 ```
-
-Likewise, use this virtualenv to enable Python type hints and language server if
-you use an editor from the console or specify it as interpreter path in an IDE.
-
-## Pebble tests
 
 The framework has some tests that interact with a real/live Pebble server, which can be installed as a snap. To run these tests, you must have [pebble](https://github.com/canonical/pebble) installed and available in your path.
 
@@ -141,7 +138,7 @@ parts:
 
 If your changes are only on your local device, you can inject your local `ops`
 into the charm after it has packed, and before you deploy it, by unzipping the
-`.charm` file and replacing the `ops` folder in the virtualenv.
+`.charm` file and replacing the `ops` folder in the virtual environment.
 
 The [canonical/hyrum](https://github.com/canonical/hyrum) tool is useful for automating this, and allows you to test using a large number of different charms.
 
@@ -164,17 +161,18 @@ Keep these customisations in mind when upgrading Sphinx Stack. To upgrade Sphinx
 
 ## Contributing docs
 
-See the [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md).
-
 1. Fork this repo and edit the relevant source files:
     - Tutorials - [`/docs/tutorial`](./docs/tutorial)
     - How-to guides - [`/docs/howto`](./docs/howto)
     - Reference - Automatically generated from Python docstrings
     - Explanation - [`/docs/explanation`](./docs/explanation)
-2. [Build the documentation locally](#how-to-build-the-documentation-locally), to check that everything looks right
+
+    Make sure to follow the [documentation style guide](https://github.com/canonical/charm-tech/blob/main/style/docs.md).
+
+2. Build the documentation locally to check that everything looks right
 3. [Propose your changes using a pull request](#pull-requests)
 
-When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.com:canonical-juju-ops" check near the bottom of the pull request page, then click **Details**. You can use the preview to double check that everything looks right.
+When you create the pull request, GitHub automatically builds a preview of the docs. To find the preview, look for the "docs/readthedocs.com:canonical-juju-ops" check near the bottom of the pull request page, which links to the preview. You can use the preview to double check that everything looks right.
 
 To build the docs and serve them locally:
 
