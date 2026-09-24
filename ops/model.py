@@ -1802,19 +1802,21 @@ class Relation:
 
         - A nested dataclass or :class:`enum.Enum` field is constructed from
           its decoded value.
-        - ``list``, ``set``, and ``frozenset`` fields coerce each element
-          against the type argument.
-        - A variable-length ``tuple[X, ...]`` coerces every element against
-          ``X``; a fixed-length ``tuple[X, Y, ...]`` coerces each position
-          against its own type, and stays a ``tuple``.
-        - A ``dict``/``Mapping`` field coerces its values against the value
-          type.
+        - Collection fields coerce their contents against the type arguments:
+          the elements of a ``list``, ``set``, ``frozenset``, or
+          variable-length ``tuple[X, ...]``, and the values of a ``dict`` or
+          ``Mapping``. A ``tuple`` field stays a ``tuple``.
+        - A fixed-length ``tuple[X, Y]`` coerces each position against its own
+          type. The value must have exactly as many items as the annotation
+          has positions; otherwise ``ValueError`` is raised.
         - An ``Optional``/``Union`` field is coerced against its single
           non-``None`` member; a ``Union`` of more than one concrete type is
           passed through as-is, since there is no way to tell which member to
           coerce against.
-        - ``Literal`` fields, and any other constructed generic not listed
-          above, are passed through unchanged.
+        - Any other type, including ``Literal`` and scalar types such as
+          ``int`` and ``str``, is passed through unchanged. Values keep their
+          decoded type: a ``'1'`` in the databag stays a string for an ``int``
+          field.
 
         If the class's type hints can't be resolved at all - for example, a
         ``TYPE_CHECKING``-only import with no runtime name - the values are
