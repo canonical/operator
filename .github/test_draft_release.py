@@ -3,9 +3,10 @@
 
 """Tests for the two scripts the create-draft-release workflow runs.
 
-pytest does not collect this with the rest of the suite: its default
-`norecursedirs` skips dotted directories, so nothing under `.github/` is
-found by `tox -e unit`. Run it by naming it:
+`tox -e unit` runs this, but only because the unit environment names the file:
+pytest's default `norecursedirs` skips dotted directories, so it never finds
+anything under `.github/` on its own. A new test file here needs adding to that
+list in `tox.ini`. To run this one on its own:
 
     uv run --group unit pytest .github/test_draft_release.py
 
@@ -69,17 +70,18 @@ Duplicate notices are compared by their full event path now.
 <!-- release-notes:end -->
 """
 
-PLACEHOLDER_DESCRIPTION = """Prepares the 3.8.3 release from `main`.
-
-<!-- release-notes:start -->
-
-_No release notes were drafted for 3.8.3: no OPENROUTER_API_KEY is configured._
-
-Write them here before merging. They become the body of the GitHub
-release, above the changelog entry for this version.
-
-<!-- release-notes:end -->
-"""
+PLACEHOLDER_DESCRIPTION = (
+    'Prepares the 3.8.3 release from `main`.\n'
+    '\n'
+    '<!-- release-notes:start -->\n'
+    '\n'
+    '_No release notes were drafted for 3.8.3: no OPENROUTER_API_KEY is configured._\n'
+    '\n'
+    'Write them here before merging. They become the body of the GitHub release,'
+    ' above the changelog entry for this version.\n'
+    '\n'
+    '<!-- release-notes:end -->\n'
+)
 
 # Two sections, so that the slice has somewhere to stop. The 3.8.2 entry is
 # the one this repository shipped.
