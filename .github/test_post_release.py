@@ -3,9 +3,10 @@
 
 """Tests for the scripts the post-release workflow runs.
 
-pytest does not collect this with the rest of the suite: its default
-`norecursedirs` skips dotted directories, so nothing under `.github/` is
-found by `tox -e unit`. Run it by naming it:
+`tox -e unit` runs this, but only because the unit environment names the file:
+pytest's default `norecursedirs` skips dotted directories, so it never finds
+anything under `.github/` on its own. A new test file here needs adding to that
+list in `tox.ini`. To run this one on its own:
 
     uv run --group unit pytest .github/test_post_release.py
 
@@ -38,7 +39,7 @@ update = load('update-release-versions')
 
 
 class TestNextDevVersion:
-    """The arithmetic, which is release.py's get_new_version_post_release."""
+    """The development version a branch goes to after a release."""
 
     @pytest.mark.parametrize(
         ('released', 'expected'),
@@ -87,7 +88,7 @@ class TestNextDevVersion:
         assert post_release.next_dev_version(released, 'main') == expected
 
     def test_a_pre_release_on_a_maintenance_branch_still_drops_its_suffix(self):
-        """release.py tests `.pre` before the branch name, so the patch stays put."""
+        """The pre-release test comes before the branch name, so the patch stays put."""
         assert post_release.next_dev_version('2.23.6rc1', '2.23-maintenance') == '2.23.6.dev0'
 
     @pytest.mark.parametrize(
@@ -106,7 +107,7 @@ class TestNextDevVersion:
         assert post_release.next_dev_version(released, branch) == expected
 
     def test_a_development_version_falls_through_to_the_bumps(self):
-        """Unreachable here, but it is what release.py does: it only reads `.pre`."""
+        """Unreachable through the pipeline, but only the pre-release suffix is checked."""
         assert post_release.next_dev_version('3.9.0.dev0', 'main') == '3.10.0.dev0'
 
     @pytest.mark.parametrize('released', ['v3.8.2', '3.8', '3.8.2.post1', '3.8.2-rc1', ''])

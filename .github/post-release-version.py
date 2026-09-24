@@ -12,14 +12,12 @@ Two questions have to be answered before anything can be rewritten:
   SHA whenever the draft was made by the create-draft-release workflow. So
   the workflow hands over what git can tell it - which release branches exist
   and which of them contain the tag - and `resolve_branch` decides.
-- **Which version does the branch go to now?** `next_dev_version` reproduces
-  what `release.py`'s `get_new_version_post_release` has always done, counted
-  from the released version rather than from `ops/version.py`.
+- **Which version does the branch go to now?** `next_dev_version` works it
+  out from the released version, rather than from `ops/version.py`.
 
 The version this prints is a placeholder, not a prediction. It stops the tree
 claiming to be the version just released; nothing counts from it, because the
-propose-release workflow counts from the last tag. `main` sat at `3.9.0.dev0`
-through both the 3.8.1 and the 3.8.2 releases, and that cost nothing.
+propose-release workflow counts from the last tag.
 
     python3 .github/post-release-version.py --tag 3.8.2 --target <sha> \
         --candidates main,2.23-maintenance --containing main
@@ -44,15 +42,15 @@ VERSION = re.compile(r'^(\d+)\.(\d+)\.(\d+)((?:a|b|rc)\d+)?(\.dev\d+)?$')
 # the answer when more than one branch contains the tag. See resolve_branch.
 DEFAULT_BRANCH = 'main'
 
-# What makes a branch a maintenance branch, here and in release.py.
+# What makes a branch a maintenance branch.
 MAINTENANCE_SUFFIX = '-maintenance'
 
 
 def next_dev_version(released: str, branch: str) -> str:
     """Return the development version the branch goes to after this release.
 
-    This is `release.py`'s `get_new_version_post_release`, with the released
-    version passed in instead of read out of `ops/version.py`:
+    The released version is passed in rather than read out of
+    `ops/version.py`:
 
     - a pre-release goes back to its own base version, so publishing 3.4.0b3
       leaves the branch working towards `3.4.0.dev0`;
@@ -60,9 +58,8 @@ def next_dev_version(released: str, branch: str) -> str:
       `2.23.6.dev0`;
     - anything else bumps the minor, so 3.8.2 leaves `3.9.0.dev0`.
 
-    The pre-release test comes first, exactly as it does in `release.py`, so a
-    release candidate cut from a maintenance branch drops its suffix rather
-    than bumping the patch.
+    The pre-release test comes first, so a release candidate cut from a
+    maintenance branch drops its suffix rather than bumping the patch.
     """
     match = VERSION.match(released)
     if not match:
@@ -70,11 +67,10 @@ def next_dev_version(released: str, branch: str) -> str:
     major, minor, patch, pre, _dev = match.groups()
 
     if pre is not None:
-        # release.py looks at `packaging.version.Version.pre` here and never
-        # at `.dev`, so a development version released by hand would fall
-        # through to the bumps below. Nothing can reach that through this
-        # pipeline - the create-draft-release workflow will not draft a
-        # release for a `.devN` version - but this is what it would do.
+        # Only the pre-release suffix is checked, never `.devN`, so a
+        # development version falls through to the bumps below. Nothing can
+        # reach that through this pipeline - the create-draft-release
+        # workflow will not draft a release for a `.devN` version.
         return f'{major}.{minor}.{patch}.dev0'
     if branch.endswith(MAINTENANCE_SUFFIX):
         return f'{major}.{minor}.{int(patch) + 1}.dev0'
@@ -95,11 +91,10 @@ def resolve_branch(target: str, candidates: list[str], containing: list[str]) ->
     it is what somebody chose.
 
     Containment on its own is ambiguous for a release cut from `main` before
-    a maintenance branch was taken off it - 2.23.0, 3.0.0, 3.1.0, 3.2.0 and
-    3.3.0 are all in the history of `main` *and* of a later maintenance
-    branch. Every one of them was released from `main`, which is what makes
-    `main` the right tie-break: a release really cut from a maintenance branch
-    is never in `main`'s history, because that is what the branch is for.
+    a maintenance branch was taken off it, because the tag is in the history
+    of both. `main` is the right tie-break: a release really cut from a
+    maintenance branch is never in `main`'s history, because that is what the
+    branch is for.
     """
     if containing:
         if target in containing:

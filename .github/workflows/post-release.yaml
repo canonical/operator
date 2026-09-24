@@ -13,12 +13,9 @@ name: Post-release version bump
 #   by a longer route, and one a hand-edit can break.
 # - The version written here is a placeholder rather than a prediction.
 #   Nothing counts from it: the propose-release workflow counts from the last
-#   tag, precisely so that being wrong about this costs nothing. `main` sat at
-#   3.9.0.dev0 through both the 3.8.1 and the 3.8.2 releases.
+#   tag, precisely so that being wrong about this costs nothing.
 # - Publishing a pre-release bumps too, and drops the suffix: publishing
-#   3.4.0b3 leaves the branch working towards 3.4.0.dev0. That is what
-#   release.py has always done, and what really happened after 3.4.0b1 and
-#   3.4.0b3.
+#   3.4.0b3 leaves the branch working towards 3.4.0.dev0.
 # - The pull request is opened with the workflow's own token, so GitHub will
 #   not start the usual checks on it, exactly as for the propose-release
 #   workflow. Close and reopen it to get them to run.
@@ -163,13 +160,13 @@ jobs:
               "$TAG" "$BRANCH"
             printf '* `ops` and `ops-tracing` go to `%s`, and `ops-scenario` follows it.\n' \
               "$VERSION"
-            printf '* The tool-versions table is left alone: it records releases, and this\n'
-            printf '  is not one.\n'
+            printf '* The tool-versions table is left alone: it records releases, and this'
+            printf ' is not one.\n'
             printf '* %s\n\n' "$RELEASE_URL"
-            printf 'The version here is a placeholder that stops the tree claiming to be\n'
-            printf '%s. Nothing counts from it - the next release is counted from the\n' "$TAG"
-            printf 'last tag on the branch - so it does not matter if the next release\n'
-            printf 'turns out to be a different one.\n'
+            printf 'The version here is a placeholder that stops the tree claiming to be'
+            printf ' %s. Nothing counts from it - the next release is counted from the' "$TAG"
+            printf ' last tag on the branch - so it does not matter if the next release'
+            printf ' turns out to be a different one.\n'
           } > "$RUNNER_TEMP/pr-body.md"
 
           url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
