@@ -1809,10 +1809,12 @@ class Relation:
         - A fixed-length ``tuple[X, Y]`` coerces each position against its own
           type. The value must have exactly as many items as the annotation
           has positions; otherwise ``ValueError`` is raised.
-        - An ``Optional``/``Union`` field is coerced against its single
-          non-``None`` member; a ``Union`` of more than one concrete type is
-          passed through as-is, since there is no way to tell which member to
-          coerce against.
+        - An ``Optional``/``Union`` field is coerced against the one member
+          that matches the shape of the decoded value: a sequence type for a
+          list, a mapping type or dataclass for an object, or any other type
+          for a scalar. If more than one member matches (for example,
+          ``SomeEnum | str`` for a string), the value is passed through as-is.
+          If none matches, ``TypeError`` is raised.
         - Any other type, including ``Literal`` and scalar types such as
           ``int`` and ``str``, is passed through unchanged. Values keep their
           decoded type: a ``'1'`` in the databag stays a string for an ``int``

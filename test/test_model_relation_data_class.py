@@ -527,6 +527,76 @@ def test_relation_load_union_of_two_concrete_types_passes_through():
     assert obj.value == 'x'
 
 
+@pytest.mark.parametrize(
+    'annotation,written,expected',
+    [
+        pytest.param(
+            list[Nested] | dict[str, Nested],
+            [{'sub': 1}],
+            [Nested(sub=1)],
+            id='list-or-dict-given-list',
+        ),
+        pytest.param(
+            list[Nested] | dict[str, Nested],
+            {'a': {'sub': 1}},
+            {'a': Nested(sub=1)},
+            id='list-or-dict-given-dict',
+        ),
+        pytest.param(Nested | str, {'sub': 1}, Nested(sub=1), id='dataclass-or-str-given-dict'),
+        pytest.param(Nested | str, 'x', 'x', id='dataclass-or-str-given-str'),
+        pytest.param(
+            Nested | _Colour, {'sub': 1}, Nested(sub=1), id='dataclass-or-enum-given-dict'
+        ),
+        pytest.param(Nested | _Colour, 'red', _Colour.RED, id='dataclass-or-enum-given-str'),
+    ],
+)
+def test_relation_load_union_picks_member_by_shape(annotation: Any, written: Any, expected: Any):
+    """A Union is coerced against the one member that matches the value's shape."""
+    # This module uses postponed annotations, so a class body annotation would
+    # be the unresolvable string 'annotation' rather than the type itself.
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps(written)})
+    assert obj.value == expected
+    assert type(obj.value) is type(expected)
+
+
+def test_relation_load_union_ambiguous_scalar_passes_through():
+    """A scalar that fits more than one member of a Union is passed through as-is."""
+
+    @dataclasses.dataclass
+    class Data:
+        colour: _Colour | str
+
+    obj = _load_into(Data, {'colour': json.dumps('red')})
+    assert obj.colour == 'red'
+
+
+def test_relation_load_union_with_none_member():
+    """A null value for a Union with a None member stays None."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | list[Nested] | None = None
+
+    obj = _load_into(Data, {'inner': json.dumps(None)})
+    assert obj.inner is None
+
+
+def test_relation_load_union_no_member_fits():
+    """A value that matches the shape of no member of a Union is rejected."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | list[Nested]
+
+    # The charm doesn't catch it, so ops.testing reports it as an uncaught error.
+    with pytest.raises(
+        testing.errors.UncaughtCharmError, match='expected a value matching one of'
+    ):
+        _load_into(Data, {'inner': json.dumps('oops')})
+
+
 def test_relation_load_variable_length_tuple():
     """tuple[X, ...] is coerced element-wise against X and stays a tuple."""
 

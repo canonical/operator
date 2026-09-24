@@ -1702,34 +1702,66 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
     raise ValueError('Unable to find class fields')
 
 
+_SEQUENCE_TYPES = (list, tuple, set, frozenset)
+
+
+def _union_member_fits(member: Any, value: Any) -> bool:
+    """Report whether a decoded ``value`` has the right shape for union ``member``.
+
+    Only the shape is checked (sequence, mapping, or anything else), so that
+    choosing a member never depends on the order the members are declared in,
+    or on constructing a member and catching the failure.
+    """
+    if member is Any:
+        return True
+    kind = typing.get_origin(member) or member
+    if isinstance(kind, type) and issubclass(kind, _SEQUENCE_TYPES):
+        return isinstance(value, _SEQUENCE_TYPES)
+    if (isinstance(kind, type) and issubclass(kind, Mapping)) or dataclasses.is_dataclass(member):
+        return isinstance(value, Mapping)
+    return not isinstance(value, (*_SEQUENCE_TYPES, Mapping))
+
+
 def _coerce_field(tp: Any, value: Any) -> Any:
     """Coerce a decoded ``value`` into the dataclass field type ``tp``.
 
     Used by :meth:`ops.Relation.load` to recursively construct nested
     dataclasses and enum values from JSON-decoded relation data. An
-    ``Optional``/``Union`` field is coerced against its single non-``None``
-    member; ``dict``/``Mapping`` fields are coerced against their value type;
-    a variable-length ``tuple[X, ...]`` is coerced element-wise against ``X``
-    and a fixed-length ``tuple[X, Y, ...]`` is coerced positionally.
+    ``Optional``/``Union`` field is coerced against the one member that
+    matches the shape of the value; ``dict``/``Mapping`` fields are coerced
+    against their value type; a variable-length ``tuple[X, ...]`` is coerced
+    element-wise against ``X`` and a fixed-length ``tuple[X, Y, ...]`` is
+    coerced positionally.
 
     Raises ``TypeError`` if the value for a sequence field is a string, bytes
     or a mapping, or if the value for a mapping field is not a mapping: those
     are all iterable, so coercing them element-wise would quietly produce a
-    wrong answer rather than fail.
+    wrong answer rather than fail. Also raises ``TypeError`` if the value
+    matches the shape of none of a ``Union`` field's members.
     """
     origin = typing.get_origin(tp)
     if origin is not None:
         args = typing.get_args(tp)
         if origin is typing.Union or origin is types.UnionType:
-            non_none = [a for a in args if a is not type(None)]
-            if len(non_none) == 1:
-                # Optional[X]: coerce against the one concrete member, unless
-                # the value really is None, which X itself won't accept.
-                if value is None:
-                    return None
-                return _coerce_field(non_none[0], value)
-            # A Union of more than one concrete type: no way to tell which
-            # member to coerce against, so accept the value as-is.
+            # None is only ever the None member, and the other members won't
+            # accept it.
+            if value is None:
+                return None
+            members = [a for a in args if a is not type(None)]
+            # Pick the member by the shape of the decoded value alone. Where
+            # more than one member fits (an enum and a str both take a string,
+            # for example), there's no principled way to choose, so accept the
+            # value as-is.
+            if len(members) > 1:
+                fits = [m for m in members if _union_member_fits(m, value)]
+                if not fits:
+                    raise TypeError(
+                        f'expected a value matching one of {tp}, '
+                        f'got {type(value).__name__}: {value!r}'
+                    )
+                members = fits
+            if len(members) == 1:
+                return _coerce_field(members[0], value)
             return value
         # A str, bytes or mapping is iterable, so coercing element-wise would
         # silently succeed with nonsense: a list of characters, or of the
