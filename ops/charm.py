@@ -1833,7 +1833,12 @@ def _build_dataclass(cls: Any, data: Mapping[str, Any], *args: Any) -> Any:
     """
     try:
         hints = get_type_hints(cls)
-    except NameError:
+    except NameError as e:
+        logger.debug(
+            'Unable to resolve type hints for %s, not coercing relation data: %s',
+            cls.__name__,
+            e,
+        )
         return cls(*args, **data)
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls)[len(args) :]:

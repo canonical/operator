@@ -1820,9 +1820,13 @@ class Relation:
           decoded type: a ``'1'`` in the databag stays a string for an ``int``
           field.
 
-        If the class's type hints can't be resolved at all - for example, a
-        ``TYPE_CHECKING``-only import with no runtime name - the values are
-        passed through uncoerced instead of raising.
+        Type hints are resolved with :func:`typing.get_type_hints`, which
+        evaluates string annotations (including those from
+        ``from __future__ import annotations``) against the module's global
+        names. If any hint can't be resolved (for example, a
+        ``TYPE_CHECKING``-only import, or a class defined inside a function),
+        none of the values are coerced, and they are passed to the class
+        as-is instead of raising.
 
         Any additional positional or keyword arguments will be passed through
         to the data class ``__init__``. For a non-pydantic dataclass target,
