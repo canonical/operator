@@ -146,7 +146,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The identity the repository's other automated pull requests use.
           git config user.name 'Prints Charming [bot]'
           git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
           git add uv.lock ops/version.py pyproject.toml \
