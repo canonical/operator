@@ -46,10 +46,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The changelog tool, pinned to a commit rather than a branch: a release
-  # should be reproducible, and this decides what the changelog says.
+  # The team's release tools, pinned to a commit rather than a branch: a
+  # release should be reproducible, and these decide what the changelog and
+  # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@8884ff533b5599a09c8e1d52fb11dcf66f0b9c47#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+  DRAFT_RELEASE_NOTES: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=draft-release-notes
 
   # The releases whose notes the model is shown, chosen for how they read
   # rather than for being the most recent: 2.23.4 for a fixes release, 3.8.1
@@ -212,7 +215,7 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
         run: |
           set -euo pipefail
-          python3 .github/draft-release-notes.py \
+          uvx --from "$DRAFT_RELEASE_NOTES" draft-release-notes \
             --repo "$GITHUB_REPOSITORY" \
             --version "$VERSION" \
             --previous "$PREVIOUS" \
