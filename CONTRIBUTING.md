@@ -340,7 +340,7 @@ To build the packages and upload them to **Test PyPI**, run the Publish workflow
 
 Two things live in the repository settings, so no PR can add them.
 
-- An environment called `release-notes`, holding an `OPENROUTER_API_KEY` secret and an `OPENROUTER_MODEL` variable. The model is a variable so that changing it is a settings edit rather than a PR. The key should be its own, and not the one the `ai-failure-triage` environment uses: release notes are published prose on every release and failure triage is internal, so they have different blast radii, and a shared key means either can spend the other's budget.
+- An environment called `release-notes`, holding an `OPENROUTER_API_KEY` secret and an `OPENROUTER_MODEL` variable. The model is a variable so that changing it is a settings edit rather than a PR. The key should be its own, and shared with another environment.
 
     A release doesn't wait on this. With any of the three missing, "Propose a release" writes a placeholder in place of the notes - a line saying none were drafted, and an instruction to write them before merging - and carries on. Write them yourself in the PR description; everything after that works the same way.
 
