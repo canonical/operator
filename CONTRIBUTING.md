@@ -344,7 +344,7 @@ Two things live in the repository settings, so no PR can add them.
 
     A release doesn't wait on this. With any of the three missing, "Propose a release" writes a placeholder in place of the notes - a line saying none were drafted, and an instruction to write them before merging - and carries on. Write them yourself in the PR description; everything after that works the same way.
 
-- A trusted publisher on Test PyPI pointing at `publish.yaml`. PyPI matches a trusted publisher against the workflow's *file name*, and Test PyPI's publisher was configured against `test-publish.yaml`, which has been folded into `publish.yaml`. Until somebody re-points it, a manual run fails when it tries to upload. PyPI's own publisher is unaffected, because the file it names kept its name.
+- A trusted publisher on Test PyPI pointing at `publish.yaml`. PyPI matches a trusted publisher against the workflow's *file name*.
 
 ### If something fails partway
 
