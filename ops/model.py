@@ -3523,6 +3523,9 @@ def _format_action_result_dict(
     return output_
 
 
+_RELATION_NOT_FOUND_RE = re.compile(r'relation (\d+ )?not found')
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -3584,15 +3587,75 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield
         except hookcmds.Error as e:
-            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
-            if (
-                cmd.startswith(('relation-', 'network-'))
-                and 'relation not found' in e.stderr.lower()
-            ):
+            stderr = e.stderr.lower()
+            if self._relation_is_gone(cmd, stderr, kwargs):
+                # A relation that Juju has forgotten about isn't an
+                # authorisation failure, so it isn't a security event.
                 raise RelationNotFoundError() from e
-            elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+            if cmd.startswith('secret-') and 'not found' in stderr:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
+
+    def _relation_is_gone(self, cmd: str, stderr: str, kwargs: Mapping[str, Any]) -> bool:
+        """Whether this hook command's failure means Juju has forgotten the relation.
+
+        Juju deliberately reports "permission denied" rather than "relation not
+        found" for a relation that has gone from its state, so that the reply
+        doesn't say whether the relation ever existed. A charm can't do anything
+        with a relation that Juju has forgotten about, so ops treats that the
+        same way as a relation Juju reports as not found.
+
+        Juju refuses two relation hook commands on a relation that does still
+        exist, and both are a follower touching its own application databag:
+        reading it, and writing it. Those keep the original error, and are
+        reported as security events, because swallowing a real authorisation
+        failure is the thing this function must not do.
+
+        A follower can be refused while ops believes it is the leader:
+        :meth:`is_leader` caches for the lease renewal period, and a write from
+        outside an observed event handler isn't checked for leadership at all.
+
+        Known limitation: a *peer* relation's application databag is readable by
+        every unit, so "permission denied" from reading one can only mean the
+        relation is gone -- but ``relation-get``'s kwargs don't say whether the
+        relation is a peer relation, so a follower reading a peer app databag
+        still gets the original error and a security event. That is issue #2709
+        in the one case this function carves out.
+
+        Args:
+            cmd: The hook command that failed.
+            stderr: The command's standard error, lowercased.
+            kwargs: The arguments the command was called with.
+        """
+        if cmd not in (
+            'relation-ids',
+            'relation-list',
+            'relation-get',
+            'relation-set',
+            'relation-model-get',
+            'network-get',
+        ):
+            return False
+        # Juju words this as "relation not found" for most hook commands and
+        # "relation 2 not found" for `network-get`.
+        if _RELATION_NOT_FOUND_RE.search(stderr):
+            return True
+        if 'permission denied' not in stderr:
+            return False
+        if cmd == 'relation-get' and kwargs.get('app') and kwargs.get('unit') == self.app_name:
+            # Reading the *remote* application databag is not restricted, and
+            # neither is reading a unit databag, so our own application databag
+            # is the only read that can be a genuine authorisation failure.
+            return self.is_leader()
+        if cmd == 'relation-set' and kwargs.get('app'):
+            # Writing an app databag is a leader-only operation, and the only
+            # app databag a unit can write is its own, so there is no `unit`
+            # kwarg to compare against.
+            return self.is_leader()
+        # Juju refuses nothing else while the relation exists, including
+        # `network-get`, which 3.6 words as "permission denied".
+        return True
 
     def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
         authz_messages = (
