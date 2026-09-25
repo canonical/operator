@@ -41,6 +41,11 @@ name: Create the draft release
 
 permissions: {}
 
+env:
+  # The team's release tools, pinned to a commit rather than a branch.
+  CHANGELOG: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+
 # One release at a time per branch. Two runs of this would race to create
 # the same release, and the loser's error would be the confusing one.
 concurrency:
@@ -60,6 +65,10 @@ jobs:
           fetch-depth: 0  # The push's own `before` commit has to be here to compare against.
           persist-credentials: false
 
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: false
+
       - name: Is this merge a release?
         id: detect
         env:
@@ -67,17 +76,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          # A force push, or a branch created by this push, can leave
-          # `before` pointing at something this checkout does not have. The
-          # script treats a missing "before" as "not a release", which is
-          # the right answer for both.
-          before=()
-          if git cat-file -e "$BEFORE:ops/version.py" 2>/dev/null; then
-            git show "$BEFORE:ops/version.py" > "$RUNNER_TEMP/version-before.py"
-            before=(--before "$RUNNER_TEMP/version-before.py")
+          version_in() { sed -n "s/^version: str = '\(.*\)'$/\1/p"; }
+
+          after=$(version_in < ops/version.py)
+          if [ -z "$after" ]; then
+            echo "::error::ops/version.py has no \`version: str = '...'\` line to read."
+            exit 1
           fi
 
-          python3 .github/detect-release-bump.py "${before[@]}" --after ops/version.py \
+          # A force push, or a branch created by this push, can leave
+          # `before` pointing at something this checkout does not have. An
+          # empty --before means "not a release", which is the right answer
+          # for both.
+          before=''
+          if git cat-file -e "$BEFORE:ops/version.py" 2>/dev/null; then
+            before=$(git show "$BEFORE:ops/version.py" | version_in)
+          fi
+
+          uvx --from "$CHANGELOG" changelog detect-release --before "$before" --after "$after" \
             >> "$GITHUB_OUTPUT"
 
       - name: Find the pull request the notes are in
@@ -116,11 +132,8 @@ jobs:
           VERSION: ${{ steps.detect.outputs.version }}
         run: |
           set -euo pipefail
-          python3 .github/build-release-body.py \
-            --version "$VERSION" \
-            --description "$RUNNER_TEMP/pr-description.md" \
-            --changelog CHANGES.md \
-            --output "$RUNNER_TEMP/release-body.md"
+          uvx --from "$CHANGELOG" changelog release-body --version "$VERSION" --changes CHANGES.md \
+            < "$RUNNER_TEMP/pr-description.md" > "$RUNNER_TEMP/release-body.md"
 
       - name: Create the draft release
         id: release

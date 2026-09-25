@@ -30,6 +30,11 @@ name: Post-release version bump
 
 permissions: {}
 
+env:
+  # The team's release tools, pinned to a commit rather than a branch.
+  CHANGELOG: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+
 # One bump per release. Two runs would race to push the same branch.
 concurrency:
   group: post-release-${{ github.event.release.tag_name }}
@@ -65,7 +70,7 @@ jobs:
 
           # The tag exists by now: GitHub creates it against the draft's
           # target when the draft is published, which is the event that
-          # started this run. If it is somehow not here, the script falls
+          # started this run. If it is somehow not here, `post-release` falls
           # back to the target_commitish being a branch name.
           sha=$(git rev-parse -q --verify "refs/tags/$TAG^{commit}") || sha=''
 
@@ -85,7 +90,7 @@ jobs:
             fi
           done
 
-          python3 .github/post-release-version.py --tag "$TAG" --target "$TARGET" \
+          uvx --from "$CHANGELOG" changelog post-release --tag "$TAG" --target "$TARGET" \
             --candidates "$candidates" --containing "$containing" >> "$GITHUB_OUTPUT"
 
       - name: Start the post-release branch
