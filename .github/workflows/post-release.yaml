@@ -1,0 +1,199 @@
+---
+name: Post-release version bump
+
+# The third of the three release workflows: once somebody publishes the draft
+# release, put the branch it came from back onto a development version. The
+# publish workflow hangs off the same event and does the other half of what
+# publication means - see .github/workflows/publish.yaml.
+#
+# Four things are worth knowing before reading the steps:
+#
+# - The released version comes from the tag on the event, never from
+#   ops/version.py. The tag is what was published; the file is the same fact
+#   by a longer route, and one a hand-edit can break.
+# - The version written here is a placeholder rather than a prediction.
+#   Nothing counts from it: the propose-release workflow counts from the last
+#   tag, precisely so that being wrong about this costs nothing.
+# - Publishing a pre-release bumps too, and drops the suffix: publishing
+#   3.4.0b3 leaves the branch working towards 3.4.0.dev0.
+# - The pull request is opened with the workflow's own token, so GitHub will
+#   not start the usual checks on it, exactly as for the propose-release
+#   workflow. Close and reopen it to get them to run.
+#
+# Re-running this after it has failed is safe: if the bump is already on the
+# branch the first step says so and stops, and every step reads what it needs
+# fresh from the branch or the API.
+
+"on":
+  release:
+    types: [published]
+
+permissions: {}
+
+env:
+  # The team's release tools, pinned to a commit rather than a branch.
+  CHANGELOG: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+
+# One bump per release. Two runs would race to push the same branch.
+concurrency:
+  group: post-release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Open the post-release pull request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # To push the post-release branch.
+      pull-requests: write  # To open the pull request.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          # Every release branch and every tag: which branch this was
+          # released from is worked out by asking which of them has the tag
+          # in its history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Work out the branch and the next version
+        id: bump
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ github.event.release.target_commitish }}
+        run: |
+          set -euo pipefail
+
+          # The tag exists by now: GitHub creates it against the draft's
+          # target when the draft is published, which is the event that
+          # started this run. If it is somehow not here, `post-release` falls
+          # back to the target_commitish being a branch name.
+          sha=$(git rev-parse -q --verify "refs/tags/$TAG^{commit}") || sha=''
+
+          # The branches this repository releases from, which is the same set
+          # the create-draft-release workflow triggers on, and then those of
+          # them whose history has the tag in it. The create-draft-release
+          # workflow passes a commit SHA as the draft's target, so the name on
+          # the event is usually no help and this is what answers it.
+          candidates=''
+          containing=''
+          for branch in $(git for-each-ref --format='%(refname:lstrip=3)' \
+            refs/remotes/origin/main 'refs/remotes/origin/*-maintenance'); do
+            candidates="$candidates,$branch"
+            if [ -n "$sha" ] && git merge-base --is-ancestor "$sha" \
+              "refs/remotes/origin/$branch"; then
+              containing="$containing,$branch"
+            fi
+          done
+
+          uvx --from "$CHANGELOG" changelog post-release --tag "$TAG" --target "$TARGET" \
+            --candidates "$candidates" --containing "$containing" >> "$GITHUB_OUTPUT"
+
+      - name: Start the post-release branch
+        id: branch
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          head_branch="post-release-$TAG"
+
+          # A re-run after the pull request was merged, or after somebody did
+          # the bump by hand. Nothing to do, and nothing to complain about.
+          if git show "origin/$BRANCH:ops/version.py" |
+            grep -q "^version: str = '$VERSION'\$"; then
+            echo "$BRANCH is already at $VERSION, so there is no bump to open."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Checked before anything is rewritten, so that a leftover branch
+          # from an abandoned attempt is a message rather than a push that
+          # fails at the end.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$head_branch" >/dev/null 2>&1; then
+            echo "::error::A $head_branch branch already exists. Merge or close the pull" \
+              "request that goes with it, or delete the branch, and re-run this workflow."
+            exit 1
+          fi
+
+          # From the tip of the release branch rather than from the tag: the
+          # branch may have moved on since the release was cut, and the bump
+          # belongs on top of wherever it is now.
+          git switch -c "$head_branch" "origin/$BRANCH"
+          echo "head-branch=$head_branch" >> "$GITHUB_OUTPUT"
+
+      - name: Update the version files
+        if: ${{ !steps.branch.outputs.skip }}
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 .github/update-release-versions.py --version "$VERSION" --post-release
+          uv lock
+          git --no-pager diff --stat
+
+      - name: Commit, push, and open the pull request
+        id: pull-request
+        if: ${{ !steps.branch.outputs.skip }}
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          HEAD_BRANCH: ${{ steps.branch.outputs.head-branch }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git config user.name 'Prints Charming [bot]'
+          git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
+          git add uv.lock ops/version.py pyproject.toml \
+            testing/pyproject.toml tracing/pyproject.toml
+          git commit -m "chore: update versions after the $TAG release"
+          git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
+            "HEAD:refs/heads/$HEAD_BRANCH"
+
+          {
+            printf '%s is released, so `%s` goes back to a development version.\n\n' \
+              "$TAG" "$BRANCH"
+            printf '* `ops` and `ops-tracing` go to `%s`, and `ops-scenario` follows it.\n' \
+              "$VERSION"
+            printf '* The tool-versions table is left alone: it records releases, and this'
+            printf ' is not one.\n'
+            printf '* %s\n\n' "$RELEASE_URL"
+            printf 'The version here is a placeholder that stops the tree claiming to be'
+            printf ' %s. Nothing counts from it - the next release is counted from the' "$TAG"
+            printf ' last tag on the branch - so it does not matter if the next release'
+            printf ' turns out to be a different one.\n'
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base "$BRANCH" --head "$HEAD_BRANCH" \
+            --title "chore: adjust versions after the $TAG release" \
+            --body-file "$RUNNER_TEMP/pr-body.md")
+          echo "Opened $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Summarise the bump
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          SKIP: ${{ steps.branch.outputs.skip }}
+          URL: ${{ steps.pull-request.outputs.url }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## After the %s release\n\n' "$TAG"
+            if [ -n "$SKIP" ]; then
+              printf '`%s` is already at `%s`. Nothing to do.\n' "$BRANCH" "$VERSION"
+            else
+              printf '`%s` goes to `%s`.\n\n%s\n' "$BRANCH" "$VERSION" "$URL"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

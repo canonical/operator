@@ -1,0 +1,292 @@
+---
+name: Propose a release
+
+# The first of the three release workflows: work out the version, write the
+# changelog, rewrite the version strings, draft the release notes, and open a
+# pull request with all of it. A human reviews and merges that pull request;
+# creating the release is the next workflow's job.
+#
+# Two things are worth knowing before running this:
+#
+# - The version is counted from the last tag on the branch, never from
+#   ops/version.py. Between releases that file holds a guess left behind by
+#   the post-release bump, and the tag is the only base that is a fact.
+# - The pull request is opened with the workflow's own token, so GitHub will
+#   not start the usual checks on it. Until that is arranged differently,
+#   close and reopen the pull request to get them to run.
+
+"on":
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          The version to release, as X.Y.Z (or X.Y.ZrcN). Leave this empty to
+          work it out from the conventional commits since the last tag.
+        required: false
+        type: string
+      branch:
+        description: The branch to release from.
+        required: false
+        default: main
+        type: string
+      dry_run:
+        description: >-
+          Do everything except push the branch and open the pull request. The
+          proposed version, changelog and notes go in the run summary.
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+# One proposal per branch at a time. Two runs would each work out the same
+# version and then race to open the same pull request.
+concurrency:
+  group: propose-release-${{ inputs.branch }}
+  cancel-in-progress: false
+
+env:
+  # The team's release tools, pinned to a commit rather than a branch: a
+  # release should be reproducible, and these decide what the changelog and
+  # the drafted notes say.
+  CHANGELOG: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+  DRAFT_RELEASE_NOTES: >-
+    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=draft-release-notes
+
+  # The releases whose notes the model is shown, chosen for how they read
+  # rather than for being the most recent: 2.23.4 for a fixes release, 3.8.1
+  # for features and polish, 3.8.2 for a release that says it is routine and
+  # stops. Replace one when a release beats it.
+  EXEMPLAR_TAGS: 2.23.4 3.8.1 3.8.2
+
+jobs:
+  propose:
+    name: Propose a release
+    runs-on: ubuntu-latest
+    environment: release-notes  # Required to access secrets.OPENROUTER_API_KEY.
+    permissions:
+      contents: write  # To push the release-prep branch.
+      pull-requests: write  # To open the pull request.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0  # The whole history and its tags: the release is counted from the tag.
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Work out the version and the range
+        id: propose
+        env:
+          BRANCH: ${{ inputs.branch }}
+          VERSION_INPUT: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # The last tag on this branch, and not the version in ops/version.py:
+          # between releases that file holds the guess the post-release bump
+          # left behind, which would either skip a version or release the
+          # guess. The tag is also where the changelog range starts, so the
+          # two cannot drift apart.
+          if ! previous=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' HEAD); then
+            echo "::error::No release tag in the history of $BRANCH to count from."
+            exit 1
+          fi
+          echo "Last tag on $BRANCH: $previous"
+
+          # One comma-separated list, from the file that explains itself. An
+          # empty list is not worth failing a release over: it credits
+          # everyone, which is the direction the changelog tool errs in too.
+          team=$(sed -e 's/#.*//' -e 's/[[:space:]]//g' .github/changelog-team.txt |
+            grep -v '^$' | paste -sd,) || team=''
+
+          format=$(uvx --from "$CHANGELOG" changelog git-log-format)
+          git log --reverse --no-merges --format="$format" "$previous..HEAD" \
+            > "$RUNNER_TEMP/changes.log"
+
+          if [ -n "$VERSION_INPUT" ]; then
+            # An explicit version is used as it stands: no inference, and no
+            # reconciling it against what the commits suggest. It is the
+            # escape hatch for everything this workflow would otherwise
+            # refuse to do, a major release among them.
+            version="$VERSION_INPUT"
+            if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'; then
+              echo "::error::'$version' is not X.Y.Z or X.Y.Z{a,b,rc}N."
+              exit 1
+            fi
+          else
+            size=$(uvx --from "$CHANGELOG" changelog bump-size --team "$team" \
+              < "$RUNNER_TEMP/changes.log")
+            echo "The commits since $previous are a $size release."
+
+            # A feature or a breaking change on a maintenance branch is not
+            # something to absorb into a patch release. Somebody has put it
+            # on the wrong branch, and the release is not the place to find
+            # that out quietly.
+            case "$BRANCH" in
+              *-maintenance)
+                if [ "$size" != patch ]; then
+                  echo "::error::The commits since $previous on $BRANCH are a $size" \
+                    "release: a feature or a breaking change has landed on a maintenance" \
+                    "branch. Fix that, or pass an explicit version if this is really intended."
+                  exit 1
+                fi
+                ;;
+            esac
+
+            version=$(uvx --from "$CHANGELOG" changelog next-version --previous "$previous" \
+              --team "$team" < "$RUNNER_TEMP/changes.log")
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "::error::$version is already tagged."
+            exit 1
+          fi
+
+          # Checked here rather than at the push, so that a leftover branch
+          # from an abandoned attempt costs nothing: everything after this
+          # step rewrites files and spends a model call.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release-prep-$version" >/dev/null 2>&1
+          then
+            echo "::error::A release-prep-$version branch already exists. Delete it, or" \
+              "finish the pull request that goes with it, before proposing $version again."
+            exit 1
+          fi
+
+          echo "Releasing $version, from the $(git rev-list --count "$previous..HEAD") commits" \
+            "since $previous."
+          {
+            echo "previous=$previous"
+            echo "version=$version"
+            echo "team=$team"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate the changelog entry
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          TEAM: ${{ steps.propose.outputs.team }}
+        run: |
+          set -euo pipefail
+          uvx --from "$CHANGELOG" changelog changes-entry \
+            --repo "$GITHUB_REPOSITORY" --tag "$VERSION" --team "$TEAM" \
+            < "$RUNNER_TEMP/changes.log" > "$RUNNER_TEMP/changes-entry.md"
+          cat "$RUNNER_TEMP/changes-entry.md" CHANGES.md > "$RUNNER_TEMP/CHANGES.md"
+          mv "$RUNNER_TEMP/CHANGES.md" CHANGES.md
+          cat "$RUNNER_TEMP/changes-entry.md"
+
+      - name: Update the version files
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 .github/update-release-versions.py --version "$VERSION"
+          uv lock
+          git --no-pager diff --stat
+
+      - name: Fetch the exemplar releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/exemplars.md"
+          for tag in $EXEMPLAR_TAGS; do
+            if body=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body); then
+              printf '## %s\n\n%s\n\n' "$tag" "$body" >> "$RUNNER_TEMP/exemplars.md"
+            else
+              echo "::warning::No release found for $tag; drafting without it."
+            fi
+          done
+
+      - name: Draft the release notes
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          PREVIOUS: ${{ steps.propose.outputs.previous }}
+          BRANCH: ${{ inputs.branch }}
+          # The model is a repository variable rather than something pinned
+          # here, so that changing it is a settings edit and not a pull
+          # request. Neither it nor the key existing is required: without
+          # them the notes are a placeholder for the reviewer to fill in.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          uvx --from "$DRAFT_RELEASE_NOTES" draft-release-notes \
+            --repo "$GITHUB_REPOSITORY" \
+            --version "$VERSION" \
+            --previous "$PREVIOUS" \
+            --branch "$BRANCH" \
+            --changelog "$RUNNER_TEMP/changes-entry.md" \
+            --exemplars "$RUNNER_TEMP/exemplars.md" \
+            --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
+            --output "$RUNNER_TEMP/release-notes.md"
+
+      - name: Write the pull request description
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          PREVIOUS: ${{ steps.propose.outputs.previous }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          # The markers are how the next workflow lifts the notes back out of
+          # this description when it creates the draft release, so anything
+          # written outside them is for reviewers and goes no further.
+          {
+            printf 'Prepares the %s release from `%s`.\n\n' "$VERSION" "$BRANCH"
+            printf '* `CHANGES.md` has a new entry for %s.\n' "$VERSION"
+            printf '* The version strings are updated across ops, ops-scenario,'
+            printf ' ops-tracing and the tool-versions table.\n'
+            printf '* [Commits since %s](%s/%s/compare/%s...%s)\n\n' \
+              "$PREVIOUS" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS" "$BRANCH"
+            printf 'The release notes below become the body of the GitHub release.'
+            printf ' Edit them here: this description is where they are read from.\n\n'
+            printf '<!-- release-notes:start -->\n\n'
+            cat "$RUNNER_TEMP/release-notes.md"
+            printf '\n<!-- release-notes:end -->\n'
+          } > "$RUNNER_TEMP/pr-body.md"
+
+      - name: Summarise the proposal
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          PREVIOUS: ${{ steps.propose.outputs.previous }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## %s, from `%s`\n\n' "$VERSION" "$BRANCH"
+            printf 'Counted from the last tag on the branch, `%s`.\n\n' "$PREVIOUS"
+            printf '<details><summary>Changelog entry</summary>\n\n'
+            cat "$RUNNER_TEMP/changes-entry.md"
+            printf '\n</details>\n\n### Draft release notes\n\n'
+            cat "$RUNNER_TEMP/release-notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit, push, and open the pull request
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          head_branch="release-prep-$VERSION"
+
+          git config user.name 'Prints Charming [bot]'
+          git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
+          git switch -c "$head_branch"
+          git add CHANGES.md uv.lock ops/version.py pyproject.toml \
+            testing/pyproject.toml tracing/pyproject.toml docs/explanation/versions.md
+          git commit -m "chore: prepare release $VERSION"
+          git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
+            "HEAD:refs/heads/$head_branch"
+
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base "$BRANCH" --head "$head_branch" \
+            --title "chore: update changelog and versions for $VERSION release" \
+            --body-file "$RUNNER_TEMP/pr-body.md")
+          echo "Opened $url"
+          printf '\n### Pull request\n\n%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
