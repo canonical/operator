@@ -272,7 +272,6 @@ jobs:
           set -euo pipefail
           head_branch="release-prep-$VERSION"
 
-          # The identity the repository's other automated pull requests use.
           git config user.name 'Prints Charming [bot]'
           git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
           git switch -c "$head_branch"
