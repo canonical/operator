@@ -37,6 +37,7 @@ from .state import (
     CharmType,
     CheckInfo,
     Container,
+    EventProtocol,
     Notice,
     Secret,
     Storage,
@@ -64,6 +65,68 @@ logger = scenario_logger.getChild('runtime')
 _DEFAULT_JUJU_VERSION = '3.6.14'
 
 
+def _as_event(event: EventProtocol) -> _Event:
+    """Narrow a public event object to the concrete type the framework uses.
+
+    :class:`CharmEvents` is the only supported way to make an event, and it
+    always makes an ``_Event``. Anything else is a test that has built its own
+    object, which won't carry the information the framework needs.
+
+    Both entry points (:meth:`Context.run` and ``Context.__call__``) narrow
+    here, so the same mistake gets the same message whichever one is used.
+    """
+    # Help people transition from Scenario 6:
+    if isinstance(event, str):
+        name = event.replace('-', '_')
+        if name in (
+            'install',
+            'start',
+            'stop',
+            'remove',
+            'update_status',
+            'config_changed',
+            'upgrade_charm',
+            'pre_series_upgrade',
+            'post_series_upgrade',
+            'leader_elected',
+            'collect_app_status',
+            'collect_unit_status',
+        ):
+            suggested = f'{name}()'
+        elif name in ('secret_changed', 'secret_rotate'):
+            suggested = f'{name}(my_secret)'
+        elif name in ('secret_expired', 'secret_remove'):
+            suggested = f'{name}(my_secret, revision=1)'
+        elif name in (
+            'relation_created',
+            'relation_joined',
+            'relation_changed',
+            'relation_departed',
+            'relation_broken',
+        ):
+            suggested = f'{name}(my_relation)'
+        elif name in ('storage_attached', 'storage_detaching'):
+            suggested = f'{name}(my_storage)'
+        elif name == 'pebble_ready':
+            suggested = f'{name}(my_container)'
+        elif name == 'pebble_custom_notice':
+            suggested = f'{name}(my_container, my_notice)'
+        else:
+            suggested = 'event()'
+        raise TypeError(
+            f'call with an event from `ctx.on`, like `ctx.on.{suggested}`',
+        )
+    if callable(event):
+        raise TypeError(
+            'You should call the event method. Did you forget to add parentheses?',
+        )
+    if not isinstance(event, _Event):
+        raise TypeError(
+            f'expected an event from `ctx.on`, like `ctx.on.start()`, not {event!r}',
+        )
+    return event
+
+
 class Manager(Generic[CharmType]):
     """Context manager to offer test code some runtime charm object introspection.
 
@@ -79,11 +142,11 @@ class Manager(Generic[CharmType]):
     def __init__(
         self,
         ctx: Context[CharmType],
-        arg: _Event,
+        arg: EventProtocol,
         state_in: State,
     ):
         self._ctx = ctx
-        self._arg = arg
+        self._arg = _as_event(arg)
         self._state_in = state_in
 
         self._emitted: bool = False
@@ -200,57 +263,57 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.InstallEvent)
-    def install():  # ruff: ignore[undocumented-public-method]
+    def install() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('install')
 
     @staticmethod
     @_copy_doc(ops.StartEvent)
-    def start():  # ruff: ignore[undocumented-public-method]
+    def start() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('start')
 
     @staticmethod
     @_copy_doc(ops.StopEvent)
-    def stop():  # ruff: ignore[undocumented-public-method]
+    def stop() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('stop')
 
     @staticmethod
     @_copy_doc(ops.RemoveEvent)
-    def remove():  # ruff: ignore[undocumented-public-method]
+    def remove() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('remove')
 
     @staticmethod
     @_copy_doc(ops.UpdateStatusEvent)
-    def update_status():  # ruff: ignore[undocumented-public-method]
+    def update_status() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('update_status')
 
     @staticmethod
     @_copy_doc(ops.ConfigChangedEvent)
-    def config_changed():  # ruff: ignore[undocumented-public-method]
+    def config_changed() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('config_changed')
 
     @staticmethod
     @_copy_doc(ops.UpgradeCharmEvent)
-    def upgrade_charm():  # ruff: ignore[undocumented-public-method]
+    def upgrade_charm() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('upgrade_charm')
 
     @staticmethod
     @_copy_doc(ops.PreSeriesUpgradeEvent)
-    def pre_series_upgrade():  # ruff: ignore[undocumented-public-method]
+    def pre_series_upgrade() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('pre_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.PostSeriesUpgradeEvent)
-    def post_series_upgrade():  # ruff: ignore[undocumented-public-method]
+    def post_series_upgrade() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('post_series_upgrade')
 
     @staticmethod
     @_copy_doc(ops.LeaderElectedEvent)
-    def leader_elected():  # ruff: ignore[undocumented-public-method]
+    def leader_elected() -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event('leader_elected')
 
     @staticmethod
     @_copy_doc(ops.SecretChangedEvent)
-    def secret_changed(secret: Secret):  # ruff: ignore[undocumented-public-method]
+    def secret_changed(secret: Secret) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         if secret.owner:
             raise ValueError(
                 'This unit will never receive secret-changed for a secret it owns.',
@@ -259,7 +322,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretExpiredEvent)
-    def secret_expired(secret: Secret, *, revision: int):  # ruff: ignore[undocumented-public-method]
+    def secret_expired(secret: Secret, *, revision: int) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-expire for a secret it does not own.',
@@ -268,7 +331,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRotateEvent)
-    def secret_rotate(secret: Secret):  # ruff: ignore[undocumented-public-method]
+    def secret_rotate(secret: Secret) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-rotate for a secret it does not own.',
@@ -277,7 +340,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.SecretRemoveEvent)
-    def secret_remove(secret: Secret, *, revision: int):  # ruff: ignore[undocumented-public-method]
+    def secret_remove(secret: Secret, *, revision: int) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         if not secret.owner:
             raise ValueError(
                 'This unit will never receive secret-removed for a secret it does not own.',
@@ -285,23 +348,27 @@ class CharmEvents:
         return _Event('secret_remove', secret=secret, secret_revision=revision)
 
     @staticmethod
-    def collect_app_status():
+    def collect_app_status() -> EventProtocol:
         """Event triggered at the end of every hook to collect app statuses for evaluation."""
         return _Event('collect_app_status')
 
     @staticmethod
-    def collect_unit_status():
+    def collect_unit_status() -> EventProtocol:
         """Event triggered at the end of every hook to collect unit statuses for evaluation."""
         return _Event('collect_unit_status')
 
     @staticmethod
     @_copy_doc(ops.RelationCreatedEvent)
-    def relation_created(relation: RelationBase):  # ruff: ignore[undocumented-public-method]
+    def relation_created(relation: RelationBase) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(f'{relation.endpoint}_relation_created', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.RelationJoinedEvent)
-    def relation_joined(relation: RelationBase, *, remote_unit: int | None = None):  # ruff: ignore[undocumented-public-method]
+    def relation_joined(  # ruff: ignore[undocumented-public-method]
+        relation: RelationBase,
+        *,
+        remote_unit: int | None = None,
+    ) -> EventProtocol:
         return _Event(
             f'{relation.endpoint}_relation_joined',
             relation=relation,
@@ -314,7 +381,7 @@ class CharmEvents:
         relation: RelationBase,
         *,
         remote_unit: int | None = None,
-    ):
+    ) -> EventProtocol:
         return _Event(
             f'{relation.endpoint}_relation_changed',
             relation=relation,
@@ -328,7 +395,7 @@ class CharmEvents:
         *,
         remote_unit: int | None = None,
         departing_unit: int | None = None,
-    ):
+    ) -> EventProtocol:
         return _Event(
             f'{relation.endpoint}_relation_departed',
             relation=relation,
@@ -338,27 +405,27 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.RelationBrokenEvent)
-    def relation_broken(relation: RelationBase):  # ruff: ignore[undocumented-public-method]
+    def relation_broken(relation: RelationBase) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(f'{relation.endpoint}_relation_broken', relation=relation)
 
     @staticmethod
     @_copy_doc(ops.StorageAttachedEvent)
-    def storage_attached(storage: Storage):  # ruff: ignore[undocumented-public-method]
+    def storage_attached(storage: Storage) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(f'{storage.name}_storage_attached', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.StorageDetachingEvent)
-    def storage_detaching(storage: Storage):  # ruff: ignore[undocumented-public-method]
+    def storage_detaching(storage: Storage) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(f'{storage.name}_storage_detaching', storage=storage)
 
     @staticmethod
     @_copy_doc(ops.PebbleReadyEvent)
-    def pebble_ready(container: Container):  # ruff: ignore[undocumented-public-method]
+    def pebble_ready(container: Container) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(f'{container.name}_pebble_ready', container=container)
 
     @staticmethod
     @_copy_doc(ops.PebbleCustomNoticeEvent)
-    def pebble_custom_notice(container: Container, notice: Notice):  # ruff: ignore[undocumented-public-method]
+    def pebble_custom_notice(container: Container, notice: Notice) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_custom_notice',
             container=container,
@@ -367,7 +434,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckFailedEvent)
-    def pebble_check_failed(container: Container, info: CheckInfo):  # ruff: ignore[undocumented-public-method]
+    def pebble_check_failed(container: Container, info: CheckInfo) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_check_failed',
             container=container,
@@ -376,7 +443,7 @@ class CharmEvents:
 
     @staticmethod
     @_copy_doc(ops.PebbleCheckRecoveredEvent)
-    def pebble_check_recovered(container: Container, info: CheckInfo):  # ruff: ignore[undocumented-public-method]
+    def pebble_check_recovered(container: Container, info: CheckInfo) -> EventProtocol:  # ruff: ignore[undocumented-public-method]
         return _Event(
             f'{container.name}_pebble_check_recovered',
             container=container,
@@ -389,7 +456,7 @@ class CharmEvents:
         name: str,
         params: Mapping[str, AnyJson] | None = None,
         id: str | None = None,
-    ):
+    ) -> EventProtocol:
         kwargs: dict[str, Any] = {}
         if params:
             kwargs['params'] = params
@@ -402,7 +469,7 @@ class CharmEvents:
         event: ops.BoundEvent,
         *args: Any,
         **kwargs: Any,
-    ):
+    ) -> EventProtocol:
         """Event triggered by a charm library.
 
         For example, suppose that a library uses a ``DatabaseRequirer`` object
@@ -850,7 +917,7 @@ class Context(Generic[CharmType]):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
-    def __call__(self, event: _Event, state: State) -> Manager[CharmType]:
+    def __call__(self, event: EventProtocol, state: State) -> Manager[CharmType]:
         """Context manager to introspect live charm object before and after the event is emitted.
 
         Usage::
@@ -877,7 +944,7 @@ class Context(Generic[CharmType]):
             'and find the results in `ctx.action_results`',
         )
 
-    def run(self, event: _Event, state: State) -> State:
+    def run(self, event: EventProtocol, state: State) -> State:
         """Trigger a charm execution with an event and a State.
 
         Calling this function will call ``ops.main`` and set up the context according to the
@@ -888,53 +955,7 @@ class Context(Generic[CharmType]):
         :arg state: the :class:`State` instance to use as data source for the hook command
             calls that the charm will invoke when handling the event.
         """
-        # Help people transition from Scenario 6:
-        if isinstance(event, str):
-            event = event.replace('-', '_')  # type: ignore
-            if event in (
-                'install',
-                'start',
-                'stop',
-                'remove',
-                'update_status',
-                'config_changed',
-                'upgrade_charm',
-                'pre_series_upgrade',
-                'post_series_upgrade',
-                'leader_elected',
-                'collect_app_status',
-                'collect_unit_status',
-            ):
-                suggested = f'{event}()'
-            elif event in ('secret_changed', 'secret_rotate'):
-                suggested = f'{event}(my_secret)'
-            elif event in ('secret_expired', 'secret_remove'):
-                suggested = f'{event}(my_secret, revision=1)'
-            elif event in (
-                'relation_created',
-                'relation_joined',
-                'relation_changed',
-                'relation_departed',
-                'relation_broken',
-            ):
-                suggested = f'{event}(my_relation)'
-            elif event in ('storage_attached', 'storage_detaching'):
-                suggested = f'{event}(my_storage)'
-            elif event == 'pebble_ready':
-                suggested = f'{event}(my_container)'
-            elif event == 'pebble_custom_notice':
-                suggested = f'{event}(my_container, my_notice)'
-            else:
-                suggested = 'event()'
-            raise TypeError(
-                f'call with an event from `ctx.on`, like `ctx.on.{suggested}`',
-            )
-        if callable(event):
-            raise TypeError(
-                'You should call the event method. Did you forget to add parentheses?',
-            )
-
-        with self._run(event=event, state=state) as ops:
+        with self._run(event=_as_event(event), state=state) as ops:
             ops.run()
         # We know that the output state will have been set by this point,
         # so let the type checkers know that too.

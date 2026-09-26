@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import re
 import typing
 from collections.abc import Mapping
 
 import pytest
+import scenario
 from scenario import Context
 from scenario.state import Container, Relation, State, _Event
 
@@ -311,3 +313,29 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+def test_events_satisfy_the_event_protocol(mycharm: type[ops.CharmBase]):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    event: scenario.EventProtocol = ctx.on.start()
+    assert isinstance(event, _Event)
+    assert event.name == 'start'
+    assert event.deferred(handler=mycharm._on_event).name == 'start'  # type: ignore
+
+
+def test_run_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
+    class NotAnEvent:
+        name = 'start'
+
+        def deferred(
+            self,
+            handler: typing.Callable[..., typing.Any],
+            event_id: int = 1,
+        ) -> scenario.DeferredEvent:
+            raise NotImplementedError()
+
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
+        # NotAnEvent satisfies EventProtocol, so this type-checks, but ctx.on
+        # is the only place an event can come from.
+        ctx.run(NotAnEvent(), State())
