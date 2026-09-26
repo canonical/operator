@@ -117,7 +117,7 @@ You'll write your charm in this directory.
 Next, use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make the directory available inside your virtual machine:
 
 ```text
-multipass mount --type native ~/k8s-tutorial juju-sandbox-k8s:~/fastapi-demo
+multipass mount --type native ~/k8s-tutorial juju-sandbox-k8s:fastapi-demo
 ```
 
 Finally, start your virtual machine and switch to your virtual machine:
