@@ -583,19 +583,22 @@ def patch_poetry(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> b
     return False
 
 
-def _declared_ops_extras(data: dict) -> set[str]:
-    """Collect the extras on every ops requirement that pyproject.toml declares."""
-    project = data.get('project', {})
-    requirements = list(project.get('dependencies', []))
-    for group in project.get('optional-dependencies', {}).values():
-        requirements.extend(group)
-    for group in data.get('dependency-groups', {}).values():
-        requirements.extend(r for r in group if isinstance(r, str))
+def _locked_ops_extras(node: object) -> set[str]:
+    """Collect the extras on every requirement on ops recorded in uv.lock.
+
+    The lock records the extras that other packages ask for too, such as a
+    charm library that depends on ops[tracing].
+    """
     extras: set[str] = set()
-    for requirement in requirements:
-        match = re.match(r'\s*ops\s*\[([^\]]*)\]', requirement)
-        if match:
-            extras.update(e.strip() for e in match.group(1).split(',') if e.strip())
+    if isinstance(node, dict):
+        if node.get('name') == 'ops':
+            for key in ('extra', 'extras'):
+                extras.update(node.get(key, []))
+        for value in node.values():
+            extras |= _locked_ops_extras(value)
+    elif isinstance(node, list):
+        for value in node:
+            extras |= _locked_ops_extras(value)
     return extras
 
 
@@ -607,8 +610,8 @@ def _override_uv_lock(charm_root: Path, wheels: dict[str, str]) -> bool:
     reinstalling the wheels in the tox environment doesn't reach it. An override
     replaces every requirement on the package, including one from another
     dependency, without adding the package where nothing requires it. It also
-    replaces the requirement's extras, so the ops override carries the extras
-    the charm asks for.
+    replaces the requirement's extras, so the ops override carries every extra
+    that the lock has on ops.
 
     Args:
         charm_root: Root directory of the charm
@@ -622,7 +625,7 @@ def _override_uv_lock(charm_root: Path, wheels: dict[str, str]) -> bool:
         print('  ✗ No pyproject.toml next to uv.lock')
         return False
     data = tomllib.loads(pyproject.read_text())
-    extras = _declared_ops_extras(data)
+    extras = _locked_ops_extras(tomllib.loads((charm_root / 'uv.lock').read_text()))
     uv_config = data.setdefault('tool', {}).setdefault('uv', {})
     overrides = [
         override
