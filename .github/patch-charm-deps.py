@@ -12,7 +12,7 @@
 This script handles multiple dependency management systems (pip, Poetry, uv)
 and updates them to use the specified version of ops and ops-scenario.
 
-Usage: patch-charm-deps.py <ops-wheel> <ops-scenario-wheel>
+Usage: patch-charm-deps.py <ops-wheel> <ops-scenario-wheel> [<ops-tracing-wheel>]
 """
 
 from __future__ import annotations
@@ -236,68 +236,80 @@ def update_python_version_requirements(charm_root: Path) -> None:
         update_python_version_file(python_version_file, charm_root)
 
 
-# Handle tox-uv
-
-
-def _detect_tox_uv_ini(config: configparser.ConfigParser) -> bool:
-    """Detect if tox-uv is being used in a tox.ini config.
-
-    Args:
-        config: Parsed configparser object
-
-    Returns:
-        True if tox-uv is detected, False otherwise
-    """
-    for section in config.sections():
-        if config.has_option(section, 'runner') and 'uv-venv' in config.get(section, 'runner'):
-            return True
-        if config.has_option(section, 'package') and 'uv' in config.get(section, 'package'):
-            return True
-    return False
-
-
-def _detect_tox_uv_toml(data: dict) -> bool:
-    """Detect if tox-uv is being used in a tox.toml config.
-
-    Args:
-        data: Parsed TOML data
-
-    Returns:
-        True if tox-uv is detected, False otherwise
-    """
-    if 'env_run_base' in data:
-        env_base = data['env_run_base']
-        if 'runner' in env_base and 'uv-venv' in str(env_base['runner']):
-            return True
-        if 'package' in env_base and 'uv' in str(env_base['package']):
-            return True
-
-    if 'env' not in data:
-        return False
-
-    for env_data in data['env'].values():
-        if 'runner' in env_data and 'uv-venv' in str(env_data['runner']):
-            return True
-        if 'package' in env_data and 'uv' in str(env_data['package']):
-            return True
-
-    return False
-
-
 # Adjust tox to install the version of ops[...] that we want.
+
+# Commands that install a charm's locked dependencies into the tox environment,
+# and would put the locked ops back over the wheel if they ran after it.
+_LOCKED_INSTALL_RE = re.compile(r'^\s*(poetry install|uv sync)\b')
+
+
+def _wheel_install_commands(ops_wheel: str, ops_scenario_wheel: str) -> list[list[str]]:
+    """Commands that force-install the ops wheels into the tox environment.
+
+    These use uv rather than pip: an environment that tox-uv creates has no pip
+    of its own, so a bare `pip` would be the system one, installing the wheels
+    outside the environment. tox sets VIRTUAL_ENV for its commands, which is
+    where `uv pip` installs. Dependencies are installed as well, since a charm
+    locked to an older ops won't have everything the new one needs.
+    """
+    return [
+        [
+            'uv',
+            'pip',
+            'install',
+            '--reinstall-package',
+            'ops',
+            '--reinstall-package',
+            'ops-scenario',
+            ops_wheel,
+            ops_scenario_wheel,
+        ]
+    ]
+
+
+def _insert_after_locked_installs_ini(commands: str, new_lines: list[str]) -> str:
+    """Insert new_lines after the last locked install in an INI commands value."""
+    lines = commands.split('\n')
+    last = None
+    i = 0
+    while i < len(lines):
+        first = i
+        while lines[i].rstrip().endswith('\\') and i + 1 < len(lines):
+            i += 1
+        if _LOCKED_INSTALL_RE.match(lines[first]):
+            last = i
+        i += 1
+    if last is None:
+        return commands
+    return '\n'.join(lines[: last + 1] + new_lines + lines[last + 1 :])
+
+
+def _insert_after_locked_installs_toml(
+    commands: list[list[str]], new_commands: list[list[str]]
+) -> list[list[str]]:
+    """Insert new_commands after the last locked install in a TOML commands list."""
+    last = None
+    for i, command in enumerate(commands):
+        if isinstance(command, list) and _LOCKED_INSTALL_RE.match(' '.join(map(str, command))):
+            last = i
+    if last is None:
+        return commands
+    return commands[: last + 1] + new_commands + commands[last + 1 :]
 
 
 def add_tox_pip_commands_ini(
-    tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool
+    tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str
 ) -> None:
-    """Add pip to allowlist_externals and commands_pre to force-reinstall ops wheels (INI format).
+    """Add commands to force-reinstall the ops wheels to a tox.ini section.
+
+    The wheels are installed in commands_pre, and again after any command that
+    installs the charm's locked dependencies, such as `poetry install`.
 
     Args:
         tox_ini_path: Path to tox.ini
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        use_uv_pip: Whether to use 'uv pip install' instead of 'pip install'
     """
     config = configparser.ConfigParser()
     config.read(tox_ini_path)
@@ -306,28 +318,31 @@ def add_tox_pip_commands_ini(
         print(f'  Section [{section}] not found in tox.ini, skipping')
         return
 
-    print(f'  Adding pip to allowlist_externals and commands_pre in [{section}]')
+    print(f'  Adding uv to allowlist_externals and commands_pre in [{section}]')
 
-    pip_cmd = 'uv pip install' if use_uv_pip else 'pip install'
-
-    # Add pip to allowlist_externals.
     if config.has_option(section, 'allowlist_externals'):
         allowlist = config.get(section, 'allowlist_externals')
-        if 'pip' not in allowlist.split():
-            print('    Found existing allowlist_externals, appending pip')
-            config.set(section, 'allowlist_externals', allowlist + '\n    pip')
+        if 'uv' not in allowlist.split():
+            print('    Found existing allowlist_externals, appending uv')
+            config.set(section, 'allowlist_externals', allowlist + '\n    uv')
     else:
-        print('    Creating new allowlist_externals with pip')
-        config.set(section, 'allowlist_externals', 'pip')
+        print('    Creating new allowlist_externals with uv')
+        config.set(section, 'allowlist_externals', 'uv')
 
-    # Append to commands_pre (preserve existing commands like 'poetry install').
-    print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
-    new_commands = (
-        f'\n    {pip_cmd} --force-reinstall --no-deps {ops_wheel}'
-        f'\n    {pip_cmd} --no-deps {ops_scenario_wheel}'
-    )
+    new_lines = [
+        f'    {" ".join(command)}'
+        for command in _wheel_install_commands(ops_wheel, ops_scenario_wheel)
+    ]
+    print("    Adding commands_pre to force-reinstall ops 3.x (using 'uv pip install')")
     existing = config.get(section, 'commands_pre', fallback='')
-    config.set(section, 'commands_pre', existing + new_commands)
+    config.set(section, 'commands_pre', existing + '\n' + '\n'.join(new_lines))
+
+    if config.has_option(section, 'commands'):
+        commands = config.get(section, 'commands')
+        patched = _insert_after_locked_installs_ini(commands, new_lines)
+        if patched != commands:
+            print('    Reinstalling the wheels after the locked install in commands')
+            config.set(section, 'commands', patched)
 
     with open(tox_ini_path, 'w') as f:
         config.write(f)
@@ -349,19 +364,15 @@ def _patch_tox_testenv_sections_toml(
     with open(tox_config, 'rb') as f:
         data = tomllib.load(f)
 
-    use_uv_pip = _detect_tox_uv_toml(data)
-    if use_uv_pip:
-        print("  Detected tox-uv, will use 'uv pip install'")
-
     # Patch env_run_base (equivalent to [testenv]).
     if 'env_run_base' in data:
-        add_tox_pip_commands_toml(tox_config, 'testenv', ops_wheel, ops_scenario_wheel, use_uv_pip)
+        add_tox_pip_commands_toml(tox_config, 'testenv', ops_wheel, ops_scenario_wheel)
 
     # Patch specific envs.
     if 'env' in data:
         for env_name in data['env']:
             add_tox_pip_commands_toml(
-                tox_config, f'testenv:{env_name}', ops_wheel, ops_scenario_wheel, use_uv_pip
+                tox_config, f'testenv:{env_name}', ops_wheel, ops_scenario_wheel
             )
 
     return True
@@ -383,17 +394,13 @@ def _patch_tox_testenv_sections_ini(
     config = configparser.ConfigParser()
     config.read(tox_config)
 
-    use_uv_pip = _detect_tox_uv_ini(config)
-    if use_uv_pip:
-        print("  Detected tox-uv, will use 'uv pip install'")
-
     # Find all testenv sections.
     testenv_sections = [s for s in config.sections() if s.startswith('testenv')]
     if not testenv_sections:
         return False
 
     for section in testenv_sections:
-        add_tox_pip_commands_ini(tox_config, section, ops_wheel, ops_scenario_wheel, use_uv_pip)
+        add_tox_pip_commands_ini(tox_config, section, ops_wheel, ops_scenario_wheel)
 
     return True
 
@@ -415,18 +422,18 @@ def patch_tox_testenv_sections(charm_root: Path, ops_wheel: str, ops_scenario_wh
 
 
 def add_tox_pip_commands_toml(
-    tox_toml_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str, use_uv_pip: bool
+    tox_toml_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str
 ) -> None:
-    """Add pip to allowlist_externals and commands_pre to force-reinstall ops wheels.
+    """Add commands to force-reinstall the ops wheels to a tox.toml section.
 
-    This function handles TOML format tox configuration files.
+    The wheels are installed in commands_pre, and again after any command that
+    installs the charm's locked dependencies, such as `poetry install`.
 
     Args:
         tox_toml_path: Path to tox.toml
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        use_uv_pip: Whether to use 'uv pip install' instead of 'pip install'
     """
     with open(tox_toml_path, 'rb') as f:
         data = tomllib.load(f)
@@ -451,45 +458,30 @@ def add_tox_pip_commands_toml(
         current = current[key]
 
     toml_section = '.'.join(section_keys)
-    print(f'  Adding pip to allowlist_externals and commands_pre in [{toml_section}]')
+    print(f'  Adding uv to allowlist_externals and commands_pre in [{toml_section}]')
 
-    pip_cmd = 'uv pip install' if use_uv_pip else 'pip install'
-    modified = False
-
-    # Update allowlist_externals.
     if 'allowlist_externals' not in current:
-        print('    Creating new allowlist_externals with pip')
-        current['allowlist_externals'] = ['pip']
-        modified = True
-    elif 'pip' not in current['allowlist_externals']:
-        print('    Found existing allowlist_externals, appending pip')
-        current['allowlist_externals'].append('pip')
-        modified = True
-    else:
-        print('      pip already in allowlist_externals, skipping')
+        print('    Creating new allowlist_externals with uv')
+        current['allowlist_externals'] = ['uv']
+    elif 'uv' not in current['allowlist_externals']:
+        print('    Found existing allowlist_externals, appending uv')
+        current['allowlist_externals'].append('uv')
 
-    # Update commands_pre (tox 4 TOML format requires list-of-lists).
-    pip_args = ['uv', 'pip', 'install'] if use_uv_pip else ['pip', 'install']
-    new_commands = [
-        [*pip_args, '--force-reinstall', '--no-deps', ops_wheel],
-        [*pip_args, '--no-deps', ops_scenario_wheel],
-    ]
-    if 'commands_pre' not in current:
-        print(f"    Adding commands_pre to force-reinstall ops 3.x (using '{pip_cmd}')")
-        current['commands_pre'] = new_commands
-        modified = True
-    else:
-        print(f"    Appending to existing commands_pre (using '{pip_cmd}')")
-        existing = current['commands_pre']
-        if isinstance(existing, list):
-            current['commands_pre'] = existing + new_commands
-        else:
-            current['commands_pre'] = new_commands
-        modified = True
+    # tox 4 TOML format requires a list of lists for commands.
+    new_commands = _wheel_install_commands(ops_wheel, ops_scenario_wheel)
+    print("    Adding commands_pre to force-reinstall ops 3.x (using 'uv pip install')")
+    existing = current.get('commands_pre')
+    current['commands_pre'] = (existing if isinstance(existing, list) else []) + new_commands
 
-    if modified:
-        with open(tox_toml_path, 'wb') as f:
-            tomli_w.dump(data, f)
+    commands = current.get('commands')
+    if isinstance(commands, list):
+        patched = _insert_after_locked_installs_toml(commands, new_commands)
+        if patched != commands:
+            print('    Reinstalling the wheels after the locked install in commands')
+            current['commands'] = patched
+
+    with open(tox_toml_path, 'wb') as f:
+        tomli_w.dump(data, f)
 
 
 def _is_ops_dependency_line(line: str) -> bool:
@@ -591,86 +583,76 @@ def patch_poetry(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> b
     return False
 
 
-def _patch_uv_deps_directly(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
-    """Patch uv dependencies directly via uv CLI when no tox config exists.
+def _declared_ops_extras(data: dict) -> set[str]:
+    """Collect the extras on every ops requirement that pyproject.toml declares."""
+    project = data.get('project', {})
+    requirements = list(project.get('dependencies', []))
+    for group in project.get('optional-dependencies', {}).values():
+        requirements.extend(group)
+    for group in data.get('dependency-groups', {}).values():
+        requirements.extend(r for r in group if isinstance(r, str))
+    extras: set[str] = set()
+    for requirement in requirements:
+        match = re.match(r'\s*ops\s*\[([^\]]*)\]', requirement)
+        if match:
+            extras.update(e.strip() for e in match.group(1).split(',') if e.strip())
+    return extras
+
+
+def _override_uv_lock(charm_root: Path, wheels: dict[str, str]) -> bool:
+    """Override ops and its companions with the wheels in pyproject.toml, and relock.
+
+    With uv.lock pointing at the wheels, `uv sync` and `uv run` install them too,
+    and `uv run` uses the project's own environment rather than tox's, so
+    reinstalling the wheels in the tox environment doesn't reach it. An override
+    replaces every requirement on the package, including one from another
+    dependency, without adding the package where nothing requires it. It also
+    replaces the requirement's extras, so the ops override carries the extras
+    the charm asks for.
 
     Args:
         charm_root: Root directory of the charm
-        ops_wheel: Path to ops wheel file
-        ops_scenario_wheel: Path to ops-scenario wheel file
+        wheels: Path to the wheel for each package name
 
     Returns:
-        True if patched successfully, False otherwise
+        True if uv.lock was updated, False otherwise
     """
-    print('  No tox config found, patching dependencies directly via uv CLI')
-
-    # Read pyproject.toml to find which groups contain ops-scenario.
     pyproject = charm_root / 'pyproject.toml'
-    scenario_groups: list[str] = []
-    if pyproject.exists():
-        data = tomllib.loads(pyproject.read_text())
-        # Check dependency-groups for ops-scenario.
-        scenario_groups = [
-            group_name
-            for group_name, group_deps in data.get('dependency-groups', {}).items()
-            for dep in group_deps
-            if isinstance(dep, str) and re.match(r'^ops-scenario\b', dep)
-        ]
-
-    # Remove existing ops deps (ignore errors - they may not exist).
-    for dep_name in ('ops[testing]', 'ops'):
-        subprocess.run(
-            ['uv', 'remove', dep_name, '--frozen'],
-            cwd=charm_root,
-            capture_output=True,
-            text=True,
+    if not pyproject.exists():
+        print('  ✗ No pyproject.toml next to uv.lock')
+        return False
+    data = tomllib.loads(pyproject.read_text())
+    extras = _declared_ops_extras(data)
+    uv_config = data.setdefault('tool', {}).setdefault('uv', {})
+    overrides = [
+        override
+        for override in uv_config.get('override-dependencies', [])
+        if re.split(r'[\s\[<>=~!@;]', override, maxsplit=1)[0] not in wheels
+    ]
+    for name, wheel in wheels.items():
+        name_with_extras = (
+            f'{name}[{",".join(sorted(extras))}]' if name == 'ops' and extras else name
         )
+        overrides.append(f'{name_with_extras} @ {Path(wheel).resolve().as_uri()}')
+    uv_config['override-dependencies'] = overrides
+    pyproject.write_text(tomli_w.dumps(data))
 
-    # Remove ops-scenario from all groups where it was found.
-    for group in scenario_groups:
-        subprocess.run(
-            ['uv', 'remove', 'ops-scenario', '--group', group, '--frozen'],
-            cwd=charm_root,
-            capture_output=True,
-            text=True,
-        )
-
-    # Add the ops wheel.
     result = subprocess.run(
-        ['uv', 'add', ops_wheel, '--raw-sources', '--prerelease=if-necessary-or-explicit'],
+        ['uv', 'lock', '--python-preference', 'system'],
         cwd=charm_root,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        print(f'    ✗ Failed to add ops wheel: {result.stderr.strip()}')
+        print(f'  ✗ Failed to lock with the ops wheels: {result.stderr.strip()}')
         return False
-    print('    ✓ Added ops wheel')
-
-    # Add the ops-scenario wheel to each group it was originally in.
-    scenario_add_targets = scenario_groups or [None]
-    for group in scenario_add_targets:
-        scenario_cmd = [
-            'uv',
-            'add',
-            ops_scenario_wheel,
-            '--raw-sources',
-            '--prerelease=if-necessary-or-explicit',
-        ]
-        if group:
-            scenario_cmd.extend(['--group', group])
-        result = subprocess.run(scenario_cmd, cwd=charm_root, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f'    ✗ Failed to add ops-scenario wheel: {result.stderr.strip()}')
-            # Still return True since ops was updated successfully.
-        else:
-            group_label = f' (group: {group})' if group else ''
-            print(f'    ✓ Added ops-scenario wheel{group_label}')
-
+    print(f'  ✓ Locked {", ".join(wheels)} to the wheels in uv.lock')
     return True
 
 
-def patch_uv(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
+def patch_uv(
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+) -> bool:
     """Patch uv-based charm dependencies.
 
     Returns:
@@ -678,14 +660,17 @@ def patch_uv(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
     """
     print('✓ Found uv-based charm')
 
-    # Try tox config first.
-    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel):
-        print('  Strategy: Force-reinstall wheels via tox after uv install')
-        print('    ✓ Updated tox config to force-reinstall ops 3.x wheels')
-        return True
+    wheels = {'ops': ops_wheel, 'ops-scenario': ops_scenario_wheel}
+    if ops_tracing_wheel:
+        wheels['ops-tracing'] = ops_tracing_wheel
+    if not _override_uv_lock(charm_root, wheels):
+        return False
 
-    # No tox config - patch deps directly via uv CLI.
-    return _patch_uv_deps_directly(charm_root, ops_wheel, ops_scenario_wheel)
+    # tox environments that install dependency groups or deps with `uv pip`
+    # don't go through the lock, so reinstall the wheels there as well.
+    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel):
+        print('    ✓ Updated tox config to force-reinstall ops 3.x wheels')
+    return True
 
 
 def main() -> int:
@@ -695,6 +680,9 @@ def main() -> int:
     )
     parser.add_argument('ops_wheel', help='Path to ops wheel file')
     parser.add_argument('ops_scenario_wheel', help='Path to ops-scenario wheel file')
+    parser.add_argument(
+        'ops_tracing_wheel', nargs='?', help='Path to ops-tracing wheel file (optional)'
+    )
     parser.add_argument(
         '--charm-root',
         type=Path,
@@ -708,6 +696,8 @@ def main() -> int:
     print('Patching charm dependencies for newer ops compatibility testing')
     print(f'OPS WHEEL: {args.ops_wheel}')
     print(f'OPS-SCENARIO WHEEL: {args.ops_scenario_wheel}')
+    if args.ops_tracing_wheel:
+        print(f'OPS-TRACING WHEEL: {args.ops_tracing_wheel}')
     print('=========================================')
 
     # Update Python version requirements.
@@ -726,7 +716,9 @@ def main() -> int:
 
     # 3. Handle uv-based charms.
     elif (args.charm_root / 'uv.lock').exists():
-        updated = patch_uv(args.charm_root, args.ops_wheel, args.ops_scenario_wheel)
+        updated = patch_uv(
+            args.charm_root, args.ops_wheel, args.ops_scenario_wheel, args.ops_tracing_wheel
+        )
 
     else:
         updated = False
