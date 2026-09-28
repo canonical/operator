@@ -1744,7 +1744,9 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     """
     origin = typing.get_origin(tp)
     if origin is None:
-        return _coerce_class(tp, value)
+        # Any, TypeVars, NewTypes and the like aren't classes, so there is
+        # nothing to build.
+        return _coerce_class(tp, value) if isinstance(tp, type) else value  # pyright: ignore[reportUnknownVariableType]
     args = typing.get_args(tp)
     if origin is typing.Union or origin is types.UnionType:
         return _coerce_union(tp, args, value)
@@ -1756,13 +1758,11 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     return value
 
 
-def _coerce_class(tp: Any, value: Any) -> Any:
-    """Coerce ``value`` against a bare class ``tp`` (no type arguments).
+def _coerce_class(tp: type[_T], value: Any) -> _T:
+    """Coerce ``value`` against a class ``tp`` with no type arguments.
 
     Builds a dataclass or enum; any other class is passed through as-is.
     """
-    if not isinstance(tp, type):
-        return value
     if dataclasses.is_dataclass(tp):
         if isinstance(value, tp):
             # Already the class we want, for example built by a custom
