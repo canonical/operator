@@ -40,7 +40,7 @@ jobs:
           - name: Prepare the artifacts
             run: |
               cd scanner
-              ./sbomber prepare ../.sbomber-manifest-${{ matrix.manifest }}.yaml
+              ./sbomber prepare ../.github/sbomber-manifest-${{ matrix.manifest }}.yaml
           - name: Submit the artifacts
             run: |
               cd scanner

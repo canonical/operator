@@ -152,7 +152,7 @@ You'll write your charm in this directory.
 Next, use the Multipass {external+multipass:ref}`mount <reference-command-line-interface-mount>` command to make the directory available inside your virtual machine:
 
 ```text
-multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:~/tinyproxy
+multipass mount --type native ~/tinyproxy-tutorial juju-sandbox:tinyproxy
 ```
 
 Finally, start your virtual machine and switch to your virtual machine:
