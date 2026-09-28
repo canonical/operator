@@ -2871,6 +2871,31 @@ class TestModelBindings:
         assert dict(relation.data[model.unit]) == {}
         assert dict(relation.data[model.app]) == {}
 
+    def test_gone_peer_relation_follower_reads_app_databag(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, root_logging: None
+    ):
+        """A peer app databag is readable by every unit, so a refusal means it's gone."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        meta = ops.CharmMeta()
+        meta.relations = {
+            'peer1': ops.RelationMeta(
+                ops.RelationRole.peer, 'peer1', {'interface': 'peer1', 'scope': 'global'}
+            ),
+        }
+        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        fake_script.write(
+            'relation-ids', """([ "$1" = peer1 ] && echo '["peer1:2"]') || echo '[]'"""
+        )
+        fake_script.write('relation-list', """echo '[]'""")
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        relation = model.get_relation('peer1')
+        assert relation is not None
+        assert dict(relation.data[model.app]) == {}
+        assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
 
 _MetricAndLabelPair = tuple[dict[str, float], dict[str, str]]
 
@@ -3090,10 +3115,9 @@ class TestModelBackend:
         still exists, so reporting it as a gone relation would swallow an
         authorisation failure and lose the security event.
 
-        A follower can get here while ops believes it is the leader -
-        `is_leader` caches for the lease renewal period, and a write from
-        outside an observed event handler isn't checked for leadership at all -
-        so the model-level guard passing doesn't mean Juju will accept it.
+        ops checks leadership before a write while it is running the charm's
+        `__init__` or an event handler, so a follower only gets here when the
+        backend is called outside those.
         """
         monkeypatch.setenv('JUJU_VERSION', '3.6.28')
         backend = _ModelBackend('myapp/0')
