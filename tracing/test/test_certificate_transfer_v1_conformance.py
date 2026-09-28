@@ -168,7 +168,7 @@ def test_requirer_ignores_unknown_provider_keys(
 # Requirer clause, verbatim (version half):
 #   "Is expected to provide 1 as a version number ..."
 #
-# A dual v0/v1 provider (LIBPATCH 15+ of the vendored library) uses this to
+# A dual v0/v1 provider (LIBPATCH 15+ of the library) uses this to
 # decide whether to publish v1 (app databag ``certificates``) or fall back to
 # v0 (unit databag ``ca``/``certificate``/``chain``). We write it on
 # ``-created`` on the leader only.
