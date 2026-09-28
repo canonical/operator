@@ -28,6 +28,7 @@ coverage.xml
 ops_scenario.egg-info
 /testing/build/
 /testing/dist/
+*.whl
 
 # Smoke test artifacts
 *.tar.gz
