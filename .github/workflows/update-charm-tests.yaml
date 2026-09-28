@@ -59,4 +59,8 @@ jobs:
     needs: [update-pins]
     permissions:
       issues: write
+      actions: read  # for ai-failure-enrich.yaml
+    secrets:
+      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     uses: ./.github/workflows/notify-scheduled-failure.yaml

@@ -38,7 +38,7 @@ For a hands-on introduction to charm development with Ops, try our tutorials:
 :class: top-aligned
 
 * - **Starting a project**
-  - [Manage charms](howto/manage-charms) • [Initialise your project](howto/initialise-your-project) • [Write and structure charm code](howto/write-and-structure-charm-code)
+  - [Manage charms](howto/manage-charms) • [Choose your tool versions](explanation/versions) • [Initialise your project](howto/initialise-your-project) • [Write and structure charm code](howto/write-and-structure-charm-code)
 * - **Running workloads**
   - [Manage packages on machines](howto/run-workloads-with-a-charm-machines) • [Manage Kubernetes workloads](howto/manage-containers/index)
 * - **Adding functionality**
@@ -69,7 +69,7 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
   - The CLI tool for initialising charms, packing charms, and interacting with [Charmhub](https://charmhub.io/). You'll find the {external+charmcraft:ref}`charmcraft.yaml specification <charmcraft-yaml-file>` especially helpful.
 * - **{external+charmlibs:doc}`Charmlibs <index>`**
   - A listing of charm libraries and guidance on how to distribute your own libraries.
-* - **[Concierge](https://github.com/canonical/concierge)**
+* - **{external+concierge:doc}`Concierge <index>`**
   - A CLI tool for setting up charm development environments.
 * - **{external+jubilant:doc}`Jubilant <index>`**
   - A Python library that wraps the Juju CLI. Use Jubilant together with [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) for your integration tests.

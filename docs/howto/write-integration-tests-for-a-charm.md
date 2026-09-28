@@ -23,7 +23,7 @@ multipass launch --cpus 4 --memory 8G --disk 50G --name juju-sandbox 24.04
 multipass shell juju-sandbox  # Switch to your virtual machine.
 ```
 
-Then use [Concierge](https://github.com/canonical/concierge) to set up a Juju controller inside your virtual machine:
+Then use {external+concierge:doc}`Concierge <index>` to set up a Juju controller inside your virtual machine:
 
 ```text
 sudo snap install --classic concierge
@@ -57,7 +57,7 @@ If your virtual machine gets into an undesirable state, use {external+multipass:
 With your virtual machine stopped, make your project directory available inside your virtual machine, then start your virtual machine:
 
 ```text
-multipass mount --type native /path/to/my-charm juju-sandbox:~/my-charm
+multipass mount --type native /path/to/my-charm juju-sandbox:my-charm
 multipass shell juju-sandbox
 ```
 

@@ -70,7 +70,7 @@ jobs:
 (set-up-ci-integration)=
 ## Run integration tests in CI
 
-Integration tests require a Juju controller and a cloud in which to deploy your charm. We recommend that you use [Concierge](https://github.com/canonical/concierge) to prepare the CI environment.
+Integration tests require a Juju controller and a cloud in which to deploy your charm. We recommend that you use {external+concierge:doc}`Concierge <index>` to prepare the CI environment.
 
 If your charm is a Kubernetes charm, add the following job to `.github/workflows/ci.yaml`:
 
