@@ -40,7 +40,7 @@ The charm should follow documented [best practices](#follow-best-practices).
 
 ### Use the evaluation tool to get more details
 
-Use the evaluation tool to see the list of requirements that will be used in the review, and have some automatically checked. The tool clones the repository itself, so you can run it from any directory. It reviews what has been pushed to the default branch, not your local changes (use `--branch` to review a different branch):
+Use the evaluation tool to see the list of requirements that will be used in the review, and have some automatically checked. The tool clones the repository itself, so you can run it from any directory:
 
 ```bash
 uvx --from charmhub-listing-review self-review \
@@ -48,7 +48,9 @@ uvx --from charmhub-listing-review self-review \
   --repository <repository-url>
 ```
 
-This will provide you with information about the full listing criteria, and, for those that can be checked automatically, whether the charm currently passes.
+This provides information about the full listing criteria, and, for those that can be checked automatically, whether the charm currently passes.
+
+The tool reviews what has been pushed to the default branch, not your local changes. Use `--branch` to review a different branch.
 
 ## 2. Request a review
 
