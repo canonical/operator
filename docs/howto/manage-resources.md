@@ -84,7 +84,9 @@ ctx = testing.Context(
     MyCharm,
     meta={
         'name': 'my-charm',
-        'resources': {'my-resource': {'type': 'file', 'filename': 'somefile.txt'}},
+        'resources': {
+            'my-resource': {'type': 'file', 'filename': 'somefile.txt'}
+        },
     },
 )
 resource = testing.Resource(name='my-resource', path='/path/to/somefile.txt')
