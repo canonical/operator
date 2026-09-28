@@ -2378,8 +2378,8 @@ class DeferredEvent:
 class EventProtocol(Protocol):
     """The shape of the event objects that :class:`CharmEvents` produces.
 
-    Get an event by calling the appropriate method of the ``on`` attribute of
-    the :class:`Context`, and pass it to :meth:`Context.run`. For example::
+    Get an event by calling the appropriate method of :attr:`Context.on`, and
+    pass it to :meth:`Context.run`. For example::
 
         ctx = Context(MyCharm)
         ctx.run(ctx.on.start(), State())
@@ -2400,10 +2400,14 @@ class EventProtocol(Protocol):
     def name(self) -> str:
         """Full event name, in Python-attribute form (as ops names the event).
 
-        Consists of a 'prefix' and a 'suffix'. The suffix denotes the type of
-        the event, the prefix the name of the entity the event is about.
-        Hyphens in the entity name are translated to underscores, so an event
-        for relation endpoint ``foo-bar`` has the name ``foo_bar_relation_changed``.
+        For Juju events, this is the Juju hook name with hyphens replaced by
+        underscores. The name consists of a prefix, naming the entity the event
+        is about, and a suffix, denoting the type of event. For example, a
+        change on relation endpoint ``foo-bar`` runs the Juju hook
+        ``foo-bar-relation-changed``, and the event name is
+        ``foo_bar_relation_changed``: the prefix is ``foo_bar`` and the suffix
+        is ``relation_changed``. Events that are not about an entity, such as
+        ``update_status``, have no prefix.
         """
         ...
 
