@@ -66,7 +66,7 @@ class PostgresCharm(ops.CharmBase):
             logger.warning('The http-test has started failing!')
             self.unit.status = ops.ActiveStatus('Degraded functionality ...')
 
-        elif event.info == 'online':
+        elif event.info.name == 'online':
             logger.error('The service is no longer online!')
 
     def _on_pebble_check_recovered(self, event: ops.PebbleCheckRecoveredEvent):
@@ -74,7 +74,7 @@ class PostgresCharm(ops.CharmBase):
             logger.warning('The http-test has stopped failing!')
             self.unit.status = ops.ActiveStatus()
 
-        elif event.info == 'online':
+        elif event.info.name == 'online':
             logger.error('The service is online again!')
 ```
 
@@ -161,14 +161,25 @@ This means you should not usually have a `level=alive` check for a service in a 
 
 > Added in ops 2.17
 
-To test charms that use Pebble check events, use the `CheckInfo` class and then emit the appropriate event. For example, to simulate the "http-test" check failing, the charm test could do the following:
+To test charms that use Pebble check events, use the `CheckInfo` class and then emit the appropriate event. For example, to simulate the "http-test" check failing in the first charm above, the charm test could do the following:
 
 ```python
 import ops
 from ops import testing
 
+
 def test_http_check_failing():
     ctx = testing.Context(PostgresCharm)
+    layer = ops.pebble.Layer({
+        'checks': {
+            'http-test': {
+                'override': 'replace',
+                'startup': 'enabled',
+                'threshold': 3,
+                'http': {'url': 'http://localhost:8080/test'},
+            },
+        },
+    })
     check_info = testing.CheckInfo(
         'http-test',
         failures=3,
@@ -177,13 +188,20 @@ def test_http_check_failing():
         startup=layer.checks['http-test'].startup,
         threshold=layer.checks['http-test'].threshold,
     )
-    layer = ops.pebble.Layer({
-        'checks': {'http-test': {'override': 'replace', 'startup': 'enabled', 'failures': 3}},
-    })
-    container = testing.Container('db', check_infos={check_info}, layers={'layer1': layer})
+    container = testing.Container(
+        'db', check_infos={check_info}, layers={'layer1': layer}
+    )
     state_in = testing.State(containers={container})
 
-    state_out = ctx.run(ctx.on.pebble_check_failed(container, info=check_info), state_in)
+    state_out = ctx.run(
+        ctx.on.pebble_check_failed(container, info=check_info), state_in
+    )
 
-    assert state_out...
+    assert state_out.unit_status == testing.ActiveStatus(
+        'Degraded functionality ...'
+    )
 ```
+
+Define the layer before the `CheckInfo`, so that the check's `level`, `startup` and `threshold` come from the same place the charm gets them from. The container's plan must contain the check, otherwise `ops.testing` reports an inconsistent state.
+
+`threshold` is the number of errors in a row that the check tolerates, and belongs in the layer. `failures` is the number of errors the check has had so far, and is only ever reported back in a `CheckInfo`, so don't put it in the layer.
