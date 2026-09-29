@@ -3571,6 +3571,13 @@ class _ModelBackend:
         if self._is_recursive.get():
             # Either `juju-log` hook command failed or there's a bug in ops.
             return
+        is_leader = None
+        if self._leader_check_time is not None:
+            time_since_check = datetime.timedelta(
+                seconds=time.monotonic() - self._leader_check_time
+            )
+            if time_since_check <= self.LEASE_RENEWAL_PERIOD:
+                is_leader = self._is_leader
         # Logs are collected via log integration, omit the subprocess calls that push
         # the same content to juju from telemetry.
         mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
@@ -3584,7 +3591,7 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
                 yield
         except hookcmds.Error as e:
-            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr, is_leader=is_leader)
             if (
                 cmd.startswith(('relation-', 'network-'))
                 and 'relation not found' in e.stderr.lower()
@@ -3594,7 +3601,9 @@ class _ModelBackend:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
 
-    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+    def _check_for_security_event(
+        self, cmd: str, returncode: int, stderr: str, *, is_leader: bool | None = None
+    ):
         authz_messages = (
             'access denied',
             'permission denied',
@@ -3604,7 +3613,7 @@ class _ModelBackend:
         if not any(message in stderr.lower() for message in authz_messages):
             return
         base_cmd = os.path.basename(cmd)
-        leadership = ' (as leader)' if self.is_leader() else ''
+        leadership = ' (as leader)' if is_leader else ''
         description = (
             f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
             f'{stderr.strip()!r}. '
@@ -3727,11 +3736,9 @@ class _ModelBackend:
             time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
             if time_since_check <= self.LEASE_RENEWAL_PERIOD:
                 return self._is_leader
-        # Current time MUST be saved before running is-leader to ensure the cache
-        # is only used inside the window that is-leader itself asserts.
-        self._leader_check_time = now
         with self._wrap_hookcmd('is-leader'):
             self._is_leader = hookcmds.is_leader()
+        self._leader_check_time = now  # Only store refreshed lease on success.
         return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:
