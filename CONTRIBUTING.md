@@ -285,12 +285,12 @@ Run the ["Propose a release"](https://github.com/canonical/operator/actions/work
 
 > The version comes from the last tag, and never from `ops/version.py`. Between releases that file holds a development version left behind by the last post-release bump, which is a guess rather than something we shipped. The tag is also where the changelog starts, so the two can't drift apart.
 
-The workflow writes the `CHANGES.md` entry, updates the version strings across `ops`, `ops-scenario`, `ops-tracing` and the tool-versions table, runs `uv lock`, drafts the release notes, and opens a PR from a `release-prep-X.Y.Z` branch, titled "chore: update changelog and versions for X.Y.Z release".
+The workflow writes the `CHANGES.md` entry, updates the version strings across `ops`, `ops-scenario`, `ops-tracing` and the tool-versions table, runs `uv lock`, drafts the release title and notes, and opens a PR from a `release-prep-X.Y.Z` branch, titled "chore: update changelog and versions for X.Y.Z release".
 
 Review both halves of it, because they are different jobs:
 
 - The diff: the version strings, the changelog entry, and the lockfile.
-- The release notes, which are in the PR description between `<!-- release-notes:start -->` and `<!-- release-notes:end -->`. Edit them there, in the description: that is where the next workflow reads them from. Everything outside the markers is for reviewers and goes no further.
+- The release title and notes, which are in the PR description. The title is the version followed by the summary between `<!-- release-title:start -->` and `<!-- release-title:end -->`: write only the summary, since the version is added for you, and leave the placeholder in if you want the title to be just the version. The notes are between `<!-- release-notes:start -->` and `<!-- release-notes:end -->`. Edit both there, in the description: that is where the next workflow reads them from. Everything outside the markers is for reviewers and goes no further.
 
 > The PR is opened with the workflow's own token, so GitHub won't start the usual checks on it. Close and reopen the PR to get them to run.
 
@@ -300,7 +300,7 @@ Wait for the checks to pass, then merge. If they don't pass at the tip of the br
 
 Merging the PR starts the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow. It runs on every push to `main` and to the maintenance branches, and decides that a push is a release when it leaves `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. Every other push, the post-release bump included, stops there quietly.
 
-For a release, it takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release named for the version. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
+For a release, it takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
 
 This is where somebody reads the notes as a reader will see them, which is a different act from reviewing a diff. Read them, edit the release body if it needs it, and then:
 

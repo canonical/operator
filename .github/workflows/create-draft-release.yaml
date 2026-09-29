@@ -2,9 +2,10 @@
 name: Create the draft release
 
 # The second of the three release workflows: turn the merge of the
-# version-bump pull request into a draft GitHub release, whose body is the
-# release notes from that pull request's description followed by this
-# version's section of CHANGES.md.
+# version-bump pull request into a draft GitHub release, titled with the
+# version and the summary from that pull request's description, whose body is
+# the release notes from the same description followed by this version's
+# section of CHANGES.md and a link comparing it with the previous release.
 #
 # Four things are worth knowing before reading the steps:
 #
@@ -44,7 +45,7 @@ permissions: {}
 env:
   # The team's release tools, pinned to a commit rather than a branch.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@a9337d7d95edd9079bc3617b7699f404fa278456#subdirectory=changelog
 
 # One release at a time per branch. Two runs of this would race to create
 # the same release, and the loser's error would be the confusing one.
@@ -126,20 +127,38 @@ jobs:
             > "$RUNNER_TEMP/pr-description.md"
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Assemble the release body
+      - name: Assemble the release title and body
+        id: assemble
         if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
         run: |
           set -euo pipefail
+
+          # The previous release is the last tag in this commit's history:
+          # this version's own tag doesn't exist until the draft is published.
+          # Without one the body just has no compare link at the end.
+          compare=()
+          if previous=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' HEAD); then
+            compare=(--compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$VERSION")
+          else
+            echo "::warning::No earlier release tag to compare $VERSION with; the body has no Full Changelog link."
+          fi
           uvx --from "$CHANGELOG" changelog release-body --version "$VERSION" --changes CHANGES.md \
-            < "$RUNNER_TEMP/pr-description.md" > "$RUNNER_TEMP/release-body.md"
+            "${compare[@]}" < "$RUNNER_TEMP/pr-description.md" > "$RUNNER_TEMP/release-body.md"
+
+          # Never fails: with no summary to use, the title is the bare version,
+          # and the reason goes to the log.
+          title=$(uvx --from "$CHANGELOG" changelog release-title --version "$VERSION" \
+            < "$RUNNER_TEMP/pr-description.md")
+          echo "title=$title" >> "$GITHUB_OUTPUT"
 
       - name: Create the draft release
         id: release
         if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
+          TITLE: ${{ steps.assemble.outputs.title }}
           PRERELEASE: ${{ steps.detect.outputs.prerelease }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -165,7 +184,7 @@ jobs:
           # is not created: GitHub creates it against --target when somebody
           # publishes the draft.
           url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --draft --target "$GITHUB_SHA" --title "$VERSION" \
+            --draft --target "$GITHUB_SHA" --title "$TITLE" \
             --notes-file "$RUNNER_TEMP/release-body.md" "${flags[@]}")
           echo "Drafted $url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -174,15 +193,17 @@ jobs:
         if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
+          TITLE: ${{ steps.assemble.outputs.title }}
           NUMBER: ${{ steps.pull-request.outputs.number }}
           URL: ${{ steps.release.outputs.url }}
         run: |
           set -euo pipefail
           {
-            printf '## Draft release for %s\n\n' "$VERSION"
+            printf '## Draft release: %s\n\n' "$TITLE"
             printf '%s\n\n' "$URL"
-            printf 'Notes from #%s, changelog from `CHANGES.md`. Nothing is published and the' \
+            printf 'Title and notes from #%s, changelog from `CHANGES.md`. Nothing is published' \
               "$NUMBER"
+            printf ' and the'
             printf ' `%s` tag does not exist yet: publishing the draft is a human step, and it' \
               "$VERSION"
             printf ' is what creates the tag.\n\n'

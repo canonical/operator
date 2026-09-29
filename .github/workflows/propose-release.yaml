@@ -50,9 +50,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@a9337d7d95edd9079bc3617b7699f404fa278456#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@a9337d7d95edd9079bc3617b7699f404fa278456#subdirectory=draft-release-notes
 
   # The releases whose notes the model is shown, chosen for how they read
   # rather than for being the most recent: 2.23.4 for a fixes release, 3.8.1
@@ -195,8 +195,11 @@ jobs:
           set -euo pipefail
           : > "$RUNNER_TEMP/exemplars.md"
           for tag in $EXEMPLAR_TAGS; do
-            if body=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body); then
-              printf '## %s\n\n%s\n\n' "$tag" "$body" >> "$RUNNER_TEMP/exemplars.md"
+            # Headed with the release's title rather than its tag, so that the
+            # model sees how our titles read as well as our notes.
+            if release=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json name,body \
+              --jq '"## \(.name)\n\n\(.body)"'); then
+              printf '%s\n\n' "$release" >> "$RUNNER_TEMP/exemplars.md"
             else
               echo "::warning::No release found for $tag; drafting without it."
             fi
@@ -223,7 +226,8 @@ jobs:
             --changelog "$RUNNER_TEMP/changes-entry.md" \
             --exemplars "$RUNNER_TEMP/exemplars.md" \
             --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
-            --output "$RUNNER_TEMP/release-notes.md"
+            --output "$RUNNER_TEMP/release-notes.md" \
+            --title-output "$RUNNER_TEMP/release-title.md"
 
       - name: Write the pull request description
         env:
@@ -232,9 +236,10 @@ jobs:
           BRANCH: ${{ inputs.branch }}
         run: |
           set -euo pipefail
-          # The markers are how the next workflow lifts the notes back out of
-          # this description when it creates the draft release, so anything
-          # written outside them is for reviewers and goes no further.
+          # The markers are how the next workflow lifts the title's summary and
+          # the notes back out of this description when it creates the draft
+          # release, so anything written outside them is for reviewers and
+          # goes no further.
           {
             printf 'Prepares the %s release from `%s`.\n\n' "$VERSION" "$BRANCH"
             printf '* `CHANGES.md` has a new entry for %s.\n' "$VERSION"
@@ -242,8 +247,12 @@ jobs:
             printf ' ops-tracing and the tool-versions table.\n'
             printf '* [Commits since %s](%s/%s/compare/%s...%s)\n\n' \
               "$PREVIOUS" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS" "$BRANCH"
-            printf 'The release notes below become the body of the GitHub release.'
-            printf ' Edit them here: this description is where they are read from.\n\n'
+            printf 'The GitHub release is titled `%s: ` followed by the summary below,' "$VERSION"
+            printf ' and the release notes below that become its body.'
+            printf ' Edit both here: this description is where they are read from.\n\n'
+            printf '<!-- release-title:start -->\n\n'
+            cat "$RUNNER_TEMP/release-title.md"
+            printf '\n<!-- release-title:end -->\n\n'
             printf '<!-- release-notes:start -->\n\n'
             cat "$RUNNER_TEMP/release-notes.md"
             printf '\n<!-- release-notes:end -->\n'
@@ -261,7 +270,9 @@ jobs:
             printf 'Counted from the last tag on the branch, `%s`.\n\n' "$PREVIOUS"
             printf '<details><summary>Changelog entry</summary>\n\n'
             cat "$RUNNER_TEMP/changes-entry.md"
-            printf '\n</details>\n\n### Draft release notes\n\n'
+            printf '\n</details>\n\n### Draft release title\n\n%s: ' "$VERSION"
+            cat "$RUNNER_TEMP/release-title.md"
+            printf '\n### Draft release notes\n\n'
             cat "$RUNNER_TEMP/release-notes.md"
           } >> "$GITHUB_STEP_SUMMARY"
 
