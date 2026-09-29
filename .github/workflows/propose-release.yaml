@@ -50,9 +50,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=draft-release-notes
 
   # The releases whose notes the model is shown, chosen for how they read
   # rather than for being the most recent: 2.23.4 for a fixes release, 3.8.1

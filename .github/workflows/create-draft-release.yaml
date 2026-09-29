@@ -44,7 +44,7 @@ permissions: {}
 env:
   # The team's release tools, pinned to a commit rather than a branch.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@696a00b5660a52b54c27d421520a0817af4af901#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@86cda6e037c7b9913b7270585456e3b4ed0c9411#subdirectory=changelog
 
 # One release at a time per branch. Two runs of this would race to create
 # the same release, and the loser's error would be the confusing one.
