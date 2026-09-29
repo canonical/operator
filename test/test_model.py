@@ -2963,14 +2963,19 @@ class TestModelBackend:
         query = mock.Mock(side_effect=is_leader)
         monkeypatch.setattr(hookcmds, 'is_leader', query)
         assert backend.is_leader() is True
+        assert query.call_count == 1
         assert backend._leader_check_time == 100
+        assert backend._leader_check_time != now
         now = 130
         assert backend.is_leader() is True
         assert query.call_count == 1
+        assert backend._leader_check_time == 100
+        assert backend._leader_check_time != now
         now = 131
         assert backend.is_leader() is True
         assert query.call_count == 2
         assert backend._leader_check_time == 131
+        assert backend._leader_check_time != now
 
     def test_relation_hook_command_errors(
         self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch

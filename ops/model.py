@@ -3571,6 +3571,8 @@ class _ModelBackend:
         if self._is_recursive.get():
             # Either `juju-log` hook command failed or there's a bug in ops.
             return
+        # Save known leadership status at time of calling the hook command,
+        # for use in security event logging if the hook command fails.
         is_leader = None
         if self._leader_check_time is not None:
             time_since_check = datetime.timedelta(
