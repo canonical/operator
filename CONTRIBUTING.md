@@ -290,7 +290,7 @@ The workflow writes the `CHANGES.md` entry, updates the version strings across `
 Review both halves of it, because they are different jobs:
 
 - The diff: the version strings, the changelog entry, and the lockfile.
-- The release title and notes, which are in the PR description. The title is the version followed by the summary between `<!-- release-title:start -->` and `<!-- release-title:end -->`: write only the summary, since the version is added for you, and leave the placeholder in if you want the title to be just the version. The notes are between `<!-- release-notes:start -->` and `<!-- release-notes:end -->`. Edit both there, in the description: that is where the next workflow reads them from. Everything outside the markers is for reviewers and goes no further.
+- The release title and notes, which are in the PR description under the "Release title" and "Release notes" headings. The title is the version followed by the summary between `<!-- release-title:start -->` and `<!-- release-title:end -->`: write only the summary, since the version is added for you, and leave the placeholder in if you want the title to be just the version. The notes are between `<!-- release-notes:start -->` and `<!-- release-notes:end -->`. Edit both there, in the description: that is where the next workflow reads them from. Everything outside the markers is for reviewers and goes no further.
 
 > The PR is opened with the workflow's own token, so GitHub won't start the usual checks on it. Close and reopen the PR to get them to run.
 

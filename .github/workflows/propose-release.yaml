@@ -239,7 +239,9 @@ jobs:
           # The markers are how the next workflow lifts the title's summary and
           # the notes back out of this description when it creates the draft
           # release, so anything written outside them is for reviewers and
-          # goes no further.
+          # goes no further. They are HTML comments, which a reader of the
+          # pull request doesn't see, so each pair also gets a visible heading
+          # just outside it.
           {
             printf 'Prepares the %s release from `%s`.\n\n' "$VERSION" "$BRANCH"
             printf '* `CHANGES.md` has a new entry for %s.\n' "$VERSION"
@@ -247,12 +249,16 @@ jobs:
             printf ' ops-tracing and the tool-versions table.\n'
             printf '* [Commits since %s](%s/%s/compare/%s...%s)\n\n' \
               "$PREVIOUS" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$PREVIOUS" "$BRANCH"
-            printf 'The GitHub release is titled `%s: ` followed by the summary below,' "$VERSION"
-            printf ' and the release notes below that become its body.'
-            printf ' Edit both here: this description is where they are read from.\n\n'
+            printf 'The GitHub release is titled `%s: ` followed by the summary under' "$VERSION"
+            printf ' "Release title", and its body is the notes under "Release notes".'
+            printf ' Edit both here: this description is where they are read from.'
+            printf ' Each is wrapped in hidden markers, which you will see when you edit;'
+            printf ' keep them.\n\n'
+            printf '## Release title\n\n'
             printf '<!-- release-title:start -->\n\n'
             cat "$RUNNER_TEMP/release-title.md"
             printf '\n<!-- release-title:end -->\n\n'
+            printf '## Release notes\n\n'
             printf '<!-- release-notes:start -->\n\n'
             cat "$RUNNER_TEMP/release-notes.md"
             printf '\n<!-- release-notes:end -->\n'
