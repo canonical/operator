@@ -49,9 +49,15 @@ You then need to use `set_default` to set an initial value; for example:
 class MyCharm(ops.CharmBase):
     _stored = ops.StoredState()
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._stored.set_default(expensive_value=None)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.install, self._on_install)
+
+    def _calculate_expensive_value(self) -> int:
+        # Pretend that working this out takes a long time.
+        return 42
 ```
 
 See more: [](ops.StoredState)
@@ -114,8 +120,12 @@ def test_charm_logs_stored_state():
         }
     )
     state_out = ctx.run(ctx.on.install(), state_in)
-    assert ctx.juju_log[0].message == 'Current value: 42'
+    assert testing.JujuLogLine('INFO', 'Current value: 42') in ctx.juju_log
 ```
+
+`ctx.juju_log` holds every line the unit logged during the event, including the
+ones `ops` itself writes, so look for the charm's line rather than indexing into
+the list.
 
 ## Storing state for the lifetime of the application
 
@@ -141,14 +151,22 @@ databag. For example, to store an expensive calculation:
 
 ```python
 def _on_start(self, event: ops.StartEvent):
+    if not self.unit.is_leader():
+        return
     peer = self.model.get_relation('charm-peer')
-    peer.data[self.app]['expensive-value'] = self._calculate_expensive_value()
+    peer.data[self.app]['expensive-value'] = str(
+        self._calculate_expensive_value()
+    )
 
 
 def _on_stop(self, event: ops.StopEvent):
     peer = self.model.get_relation('charm-peer')
     logger.info('Value at stop is: %s', peer.data[self.app]['expensive-value'])
 ```
+
+Relation data values are always strings, so convert the value before storing it.
+Only the leader unit can write to the application databag, so the handler returns
+early on the other units.
 
 ```{caution}
 Peer relations are not available early in the Charm lifecycle, so you'll need
@@ -174,11 +192,14 @@ In your `tests/unit/test_charm.py` file, add tests that have an initial state
 that includes a [](ops.testing.PeerRelation) object.
 
 ```python
-def test_charm_sets_stored_state():
+def test_charm_sets_peer_data():
     ctx = testing.Context(MyCharm)
     peer = testing.PeerRelation('charm-peer')
-    state_in = testing.State(relations={peer})
+    state_in = testing.State(relations={peer}, leader=True)
     state_out = ctx.run(ctx.on.start(), state_in)
     rel = state_out.get_relation(peer.id)
-    assert rel.local_app_data['expensive_value'] == '42'
+    assert rel.local_app_data['expensive-value'] == '42'
 ```
+
+The state has to be the leader, because the charm writes to the application
+databag. The key is the one the charm wrote, `expensive-value`.
