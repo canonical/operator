@@ -1848,11 +1848,10 @@ def _build_dataclass(
     share any names with ``data``.
 
     Falls back to the un-coerced ``cls(*args, **extra_kwargs, **data)`` if
-    ``cls``'s type hints can't be resolved, for example a
-    ``TYPE_CHECKING``-only import with no runtime name: ``get_type_hints``
-    resolves every field's annotation eagerly, so one unresolvable field would
-    otherwise break construction even when the relation data at hand doesn't
-    touch it.
+    ``get_type_hints`` raises, which happens even if a single field's
+    annotation is unresolvable, because ``get_type_hints`` resolves every
+    field at once. This is most likely to happen with a
+    ``TYPE_CHECKING``-only import that has no runtime name.
 
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
     missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
