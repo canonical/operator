@@ -109,6 +109,33 @@ class TestPostReleaseFanOut:
         doc = (tree / 'docs/explanation/versions.md').read_text()
         assert '| Ops 3.9 | Active | 2026-09-30 | 2027-09-30 |' in doc
 
+    def test_a_release_leaves_an_lts_row_alone(self, tree: pathlib.Path):
+        """An LTS row's dates are a support commitment, not a year from now."""
+        for name in TREE:
+            if name.endswith('.md'):
+                continue
+            path = tree / name
+            path.write_text(path.read_text().replace('3.8.2', '2.23.5').replace('8.8.2', '7.23.5'))
+
+        assert update.main(['--version', '2.23.6', '--date', '2026-09-30']) == 0
+        assert "version: str = '2.23.6'" in (tree / 'ops/version.py').read_text()
+        assert (tree / 'docs/explanation/versions.md').read_text() == (
+            TREE['docs/explanation/versions.md']
+        )
+
+    def test_a_release_keeps_a_label_other_than_lts(self, tree: pathlib.Path):
+        """The label survives the rewrite; only the minor and the dates move."""
+        doc = tree / 'docs/explanation/versions.md'
+        doc.write_text(doc.read_text().replace('| Ops 3.8 |', '| Ops 3.8 (Beta) |'))
+        assert update.main(['--version', '3.9.0', '--date', '2026-09-30']) == 0
+        assert '| Ops 3.9 (Beta) | Active | 2026-09-30 | 2027-09-30 |' in doc.read_text()
+
+    def test_a_second_release_on_the_same_day_is_not_an_error(self, tree: pathlib.Path):
+        """The row is already current, which is fine rather than suspicious."""
+        doc = tree / 'docs/explanation/versions.md'
+        assert update.main(['--version', '3.8.3', '--date', '2026-08-31']) == 0
+        assert doc.read_text() == TREE['docs/explanation/versions.md']
+
     def test_the_maintenance_shape(self, tree: pathlib.Path):
         """The LTS branch's patch bump, over the same four files."""
         for name in TREE:

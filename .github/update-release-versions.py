@@ -133,12 +133,19 @@ def update_versions_doc(ops_version: str, released: datetime.date) -> None:
         print(f'{path}: not present, skipping')
         return
     content = path.read_text()
-    pattern = rf'(\| Ops {major})\.\d+ (\| [^|]+ \|) [^|]+ \| [^|]+ \|'
-    replacement = rf'\1.{minor} \2 {released:%Y-%m-%d} | {eol:%Y-%m-%d} |'
-    updated = re.sub(pattern, replacement, content)
-    if content == updated:
-        raise ValueError(f'Nothing changed in {path}: is there an "Ops {major}.x" row?')
-    path.write_text(updated)
+    # A row can carry a label after the version, such as `Ops 2.23 (LTS)`.
+    pattern = rf'(\| Ops {major})\.\d+( \([^)|]*\))? (\| [^|]+ \|) [^|]+ \| [^|]+ \|'
+    match = re.search(pattern, content)
+    if not match:
+        raise ValueError(f'Nothing to update in {path}: is there an "Ops {major}.x" row?')
+    # An LTS row's dates are the support commitment made when it became LTS,
+    # not a year from the latest release, so a release doesn't move them.
+    if match.group(2) == ' (LTS)':
+        print(f'{path}: Ops {major} is an LTS row, leaving it alone')
+        return
+    prefix, label, status = match.group(1), match.group(2) or '', match.group(3)
+    row = f'{prefix}.{minor}{label} {status} {released:%Y-%m-%d} | {eol:%Y-%m-%d} |'
+    path.write_text(content[: match.start()] + row + content[match.end() :])
     print(f'{path}: Ops {major}.{minor}, released {released:%Y-%m-%d}, EOL {eol:%Y-%m-%d}')
 
 
