@@ -97,6 +97,7 @@ jobs:
         env:
           BRANCH: ${{ inputs.branch }}
           VERSION_INPUT: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -163,8 +164,10 @@ jobs:
 
           # Checked here rather than at the push, so that a leftover branch
           # from an abandoned attempt costs nothing: everything after this
-          # step rewrites files and spends a model call.
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release-prep-$version" >/dev/null 2>&1
+          # step rewrites files and spends a model call. A dry run never
+          # pushes, so a leftover branch is no obstacle to one.
+          if [ "$DRY_RUN" != true ] &&
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release-prep-$version" >/dev/null 2>&1
           then
             echo "::error::A release-prep-$version branch already exists. Delete it, or" \
               "finish the pull request that goes with it, before proposing $version again."
