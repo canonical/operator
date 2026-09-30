@@ -345,7 +345,7 @@ class HandleKind:
     be explicitly overridden if desired.
     """
 
-    def __get__(self, obj: Object, obj_type: type[Object]) -> str:
+    def __get__(self, obj: Object | None, obj_type: type[Object]) -> str:
         kind = typing.cast('str', obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
