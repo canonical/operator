@@ -14,6 +14,9 @@ name: Propose a release
 # - The pull request is opened with the workflow's own token, so GitHub will
 #   not start the usual checks on it. Until that is arranged differently,
 #   close and reopen the pull request to get them to run.
+#   TODO: open it with a GitHub App token (or the bot account's PAT) instead,
+#   so that the checks start on their own, and drop the close-and-reopen step
+#   here, in create-draft-release.yaml, and in CONTRIBUTING.md.
 # - The scripts and data files in .github/ come from this workflow's own
 #   commit, not from the branch being released. That is what lets a
 #   maintenance branch be released without carrying copies of them.
