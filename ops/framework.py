@@ -406,7 +406,7 @@ class ObjectEvents(Object):
     def __init__(self, parent: Object | None = None, key: str | None = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = weakref.WeakKeyDictionary()
+        self._cache: weakref.WeakKeyDictionary[Object, Self] = weakref.WeakKeyDictionary()
 
     def __get__(self, emitter: Object | None, emitter_type: type[Object]) -> Self:
         if emitter is None:
@@ -416,7 +416,7 @@ class ObjectEvents(Object):
             # Same type, different instance, more data. Doing this unusual construct
             # means people can subclass just this one class to have their own 'on'.
             instance = self._cache[emitter] = type(self)(emitter)
-        return typing.cast('Self', instance)
+        return instance
 
     @classmethod
     def define_event(cls, event_kind: str, event_type: type[EventBase]):
