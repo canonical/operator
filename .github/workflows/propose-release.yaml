@@ -1,12 +1,12 @@
 ---
 name: Propose a release
 
-# The first of the three release workflows: work out the version, write the
+# The first of the two release workflows: work out the version, write the
 # changelog, rewrite the version strings, draft the release notes, and open a
 # pull request with all of it. A human reviews and merges that pull request;
 # creating the release is the next workflow's job.
 #
-# Two things are worth knowing before running this:
+# Three things are worth knowing before running this:
 #
 # - The version is counted from the last tag on the branch, never from
 #   ops/version.py. Between releases that file holds a guess left behind by
@@ -14,6 +14,9 @@ name: Propose a release
 # - The pull request is opened with the workflow's own token, so GitHub will
 #   not start the usual checks on it. Until that is arranged differently,
 #   close and reopen the pull request to get them to run.
+# - The scripts and data files in .github/ come from this workflow's own
+#   commit, not from the branch being released. That is what lets a
+#   maintenance branch be released without carrying copies of them.
 
 "on":
   workflow_dispatch:
@@ -75,6 +78,16 @@ jobs:
           fetch-depth: 0  # The whole history and its tags: the release is counted from the tag.
           persist-credentials: false
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          # This workflow's own .github/, beside the branch being released:
+          # the version script and the team list are read from here.
+          ref: ${{ github.sha }}
+          path: release-tools
+          sparse-checkout: /.github/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
         with:
           enable-cache: false
@@ -102,7 +115,7 @@ jobs:
           # One comma-separated list, from the file that explains itself. An
           # empty list is not worth failing a release over: it credits
           # everyone, which is the direction the changelog tool errs in too.
-          team=$(sed -e 's/#.*//' -e 's/[[:space:]]//g' .github/changelog-team.txt |
+          team=$(sed -e 's/#.*//' -e 's/[[:space:]]//g' release-tools/.github/changelog-team.txt |
             grep -v '^$' | paste -sd,) || team=''
 
           format=$(uvx --from "$CHANGELOG" changelog git-log-format)
@@ -184,7 +197,7 @@ jobs:
           VERSION: ${{ steps.propose.outputs.version }}
         run: |
           set -euo pipefail
-          python3 .github/update-release-versions.py --version "$VERSION"
+          python3 release-tools/.github/update-release-versions.py --version "$VERSION"
           uv lock
           git --no-pager diff --stat
 
@@ -295,8 +308,10 @@ jobs:
           git config user.name 'Prints Charming [bot]'
           git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
           git switch -c "$head_branch"
-          git add CHANGES.md uv.lock ops/version.py pyproject.toml \
-            testing/pyproject.toml tracing/pyproject.toml docs/explanation/versions.md
+          # Every tracked file the steps above changed, and nothing else: the
+          # release-tools checkout is untracked, and a maintenance branch has
+          # no tool-versions table for the script to write.
+          git add -u
           git commit -m "chore: prepare release $VERSION"
           git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
             "HEAD:refs/heads/$head_branch"

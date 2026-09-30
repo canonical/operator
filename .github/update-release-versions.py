@@ -4,8 +4,10 @@
 """Rewrite the version strings across the repository for a release.
 
 Called by the propose-release workflow, which has already worked out which
-version is being released, and again by the post-release workflow, which has
-worked out which development version the branch goes back to. This script only
+version is being released, and again by the create-draft-release workflow's
+post-release job, which has worked out which development version the branch
+goes back to. Both run it from their own checkout of the default branch, so a
+maintenance branch doesn't need a copy. This script only
 writes files: it does not decide the version, run git, or talk to GitHub, and
 it deliberately does not run `uv lock` either, so that the lockfile update is
 a visible workflow step rather than something buried in here.

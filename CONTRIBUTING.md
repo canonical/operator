@@ -271,7 +271,7 @@ The Matrix post should be similar.
 
 ## Publishing a release
 
-Three workflows make a release, and you decide twice: once when you review the version-bump PR, and once when you publish the draft release. Nothing reaches PyPI until you publish the draft, so an abandoned attempt costs at most a branch and a draft to delete.
+Two workflows make a release, and you decide twice: once when you review the version-bump PR, and once when you publish the draft release. Nothing reaches PyPI until you publish the draft, so an abandoned attempt costs at most a branch and a draft to delete.
 
 You don't need a GitHub token, a checkout, or a fork for any of this. The whole release runs in Actions and the only tools you need are the Actions tab and the releases page.
 
@@ -298,9 +298,13 @@ Wait for the checks to pass, then merge. If they don't pass at the tip of the br
 
 ### 2. Merge the PR, and check the draft release
 
-Merging the PR starts the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow. It runs on every push to `main` and to the maintenance branches, and decides that a push is a release when it leaves `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. Every other push, the post-release bump included, stops there quietly.
+Merging the PR starts the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow. It runs whenever a PR that changes `ops/version.py` is merged into `main` or a maintenance branch, and decides that the merge is a release when it leaves `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. Every other merge, the post-release bump included, stops there quietly.
 
 For a release, it takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
+
+It also opens a PR titled "chore: adjust versions after the X.Y.Z release" that puts the branch back onto a development version. Review and merge it. It doesn't matter whether that happens before or after you publish the draft, because the draft is pinned to the commit that was reviewed rather than to the branch. The same token caveat applies, so close and reopen it if you want the checks to run.
+
+> The version in that PR is a placeholder rather than a prediction. Nothing counts from it, because the next release is counted from the last tag, so it doesn't matter if the next release turns out to be a different version. `main` sat at `3.9.0.dev0` through both the 3.8.1 and the 3.8.2 releases.
 
 This is where somebody reads the notes as a reader will see them, which is a different act from reviewing a diff. Read them, edit the release body if it needs it, and then:
 
@@ -309,12 +313,7 @@ This is where somebody reads the notes as a reader will see them, which is a dif
 
 ### 3. Publishing does the rest
 
-Publishing the draft starts two workflows, which are siblings rather than one after the other:
-
-- [Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml) builds the three packages and uploads them to PyPI ([ops](https://pypi.org/project/ops/), [ops-scenario](https://pypi.org/project/ops-scenario), and [ops-tracing](https://pypi.org/project/ops-tracing/)), attests what it built, and runs the "SBOM and secscan" workflow. It sometimes takes a while for the new releases to show up on PyPI.
-- [Post-release version bump](https://github.com/canonical/operator/actions/workflows/post-release.yaml) works out which branch the release came from, and opens a PR titled "chore: adjust versions after the X.Y.Z release" that puts that branch back onto a development version. Review and merge it. The same token caveat applies, so close and reopen it if you want the checks to run.
-
-> The version in that PR is a placeholder rather than a prediction. Nothing counts from it, because the next release is counted from the last tag, so it doesn't matter if the next release turns out to be a different version. `main` sat at `3.9.0.dev0` through both the 3.8.1 and the 3.8.2 releases.
+Publishing the draft starts the [Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml) workflow, which builds the three packages and uploads them to PyPI ([ops](https://pypi.org/project/ops/), [ops-scenario](https://pypi.org/project/ops-scenario), and [ops-tracing](https://pypi.org/project/ops-tracing/)), attests what it built, and runs the "SBOM and secscan" workflow. It sometimes takes a while for the new releases to show up on PyPI.
 
 Two things are still yours to do by hand:
 
@@ -326,11 +325,13 @@ Two things are still yours to do by hand:
 
 ### Maintenance branches, pre-releases and major releases
 
-A **maintenance release** is the same three steps with `branch` set to, for example, `2.23-maintenance`. Both the version and the changelog come from that branch's own last tag rather than from the newest tag in the repository.
+A **maintenance release** is the same steps with `branch` set to, for example, `2.23-maintenance`. Both the version and the changelog come from that branch's own last tag rather than from the newest tag in the repository.
+
+Nothing needs to be added to a maintenance branch first. Both workflows run from `main`, and read the version script and the team list from `main`, so the maintenance branch only has to have the files that get a new version written into them. The one difference is publishing: publishing the draft creates the tag, and a tag's publish workflow is the one on the branch it was cut from. On `2.23-maintenance` and `3.3-maintenance` that is the older tag-triggered workflow (`publish-ops.yaml` and its siblings on 2.23, and `publish.yaml` on 3.3), which uploads to PyPI in the same way.
 
 "Propose a release" stops, rather than releasing, if the commits on a maintenance branch since its last tag include a feature or a breaking change. That means somebody has put a commit on the wrong branch, and a release is not the place to absorb it: fix the branch, or pass an explicit `version` if it really is what you want. Remember to untick "Set as the latest release" on the draft.
 
-A **pre-release** needs an explicit `version`, for example `3.9.0rc1`, because the commits never imply one. The draft is marked as a pre-release, and it does go to PyPI: the Publish workflow fires on any published release rather than on a version pattern. Publishing a pre-release opens a post-release bump like any other release, and the bump drops the suffix, so after 3.4.0b3 the branch goes back to working towards `3.4.0.dev0`.
+A **pre-release** needs an explicit `version`, for example `3.9.0rc1`, because the commits never imply one. The draft is marked as a pre-release, and it does go to PyPI: the Publish workflow fires on any published release rather than on a version pattern. A pre-release gets a post-release bump like any other release, and the bump drops the suffix, so after 3.4.0b3 the branch goes back to working towards `3.4.0.dev0`.
 
 A **major release** needs an explicit `version` too. A `!` on a commit is surfaced in the changelog under "Breaking Changes" but is never read as a major bump, because we sometimes let a breaking change ride in a minor release.
 
@@ -352,9 +353,9 @@ Every step reads what it needs fresh from the branch or the API, so re-running t
 
 - **"Propose a release" failed.** If it failed before pushing, nothing happened and you can run it again. If it pushed `release-prep-X.Y.Z` and then failed, close the PR if there is one and delete that branch before running it again: the workflow refuses to start while the branch exists, so that a half-finished attempt can't be mistaken for the real one.
 - **The PR merged but no draft release appeared.** The workflow decided the push wasn't a release. Check the run's log, which says what it decided and why: the usual cause is a version that still has a `.devN` suffix on it.
-- **"Create the draft release" failed.** Fix the cause and re-run the failed job; the push doesn't have to happen again. A PR description can still be edited after the merge, so markers somebody removed can be put back. If a draft was created before the failure, delete it first, because the workflow refuses to make a second one.
+- **"Create the draft release" failed.** Fix the cause and re-run the failed job; the merge doesn't have to happen again. A PR description can still be edited after the merge, so markers somebody removed can be put back. If a draft was created before the failure, delete it first, because the workflow refuses to make a second one.
 - **Publish failed.** Re-run it. The release stays published and the tag stays where it is, so there's nothing to unwind. If the packages reached PyPI before the failure, they can't be replaced: fix the problem in a new patch release.
-- **"Post-release version bump" failed.** Re-run it. If the bump is already on the branch, it says so and stops, so a re-run after somebody did it by hand is safe. If a `post-release-X.Y.Z` branch is left over from an attempt, merge, close or delete it first.
+- **The draft was created but the post-release PR wasn't.** Re-run the failed "Open the post-release pull request" job on its own; it doesn't touch the draft. If the bump is already on the branch, it says so and stops, so a re-run after somebody did it by hand is safe. If a `post-release-X.Y.Z` branch is left over from an attempt, merge, close or delete it first.
 
 If you need to give up on an attempt, delete the draft release and any `release-prep-*` and `post-release-*` branches, then start again. The one thing that can't be undone is a published release: the tag and the PyPI upload are both permanent.
 
