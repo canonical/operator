@@ -59,7 +59,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
 
   test-build-and-publish:
-    name: Build and publish to Test PYPI
+    name: Build and publish to Test PyPI
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
