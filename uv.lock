@@ -1003,7 +1003,6 @@ dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-sdk" },
     { name = "ops" },
-    { name = "pydantic" },
 ]
 
 [package.dev-dependencies]
@@ -1022,7 +1021,6 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = "~=1.0" },
     { name = "opentelemetry-sdk", specifier = "~=1.30" },
     { name = "ops", editable = "." },
-    { name = "pydantic" },
 ]
 
 [package.metadata.requires-dev]
