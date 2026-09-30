@@ -1792,7 +1792,7 @@ class Relation:
                 data = event.relation.load(Data, event.app)
                 secret = self.model.get_secret(data.secret_id)
 
-        For a Pydantic ``BaseModel`` or pydantic dataclass, the decoded values
+        For a Pydantic ``BaseModel`` or Pydantic dataclass, the decoded values
         are passed straight through as keyword arguments and Pydantic
         performs its own coercion and validation.
 
@@ -1801,24 +1801,32 @@ class Relation:
         passed to ``__init__``:
 
         - A nested dataclass or :class:`enum.Enum` field is constructed from
-          its decoded value.
-        - Collection fields coerce their contents against the type arguments:
-          the elements of a ``list``, ``set``, ``frozenset``, or
-          variable-length ``tuple[X, ...]``, and the values of a ``dict`` or
-          ``Mapping``. A ``tuple`` field stays a ``tuple``.
-        - A fixed-length ``tuple[X, Y]`` coerces each position against its own
-          type. The value must have exactly as many items as the annotation
-          has positions; otherwise ``ValueError`` is raised.
+          its decoded value. This includes a nested Pydantic dataclass, which
+          then does its own validation.
+        - A ``list``, ``set``, ``frozenset``, or variable-length
+          ``tuple[X, ...]`` field is built as that collection type, with each
+          element coerced against the type argument. A ``dict`` or ``Mapping``
+          field is built as a ``dict``, with each value coerced against the
+          value type.
+        - An abstract collection field is built as a concrete type, with each
+          element coerced against the type argument: a ``list`` for
+          ``Iterable``, ``Collection``, ``Sequence``, or ``MutableSequence``,
+          a ``frozenset`` for ``Set`` (``AbstractSet``), and a ``set`` for
+          ``MutableSet``.
+        - A fixed-length ``tuple[X, Y]`` field is built as a ``tuple``, with
+          each position coerced against its own type. The value must have
+          exactly as many items as the annotation has positions.
         - An ``Optional``/``Union`` field is coerced against the one member
           that matches the shape of the decoded value: a sequence type for a
           list, a mapping type or dataclass for an object, or any other type
           for a scalar. If more than one member matches (for example,
           ``SomeEnum | str`` for a string), the value is passed through as-is.
-          If none matches, ``TypeError`` is raised.
-        - Any other type, including ``Literal`` and scalar types such as
-          ``int`` and ``str``, is passed through unchanged. Values keep their
-          decoded type: a ``'1'`` in the databag stays a string for an ``int``
-          field.
+        - The value for any other type annotation is passed through
+          unchanged. This includes ``Literal``, scalar types such as ``int``
+          and ``str``, and classes that are neither dataclasses nor enums, such
+          as a nested Pydantic ``BaseModel``. Values keep their decoded type: a
+          ``'1'`` in the databag stays a string for an ``int`` field, and an
+          object stays a ``dict`` for a nested ``BaseModel`` field.
 
         Type hints are resolved with :func:`typing.get_type_hints`, which
         evaluates string annotations (including those from
@@ -1831,10 +1839,8 @@ class Relation:
         Any additional positional or keyword arguments are passed through to
         the data class ``__init__`` as given, without coercion; a keyword
         argument with the same name as a field in the relation data is
-        overridden by that data. For a non-pydantic dataclass target,
-        positional arguments are matched to the class's leading fields by
-        position, and any remaining fields supplied from the relation data are
-        still coerced as above.
+        overridden by that data. A positional argument for a field that is
+        also in the relation data raises ``TypeError``.
 
         Args:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
@@ -1851,6 +1857,17 @@ class Relation:
         Returns:
             An instance of the data class that was provided as ``cls`` with the
             current relation data values.
+
+        Raises:
+            TypeError: If coercing a dataclass field finds a decoded value of
+                the wrong shape: a non-mapping for a nested dataclass or a
+                ``dict`` or ``Mapping`` field, a string, bytes, or mapping for a
+                sequence or set field, or a value that matches none of a
+                ``Union`` field's members. Also raised if a nested dataclass is
+                missing a required field.
+            ValueError: If coercing a dataclass field finds a value that isn't a
+                member of its ``Enum``, or a fixed-length ``tuple`` value with
+                the wrong number of items.
         """
         try:
             fields = _charm._juju_fields(cls)
@@ -1871,10 +1888,7 @@ class Relation:
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
         # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
         # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
-        # Any fields filled positionally by args are left uncoerced, since args
-        # are matched to the class's leading fields by position, not by name.
-        # Keyword arguments are passed through uncoerced, the same as positional
-        # ones.
+        # Positional and keyword arguments are passed through uncoerced.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
             return _charm._build_dataclass(cls, data, args, kwargs)
         return cls(*args, **kwargs, **data)

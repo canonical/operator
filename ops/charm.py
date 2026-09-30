@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import enum
 import logging
@@ -1707,6 +1708,17 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
 
 _SEQUENCE_TYPES = (list, tuple, set, frozenset)
 
+# Abstract collection annotations don't name a type to build, so each is
+# built as a concrete type that satisfies it.
+_ABSTRACT_SEQUENCE_TYPES: dict[Any, type] = {
+    collections.abc.Iterable: list,
+    collections.abc.Collection: list,
+    collections.abc.Sequence: list,
+    collections.abc.MutableSequence: list,
+    collections.abc.Set: frozenset,
+    collections.abc.MutableSet: set,
+}
+
 
 def _union_member_fits(member: Any, value: Any) -> bool:
     """Report whether a decoded ``value`` has the right shape for union ``member``.
@@ -1718,6 +1730,7 @@ def _union_member_fits(member: Any, value: Any) -> bool:
     if member is Any:
         return True
     kind = typing.get_origin(member) or member
+    kind = _ABSTRACT_SEQUENCE_TYPES.get(kind, kind)
     if isinstance(kind, type) and issubclass(kind, _SEQUENCE_TYPES):
         return isinstance(value, _SEQUENCE_TYPES)
     if (isinstance(kind, type) and issubclass(kind, Mapping)) or dataclasses.is_dataclass(member):
@@ -1732,9 +1745,10 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     dataclasses and enum values from JSON-decoded relation data. An
     ``Optional``/``Union`` field is coerced against the one member that
     matches the shape of the value; ``dict``/``Mapping`` fields are coerced
-    against their value type; a variable-length ``tuple[X, ...]`` is coerced
-    element-wise against ``X`` and a fixed-length ``tuple[X, Y, ...]`` is
-    coerced positionally.
+    against their value type; abstract sequence and set fields such as
+    ``Sequence[X]`` are built as a ``list``, ``set`` or ``frozenset``; a
+    variable-length ``tuple[X, ...]`` is coerced element-wise against ``X``
+    and a fixed-length ``tuple[X, Y, ...]`` is coerced positionally.
 
     Raises ``TypeError`` if the value for a sequence field is a string, bytes
     or a mapping, or if the value for a mapping field is not a mapping: those
@@ -1752,6 +1766,8 @@ def _coerce_field(tp: Any, value: Any) -> Any:
         return _coerce_union(tp, args, value)
     if origin in _SEQUENCE_TYPES and args:
         return _coerce_sequence(tp, origin, args, value)
+    if origin in _ABSTRACT_SEQUENCE_TYPES and args:
+        return _coerce_sequence(tp, _ABSTRACT_SEQUENCE_TYPES[origin], args, value)
     if isinstance(origin, type) and issubclass(origin, Mapping) and len(args) == 2:
         return _coerce_mapping(tp, args[1], value)
     # Literal and other constructed generics: accept the value as-is.
@@ -1854,7 +1870,8 @@ def _build_dataclass(
     ``TYPE_CHECKING``-only import that has no runtime name.
 
     Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
-    missing, and ``ValueError``/``TypeError`` from coercion of malformed values.
+    missing or an item in ``args`` fills a field that is also in ``data``, and
+    ``ValueError``/``TypeError`` from coercion of malformed values.
     """
     extra_kwargs = extra_kwargs or {}
     try:
@@ -1867,7 +1884,7 @@ def _build_dataclass(
         )
         return cls(*args, **extra_kwargs, **data)
     kwargs: dict[str, Any] = {}
-    for field in dataclasses.fields(cls)[len(args) :]:
+    for field in dataclasses.fields(cls):
         if field.name not in data:
             continue
         kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])

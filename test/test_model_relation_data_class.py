@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import enum
 import functools
@@ -566,6 +567,15 @@ def test_relation_load_union_of_two_concrete_types_passes_through():
             Nested | _Colour, {'sub': 1}, Nested(sub=1), id='dataclass-or-enum-given-dict'
         ),
         pytest.param(Nested | _Colour, 'red', _Colour.RED, id='dataclass-or-enum-given-str'),
+        pytest.param(
+            collections.abc.Sequence[Nested] | str,
+            [{'sub': 1}],
+            [Nested(sub=1)],
+            id='sequence-or-str-given-list',
+        ),
+        pytest.param(
+            collections.abc.Sequence[Nested] | str, 'x', 'x', id='sequence-or-str-given-str'
+        ),
     ],
 )
 def test_relation_load_union_picks_member_by_shape(annotation: Any, written: Any, expected: Any):
@@ -654,6 +664,30 @@ def test_relation_load_set_and_frozenset():
     assert type(obj.mutable) is set
     assert obj.immutable == frozenset({_Colour.RED, _Colour.BLUE})
     assert type(obj.immutable) is frozenset
+
+
+@pytest.mark.parametrize(
+    'annotation,expected',
+    [
+        pytest.param(collections.abc.Iterable[_Colour], [_Colour.RED], id='iterable'),
+        pytest.param(collections.abc.Collection[_Colour], [_Colour.RED], id='collection'),
+        pytest.param(collections.abc.Sequence[_Colour], [_Colour.RED], id='sequence'),
+        pytest.param(
+            collections.abc.MutableSequence[_Colour], [_Colour.RED], id='mutable-sequence'
+        ),
+        pytest.param(collections.abc.Set[_Colour], frozenset({_Colour.RED}), id='set'),
+        pytest.param(collections.abc.MutableSet[_Colour], {_Colour.RED}, id='mutable-set'),
+    ],
+)
+def test_relation_load_abstract_collection(annotation: Any, expected: Any):
+    """An abstract collection field coerces its elements and is built as a concrete type."""
+    # This module uses postponed annotations, so a class body annotation would
+    # be the unresolvable string 'annotation' rather than the type itself.
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps(['red'])})
+    assert obj.value == expected
+    assert type(obj.value) is type(expected)
 
 
 def test_relation_load_sequence_field_rejects_string_or_mapping(monkeypatch: pytest.MonkeyPatch):
@@ -855,6 +889,34 @@ def test_relation_load_extra_args_still_coerces_remaining_fields():
     assert obj.a == 10
     assert isinstance(obj.b, Nested)
     assert obj.b.sub == 1
+
+
+def test_relation_load_positional_arg_colliding_with_relation_data_raises(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A positional arg for a field that is also in the relation data raises TypeError."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        b: Nested
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.load(Data, event.app, 10)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db', remote_app_data={'a': json.dumps(20), 'b': json.dumps({'sub': 1})}
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    with pytest.raises(TypeError, match='multiple values'):
+        ctx.run(ctx.on.relation_changed(rel), state_in)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
