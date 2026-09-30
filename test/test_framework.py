@@ -1399,6 +1399,13 @@ class TestStoredState:
             pytest.fail('AttributeError not raised')
 
         try:
+            obj._stored.on
+        except AttributeError as e:
+            assert str(e) == "attribute 'on' is reserved"
+        else:
+            pytest.fail('AttributeError not raised')
+
+        try:
             obj._stored.on = 'nonono'
         except AttributeError as e:
             assert str(e) == "attribute 'on' is reserved and cannot be set"
