@@ -227,34 +227,6 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
         assert exc.value.__cause__.exit_code == exit_code
 
 
-@pytest.mark.parametrize('exit_code', (-1, 0, 1, 42))
-def test_ops_raises_abort_in_init(exit_code: int, monkeypatch: pytest.MonkeyPatch):
-    class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on.start, self._on_start)
-            self.unit.status = ops.BlockedStatus('bad config')
-            # Charms can't actually do this (_Abort is private), but this is
-            # simpler than causing the framework to raise it.
-            raise _Abort(exit_code)
-
-        def _on_start(self, _: ops.StartEvent):
-            self.unit.status = ops.ActiveStatus()
-
-    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
-    ctx = Context(MyCharm, meta={'name': 'foo'})
-    if exit_code == 0:
-        state_out = ctx.run(ctx.on.start(), State())
-        # As in production, the event isn't emitted and nothing is committed.
-        assert not ctx.emitted_events
-        assert state_out.unit_status == ops.BlockedStatus('bad config')
-    else:
-        with pytest.raises(UncaughtCharmError) as exc:
-            ctx.run(ctx.on.start(), State())
-        assert isinstance(exc.value.__cause__, _Abort)
-        assert exc.value.__cause__.exit_code == exit_code
-
-
 def test_load_config_blocked_in_init():
     @dataclasses.dataclass
     class Config:
@@ -267,7 +239,11 @@ def test_load_config_blocked_in_init():
     class MyCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
+            framework.observe(self.on.config_changed, self._on_config_changed)
             self.typed_config = self.load_config(Config, errors='blocked')
+
+        def _on_config_changed(self, _: ops.ConfigChangedEvent):
+            self.unit.status = ops.ActiveStatus()
 
     ctx = Context(
         MyCharm,
@@ -275,7 +251,47 @@ def test_load_config_blocked_in_init():
         config={'options': {'port': {'type': 'int', 'default': 8080}}},
     )
     state_out = ctx.run(ctx.on.config_changed(), State(config={'port': 0}))
+    # As in production, the event isn't emitted and nothing is committed.
+    assert not ctx.emitted_events
     assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+@pytest.mark.parametrize('exit_code', (-1, 1, 42))
+def test_ops_raises_nonzero_abort_in_init(exit_code: int, monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            # Charms can't actually do this (_Abort is private, and the public
+            # APIs that raise it in __init__ use exit code 0), but this is
+            # simpler than causing the framework to raise it.
+            raise _Abort(exit_code)
+
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == exit_code
+
+
+def test_leaked_operator_dispatch_raises(monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        initialised = False
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            MyCharm.initialised = True
+
+    # A leaked OPERATOR_DISPATCH makes the dispatcher raise _Abort(0) before the
+    # framework exists. That must fail the test rather than silently pass.
+    monkeypatch.setenv('OPERATOR_DISPATCH', '1')
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == 0
+    assert not MyCharm.initialised
 
 
 class ValueErrorCharm(ops.CharmBase):
