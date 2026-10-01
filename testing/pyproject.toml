@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -39,4 +39,4 @@ classifiers = [
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/scenario"]
+packages = ["src/scenario"]  # Hatch looks for 'ops_scenario' by default.

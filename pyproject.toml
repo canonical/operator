@@ -88,29 +88,24 @@ tiobe = [
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
+source = "code"
 path = "ops/version.py"
-pattern = "^version: str = ['\"](?P<version>[^'\"]+)['\"]"
+expression = "version"
 
 [tool.hatch.build.targets.sdist]
+# Only include ops, not docs, examples, or testing and tracing packages.
 include = [
     "/ops",
     "/test",
-    "/*.txt",
-    "/*.md",
-    "/pyproject.toml",
-    "/tox.ini",
+    "/*.md",  # Include changelog and contributor docs.
 ]
-exclude = [
-    "*~",
-    "*.py[cod]",
-    "*.charm",
-    "*.whl",
-    "*.tar.gz",
-]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ops"]
 
 [tool.uv.workspace]
 members = ["tracing", "testing"]
