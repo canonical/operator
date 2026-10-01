@@ -2348,8 +2348,9 @@ class _CharmSpec(Generic[_CharmTypeCo]):
 class DeferredEvent:
     """An event that has been deferred to run prior to the next Juju event.
 
-    Tests should not instantiate this class directly: use the `deferred` method
-    of the event instead. For example:
+    Tests should not instantiate this class directly: use the
+    :meth:`deferred <EventProtocol.deferred>` method of the event instead. For
+    example::
 
         ctx = Context(MyCharm)
         deferred_start = ctx.on.start().deferred(handler=MyCharm._on_start)
@@ -2386,35 +2387,32 @@ class EventProtocol(Protocol):
 
     Tests should not implement this protocol, or construct event objects any
     other way: the methods of :class:`CharmEvents` make sure that the event is
-    consistent with the component (relation, container, secret, and so on) that
-    it is about.
+    consistent with the component that it is about (the relation, container,
+    secret, and so on).
 
-    That restriction is enforced, not only advice: :meth:`Context.run` raises
-    :class:`TypeError` for any object it did not create itself, including one
-    that satisfies this protocol. The protocol is here to document and to type
-    what :class:`CharmEvents` returns, rather than to describe something for
-    tests to implement.
+    :meth:`Context.run` raises :class:`TypeError` for any object it did not
+    create itself, including one that satisfies this protocol. This protocol
+    is for documentation and type checking only.
     """
 
     @property
     def name(self) -> str:
-        """Full event name, in Python-attribute form (as ops names the event).
+        """Full event name.
 
         For Juju events, this is the Juju hook name with hyphens replaced by
         underscores. The name consists of a prefix, naming the entity the event
         is about, and a suffix, denoting the type of event. For example, a
         change on relation endpoint ``foo-bar`` runs the Juju hook
         ``foo-bar-relation-changed``, and the event name is
-        ``foo_bar_relation_changed``: the prefix is ``foo_bar`` and the suffix
-        is ``relation_changed``. Events that are not about an entity, such as
-        ``update_status``, have no prefix.
+        ``foo_bar_relation_changed``. Events that are not about an entity, such
+        as ``update_status``, have no prefix.
         """
         ...
 
     def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
         """Construct a deferred event from this event.
 
-        See :meth:`DeferredEvent` for how deferred events are used in a
+        See :class:`DeferredEvent` for how deferred events are used in a
         :class:`State`.
 
         Args:

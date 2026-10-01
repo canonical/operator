@@ -75,7 +75,9 @@ def _as_event(event: EventProtocol) -> _Event:
     Both entry points (:meth:`Context.run` and ``Context.__call__``) narrow
     here, so the same mistake gets the same message whichever one is used.
     """
-    # Help people transition from Scenario 6:
+    # Help people transition from Scenario 6, where events were passed by
+    # name. This doesn't need to track new CharmEvents methods: any name not
+    # listed here gets the generic suggestion.
     if isinstance(event, str):
         name = event.replace('-', '_')
         if name in (

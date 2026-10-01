@@ -323,19 +323,27 @@ def test_events_satisfy_the_event_protocol(mycharm: type[ops.CharmBase]):
     assert event.deferred(handler=mycharm._on_event).name == 'start'  # type: ignore
 
 
+class _NotAnEvent:
+    """Satisfies EventProtocol, so it type-checks, but did not come from ctx.on."""
+
+    name = 'start'
+
+    def deferred(
+        self,
+        handler: typing.Callable[..., typing.Any],
+        event_id: int = 1,
+    ) -> scenario.DeferredEvent:
+        raise NotImplementedError()
+
+
 def test_run_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
-    class NotAnEvent:
-        name = 'start'
-
-        def deferred(
-            self,
-            handler: typing.Callable[..., typing.Any],
-            event_id: int = 1,
-        ) -> scenario.DeferredEvent:
-            raise NotImplementedError()
-
     ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
     with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
-        # NotAnEvent satisfies EventProtocol, so this type-checks, but ctx.on
-        # is the only place an event can come from.
-        ctx.run(NotAnEvent(), State())
+        ctx.run(_NotAnEvent(), State())
+
+
+def test_manager_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
+        with ctx(_NotAnEvent(), State()):
+            pass
