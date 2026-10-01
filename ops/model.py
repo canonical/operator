@@ -2064,8 +2064,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 f'Remote application instance cannot be retrieved for {self.relation}.'
             )
 
-        # if we're here it means: this is not a peer relation, this is a remote
-        # app databag, and we don't have leadership -- which is readable.
+        # If we're here it means this is a remote app databag (readable by any remote unit).
         return
 
     def _validate_write(self, data: Mapping[str, str]) -> None:
