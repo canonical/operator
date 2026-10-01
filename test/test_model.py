@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import io
 import ipaddress
@@ -2848,6 +2849,29 @@ _ValidMetricsTestCase = tuple[
 ]
 
 
+class _RecordingSpan:
+    def __init__(self, name: str):
+        self.name = name
+        self.attributes: dict[str, Any] = {}
+
+    def is_recording(self) -> bool:
+        return True
+
+    def set_attribute(self, key: str, value: Any):
+        self.attributes[key] = value
+
+
+class _RecordingTracer:
+    def __init__(self):
+        self.spans: list[_RecordingSpan] = []
+
+    @contextlib.contextmanager
+    def start_as_current_span(self, name: str):
+        span = _RecordingSpan(name)
+        self.spans.append(span)
+        yield span
+
+
 class TestModelBackend:
     @pytest.fixture
     def backend(self, fake_juju_version: None) -> _ModelBackend:
@@ -3222,6 +3246,48 @@ class TestModelBackend:
         fake_script.write('action-set', 'exit 0')
         backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
         assert sorted(['action-set', 'a.b=1', 'a.c=2', 'd=3']) == sorted(fake_script.calls()[0])
+
+    def test_hookcmd_tracing_omits_sensitive_data(
+        self, fake_script: FakeScript, backend: _ModelBackend, monkeypatch: pytest.MonkeyPatch
+    ):
+        tracer = _RecordingTracer()
+        monkeypatch.setattr(ops.model, 'tracer', tracer)
+        fake_script.write('secret-add', 'echo secret:123')
+        fake_script.write('secret-set', 'exit 0')
+        fake_script.write('relation-set', 'exit 0')
+        fake_script.write('pod-spec-set', 'exit 0')
+        fake_script.write('action-set', 'exit 0')
+        fake_script.write('action-log', 'exit 0')
+
+        sensitive = 'sensitive-value'
+        backend.secret_add({'password': sensitive}, label='my-label', owner='application')
+        backend.secret_set(
+            'secret:123',
+            content={'password': sensitive},
+            label='my-label',
+            description='my-description',
+            expire=datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc),
+            rotate=ops.SecretRotate.DAILY,
+        )
+        backend.relation_set(1, {'password': sensitive}, is_app=False)
+        backend.pod_spec_set({'password': sensitive}, {'password': sensitive})
+        backend.action_set({'password': sensitive})
+        backend.action_log(sensitive)
+
+        assert [span.name for span in tracer.spans] == [
+            'secret-add',
+            'secret-set',
+            'relation-set',
+            'pod-spec-set',
+            'action-set',
+            'action-log',
+        ]
+        for span in tracer.spans:
+            assert sensitive not in repr(span.attributes), span.name
+        # Arguments named in trace are still recorded.
+        assert 'id=secret:123' in tracer.spans[1].attributes['kwargs']
+        assert 'label=my-label' in tracer.spans[1].attributes['kwargs']
+        assert 'relation_id=1' in tracer.spans[2].attributes['kwargs']
 
     def test_action_set_more_nested(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')
