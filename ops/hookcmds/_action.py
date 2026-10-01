@@ -125,7 +125,7 @@ def action_log(message: str):
         message: The progress message to provide to the Juju user.
     """
     # The '--' allows messages that start with a hyphen.
-    run('action-log', '--', message)
+    run('action-log', '--', message, redacted_cmd=['action-log', '--', '<redacted>'])
 
 
 def action_set(results: Mapping[str, Any]):
@@ -140,4 +140,8 @@ def action_set(results: Mapping[str, Any]):
     # The Juju action-set hook command cannot interpret nested dicts, so we use a
     # helper to flatten out any nested dict structures into a dotted notation.
     flat_results = format_result_dict(results)
-    run('action-set', *[f'{k}={v}' for k, v in flat_results.items()])
+    run(
+        'action-set',
+        *[f'{k}={v}' for k, v in flat_results.items()],
+        redacted_cmd=['action-set', *[f'{k}=<redacted>' for k in flat_results]],
+    )

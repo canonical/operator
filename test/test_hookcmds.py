@@ -226,6 +226,23 @@ def test_action_set(run: Run):
     hookcmds.action_set({'foo': 'bar', 'baz': 'qux'})
 
 
+def test_action_log_error_redacts_message(run: Run):
+    run.handle(['action-log', '--', 'sensitive-value'], returncode=1, stderr='error msg')
+    with pytest.raises(hookcmds.Error) as excinfo:
+        hookcmds.action_log('sensitive-value')
+    assert excinfo.value.cmd == ['action-log', '--', '<redacted>']
+    assert excinfo.value.stderr == 'error msg'
+    assert 'sensitive-value' not in str(excinfo.value)
+
+
+def test_action_set_error_redacts_values(run: Run):
+    run.handle(['action-set', 'foo=sensitive-value', 'baz.baz2=qux'], returncode=1)
+    with pytest.raises(hookcmds.Error) as excinfo:
+        hookcmds.action_set({'foo': 'sensitive-value', 'baz': {'baz2': 'qux'}})
+    assert excinfo.value.cmd == ['action-set', 'foo=<redacted>', 'baz.baz2=<redacted>']
+    assert 'sensitive-value' not in str(excinfo.value)
+
+
 def test_action_set_nested(run: Run):
     run.handle(['action-set', 'foo=bar', 'baz.baz2=qux'])
     hookcmds.action_set({'foo': 'bar', 'baz': {'baz2': 'qux'}})
