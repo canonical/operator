@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import contextlib
-import contextvars
 import copy
 import dataclasses
 import datetime
@@ -3562,32 +3561,22 @@ class _ModelBackend:
         self._is_leader: bool | None = None
         self._leader_check_time = None
         self._hook_is_running = ''
-        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
 
     @contextlib.contextmanager
-    def _prevent_recursion(self):
-        token = self._is_recursive.set(True)
-        try:
-            yield
-        finally:
-            self._is_recursive.reset(token)
+    def _wrap_hookcmd(self, cmd: str, **trace: Any) -> Generator[None]:
+        """Run a hook command with tracing and ops error handling.
 
-    @contextlib.contextmanager
-    def _wrap_hookcmd(self, cmd: str, *args: Any, **kwargs: Any):
-        if self._is_recursive.get():
-            # Either `juju-log` hook command failed or there's a bug in ops.
-            return
-        # Logs are collected via log integration, omit the subprocess calls that push
-        # the same content to juju from telemetry.
-        mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
+        The ``trace`` keyword arguments are recorded on the span, and the span
+        is exported to the charm's tracing backend. Never pass a value that may
+        hold sensitive data, such as secret content, relation data, or action
+        results.
+        """
         try:
-            with mgr as span:
-                if span is not None:
+            with tracer.start_as_current_span(cmd) as span:
+                if span.is_recording():
                     span.set_attribute('call', 'subprocess.run')
-                    if args:
-                        span.set_attribute('args', args)
-                    if kwargs:
-                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                    if trace:
+                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in trace.items()])
                 yield
         except hookcmds.Error as e:
             self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
@@ -3701,12 +3690,11 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
+        # `data` is intentionally excluded from tracing. It should not contain sensitive data,
+        # but sometimes does, particularly when the charm needs to work on an older Juju
+        # without secrets support.
         with self._wrap_hookcmd(
-            'relation-set',
-            relation_id=relation_id,
-            endpoint=relation_name,
-            data=data,
-            app=is_app,
+            'relation-set', relation_id=relation_id, endpoint=relation_name, app=is_app
         ):
             hookcmds.relation_set(data, relation_id, endpoint=relation_name, app=is_app)
 
@@ -3762,8 +3750,10 @@ class _ModelBackend:
                 with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            with self._wrap_hookcmd('pod-spec-set', spec=spec, k8s_resources=k8s_resources):
-                hookcmds._utils.run('pod-spec-set', *args)
+            with self._wrap_hookcmd('pod-spec-set'):
+                hookcmds._utils.run(
+                    'pod-spec-set', *args, redacted_cmd=['pod-spec-set', '--', '<redacted>']
+                )
         finally:
             shutil.rmtree(str(tmpdir))
 
@@ -3834,12 +3824,14 @@ class _ModelBackend:
         # The hookcmds action_set method will handle flattening nested structures, but does
         # not do validation, so we handle both here.
         flat_results = _format_action_result_dict(results)
-        # We do not trace the arguments here, as they may contain sensitive data.
-        with self._wrap_hookcmd('action-set', '...'):
+        # `results` is intentionally excluded from tracing, as it may contain sensitive data.
+        with self._wrap_hookcmd('action-set'):
             hookcmds.action_set(flat_results)
 
     def action_log(self, message: str) -> None:
-        with self._wrap_hookcmd('action-log', message=message):
+        # The message should not contain sensitive information, but it might, so we don't
+        # include it in the trace. It seems unlikely that it's useful in a trace anyway.
+        with self._wrap_hookcmd('action-log'):
             hookcmds.action_log(message)
 
     def action_fail(self, message: str = '') -> None:
@@ -3912,23 +3904,23 @@ class _ModelBackend:
     def add_metrics(
         self, metrics: Mapping[str, int | float], labels: Mapping[str, str] | None = None
     ) -> None:
-        cmd: list[str] = ['add-metric']
+        args: list[str] = []
         if labels:
             label_args: list[str] = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
                 label_args.append(f'{k}={v}')
-            cmd.extend(['--labels', ','.join(label_args)])
+            args.extend(['--labels', ','.join(label_args)])
 
         metric_args: list[str] = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
             metric_args.append(f'{k}={metric_value}')
-        cmd.extend(metric_args)
-        with self._wrap_hookcmd(*cmd):
-            hookcmds._utils.run(*cmd)
+        args.extend(metric_args)
+        with self._wrap_hookcmd('add-metric', args=args):
+            hookcmds._utils.run('add-metric', *args)
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
@@ -4031,10 +4023,10 @@ class _ModelBackend:
                 rotate = rotate or info.rotation
                 # The label fix is needed for Juju < 3.5
                 label = label or info.label
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-set',
             id=id,
-            content=content,
             label=label,
             description=description,
             expire=expire,
@@ -4060,9 +4052,9 @@ class _ModelBackend:
         owner: str | None = None,
     ) -> str:
         # The content has already been validated with Secret._validate_content
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-add',
-            content=content,
             label=label,
             description=description,
             expire=expire,
