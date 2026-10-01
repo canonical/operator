@@ -3557,11 +3557,14 @@ def _notes(error: BaseException) -> list[str]:
     return getattr(error, '__notes__', [])
 
 
-def _backend_for(dispatch_path: str = '', hook_name: str = '') -> _ModelBackend:
+def _backend_for(
+    dispatch_path: str = '', hook_name: str = '', action_name: str = ''
+) -> _ModelBackend:
     context = JujuContext._from_dict({
         'JUJU_VERSION': '3.6.0',
         'JUJU_DISPATCH_PATH': dispatch_path,
         'JUJU_HOOK_NAME': hook_name,
+        'JUJU_ACTION_NAME': action_name,
     })
     return _ModelBackend('myapp/0', juju_context=context)
 
@@ -3628,23 +3631,38 @@ class TestModelErrorHookContext:
             ]
 
     def test_action(self, fake_script: FakeScript):
-        backend = _backend_for('actions/back-up')
+        backend = _backend_for('actions/back-up', action_name='back-up')
         backend._hook_is_running = 'back_up_action'
         fake_script.write('action-fail', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_fail('disk full')
         error = excinfo.value
         assert error.hook_command_args == {'message': 'disk full'}
-        assert error.current_hook == 'back-up-action'
+        assert error.current_hook is None
         assert error.current_event == 'back_up_action'
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'action-fail' (message='disk full') "
-                "failed during the 'back-up-action' hook."
+                "failed during the 'back-up' action."
+            ]
+
+    def test_action_other_event(self, fake_script: FakeScript):
+        backend = _backend_for('actions/back-up', action_name='back-up')
+        backend._hook_is_running = 'collect_unit_status'
+        fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        error = excinfo.value
+        assert error.current_hook is None
+        assert error.current_event == 'collect_unit_status'
+        if sys.version_info >= (3, 11):
+            assert _notes(error) == [
+                "Hook command 'is-leader' failed during the 'back-up' action "
+                "while handling the 'collect_unit_status' event."
             ]
 
     def test_action_set_results_excluded(self, fake_script: FakeScript):
-        backend = _backend_for('actions/back-up')
+        backend = _backend_for('actions/back-up', action_name='back-up')
         fake_script.write('action-set', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_set({'password': 's3cret'})

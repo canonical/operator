@@ -924,7 +924,7 @@ class Framework(Object):
 
     @contextmanager
     def _event_context(self, event_name: str, *, deferred: bool = False):
-        """Handles toggling the hook-is-running state in backends.
+        """Handles toggling the hook-is-running and event-is-deferred state in backends.
 
         This allows e.g. harness logic to know if it is executing within a running hook context
         or not.  It sets backend._hook_is_running equal to the name of the currently running

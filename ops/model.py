@@ -3416,6 +3416,10 @@ class ModelError(Exception):
     above, a summary of these details is also added to the exception as a note,
     so that it appears in the traceback.
 
+    The attributes are also set when a simulated hook command fails in a
+    :class:`ops.testing.Context` unit test, but not when using
+    :class:`ops.testing.Harness`.
+
     For example::
 
         try:
@@ -3439,14 +3443,19 @@ class ModelError(Exception):
     relation IDs and secret labels are included, but relation data and secret
     content are not. ``None`` if the error was not caused by a failed hook
     command.
+
+    This is intended for logging. The keys, and which arguments are included,
+    may change in future versions of ops, so don't rely on a specific key being
+    present.
     """
 
     current_hook: str | None = None
     """The name of the Juju hook that was running when the hook command failed.
 
-    For example, ``config-changed``, ``db-relation-changed``, or, for an action
-    named ``backup``, ``backup-action``. ``None`` if the error was not caused by
-    a failed hook command, or the hook is not known.
+    For example, ``config-changed`` or ``db-relation-changed``. ``None`` if the
+    error was not caused by a failed hook command, if the hook is not known, or
+    if an action is running. For an action, :attr:`current_event` is the
+    action's event, such as ``backup_action``.
     """
 
     current_event: str | None = None
@@ -3460,7 +3469,10 @@ class ModelError(Exception):
     """
 
     current_event_deferred: bool = False
-    """Whether :attr:`current_event` is a previously deferred event being handled again."""
+    """Whether :attr:`current_event` is a previously deferred event being handled again.
+
+    ``False`` if the error was not caused by a failed hook command.
+    """
 
 
 class TooManyRelatedAppsError(ModelError):
@@ -3643,7 +3655,7 @@ class _ModelBackend:
         if not dispatch_path:
             return self._juju_context.hook_name or None
         kind, _, name = dispatch_path.rpartition('/')
-        return f'{name}-action' if kind == 'actions' else name
+        return None if kind == 'actions' else name
 
     def _add_hook_command_context(
         self, error: ModelError, cmd: str, args: Mapping[str, Any]
@@ -3663,16 +3675,22 @@ class _ModelBackend:
             formatted = ', '.join(f'{k}={v!r}' for k, v in error.hook_command_args.items())
             note += f' ({formatted})'
         note += ' failed'
+        action = self._juju_context.action_name
+        dispatched_event = None
         if error.current_hook is not None:
             note += f' during the {error.current_hook!r} hook'
+            dispatched_event = error.current_hook.replace('-', '_')
+        elif action is not None:
+            note += f' during the {action!r} action'
+            dispatched_event = f'{action.replace("-", "_")}_action'
         if initialising:
             note += ' while initialising the charm'
         elif error.current_event_deferred:
             note += f' while handling the deferred {error.current_event!r} event'
-        elif error.current_event is not None and (
-            error.current_hook is None
-            or error.current_event != error.current_hook.replace('-', '_')
-        ):
+        # Leave out the event when it's the one the hook or action dispatched,
+        # rather than saying "during the 'config-changed' hook while handling
+        # the 'config_changed' event".
+        elif error.current_event not in (None, dispatched_event):
             note += f' while handling the {error.current_event!r} event'
         error.add_note(f'{note}.')
 
