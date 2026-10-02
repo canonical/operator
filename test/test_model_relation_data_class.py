@@ -407,6 +407,24 @@ def test_relation_save_custom_naming_pattern(relation_data_class: type[_AliasPro
     }
 
 
+def test_juju_fields_pydantic_dataclass_without_is_pydantic_dataclass():
+    """Pydantic dataclasses from before pydantic 2.11 still have their aliases kept.
+
+    ``__is_pydantic_dataclass__`` only exists from pydantic 2.11, but every
+    pydantic 2 dataclass has ``__pydantic_validator__`` in its ``__dict__``.
+    Simulate the older shape on a plain dataclass, so that the test doesn't
+    need multiple installed pydantic versions.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'fooBar'})
+
+    Data.__pydantic_validator__ = object()  # pyright: ignore[reportAttributeAccessIssue]
+
+    assert ops.charm._juju_fields(Data) == {'fooBar': 'fooBar'}
+
+
 def test_relation_load_extra_args():
     @dataclasses.dataclass
     class Data:
@@ -499,6 +517,34 @@ def test_relation_load_then_save(charm_class: type[BaseTestCharm]):
         'baz': json.dumps(['a', 'b', 'new']),
         'quux': json.dumps({'sub': 29}),
     }
+
+
+@pytest.mark.parametrize('charm_class', [c for c in _test_classes if c is not MyCharm])
+def test_relation_load_unit_data_ignores_juju_keys(charm_class: type[BaseTestCharm]):
+    class Charm(charm_class):
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            saved = self.databag_class(foo='value', bar=1, baz=['a', 'b'])
+            event.relation.save(saved, self.unit, encoder=self.encoder)
+            assert 'ingress-address' in event.relation.data[self.unit]
+            assert 'private-address' in event.relation.data[self.unit]
+            self.data = event.relation.load(self.databag_class, self.unit, decoder=self.decoder)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db',
+        local_unit_data={
+            'egress-subnets': '192.0.2.0',
+            'ingress-address': '192.0.2.0',
+            'private-address': '192.0.2.0',
+        },
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.foo == 'value'
+    assert obj.bar == 1
+    assert obj.baz == ['a', 'b']
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)
