@@ -1805,14 +1805,17 @@ class Relation:
           then does its own validation.
         - A ``list``, ``set``, ``frozenset``, or variable-length
           ``tuple[X, ...]`` field is built as that collection type, with each
-          element coerced against the type argument. A ``dict`` or ``Mapping``
-          field is built as a ``dict``, with each value coerced against the
-          value type.
+          element coerced against the type argument. A ``dict`` field is built
+          as a ``dict``, with each key and value coerced against the key and
+          value types.
         - An abstract collection field is built as a concrete type, with each
-          element coerced against the type argument: a ``list`` for
-          ``Iterable``, ``Collection``, ``Sequence``, or ``MutableSequence``,
-          a ``frozenset`` for ``Set`` (``AbstractSet``), and a ``set`` for
-          ``MutableSet``.
+          element, key, or value coerced against its type argument: a
+          ``list`` for ``Iterable``, ``Collection``, ``Sequence``, or
+          ``MutableSequence``, a ``frozenset`` for ``Set`` (``AbstractSet``),
+          a ``set`` for ``MutableSet``, and a ``dict`` for ``Mapping`` or
+          ``MutableMapping``. A mapping is an ``Iterable`` or ``Collection``
+          of its keys, so an ``Iterable`` or ``Collection`` field given a
+          mapping is built as a ``list`` of its keys.
         - A fixed-length ``tuple[X, Y]`` field is built as a ``tuple``, with
           each position coerced against its own type. The value must have
           exactly as many items as the annotation has positions.
@@ -1823,8 +1826,10 @@ class Relation:
           ``SomeEnum | str`` for a string), the value is passed through as-is.
         - The value for any other type annotation is passed through
           unchanged. This includes ``Literal``, scalar types such as ``int``
-          and ``str``, and classes that are neither dataclasses nor enums, such
-          as a nested Pydantic ``BaseModel``. Values keep their decoded type: a
+          and ``str``, a ``tuple`` with an unpacked member such as
+          ``tuple[int, *tuple[str, ...]]``, and classes that are neither
+          dataclasses nor enums, such as a nested Pydantic ``BaseModel``.
+          Values keep their decoded type: a
           ``'1'`` in the databag stays a string for an ``int`` field, and an
           object stays a ``dict`` for a nested ``BaseModel`` field.
 
@@ -1832,9 +1837,9 @@ class Relation:
         evaluates string annotations (including those from
         ``from __future__ import annotations``) against the module's global
         names. If any hint can't be resolved (for example, a
-        ``TYPE_CHECKING``-only import, or a class defined inside a function),
-        none of the values are coerced, and they are passed to the class
-        as-is instead of raising.
+        ``TYPE_CHECKING``-only import, a class defined inside a function, or
+        an annotation that doesn't evaluate to a type), none of the values are
+        coerced, and they are passed to the class as-is instead of raising.
 
         Any additional positional or keyword arguments are passed through to
         the data class ``__init__`` as given, without coercion; a keyword
@@ -1862,9 +1867,10 @@ class Relation:
             TypeError: If coercing a dataclass field finds a decoded value of
                 the wrong shape: a non-mapping for a nested dataclass or a
                 ``dict`` or ``Mapping`` field, a string, bytes, or mapping for a
-                sequence or set field, or a value that matches none of a
-                ``Union`` field's members. Also raised if a nested dataclass is
-                missing a required field.
+                sequence or set field (other than a mapping for an
+                ``Iterable`` or ``Collection`` field), or a value that matches
+                none of a ``Union`` field's members. Also raised if a nested
+                dataclass is missing a required field.
             ValueError: If coercing a dataclass field finds a value that isn't a
                 member of its ``Enum``, or a fixed-length ``tuple`` value with
                 the wrong number of items.
