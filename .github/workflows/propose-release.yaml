@@ -161,7 +161,19 @@ jobs:
           fi
 
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-            echo "::error::$version is already tagged."
+            # Worked out from the commits, the version can only be taken if
+            # the tag is somewhere this branch can't see: 3.8.3 was released
+            # from 3.8-maintenance, so on main the last tag was still 3.8.2
+            # and a patch release came out as 3.8.3 again. Which version main
+            # should release next is a person's call, not the commits'.
+            if [ -z "$VERSION_INPUT" ]; then
+              echo "::error::The commits since $previous make this $version, but" \
+                "$version is already tagged outside $BRANCH's history (it was probably" \
+                "released from a maintenance branch). Run this again with an explicit" \
+                "version."
+            else
+              echo "::error::$version is already tagged."
+            fi
             exit 1
           fi
 
