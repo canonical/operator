@@ -101,6 +101,7 @@ This API for testing was previously called 'Scenario'.
    :special-members: __call__
 .. autoclass:: ops.testing.DeferredEvent
 .. autoclass:: ops.testing.ErrorStatus
+.. autoclass:: ops.testing.EventProtocol
 .. autoclass:: ops.testing.Exec
 .. autoclass:: ops.testing.ICMPPort
 .. autoclass:: ops.testing.JujuLogLine

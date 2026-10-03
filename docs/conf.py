@@ -392,7 +392,6 @@ nitpick_ignore = [
     ("py:class", "_ChangeDict"),
     ("py:class", "_CheckInfoDict"),
     ("py:class", "_EntityStatus"),
-    ("py:class", "_Event"),
     ("py:class", "_FileInfoDict"),
     ("py:class", "_NetworkDict"),
     ("py:class", "_NoticeDict"),
@@ -434,7 +433,6 @@ nitpick_ignore = [
     ("py:obj", "scenario.state.CharmType"),
     ("py:class", "scenario.state.CharmType"),
     ("py:class", "scenario.state._EntityStatus"),
-    ("py:class", "scenario.state._Event"),
     ("py:class", "scenario.state._RelationType"),
 ]
 

@@ -24,6 +24,7 @@ from typing import (
     Generic,
     Literal,
     NoReturn,
+    Protocol,
     TypeVar,
     cast,
     overload,
@@ -2347,8 +2348,9 @@ class _CharmSpec(Generic[_CharmTypeCo]):
 class DeferredEvent:
     """An event that has been deferred to run prior to the next Juju event.
 
-    Tests should not instantiate this class directly: use the `deferred` method
-    of the event instead. For example:
+    Tests should not instantiate this class directly: use the
+    :meth:`deferred <EventProtocol.deferred>` method of the event instead. For
+    example::
 
         ctx = Context(MyCharm)
         deferred_start = ctx.on.start().deferred(handler=MyCharm._on_start)
@@ -2372,6 +2374,53 @@ class DeferredEvent:
     def name(self):
         """A comparable name for the event."""
         return self.handle_path.split('/')[-1].split('[')[0]
+
+
+class EventProtocol(Protocol):
+    """The shape of the event objects that :class:`CharmEvents` produces.
+
+    Get an event by calling the appropriate method of :attr:`Context.on`, and
+    pass it to :meth:`Context.run`. For example::
+
+        ctx = Context(MyCharm)
+        ctx.run(ctx.on.start(), State())
+
+    Tests should not implement this protocol, or construct event objects any
+    other way: the methods of :class:`CharmEvents` make sure that the event is
+    consistent with the component that it is about (the relation, container,
+    secret, and so on).
+
+    :meth:`Context.run` raises :class:`TypeError` for any object it did not
+    create itself, including one that satisfies this protocol. This protocol
+    is for documentation and type checking only.
+    """
+
+    @property
+    def name(self) -> str:
+        """Full event name.
+
+        For Juju events, this is the Juju hook name with hyphens replaced by
+        underscores. The name consists of a prefix, naming the entity the event
+        is about, and a suffix, denoting the type of event. For example, a
+        change on relation endpoint ``foo-bar`` runs the Juju hook
+        ``foo-bar-relation-changed``, and the event name is
+        ``foo_bar_relation_changed``. Events that are not about an entity, such
+        as ``update_status``, have no prefix.
+        """
+        ...
+
+    def deferred(self, handler: Callable[..., Any], event_id: int = 1) -> DeferredEvent:
+        """Construct a deferred event from this event.
+
+        See :class:`DeferredEvent` for how deferred events are used in a
+        :class:`State`.
+
+        Args:
+            handler: the method of the charm class that would have handled the
+                event, for example ``MyCharm._on_start``.
+            event_id: the position of the event in the simulated notice queue.
+        """
+        ...
 
 
 class _EventType(str, Enum):
