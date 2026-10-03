@@ -16,13 +16,17 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import enum
 import logging
 import os
 import pathlib
+import sys
+import types
+import typing
 import warnings
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -33,6 +37,7 @@ from typing import (
     TypedDict,
     TypeVar,
     cast,
+    get_type_hints,
 )
 
 from . import model
@@ -1700,6 +1705,243 @@ def _juju_fields(cls: type[object]) -> dict[str, str]:
         return class_fields
     # It's not clear, so give up.
     raise ValueError('Unable to find class fields')
+
+
+_SEQUENCE_TYPES = (list, tuple, set, frozenset)
+
+# Abstract collection annotations don't name a type to build, so each is
+# built as a concrete type that satisfies it. The read-only sequence types
+# would be better built as a tuple, but charms may rely on getting a list, so
+# that change is left for the next major release.
+_ABSTRACT_SEQUENCE_TYPES: dict[Any, type] = {
+    collections.abc.Iterable: list,
+    collections.abc.Collection: list,
+    collections.abc.Sequence: list,
+    collections.abc.MutableSequence: list,
+    collections.abc.Set: frozenset,
+    collections.abc.MutableSet: set,
+}
+_ABSTRACT_MAPPING_TYPES: dict[Any, type] = {
+    collections.abc.Mapping: dict,
+    collections.abc.MutableMapping: dict,
+}
+# A mapping is an Iterable or Collection of its keys, so a mapping value
+# satisfies these annotations and they are built from its keys.
+_MAPPING_KEY_TYPES = (collections.abc.Iterable, collections.abc.Collection)
+
+
+def _union_member_fits(member: Any, value: Any) -> bool:
+    """Report whether a decoded ``value`` has the right shape for union ``member``.
+
+    Only the shape is checked (sequence, mapping, or anything else). The
+    member is never constructed, so the check has no side effects.
+    """
+    if member is Any or member is object:
+        return True
+    # A type alias from the `type` statement isn't resolved, so the value is
+    # passed through whatever its shape.
+    if isinstance(member, getattr(typing, 'TypeAliasType', ())):
+        return True
+    kind = typing.get_origin(member) or member
+    if kind in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
+        return True
+    kind = _ABSTRACT_SEQUENCE_TYPES.get(kind, kind)
+    if isinstance(kind, type) and issubclass(kind, _SEQUENCE_TYPES):
+        return isinstance(value, _SEQUENCE_TYPES)
+    if (isinstance(kind, type) and issubclass(kind, Mapping)) or dataclasses.is_dataclass(member):
+        return isinstance(value, Mapping)
+    return not isinstance(value, (*_SEQUENCE_TYPES, Mapping))
+
+
+def _coerce_field(tp: Any, value: Any) -> Any:
+    """Coerce a decoded ``value`` into the dataclass field type ``tp``.
+
+    Used by :meth:`ops.Relation.load` to recursively construct nested
+    dataclasses and enum values from JSON-decoded relation data. An
+    ``Optional``/``Union`` field is coerced against the one member that
+    matches the shape of the value; ``dict``, ``Mapping`` and
+    ``MutableMapping`` fields have their keys and values coerced; abstract
+    sequence and set fields such as ``Sequence[X]`` are built as a ``list``,
+    ``set`` or ``frozenset``; a variable-length ``tuple[X, ...]`` is coerced
+    element-wise against ``X`` and a fixed-length ``tuple[X, Y, ...]`` is
+    coerced positionally.
+
+    Raises ``TypeError`` if the value for a sequence field is a string, bytes
+    or a mapping (other than a mapping for an ``Iterable`` or ``Collection``
+    field, which is built from its keys), or if the value for a mapping field
+    is not a mapping: those are all iterable, so coercing them element-wise
+    would quietly produce a wrong answer rather than fail. Also raises
+    ``TypeError`` if the value matches the shape of none of a ``Union``
+    field's members.
+    """
+    origin = typing.get_origin(tp)
+    if origin is None:
+        if isinstance(tp, type):
+            return _coerce_class(tp, value)  # pyright: ignore[reportUnknownVariableType]
+        # Any, TypeVars, NewTypes and the like aren't classes, so there is
+        # nothing to build.
+        return value
+    args = typing.get_args(tp)
+    if not args:
+        return value
+    if origin is typing.Union or origin is types.UnionType:
+        return _coerce_union(tp, args, value)
+    if origin in _SEQUENCE_TYPES:
+        return _coerce_sequence(tp, origin, args, value)
+    if origin in _ABSTRACT_SEQUENCE_TYPES:
+        concrete = _ABSTRACT_SEQUENCE_TYPES[origin]
+        if origin in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
+            return _coerce_sequence(tp, concrete, args, list(cast('Mapping[Any, Any]', value)))
+        return _coerce_sequence(tp, concrete, args, value)
+    if (origin is dict or origin in _ABSTRACT_MAPPING_TYPES) and len(args) == 2:
+        return _coerce_mapping(tp, args[0], args[1], value)
+    # Literal and other constructed generics: accept the value as-is.
+    return value
+
+
+def _coerce_class(tp: type[_T], value: Any) -> _T:
+    """Coerce ``value`` against a class ``tp`` with no type arguments.
+
+    Builds a dataclass or enum; any other class is passed through as-is.
+    """
+    if dataclasses.is_dataclass(tp):
+        if isinstance(value, tp):
+            # Already the class we want, for example built by a custom
+            # decoder, so there is nothing to coerce.
+            return value
+        if not isinstance(value, Mapping):
+            # Without this, a remote app writing a string or a list where a
+            # nested dataclass belongs gets a default-constructed object
+            # that corresponds to nothing in the databag: `field.name not in
+            # 'oops'` is False for every field, so every one is skipped.
+            raise TypeError(
+                f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
+            )
+        return _build_dataclass(tp, cast('Mapping[str, Any]', value))
+    if issubclass(tp, enum.Enum):
+        return tp(value)
+    return value
+
+
+def _coerce_union(tp: Any, args: tuple[Any, ...], value: Any) -> Any:
+    """Coerce ``value`` against the member of union ``tp`` that its shape matches."""
+    # None is only ever the None member, and the other members won't
+    # accept it.
+    if value is None:
+        return None
+    # Python flattens nested unions when they are defined, so args already
+    # holds every member.
+    members = [a for a in args if a is not type(None)]
+    # Pick the member by the shape of the decoded value alone, checking
+    # every member so that the result doesn't depend on the order they are
+    # declared in. Where more than one member fits (an enum and a str both
+    # take a string, for example), there's no principled way to choose, so
+    # accept the value as-is.
+    if len(members) > 1:
+        fits = [m for m in members if _union_member_fits(m, value)]
+        if not fits:
+            raise TypeError(
+                f'expected a value matching one of {tp}, got {type(value).__name__}: {value!r}'
+            )
+        members = fits
+    if len(members) == 1:
+        return _coerce_field(members[0], value)
+    return value
+
+
+def _is_unpacked(arg: Any) -> bool:
+    """Report whether type argument ``arg`` is unpacked, such as ``*tuple[str, ...]``."""
+    if getattr(arg, '__unpacked__', False):
+        return True
+    origin = typing.get_origin(arg)
+    if origin is None:
+        return False
+    # Before Python 3.12, typing_extensions.Unpack is a separate object from
+    # typing.Unpack, and it can only be in use if the charm has imported it.
+    typing_extensions = sys.modules.get('typing_extensions')
+    return origin is getattr(typing, 'Unpack', None) or origin is getattr(
+        typing_extensions, 'Unpack', None
+    )
+
+
+def _coerce_sequence(tp: Any, origin: type, args: tuple[Any, ...], value: Any) -> Any:
+    """Coerce the elements of ``value`` against sequence type ``tp``."""
+    # An unpacked member such as *tuple[str, ...] makes the number of
+    # positions variable, which isn't supported, and an Ellipsis anywhere
+    # other than tuple[X, ...] isn't a valid annotation, so accept the value
+    # as-is.
+    variable_length = len(args) == 2 and args[1] is Ellipsis
+    if (
+        origin is tuple
+        and not variable_length
+        and (Ellipsis in args or any(_is_unpacked(a) for a in args))
+    ):
+        return value
+    # A str, bytes or mapping is iterable, so coercing element-wise would
+    # silently succeed with nonsense: a list of characters, or of the
+    # mapping's keys. None of those is a sequence the charm meant, so
+    # refuse rather than hand back the wrong answer.
+    if isinstance(value, (str, bytes, Mapping)):
+        given_type = type(value)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+        raise TypeError(f'expected a sequence for {tp}, got {given_type.__name__}: {value!r}')
+    if origin is tuple:
+        if variable_length:
+            return tuple(_coerce_field(args[0], v) for v in value)
+        return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
+    if origin is set:
+        return {_coerce_field(args[0], v) for v in value}
+    if origin is frozenset:
+        return frozenset(_coerce_field(args[0], v) for v in value)
+    return [_coerce_field(args[0], v) for v in value]
+
+
+def _coerce_mapping(tp: Any, key_type: Any, value_type: Any, value: Any) -> Any:
+    """Coerce the keys and values of ``value`` against the key and value types of ``tp``."""
+    if not isinstance(value, Mapping):
+        raise TypeError(f'expected a mapping for {tp}, got {type(value).__name__}: {value!r}')
+    mapping = cast('Mapping[Any, Any]', value)
+    return {_coerce_field(key_type, k): _coerce_field(value_type, v) for k, v in mapping.items()}
+
+
+def _build_dataclass(
+    cls: Any,
+    data: Mapping[str, Any],
+    args: Sequence[Any] = (),
+    extra_kwargs: Mapping[str, Any] | None = None,
+) -> Any:
+    """Construct dataclass ``cls`` from ``data``, ``args``, and ``extra_kwargs``.
+
+    Recursively coerces nested dataclass / enum / list / set / tuple / dict
+    fields supplied via ``data``. The caller's ``args`` and ``extra_kwargs``
+    are passed through as given rather than coerced; ``extra_kwargs`` must not
+    share any names with ``data``.
+
+    Falls back to the un-coerced ``cls(*args, **extra_kwargs, **data)`` if
+    ``get_type_hints`` raises, which happens even if a single field's
+    annotation is unresolvable, because ``get_type_hints`` resolves every
+    field at once. This is most likely to happen with a
+    ``TYPE_CHECKING``-only import that has no runtime name.
+
+    Raises ``TypeError`` (via the dataclass ``__init__``) if a required field is
+    missing or an item in ``args`` fills a field that is also in ``data``, and
+    ``ValueError``/``TypeError`` from coercion of malformed values.
+    """
+    extra_kwargs = extra_kwargs or {}
+    try:
+        hints = get_type_hints(cls)
+    except (NameError, TypeError) as e:
+        logger.debug(
+            'Unable to resolve type hints for %s, not coercing relation data: %s',
+            cls.__name__,
+            e,
+        )
+        return cls(*args, **extra_kwargs, **data)
+    kwargs: dict[str, Any] = {}
+    for field in dataclasses.fields(cls):
+        if field.name not in data:
+            continue
+        kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
+    return cls(*args, **extra_kwargs, **kwargs)
 
 
 class CharmMeta:

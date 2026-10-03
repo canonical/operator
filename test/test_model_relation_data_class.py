@@ -14,16 +14,25 @@
 
 from __future__ import annotations
 
+import collections.abc
 import dataclasses
 import enum
 import functools
 import ipaddress
 import json
+import sys
+import typing
 import urllib.parse
 from collections.abc import Callable, Iterable
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    # Used only by test_relation_load_falls_back_when_type_hints_unresolvable,
+    # which needs an annotation naming a type that is never actually imported
+    # at runtime.
+    import decimal
 
 try:
     import pydantic
@@ -43,6 +52,11 @@ from ops import testing
 @dataclasses.dataclass
 class Nested:
     sub: int = 28
+
+
+class _Colour(enum.Enum):
+    RED = 'red'
+    BLUE = 'blue'
 
 
 class DatabagProtocol(Protocol):
@@ -448,6 +462,595 @@ def test_relation_load_extra_args():
     assert obj.a == 10
     assert obj.b == 3.14
     assert obj.c == 'foo'
+
+
+def _load_into(cls: type[Any], remote_app_data: dict[str, str]) -> Any:
+    """Load ``remote_app_data`` into ``cls`` via ``Relation.load`` and return the result."""
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(cls, event.app)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data=remote_app_data)
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        return mgr.charm.data
+
+
+def test_relation_load_optional_nested_dataclass():
+    """Optional[X] (a Union with one concrete member) is coerced against X."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | None = None
+
+    obj = _load_into(Data, {'inner': json.dumps({'sub': 1})})
+    assert isinstance(obj.inner, Nested)
+    assert obj.inner.sub == 1
+
+    obj = _load_into(Data, {})
+    assert obj.inner is None
+
+
+def test_relation_load_optional_explicit_null():
+    """An Optional[X] field whose databag value is null stays None.
+
+    The value is not coerced against X, which would reject None: building a
+    nested dataclass, iterating a list, or calling an enum all fail on it.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | None = None
+        items: list[str] | None = None
+        colour: _Colour | None = None
+
+    obj = _load_into(
+        Data,
+        {'inner': json.dumps(None), 'items': json.dumps(None), 'colour': json.dumps(None)},
+    )
+    assert obj.inner is None
+    assert obj.items is None
+    assert obj.colour is None
+
+
+def test_relation_load_dict_of_nested_dataclass():
+    """dict[str, X] fields are coerced against X for each value."""
+
+    @dataclasses.dataclass
+    class Data:
+        by_name: dict[str, Nested]
+
+    obj = _load_into(Data, {'by_name': json.dumps({'a': {'sub': 1}, 'b': {'sub': 2}})})
+    assert obj.by_name == {'a': Nested(sub=1), 'b': Nested(sub=2)}
+    assert all(isinstance(v, Nested) for v in obj.by_name.values())
+
+
+def test_relation_load_dict_with_enum_keys():
+    """dict[K, V] fields coerce each key against K as well as each value against V."""
+
+    @dataclasses.dataclass
+    class Data:
+        by_colour: dict[_Colour, Nested]
+
+    obj = _load_into(Data, {'by_colour': json.dumps({'red': {'sub': 1}})})
+    assert obj.by_colour == {_Colour.RED: Nested(sub=1)}
+
+
+def test_relation_load_union_of_two_concrete_types_passes_through():
+    """A Union with more than one concrete member is passed through as-is.
+
+    There is no way to tell which member to coerce against, so this is a
+    regression check that such fields keep working uncoerced rather than
+    raising.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        value: int | str
+
+    obj = _load_into(Data, {'value': json.dumps('x')})
+    assert obj.value == 'x'
+
+
+@pytest.mark.parametrize(
+    'annotation,written,expected',
+    [
+        pytest.param(
+            list[Nested] | dict[str, Nested],
+            [{'sub': 1}],
+            [Nested(sub=1)],
+            id='list-or-dict-given-list',
+        ),
+        pytest.param(
+            list[Nested] | dict[str, Nested],
+            {'a': {'sub': 1}},
+            {'a': Nested(sub=1)},
+            id='list-or-dict-given-dict',
+        ),
+        pytest.param(Nested | str, {'sub': 1}, Nested(sub=1), id='dataclass-or-str-given-dict'),
+        pytest.param(Nested | str, 'x', 'x', id='dataclass-or-str-given-str'),
+        pytest.param(
+            Nested | _Colour, {'sub': 1}, Nested(sub=1), id='dataclass-or-enum-given-dict'
+        ),
+        pytest.param(Nested | _Colour, 'red', _Colour.RED, id='dataclass-or-enum-given-str'),
+        pytest.param(
+            collections.abc.Sequence[Nested] | str,
+            [{'sub': 1}],
+            [Nested(sub=1)],
+            id='sequence-or-str-given-list',
+        ),
+        pytest.param(
+            collections.abc.Sequence[Nested] | str, 'x', 'x', id='sequence-or-str-given-str'
+        ),
+    ],
+)
+def test_relation_load_union_picks_member_by_shape(annotation: Any, written: Any, expected: Any):
+    """A Union is coerced against the one member that matches the value's shape."""
+    # This module uses postponed annotations, so a class body annotation would
+    # be the unresolvable string 'annotation' rather than the type itself.
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps(written)})
+    assert obj.value == expected
+    assert type(obj.value) is type(expected)
+
+
+def test_relation_load_union_ambiguous_scalar_passes_through():
+    """A scalar that fits more than one member of a Union is passed through as-is."""
+
+    @dataclasses.dataclass
+    class Data:
+        colour: _Colour | str
+
+    obj = _load_into(Data, {'colour': json.dumps('red')})
+    assert obj.colour == 'red'
+
+
+@pytest.mark.parametrize(
+    'wildcard', [pytest.param(Any, id='any'), pytest.param(object, id='object')]
+)
+def test_relation_load_union_with_any_or_object_member_passes_through(wildcard: Any):
+    """Any and object accept a value of any shape, so the value is passed through as-is."""
+    data_class = dataclasses.make_dataclass('Data', [('value', list[Nested] | wildcard)])
+
+    obj = _load_into(data_class, {'value': json.dumps({'sub': 1})})
+    assert obj.value == {'sub': 1}
+
+
+@pytest.mark.parametrize('form', ['alias', 'alias-or-none', 'alias-or-int'])
+def test_relation_load_type_statement_alias_passes_through(form: str):
+    """A type alias from the type statement isn't resolved, so the value is passed through."""
+    if sys.version_info < (3, 12):
+        pytest.skip('the type statement needs Python 3.12')
+    alias = typing.TypeAliasType('Pets', list[Nested])
+    annotation = {'alias': alias, 'alias-or-none': alias | None, 'alias-or-int': alias | int}[form]
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [{'sub': 1}]
+
+
+def test_relation_load_union_with_none_member():
+    """A null value for a Union with a None member stays None."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | list[Nested] | None = None
+
+    obj = _load_into(Data, {'inner': json.dumps(None)})
+    assert obj.inner is None
+
+
+def test_relation_load_union_no_member_fits():
+    """A value that matches the shape of no member of a Union is rejected."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested | list[Nested]
+
+    # The charm doesn't catch it, so ops.testing reports it as an uncaught error.
+    with pytest.raises(
+        testing.errors.UncaughtCharmError, match='expected a value matching one of'
+    ):
+        _load_into(Data, {'inner': json.dumps('oops')})
+
+
+def test_relation_load_variable_length_tuple():
+    """tuple[X, ...] is coerced element-wise against X and stays a tuple."""
+
+    @dataclasses.dataclass
+    class Data:
+        items: tuple[Nested, ...]
+
+    obj = _load_into(Data, {'items': json.dumps([{'sub': 1}, {'sub': 2}])})
+    assert obj.items == (Nested(sub=1), Nested(sub=2))
+    assert isinstance(obj.items, tuple)
+
+
+def test_relation_load_heterogeneous_tuple():
+    """A fixed-length tuple[X, Y] is coerced positionally against each type."""
+
+    @dataclasses.dataclass
+    class Data:
+        pair: tuple[int, _Colour]
+
+    obj = _load_into(Data, {'pair': json.dumps([1, 'red'])})
+    assert obj.pair == (1, _Colour.RED)
+    assert isinstance(obj.pair, tuple)
+
+
+@pytest.mark.parametrize('form', ['star', 'unpack'])
+def test_relation_load_tuple_with_unpacked_member_passes_through(form: str):
+    """A tuple with an unpacked member, such as *tuple[X, ...], is passed through as-is."""
+    if sys.version_info < (3, 11):
+        pytest.skip('unpacked tuple members need Python 3.11')
+    if form == 'star':
+        annotation = tuple[(int, *tuple[Nested, ...])]
+    else:
+        annotation = tuple[int, typing.Unpack[tuple[Nested, ...]]]
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps([1, {'sub': 1}, {'sub': 2}])})
+    assert obj.value == [1, {'sub': 1}, {'sub': 2}]
+
+
+@pytest.mark.parametrize(
+    'annotation',
+    [
+        pytest.param(tuple[int, str, ...], id='ellipsis-after-two-types'),  # pyright: ignore[reportInvalidTypeForm]
+        pytest.param(tuple[...], id='ellipsis-alone'),  # pyright: ignore[reportInvalidTypeForm]
+    ],
+)
+def test_relation_load_tuple_with_misplaced_ellipsis_passes_through(annotation: Any):
+    """A tuple with an Ellipsis anywhere other than tuple[X, ...] is passed through as-is."""
+    # This module uses postponed annotations, so a class body annotation would
+    # be the unresolvable string 'annotation' rather than the type itself.
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps([1, 'a', 'b'])})
+    assert obj.value == [1, 'a', 'b']
+
+
+def test_relation_load_set_and_frozenset():
+    """set[X] and frozenset[X] coerce their elements and keep their own type."""
+
+    @dataclasses.dataclass
+    class Data:
+        mutable: set[_Colour]
+        immutable: frozenset[_Colour]
+
+    obj = _load_into(
+        Data, {'mutable': json.dumps(['red']), 'immutable': json.dumps(['red', 'blue'])}
+    )
+    assert obj.mutable == {_Colour.RED}
+    assert type(obj.mutable) is set
+    assert obj.immutable == frozenset({_Colour.RED, _Colour.BLUE})
+    assert type(obj.immutable) is frozenset
+
+
+@pytest.mark.parametrize(
+    'annotation,expected',
+    [
+        pytest.param(collections.abc.Iterable[_Colour], [_Colour.RED], id='iterable'),
+        pytest.param(collections.abc.Collection[_Colour], [_Colour.RED], id='collection'),
+        pytest.param(collections.abc.Sequence[_Colour], [_Colour.RED], id='sequence'),
+        pytest.param(
+            collections.abc.MutableSequence[_Colour], [_Colour.RED], id='mutable-sequence'
+        ),
+        pytest.param(collections.abc.Set[_Colour], frozenset({_Colour.RED}), id='set'),
+        pytest.param(collections.abc.MutableSet[_Colour], {_Colour.RED}, id='mutable-set'),
+    ],
+)
+def test_relation_load_abstract_collection(annotation: Any, expected: Any):
+    """An abstract collection field coerces its elements and is built as a concrete type."""
+    # This module uses postponed annotations, so a class body annotation would
+    # be the unresolvable string 'annotation' rather than the type itself.
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps(['red'])})
+    assert obj.value == expected
+    assert type(obj.value) is type(expected)
+
+
+@pytest.mark.parametrize(
+    'annotation',
+    [
+        pytest.param(collections.abc.Mapping[str, _Colour], id='mapping'),
+        pytest.param(collections.abc.MutableMapping[str, _Colour], id='mutable-mapping'),
+    ],
+)
+def test_relation_load_abstract_mapping(annotation: Any):
+    """An abstract mapping field coerces its values and is built as a dict."""
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps({'a': 'red'})})
+    assert obj.value == {'a': _Colour.RED}
+    assert type(obj.value) is dict
+
+
+@pytest.mark.parametrize(
+    'annotation',
+    [
+        pytest.param(collections.abc.Iterable[_Colour], id='iterable'),
+        pytest.param(collections.abc.Collection[_Colour], id='collection'),
+        pytest.param(collections.abc.Collection[_Colour] | int, id='collection-or-int'),
+    ],
+)
+def test_relation_load_iterable_or_collection_given_mapping_uses_keys(annotation: Any):
+    """A mapping is an Iterable or Collection of its keys, so its keys are coerced."""
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps({'red': 1, 'blue': 2})})
+    assert obj.value == [_Colour.RED, _Colour.BLUE]
+
+
+def test_relation_load_other_mapping_type_passes_through():
+    """A mapping type other than dict, Mapping or MutableMapping is passed through.
+
+    There is no general way to build an arbitrary mapping type (a defaultdict
+    needs a default factory, for example), so the field gets the decoded dict.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        by_name: collections.OrderedDict[str, Nested]
+
+    obj = _load_into(Data, {'by_name': json.dumps({'a': {'sub': 1}})})
+    assert obj.by_name == {'a': {'sub': 1}}
+
+
+def test_relation_load_sequence_field_rejects_string_or_mapping(monkeypatch: pytest.MonkeyPatch):
+    """A str, bytes or mapping value for a sequence field raises, rather than being iterated.
+
+    All three are iterable, so coercing element-wise would silently produce a
+    list of characters, or of the mapping's keys, instead of failing.
+    """
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        tags: list[str]
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(Data, {'tags': json.dumps('hello')})
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(Data, {'tags': json.dumps({'a': 1})})
+
+    @dataclasses.dataclass
+    class SetData:
+        tags: set[str]
+
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(SetData, {'tags': json.dumps('hello')})
+
+    # A mapping isn't a Sequence, unlike an Iterable or Collection.
+    sequence_data = dataclasses.make_dataclass(
+        'SequenceData', [('tags', collections.abc.Sequence[str])]
+    )
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(sequence_data, {'tags': json.dumps({'a': 1})})
+
+    # A genuine sequence is still coerced.
+    obj = _load_into(Data, {'tags': json.dumps(['hello'])})
+    assert obj.tags == ['hello']
+
+
+def test_relation_load_mapping_field_rejects_non_mapping(monkeypatch: pytest.MonkeyPatch):
+    """A non-mapping value for a dict field raises a clear error."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        by_name: dict[str, int]
+
+    with pytest.raises(TypeError, match='expected a mapping'):
+        _load_into(Data, {'by_name': json.dumps([1, 2])})
+
+    obj = _load_into(Data, {'by_name': json.dumps({'a': 1})})
+    assert obj.by_name == {'a': 1}
+
+
+def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():
+    """The pydantic guard must key off __pydantic_validator__, not __is_pydantic_dataclass__.
+
+    __is_pydantic_dataclass__ only exists from pydantic 2.11; older pydantic
+    dataclasses (as old as 2.0.3) have __pydantic_validator__ in their
+    __dict__ instead. Simulate that older shape on a plain dataclass, without
+    needing multiple installed pydantic versions, and confirm Relation.load
+    still treats it as a pydantic target: ops's own recursive coercion must
+    not run, so a nested-dataclass-typed field stays a plain decoded dict
+    rather than being (mis-)coerced ahead of pydantic's own validation.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        nested: Nested
+
+    # Simulate pydantic < 2.11's shape.
+    Data.__pydantic_validator__ = object()  # pyright: ignore[reportAttributeAccessIssue]
+
+    obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
+    assert isinstance(obj.nested, dict)
+
+
+@pytest.mark.parametrize(
+    'written',
+    [
+        pytest.param(json.dumps('oops'), id='string'),
+        pytest.param(json.dumps([1, 2]), id='list'),
+        pytest.param(json.dumps(3), id='int'),
+        # A string that happens to contain every field name: the membership
+        # test that skips absent fields passes for the wrong reason.
+        pytest.param(json.dumps('subscribe'), id='string-containing-field-name'),
+    ],
+)
+def test_relation_load_rejects_a_non_mapping_for_a_nested_dataclass(written: str):
+    """A remote app can write anything, and ops must not invent an object from it.
+
+    `_build_dataclass` decides which fields to fill with `field.name not in
+    data`, which is False for every field of a string or a list, so without
+    this guard the charm is handed a confidently default-constructed object
+    corresponding to nothing in the databag - or a TypeError from inside ops,
+    depending on the value.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        nested: Nested | None = None
+
+    # The charm doesn't catch it, so ops.testing reports it as an uncaught error.
+    with pytest.raises(testing.errors.UncaughtCharmError, match='expected a mapping for Nested'):
+        _load_into(Data, {'nested': written})
+
+
+def test_relation_load_passes_through_an_already_built_keyword_argument():
+    """`kwargs` are passed through to the data class as given."""
+
+    @dataclasses.dataclass
+    class Data:
+        name: str = ''
+        nested: Nested | None = None
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, nested=Nested(sub=5))
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'name': json.dumps('x')})
+    with ctx(ctx.on.relation_changed(rel), testing.State(relations={rel})) as mgr:
+        mgr.run()
+        data = mgr.charm.data
+
+    assert data == Data(name='x', nested=Nested(sub=5))
+
+
+def test_relation_load_does_not_coerce_keyword_arguments():
+    """A keyword argument is passed through uncoerced, like a positional one."""
+
+    @dataclasses.dataclass
+    class Data:
+        name: str = ''
+        nested: Nested | None = None
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, nested={'sub': 5})
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'name': json.dumps('x')})
+    with ctx(ctx.on.relation_changed(rel), testing.State(relations={rel})) as mgr:
+        mgr.run()
+        data = mgr.charm.data
+
+    assert data.nested == {'sub': 5}
+
+
+def test_relation_load_falls_back_when_type_hints_unresolvable():
+    """get_type_hints raises NameError on a TYPE_CHECKING-only annotation.
+
+    ops's own ruff config disables TC001/2/3, so charms following ops's
+    conventions are the ones most likely to hit this. Relation.load must
+    fall back to the un-coerced constructor rather than raising.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        amount: decimal.Decimal | None = None
+        name: str = ''
+
+    obj = _load_into(Data, {'name': json.dumps('x')})
+    assert obj.name == 'x'
+    assert obj.amount is None
+
+
+def test_relation_load_falls_back_when_type_hint_is_not_a_type():
+    """get_type_hints raises TypeError on an annotation that isn't a type."""
+
+    @dataclasses.dataclass
+    class Data:
+        count: int | 1 = 0  # pyright: ignore[reportGeneralTypeIssues]
+        nested: Nested | None = None
+
+    obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
+    assert obj.nested == {'sub': 1}
+    assert obj.count == 0
+
+
+def test_relation_load_extra_args_still_coerces_remaining_fields():
+    """A positional arg must not silently disable coercion for other fields.
+
+    relation.load(cls, src, *args) matches args to cls's leading fields by
+    position; any fields filled that way are left uncoerced (there's nothing
+    to coerce them against without knowing which field each arg is for), but
+    fields still supplied from the relation data should keep being coerced.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        b: Nested
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, 10)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'b': json.dumps({'sub': 1})})
+    state_in = testing.State(leader=True, relations={rel})
+    with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+        mgr.run()
+        obj = mgr.charm.data
+    assert obj.a == 10
+    assert isinstance(obj.b, Nested)
+    assert obj.b.sub == 1
+
+
+def test_relation_load_positional_arg_colliding_with_relation_data_raises(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A positional arg for a field that is also in the relation data raises TypeError."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        a: int
+        b: Nested
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            event.relation.load(Data, event.app, 10)
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation(
+        'db', remote_app_data={'a': json.dumps(20), 'b': json.dumps({'sub': 1})}
+    )
+    state_in = testing.State(leader=True, relations={rel})
+    with pytest.raises(TypeError, match='multiple values'):
+        ctx.run(ctx.on.relation_changed(rel), state_in)
 
 
 @pytest.mark.parametrize('charm_class', _test_classes)

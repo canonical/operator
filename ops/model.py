@@ -1765,9 +1765,9 @@ class Relation:
     ) -> _T:
         """Load the data for this relation into an instance of a data class.
 
-        The raw Juju relation data is passed to the data class's ``__init__``
-        method as keyword arguments, with values decoded using the provided
-        decoder function, or :func:`json.loads` if no decoder is provided.
+        The raw Juju relation data is decoded using the provided decoder
+        function, or :func:`json.loads` if no decoder is provided, and passed
+        to the data class's ``__init__`` method as keyword arguments.
 
         For example::
 
@@ -1791,8 +1791,66 @@ class Relation:
                 data = event.relation.load(Data, event.app)
                 secret = self.model.get_secret(data.secret_id)
 
-        Any additional positional or keyword arguments will be passed through to
-        the data class ``__init__``.
+        For a Pydantic ``BaseModel`` or Pydantic dataclass, the decoded values
+        are passed straight through as keyword arguments and Pydantic
+        performs its own coercion and validation.
+
+        For any other :func:`dataclasses.dataclass`, the decoded values are
+        also recursively coerced to match each field's type hint before being
+        passed to ``__init__``:
+
+        - A nested dataclass or :class:`enum.Enum` field is constructed from
+          its decoded value. This includes a nested Pydantic dataclass, which
+          then does its own validation.
+        - A ``list``, ``set``, ``frozenset``, or variable-length
+          ``tuple[X, ...]`` field is built as that collection type, with each
+          element coerced against the type argument. A ``dict`` field is built
+          as a ``dict``, with each key and value coerced against the key and
+          value types.
+        - An abstract collection field is built as a concrete type, with each
+          element, key, or value coerced against its type argument: a
+          ``list`` for ``Iterable``, ``Collection``, ``Sequence``, or
+          ``MutableSequence``, a ``frozenset`` for ``Set`` (``AbstractSet``),
+          a ``set`` for ``MutableSet``, and a ``dict`` for ``Mapping`` or
+          ``MutableMapping``. A mapping is an ``Iterable`` or ``Collection``
+          of its keys, so an ``Iterable`` or ``Collection`` field given a
+          mapping is built as a ``list`` of its keys.
+        - A fixed-length ``tuple[X, Y]`` field is built as a ``tuple``, with
+          each position coerced against its own type. The value must have
+          exactly as many items as the annotation has positions.
+        - An ``Optional``/``Union`` field is coerced against the one member
+          that matches the shape of the decoded value: a sequence type for a
+          list, a mapping type or dataclass for an object, or any other type
+          for a scalar. If more than one member matches (for example,
+          ``SomeEnum | str`` for a string), the value is passed through as-is.
+        - The value for any other type annotation is passed through
+          unchanged. This includes ``Literal``, scalar types such as ``int``
+          and ``str``, a ``tuple`` with an unpacked member such as
+          ``tuple[int, *tuple[str, ...]]``, and classes that are neither
+          dataclasses nor enums, such as a nested Pydantic ``BaseModel``.
+          Values keep their decoded type: a ``'1'`` in the databag stays a
+          string for an ``int`` field, and an object stays a ``dict`` for a
+          nested ``BaseModel`` field.
+        - A field annotated with a type alias defined with the ``type``
+          statement, such as ``type Pets = list[Pet]``, is passed through
+          unchanged. This also applies when the alias is a member of a
+          ``Union``. To have the value coerced, annotate the field with the
+          aliased type directly, or define the alias with a plain assignment,
+          such as ``Pets = list[Pet]``.
+
+        Type hints are resolved with :func:`typing.get_type_hints`, which
+        evaluates string annotations (including those from
+        ``from __future__ import annotations``) against the module's global
+        names. If any hint can't be resolved (for example, a
+        ``TYPE_CHECKING``-only import, a class defined inside a function, or
+        an annotation that doesn't evaluate to a type), none of the values are
+        coerced, and they are passed to the class as-is instead of raising.
+
+        Any additional positional or keyword arguments are passed through to
+        the data class ``__init__`` as given, without coercion; a keyword
+        argument with the same name as a field in the relation data is
+        overridden by that data. A positional argument for a field that is
+        also in the relation data raises ``TypeError``.
 
         Args:
             cls: A class, typically a Pydantic `BaseModel` subclass or a
@@ -1809,12 +1867,24 @@ class Relation:
         Returns:
             An instance of the data class that was provided as ``cls`` with the
             current relation data values.
+
+        Raises:
+            TypeError: If coercing a dataclass field finds a decoded value of
+                the wrong shape: a non-mapping for a nested dataclass or a
+                ``dict`` or ``Mapping`` field, a string, bytes, or mapping for a
+                sequence or set field (other than a mapping for an
+                ``Iterable`` or ``Collection`` field), or a value that matches
+                none of a ``Union`` field's members. Also raised if a nested
+                dataclass is missing a required field.
+            ValueError: If coercing a dataclass field finds a value that isn't a
+                member of its ``Enum``, or a fixed-length ``tuple`` value with
+                the wrong number of items.
         """
         try:
             fields = _charm._juju_fields(cls)
         except ValueError:
             fields = None
-        data: dict[str, Any] = copy.deepcopy(kwargs)
+        data: dict[str, Any] = {}
         if decoder is None:
             decoder = json.loads
         for key, value in sorted(self.data[src].items()):
@@ -1822,7 +1892,17 @@ class Relation:
                 data[key] = decoder(value)
             elif key in fields:
                 data[fields[key]] = decoder(value)
-        return cls(*args, **data)
+        # Relation data wins over a keyword argument of the same name.
+        kwargs = {k: v for k, v in copy.deepcopy(kwargs).items() if k not in data}
+        # For plain (non-pydantic) dataclass targets, recursively coerce nested
+        # dataclass / enum / list / set fields. Pydantic handles its own coercion.
+        # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
+        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
+        # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
+        # Positional and keyword arguments are passed through uncoerced.
+        if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
+            return _charm._build_dataclass(cls, data, args, kwargs)
+        return cls(*args, **kwargs, **data)
 
     def save(
         self,
