@@ -35,8 +35,11 @@ See more: {ref}`init-charm`
 
 The Charmcraft profile has configured some commands to help you develop your charm:
 
-- Run `tox` to format and lint the code, and run static type checking and the
-  charm unit tests.
+- Use tox to format and lint the code, and run static type checking and the
+  charm unit tests:
+    - `tox -e format`
+    - `tox -e lint` (includes static type checking)
+    - `tox -e unit`
 - Run `tox -e integration` to run the charm integration tests.
 - Run `tox list` to see the available commands.
 
