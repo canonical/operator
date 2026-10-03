@@ -1738,6 +1738,10 @@ def _union_member_fits(member: Any, value: Any) -> bool:
     """
     if member is Any or member is object:
         return True
+    # A type alias from the `type` statement isn't resolved, so the value is
+    # passed through whatever its shape.
+    if isinstance(member, getattr(typing, 'TypeAliasType', ())):
+        return True
     kind = typing.get_origin(member) or member
     if kind in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
         return True

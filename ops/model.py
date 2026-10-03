@@ -1829,9 +1829,15 @@ class Relation:
           and ``str``, a ``tuple`` with an unpacked member such as
           ``tuple[int, *tuple[str, ...]]``, and classes that are neither
           dataclasses nor enums, such as a nested Pydantic ``BaseModel``.
-          Values keep their decoded type: a
-          ``'1'`` in the databag stays a string for an ``int`` field, and an
-          object stays a ``dict`` for a nested ``BaseModel`` field.
+          Values keep their decoded type: a ``'1'`` in the databag stays a
+          string for an ``int`` field, and an object stays a ``dict`` for a
+          nested ``BaseModel`` field.
+        - A field annotated with a type alias defined with the ``type``
+          statement, such as ``type Pets = list[Pet]``, is passed through
+          unchanged. This also applies when the alias is a member of a
+          ``Union``. To have the value coerced, annotate the field with the
+          aliased type directly, or define the alias with a plain assignment,
+          such as ``Pets = list[Pet]``.
 
         Type hints are resolved with :func:`typing.get_type_hints`, which
         evaluates string annotations (including those from

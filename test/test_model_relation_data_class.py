@@ -624,6 +624,19 @@ def test_relation_load_union_with_any_or_object_member_passes_through(wildcard: 
     assert obj.value == {'sub': 1}
 
 
+@pytest.mark.parametrize('form', ['alias', 'alias-or-none', 'alias-or-int'])
+def test_relation_load_type_statement_alias_passes_through(form: str):
+    """A type alias from the type statement isn't resolved, so the value is passed through."""
+    if sys.version_info < (3, 12):
+        pytest.skip('the type statement needs Python 3.12')
+    alias = typing.TypeAliasType('Pets', list[Nested])
+    annotation = {'alias': alias, 'alias-or-none': alias | None, 'alias-or-int': alias | int}[form]
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [{'sub': 1}]
+
+
 def test_relation_load_union_with_none_member():
     """A null value for a Union with a None member stays None."""
 
