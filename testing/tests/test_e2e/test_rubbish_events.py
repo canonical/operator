@@ -34,7 +34,9 @@ def mycharm():
         on: ClassVar[MySubEvents] = MySubEvents()
 
     class MyCharm(CharmBase):
-        on: ClassVar[MyCharmEvents] = MyCharmEvents()
+        # Narrowing CharmBase.on's type here is inherently invariant (it's a
+        # mutable attribute), so this needs an ignore regardless of "on"'s typing.
+        on: ClassVar[MyCharmEvents] = MyCharmEvents()  # type: ignore
         evts: ClassVar[list[EventBase]] = []
 
         def __init__(self, framework: Framework):

@@ -1482,15 +1482,10 @@ class CharmBase(Object):
             charm.
     """
 
-    on: CharmEvents = CharmEvents()  # type: ignore
+    on: CharmEvents = CharmEvents()
     """This property is used to create an event handler using :meth:`Framework.observe`,
     and can be one of the events listed at :class:`CharmEvents`.
     """
-
-    if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        @property
-        def on(self) -> CharmEvents: ...  # ruff: ignore[undocumented-public-method]
 
     def __init__(self, framework: Framework):
         super().__init__(framework, None)

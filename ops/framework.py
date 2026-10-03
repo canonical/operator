@@ -38,6 +38,9 @@ from ._private import tracer
 from .model import Model, _ModelBackend
 from .storage import JujuStorage, NoSnapshotError, SQLiteStorage
 
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
 
 class Serializable(typing.Protocol):
     """The type returned by :meth:`Framework.load_snapshot`."""
@@ -342,7 +345,7 @@ class HandleKind:
     be explicitly overridden if desired.
     """
 
-    def __get__(self, obj: Object, obj_type: type[Object]) -> str:
+    def __get__(self, obj: Object | None, obj_type: type[Object]) -> str:
         kind = typing.cast('str', obj_type.__dict__.get('handle_kind'))
         if kind:
             return kind
@@ -370,12 +373,6 @@ class Object:
     """
 
     handle_kind: str = HandleKind()  # type: ignore
-
-    if TYPE_CHECKING:
-        # to help the type checker and IDEs:
-        # all these are guaranteed to be set at runtime.
-        @property
-        def on(self) -> 'ObjectEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(self, parent: Framework | Object, key: str | None):
         self.framework: Framework = None  # type: ignore
@@ -409,9 +406,9 @@ class ObjectEvents(Object):
     def __init__(self, parent: Object | None = None, key: str | None = None):
         if parent is not None:
             super().__init__(parent, key)
-        self._cache: weakref.WeakKeyDictionary[Object, ObjectEvents] = weakref.WeakKeyDictionary()
+        self._cache: weakref.WeakKeyDictionary[Object, Self] = weakref.WeakKeyDictionary()
 
-    def __get__(self, emitter: Object, emitter_type: type[Object]):
+    def __get__(self, emitter: Object | None, emitter_type: type[Object]) -> Self:
         if emitter is None:
             return self
         instance = self._cache.get(emitter)
@@ -568,7 +565,7 @@ _event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
 class Framework(Object):
     """Main interface from the Charm to the ops library's infrastructure."""
 
-    on = FrameworkEvents()  # type: ignore
+    on = FrameworkEvents()
     """Used for :meth:`observe`-ing framework-specific events."""
 
     # Override properties from Object so that we can set them in __init__.
@@ -582,12 +579,6 @@ class Framework(Object):
     """The directory where the charm is running."""
 
     _stored: StoredStateData = None  # type: ignore
-
-    # to help the type checker and IDEs:
-    if TYPE_CHECKING:
-
-        @property
-        def on(self) -> 'FrameworkEvents': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
 
     def __init__(
         self,
@@ -1182,18 +1173,10 @@ class BoundStoredState:
 
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
-    @typing.overload
-    def __getattr__(self, key: Literal['on']) -> ObjectEvents:
-        pass
-
-    @typing.overload
-    def __getattr__(self, key: str) -> Any:
-        pass
-
     def __getattr__(self, key: str) -> Any:
         # "on" is the only reserved key that can't be used in the data map.
         if key == 'on':
-            return self._data.on
+            raise AttributeError("attribute 'on' is reserved")
         if key not in self._data:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])

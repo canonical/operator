@@ -274,10 +274,10 @@ class _TestMain(abc.ABC):
         class TestCharmEvents(ops.CharmEvents):
             pass
 
-        ops.CharmBase.on = TestCharmEvents()  # type: ignore
+        ops.CharmBase.on = TestCharmEvents()
 
         def cleanup():
-            ops.CharmBase.on = ops.CharmEvents()  # type: ignore
+            ops.CharmBase.on = ops.CharmEvents()
 
         request.addfinalizer(cleanup)
 
