@@ -225,8 +225,10 @@ jobs:
           # Get the absolute paths to the wheels
           ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
           ops_scenario_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops_scenario-*.whl)"
+          ops_tracing_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops_tracing-*.whl)"
 
-          /tmp/operator-scripts/patch-charm-deps.py "${ops_wheel}" "${ops_scenario_wheel}"
+          /tmp/operator-scripts/patch-charm-deps.py \
+            "${ops_wheel}" "${ops_scenario_wheel}" "${ops_tracing_wheel}"
       - name: Install dependencies
         id: deps
         run: |
@@ -268,6 +270,29 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' && steps.has-static.outputs.static == 'true' }}
         working-directory: charm-repo/${{ matrix.charm-root }}
         run: tox -vve static
+
+      # A charm's tox commands can install its locked dependencies after the
+      # wheels, or run the tests in an environment of their own, and the tests
+      # then pass against the charm's own ops. Fail rather than report that.
+      - name: Check that the tests used the ops wheel
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
+          expected="$(basename "$ops_wheel" | cut -d- -f2)"
+          status=0
+          while IFS= read -r dist_info; do
+            version="$(basename "$dist_info" .dist-info)"
+            version="${version#ops-}"
+            if [ "$version" = "$expected" ]; then
+              echo "ops $version in $dist_info"
+            else
+              echo "::error::ops $version, not $expected, is installed in $dist_info"
+              status=1
+            fi
+          done < <(find charm-repo "$HOME/.cache/pypoetry/virtualenvs" \
+            -type d -path '*site-packages/ops-[0-9]*.dist-info' 2>/dev/null)
+          exit "$status"
 
 
   charmcraft-profile-tests:
