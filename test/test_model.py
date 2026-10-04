@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import io
 import ipaddress
@@ -784,6 +785,128 @@ class TestModel:
                 ('relation_get', 0, 'remoteapp1', True, {'relation_name': 'db1'}),
             ]
             self.assertBackendCalls(harness, expected_backend_calls)
+
+    def test_relation_local_app_data_readability_follower_no_getitem(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """A follower can't read its own app databag by any route, not only __getitem__."""
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(False)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            databag = rel_db1.data[local_app]
+            with pytest.raises(ops.RelationDataError):
+                _ = 'local' in databag
+            with pytest.raises(ops.RelationDataError):
+                len(databag)
+            with pytest.raises(ops.RelationDataError):
+                list(databag)
+            with pytest.raises(ops.RelationDataError):
+                dict(databag)
+
+    def test_relation_local_app_data_readability_follower_after_caching(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """Leadership lost after a successful read: every path stops, not just __getitem__.
+
+        The cold path validates inside `_load`, so a databag whose first read
+        failed re-validates on every access. This is the other half: a databag
+        that loaded while the unit was leader is served from the cache, and
+        `in`, `len()` and iteration would keep answering from it.
+        """
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(True)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            databag = rel_db1.data[local_app]
+            assert databag['local'] == 'data'  # Populates the cache.
+
+            harness.set_leader(False)
+
+            with pytest.raises(ops.RelationDataError):
+                _ = 'local' in databag
+            with pytest.raises(ops.RelationDataError):
+                len(databag)
+            with pytest.raises(ops.RelationDataError):
+                list(databag)
+            with pytest.raises(ops.RelationDataError):
+                databag['local']
+            assert repr(databag) == '<n/a>'
+
+    def test_relation_broken_app_data_reads_as_empty_for_a_follower(self):
+        """A dead relation's databag is empty rather than an access error.
+
+        `_load` returns {} for a relation Juju no longer knows about, and
+        validating before the read must not turn that into a raise -- least of
+        all into one about a remote application, which is what a broken
+        relation's `app` being None would otherwise produce.
+        """
+
+        class Backend:
+            app_name = 'myapp'
+            unit_name = 'myapp/0'
+            _hook_is_running = 'db1-relation-broken'
+
+            def is_leader(self):
+                return False
+
+            def relation_get(self, *args: typing.Any, **kwargs: typing.Any):
+                raise ops.model.RelationNotFoundError()
+
+        class DeadRelation:
+            id = 0
+            name = 'db1'
+            app = None  # See Relation.__init__ and LP#1960934.
+            active = False
+
+            def __repr__(self):
+                return '<Relation db1:0>'
+
+        backend = typing.cast('ops.model._ModelBackend', Backend())
+        app = ops.Application('myapp', typing.cast('typing.Any', None), backend, None)  # type: ignore[arg-type]
+        databag = ops.model.RelationDataContent(
+            typing.cast('typing.Any', DeadRelation()), app, backend
+        )
+
+        assert 'local' not in databag
+        assert len(databag) == 0
+        assert list(databag) == []
+
+    def test_relation_update_follower_app_data_reports_write_error(
+        self,
+        harness: ops.testing.Harness[ops.CharmBase],
+    ):
+        """update() reports the failed write, not the read that change detection needs."""
+        relation_id = harness.add_relation('db1', 'remoteapp1')
+        with harness._event_context('foo_event'):
+            harness.update_relation_data(relation_id, 'myapp', {'local': 'data'})
+        harness.model.relations._invalidate('db1')
+
+        rel_db1 = self.ensure_relation(harness, 'db1')
+        harness.begin()
+        harness.set_leader(False)
+        local_app = harness.charm.app
+
+        with harness._event_context('foo_event'):
+            with pytest.raises(ops.RelationDataError) as excinfo:
+                rel_db1.data[local_app].update({'local': 'other'})
+            assert 'cannot write application data' in str(excinfo.value)
 
     def test_relation_no_units(self, harness: ops.testing.Harness[ops.CharmBase]):
         harness.add_relation('db1', 'remoteapp1')
@@ -2848,6 +2971,29 @@ _ValidMetricsTestCase = tuple[
 ]
 
 
+class _RecordingSpan:
+    def __init__(self, name: str):
+        self.name = name
+        self.attributes: dict[str, Any] = {}
+
+    def is_recording(self) -> bool:
+        return True
+
+    def set_attribute(self, key: str, value: Any):
+        self.attributes[key] = value
+
+
+class _RecordingTracer:
+    def __init__(self):
+        self.spans: list[_RecordingSpan] = []
+
+    @contextlib.contextmanager
+    def start_as_current_span(self, name: str):
+        span = _RecordingSpan(name)
+        self.spans.append(span)
+        yield span
+
+
 class TestModelBackend:
     @pytest.fixture
     def backend(self, fake_juju_version: None) -> _ModelBackend:
@@ -3222,6 +3368,48 @@ class TestModelBackend:
         fake_script.write('action-set', 'exit 0')
         backend.action_set({'a': {'b': 1, 'c': 2}, 'd': 3})
         assert sorted(['action-set', 'a.b=1', 'a.c=2', 'd=3']) == sorted(fake_script.calls()[0])
+
+    def test_hookcmd_tracing_omits_sensitive_data(
+        self, fake_script: FakeScript, backend: _ModelBackend, monkeypatch: pytest.MonkeyPatch
+    ):
+        tracer = _RecordingTracer()
+        monkeypatch.setattr(ops.model, 'tracer', tracer)
+        fake_script.write('secret-add', 'echo secret:123')
+        fake_script.write('secret-set', 'exit 0')
+        fake_script.write('relation-set', 'exit 0')
+        fake_script.write('pod-spec-set', 'exit 0')
+        fake_script.write('action-set', 'exit 0')
+        fake_script.write('action-log', 'exit 0')
+
+        sensitive = 'sensitive-value'
+        backend.secret_add({'password': sensitive}, label='my-label', owner='application')
+        backend.secret_set(
+            'secret:123',
+            content={'password': sensitive},
+            label='my-label',
+            description='my-description',
+            expire=datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc),
+            rotate=ops.SecretRotate.DAILY,
+        )
+        backend.relation_set(1, {'password': sensitive}, is_app=False)
+        backend.pod_spec_set({'password': sensitive}, {'password': sensitive})
+        backend.action_set({'password': sensitive})
+        backend.action_log(sensitive)
+
+        assert [span.name for span in tracer.spans] == [
+            'secret-add',
+            'secret-set',
+            'relation-set',
+            'pod-spec-set',
+            'action-set',
+            'action-log',
+        ]
+        for span in tracer.spans:
+            assert sensitive not in repr(span.attributes), span.name
+        # Arguments named in trace are still recorded.
+        assert 'id=secret:123' in tracer.spans[1].attributes['kwargs']
+        assert 'label=my-label' in tracer.spans[1].attributes['kwargs']
+        assert 'relation_id=1' in tracer.spans[2].attributes['kwargs']
 
     def test_action_set_more_nested(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('action-get', 'exit 1')

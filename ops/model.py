@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import contextlib
-import contextvars
 import copy
 import dataclasses
 import datetime
@@ -1993,6 +1992,10 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def _load(self) -> _RelationDataContent_Raw:
         """Load the data from the current entity / relation."""
+        # Validate every uncached read here, so that all read paths raise
+        # RelationDataAccessError rather than a bare ModelError from Juju. Reads
+        # served from the cache are validated in _validate_cached_read.
+        self._validate_read_if_active()
         try:
             return self._backend.relation_get(
                 self.relation.id,
@@ -2004,8 +2007,21 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # Dead relations tell no tales (and have no data).
             return {}
 
-    def _validate_read(self):
-        """Return if the data content can be read."""
+    def _validate_read_if_active(self) -> None:
+        """Validate a read, except on a relation that is already gone.
+
+        Dead relations tell no tales: reading a broken relation's databag gives
+        `{}` rather than raising, and that has to hold whether or not this unit
+        could have read the databag while the relation was alive. Without this,
+        validating before the read turns the empty dict `_load` returns for a
+        `RelationNotFoundError` into an access error -- and for a follower's own
+        app databag, into one that talks about a remote application.
+        """
+        if self.relation.active:
+            self._validate_read()
+
+    def _validate_read(self) -> None:
+        """Raise if the data content cannot be read."""
         # if we're not in production (we're testing): we skip access control rules
         if not self._hook_is_running:
             return
@@ -2022,23 +2038,17 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             # leaders have no read restrictions
             return
 
-        # type guard; we should not be accessing relation data
-        # if the remote app does not exist.
         app = self.relation.app
-        if app is None:
-            raise RelationDataAccessError(
-                f'Remote application instance cannot be retrieved for {self.relation}.'
-            )
 
         # is this a peer relation?
-        if app.name == self._entity.name:
+        if app is not None and app.name == self._entity.name:
             # peer relation data is always publicly readable
             return
 
-        # if we're here it means: this is not a peer relation,
-        # this is an app databag, and we don't have leadership.
-
-        # is this a LOCAL app databag?
+        # Check for the local app databag before the remote-app type guard below,
+        # so that a follower reading its own app databag is told that, rather than
+        # told about a remote application. The two overlap on a broken relation,
+        # where `relation.app` can be None (https://bugs.launchpad.net/juju/+bug/1960934).
         if self._backend.app_name == self._entity.name:
             # minions can't read local app databags
             raise RelationDataAccessError(
@@ -2046,7 +2056,15 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 f'application databag'
             )
 
-        return True
+        # type guard; we should not be accessing relation data
+        # if the remote app does not exist.
+        if app is None:
+            raise RelationDataAccessError(
+                f'Remote application instance cannot be retrieved for {self.relation}.'
+            )
+
+        # If we're here it means this is a remote app databag (readable by any remote unit).
+        return
 
     def _validate_write(self, data: Mapping[str, str]) -> None:
         """Validate writing key:value pairs to this databag.
@@ -2120,9 +2138,37 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
             else:
                 self._data[key] = value
 
+    def _validate_cached_read(self) -> None:
+        """Validate a read of data that may already be cached.
+
+        When the data hasn't been loaded yet, ``_load`` validates the read, so
+        validating here as well would mean a redundant leadership check.
+        """
+        if self._lazy_data is not None:
+            self._validate_read_if_active()
+
     def __getitem__(self, key: str) -> str:
-        self._validate_read()
+        self._validate_cached_read()
         return super().__getitem__(key)
+
+    # `_GenericLazyMapping` serves these three from `_data`, which only calls
+    # `_load` while the cache is empty. Without them, a databag that loaded
+    # while the unit was leader stays readable through `in`, `len()` and
+    # iteration after leadership is lost, while `__getitem__` raises: the same
+    # read/no-read split this class exists to remove, moved to the warm path.
+    # The extra check is a comparison against `_ModelBackend.is_leader`'s
+    # 30-second lease cache, not another hook-tool call.
+    def __contains__(self, key: str) -> bool:
+        self._validate_cached_read()
+        return super().__contains__(key)
+
+    def __iter__(self):
+        self._validate_cached_read()
+        return super().__iter__()
+
+    def __len__(self) -> int:
+        self._validate_cached_read()
+        return super().__len__()
 
     def update(
         self, data: Mapping[str, str] | Iterable[tuple[str, str]] = (), /, **kwargs: str
@@ -2137,12 +2183,16 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
                 self[k] = v
         """
         data = dict(data, **kwargs)
+        # Validate writes before checking what's changed, so a permission error names the operation
+        # the user was attempting, rather than the read that change detection happens to require.
+        # This also validates malformed keys and values that would otherwise be a no-op (for
+        # example, `del bag[1]`).
+        self._validate_write(data)
         changes = {
             key: val
             for key, val in data.items()
             if (key not in self and val != '') or (key in self and val != self[key])
         }
-        self._validate_write(changes)  # always check permissions
         if not changes:  # return early if there are no changes required
             return
         self._commit(changes)
@@ -2155,10 +2205,12 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
 
     def __repr__(self):
         try:
-            self._validate_read()
+            # `super().__repr__()` reads `_data`, which validates the read when
+            # it loads; this covers the case where it is already cached.
+            self._validate_cached_read()
+            return super().__repr__()
         except RelationDataAccessError:
             return '<n/a>'
-        return super().__repr__()
 
 
 class ConfigData(_GenericLazyMapping['bool | int | float | str']):
@@ -3556,32 +3608,22 @@ class _ModelBackend:
         self._is_leader: bool | None = None
         self._leader_check_time: float | None = None
         self._hook_is_running = ''
-        self._is_recursive = contextvars.ContextVar('_is_recursive', default=False)
 
     @contextlib.contextmanager
-    def _prevent_recursion(self):
-        token = self._is_recursive.set(True)
-        try:
-            yield
-        finally:
-            self._is_recursive.reset(token)
+    def _wrap_hookcmd(self, cmd: str, **trace: Any) -> Generator[None]:
+        """Run a hook command with tracing and ops error handling.
 
-    @contextlib.contextmanager
-    def _wrap_hookcmd(self, cmd: str, *args: Any, **kwargs: Any):
-        if self._is_recursive.get():
-            # Either `juju-log` hook command failed or there's a bug in ops.
-            return
-        # Logs are collected via log integration, omit the subprocess calls that push
-        # the same content to juju from telemetry.
-        mgr = self._prevent_recursion() if cmd == 'juju-log' else tracer.start_as_current_span(cmd)
+        The ``trace`` keyword arguments are recorded on the span, and the span
+        is exported to the charm's tracing backend. Never pass a value that may
+        hold sensitive data, such as secret content, relation data, or action
+        results.
+        """
         try:
-            with mgr as span:
-                if span is not None:
+            with tracer.start_as_current_span(cmd) as span:
+                if span.is_recording():
                     span.set_attribute('call', 'subprocess.run')
-                    if args:
-                        span.set_attribute('args', args)
-                    if kwargs:
-                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in kwargs.items()])
+                    if trace:
+                        span.set_attribute('kwargs', [f'{k}={v}' for k, v in trace.items()])
                 yield
         except hookcmds.Error as e:
             self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
@@ -3695,12 +3737,11 @@ class _ModelBackend:
                 f'{self._juju_context.version}'
             )
 
+        # `data` is intentionally excluded from tracing. It should not contain sensitive data,
+        # but sometimes does, particularly when the charm needs to work on an older Juju
+        # without secrets support.
         with self._wrap_hookcmd(
-            'relation-set',
-            relation_id=relation_id,
-            endpoint=relation_name,
-            data=data,
-            app=is_app,
+            'relation-set', relation_id=relation_id, endpoint=relation_name, app=is_app
         ):
             hookcmds.relation_set(data, relation_id, endpoint=relation_name, app=is_app)
 
@@ -3752,8 +3793,10 @@ class _ModelBackend:
                 with k8s_res_path.open('wt', encoding='utf8') as f:
                     yaml.safe_dump(k8s_resources, stream=f)
                 args.extend(['--k8s-resources', str(k8s_res_path)])
-            with self._wrap_hookcmd('pod-spec-set', spec=spec, k8s_resources=k8s_resources):
-                hookcmds._utils.run('pod-spec-set', *args)
+            with self._wrap_hookcmd('pod-spec-set'):
+                hookcmds._utils.run(
+                    'pod-spec-set', *args, redacted_cmd=['pod-spec-set', '--', '<redacted>']
+                )
         finally:
             shutil.rmtree(str(tmpdir))
 
@@ -3824,12 +3867,14 @@ class _ModelBackend:
         # The hookcmds action_set method will handle flattening nested structures, but does
         # not do validation, so we handle both here.
         flat_results = _format_action_result_dict(results)
-        # We do not trace the arguments here, as they may contain sensitive data.
-        with self._wrap_hookcmd('action-set', '...'):
+        # `results` is intentionally excluded from tracing, as it may contain sensitive data.
+        with self._wrap_hookcmd('action-set'):
             hookcmds.action_set(flat_results)
 
     def action_log(self, message: str) -> None:
-        with self._wrap_hookcmd('action-log', message=message):
+        # The message should not contain sensitive information, but it might, so we don't
+        # include it in the trace. It seems unlikely that it's useful in a trace anyway.
+        with self._wrap_hookcmd('action-log'):
             hookcmds.action_log(message)
 
     def action_fail(self, message: str = '') -> None:
@@ -3902,23 +3947,23 @@ class _ModelBackend:
     def add_metrics(
         self, metrics: Mapping[str, int | float], labels: Mapping[str, str] | None = None
     ) -> None:
-        cmd: list[str] = ['add-metric']
+        args: list[str] = []
         if labels:
             label_args: list[str] = []
             for k, v in labels.items():
                 _ModelBackendValidator.validate_metric_label(k)
                 _ModelBackendValidator.validate_label_value(k, v)
                 label_args.append(f'{k}={v}')
-            cmd.extend(['--labels', ','.join(label_args)])
+            args.extend(['--labels', ','.join(label_args)])
 
         metric_args: list[str] = []
         for k, v in metrics.items():
             _ModelBackendValidator.validate_metric_key(k)
             metric_value = _ModelBackendValidator.format_metric_value(v)
             metric_args.append(f'{k}={metric_value}')
-        cmd.extend(metric_args)
-        with self._wrap_hookcmd(*cmd):
-            hookcmds._utils.run(*cmd)
+        args.extend(metric_args)
+        with self._wrap_hookcmd('add-metric', args=args):
+            hookcmds._utils.run('add-metric', *args)
 
     def get_pebble(self, socket_path: str) -> pebble.Client:
         """Create a pebble.Client instance from given socket path."""
@@ -4021,10 +4066,10 @@ class _ModelBackend:
                 rotate = rotate or info.rotation
                 # The label fix is needed for Juju < 3.5
                 label = label or info.label
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-set',
             id=id,
-            content=content,
             label=label,
             description=description,
             expire=expire,
@@ -4050,9 +4095,9 @@ class _ModelBackend:
         owner: str | None = None,
     ) -> str:
         # The content has already been validated with Secret._validate_content
+        # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-add',
-            content=content,
             label=label,
             description=description,
             expire=expire,
