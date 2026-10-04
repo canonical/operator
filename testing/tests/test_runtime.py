@@ -227,31 +227,47 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
         assert exc.value.__cause__.exit_code == exit_code
 
 
+@dataclasses.dataclass
+class PortConfig:
+    port: int
+
+    def __post_init__(self):
+        if not 1 <= self.port <= 65535:
+            raise ValueError('port out of range')
+
+
+class LoadConfigBlockedCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        self.typed_config = self.load_config(PortConfig, errors='blocked')
+
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+        self.unit.status = ops.ActiveStatus()
+
+
 def test_load_config_blocked_in_init():
-    @dataclasses.dataclass
-    class Config:
-        port: int
-
-        def __post_init__(self):
-            if not 1 <= self.port <= 65535:
-                raise ValueError('port out of range')
-
-    class MyCharm(ops.CharmBase):
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            framework.observe(self.on.config_changed, self._on_config_changed)
-            self.typed_config = self.load_config(Config, errors='blocked')
-
-        def _on_config_changed(self, _: ops.ConfigChangedEvent):
-            self.unit.status = ops.ActiveStatus()
-
     ctx = Context(
-        MyCharm,
+        LoadConfigBlockedCharm,
         meta={'name': 'foo'},
         config={'options': {'port': {'type': 'int', 'default': 8080}}},
     )
     state_out = ctx.run(ctx.on.config_changed(), State(config={'port': 0}))
     # As in production, the event isn't emitted and nothing is committed.
+    assert not ctx.emitted_events
+    assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+def test_load_config_blocked_in_init_manager():
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    with ctx(ctx.on.config_changed(), State(config={'port': 0})) as mgr:
+        with pytest.raises(RuntimeError, match='exited early'):
+            mgr.charm  # ruff: ignore[useless-expression]
+        state_out = mgr.run()
     assert not ctx.emitted_events
     assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
 

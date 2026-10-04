@@ -97,9 +97,14 @@ class Manager(Generic[CharmType]):
 
         The charm is only available during the context manager scope.
         """
-        if self.ops is None or self.ops.charm is None:
+        if self.ops is None:
             raise RuntimeError(
                 'you should __enter__ this context manager before accessing this',
+            )
+        if self.ops._aborted_in_init:
+            raise RuntimeError(
+                "the charm's __init__ exited early (for example, load_config(errors='blocked') "
+                'found invalid config), so there is no charm object',
             )
         return self.ops.charm
 
