@@ -117,7 +117,6 @@ Now, in your charm's `__init__` method, initialise the `MetricsEndpointProvider`
 :language: python
 :start-at: "# Provide a metrics endpoint for Prometheus to scrape."
 :end-before: "# Provide grafana dashboards"
-:dedent:
 ```
 
 Congratulations, your charm is ready to be integrated with Prometheus!
@@ -154,7 +153,6 @@ Then, in your charm's `__init__` method, initialise the `LogForwarder` instance 
 :language: python
 :start-at: "# Enable pushing application logs to Loki."
 :end-at: self._logging = LogForwarder
-:dedent:
 ```
 
 Congratulations, your charm can now also integrate with Loki!
@@ -191,7 +189,6 @@ Now, in your charm's `__init__` method, initialise the `GrafanaDashboardProvider
 :language: python
 :start-at: "# Provide grafana dashboards over a relation interface."
 :end-at: ')'
-:dedent:
 ```
 
 Now, in your `src` directory, create a subdirectory called `grafana_dashboards` and, in this directory, create a file called `FastAPI-Monitoring.json.tmpl` with the following content:
@@ -476,8 +473,7 @@ Next, still in `tests/integration/test_charm.py`, define the new fixture:
 
 ```{literalinclude} ../../../examples/k8s-5-observe/tests/integration/test_charm.py
 :language: python
-:start-at: '@pytest.fixture(scope="module")'
-:end-at: yield juju_factory.get_juju
+:pyobject: cos
 ```
 
 `get_juju` creates a model called `jubilant-<randomhex>-cos`.

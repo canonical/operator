@@ -126,7 +126,6 @@ In the `__init__` method, define a new instance of the 'DatabaseRequires' class.
 :language: python
 :start-at: "# The 'relation_name' comes from the 'charmcraft.yaml file'."
 :end-at: self.database = DatabaseRequires(
-:dedent:
 ```
 
 Next, add event observers for all the database events:
@@ -135,7 +134,6 @@ Next, add event observers for all the database events:
 :language: python
 :start-at: "# See https://charmhub.io/data-platform-libs/libraries/data_interfaces"
 :end-at: framework.observe(self.database.on.endpoints_changed
-:dedent:
 ```
 
 Finally, define the method that is called on the database events:
@@ -143,7 +141,6 @@ Finally, define the method that is called on the database events:
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._on_database_endpoint
-:dedent:
 ```
 
 We now need to make sure that our application knows how to access the database.
@@ -155,7 +152,6 @@ Our application consumes database authentication data in the form of environment
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm.get_app_environment
-:dedent:
 ```
 
 This method depends on the following method, which extracts the database authentication data:
@@ -163,7 +159,6 @@ This method depends on the following method, which extracts the database authent
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm.fetch_database_relation_data
-:dedent:
 ```
 
 ### Share the authentication data with your application
@@ -175,7 +170,6 @@ First, update `_replan_workload()` to provide environment variables when creatin
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._replan_workload
-:dedent:
 ```
 
 We removed three `self.unit.status = ` lines from this version of the method. We'll handle replacing those shortly.
@@ -185,7 +179,6 @@ Next, update `_get_pebble_layer()` to put the environment variables in the Pebbl
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._get_pebble_layer
-:dedent:
 ```
 
 With these changes, we've made sure that our application knows how to access the database.
@@ -214,7 +207,6 @@ In your charm's `__init__` add a new observer:
 :language: python
 :start-at: "# Report the unit status after each event."
 :end-at: framework.observe(self.on.collect_unit_status
-:dedent:
 ```
 
 And define a method that does the various checks, adding appropriate statuses. The library will take care of selecting the 'most significant' status for you.
@@ -222,7 +214,6 @@ And define a method that does the various checks, adding appropriate statuses. T
 ```{literalinclude} ../../../examples/k8s-3-postgresql/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._on_collect_status
-:dedent:
 ```
 
 We also want to clean up the code to remove the places where we're setting the status outside of this method, other than anywhere we're wanting a status to show up *during* the event execution (such as `MaintenanceStatus`). If you missed doing so above, in `_replan_workload`, remove the lines:

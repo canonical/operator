@@ -61,7 +61,6 @@ In the `__init__` function, add an observer for the `config_changed` event and p
 :language: python
 :start-at: framework.observe(self.on.config_changed
 :end-at: framework.observe(self.on.config_changed
-:dedent:
 ```
 
 Now, define the handler, as below. Since configuring something like a port affects the way we call our workload application, we need to update our Pebble configuration.
@@ -69,7 +68,6 @@ Now, define the handler, as below. Since configuring something like a port affec
 ```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._on_config_changed
-:dedent:
 ```
 
 We'll define `_replan_workload` shortly.
@@ -85,7 +83,6 @@ In the `__init__` function, add attributes for the workload container and the na
 :language: python
 :start-at: "# See 'containers' in charmcraft.yaml."
 :end-at: self.pebble_service_name = "fastapi"
-:dedent:
 ```
 
 As we saw in the previous chapter, the `fastapi` service exposes the app on port 8000. To be able to configure the port, our charm needs to add a Pebble layer that overrides the definition of the `fastapi` service.
@@ -115,7 +112,6 @@ Next, create the `_replan_workload` method, as below. This method will add our c
 ```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._replan_workload
-:dedent:
 ```
 
 If the loaded config is invalid (in our case, if the port is set to 22), we set the status of the unit to blocked. This lets the Juju user know that they need to take action.
@@ -125,7 +121,6 @@ As you may have noticed, `_replan_workload` looks like a more advanced variant o
 ```{literalinclude} ../../../examples/k8s-2-configurable/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._on_demo_server_pebble_ready
-:dedent:
 ```
 
 ## Validate your charm
@@ -202,7 +197,6 @@ First, in `tests/unit/test_charm.py`, find the `expected_plan = ` line then add 
 :language: python
 :start-at: "# Expected plan after Pebble ready with default config."
 :end-at: expected_plan.services["fastapi"].override = "merge"
-:dedent:
 ```
 
 This is needed because the charm's `_get_pebble_layer` method sets `override` to `merge` in the layer that it constructs.

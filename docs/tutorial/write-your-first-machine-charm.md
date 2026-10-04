@@ -295,15 +295,15 @@ Your charm now needs a way to load the value of the `slug` configuration option,
 2. To write a configuration file, we'll use the `ensure_config` function from the helper module.
 3. To start tinyproxy, we'll use the `start` function from the helper module.
 
-In `src/charm.py`, add the following methods to the charm class:
+First, near the top of `src/charm.py`, after the imports, define the port that we'll write to the configuration file:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
-:start-at: def configure_and_run
-:end-at: "# The Juju logs will show the error message, to help you debug the error."
+:start-at: PORT = 8000
+:end-at: PORT = 8000
 ```
 
-Then add the following lines at the beginning of `src/charm.py`:
+Then add the following import to `src/charm.py`:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
@@ -311,10 +311,12 @@ Then add the following lines at the beginning of `src/charm.py`:
 :end-at: import time
 ```
 
+We're now ready to implement the logic to load `slug` and configure and start tinyproxy. Add the following methods to the charm class:
+
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
-:start-at: PORT = 8000
-:end-at: PORT = 8000
+:start-at: def configure_and_run
+:end-at: "# The Juju logs will show the error message, to help you debug the error."
 ```
 
 The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
@@ -382,8 +384,12 @@ Then add the following methods to the charm class:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
-:start-at: def _on_stop
-:end-at: tinyproxy.uninstall()
+:pyobject: TinyproxyCharm._on_stop
+```
+
+```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
+:language: python
+:pyobject: TinyproxyCharm._on_remove
 ```
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py

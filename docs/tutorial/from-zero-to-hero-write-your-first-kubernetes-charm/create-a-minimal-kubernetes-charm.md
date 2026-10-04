@@ -130,7 +130,6 @@ In the `__init__` function of your charm class, we'll tell Ops which method of y
 :language: python
 :start-at: framework.observe(self.on["demo-server"]
 :end-at: framework.observe(self.on["demo-server"]
-:dedent:
 ```
 
 
@@ -191,7 +190,6 @@ In `src/charm.py`, add the following lines to the `_on_demo_server_pebble_ready`
 :language: python
 :start-at: "# Set the workload version of this charm."
 :end-at: self.unit.set_workload_version(version)
-:dedent:
 ```
 
 We get the workload version over port 8000 because the `fastapi` service runs the app on this port. Then `self.unit.set_workload_version` exposes the workload version to Juju. If the `get_version` call fails (for example, an `URLError` exception is raised), the charm will go into error status. The Juju logs will show the error message, to help you debug the error.

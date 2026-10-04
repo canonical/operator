@@ -55,7 +55,6 @@ In the  charm  `__init__` method, add an action event observer, as below. As you
 :language: python
 :start-at: "# Events on charm actions that are run via 'juju run'."
 :end-at: framework.observe(self.on.get_db_info_action
-:dedent:
 ```
 
 Now, define the action event handler, as below:  First, read the value of the parameter defined in the `charmcraft.yaml` file (`show-password`). Then, use the `fetch_database_relation_data` method (that we defined in a previous chapter) to read the contents of the database relation data and, if the parameter value read earlier is `True`, add the username and password to the output. Finally, use `event.set_results` to attach the results to the event that has called the action; this will print the output to the terminal.
@@ -65,7 +64,6 @@ If we are not able to get the data (for example, if the charm has not yet been i
 ```{literalinclude} ../../../examples/k8s-4-action/src/charm.py
 :language: python
 :pyobject: FastAPIDemoCharm._on_get_db_info_action
-:dedent:
 ```
 
 ## Validate your charm
