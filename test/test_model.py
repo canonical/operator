@@ -2882,7 +2882,9 @@ class TestModelBindings:
                 ops.RelationRole.peer, 'peer1', {'interface': 'peer1', 'scope': 'global'}
             ),
         }
-        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        backend = _ModelBackend('myapp/0')
+        backend._peer_endpoints = frozenset({'peer1'})
+        model = ops.Model(meta, backend)
         fake_script.write(
             'relation-ids', """([ "$1" = peer1 ] && echo '["peer1:2"]') || echo '[]'"""
         )
@@ -3059,8 +3061,8 @@ class TestModelBackend:
             with pytest.raises(ops.RelationNotFoundError):
                 call()
 
-        # A relation Juju has forgotten about isn't an authorisation failure, so
-        # it isn't reported as a security event.
+        # A gone relation isn't an authorisation failure, so it isn't reported
+        # as a security event.
         assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
 
     def test_gone_relation_network_get(
