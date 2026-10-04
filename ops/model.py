@@ -3636,7 +3636,7 @@ class _ModelBackend:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
 
-    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str) -> None:
         authz_messages = (
             'access denied',
             'permission denied',
@@ -3646,7 +3646,15 @@ class _ModelBackend:
         if not any(message in stderr.lower() for message in authz_messages):
             return
         base_cmd = os.path.basename(cmd)
-        leadership = ' (as leader)' if self.is_leader() else ''
+        # Use the cached leadership status rather than querying it, so that
+        # reporting a failure never runs another hook command.
+        is_leader = self._cached_leadership()
+        if is_leader is None:
+            leadership = ' (leadership unknown)'
+        elif is_leader:
+            leadership = ' (as leader)'
+        else:
+            leadership = ''
         description = (
             f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
             f'{stderr.strip()!r}. '
@@ -3764,15 +3772,21 @@ class _ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         now = time.monotonic()
-        if self._leader_check_time is not None and self._is_leader is not None:
-            time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-            if time_since_check <= self.LEASE_RENEWAL_PERIOD:
-                return self._is_leader
-        # Current time MUST be saved before running is-leader to ensure the cache
-        # is only used inside the window that is-leader itself asserts.
-        self._leader_check_time = now
+        is_leader = self._cached_leadership()
+        if is_leader is not None:
+            return is_leader
         with self._wrap_hookcmd('is-leader'):
             self._is_leader = hookcmds.is_leader()
+        self._leader_check_time = now  # Only store refreshed lease on success.
+        return self._is_leader
+
+    def _cached_leadership(self) -> bool | None:
+        """Return the cached leadership status, or None if unknown or the lease has expired."""
+        if self._leader_check_time is None or self._is_leader is None:
+            return None
+        time_since_check = datetime.timedelta(seconds=time.monotonic() - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD:
+            return None
         return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:

@@ -25,6 +25,7 @@ import pathlib
 import re
 import sys
 import tempfile
+import types
 import typing
 import unittest
 import warnings
@@ -3036,6 +3037,105 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
+    @pytest.mark.parametrize(
+        'cached,age,leadership',
+        [
+            (True, 0, ' (as leader)'),
+            (True, 30, ' (as leader)'),
+            (True, 31, ' (leadership unknown)'),
+            (False, 0, ''),
+            (None, 0, ' (leadership unknown)'),
+        ],
+    )
+    def test_security_event_uses_cached_leadership(
+        self,
+        fake_script: FakeScript,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+        cached: bool | None,
+        age: float,
+        leadership: str,
+    ):
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: 100))
+        backend._is_leader = cached
+        backend._leader_check_time = None if cached is None else 100 - age
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.relation_get(0, 'remote/0', False)
+        assert str(excinfo.value) == 'ERROR permission denied\n'
+        calls = fake_script.calls(clear=True)
+        # Reporting the failure doesn't run is-leader.
+        assert [call[0] for call in calls] == ['relation-get', 'juju-log']
+        description = json.loads(calls[1][-1])['description']
+        assert description.startswith(f"Hook command 'relation-get'{leadership} failed")
+
+    def test_is_leader_authz_failure_is_reported_once(
+        self, fake_script: FakeScript, backend: _ModelBackend, root_logging: None
+    ):
+        # Nothing is cached, and is-leader itself fails with an authorisation error.
+        fake_script.write('is-leader', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        assert str(excinfo.value) == 'ERROR permission denied\n'
+        calls = fake_script.calls(clear=True)
+        # Reporting the failure doesn't run is-leader again.
+        assert [call[0] for call in calls] == ['is-leader', 'juju-log']
+        description = json.loads(calls[1][-1])['description']
+        assert description.startswith("Hook command 'is-leader' (leadership unknown) failed")
+
+    @pytest.mark.parametrize('cached', [True, False, None])
+    def test_is_leader_failed_refresh_keeps_lease(
+        self,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        cached: bool | None,
+    ):
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: 100))
+        last_check = None if cached is None else 50
+        backend._is_leader = cached
+        backend._leader_check_time = last_check
+        error = hookcmds.Error(returncode=1, cmd=['is-leader'], stderr='unavailable')
+        query = mock.Mock(side_effect=[error, False])
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+
+        with pytest.raises(ops.ModelError):
+            backend.is_leader()
+        # The failed refresh didn't start a new lease.
+        assert backend._is_leader is cached
+        assert backend._leader_check_time == last_check
+
+        assert backend.is_leader() is False
+        assert backend._leader_check_time == 100
+        assert query.call_count == 2
+
+    def test_is_leader_lease_starts_before_query(
+        self, backend: _ModelBackend, monkeypatch: pytest.MonkeyPatch
+    ):
+        now = 100.0
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: now))
+
+        def is_leader():
+            nonlocal now
+            now += 5  # The query takes time, which must not extend the lease.
+            return True
+
+        query = mock.Mock(side_effect=is_leader)
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+        assert backend.is_leader() is True
+        assert query.call_count == 1
+        assert backend._leader_check_time == 100
+        now = 130
+        assert backend.is_leader() is True
+        assert query.call_count == 1
+        assert backend._leader_check_time == 100
+        now = 131
+        assert backend.is_leader() is True
+        assert query.call_count == 2
+        assert backend._leader_check_time == 131
+
     def test_relation_hook_command_errors(
         self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
     ):
@@ -3932,6 +4032,8 @@ class TestSecrets:
         fake_script.write(hook_command, f"""echo 'ERROR: {failure}' >&2 && exit 1""")
         fake_script.write('is-leader', 'echo true' if is_leader else 'echo false')
         fake_script.write('juju-log', 'exit 0')
+        # The security event reports the leadership status that is already known.
+        model.unit.is_leader()
         if '.' in method:
             attr_name, method = method.split('.', 1)
             attr = getattr(model, attr_name)
@@ -3940,9 +4042,9 @@ class TestSecrets:
         with pytest.raises(ops.ModelError):
             getattr(attr, method)(**kwargs)
         calls = fake_script.calls(clear=True)
-        # For this test we aren't interested in the secret or is-leader call.
-        calls.pop(0)
-        calls.pop(0)
+        # Reporting the failure doesn't run is-leader again.
+        assert calls.pop(0)[0] == 'is-leader'
+        assert calls.pop(0)[0] == hook_command
         assert len(calls) == 1
         assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data = json.loads(calls[0][-1])
@@ -3950,8 +4052,10 @@ class TestSecrets:
         assert data['type'] == 'security'
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == f'authz_fail:{hook_command}'
-        leadership = '(as leader)' if is_leader else ''
-        assert f"{leadership} failed with code 1: 'ERROR: {failure}'" in data['description']
+        leadership = ' (as leader)' if is_leader else ''
+        assert data['description'].startswith(
+            f"Hook command {hook_command!r}{leadership} failed with code 1: 'ERROR: {failure}'"
+        )
         timestamp = datetime.datetime.fromisoformat(data['datetime'])
         assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
@@ -4826,14 +4930,12 @@ class TestCloudCredential:
         monkeypatch.setattr(os, 'getuid', lambda: 1001)
         message = 'cannot access cloud credentials: permission denied'
         fake_script.write('credential-get', f"""echo 'ERROR: {message}' >&2 && exit 1""")
-        fake_script.write('is-leader', 'echo true')
         fake_script.write('juju-log', 'exit 0')
         with pytest.raises(ops.ModelError):
             model.get_cloud_spec()
         calls = fake_script.calls(clear=True)
-        # For this test we aren't interested in the credential-get or is-leader call.
-        calls.pop(0)
-        calls.pop(0)
+        # Reporting the failure doesn't run is-leader.
+        assert calls.pop(0)[0] == 'credential-get'
         assert len(calls) == 1
         assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data = json.loads(calls[0][-1])
