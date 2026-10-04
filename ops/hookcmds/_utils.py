@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import subprocess
+from collections.abc import Sequence
 
 
 class Error(Exception):
@@ -25,7 +26,11 @@ class Error(Exception):
     """Exit status of the child process."""
 
     cmd: list[str]
-    """The full command that was run."""
+    """The command that was run.
+
+    Arguments that may contain sensitive data, such as action results, are
+    replaced with ``<redacted>``.
+    """
 
     stdout: str = ''
     """Stdout output of the child process."""
@@ -44,13 +49,24 @@ class Error(Exception):
 def run(
     *args: str,
     input: str | None = None,
+    redacted_cmd: Sequence[str] | None = None,
 ) -> str:
+    """Run a hook command and return its stdout.
+
+    Args:
+        args: The hook command and its arguments.
+        input: Data to send to the hook command's stdin.
+        redacted_cmd: If provided, used in place of ``args`` in any raised
+            :class:`Error`. Pass this when ``args`` may contain sensitive data,
+            so that it doesn't end up in error messages and tracebacks.
+    """
     try:
         result = subprocess.run(
             args, capture_output=True, check=True, encoding='utf-8', input=input
         )
     except subprocess.CalledProcessError as e:
-        raise Error(returncode=e.returncode, cmd=e.cmd, stdout=e.stdout, stderr=e.stderr) from None
+        cmd = e.cmd if redacted_cmd is None else list(redacted_cmd)
+        raise Error(returncode=e.returncode, cmd=cmd, stdout=e.stdout, stderr=e.stderr) from None
     return result.stdout
 
 
