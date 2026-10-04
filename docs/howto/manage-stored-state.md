@@ -150,23 +150,39 @@ In your `src/charm.py` file, set and get the data from the peer relation
 databag. For example, to store an expensive calculation:
 
 ```python
-def _on_start(self, event: ops.StartEvent):
-    if not self.unit.is_leader():
-        return
-    peer = self.model.get_relation('charm-peer')
-    peer.data[self.app]['expensive-value'] = str(
-        self._calculate_expensive_value()
-    )
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.stop, self._on_stop)
 
+    def _calculate_expensive_value(self) -> int:
+        # Pretend that working this out takes a long time.
+        return 42
 
-def _on_stop(self, event: ops.StopEvent):
-    peer = self.model.get_relation('charm-peer')
-    logger.info('Value at stop is: %s', peer.data[self.app]['expensive-value'])
+    def _on_start(self, event: ops.StartEvent):
+        if not self.unit.is_leader():
+            return
+        peer = self.model.get_relation('charm-peer')
+        if peer is None:
+            return
+        peer.data[self.app]['expensive-value'] = str(
+            self._calculate_expensive_value()
+        )
+
+    def _on_stop(self, event: ops.StopEvent):
+        peer = self.model.get_relation('charm-peer')
+        if peer is None:
+            logger.warning('Peer relation is gone; no value to report')
+            return
+        value = peer.data[self.app].get('expensive-value')
+        logger.info('Value at stop is: %s', value)
 ```
 
 Relation data values are always strings, so convert the value before storing it.
 Only the leader unit can write to the application databag, so the handler returns
-early on the other units.
+early on the other units. The peer relation can be gone by the time `stop`
+arrives, so check for `None` before using it.
 
 ```{caution}
 Peer relations are not available early in the Charm lifecycle, so you'll need

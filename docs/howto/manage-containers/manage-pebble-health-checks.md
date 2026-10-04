@@ -204,4 +204,4 @@ def test_http_check_failing():
 
 Define the layer before the `CheckInfo`, so that the check's `level`, `startup` and `threshold` come from the same place the charm gets them from. The container's plan must contain the check, otherwise `ops.testing` reports an inconsistent state.
 
-`threshold` is the number of errors in a row that the check tolerates, and belongs in the layer. `failures` is the number of errors the check has had so far, and is only ever reported back in a `CheckInfo`, so don't put it in the layer.
+`threshold` is the number of errors in a row that the check tolerates. Set it in the layer even though Pebble defaults it to 3: `CheckInfo.threshold` is an `int`, and reading an unset value from the layer gives `None`. `failures` is the number of errors the check has had so far, and is only ever reported back in a `CheckInfo`, so don't put it in the layer.
