@@ -8,38 +8,22 @@ name: Create the draft release
 # CHANGES.md and a link comparing it with the previous release. Then open the
 # pull request that puts the branch back onto a development version.
 #
-# Five things are worth knowing before reading the steps:
+# Worth knowing:
 #
-# - This runs on pull_request_target rather than on push because that event
-#   always takes the workflow file from the default branch, whichever branch
-#   the pull request was merged into. A push takes it from the branch that was
-#   pushed to, so a maintenance branch would need its own copy of this file
-#   and of everything it reads out of .github/. With this, releasing from a
-#   maintenance branch needs nothing on that branch but the version files.
-# - pull_request_target runs with a write token, which is why it has a
-#   reputation. Nothing here executes code from the checkout: the merged tree
-#   is read as data (the version, CHANGES.md), and the version script comes
-#   from this workflow's own commit on the default branch. It also only acts
-#   on a pull request that has been merged, so the tree it reads is one a
-#   maintainer has already accepted.
-# - The release is a draft, and that is the design rather than a caution to
-#   be lifted later. Publishing it is the second of this pipeline's two
-#   human gates: the pull request review reads the diff, and the draft is
-#   where somebody reads the notes as a reader will see them. There is no
-#   auto-publish path here and no input for one.
-# - A draft release does not create its tag. Nothing here tags anything. The
-#   tag appears, against the squash commit of the merged pull request, when a
-#   human publishes the draft. Because the draft is pinned to that commit,
-#   the post-release bump can be opened, and even merged, before the draft is
-#   published without changing what gets released.
-# - Almost every merge is not a release. The path filter keeps most of them
-#   from starting a run at all, and the first step exits quietly on the rest -
-#   the post-release .dev0 bump among them.
+# - It runs on pull_request_target rather than push, so the workflow always
+#   comes from the default branch. A maintenance branch needs nothing but its
+#   version files.
+# - Nothing here runs code from the checkout. The merged tree is read as data,
+#   and only a merged pull request is acted on.
+# - The release is always a draft. Publishing it is the human check on the
+#   notes, and is what creates the tag.
+# - The draft is pinned to the merge commit, so the post-release bump can be
+#   merged before the draft is published.
+# - Most merges are not releases. The path filter skips most of them, and the
+#   first step exits quietly on the rest.
 #
-# If a job fails on a merge that really was a release - a description whose
-# markers somebody removed, say - fix the cause and re-run the failed job. A
-# pull request description can still be edited after the merge, and every
-# step reads what it needs fresh from the branch or the API.
+# If a job fails on a real release, fix the cause and re-run the job. Every
+# step reads the pull request description and the branch afresh.
 
 "on":
   pull_request_target:  # zizmor: ignore[dangerous-triggers] -- see the comment above.

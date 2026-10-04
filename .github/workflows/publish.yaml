@@ -4,14 +4,12 @@ name: Publish
 # Publishing a release is what puts the packages on PyPI. The manual job
 # below builds and publishes to Test PyPI instead.
 #
-# Three things are worth knowing:
+# Worth knowing:
 #
-# - Trusted publishing is configured on PyPI and on Test PyPI against this
-#   file's *name*, so renaming it breaks both.
-# - Every published release goes to PyPI, whatever its version. The checks
-#   before that are a human publishing the draft release, and the
-#   `publish-pypi` environment.
-# - `published` rather than `released`, so that a pre-release publishes too.
+# - Trusted publishing on PyPI and Test PyPI is tied to this file's name.
+# - Every published release goes to PyPI. The checks are a human publishing
+#   the draft and the `publish-pypi` environment.
+# - `published` rather than `released`, so pre-releases publish too.
 
 "on":
   release:

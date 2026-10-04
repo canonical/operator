@@ -6,20 +6,17 @@ name: Propose a release
 # pull request with all of it. A human reviews and merges that pull request;
 # creating the release is the next workflow's job.
 #
-# Three things are worth knowing before running this:
+# Worth knowing:
 #
 # - The version is counted from the last tag on the branch, never from
-#   ops/version.py. Between releases that file holds a guess left behind by
-#   the post-release bump, and the tag is the only base that is a fact.
-# - The pull request is opened with the workflow's own token, so GitHub will
-#   not start the usual checks on it. Until that is arranged differently,
-#   close and reopen the pull request to get them to run.
-#   TODO: open it with a GitHub App token (or the bot account's PAT) instead,
-#   so that the checks start on their own, and drop the close-and-reopen step
-#   here, in create-draft-release.yaml, and in CONTRIBUTING.md.
+#   ops/version.py, which only holds the post-release placeholder.
+# - The pull request is opened with the workflow's own token, so its checks
+#   don't start. Close and reopen it to run them.
+#   TODO: open it with a GitHub App token or a PAT so the checks start on
+#   their own, and drop the close-and-reopen step here, in
+#   create-draft-release.yaml, and in CONTRIBUTING.md.
 # - The scripts and data files in .github/ come from this workflow's own
-#   commit, not from the branch being released. That is what lets a
-#   maintenance branch be released without carrying copies of them.
+#   commit, not from the branch being released.
 
 "on":
   workflow_dispatch:
