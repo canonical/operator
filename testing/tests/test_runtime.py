@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import pathlib
 from tempfile import TemporaryDirectory
@@ -224,6 +225,89 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
             ctx.run(ctx.on.start(), State())
         assert isinstance(exc.value.__cause__, _Abort)
         assert exc.value.__cause__.exit_code == exit_code
+
+
+@dataclasses.dataclass
+class PortConfig:
+    port: int
+
+    def __post_init__(self):
+        if not 1 <= self.port <= 65535:
+            raise ValueError('port out of range')
+
+
+class LoadConfigBlockedCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        self.typed_config = self.load_config(PortConfig, errors='blocked')
+
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+        self.unit.status = ops.ActiveStatus()
+
+
+def test_load_config_blocked_in_init():
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    state_out = ctx.run(ctx.on.config_changed(), State(config={'port': 0}))
+    # As in production, the event isn't emitted and nothing is committed.
+    assert not ctx.emitted_events
+    assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+def test_load_config_blocked_in_init_manager():
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    with ctx(ctx.on.config_changed(), State(config={'port': 0})) as mgr:
+        with pytest.raises(RuntimeError, match='exited early'):
+            mgr.charm  # ruff: ignore[useless-expression]
+        state_out = mgr.run()
+    assert not ctx.emitted_events
+    assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+@pytest.mark.parametrize('exit_code', (-1, 1, 42))
+def test_ops_raises_nonzero_abort_in_init(exit_code: int, monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            # Charms can't actually do this (_Abort is private, and the public
+            # APIs that raise it in __init__ use exit code 0), but this is
+            # simpler than causing the framework to raise it.
+            raise _Abort(exit_code)
+
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == exit_code
+
+
+def test_leaked_operator_dispatch_raises(monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        initialised = False
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            MyCharm.initialised = True
+
+    # A leaked OPERATOR_DISPATCH makes the dispatcher raise _Abort(0) before the
+    # framework exists. That must fail the test rather than silently pass.
+    monkeypatch.setenv('OPERATOR_DISPATCH', '1')
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == 0
+    assert not MyCharm.initialised
 
 
 class ValueErrorCharm(ops.CharmBase):
