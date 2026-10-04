@@ -70,11 +70,6 @@ integration = [
     "minio~=7.2",
     "httpx~=0.28",
 ]
-release = [
-    "packaging>=24,<27",
-    "pygithub~=2.6",
-    "rich>=14.1,<16.0",
-]
 tiobe = [
     "flake8==7.4.1",
     "pylint==4.0.9",
@@ -267,7 +262,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = [".github/update-release-versions.py", ".github/test_update_release_versions.py", "ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
 ]
