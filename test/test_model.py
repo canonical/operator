@@ -25,6 +25,7 @@ import pathlib
 import re
 import sys
 import tempfile
+import types
 import typing
 import unittest
 import warnings
@@ -2960,6 +2961,67 @@ class TestModelBindings:
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         assert binding.network.ingress_addresses == ['foo.bar.baz.com']
 
+    def test_dangling_cross_model_relation(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, root_logging: None
+    ):
+        """A relation that's gone from Juju's state but still offered to the charm.
+
+        `relation-ids` and `relation-list` succeed, but every `relation-get`
+        fails with "permission denied" rather than "relation not found".
+        Verified against Juju 3.6 and 4.0 on the consuming side of a cross-model
+        relation, after `juju remove-saas <saas> --force`.
+        """
+        monkeypatch.setenv('JUJU_VERSION', '3.6.29')
+        meta = ops.CharmMeta()
+        meta.relations = {
+            'db1': ops.RelationMeta(
+                ops.RelationRole.requires, 'db1', {'interface': 'db1', 'scope': 'global'}
+            ),
+        }
+        model = ops.Model(meta, _ModelBackend('myapp/0'))
+        fake_script.write('relation-ids', """([ "$1" = db1 ] && echo '["db1:2"]') || echo '[]'""")
+        fake_script.write(
+            'relation-list',
+            """if [ "$2" = --app ]; then echo '"remoteapp1"'; else echo '[]'; fi""",
+        )
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
+
+        relation = model.relations['db1'][0]
+        assert relation.app is not None
+        # Dead relations have no data.
+        assert dict(relation.data[relation.app]) == {}
+        assert dict(relation.data[model.unit]) == {}
+        assert dict(relation.data[model.app]) == {}
+
+    def test_gone_peer_relation_follower_reads_app_databag(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, root_logging: None
+    ):
+        """A peer app databag is readable by every unit, so a refusal means it's gone."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        meta = ops.CharmMeta()
+        meta.relations = {
+            'peer1': ops.RelationMeta(
+                ops.RelationRole.peer, 'peer1', {'interface': 'peer1', 'scope': 'global'}
+            ),
+        }
+        backend = _ModelBackend('myapp/0')
+        backend._peer_endpoints = frozenset({'peer1'})
+        model = ops.Model(meta, backend)
+        fake_script.write(
+            'relation-ids', """([ "$1" = peer1 ] && echo '["peer1:2"]') || echo '[]'"""
+        )
+        fake_script.write('relation-list', """echo '[]'""")
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        relation = model.get_relation('peer1')
+        assert relation is not None
+        assert dict(relation.data[model.app]) == {}
+        assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
 
 _MetricAndLabelPair = tuple[dict[str, float], dict[str, str]]
 
@@ -3036,6 +3098,105 @@ class TestModelBackend:
         backend._leader_check_time = None
         assert model.unit.is_leader()
 
+    @pytest.mark.parametrize(
+        'cached,age,leadership',
+        [
+            (True, 0, ' (as leader)'),
+            (True, 30, ' (as leader)'),
+            (True, 31, ' (leadership unknown)'),
+            (False, 0, ''),
+            (None, 0, ' (leadership unknown)'),
+        ],
+    )
+    def test_security_event_uses_cached_leadership(
+        self,
+        fake_script: FakeScript,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+        cached: bool | None,
+        age: float,
+        leadership: str,
+    ):
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: 100))
+        backend._is_leader = cached
+        backend._leader_check_time = None if cached is None else 100 - age
+        fake_script.write('config-get', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.config_get()
+        assert str(excinfo.value) == 'ERROR permission denied\n'
+        calls = fake_script.calls(clear=True)
+        # Reporting the failure doesn't run is-leader.
+        assert [call[0] for call in calls] == ['config-get', 'juju-log']
+        description = json.loads(calls[1][-1])['description']
+        assert description.startswith(f"Hook command 'config-get'{leadership} failed")
+
+    def test_is_leader_authz_failure_is_reported_once(
+        self, fake_script: FakeScript, backend: _ModelBackend, root_logging: None
+    ):
+        # Nothing is cached, and is-leader itself fails with an authorisation error.
+        fake_script.write('is-leader', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('juju-log', 'exit 0')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        assert str(excinfo.value) == 'ERROR permission denied\n'
+        calls = fake_script.calls(clear=True)
+        # Reporting the failure doesn't run is-leader again.
+        assert [call[0] for call in calls] == ['is-leader', 'juju-log']
+        description = json.loads(calls[1][-1])['description']
+        assert description.startswith("Hook command 'is-leader' (leadership unknown) failed")
+
+    @pytest.mark.parametrize('cached', [True, False, None])
+    def test_is_leader_failed_refresh_keeps_lease(
+        self,
+        backend: _ModelBackend,
+        monkeypatch: pytest.MonkeyPatch,
+        cached: bool | None,
+    ):
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: 100))
+        last_check = None if cached is None else 50
+        backend._is_leader = cached
+        backend._leader_check_time = last_check
+        error = hookcmds.Error(returncode=1, cmd=['is-leader'], stderr='unavailable')
+        query = mock.Mock(side_effect=[error, False])
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+
+        with pytest.raises(ops.ModelError):
+            backend.is_leader()
+        # The failed refresh didn't start a new lease.
+        assert backend._is_leader is cached
+        assert backend._leader_check_time == last_check
+
+        assert backend.is_leader() is False
+        assert backend._leader_check_time == 100
+        assert query.call_count == 2
+
+    def test_is_leader_lease_starts_before_query(
+        self, backend: _ModelBackend, monkeypatch: pytest.MonkeyPatch
+    ):
+        now = 100.0
+        monkeypatch.setattr(ops.model, 'time', types.SimpleNamespace(monotonic=lambda: now))
+
+        def is_leader():
+            nonlocal now
+            now += 5  # The query takes time, which must not extend the lease.
+            return True
+
+        query = mock.Mock(side_effect=is_leader)
+        monkeypatch.setattr(hookcmds, 'is_leader', query)
+        assert backend.is_leader() is True
+        assert query.call_count == 1
+        assert backend._leader_check_time == 100
+        now = 130
+        assert backend.is_leader() is True
+        assert query.call_count == 1
+        assert backend._leader_check_time == 100
+        now = 131
+        assert backend.is_leader() is True
+        assert query.call_count == 2
+        assert backend._leader_check_time == 131
+
     def test_relation_hook_command_errors(
         self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
     ):
@@ -3099,6 +3260,158 @@ class TestModelBackend:
             with pytest.raises(exception):
                 run()
             assert fake_script.calls(clear=True) == calls
+
+    @pytest.mark.parametrize(
+        'stderr',
+        [
+            # The wordings Juju 3.6.28 and 4.0.14 use for the various hook
+            # commands on the consuming side of a cross-model relation, after
+            # `juju remove-saas <saas> --force` has left the relation in the
+            # uniter's context but gone from Juju's state.
+            'ERROR permission denied',
+            'ERROR permission denied (unauthorized access)',
+            'ERROR cannot read relation settings: permission denied',
+            'ERROR cannot read relation application settings: permission denied '
+            '(unauthorized access)',
+        ],
+    )
+    def test_gone_relation_hook_command_errors(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+        stderr: str,
+    ):
+        """Juju says "permission denied" for a relation that's gone from its state."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        for cmd in ('relation-list', 'relation-get', 'relation-set', 'network-get'):
+            fake_script.write(cmd, f'echo "{stderr}" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
+
+        calls = [
+            lambda: backend.relation_list(2),
+            lambda: backend.relation_get(2, 'remoteapp1', is_app=True),
+            lambda: backend.relation_get(2, 'remoteapp1/0', is_app=False),
+            lambda: backend.relation_get(2, 'myapp', is_app=True),
+            lambda: backend.relation_get(2, 'myapp/0', is_app=False),
+            lambda: backend.relation_set(2, {'foo': 'bar'}, is_app=False),
+            # `relation-set --app` is in this list only because `is-leader` says
+            # true above: as a follower it is a real authorisation failure. See
+            # test_follower_writing_own_app_databag.
+            lambda: backend.relation_set(2, {'foo': 'bar'}, is_app=True),
+            lambda: backend.network_get('db1', 2),
+        ]
+        for call in calls:
+            with pytest.raises(ops.RelationNotFoundError):
+                call()
+
+        # A gone relation isn't an authorisation failure, so it isn't reported
+        # as a security event.
+        assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_gone_relation_network_get(
+        self, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch, root_logging: None
+    ):
+        """`network-get` names the relation in its "not found" message."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        # Juju 3.6.28 on a relation that's gone from its state. (Juju 4.0.14 says
+        # "permission denied (unauthorized access)" for the same call.)
+        fake_script.write(
+            'network-get', 'echo "ERROR relation 2 not found (not found)" >&2; exit 1'
+        )
+        fake_script.write('is-leader', 'echo true')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.RelationNotFoundError):
+            backend.network_get('db1', 2)
+
+    def test_follower_reading_own_app_databag(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """A follower reading its own app databag is a real authorisation failure.
+
+        Juju uses the same "permission denied" wording as it does for a gone
+        relation, so this is the one case that keeps the original error rather
+        than being reported as a relation that doesn't exist.
+        """
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('relation-get', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.relation_get(2, 'myapp', is_app=True)
+        assert not isinstance(excinfo.value, ops.RelationNotFoundError)
+        assert [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_follower_writing_own_app_databag(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """A follower writing its own app databag is a real authorisation failure.
+
+        The same carve-out as reading it: Juju refuses this on a relation that
+        still exists, so reporting it as a gone relation would swallow an
+        authorisation failure and lose the security event.
+
+        ops checks leadership before a write while it is running the charm's
+        `__init__` or an event handler, so a follower only gets here when the
+        backend is called outside those.
+        """
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('relation-set', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.relation_set(2, {'foo': 'bar'}, is_app=True)
+        assert not isinstance(excinfo.value, ops.RelationNotFoundError)
+        assert [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_follower_writing_own_unit_databag_on_a_gone_relation(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """Only the *app* write is leader-only; a unit write is still a gone relation."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('relation-set', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.RelationNotFoundError):
+            backend.relation_set(2, {'foo': 'bar'}, is_app=False)
+        assert not [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
+
+    def test_non_relation_permission_denied_logs_security_event(
+        self,
+        fake_script: FakeScript,
+        monkeypatch: pytest.MonkeyPatch,
+        root_logging: None,
+    ):
+        """A hook command that isn't about a relation still reports a security event."""
+        monkeypatch.setenv('JUJU_VERSION', '3.6.28')
+        backend = _ModelBackend('myapp/0')
+        fake_script.write('secret-get', 'echo "ERROR permission denied" >&2 ; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        fake_script.write('juju-log', 'exit 0')
+
+        with pytest.raises(ops.ModelError):
+            backend.secret_get(id='secret:1234')
+
+        assert [call for call in fake_script.calls(clear=True) if call[0] == 'juju-log']
 
     def test_status_get(self, fake_script: FakeScript, backend: _ModelBackend):
         # taken from actual Juju output
@@ -3932,6 +4245,8 @@ class TestSecrets:
         fake_script.write(hook_command, f"""echo 'ERROR: {failure}' >&2 && exit 1""")
         fake_script.write('is-leader', 'echo true' if is_leader else 'echo false')
         fake_script.write('juju-log', 'exit 0')
+        # The security event reports the leadership status that is already known.
+        model.unit.is_leader()
         if '.' in method:
             attr_name, method = method.split('.', 1)
             attr = getattr(model, attr_name)
@@ -3940,9 +4255,9 @@ class TestSecrets:
         with pytest.raises(ops.ModelError):
             getattr(attr, method)(**kwargs)
         calls = fake_script.calls(clear=True)
-        # For this test we aren't interested in the secret or is-leader call.
-        calls.pop(0)
-        calls.pop(0)
+        # Reporting the failure doesn't run is-leader again.
+        assert calls.pop(0)[0] == 'is-leader'
+        assert calls.pop(0)[0] == hook_command
         assert len(calls) == 1
         assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data = json.loads(calls[0][-1])
@@ -3950,8 +4265,10 @@ class TestSecrets:
         assert data['type'] == 'security'
         assert data['appid'] == '1234-myapp/0'
         assert data['event'] == f'authz_fail:{hook_command}'
-        leadership = '(as leader)' if is_leader else ''
-        assert f"{leadership} failed with code 1: 'ERROR: {failure}'" in data['description']
+        leadership = ' (as leader)' if is_leader else ''
+        assert data['description'].startswith(
+            f"Hook command {hook_command!r}{leadership} failed with code 1: 'ERROR: {failure}'"
+        )
         timestamp = datetime.datetime.fromisoformat(data['datetime'])
         assert (datetime.datetime.now(datetime.timezone.utc) - timestamp).total_seconds() < 60
 
@@ -4826,14 +5143,12 @@ class TestCloudCredential:
         monkeypatch.setattr(os, 'getuid', lambda: 1001)
         message = 'cannot access cloud credentials: permission denied'
         fake_script.write('credential-get', f"""echo 'ERROR: {message}' >&2 && exit 1""")
-        fake_script.write('is-leader', 'echo true')
         fake_script.write('juju-log', 'exit 0')
         with pytest.raises(ops.ModelError):
             model.get_cloud_spec()
         calls = fake_script.calls(clear=True)
-        # For this test we aren't interested in the credential-get or is-leader call.
-        calls.pop(0)
-        calls.pop(0)
+        # Reporting the failure doesn't run is-leader.
+        assert calls.pop(0)[0] == 'credential-get'
         assert len(calls) == 1
         assert calls[0][:-1] == ['juju-log', '--log-level', 'TRACE', '--']
         data = json.loads(calls[0][-1])

@@ -3607,6 +3607,7 @@ class _ModelBackend:
 
         self._is_leader: bool | None = None
         self._leader_check_time: float | None = None
+        self._peer_endpoints: frozenset[str] = frozenset()
         self._hook_is_running = ''
 
     @contextlib.contextmanager
@@ -3626,17 +3627,81 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in trace.items()])
                 yield
         except hookcmds.Error as e:
-            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
-            if (
-                cmd.startswith(('relation-', 'network-'))
-                and 'relation not found' in e.stderr.lower()
-            ):
+            stderr_lower = e.stderr.lower()
+            if self._relation_is_gone(cmd, stderr_lower, trace):
+                # A gone relation isn't an authorisation failure, so it isn't
+                # a security event.
                 raise RelationNotFoundError() from e
-            elif cmd.startswith('secret-') and 'not found' in e.stderr.lower():
+            self._check_for_security_event(e.cmd[0], e.returncode, e.stderr)
+            if cmd.startswith('secret-') and 'not found' in stderr_lower:
                 raise SecretNotFoundError() from e
             raise ModelError(e.stderr) from e
 
-    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
+    def _relation_is_gone(self, cmd: str, stderr: str, trace: Mapping[str, object]) -> bool:
+        """Whether this hook command's failure means the relation is gone.
+
+        Juju reports a missing relation in one of two ways, depending on where
+        it's missing from. If the unit agent no longer has the relation in its
+        hook context, the hook command rejects the relation ID itself, with
+        "relation not found". If the agent still has the relation but the
+        controller doesn't (for example, on the consuming side of a cross-model
+        relation after ``juju remove-saas --force``), the command reaches the
+        controller, which often answers "permission denied" so that the reply
+        doesn't say whether the relation ever existed. Which commands get which
+        wording varies by Juju version: on Juju 3.6 reading a remote databag
+        says "permission denied" and ``network-get`` says "not found", and on
+        Juju 4.0 it's the other way around. A charm can't do anything with the
+        relation in either case, so ops treats both wordings the same way.
+
+        On a relation that still exists, Juju refuses only a follower reading its
+        own (non-peer) application databag, or writing it. In those two cases ops
+        can't tell a gone relation from a real authorisation failure, so it keeps
+        the original error and reports a security event: swallowing a real
+        authorisation failure is the thing this function must not do.
+
+        ops's own access checks stop most such calls before they reach Juju, but
+        they don't run outside the charm's ``__init__`` and event handlers. This
+        function checks leadership with :meth:`is_leader`, which only uses a
+        cached value within the lease period that Juju guarantees.
+
+        Args:
+            cmd: The hook command that failed.
+            stderr: The command's standard error, lowercased.
+            trace: The arguments the call site passed to :meth:`_wrap_hookcmd`.
+                This relies on ``relation-get`` passing ``app``, ``unit`` and
+                ``endpoint``, and ``relation-set`` passing ``app``.
+        """
+        if cmd not in (
+            'relation-ids',
+            'relation-list',
+            'relation-get',
+            'relation-set',
+            'relation-model-get',
+            'network-get',
+        ):
+            return False
+        # Juju words this as "relation not found" for most hook commands and
+        # "relation 42 not found" for `network-get`.
+        if re.search(r'relation (\d+ )?not found', stderr):
+            return True
+        if 'permission denied' not in stderr:
+            return False
+        # "permission denied" means the relation is gone, except in the two
+        # cases where a follower touches its own application databag.
+        # 1. Reading it, unless it's a peer relation's, which every unit can
+        #    read. The remote application databag and unit databags are
+        #    readable by any unit, so this is the only read Juju can refuse.
+        if cmd == 'relation-get' and trace.get('app') and trace.get('unit') == self.app_name:
+            return trace.get('endpoint') in self._peer_endpoints or self.is_leader()
+        # 2. Writing it. A unit can only write its own application databag, so
+        #    there is no `unit` argument to compare against.
+        if cmd == 'relation-set' and trace.get('app'):
+            return self.is_leader()
+        # Any other "permission denied" means the relation is gone, including
+        # from `network-get`, which 4.0 words that way.
+        return True
+
+    def _check_for_security_event(self, cmd: str, returncode: int, stderr: str) -> None:
         authz_messages = (
             'access denied',
             'permission denied',
@@ -3646,7 +3711,15 @@ class _ModelBackend:
         if not any(message in stderr.lower() for message in authz_messages):
             return
         base_cmd = os.path.basename(cmd)
-        leadership = ' (as leader)' if self.is_leader() else ''
+        # Use the cached leadership status rather than querying it, so that
+        # reporting a failure never runs another hook command.
+        is_leader = self._cached_leadership()
+        if is_leader is None:
+            leadership = ' (leadership unknown)'
+        elif is_leader:
+            leadership = ' (as leader)'
+        else:
+            leadership = ''
         description = (
             f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
             f'{stderr.strip()!r}. '
@@ -3764,15 +3837,21 @@ class _ModelBackend:
         The value is cached for the duration of a lease which is 30s in Juju.
         """
         now = time.monotonic()
-        if self._leader_check_time is not None and self._is_leader is not None:
-            time_since_check = datetime.timedelta(seconds=now - self._leader_check_time)
-            if time_since_check <= self.LEASE_RENEWAL_PERIOD:
-                return self._is_leader
-        # Current time MUST be saved before running is-leader to ensure the cache
-        # is only used inside the window that is-leader itself asserts.
-        self._leader_check_time = now
+        is_leader = self._cached_leadership()
+        if is_leader is not None:
+            return is_leader
         with self._wrap_hookcmd('is-leader'):
             self._is_leader = hookcmds.is_leader()
+        self._leader_check_time = now  # Only store refreshed lease on success.
+        return self._is_leader
+
+    def _cached_leadership(self) -> bool | None:
+        """Return the cached leadership status, or None if unknown or the lease has expired."""
+        if self._leader_check_time is None or self._is_leader is None:
+            return None
+        time_since_check = datetime.timedelta(seconds=time.monotonic() - self._leader_check_time)
+        if time_since_check > self.LEASE_RENEWAL_PERIOD:
+            return None
         return self._is_leader
 
     def resource_get(self, resource_name: str) -> str:

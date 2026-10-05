@@ -83,10 +83,24 @@ tiobe = [
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
-requires = [
-    "setuptools>=60",
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "code"
+path = "ops/version.py"
+expression = "version"
+
+[tool.hatch.build.targets.sdist]
+# Only include ops, not docs, examples, or testing and tracing packages.
+include = [
+    "/ops",
+    "/test",
+    "/*.md",  # Include changelog and contributor docs.
 ]
-build-backend = "setuptools.build_meta"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ops"]
 
 [tool.uv.workspace]
 members = ["tracing", "testing"]
@@ -95,12 +109,6 @@ members = ["tracing", "testing"]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
-
-[tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
-
-[tool.setuptools.dynamic]
-version = {attr = "ops.version.version"}
 
 # Testing tools configuration
 [tool.coverage.run]
