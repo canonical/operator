@@ -2453,7 +2453,7 @@ class _EventPath(str):
 
 
 @dataclasses.dataclass(frozen=True)
-class _Event:  # type: ignore
+class _Event:
     """A Juju, ops, or custom event that can be run against a charm."""
 
     path: str
