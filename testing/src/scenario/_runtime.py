@@ -352,7 +352,9 @@ class Runtime:
                 raise  # propagate along
             except _Abort as e:
                 # If ops raised _Abort(0) then we want to treat that as normal completion.
-                if e.exit_code != 0:
+                # An _Abort(0) before there is an Ops object comes from the dispatcher (for
+                # example, a leaked OPERATOR_DISPATCH), not the charm, so propagate that.
+                if e.exit_code != 0 or ops is None:
                     raise
             except Exception as e:
                 # The following is intentionally on one long line, so that the last line of pdb
