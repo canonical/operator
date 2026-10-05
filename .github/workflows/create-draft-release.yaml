@@ -220,8 +220,8 @@ jobs:
     #
     # The pull request is opened with the workflow's own token, so GitHub
     # will not start the usual checks on it: close and reopen it to get them
-    # to run. TODO: use a GitHub App token (or the bot account's PAT) here, as
-    # for propose-release.yaml.
+    # to run. TODO: open it with a GitHub App token or a PAT instead; see the
+    # matching TODO in propose-release.yaml.
     needs: draft
     if: ${{ needs.draft.outputs.version }}
     runs-on: ubuntu-latest

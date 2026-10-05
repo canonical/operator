@@ -133,6 +133,15 @@ class TestPostRelease:
         assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
         assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 1
 
+    def test_a_pyproject_already_at_the_version_is_an_error(
+        self, tree: pathlib.Path, capsys: pytest.CaptureFixture[str]
+    ):
+        """Each pyproject is checked on its own, not only ops/version.py."""
+        path = tree / 'tracing/pyproject.toml'
+        path.write_text(path.read_text().replace('3.8.2', '3.9.0.dev0'))
+        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 1
+        assert 'Nothing changed in tracing/pyproject.toml' in capsys.readouterr().err
+
     def test_the_files_the_workflow_commits_are_the_files_it_writes(self, tree: pathlib.Path):
         """Nothing else in the tree moves, so `git add -u` commits only these."""
         before = {path: path.read_text() for path in sorted(tree.rglob('*')) if path.is_file()}
@@ -189,3 +198,17 @@ class TestRelease:
         content = path.read_text()
         assert '\nversion = "3.9.0"\n' in content
         assert 'minimum_version = "3.8.2"' in content
+
+    def test_a_branch_without_the_versions_doc_still_releases(self, tree: pathlib.Path):
+        """The older maintenance branches have no tool-versions table."""
+        doc = tree / 'docs/explanation/versions.md'
+        doc.unlink()
+        assert update.main(['--version', '3.9.0', '--date', '2026-09-30']) == 0
+        assert "version: str = '3.9.0'" in (tree / 'ops/version.py').read_text()
+        assert not doc.exists()
+
+    def test_a_leap_day_release_ends_support_on_1_march(self, tree: pathlib.Path):
+        """29 February has no anniversary in the next year."""
+        assert update.main(['--version', '3.9.0', '--date', '2028-02-29']) == 0
+        doc = (tree / 'docs/explanation/versions.md').read_text()
+        assert '| Ops 3.9 | Active | 2028-02-29 | 2029-03-01 |' in doc

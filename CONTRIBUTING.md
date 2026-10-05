@@ -335,7 +335,7 @@ A **pre-release** needs an explicit `version`, for example `3.9.0rc1`, because t
 
 A **major release** needs an explicit `version` too. A `!` on a commit is surfaced in the changelog under "Breaking Changes" but is never read as a major bump, because we sometimes let a breaking change ride in a minor release.
 
-To build the packages and upload them to **Test PyPI**, run the Publish workflow by hand from whichever branch or tag you want built. That path needs the setting described below.
+To build the packages and upload them to **Test PyPI**, run the Publish workflow by hand from whichever branch or tag you want built. That path needs the Test PyPI trusted publisher described in [Settings a repository admin has to create](#settings-a-repository-admin-has-to-create).
 
 ### Settings a repository admin has to create
 
