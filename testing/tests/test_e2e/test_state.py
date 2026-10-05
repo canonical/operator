@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import tempfile
+import time
 from collections.abc import Callable, Generator, Iterable
 from dataclasses import asdict, replace
 from typing import Any
@@ -332,7 +333,7 @@ def test_container_name_invalid(name: str):
         Container(name)
 
 
-@pytest.mark.parametrize('name', ('store', 'store-a', 's', 'store-a1', 's0'))
+@pytest.mark.parametrize('name', ('store', 'store-a', 's', 'store-a1', 's0', 'store-1a', 'a-12b3'))
 def test_storage_name_valid(name: str):
     assert Storage(name).name == name
 
@@ -344,6 +345,15 @@ def test_storage_name_valid(name: str):
 def test_storage_name_invalid(name: str):
     with pytest.raises(StateValidationError):
         Storage(name)
+
+
+def test_storage_name_invalid_is_fast():
+    # An ambiguous storage-name regex takes seconds to backtrack on this input.
+    name = 'a-' + 'aa-' * 26 + '!'
+    start = time.perf_counter()
+    with pytest.raises(StateValidationError):
+        Storage(name)
+    assert time.perf_counter() - start < 1
 
 
 @pytest.mark.parametrize(
