@@ -7,10 +7,10 @@ Called by the propose-release workflow, which has already worked out which
 version is being released, and again by the create-draft-release workflow's
 post-release job, which has worked out which development version the branch
 goes back to. Both run it from their own checkout of the default branch, so a
-maintenance branch doesn't need a copy. This script only
-writes files: it does not decide the version, run git, or talk to GitHub, and
-it deliberately does not run `uv lock` either, so that the lockfile update is
-a visible workflow step rather than something buried in here.
+maintenance branch doesn't need a copy. This script only writes files: it does
+not decide the version, run git, or talk to GitHub, and it deliberately does
+not run `uv lock` either, so that the lockfile update is a visible workflow
+step rather than something buried in here.
 
 The ops-to-scenario relationship and the fan-out over the four packages are
 the parts of the release that are specific to this repository, so they stay
@@ -69,7 +69,9 @@ def scenario_version(ops_version: str) -> str:
 def update_pyproject(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
     """Rewrite a pyproject.toml's own version and its pins on our own packages."""
     content = path.read_text()
-    updated = re.sub(rf'version = "{EXISTING_VERSION}"', f'version = "{version}"', content)
+    updated = re.sub(
+        rf'^version = "{EXISTING_VERSION}"$', f'version = "{version}"', content, flags=re.MULTILINE
+    )
     for package, pinned in deps.items():
         updated = re.sub(rf'{package}=={EXISTING_VERSION}', f'{package}=={pinned}', updated)
     if content == updated:

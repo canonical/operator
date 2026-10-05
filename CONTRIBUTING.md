@@ -222,7 +222,7 @@ Unmarked features are assumed to work and be available in the latest LTS version
 
 ## Release documentation
 
-Part of making a release is a summary of it, and you review and edit that summary rather than writing it from nothing: the "Propose a release" workflow drafts it and puts it in the description of the pull request it opens. The summary appears in the GitHub release notes and in Discourse and Matrix.
+The "Propose a release" workflow drafts a summary of the release and puts it in the description of the PR it opens. You review and edit it there, rather than writing it from scratch. The summary appears in the GitHub release notes and in Discourse and Matrix.
 
 In the summary, outline the key improvements from all areas of Ops,
 including testing, tracing, and the docs.
@@ -341,7 +341,7 @@ To build the packages and upload them to **Test PyPI**, run the Publish workflow
 
 Two things live in the repository settings, so no PR can add them.
 
-- An environment called `release-notes`, holding an `OPENROUTER_API_KEY` secret and an `OPENROUTER_MODEL` variable. The model is a variable so that changing it is a settings edit rather than a PR. The key should be its own, and shared with another environment.
+- An environment called `release-notes`, holding an `OPENROUTER_API_KEY` secret and an `OPENROUTER_MODEL` variable. The model is a variable so that changing it is a settings edit rather than a PR. The key should be its own, and not shared with another environment.
 
     A release doesn't wait on this. With any of the three missing, "Propose a release" writes a placeholder in place of the notes - a line saying none were drafted, and an instruction to write them before merging - and carries on. Write them yourself in the PR description; everything after that works the same way.
 
@@ -352,7 +352,7 @@ Two things live in the repository settings, so no PR can add them.
 Every step reads what it needs fresh from the branch or the API, so re-running the failed job is usually the fix. Specifically:
 
 - **"Propose a release" failed.** If it failed before pushing, nothing happened and you can run it again. If it pushed `release-prep-X.Y.Z` and then failed, close the PR if there is one and delete that branch before running it again: the workflow refuses to start while the branch exists, so that a half-finished attempt can't be mistaken for the real one.
-- **The PR merged but no draft release appeared.** The workflow decided the push wasn't a release. Check the run's log, which says what it decided and why: the usual cause is a version that still has a `.devN` suffix on it.
+- **The PR merged but no draft release appeared.** The workflow decided the merge wasn't a release. Check the run's log, which says what it decided and why: the usual cause is a version that still has a `.devN` suffix on it.
 - **"Create the draft release" failed.** Fix the cause and re-run the failed job; the merge doesn't have to happen again. A PR description can still be edited after the merge, so markers somebody removed can be put back. If a draft was created before the failure, delete it first, because the workflow refuses to make a second one.
 - **Publish failed.** Re-run it. The release stays published and the tag stays where it is, so there's nothing to unwind. If the packages reached PyPI before the failure, they can't be replaced: fix the problem in a new patch release.
 - **The draft was created but the post-release PR wasn't.** Re-run the failed "Open the post-release pull request" job on its own; it doesn't touch the draft. If the bump is already on the branch, it says so and stops, so a re-run after somebody did it by hand is safe. If a `post-release-X.Y.Z` branch is left over from an attempt, merge, close or delete it first.

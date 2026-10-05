@@ -76,7 +76,18 @@ def tree(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Pat
     return tmp_path
 
 
-class TestPostReleaseFanOut:
+@pytest.fixture
+def lts_tree(tree: pathlib.Path) -> pathlib.Path:
+    """The same tree, at the versions a 2.23 LTS release left behind."""
+    for name in TREE:
+        if name.endswith('.md'):
+            continue
+        path = tree / name
+        path.write_text(path.read_text().replace('3.8.2', '2.23.5').replace('8.8.2', '7.23.5'))
+    return tree
+
+
+class TestPostRelease:
     """update-release-versions.py in its post-release shape."""
 
     def test_it_writes_every_version_file_and_leaves_the_doc(self, tree: pathlib.Path):
@@ -103,23 +114,57 @@ class TestPostReleaseFanOut:
             TREE['docs/explanation/versions.md']
         )
 
+    def test_the_maintenance_shape(self, lts_tree: pathlib.Path):
+        """The LTS branch's patch bump, over the same four files."""
+        assert update.main(['--version', '2.23.6.dev0', '--post-release']) == 0
+        assert "version: str = '2.23.6.dev0'" in (lts_tree / 'ops/version.py').read_text()
+        assert 'version = "7.23.6.dev0"' in (lts_tree / 'testing/pyproject.toml').read_text()
+        assert (lts_tree / 'docs/explanation/versions.md').read_text() == (
+            TREE['docs/explanation/versions.md']
+        )
+
+    def test_the_scenario_version_carries_the_dev_suffix(self):
+        """ops-scenario is five majors ahead, suffix and all."""
+        assert update.scenario_version('3.9.0.dev0') == '8.9.0.dev0'
+        assert update.scenario_version('3.4.0.dev0') == '8.4.0.dev0'
+
+    def test_a_tree_already_at_the_version_is_an_error(self, tree: pathlib.Path):
+        """The workflow checks the branch first, so this is the backstop."""
+        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
+        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 1
+
+    def test_the_files_the_workflow_commits_are_the_files_it_writes(self, tree: pathlib.Path):
+        """Nothing else in the tree moves, so `git add -u` commits only these."""
+        before = {path: path.read_text() for path in sorted(tree.rglob('*')) if path.is_file()}
+        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
+        changed = {
+            str(path.relative_to(tree))
+            for path, content in before.items()
+            if path.read_text() != content
+        }
+        # uv.lock is the fifth, and the workflow writes it in its own step.
+        assert changed == {
+            'ops/version.py',
+            'pyproject.toml',
+            'testing/pyproject.toml',
+            'tracing/pyproject.toml',
+        }
+
+
+class TestRelease:
+    """update-release-versions.py in its release shape."""
+
     def test_a_release_run_on_the_same_tree_does_write_the_doc(self, tree: pathlib.Path):
         """The other half of the pair: the skipping is the flag's doing."""
         assert update.main(['--version', '3.9.0', '--date', '2026-09-30']) == 0
         doc = (tree / 'docs/explanation/versions.md').read_text()
         assert '| Ops 3.9 | Active | 2026-09-30 | 2027-09-30 |' in doc
 
-    def test_a_release_leaves_an_lts_row_alone(self, tree: pathlib.Path):
+    def test_a_release_leaves_an_lts_row_alone(self, lts_tree: pathlib.Path):
         """An LTS row's dates are a support commitment, not a year from now."""
-        for name in TREE:
-            if name.endswith('.md'):
-                continue
-            path = tree / name
-            path.write_text(path.read_text().replace('3.8.2', '2.23.5').replace('8.8.2', '7.23.5'))
-
         assert update.main(['--version', '2.23.6', '--date', '2026-09-30']) == 0
-        assert "version: str = '2.23.6'" in (tree / 'ops/version.py').read_text()
-        assert (tree / 'docs/explanation/versions.md').read_text() == (
+        assert "version: str = '2.23.6'" in (lts_tree / 'ops/version.py').read_text()
+        assert (lts_tree / 'docs/explanation/versions.md').read_text() == (
             TREE['docs/explanation/versions.md']
         )
 
@@ -136,44 +181,11 @@ class TestPostReleaseFanOut:
         assert update.main(['--version', '3.8.3', '--date', '2026-08-31']) == 0
         assert doc.read_text() == TREE['docs/explanation/versions.md']
 
-    def test_the_maintenance_shape(self, tree: pathlib.Path):
-        """The LTS branch's patch bump, over the same four files."""
-        for name in TREE:
-            if name.endswith('.md'):
-                continue
-            path = tree / name
-            path.write_text(path.read_text().replace('3.8.2', '2.23.5').replace('8.8.2', '7.23.5'))
-
-        assert update.main(['--version', '2.23.6.dev0', '--post-release']) == 0
-        assert "version: str = '2.23.6.dev0'" in (tree / 'ops/version.py').read_text()
-        assert 'version = "7.23.6.dev0"' in (tree / 'testing/pyproject.toml').read_text()
-        assert (tree / 'docs/explanation/versions.md').read_text() == (
-            TREE['docs/explanation/versions.md']
-        )
-
-    def test_the_scenario_version_carries_the_dev_suffix(self):
-        """ops-scenario is five majors ahead, suffix and all."""
-        assert update.scenario_version('3.9.0.dev0') == '8.9.0.dev0'
-        assert update.scenario_version('3.4.0.dev0') == '8.4.0.dev0'
-
-    def test_a_tree_already_at_the_version_is_an_error(self, tree: pathlib.Path):
-        """The workflow checks the branch first, so this is the backstop."""
-        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
-        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 1
-
-    def test_the_files_the_workflow_commits_are_the_files_it_writes(self, tree: pathlib.Path):
-        """Nothing else in the tree moves, so the commit can name its files."""
-        before = {path: path.read_text() for path in sorted(tree.rglob('*')) if path.is_file()}
-        assert update.main(['--version', '3.9.0.dev0', '--post-release']) == 0
-        changed = {
-            str(path.relative_to(tree))
-            for path, content in before.items()
-            if path.read_text() != content
-        }
-        # uv.lock is the fifth, and the workflow writes it in its own step.
-        assert changed == {
-            'ops/version.py',
-            'pyproject.toml',
-            'testing/pyproject.toml',
-            'tracing/pyproject.toml',
-        }
+    def test_only_the_projects_own_version_line_moves(self, tree: pathlib.Path):
+        """A key that only ends in `version` keeps its value."""
+        path = tree / 'tracing/pyproject.toml'
+        path.write_text(path.read_text() + '\n[tool.example]\nminimum_version = "3.8.2"\n')
+        assert update.main(['--version', '3.9.0', '--date', '2026-09-30']) == 0
+        content = path.read_text()
+        assert '\nversion = "3.9.0"\n' in content
+        assert 'minimum_version = "3.8.2"' in content
