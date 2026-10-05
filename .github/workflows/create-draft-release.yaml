@@ -1,12 +1,13 @@
 ---
 name: Create the draft release
 
-# The second of the two release workflows: turn the merge of the version-bump
-# pull request into a draft GitHub release, titled with the version and the
-# summary from that pull request's description, whose body is the release
-# notes from the same description followed by this version's section of
-# CHANGES.md and a link comparing it with the previous release. Then open the
-# pull request that puts the branch back onto a development version.
+# The second of the two release workflows, run by hand once the version-bump
+# pull request is merged: turn that merge into a draft GitHub release, titled
+# with the version and the summary from the pull request's description, whose
+# body is the release notes from the same description followed by this
+# version's section of CHANGES.md and a link comparing it with the previous
+# release. Then open the pull request that puts the branch back onto a
+# development version.
 #
 # Worth knowing:
 #
@@ -14,28 +15,20 @@ name: Create the draft release
 #   notes, and is what creates the tag.
 # - The draft is pinned to the merge commit, so the post-release bump can be
 #   merged before the draft is published.
-# - Most merges are not releases. The path filter skips most of them, and the
-#   first step exits quietly on the rest.
 #
 # If a job fails on a real release, fix the cause and re-run the job. Every
 # step reads the pull request description and the branch afresh.
 
 on:
-  # This runs on pull_request_target rather than push, so the workflow always
-  # comes from the default branch. A maintenance branch needs nothing but its
-  # version files. Nothing here runs code from the checkout. The merged tree
-  # is read as data, and only a merged pull request is acted on.
-  pull_request_target:  # zizmor: ignore[dangerous-triggers] -- see the comment above.
-    types: [closed]
-    branches:
-      - main
-      - '*-maintenance'  # A glob: a list would go stale the next time a branch is cut.
-    paths:
-      # A cheap filter so that most merges never start a run. Every release
-      # changes this file, and nearly nothing else does. It is only an
-      # optimisation: the first step in the job decides whether this is a
-      # release.
-      - ops/version.py
+  # Dispatched from main for every branch, so a maintenance branch needs
+  # nothing but its version files: the pull request says which branch the
+  # release is from.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The number of the merged version-bump pull request.
+        required: true
+        type: number
 
 permissions: {}
 
@@ -44,32 +37,62 @@ env:
   CHANGELOG: >-
     git+https://github.com/canonical/charm-tech-code@9e86fcf600e094b5d7afaaf0d6096d1fdb547eae#subdirectory=changelog
 
-# One release at a time per branch. Two runs of this would race to create
-# the same release, and the loser's error would be the confusing one. Queue
-# every run rather than only the latest, so a release merged just before
-# another version change isn't dropped.
+# One run per pull request at a time. Drafts don't reserve their tag name, so
+# two runs of this could each create a draft for the same release.
 concurrency:
-  group: create-draft-release-${{ github.event.pull_request.base.ref }}
+  group: create-draft-release-${{ inputs.pr }}
   cancel-in-progress: false
-  queue: max
 
 jobs:
   draft:
     name: Create the draft release
-    if: ${{ github.event.pull_request.merged }}
     runs-on: ubuntu-latest
     permissions:
       contents: write  # To create the draft release.
-      pull-requests: read  # To read the merged pull request's description.
+      pull-requests: read  # To read the merged pull request.
     outputs:
       version: ${{ steps.detect.outputs.version }}
+      branch: ${{ steps.pr.outputs.branch }}
     steps:
+      - name: Read the pull request
+        id: pr
+        env:
+          NUMBER: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Fresh from the API, so that a re-run after somebody fixed the
+          # description picks up the fix.
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$NUMBER" > "$RUNNER_TEMP/pr.json"
+          branch=$(jq -r .base.ref "$RUNNER_TEMP/pr.json")
+          target=$(jq -r .merge_commit_sha "$RUNNER_TEMP/pr.json")
+
+          if [ "$(jq -r .merged "$RUNNER_TEMP/pr.json")" != true ]; then
+            echo "::error::#$NUMBER is not merged. Merge the version-bump pull request first."
+            exit 1
+          fi
+          case "$branch" in
+            main | *-maintenance) ;;
+            *)
+              echo "::error::#$NUMBER was merged into $branch, which is not main or a" \
+                "maintenance branch."
+              exit 1
+              ;;
+          esac
+
+          jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-description.md"
+          echo "The release notes come from #$NUMBER, merged into $branch as $target."
+          {
+            echo "branch=$branch"
+            echo "target=$target"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           # The squash commit the merge made, which is the release. Its parent
           # is the branch before the merge, which is what the version is
           # compared against, and the tags are where the compare link starts.
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ steps.pr.outputs.target }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -77,8 +100,10 @@ jobs:
         with:
           enable-cache: false
 
-      - name: Is this merge a release?
+      - name: Check that the merge is a release
         id: detect
+        env:
+          NUMBER: ${{ inputs.pr }}
         run: |
           set -euo pipefail
 
@@ -99,25 +124,18 @@ jobs:
             before=$(git show "HEAD^1:ops/version.py" | version_in)
           fi
 
-          uvx --from "$CHANGELOG" changelog detect-release --before "$before" --after "$after" \
-            >> "$GITHUB_OUTPUT"
-
-      - name: Read the merged pull request's description
-        if: ${{ steps.detect.outputs.version }}
-        env:
-          NUMBER: ${{ github.event.pull_request.number }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Fresh from the API rather than from the event, so that a re-run
-          # after somebody fixed the description picks up the fix.
-          echo "The release notes come from #$NUMBER."
-          gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
-            > "$RUNNER_TEMP/pr-description.md"
+          # Prints nothing, and says why on stderr, when it is not a release.
+          detected=$(uvx --from "$CHANGELOG" changelog detect-release --before "$before" \
+            --after "$after")
+          if [ -z "$detected" ]; then
+            echo "::error::#$NUMBER is not a release: it moved ops/version.py from" \
+              "'$before' to '$after'. A release changes it to a version without .devN."
+            exit 1
+          fi
+          echo "$detected" >> "$GITHUB_OUTPUT"
 
       - name: Assemble the release title and body
         id: assemble
-        if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
         run: |
@@ -143,12 +161,11 @@ jobs:
 
       - name: Create the draft release
         id: release
-        if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
           TITLE: ${{ steps.assemble.outputs.title }}
           PRERELEASE: ${{ steps.detect.outputs.prerelease }}
-          TARGET: ${{ github.event.pull_request.merge_commit_sha }}
+          TARGET: ${{ steps.pr.outputs.target }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -180,11 +197,10 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Summarise the draft
-        if: ${{ steps.detect.outputs.version }}
         env:
           VERSION: ${{ steps.detect.outputs.version }}
           TITLE: ${{ steps.assemble.outputs.title }}
-          NUMBER: ${{ github.event.pull_request.number }}
+          NUMBER: ${{ inputs.pr }}
           URL: ${{ steps.release.outputs.url }}
         shell: python
         run: |
@@ -223,7 +239,6 @@ jobs:
     # to run. TODO: open it with a GitHub App token or a PAT instead; see the
     # matching TODO in propose-release.yaml.
     needs: draft
-    if: ${{ needs.draft.outputs.version }}
     runs-on: ubuntu-latest
     permissions:
       contents: write  # To push the post-release branch.
@@ -234,7 +249,7 @@ jobs:
           # The tip of the release branch rather than the release commit: the
           # branch may have moved on since, and the bump belongs on top of
           # wherever it is now.
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ needs.draft.outputs.branch }}
           persist-credentials: false
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
@@ -255,7 +270,7 @@ jobs:
         id: bump
         env:
           RELEASED: ${{ needs.draft.outputs.version }}
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ needs.draft.outputs.branch }}
         run: |
           set -euo pipefail
           # The branch is known, since it is the one the pull request was
@@ -269,7 +284,7 @@ jobs:
         env:
           RELEASED: ${{ needs.draft.outputs.version }}
           VERSION: ${{ steps.bump.outputs.version }}
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ needs.draft.outputs.branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -311,7 +326,7 @@ jobs:
         env:
           RELEASED: ${{ needs.draft.outputs.version }}
           VERSION: ${{ steps.bump.outputs.version }}
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ needs.draft.outputs.branch }}
         shell: python
         run: |
           import os
@@ -347,7 +362,7 @@ jobs:
         if: ${{ !steps.branch.outputs.skip }}
         env:
           RELEASED: ${{ needs.draft.outputs.version }}
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ needs.draft.outputs.branch }}
           HEAD_BRANCH: ${{ steps.branch.outputs.head-branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -371,7 +386,7 @@ jobs:
 
       - name: Summarise the bump
         env:
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ needs.draft.outputs.branch }}
           VERSION: ${{ steps.bump.outputs.version }}
           SKIP: ${{ steps.branch.outputs.skip }}
           URL: ${{ steps.pull-request.outputs.url }}

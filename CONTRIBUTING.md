@@ -296,11 +296,11 @@ Review both halves of it, because they are different jobs:
 
 Wait for the checks to pass, then merge. If they don't pass at the tip of the branch, don't continue.
 
-### 2. Merge the PR, and check the draft release
+### 2. Merge the PR, then create the draft release
 
-Merging the PR starts the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow. It runs whenever a PR that changes `ops/version.py` is merged into `main` or a maintenance branch, and decides that the merge is a release when it leaves `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. Every other merge, the post-release bump included, stops there quietly.
+Once the PR is merged, run the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow with the PR's number. The PR description links to it. The workflow checks that the PR was merged into `main` or a maintenance branch, and that the merge left `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. If either check fails, it stops with an error that says why.
 
-For a release, it takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
+The workflow then takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
 
 It also opens a PR titled "chore: adjust versions after the X.Y.Z release" that puts the branch back onto a development version. Review and merge it. It doesn't matter whether that happens before or after you publish the draft, because the draft is pinned to the commit that was reviewed rather than to the branch. The same token caveat applies, so close and reopen it if you want the checks to run.
 
@@ -352,7 +352,7 @@ Two things live in the repository settings, so no PR can add them.
 Every step reads what it needs fresh from the branch or the API, so re-running the failed job is usually the fix. Specifically:
 
 - **"Propose a release" failed.** If it failed before pushing, nothing happened and you can run it again. If it pushed `release-prep-X.Y.Z` and then failed, close the PR if there is one and delete that branch before running it again: the workflow refuses to start while the branch exists, so that a half-finished attempt can't be mistaken for the real one.
-- **The PR merged but no draft release appeared.** The workflow decided the merge wasn't a release. Check the run's log, which says what it decided and why: the usual cause is a version that still has a `.devN` suffix on it.
+- **"Create the draft release" says the PR isn't a release.** The error says what the merge did to `ops/version.py`. The usual causes are the wrong PR number, or a version that still has a `.devN` suffix on it.
 - **"Create the draft release" failed.** Fix the cause and re-run the failed job; the merge doesn't have to happen again. A PR description can still be edited after the merge, so markers somebody removed can be put back. If a draft was created before the failure, delete it first, because the workflow refuses to make a second one.
 - **Publish failed.** Re-run it. The release stays published and the tag stays where it is, so there's nothing to unwind. If the packages reached PyPI before the failure, they can't be replaced: fix the problem in a new patch release.
 - **The draft was created but the post-release PR wasn't.** Re-run the failed "Open the post-release pull request" job on its own; it doesn't touch the draft. If the bump is already on the branch, it says so and stops, so a re-run after somebody did it by hand is safe. If a `post-release-X.Y.Z` branch is left over from an attempt, merge, close or delete it first.

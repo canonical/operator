@@ -304,6 +304,8 @@ jobs:
 
           {instructions}
 
+          Once this is merged, run [Create the draft release]({repo_url}/actions/workflows/create-draft-release.yaml) with this pull request's number.
+
           ## Release title
 
           <!-- release-title:start -->
