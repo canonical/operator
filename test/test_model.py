@@ -3573,10 +3573,7 @@ class TestModelErrorHookContext:
     def test_not_from_hook_command(self):
         error = ops.ModelError('boom')
         assert error.hook_command is None
-        assert error.hook_command_args is None
-        assert error.current_hook is None
-        assert error.current_event is None
-        assert error.current_event_deferred is False
+        assert error.event_info is None
         assert _notes(error) == []
 
     def test_hook_command_failure(self, fake_script: FakeScript):
@@ -3587,11 +3584,12 @@ class TestModelErrorHookContext:
             backend.relation_set(3, {'password': 's3cret'}, is_app=True, relation_name='db')
         error = excinfo.value
         assert str(error) == 'ERROR boom\n'
-        assert error.hook_command == 'relation-set'
-        assert error.hook_command_args == {'relation_id': 3, 'endpoint': 'db', 'app': True}
-        assert error.current_hook == 'config-changed'
-        assert error.current_event == 'config_changed'
-        assert error.current_event_deferred is False
+        assert error.hook_command == ops.HookCommandInfo(
+            name='relation-set', args={'relation_id': 3, 'endpoint': 'db', 'app': True}
+        )
+        assert error.event_info == ops.EventInfo(
+            hook='config-changed', event='config_changed', deferred=False
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'relation-set' (relation_id=3, endpoint='db', app=True) "
@@ -3608,12 +3606,10 @@ class TestModelErrorHookContext:
                 {'password': 's3cret'}, label='db-pass', description='shown', owner='app'
             )
         error = excinfo.value
-        assert error.hook_command == 'secret-add'
-        assert error.hook_command_args == {
-            'label': 'db-pass',
-            'description': 'shown',
-            'owner': 'app',
-        }
+        assert error.hook_command == ops.HookCommandInfo(
+            name='secret-add',
+            args={'label': 'db-pass', 'description': 'shown', 'owner': 'app'},
+        )
         for note in _notes(error):
             assert 's3cret' not in note
             assert 'password' not in note
@@ -3624,7 +3620,7 @@ class TestModelErrorHookContext:
         fake_script.write('config-get', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.config_get()
-        assert excinfo.value.hook_command_args == {}
+        assert excinfo.value.hook_command == ops.HookCommandInfo(name='config-get', args={})
         if sys.version_info >= (3, 11):
             assert _notes(excinfo.value) == [
                 "Hook command 'config-get' failed during the 'start' hook."
@@ -3637,9 +3633,10 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_fail('disk full')
         error = excinfo.value
-        assert error.hook_command_args == {'message': 'disk full'}
-        assert error.current_hook is None
-        assert error.current_event == 'back_up_action'
+        assert error.hook_command == ops.HookCommandInfo(
+            name='action-fail', args={'message': 'disk full'}
+        )
+        assert error.event_info == ops.EventInfo(hook=None, event='back_up_action', deferred=False)
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'action-fail' (message='disk full') "
@@ -3653,8 +3650,9 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
         error = excinfo.value
-        assert error.current_hook is None
-        assert error.current_event == 'collect_unit_status'
+        assert error.event_info == ops.EventInfo(
+            hook=None, event='collect_unit_status', deferred=False
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'is-leader' failed during the 'back-up' action "
@@ -3666,8 +3664,7 @@ class TestModelErrorHookContext:
         fake_script.write('action-set', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_set({'password': 's3cret'})
-        assert excinfo.value.hook_command == 'action-set'
-        assert excinfo.value.hook_command_args == {}
+        assert excinfo.value.hook_command == ops.HookCommandInfo(name='action-set', args={})
         for note in _notes(excinfo.value):
             assert 's3cret' not in note
             assert 'password' not in note
@@ -3687,8 +3684,7 @@ class TestModelErrorHookContext:
         fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        assert excinfo.value.current_hook == expected
-        assert excinfo.value.current_event is None
+        assert excinfo.value.event_info == ops.EventInfo(hook=expected, event=None, deferred=False)
         if sys.version_info >= (3, 11):
             expected_note = "Hook command 'is-leader' failed"
             if expected is not None:
@@ -3701,8 +3697,9 @@ class TestModelErrorHookContext:
         fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        assert excinfo.value.current_hook == 'install'
-        assert excinfo.value.current_event is None
+        assert excinfo.value.event_info == ops.EventInfo(
+            hook='install', event=None, deferred=False
+        )
         if sys.version_info >= (3, 11):
             assert _notes(excinfo.value) == [
                 "Hook command 'is-leader' failed during the 'install' hook "
@@ -3715,17 +3712,17 @@ class TestModelErrorHookContext:
         fake_script.write('secret-get', "echo 'ERROR secret not found' >&2; exit 1")
         with pytest.raises(ops.RelationNotFoundError) as relation_excinfo:
             backend.relation_list(7)
-        assert relation_excinfo.value.hook_command == 'relation-list'
-        assert relation_excinfo.value.hook_command_args == {'relation_id': 7}
-        assert relation_excinfo.value.current_hook == 'update-status'
+        assert relation_excinfo.value.hook_command == ops.HookCommandInfo(
+            name='relation-list', args={'relation_id': 7}
+        )
+        assert relation_excinfo.value.event_info == ops.EventInfo(
+            hook='update-status', event=None, deferred=False
+        )
         with pytest.raises(ops.SecretNotFoundError) as secret_excinfo:
             backend.secret_get(label='missing')
-        assert secret_excinfo.value.hook_command == 'secret-get'
-        assert secret_excinfo.value.hook_command_args == {
-            'label': 'missing',
-            'refresh': False,
-            'peek': False,
-        }
+        assert secret_excinfo.value.hook_command == ops.HookCommandInfo(
+            name='secret-get', args={'label': 'missing', 'refresh': False, 'peek': False}
+        )
         if sys.version_info >= (3, 11):
             assert len(_notes(relation_excinfo.value)) == 1
             assert len(_notes(secret_excinfo.value)) == 1
@@ -3735,8 +3732,9 @@ class TestModelErrorHookContext:
         fake_script.write('juju-log', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.juju_log('WARNING', 'the message is not included')
-        assert excinfo.value.hook_command == 'juju-log'
-        assert excinfo.value.hook_command_args == {'level': 'WARNING'}
+        assert excinfo.value.hook_command == ops.HookCommandInfo(
+            name='juju-log', args={'level': 'WARNING'}
+        )
 
     @pytest.fixture
     def charm(
@@ -3769,11 +3767,12 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             charm.on.config_changed.emit()
         error = excinfo.value
-        assert error.hook_command == 'status-set'
-        assert error.hook_command_args == {'status': 'active', 'message': 'ready', 'app': False}
-        assert error.current_hook == 'config-changed'
-        assert error.current_event == 'config_changed'
-        assert error.current_event_deferred is False
+        assert error.hook_command == ops.HookCommandInfo(
+            name='status-set', args={'status': 'active', 'message': 'ready', 'app': False}
+        )
+        assert error.event_info == ops.EventInfo(
+            hook='config-changed', event='config_changed', deferred=False
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'status-set' (status='active', message='ready', app=False) "
@@ -3787,9 +3786,9 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             charm.framework.reemit()
         error = excinfo.value
-        assert error.current_hook == 'config-changed'
-        assert error.current_event == 'update_status'
-        assert error.current_event_deferred is True
+        assert error.event_info == ops.EventInfo(
+            hook='config-changed', event='update_status', deferred=True
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'status-set' (status='active', message='ready', app=False) "
@@ -3804,8 +3803,9 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             charm.framework.reemit()
         error = excinfo.value
-        assert error.current_event == 'config_changed'
-        assert error.current_event_deferred is True
+        assert error.event_info == ops.EventInfo(
+            hook='config-changed', event='config_changed', deferred=True
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'status-set' (status='active', message='ready', app=False) "
@@ -3817,8 +3817,9 @@ class TestModelErrorHookContext:
         with pytest.raises(ops.ModelError) as excinfo:
             charm.on.custom.emit()
         error = excinfo.value
-        assert error.current_event == 'custom'
-        assert error.current_event_deferred is False
+        assert error.event_info == ops.EventInfo(
+            hook='config-changed', event='custom', deferred=False
+        )
         if sys.version_info >= (3, 11):
             assert _notes(error) == [
                 "Hook command 'status-set' (status='active', message='ready', app=False) "

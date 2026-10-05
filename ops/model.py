@@ -3407,14 +3407,65 @@ class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
         return repr(self._checks)
 
 
+@dataclasses.dataclass(frozen=True)
+class HookCommandInfo:
+    """Details of a hook command that failed.
+
+    See :attr:`ModelError.hook_command`.
+    """
+
+    name: str
+    """The name of the hook command, such as ``relation-set``."""
+
+    args: Mapping[str, Any]
+    """The arguments passed to the hook command.
+
+    Only arguments that are safe to include in logs are present. For example,
+    relation IDs and secret labels are included, but relation data and secret
+    content are not.
+
+    This is intended for logging. The keys, and which arguments are included,
+    may change in future versions of ops, so don't rely on a specific key being
+    present.
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class EventInfo:
+    """Details of the hook and event that were running when an error happened.
+
+    See :attr:`ModelError.event_info`.
+    """
+
+    hook: str | None
+    """The name of the Juju hook that was running.
+
+    For example, ``config-changed`` or ``db-relation-changed``. ``None`` if the
+    hook is not known, or if an action is running. For an action, :attr:`event`
+    is the action's event, such as ``backup_action``.
+    """
+
+    event: str | None
+    """The name of the event being handled.
+
+    For example, ``config_changed``. This differs from :attr:`hook` when a
+    deferred event is being handled (see :attr:`deferred`), or when a custom or
+    framework event, such as ``collect_unit_status``, is being handled. ``None``
+    if no event was being handled.
+    """
+
+    deferred: bool
+    """Whether :attr:`event` is a previously deferred event being handled again."""
+
+
 class ModelError(Exception):
     """Base class for exceptions raised when interacting with the Model.
 
-    When the error is caused by a failed hook command, the attributes below
-    describe the failure and where it happened. This allows charms to catch the
-    exception, log the details they need, and re-raise it. On Python 3.11 and
-    above, a summary of these details is also added to the exception as a note,
-    so that it appears in the traceback.
+    When the error is caused by a failed hook command, :attr:`hook_command` and
+    :attr:`event_info` describe the failure and where it happened. This allows
+    charms to catch the exception, log the details they need, and re-raise it. On
+    Python 3.11 and above, a summary of these details is also added to the
+    exception as a note, so that it appears in the traceback.
 
     The attributes are also set when a simulated hook command fails in a
     :class:`ops.testing.Context` unit test, but not when using
@@ -3425,53 +3476,21 @@ class ModelError(Exception):
         try:
             self.unit.status = ops.ActiveStatus()
         except ops.ModelError as e:
-            if e.hook_command is not None:
-                logger.error('%s failed during %s', e.hook_command, e.current_hook)
+            if e.hook_command is not None and e.event_info is not None:
+                logger.error('%s failed during %s', e.hook_command.name, e.event_info.hook)
             raise
     """
 
-    hook_command: str | None = None
-    """The name of the hook command that failed, such as ``relation-set``.
+    hook_command: HookCommandInfo | None = None
+    """The hook command that failed.
 
     ``None`` if the error was not caused by a failed hook command.
     """
 
-    hook_command_args: Mapping[str, Any] | None = None
-    """The arguments passed to the hook command that failed.
+    event_info: EventInfo | None = None
+    """The hook and event that were running when the hook command failed.
 
-    Only arguments that are safe to include in logs are present. For example,
-    relation IDs and secret labels are included, but relation data and secret
-    content are not. ``None`` if the error was not caused by a failed hook
-    command.
-
-    This is intended for logging. The keys, and which arguments are included,
-    may change in future versions of ops, so don't rely on a specific key being
-    present.
-    """
-
-    current_hook: str | None = None
-    """The name of the Juju hook that was running when the hook command failed.
-
-    For example, ``config-changed`` or ``db-relation-changed``. ``None`` if the
-    error was not caused by a failed hook command, if the hook is not known, or
-    if an action is running. For an action, :attr:`current_event` is the
-    action's event, such as ``backup_action``.
-    """
-
-    current_event: str | None = None
-    """The name of the event being handled when the hook command failed.
-
-    For example, ``config_changed``. This differs from :attr:`current_hook` when
-    a deferred event is being handled (see :attr:`current_event_deferred`), or
-    when a custom or framework event, such as ``collect_unit_status``, is being
-    handled. ``None`` if the error was not caused by a failed hook command, or
-    no event was being handled.
-    """
-
-    current_event_deferred: bool = False
-    """Whether :attr:`current_event` is a previously deferred event being handled again.
-
-    ``False`` if the error was not caused by a failed hook command.
+    ``None`` if the error was not caused by a failed hook command.
     """
 
 
@@ -3660,38 +3679,43 @@ class _ModelBackend:
     def _add_hook_command_context(
         self, error: ModelError, cmd: str, args: Mapping[str, Any]
     ) -> None:
-        error.hook_command = cmd
-        error.hook_command_args = {k: v for k, v in args.items() if v is not None}
-        error.current_hook = self._current_hook()
+        hook_command = HookCommandInfo(
+            name=cmd, args={k: v for k, v in args.items() if v is not None}
+        )
         # The framework marks charm construction with the pseudo-event name
         # '__init__', which is not an event that charms can observe.
         initialising = self._hook_is_running == '__init__'
-        error.current_event = None if initialising else self._hook_is_running or None
-        error.current_event_deferred = self._event_is_deferred
+        event_info = EventInfo(
+            hook=self._current_hook(),
+            event=None if initialising else self._hook_is_running or None,
+            deferred=self._event_is_deferred,
+        )
+        error.hook_command = hook_command
+        error.event_info = event_info
         if sys.version_info < (3, 11):
             return
         note = f'Hook command {cmd!r}'
-        if error.hook_command_args:
-            formatted = ', '.join(f'{k}={v!r}' for k, v in error.hook_command_args.items())
+        if hook_command.args:
+            formatted = ', '.join(f'{k}={v!r}' for k, v in hook_command.args.items())
             note += f' ({formatted})'
         note += ' failed'
         action = self._juju_context.action_name
         dispatched_event = None
-        if error.current_hook is not None:
-            note += f' during the {error.current_hook!r} hook'
-            dispatched_event = error.current_hook.replace('-', '_')
+        if event_info.hook is not None:
+            note += f' during the {event_info.hook!r} hook'
+            dispatched_event = event_info.hook.replace('-', '_')
         elif action is not None:
             note += f' during the {action!r} action'
             dispatched_event = f'{action.replace("-", "_")}_action'
         if initialising:
             note += ' while initialising the charm'
-        elif error.current_event_deferred:
-            note += f' while handling the deferred {error.current_event!r} event'
+        elif event_info.deferred:
+            note += f' while handling the deferred {event_info.event!r} event'
         # Leave out the event when it's the one the hook or action dispatched,
         # rather than saying "during the 'config-changed' hook while handling
         # the 'config_changed' event".
-        elif error.current_event not in (None, dispatched_event):
-            note += f' while handling the {error.current_event!r} event'
+        elif event_info.event not in (None, dispatched_event):
+            note += f' while handling the {event_info.event!r} event'
         error.add_note(f'{note}.')
 
     def _check_for_security_event(self, cmd: str, returncode: int, stderr: str):
