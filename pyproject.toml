@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.8.3",
+    "ops-scenario==8.9.0.dev0",
 ]
 tracing = [
-    "ops-tracing==3.8.3",
+    "ops-tracing==3.9.0.dev0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -37,9 +37,9 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.16.4",
+    "ruff==0.16.9",
     "codespell==2.4.2",
-    "zizmor==1.29.0",
+    "zizmor==1.30.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -76,8 +76,8 @@ release = [
     "rich>=14.1,<16.0",
 ]
 tiobe = [
-    "flake8==7.3.0",
-    "pylint==4.0.7",
+    "flake8==7.4.1",
+    "pylint==4.0.9",
 ]
 
 [project.urls]
@@ -88,10 +88,24 @@ tiobe = [
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
-requires = [
-    "setuptools>=60",
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "code"
+path = "ops/version.py"
+expression = "version"
+
+[tool.hatch.build.targets.sdist]
+# Only include ops, not docs, examples, or testing and tracing packages.
+include = [
+    "/ops",
+    "/test",
+    "/*.md",  # Include changelog and contributor docs.
 ]
-build-backend = "setuptools.build_meta"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ops"]
 
 [tool.uv.workspace]
 members = ["tracing", "testing"]
@@ -100,12 +114,6 @@ members = ["tracing", "testing"]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
-
-[tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
-
-[tool.setuptools.dynamic]
-version = {attr = "ops.version.version"}
 
 # Testing tools configuration
 [tool.coverage.run]

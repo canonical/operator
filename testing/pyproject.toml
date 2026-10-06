@@ -1,13 +1,11 @@
 [build-system]
-requires = [
-    "setuptools >= 35.0.2",
-]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "ops-scenario"
 
-version = "8.8.3"
+version = "8.9.0.dev0"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -20,7 +18,7 @@ license = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops==3.8.3",
+    "ops==3.9.0.dev0",
     "PyYAML>=6.0.1",
     "typing_extensions>=4.9.0",  # for `deprecated` decorator, replace with stdlib `warnings.deprecated` when we're Python 3.13+
 ]
@@ -40,5 +38,5 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
 
-[bdist_wheel]
-universal = 1
+[tool.hatch.build.targets.wheel]
+packages = ["src/scenario"]  # Hatch looks for 'ops_scenario' by default.
