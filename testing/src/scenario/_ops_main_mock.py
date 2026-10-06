@@ -59,10 +59,13 @@ class UnitStateDB:
         """Load any StoredState data structures from the db."""
         db = self._db
         stored_states: set[StoredState] = set()
+        # A deferred custom event's handle path doesn't have to match the
+        # event regex, so also skip anything that has a notice.
+        event_paths = {event_path for event_path, _, _ in db.notices()}
         for handle_path in db.list_snapshots():
-            if not EVENT_REGEX.match(handle_path) and (
-                match := STORED_STATE_REGEX.match(handle_path)
-            ):
+            if handle_path in event_paths or EVENT_REGEX.match(handle_path):
+                continue
+            if match := STORED_STATE_REGEX.match(handle_path):
                 stored_state_snapshot = db.load_snapshot(handle_path)
                 kwargs = match.groupdict()
                 sst = StoredState(content=stored_state_snapshot, **kwargs)
@@ -74,22 +77,21 @@ class UnitStateDB:
         """Load any DeferredEvent data structures from the db."""
         db = self._db
         deferred: list[DeferredEvent] = []
+        # ops re-emits every notice, so don't filter on the event regex.
         for handle_path in db.list_snapshots():
-            if EVENT_REGEX.match(handle_path):
-                notices = db.notices(handle_path)
-                for handle, owner, observer in notices:
-                    try:
-                        snapshot_data = db.load_snapshot(handle)
-                    except ops.storage.NoSnapshotError:
-                        snapshot_data: dict[str, Any] = {}
+            for handle, owner, observer in db.notices(handle_path):
+                try:
+                    snapshot_data = db.load_snapshot(handle)
+                except ops.storage.NoSnapshotError:
+                    snapshot_data: dict[str, Any] = {}
 
-                    event = DeferredEvent(
-                        handle_path=handle,
-                        owner=owner,
-                        observer=observer,
-                        snapshot_data=snapshot_data,
-                    )
-                    deferred.append(event)
+                event = DeferredEvent(
+                    handle_path=handle,
+                    owner=owner,
+                    observer=observer,
+                    snapshot_data=snapshot_data,
+                )
+                deferred.append(event)
 
         return deferred
 

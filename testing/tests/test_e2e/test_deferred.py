@@ -311,3 +311,58 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+class WorkloadEvents(ops.ObjectEvents):
+    workload_started = ops.EventSource(CustomEventWithArgs)
+
+
+def test_defer_custom_event_without_on():
+    """Custom events are re-emitted even when the handle path has no ``on/``.
+
+    ops re-emits every deferred notice, whatever the event's handle path, so
+    an event from an ``ObjectEvents`` created with a key, or from an
+    ``EventSource`` directly on the charm, must survive into the next run.
+    """
+    captured: list[CustomEventWithArgs] = []
+    defer = True
+
+    class MyCharm(ops.CharmBase):
+        restart_workload = ops.EventSource(CustomEventWithArgs)
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.workload_events = WorkloadEvents(self, 'workload_events')
+            framework.observe(self.on.start, self._on_start)
+            framework.observe(self.workload_events.workload_started, self._on_custom)
+            framework.observe(self.restart_workload, self._on_custom)
+
+        def _on_start(self, event: ops.StartEvent):
+            self.workload_events.workload_started.emit('started', 1)
+            self.restart_workload.emit('restart', 2)
+
+        def _on_custom(self, event: CustomEventWithArgs):
+            captured.append(event)
+            if defer:
+                event.defer()
+
+    ctx = Context(MyCharm, meta={'name': 'mycharm'})
+    state_1 = ctx.run(ctx.on.start(), State())
+    assert [e.handle_path for e in state_1.deferred] == [
+        'MyCharm/on[workload_events]/workload_started[2]',
+        'MyCharm/restart_workload[3]',
+    ]
+    assert [e.snapshot_data for e in state_1.deferred] == [
+        {'arg0': 'started', 'arg1': 1},
+        {'arg0': 'restart', 'arg1': 2},
+    ]
+    assert {s.name for s in state_1.stored_states} == {'_stored'}
+
+    defer = False
+    captured.clear()
+    state_2 = ctx.run(ctx.on.update_status(), state_1)
+    assert [(e.handle.kind, e.arg0, e.arg1) for e in captured] == [
+        ('workload_started', 'started', 1),
+        ('restart_workload', 'restart', 2),
+    ]
+    assert not state_2.deferred
