@@ -47,9 +47,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@9e86fcf600e094b5d7afaaf0d6096d1fdb547eae#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@9e86fcf600e094b5d7afaaf0d6096d1fdb547eae#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=draft-release-notes
 
 jobs:
   propose:
@@ -69,8 +69,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           # This workflow's own .github/release/, beside the branch being
-          # released: the version script, the team list, the release-note
-          # exemplars and the pull request template are read from here.
+          # released: the version script, the release-note exemplars and
+          # the pull request template are read from here.
           ref: ${{ github.sha }}
           path: release-tools
           sparse-checkout: /.github/release/
@@ -93,11 +93,10 @@ jobs:
       - name: Generate the changelog entry
         env:
           VERSION: ${{ steps.propose.outputs.version }}
-          TEAM: ${{ steps.propose.outputs.team }}
         run: |
           set -euo pipefail
           uvx --from "$CHANGELOG" changelog changes-entry \
-            --repo "$GITHUB_REPOSITORY" --tag "$VERSION" --team "$TEAM" \
+            --repo "$GITHUB_REPOSITORY" --tag "$VERSION" \
             < "$RUNNER_TEMP/changes.log" > "$RUNNER_TEMP/changes-entry.md"
           cat "$RUNNER_TEMP/changes-entry.md" CHANGES.md > "$RUNNER_TEMP/CHANGES.md"
           mv "$RUNNER_TEMP/CHANGES.md" CHANGES.md

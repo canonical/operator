@@ -13,7 +13,7 @@ it needs comes from the environment the workflow sets:
     CHANGELOG      The uvx `--from` spec for the team's changelog tool.
 
 It writes the commits since the last tag to `$RUNNER_TEMP/changes.log`, for
-the later steps, and sets `previous`, `version` and `team` as step outputs.
+the later steps, and sets `previous` and `version` as step outputs.
 Every refusal is a workflow error annotation and a non-zero exit.
 """
 
@@ -25,8 +25,6 @@ import re
 import subprocess
 import sys
 import typing
-
-TEAM_FILE = pathlib.Path(__file__).parent / 'changelog-team.txt'
 
 
 def run(*args: str, input: str | None = None) -> str:
@@ -43,21 +41,6 @@ def fail(message: str) -> typing.NoReturn:
     """Report an error annotation on the workflow run, and stop."""
     print(f'::error::{message}')
     sys.exit(1)
-
-
-def read_team() -> str:
-    """Return the team list as the one comma-separated value `--team` takes.
-
-    An empty list is not worth failing a release over: it credits everyone,
-    which is the direction the changelog tool errs in too.
-    """
-    team: list[str] = []
-    for line in TEAM_FILE.read_text().splitlines():
-        name, _, _ = line.partition('#')
-        name = ''.join(name.split())
-        if name:
-            team.append(name)
-    return ','.join(team)
 
 
 def main() -> None:
@@ -82,8 +65,6 @@ def main() -> None:
         fail(f'No release tag in the history of {branch} to count from.')
     print(f'Last tag on {branch}: {previous}')
 
-    team = read_team()
-
     log_format = run(*tool, 'git-log-format').strip()
     log = run(
         'git', 'log', '--reverse', '--no-merges', f'--format={log_format}', f'{previous}..HEAD'
@@ -97,7 +78,13 @@ def main() -> None:
         if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?', version):
             fail(f"'{version}' is not X.Y.Z or X.Y.Z{{a,b,rc}}N.")
     else:
-        size = run(*tool, 'bump-size', input=log).strip()
+        # `next-version` prints `version=` and `size=` lines, so the size the
+        # maintenance check reads is the one the version was worked out from.
+        output = dict(
+            line.split('=', 1)
+            for line in run(*tool, 'next-version', '--previous', previous, input=log).splitlines()
+        )
+        version, size = output['version'], output['size']
         print(f'The commits since {previous} are a {size} release.')
         # A feature or a breaking change on a maintenance branch has been put
         # on the wrong branch, and a patch release is not the place to find
@@ -106,7 +93,6 @@ def main() -> None:
             fail(
                 f'The commits since {previous} on {branch} are a {size} release: a feature or a breaking change has landed on a maintenance branch. Fix that, or pass an explicit version if this is really intended.'
             )
-        version = run(*tool, 'next-version', '--previous', previous, input=log).strip()
 
     if succeeds('git', 'rev-parse', '-q', '--verify', f'refs/tags/{version}'):
         if version_input:
@@ -133,7 +119,7 @@ def main() -> None:
     count = run('git', 'rev-list', '--count', f'{previous}..HEAD').strip()
     print(f'Releasing {version}, from the {count} commits since {previous}.')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write(f'previous={previous}\nversion={version}\nteam={team}\n')
+        f.write(f'previous={previous}\nversion={version}\n')
 
 
 if __name__ == '__main__':
