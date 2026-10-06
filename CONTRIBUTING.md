@@ -85,9 +85,9 @@ workshop launch dev
 workshop run dev lint
 ```
 
-The `format`, `lint`, `unit`, and `pebble` actions run the `tox` environments with the same names. `unit` and `pebble` pass extra arguments to `pytest`, for example `workshop run dev unit -k <pattern>`. The `pi` action runs Pi in the workshop.
+The `format`, `lint`, `unit`, and `pebble` actions run the `tox` environments with the same names. `unit` and `pebble` pass extra arguments to `pytest`. For example, `workshop run dev unit -k <pattern>`. The `pi` action runs Pi in the workshop.
 
-The `docs` action builds the docs into `docs/_build`. The `docs-run` action serves them, rebuilding as you edit, at `http://dev.<directory>.wp:8000`, where `<directory>` is the name of your project directory. Run `workshop info dev` to see the exact hostname.
+The `docs` action builds the docs into `docs/_build`. The `docs-run` action serves them, rebuilding as you edit, at `http://dev.<directory>.wp:8000`, where `<directory>` is the name of your project directory. Run `workshop info dev` to see the exact hostname. If your host doesn't use systemd-resolved, the hostname won't resolve, so use the workshop's IP address instead.
 
 The workshop keeps tox's environments and the docs' virtual environment outside the project directory, so they don't clash with the ones on your host. There are no smoke or integration test actions, because a Juju controller can't run in the workshop.
 
