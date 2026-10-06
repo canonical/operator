@@ -68,11 +68,12 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
-          # This workflow's own .github/, beside the branch being released:
-          # the version script and the team list are read from here.
+          # This workflow's own .github/release/, beside the branch being
+          # released: the version script, the team list, the release-note
+          # exemplars and the pull request template are read from here.
           ref: ${{ github.sha }}
           path: release-tools
-          sparse-checkout: /.github/
+          sparse-checkout: /.github/release/
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -87,130 +88,7 @@ jobs:
           VERSION_INPUT: ${{ inputs.version }}
           DRY_RUN: ${{ inputs.dry_run }}
           GH_TOKEN: ${{ github.token }}
-        shell: python
-        run: |
-          import os
-          import pathlib
-          import re
-          import subprocess
-          import sys
-
-          branch = os.environ['BRANCH']
-          version_input = os.environ['VERSION_INPUT']
-          changelog = os.environ['CHANGELOG']
-
-
-          def run(*args, input=None):
-              # stderr is left alone, so a failing command's own message is in the log.
-              return subprocess.run(
-                  args, input=input, stdout=subprocess.PIPE, text=True, check=True
-              ).stdout
-
-
-          def succeeds(*args):
-              return subprocess.run(args, capture_output=True).returncode == 0
-
-
-          def fail(message):
-              print(f'::error::{message}')
-              sys.exit(1)
-
-
-          # The last tag on this branch, and not the version in ops/version.py:
-          # between releases that file holds the guess the post-release bump
-          # left behind, which would either skip a version or release the
-          # guess. The tag is also where the changelog range starts, so the
-          # two cannot drift apart.
-          try:
-              previous = run(
-                  'git', 'describe', '--tags', '--abbrev=0',
-                  '--match', '[0-9]*.[0-9]*.[0-9]*', 'HEAD',
-              ).strip()
-          except subprocess.CalledProcessError:
-              fail(f'No release tag in the history of {branch} to count from.')
-          print(f'Last tag on {branch}: {previous}')
-
-          # One comma-separated list, from the file that explains itself. An
-          # empty list is not worth failing a release over: it credits
-          # everyone, which is the direction the changelog tool errs in too.
-          team_file = pathlib.Path('release-tools/.github/changelog-team.txt')
-          team = ','.join(
-              name
-              for line in team_file.read_text().splitlines()
-              if (name := ''.join(line.partition('#')[0].split()))
-          )
-
-          log_format = run('uvx', '--from', changelog, 'changelog', 'git-log-format').strip()
-          log = run(
-              'git', 'log', '--reverse', '--no-merges', f'--format={log_format}',
-              f'{previous}..HEAD',
-          )
-          pathlib.Path(os.environ['RUNNER_TEMP'], 'changes.log').write_text(log)
-
-          if version_input:
-              # An explicit version is used as it stands: no inference, and no
-              # reconciling it against what the commits suggest. It is the
-              # escape hatch for everything this workflow would otherwise
-              # refuse to do, a major release among them.
-              version = version_input
-              if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?', version):
-                  fail(f"'{version}' is not X.Y.Z or X.Y.Z{{a,b,rc}}N.")
-          else:
-              size = run(
-                  'uvx', '--from', changelog, 'changelog', 'bump-size', '--team', team,
-                  input=log,
-              ).strip()
-              print(f'The commits since {previous} are a {size} release.')
-
-              # A feature or a breaking change on a maintenance branch is not
-              # something to absorb into a patch release. Somebody has put it
-              # on the wrong branch, and the release is not the place to find
-              # that out quietly.
-              if branch.endswith('-maintenance') and size != 'patch':
-                  fail(
-                      f'The commits since {previous} on {branch} are a {size} release:'
-                      ' a feature or a breaking change has landed on a maintenance'
-                      ' branch. Fix that, or pass an explicit version if this is really'
-                      ' intended.'
-                  )
-
-              version = run(
-                  'uvx', '--from', changelog, 'changelog', 'next-version',
-                  '--previous', previous, '--team', team,
-                  input=log,
-              ).strip()
-
-          if succeeds('git', 'rev-parse', '-q', '--verify', f'refs/tags/{version}'):
-              # Worked out from the commits, the version can only be taken if
-              # the tag is somewhere this branch can't see: 3.8.3 was released
-              # from 3.8-maintenance, so on main the last tag was still 3.8.2
-              # and a patch release came out as 3.8.3 again. Which version main
-              # should release next is a person's call, not the commits'.
-              if version_input:
-                  fail(f'{version} is already tagged.')
-              fail(
-                  f'The commits since {previous} make this {version}, but {version} is'
-                  f" already tagged outside {branch}'s history (it was probably"
-                  ' released from a maintenance branch). Run this again with an explicit'
-                  ' version.'
-              )
-
-          # Checked here rather than at the push, so that a leftover branch
-          # from an abandoned attempt costs nothing: everything after this
-          # step rewrites files and spends a model call. A dry run never
-          # pushes, so a leftover branch is no obstacle to one.
-          head_ref = f"repos/{os.environ['GITHUB_REPOSITORY']}/git/ref/heads/release-prep-{version}"
-          if os.environ['DRY_RUN'] != 'true' and succeeds('gh', 'api', head_ref):
-              fail(
-                  f'A release-prep-{version} branch already exists. Delete it, or'
-                  f' finish the pull request that goes with it, before proposing'
-                  f' {version} again.'
-              )
-
-          count = run('git', 'rev-list', '--count', f'{previous}..HEAD').strip()
-          print(f'Releasing {version}, from the {count} commits since {previous}.')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f'previous={previous}\nversion={version}\nteam={team}\n')
+        run: python3 release-tools/.github/release/propose-release-version.py
 
       - name: Generate the changelog entry
         env:
@@ -230,16 +108,16 @@ jobs:
           VERSION: ${{ steps.propose.outputs.version }}
         run: |
           set -euo pipefail
-          python3 release-tools/.github/update-release-versions.py --version "$VERSION"
+          python3 release-tools/.github/release/update-release-versions.py --version "$VERSION"
           uv lock
           git --no-pager diff --stat
 
-      # The exemplars in .github/release-note-exemplars.md are chosen for how
-      # they read rather than for being the most recent: 2.23.4 for a fixes
-      # release, 3.8.1 for features and polish, 3.8.2 for a release that says
-      # it is routine and stops. Replace one when a release beats it. Each is
-      # headed with the release's title, so the model sees how our titles read
-      # as well as our notes.
+      # The exemplars in .github/release/release-note-exemplars.md are chosen
+      # for how they read rather than for being the most recent: 2.23.4 for a
+      # fixes release, 3.8.1 for features and polish, 3.8.2 for a release that
+      # says it is routine and stops. Replace one when a release beats it.
+      # Each is headed with the release's title, so the model sees how our
+      # titles read as well as our notes.
       - name: Draft the release notes
         env:
           VERSION: ${{ steps.propose.outputs.version }}
@@ -259,7 +137,7 @@ jobs:
             --previous "$PREVIOUS" \
             --branch "$BRANCH" \
             --changelog "$RUNNER_TEMP/changes-entry.md" \
-            --exemplars release-tools/.github/release-note-exemplars.md \
+            --exemplars release-tools/.github/release/release-note-exemplars.md \
             --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
             --output "$RUNNER_TEMP/release-notes.md" \
             --title-output "$RUNNER_TEMP/release-title.md"
@@ -273,6 +151,7 @@ jobs:
         run: |
           import os
           import pathlib
+          import string
 
           version = os.environ['VERSION']
           previous = os.environ['PREVIOUS']
@@ -282,44 +161,15 @@ jobs:
           title = (temp / 'release-title.md').read_text()
           notes = (temp / 'release-notes.md').read_text()
           changes_entry = (temp / 'changes-entry.md').read_text()
-          # The markers are how the next workflow lifts the title's summary and
-          # the notes back out of this description when it creates the draft
-          # release, so anything written outside them is for reviewers and
-          # goes no further. They are HTML comments, which a reader of the
-          # pull request doesn't see, so each pair also gets a visible heading
-          # just outside it.
-          instructions = (
-              f'The GitHub release is titled `{version}: ` followed by the summary under'
-              ' "Release title", and its body is the notes under "Release notes".'
-              ' Edit both here: this description is where they are read from.'
-              ' Each is wrapped in hidden markers, which you will see when you edit;'
-              ' keep them.'
+          template = pathlib.Path('release-tools/.github/release/release-pr-body.md').read_text()
+          body = string.Template(template).substitute(
+              version=version,
+              branch=branch,
+              previous=previous,
+              repo_url=repo_url,
+              title=title,
+              notes=notes,
           )
-          body = f"""\
-          Prepares the {version} release from `{branch}`.
-
-          * `CHANGES.md` has a new entry for {version}.
-          * The version strings are updated across ops, ops-scenario, ops-tracing and the tool-versions table.
-          * [Commits since {previous}]({repo_url}/compare/{previous}...{branch})
-
-          {instructions}
-
-          Once this is merged, run [Create the draft release]({repo_url}/actions/workflows/create-draft-release.yaml) with this pull request's number.
-
-          ## Release title
-
-          <!-- release-title:start -->
-
-          {title}
-          <!-- release-title:end -->
-
-          ## Release notes
-
-          <!-- release-notes:start -->
-
-          {notes}
-          <!-- release-notes:end -->
-          """
           (temp / 'pr-body.md').write_text(body)
 
           summary = f"""\

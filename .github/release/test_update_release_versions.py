@@ -8,7 +8,7 @@ pytest's default `norecursedirs` skips dotted directories, so it never finds
 anything under `.github/` on its own. A new test file here needs adding to that
 list in `tox.ini`. To run this one on its own:
 
-    uv run --group unit pytest .github/test_update_release_versions.py
+    uv run --group unit pytest .github/release/test_update_release_versions.py
 
 The script has a hyphen in its name, following the other scripts here, which
 means it cannot be imported by name; `load` below does it by path.

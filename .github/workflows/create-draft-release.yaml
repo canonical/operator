@@ -258,7 +258,7 @@ jobs:
           # workflow runs from. A maintenance branch doesn't have to carry it.
           ref: ${{ github.sha }}
           path: release-tools
-          sparse-checkout: /.github/
+          sparse-checkout: /.github/release/
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -316,7 +316,7 @@ jobs:
           VERSION: ${{ steps.bump.outputs.version }}
         run: |
           set -euo pipefail
-          python3 release-tools/.github/update-release-versions.py --version "$VERSION" \
+          python3 release-tools/.github/release/update-release-versions.py --version "$VERSION" \
             --post-release
           uv lock
           git --no-pager diff --stat

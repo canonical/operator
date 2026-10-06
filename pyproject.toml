@@ -251,6 +251,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 ".github/patch-charm-deps.py" = [
     "start-process-with-partial-path",  # S607
 ]
+".github/release/propose-release-version.py" = [
+    "line-too-long",  # E501: The failure messages read best kept whole.
+]
 "docs/custom_conf.py" = [
     "undocumented-public-module",  # D100
     "undocumented-public-class",  # D101
@@ -270,7 +273,7 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = [".github/update-release-versions.py", ".github/test_update_release_versions.py", "ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+include = [".github/release/propose-release-version.py", ".github/release/update-release-versions.py", ".github/release/test_update_release_versions.py", "ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
 exclude = [
     "tracing/*",
 ]

@@ -18,8 +18,8 @@ here rather than moving to the shared changelog package.
 
 Reads nothing but the files it rewrites:
 
-    python3 .github/update-release-versions.py --version 3.9.0
-    python3 .github/update-release-versions.py --version 3.9.0.dev0 --post-release
+    python3 .github/release/update-release-versions.py --version 3.9.0
+    python3 .github/release/update-release-versions.py --version 3.9.0.dev0 --post-release
 
 The two differ in one thing: `--post-release` leaves the tool-versions table
 alone. That table records when a major.minor was released and when it goes
