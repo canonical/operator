@@ -1,0 +1,15 @@
+# tox's environments and the docs' virtual environment default to `.tox/` and
+# `docs/.venv/` in the mounted project directory, where they would clash with
+# the host's. tox 4.64+ also writes a PEP 832 `.venv` redirect file there,
+# pointing at a path that only exists in the workshop, and uv on the host
+# then refuses the project. Workshop's SDK guidance is ~/.profile for the
+# workshop user's own variables.
+cat <<EOF >> ~/.profile
+
+export TOX_WORK_DIR=/home/workshop/.tox-ops
+export TOX_OVERRIDE=tox.venv_redirect=false
+export DOCS_VENVDIR=/home/workshop/.venvs/ops-docs
+EOF
+
+# tox, as CONTRIBUTING.md asks for.
+uv tool install tox --with tox-uv

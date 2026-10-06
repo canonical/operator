@@ -1,0 +1,26 @@
+name: dev
+base: ubuntu@26.04
+sdks:
+  - name: uv
+    channel: latest/stable
+  - name: pi-coding-agent
+    channel: latest/stable
+  # The project- prefix tells Workshop to load this SDK from .workshop/tools/
+  # rather than the store, and the directory and the name in its sdk.yaml must
+  # both match what follows the prefix. It installs tox, Pebble, and make,
+  # which the actions below run.
+  - name: project-tools
+
+# The checks CONTRIBUTING.md asks for, and the docs build.
+#
+# There are deliberately no smoke or integration actions. Those tests need a
+# Juju controller, and one can't run in a workshop. Run them on the host
+# instead.
+actions:
+  docs: make -C docs html
+  docs-run: make -C docs run SPHINX_HOST=0.0.0.0
+  format: tox -e format
+  lint: tox -e lint
+  pebble: tox -e pebble -- "$@"
+  pi: pi "$@"
+  unit: tox -e unit -- "$@"
