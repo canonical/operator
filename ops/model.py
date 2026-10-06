@@ -1818,7 +1818,9 @@ class Relation:
           mapping is built as a ``list`` of its keys.
         - A fixed-length ``tuple[X, Y]`` field is built as a ``tuple``, with
           each position coerced against its own type. The value must have
-          exactly as many items as the annotation has positions.
+          exactly as many items as the annotation has positions. A ``tuple``
+          with an unpacked member, such as ``tuple[int, *tuple[str, ...]]``,
+          is built as a ``tuple`` without coercing its items.
         - An ``Optional``/``Union`` field is coerced against the one member
           that matches the shape of the decoded value: a sequence type for a
           list, a mapping type or dataclass for an object, or any other type
@@ -1826,8 +1828,7 @@ class Relation:
           ``SomeEnum | str`` for a string), the value is passed through as-is.
         - The value for any other type annotation is passed through
           unchanged. This includes ``Literal``, scalar types such as ``int``
-          and ``str``, a ``tuple`` with an unpacked member such as
-          ``tuple[int, *tuple[str, ...]]``, and classes that are neither
+          and ``str``, and classes that are neither
           dataclasses nor enums, such as a nested Pydantic ``BaseModel``.
           Values keep their decoded type: a ``'1'`` in the databag stays a
           string for an ``int`` field, and an object stays a ``dict`` for a
@@ -1893,8 +1894,7 @@ class Relation:
                 data[key] = decoder(value)
             elif key in fields:
                 data[fields[key]] = decoder(value)
-        # Relation data wins over a keyword argument of the same name.
-        kwargs = {k: v for k, v in copy.deepcopy(kwargs).items() if k not in data}
+        kwargs = copy.deepcopy(kwargs)
         # For plain (non-pydantic) dataclass targets, recursively coerce nested
         # dataclass / enum / list / set fields. Pydantic handles its own coercion.
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
@@ -1903,7 +1903,8 @@ class Relation:
         # Positional and keyword arguments are passed through uncoerced.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
             return _charm._build_dataclass(cls, data, args, kwargs)
-        return cls(*args, **kwargs, **data)
+        # Relation data wins over a keyword argument of the same name.
+        return cls(*args, **{**kwargs, **data})
 
     def save(
         self,

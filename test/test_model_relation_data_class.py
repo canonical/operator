@@ -687,8 +687,8 @@ def test_relation_load_heterogeneous_tuple():
 
 
 @pytest.mark.parametrize('form', ['star', 'unpack'])
-def test_relation_load_tuple_with_unpacked_member_passes_through(form: str):
-    """A tuple with an unpacked member, such as *tuple[X, ...], is passed through as-is."""
+def test_relation_load_tuple_with_unpacked_member_builds_uncoerced_tuple(form: str):
+    """A tuple with an unpacked member, such as *tuple[X, ...], is built without coercion."""
     if sys.version_info < (3, 11):
         pytest.skip('unpacked tuple members need Python 3.11')
     if form == 'star':
@@ -698,7 +698,7 @@ def test_relation_load_tuple_with_unpacked_member_passes_through(form: str):
     data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
 
     obj = _load_into(data_class, {'value': json.dumps([1, {'sub': 1}, {'sub': 2}])})
-    assert obj.value == [1, {'sub': 1}, {'sub': 2}]
+    assert obj.value == (1, {'sub': 1}, {'sub': 2})
 
 
 @pytest.mark.parametrize(
@@ -708,14 +708,14 @@ def test_relation_load_tuple_with_unpacked_member_passes_through(form: str):
         pytest.param(tuple[...], id='ellipsis-alone'),  # pyright: ignore[reportInvalidTypeForm]
     ],
 )
-def test_relation_load_tuple_with_misplaced_ellipsis_passes_through(annotation: Any):
-    """A tuple with an Ellipsis anywhere other than tuple[X, ...] is passed through as-is."""
+def test_relation_load_tuple_with_misplaced_ellipsis_builds_uncoerced_tuple(annotation: Any):
+    """A tuple with an Ellipsis anywhere other than tuple[X, ...] is built without coercion."""
     # This module uses postponed annotations, so a class body annotation would
     # be the unresolvable string 'annotation' rather than the type itself.
     data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
 
     obj = _load_into(data_class, {'value': json.dumps([1, 'a', 'b'])})
-    assert obj.value == [1, 'a', 'b']
+    assert obj.value == (1, 'a', 'b')
 
 
 def test_relation_load_set_and_frozenset():
@@ -838,6 +838,14 @@ def test_relation_load_sequence_field_rejects_string_or_mapping(monkeypatch: pyt
     with pytest.raises(TypeError, match='expected a sequence'):
         _load_into(sequence_data, {'tags': json.dumps({'a': 1})})
 
+    # A tuple shape that is otherwise passed through as-is still rejects a string.
+    unsupported_tuple_data = dataclasses.make_dataclass(
+        'UnsupportedTupleData',
+        [('tags', tuple[int, str, ...])],  # pyright: ignore[reportInvalidTypeForm]
+    )
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(unsupported_tuple_data, {'tags': json.dumps('hello')})
+
     # A genuine sequence is still coerced.
     obj = _load_into(Data, {'tags': json.dumps(['hello'])})
     assert obj.tags == ['hello']
@@ -959,6 +967,58 @@ def test_relation_load_does_not_coerce_keyword_arguments():
         data = mgr.charm.data
 
     assert data.nested == {'sub': 5}
+
+
+@pytest.mark.parametrize('kind', ['dataclass', 'dataclass-fallback', 'pydantic', 'plain-class'])
+def test_relation_load_relation_data_overrides_keyword_argument(kind: str):
+    """A keyword argument with the same name as a field in the relation data is overridden."""
+    if kind == 'dataclass':
+
+        @dataclasses.dataclass
+        class Data:  # pyright: ignore[reportRedeclaration]
+            name: str = ''
+            other: str = ''
+
+    elif kind == 'dataclass-fallback':
+
+        @dataclasses.dataclass
+        class Data:  # pyright: ignore[reportRedeclaration]
+            name: str = ''
+            other: str = ''
+            # Not a type, so get_type_hints raises and nothing is coerced.
+            count: int | 1 = 0  # pyright: ignore[reportGeneralTypeIssues]
+
+    elif kind == 'pydantic':
+        if pydantic is None:
+            pytest.skip('pydantic is not installed')
+
+        class Data(pydantic.BaseModel):  # pyright: ignore[reportRedeclaration]
+            name: str = ''
+            other: str = ''
+
+    else:
+        # Deliberately not a dataclass, to exercise the path for any other class.
+        class Data:  # ruff: ignore[class-as-data-structure]
+            def __init__(self, name: str = '', other: str = ''):
+                self.name = name
+                self.other = other
+
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
+
+        def _on_relation_changed(self, event: ops.RelationChangedEvent):
+            self.data = event.relation.load(Data, event.app, name='kwarg', other='kwarg')
+
+    ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
+    rel = testing.Relation('db', remote_app_data={'name': json.dumps('relation')})
+    with ctx(ctx.on.relation_changed(rel), testing.State(relations={rel})) as mgr:
+        mgr.run()
+        data = mgr.charm.data
+
+    assert data.name == 'relation'
+    assert data.other == 'kwarg'
 
 
 def test_relation_load_falls_back_when_type_hints_unresolvable():

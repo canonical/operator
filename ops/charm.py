@@ -1713,15 +1713,13 @@ _SEQUENCE_TYPES = (list, tuple, set, frozenset)
 # built as a concrete type that satisfies it. The read-only sequence types
 # would be better built as a tuple, but charms may rely on getting a list, so
 # that change is left for the next major release.
-_ABSTRACT_SEQUENCE_TYPES: dict[Any, type] = {
+_ABSTRACT_COLLECTION_TYPES: dict[Any, type] = {
     collections.abc.Iterable: list,
     collections.abc.Collection: list,
     collections.abc.Sequence: list,
     collections.abc.MutableSequence: list,
     collections.abc.Set: frozenset,
     collections.abc.MutableSet: set,
-}
-_ABSTRACT_MAPPING_TYPES: dict[Any, type] = {
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,
 }
@@ -1745,7 +1743,7 @@ def _union_member_fits(member: Any, value: Any) -> bool:
     kind = typing.get_origin(member) or member
     if kind in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
         return True
-    kind = _ABSTRACT_SEQUENCE_TYPES.get(kind, kind)
+    kind = _ABSTRACT_COLLECTION_TYPES.get(kind, kind)
     if isinstance(kind, type) and issubclass(kind, _SEQUENCE_TYPES):
         return isinstance(value, _SEQUENCE_TYPES)
     if (isinstance(kind, type) and issubclass(kind, Mapping)) or dataclasses.is_dataclass(member):
@@ -1786,14 +1784,12 @@ def _coerce_field(tp: Any, value: Any) -> Any:
         return value
     if origin is typing.Union or origin is types.UnionType:
         return _coerce_union(tp, args, value)
-    if origin in _SEQUENCE_TYPES:
-        return _coerce_sequence(tp, origin, args, value)
-    if origin in _ABSTRACT_SEQUENCE_TYPES:
-        concrete = _ABSTRACT_SEQUENCE_TYPES[origin]
-        if origin in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
-            return _coerce_sequence(tp, concrete, args, list(cast('Mapping[Any, Any]', value)))
+    if origin in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
+        value = list(cast('Mapping[Any, Any]', value))
+    concrete = _ABSTRACT_COLLECTION_TYPES.get(origin, origin)
+    if concrete in _SEQUENCE_TYPES:
         return _coerce_sequence(tp, concrete, args, value)
-    if (origin is dict or origin in _ABSTRACT_MAPPING_TYPES) and len(args) == 2:
+    if concrete is dict and len(args) == 2:
         return _coerce_mapping(tp, args[0], args[1], value)
     # Literal and other constructed generics: accept the value as-is.
     return value
@@ -1866,27 +1862,24 @@ def _is_unpacked(arg: Any) -> bool:
 
 def _coerce_sequence(tp: Any, origin: type, args: tuple[Any, ...], value: Any) -> Any:
     """Coerce the elements of ``value`` against sequence type ``tp``."""
-    # An unpacked member such as *tuple[str, ...] makes the number of
-    # positions variable, which isn't supported, and an Ellipsis anywhere
-    # other than tuple[X, ...] isn't a valid annotation, so accept the value
-    # as-is.
-    variable_length = len(args) == 2 and args[1] is Ellipsis
-    if (
-        origin is tuple
-        and not variable_length
-        and (Ellipsis in args or any(_is_unpacked(a) for a in args))
-    ):
-        return value
-    # A str, bytes or mapping is iterable, so coercing element-wise would
-    # silently succeed with nonsense: a list of characters, or of the
-    # mapping's keys. None of those is a sequence the charm meant, so
-    # refuse rather than hand back the wrong answer.
+    # A str, bytes or mapping is iterable, so coercing it element-wise would
+    # silently produce a list of characters or of the mapping's keys. Where
+    # the annotation admits a mapping (Iterable or Collection), the caller has
+    # already turned it into its keys, so a mapping that gets here is no more
+    # what the charm meant than a string is: refuse rather than hand back the
+    # wrong answer.
     if isinstance(value, (str, bytes, Mapping)):
         given_type = type(value)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
         raise TypeError(f'expected a sequence for {tp}, got {given_type.__name__}: {value!r}')
     if origin is tuple:
-        if variable_length:
+        if len(args) == 2 and args[1] is Ellipsis:
             return tuple(_coerce_field(args[0], v) for v in value)
+        # An unpacked member such as *tuple[str, ...] makes the number of
+        # positions variable, which isn't supported, and an Ellipsis anywhere
+        # other than tuple[X, ...] isn't a valid annotation, so build a tuple
+        # without coercing its elements.
+        if Ellipsis in args or any(_is_unpacked(a) for a in args):
+            return tuple(value)
         return tuple(_coerce_field(t, v) for t, v in zip(args, value, strict=True))
     if origin is set:
         return {_coerce_field(args[0], v) for v in value}
@@ -1913,10 +1906,10 @@ def _build_dataclass(
 
     Recursively coerces nested dataclass / enum / list / set / tuple / dict
     fields supplied via ``data``. The caller's ``args`` and ``extra_kwargs``
-    are passed through as given rather than coerced; ``extra_kwargs`` must not
-    share any names with ``data``.
+    are passed through as given rather than coerced; a name in both
+    ``extra_kwargs`` and ``data`` is taken from ``data``.
 
-    Falls back to the un-coerced ``cls(*args, **extra_kwargs, **data)`` if
+    Falls back to the un-coerced ``cls(*args, **{**extra_kwargs, **data})`` if
     ``get_type_hints`` raises, which happens even if a single field's
     annotation is unresolvable, because ``get_type_hints`` resolves every
     field at once. This is most likely to happen with a
@@ -1930,18 +1923,16 @@ def _build_dataclass(
     try:
         hints = get_type_hints(cls)
     except (NameError, TypeError) as e:
-        logger.debug(
-            'Unable to resolve type hints for %s, not coercing relation data: %s',
-            cls.__name__,
-            e,
-        )
-        return cls(*args, **extra_kwargs, **data)
+        msg = 'Unable to resolve type hints for %s, not coercing relation data: %s'
+        logger.debug(msg, cls.__name__, e)
+        # Relation data wins over a keyword argument of the same name.
+        return cls(*args, **{**extra_kwargs, **data})
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
         if field.name not in data:
             continue
         kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
-    return cls(*args, **extra_kwargs, **kwargs)
+    return cls(*args, **{**extra_kwargs, **kwargs})
 
 
 class CharmMeta:
