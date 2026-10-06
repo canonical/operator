@@ -1,7 +1,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Work out which version to release, and the range of commits it covers.
+"""Work out which version to release, and write its changelog entry.
 
 Called by the propose-release workflow, from its own checkout of the default
 branch, with the branch being released as the working directory. Everything
@@ -12,8 +12,9 @@ it needs comes from the environment the workflow sets:
     DRY_RUN        'true' when nothing is going to be pushed.
     CHANGELOG      The uvx `--from` spec for the team's changelog tool.
 
-It writes the commits since the last tag to `$RUNNER_TEMP/changes.log`, for
-the later steps, and sets `previous` and `version` as step outputs.
+It writes the changelog entry for the commits since the last tag to
+`$RUNNER_TEMP/changes-entry.md`, for the later steps, and sets `previous` and
+`version` as step outputs.
 Every refusal is a workflow error annotation and a non-zero exit.
 """
 
@@ -44,7 +45,7 @@ def fail(message: str) -> typing.NoReturn:
 
 
 def main() -> None:
-    """Pick the version, check it can be released, and set the step outputs."""
+    """Pick the version, check it can be released, and write its entry."""
     branch = os.environ['BRANCH']
     version_input = os.environ['VERSION_INPUT']
     dry_run = os.environ['DRY_RUN'] == 'true'
@@ -69,7 +70,6 @@ def main() -> None:
     log = run(
         'git', 'log', '--reverse', '--no-merges', f'--format={log_format}', f'{previous}..HEAD'
     )
-    (runner_temp / 'changes.log').write_text(log)
 
     if version_input:
         # An explicit version is used as it stands, with no inference: it is
@@ -107,7 +107,7 @@ def main() -> None:
         )
 
     # Checked here rather than at the push, so that a leftover branch costs
-    # nothing: everything after this step rewrites files and spends a model
+    # nothing: everything after this check writes files and spends a model
     # call. A dry run never pushes, so a leftover branch doesn't block one.
     if not dry_run and succeeds(
         'gh', 'api', f'repos/{repository}/git/ref/heads/release-prep-{version}'
@@ -115,6 +115,10 @@ def main() -> None:
         fail(
             f'A release-prep-{version} branch already exists. Delete it, or finish the pull request that goes with it, before proposing {version} again.'
         )
+
+    entry = run(*tool, 'changes-entry', '--repo', repository, '--tag', version, input=log)
+    (runner_temp / 'changes-entry.md').write_text(entry)
+    print(entry, end='')
 
     count = run('git', 'rev-list', '--count', f'{previous}..HEAD').strip()
     print(f'Releasing {version}, from the {count} commits since {previous}.')

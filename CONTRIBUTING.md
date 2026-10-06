@@ -222,9 +222,11 @@ Unmarked features are assumed to work and be available in the latest LTS version
 
 ## Release documentation
 
-The "Propose a release" workflow drafts a summary of the release and puts it in the description of the PR it opens. You review and edit it there, rather than writing it from scratch. The summary appears in the GitHub release notes and in Discourse and Matrix.
+### Release notes
 
-In the summary, outline the key improvements from all areas of Ops,
+The "Propose a release" workflow drafts the release notes and puts them in the description of the PR it opens. You review and edit them there, rather than writing them from scratch. The "Create the draft release" workflow later copies them into the GitHub release, and you reuse them when you announce the release on Discourse and Matrix.
+
+In the release notes, outline the key improvements from all areas of Ops,
 including testing, tracing, and the docs.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
@@ -235,7 +237,7 @@ transition testing".
 
 ### CHANGES.md
 
-[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is kept up-to-date by the PR that the "Propose a release" workflow opens during the release process. You only need to manually edit the changelog if a commit message needs adjusting (we try to avoid doing this).
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is kept up-to-date by the PR that the "Propose a release" workflow opens during the release process. You only need to edit the changelog by hand if a commit message needs adjusting, for example to fix a typo or a description that would mislead readers. Make the edit to `CHANGES.md` in the release PR, before merging it: the draft release copies this version's section from there. We try to avoid this by getting the PR title right before merging, since that becomes the commit message.
 
 The entry is generated from the commits in the release, so it is a reference rather than an explanation: comprehensive, consistent, and not the place for prose. That is what the release notes are for.
 
@@ -243,9 +245,9 @@ There's also a changelog for `ops-scenario`:
 [testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
 We've kept it for historical reference, but we no longer maintain it.
 
-### GitHub release notes
+### GitHub release
 
-The GitHub release notes include the summary of the release and the list of changes found in the changelog. The "Create the draft release" workflow puts the two together when the version-bump PR is merged: the summary as you left it in that PR's description, then this version's section of the changelog, copied rather than generated again. You might need to edit the draft release after a review.
+The GitHub release has the release notes, then the list of changes found in the changelog. The "Create the draft release" workflow puts the two together when the version-bump PR is merged: the notes as you left them in that PR's description, then this version's section of the changelog, copied rather than generated again. You might need to edit the draft release after a review.
 
 ### Discourse and Matrix
 
@@ -273,14 +275,14 @@ The Matrix post should be similar.
 
 Two workflows make a release, and you decide twice: once when you review the version-bump PR, and once when you publish the draft release. Nothing reaches PyPI until you publish the draft, so an abandoned attempt costs at most a branch and a draft to delete.
 
-You don't need a GitHub token, a checkout, or a fork for any of this. The whole release runs in Actions and the only tools you need are the Actions tab and the releases page.
+The whole release runs in Actions, and the only tools you need are the Actions tab and the releases page.
 
 ### 1. Propose the release
 
 Run the ["Propose a release"](https://github.com/canonical/operator/actions/workflows/propose-release.yaml) workflow. It takes three inputs:
 
-- `version`: leave this empty for an ordinary release. The workflow counts from the last release tag on the branch and reads the conventional commits since then: a feature or a breaking change makes it a minor release, and anything else makes it a patch release. Fill it in when the commits can't give the right answer, that is, for a major release or a pre-release such as `3.9.0rc1`. What you type is used as it stands, with no reconciling against what the commits suggest.
-- `branch`: `main`, or a maintenance branch such as `2.23-maintenance`.
+- `version`: leave this empty for an ordinary release. The workflow counts from the last release tag on the branch and reads the conventional commits since then: a feature or a breaking change makes it a minor release, and anything else makes it a patch release. Fill it in when you know in advance that the commits won't give the right answer: for a major release, or a pre-release such as `3.9.0rc1`. If you're not sure what the commits will give, run with `dry_run` first and check the proposed version in the run summary. What you type is used as it stands, with no reconciling against what the commits suggest.
+- `branch`: the branch to release from, either `main` or a maintenance branch such as `2.23-maintenance`.
 - `dry_run`: do everything except push the branch and open the PR. The proposed version, the changelog entry and the drafted notes go in the run summary, so this is how to see what a release would look like without proposing one.
 
 > The version comes from the last tag, and never from `ops/version.py`. Between releases that file holds a development version left behind by the last post-release bump, which is a guess rather than something we shipped. The tag is also where the changelog starts, so the two can't drift apart.
@@ -298,7 +300,7 @@ Wait for the checks to pass, then merge. If they don't pass at the tip of the br
 
 ### 2. Merge the PR, then create the draft release
 
-Once the PR is merged, run the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow with the PR's number. The PR description links to it. The workflow checks that the PR was merged into `main` or a maintenance branch, and that the merge left `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. If either check fails, it stops with an error that says why.
+Once the PR is merged, run the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow with the PR's number. The version-bump PR's description has a link to the workflow, for convenience; the workflow itself only knows which PR to use from the number you give it. The workflow checks that the PR was merged into `main` or a maintenance branch, and that the merge left `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. If either check fails, it stops with an error that says why.
 
 The workflow then takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
 
@@ -329,13 +331,15 @@ A **maintenance release** is the same steps with `branch` set to, for example, `
 
 Nothing needs to be added to a maintenance branch first. Both workflows run from `main`, and read the version script from `main`, so the maintenance branch only has to have the files that get a new version written into them. The one difference is publishing: publishing the draft creates the tag, and a tag's publish workflow is the one on the branch it was cut from. On `2.23-maintenance` and `3.3-maintenance` that is the older tag-triggered workflow (`publish-ops.yaml` and its siblings on 2.23, and `publish.yaml` on 3.3), which uploads to PyPI in the same way.
 
-"Propose a release" stops, rather than releasing, if the commits on a maintenance branch since its last tag include a feature or a breaking change. That means somebody has put a commit on the wrong branch, and a release is not the place to absorb it: fix the branch, or pass an explicit `version` if it really is what you want. Remember to untick "Set as the latest release" on the draft.
+"Propose a release" stops with an error, instead of opening the PR, if the commits on a maintenance branch since its last tag include a feature or a breaking change. That means somebody has put a commit on the wrong branch, and a release is not the place to absorb it: fix the branch, or pass an explicit `version` if it really is what you want. Remember to untick "Set as the latest release" on the draft.
 
 A **pre-release** needs an explicit `version`, for example `3.9.0rc1`, because the commits never imply one. The draft is marked as a pre-release, and it does go to PyPI: the Publish workflow fires on any published release rather than on a version pattern. A pre-release gets a post-release bump like any other release, and the bump drops the suffix, so after 3.4.0b3 the branch goes back to working towards `3.4.0.dev0`.
 
 A **major release** needs an explicit `version` too. A `!` on a commit is surfaced in the changelog under "Breaking Changes" but is never read as a major bump, because we sometimes let a breaking change ride in a minor release.
 
-To build the packages and upload them to **Test PyPI**, run the Publish workflow by hand from whichever branch or tag you want built. That path needs the Test PyPI trusted publisher described in [Settings a repository admin has to create](#settings-a-repository-admin-has-to-create).
+### Uploading to Test PyPI
+
+No release needs this. To build the packages and upload them to Test PyPI without making a release, run the Publish workflow by hand from whichever branch or tag you want built. A manual run only ever uploads to Test PyPI, and it needs the Test PyPI trusted publisher described in [Settings a repository admin has to create](#settings-a-repository-admin-has-to-create).
 
 ### Settings a repository admin has to create
 

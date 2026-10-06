@@ -81,7 +81,7 @@ jobs:
         with:
           enable-cache: false
 
-      - name: Work out the version and the range
+      - name: Work out the version and write the changelog entry
         id: propose
         env:
           BRANCH: ${{ inputs.branch }}
@@ -90,17 +90,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 release-tools/.github/release/propose-release-version.py
 
-      - name: Generate the changelog entry
-        env:
-          VERSION: ${{ steps.propose.outputs.version }}
+      - name: Add the entry to CHANGES.md
         run: |
           set -euo pipefail
-          uvx --from "$CHANGELOG" changelog changes-entry \
-            --repo "$GITHUB_REPOSITORY" --tag "$VERSION" \
-            < "$RUNNER_TEMP/changes.log" > "$RUNNER_TEMP/changes-entry.md"
           cat "$RUNNER_TEMP/changes-entry.md" CHANGES.md > "$RUNNER_TEMP/CHANGES.md"
           mv "$RUNNER_TEMP/CHANGES.md" CHANGES.md
-          cat "$RUNNER_TEMP/changes-entry.md"  # For the log, even if a later step fails.
 
       - name: Update the version files
         env:

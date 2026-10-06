@@ -74,8 +74,7 @@ jobs:
           case "$branch" in
             main | *-maintenance) ;;
             *)
-              echo "::error::#$NUMBER was merged into $branch, which is not main or a" \
-                "maintenance branch."
+              echo "::error::#$NUMBER was merged into $branch, which is not main or a maintenance branch."
               exit 1
               ;;
           esac
@@ -116,17 +115,11 @@ jobs:
           fi
 
           # The repository only squash merges, so the first parent is the
-          # branch as it was before this pull request. An empty --before
-          # means "not a release", which is the right answer for a branch
-          # that had no version file before.
-          before=''
-          if git cat-file -e "HEAD^1:ops/version.py" 2>/dev/null; then
-            before=$(git show "HEAD^1:ops/version.py" | version_in)
-          fi
+          # branch as it was before this pull request.
+          before=$(git show "HEAD^1:ops/version.py" | version_in)
 
           # Prints nothing, and says why on stderr, when it is not a release.
-          detected=$(uvx --from "$CHANGELOG" changelog detect-release --before "$before" \
-            --after "$after")
+          detected=$(uvx --from "$CHANGELOG" changelog detect-release --before "$before" --after "$after")
           if [ -z "$detected" ]; then
             echo "::error::#$NUMBER is not a release: it moved ops/version.py from" \
               "'$before' to '$after'. A release changes it to a version without .devN."
@@ -170,9 +163,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Checked here for the sake of the message: `gh release create`
-          # would fail on its own, but a re-run of this workflow after the
-          # release was already made is worth naming as such.
+          # Check whether this version already has a release, draft or
+          # published. `gh release create` would refuse a published one, but
+          # would quietly add a second draft alongside an existing one.
           if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::There is already a release for $VERSION. If it needs to be rebuilt," \
               "delete it first; if it is already published, there is nothing to do here."
@@ -184,12 +177,12 @@ jobs:
             flags=(--prerelease)
           fi
 
-          # --draft is the point of this workflow, and --notes-file is what
-          # keeps GitHub from generating a second, differently grouped
-          # changelog underneath ours. The tag named here does not exist and
-          # is not created: GitHub creates it against --target when somebody
-          # publishes the draft. The target is the merge's own commit rather
-          # than the branch, so that nothing merged after it can ride along.
+          # $VERSION: the tag, which GitHub creates against --target when somebody publishes the draft.
+          # --draft: this workflow only drafts the release; publishing it is a person's call.
+          # --target: the merge's own commit rather than the branch, so nothing merged after it rides along.
+          # --title: the version and the summary from the PR description.
+          # --notes-file: the assembled body, with the release notes and then the changelog section.
+          # flags: --prerelease when the version has an a, b or rc suffix.
           url=$(gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
             --draft --target "$TARGET" --title "$TITLE" \
             --notes-file "$RUNNER_TEMP/release-body.md" "${flags[@]}")
