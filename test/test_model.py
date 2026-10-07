@@ -45,7 +45,7 @@ from ops.jujucontext import JujuContext
 from ops.jujuversion import JujuVersion
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id, setup_root_logging
 from ops.model import _ModelBackend
-from test.test_helpers import FakeScript
+from test.test_helpers import FakeScript, create_framework
 
 
 @pytest.fixture
@@ -3986,6 +3986,237 @@ class TestLazyMapping:
         map._invalidate()
         assert map['foo'] == 'bar'
         assert loaded == [1, 1]
+
+
+def _notes(error: BaseException) -> list[str]:
+    return getattr(error, '__notes__', [])
+
+
+def _backend_for(
+    dispatch_path: str = '', hook_name: str = '', action_name: str = ''
+) -> _ModelBackend:
+    context = JujuContext._from_dict({
+        'JUJU_VERSION': '3.6.0',
+        'JUJU_DISPATCH_PATH': dispatch_path,
+        'JUJU_HOOK_NAME': hook_name,
+        'JUJU_ACTION_NAME': action_name,
+    })
+    return _ModelBackend('myapp/0', juju_context=context)
+
+
+def test_model_error_not_from_hook_command():
+    assert _notes(ops.ModelError('boom')) == []
+
+
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason='exception notes need Python 3.11')
+def test_model_error_no_note_before_python_311(fake_script: FakeScript):
+    backend = _backend_for('hooks/start')
+    fake_script.write('config-get', "echo 'ERROR boom' >&2; exit 1")
+    with pytest.raises(ops.ModelError) as excinfo:
+        backend.config_get()
+    assert _notes(excinfo.value) == []
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
+class TestModelErrorNote:
+    def test_hook_command_failure(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/config-changed', 'config-changed')
+        backend._hook_is_running = 'config_changed'
+        fake_script.write('relation-set', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.relation_set(3, {'password': 's3cret'}, is_app=True, relation_name='db')
+        error = excinfo.value
+        assert str(error) == 'ERROR boom\n'
+        assert _notes(error) == [
+            "Hook command 'relation-set' (relation_id=3, endpoint='db', app=True) "
+            "failed during the 'config-changed' hook."
+        ]
+
+    def test_sensitive_args_excluded(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/config-changed')
+        fake_script.write('secret-add', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.secret_add(
+                {'password': 's3cret'}, label='db-pass', description='shown', owner='app'
+            )
+        assert _notes(excinfo.value) == [
+            "Hook command 'secret-add' (label='db-pass', description='shown', owner='app') "
+            "failed during the 'config-changed' hook."
+        ]
+
+    def test_no_args(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/start')
+        backend._hook_is_running = 'start'
+        fake_script.write('config-get', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.config_get()
+        assert _notes(excinfo.value) == [
+            "Hook command 'config-get' failed during the 'start' hook."
+        ]
+
+    def test_action(self, fake_script: FakeScript):
+        backend = _backend_for('actions/back-up', action_name='back-up')
+        backend._hook_is_running = 'back_up_action'
+        fake_script.write('action-fail', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.action_fail('disk full')
+        assert _notes(excinfo.value) == [
+            "Hook command 'action-fail' (message='disk full') failed during the 'back-up' action."
+        ]
+
+    def test_action_other_event(self, fake_script: FakeScript):
+        backend = _backend_for('actions/back-up', action_name='back-up')
+        backend._hook_is_running = 'collect_unit_status'
+        fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        assert _notes(excinfo.value) == [
+            "Hook command 'is-leader' failed during the 'back-up' action "
+            "while handling the 'collect_unit_status' event."
+        ]
+
+    def test_action_set_results_excluded(self, fake_script: FakeScript):
+        backend = _backend_for('actions/back-up', action_name='back-up')
+        fake_script.write('action-set', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.action_set({'password': 's3cret'})
+        assert _notes(excinfo.value) == [
+            "Hook command 'action-set' failed during the 'back-up' action."
+        ]
+
+    @pytest.mark.parametrize(
+        'dispatch_path,hook_name,expected',
+        [
+            ('hooks/db-relation-changed', 'db-relation-changed', 'db-relation-changed'),
+            ('', 'install', 'install'),
+            ('', '', None),
+        ],
+    )
+    def test_current_hook(
+        self, fake_script: FakeScript, dispatch_path: str, hook_name: str, expected: str | None
+    ):
+        backend = _backend_for(dispatch_path, hook_name)
+        fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        expected_note = "Hook command 'is-leader' failed"
+        if expected is not None:
+            expected_note += f' during the {expected!r} hook'
+        assert _notes(excinfo.value) == [f'{expected_note}.']
+
+    def test_charm_init(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/install')
+        backend._hook_is_running = '__init__'
+        fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.is_leader()
+        assert _notes(excinfo.value) == [
+            "Hook command 'is-leader' failed during the 'install' hook "
+            'while initialising the charm.'
+        ]
+
+    def test_subclasses(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/update-status')
+        fake_script.write('relation-list', "echo 'ERROR relation not found' >&2; exit 2")
+        fake_script.write('secret-get', "echo 'ERROR secret not found' >&2; exit 1")
+        with pytest.raises(ops.RelationNotFoundError) as relation_excinfo:
+            backend.relation_list(7)
+        assert _notes(relation_excinfo.value) == [
+            "Hook command 'relation-list' (relation_id=7) failed during the 'update-status' hook."
+        ]
+        with pytest.raises(ops.SecretNotFoundError) as secret_excinfo:
+            backend.secret_get(label='missing')
+        assert _notes(secret_excinfo.value) == [
+            "Hook command 'secret-get' (label='missing', refresh=False, peek=False) "
+            "failed during the 'update-status' hook."
+        ]
+
+    def test_juju_log(self, fake_script: FakeScript):
+        backend = _backend_for('hooks/install')
+        fake_script.write('juju-log', "echo 'ERROR boom' >&2; exit 1")
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.juju_log('WARNING', 'the message is not included')
+        assert _notes(excinfo.value) == [
+            "Hook command 'juju-log' (level='WARNING') failed during the 'install' hook."
+        ]
+
+    @pytest.fixture
+    def charm(
+        self,
+        request: pytest.FixtureRequest,
+        monkeypatch: pytest.MonkeyPatch,
+        fake_script: FakeScript,
+    ):
+        monkeypatch.setenv('JUJU_DISPATCH_PATH', 'hooks/config-changed')
+        framework = create_framework(request)
+        fake_script.write('status-set', "echo 'ERROR boom' >&2; exit 1")
+
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                self.defer_events = False
+                framework.observe(self.on.update_status, self._on_event)
+                framework.observe(self.on.config_changed, self._on_event)
+                framework.observe(self.on.custom, self._on_event)
+
+            def _on_event(self, event: ops.EventBase):
+                if self.defer_events:
+                    event.defer()
+                    return
+                self.unit.status = ops.ActiveStatus('ready')
+
+        return MyCharm(framework)
+
+    def test_event_matching_hook(self, charm: ops.CharmBase):
+        with pytest.raises(ops.ModelError) as excinfo:
+            charm.on.config_changed.emit()
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook."
+        ]
+
+    def test_deferred_event(self, charm: ops.CharmBase):
+        charm.defer_events = True  # type: ignore
+        charm.on.update_status.emit()
+        charm.defer_events = False  # type: ignore
+        with pytest.raises(ops.ModelError) as excinfo:
+            charm.framework.reemit()
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the deferred 'update_status' event."
+        ]
+
+    def test_deferred_event_same_as_hook(self, charm: ops.CharmBase):
+        charm.defer_events = True  # type: ignore
+        charm.on.config_changed.emit()
+        charm.defer_events = False  # type: ignore
+        with pytest.raises(ops.ModelError) as excinfo:
+            charm.framework.reemit()
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the deferred 'config_changed' event."
+        ]
+
+    def test_custom_event(self, charm: ops.CharmBase):
+        with pytest.raises(ops.ModelError) as excinfo:
+            charm.on.custom.emit()
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the 'custom' event."
+        ]
+
+    def test_deferred_state_restored(self, charm: ops.CharmBase):
+        charm.defer_events = True  # type: ignore
+        charm.on.update_status.emit()
+        charm.defer_events = False  # type: ignore
+        with pytest.raises(ops.ModelError):
+            charm.framework.reemit()
+        backend = charm.framework.model._backend
+        assert backend._hook_is_running == ''
+        assert backend._event_is_deferred is False
 
 
 class TestSecrets:

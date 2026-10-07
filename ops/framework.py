@@ -914,13 +914,14 @@ class Framework(Object):
         self._reemit()
 
     @contextmanager
-    def _event_context(self, event_name: str):
-        """Handles toggling the hook-is-running state in backends.
+    def _event_context(self, event_name: str, *, deferred: bool = False):
+        """Handles toggling the hook-is-running and event-is-deferred state in backends.
 
         This allows e.g. harness logic to know if it is executing within a running hook context
         or not.  It sets backend._hook_is_running equal to the name of the currently running
         hook (e.g. "set-leader") and reverts back to the empty string when the hook execution
-        is completed.
+        is completed. It also records whether the event is a deferred one being re-emitted,
+        so that errors can report it.
 
         Usage:
 
@@ -944,11 +945,14 @@ class Framework(Object):
         self._event_name = event_name
 
         old_hook_is_running = backend._hook_is_running
+        old_event_is_deferred = backend._event_is_deferred
         backend._hook_is_running = event_name
+        backend._event_is_deferred = deferred
         try:
             yield
         finally:
             backend._hook_is_running = old_hook_is_running
+            backend._event_is_deferred = old_event_is_deferred
             self._event_name = old_event_name
 
     def _reemit(self, single_event_path: str | None = None):
@@ -1012,7 +1016,9 @@ class Framework(Object):
                         span.set_attribute('event_class', event.__class__.__qualname__)
                         span.set_attribute('event_name', event_handle.kind)
                         span.set_attribute('handler', f'{observer_path}.{method_name}')
-                        with self._event_context(event_handle.kind):
+                        with self._event_context(
+                            event_handle.kind, deferred=single_event_path is None
+                        ):
                             if (
                                 event_is_from_juju or event_is_action
                             ) and self._juju_debug_at.intersection({'all', 'hook'}):
