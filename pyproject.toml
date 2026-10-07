@@ -37,9 +37,9 @@ harness = []
 
 [dependency-groups]
 lint = [
-    "ruff==0.16.4",
+    "ruff==0.16.9",
     "codespell==2.4.2",
-    "zizmor==1.29.0",
+    "zizmor==1.30.1",
     "ops[testing,tracing]",
     "pyright~=1.1",
     "typing_extensions~=4.2",
@@ -70,14 +70,9 @@ integration = [
     "minio~=7.2",
     "httpx~=0.28",
 ]
-release = [
-    "packaging>=24,<27",
-    "pygithub~=2.6",
-    "rich>=14.1,<16.0",
-]
 tiobe = [
-    "flake8==7.3.0",
-    "pylint==4.0.7",
+    "flake8==7.4.1",
+    "pylint==4.0.9",
 ]
 
 [project.urls]
@@ -88,10 +83,24 @@ tiobe = [
 "Changelog" = "https://github.com/canonical/operator/blob/main/CHANGES.md"
 
 [build-system]
-requires = [
-    "setuptools>=60",
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "code"
+path = "ops/version.py"
+expression = "version"
+
+[tool.hatch.build.targets.sdist]
+# Only include ops, not docs, examples, or testing and tracing packages.
+include = [
+    "/ops",
+    "/test",
+    "/*.md",  # Include changelog and contributor docs.
 ]
-build-backend = "setuptools.build_meta"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ops"]
 
 [tool.uv.workspace]
 members = ["tracing", "testing"]
@@ -100,12 +109,6 @@ members = ["tracing", "testing"]
 ops = { workspace = true }
 ops-scenario = { workspace = true }
 ops-tracing = { workspace = true }
-
-[tool.setuptools.packages.find]
-include = ["ops", "ops._private", "ops.hookcmds", "ops.lib"]
-
-[tool.setuptools.dynamic]
-version = {attr = "ops.version.version"}
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -248,6 +251,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 ".github/patch-charm-deps.py" = [
     "start-process-with-partial-path",  # S607
 ]
+".github/release/propose-release-version.py" = [
+    "line-too-long",  # E501: The failure messages read best kept whole.
+]
 "docs/custom_conf.py" = [
     "undocumented-public-module",  # D100
     "undocumented-public-class",  # D101
@@ -270,7 +276,7 @@ builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "Con
 # Whole trees rather than a list of directories, so that a new package or test
 # charm is checked from the day it's added. What isn't checked yet is listed
 # explicitly below instead.
-include = ["ops", "test", "testing"]
+include = [".github/release", "ops", "test", "testing"]
 exclude = [
     "tracing/*",
     # Legacy, and not yet clean.

@@ -533,6 +533,9 @@ class TestHarness:
         )
         request.addfinalizer(harness.cleanup)
         harness.begin()
+        # The charm records every databag, including its own application one, so it
+        # needs to be the leader to read them all.
+        harness.set_leader(True)
         harness.charm.observe_relation_events('db')
         # First add a relation and unit
         rel_id = harness.add_relation('db', 'postgresql')
@@ -7437,13 +7440,17 @@ def test_relation_validates_access(
             if self.unit.is_leader():
                 assert local_app_data['k'] == 'local val'  # test read
                 local_app_data['k'] = 'new val'  # test write
+                assert len(local_app_data.items()) == 1
+                assert 'k' in local_app_data
             else:
                 with pytest.raises(ops.RelationDataAccessError):
                     local_app_data['k']
-            # these probably fail at real runtime with a ModelError
-            # but pass here because the validation methods are only hooked up to get/set
-            assert len(local_app_data.items()) == 1
-            assert 'k' in local_app_data
+                # Juju refuses these too, so every route reports the same
+                # error rather than only the ones that go through __getitem__.
+                with pytest.raises(ops.RelationDataAccessError):
+                    len(local_app_data.items())
+                with pytest.raises(ops.RelationDataAccessError):
+                    _ = 'k' in local_app_data
 
     harness = ops.testing.Harness(
         Charm,

@@ -222,10 +222,11 @@ Unmarked features are assumed to work and be available in the latest LTS version
 
 ## Release documentation
 
-As part of the release process, you'll write a summary of the release.
-The summary appears in the GitHub release notes and in Discourse and Matrix.
+### Release notes
 
-In the summary, outline the key improvements from all areas of Ops,
+The "Propose a release" workflow drafts the release notes and puts them in the description of the PR it opens. You review and edit them there, rather than writing them from scratch. The "Create the draft release" workflow later copies them into the GitHub release, and you reuse them when you announce the release on Discourse and Matrix.
+
+In the release notes, outline the key improvements from all areas of Ops,
 including testing, tracing, and the docs.
 The point here is to encourage people to check out the full notes and to upgrade
 promptly, so ensure that you entice them with the best that the new versions
@@ -236,21 +237,17 @@ transition testing".
 
 ### CHANGES.md
 
-[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is
-kept up-to-date by the PR that's created when you run `tox -e draft-release`
-during the release process. You only need to manually edit the changelog if a
-commit message needs adjusting (we try to avoid doing this).
+[CHANGES.md](CHANGES.md) lists the changes in each release. The changelog is kept up-to-date by the PR that the "Propose a release" workflow opens during the release process. You only need to edit the changelog by hand if a commit message needs adjusting, for example to fix a typo or a description that would mislead readers. Make the edit to `CHANGES.md` in the release PR, before merging it: the draft release copies this version's section from there. We try to avoid this by getting the PR title right before merging, since that becomes the commit message.
+
+The entry is generated from the commits in the release, so it is a reference rather than an explanation: comprehensive, consistent, and not the place for prose. That is what the release notes are for.
 
 There's also a changelog for `ops-scenario`:
 [testing/CHANGES.md](testing/CHANGES.md). Don't add new entries to this file.
 We've kept it for historical reference, but we no longer maintain it.
 
-### GitHub release notes
+### GitHub release
 
-The GitHub release notes include the summary of the release and
-the list of changes found in the changelog. A draft release is created when
-you run `tox -e draft-release` duing the release process. You might need to
-edit the draft release after a review.
+The GitHub release has the release notes, then the list of changes found in the changelog. The "Create the draft release" workflow puts the two together when the version-bump PR is merged: the notes as you left them in that PR's description, then this version's section of the changelog, copied rather than generated again. You might need to edit the draft release after a review.
 
 ### Discourse and Matrix
 
@@ -276,58 +273,95 @@ The Matrix post should be similar.
 
 ## Publishing a release
 
-Before you start, ensure that your environment variable GITHUB_TOKEN is set and that the token has sufficient permissions. The easiest way to set a token is to run `gh auth login` first, follow the steps to log in, then run `export GITHUB_TOKEN=$(gh auth token)`.
+Two workflows make a release, and you decide twice: once when you review the version-bump PR, and once when you publish the draft release. Nothing reaches PyPI until you publish the draft, so an abandoned attempt costs at most a branch and a draft to delete.
 
-Alternatively, you can also create a personal access token. To do so, go to GitHub -> Settings -> Developer Settings -> Personal access tokens -> Fine-grained tokens, and click "Generate new token" (shortcut: click [this link](https://github.com/settings/personal-access-tokens/new)). For "Resource owner", choose "canonical". For "Expiration", choose a desired setting (maximum is 366 days). Under "Repository access", choose "Only select repositories" and select "canonical/operator". Under "Permissions", click "Add permissions", select "Contents" and "Pull requests", then set the access to both of them to "Read and write" (since we need to create draft releases and PRs); note that "Metadata" will be chosen automatically as well. Click "Generate token", then set the environment variable `GITHUB_TOKEN` with it.
+The whole release runs in Actions, and the only tools you need are the Actions tab and the releases page.
 
-Then, check out the main branch of your forked operator repo and pull upstream to ensure the release automation script is the latest.
+### 1. Propose the release
 
-1. Draft a release: Run: `tox -e draft-release` at the root directory of the forked repo.
+Run the ["Propose a release"](https://github.com/canonical/operator/actions/workflows/propose-release.yaml) workflow. It takes three inputs:
 
-    > This assumes a draft release on the main branch, and your forked remote name is `origin`, and the `canonical/operator` remote name is `upstream`.
-    >
-    > If you have different settings, add parameters accordingly. For example, the following command assumes your forked remote name is `mine`, and `canonical/operator` remote name is `origin`:
-    >
-    > `tox -e draft-release -- --canonical-remote origin --fork-remote mine`
-    >
-    > By default, the script makes a release on the main branch. If you want to make a release on another branch, for example, on "2.23-maintenance" (you do not need to switch to this branch in your forked repo), run it with the "--branch" parameter:
-    >
-    > `tox -e draft-release -- --branch 2.23-maintenance`
+- `version`: leave this empty for an ordinary release. The workflow counts from the last release tag on the branch and reads the conventional commits since then: a feature or a breaking change makes it a minor release, and anything else makes it a patch release. Fill it in when you know in advance that the commits won't give the right answer: for a major release, or a pre-release such as `3.9.0rc1`. If you're not sure what the commits will give, run with `dry_run` first and check the proposed version in the run summary. What you type is used as it stands, with no reconciling against what the commits suggest.
+- `branch`: the branch to release from, either `main` or a maintenance branch such as `2.23-maintenance`.
+- `dry_run`: do everything except push the branch and open the PR. The proposed version, the changelog entry and the drafted notes go in the run summary, so this is how to see what a release would look like without proposing one.
 
-2. Follow the steps of the `tox -e draft-release` output. You need to input the release title and an introduction section, which can be multiple paragraphs with empty lines in between. End the introduction section by typing a period sign (.) in a new line, then press enter.
+> The version comes from the last tag, and never from `ops/version.py`. Between releases that file holds a development version left behind by the last post-release bump, which is a guess rather than something we shipped. The tag is also where the changelog starts, so the two can't drift apart.
 
-3. If drafting the release succeeds, a PR named "chore: update changelog and versions for X.Y.Z release" will be created. Get it reviewed and merged, then wait until the tests pass after merging. It takes around 10 minutes. If the tests don't pass at the tip of the main branch, do not continue.
+The workflow writes the `CHANGES.md` entry, updates the version strings across `ops`, `ops-scenario`, `ops-tracing` and the tool-versions table, runs `uv lock`, drafts the release title and notes, and opens a PR from a `release-prep-X.Y.Z` branch, titled "chore: update changelog and versions for X.Y.Z release".
 
-4. Go to the GitHub releases page, then edit the latest draft release. If you are releasing from the main branch, tick the "set as latest release" box. If you are releasing from a maintenance branch, uncheck the box for "set as latest release". Then, click "Publish release". GitHub will create the additional tag.
+Review both halves of it, because they are different jobs:
 
-    > Pushing the tags will trigger automatic builds for the Python packages and
-    > publish them to PyPI ([ops](https://pypi.org/project/ops/)
-    > ,[ops-scenario](https://pypi.org/project/ops-scenario), and
-    > [ops-tracing](https://pypi.org/project/ops-tracing/)).
-    > Note that it sometimes takes a bit of time for the new releases to show up.
-    >
-    > See [.github/workflows/publish.yaml](.github/workflows/publish.yaml) for details.
-    >
-    > You can troubleshoot errors at [Actions > Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml).
-    >
-    > The Publish workflow includes a job that runs the "SBOM and secscan" workflow.
+- The diff: the version strings, the changelog entry, and the lockfile.
+- The release title and notes, which are in the PR description under the "Release title" and "Release notes" headings. The title is the version followed by the summary between `<!-- release-title:start -->` and `<!-- release-title:end -->`: write only the summary, since the version is added for you, and leave the placeholder in if you want the title to be just the version. The notes are between `<!-- release-notes:start -->` and `<!-- release-notes:end -->`. Edit both there, in the description: that is where the next workflow reads them from. Everything outside the markers is for reviewers and goes no further.
 
-5. On the summary page of the most recent Publish run, locate the secscan artifacts. There will be two artifacts: `secscan-report-upload-sdist` and `secscan-report-upload-wheel`.
+> The PR is opened with the workflow's own token, so GitHub won't start the usual checks on it. Close and reopen the PR to get them to run.
+
+Wait for the checks to pass, then merge. If they don't pass at the tip of the branch, don't continue.
+
+### 2. Merge the PR, then create the draft release
+
+Once the PR is merged, run the ["Create the draft release"](https://github.com/canonical/operator/actions/workflows/create-draft-release.yaml) workflow with the PR's number. The version-bump PR's description has a link to the workflow, for convenience; the workflow itself only knows which PR to use from the number you give it. The workflow checks that the PR was merged into `main` or a maintenance branch, and that the merge left `ops/version.py` holding a version it didn't hold before, with no `.devN` suffix. If either check fails, it stops with an error that says why.
+
+The workflow then takes the notes out of the merged PR's description, adds this version's section of `CHANGES.md` underneath, and creates a **draft** release titled with the version and your summary, such as "3.8.3: fix how duplicate events are identified". The body ends with a "Full Changelog" link comparing this release with the previous one. A version with an `a`, `b` or `rc` in it is marked as a pre-release. Nothing is published and the tag doesn't exist yet.
+
+It also opens a PR titled "chore: adjust versions after the X.Y.Z release" that puts the branch back onto a development version. Review and merge it. It doesn't matter whether that happens before or after you publish the draft, because the draft is pinned to the commit that was reviewed rather than to the branch. The same token caveat applies, so close and reopen it if you want the checks to run.
+
+> The version in that PR is a placeholder rather than a prediction. Nothing counts from it, because the next release is counted from the last tag, so it doesn't matter if the next release turns out to be a different version. `main` sat at `3.9.0.dev0` through both the 3.8.1 and the 3.8.2 releases.
+
+This is where somebody reads the notes as a reader will see them, which is a different act from reviewing a diff. Read them, edit the release body if it needs it, and then:
+
+1. If you are releasing from `main`, tick "Set as the latest release". If you are releasing from a maintenance branch, untick it.
+2. Click "Publish release". GitHub creates the tag as it publishes.
+
+### 3. Publishing does the rest
+
+Publishing the draft starts the [Publish](https://github.com/canonical/operator/actions/workflows/publish.yaml) workflow, which builds the three packages and uploads them to PyPI ([ops](https://pypi.org/project/ops/), [ops-scenario](https://pypi.org/project/ops-scenario), and [ops-tracing](https://pypi.org/project/ops-tracing/)), attests what it built, and runs the "SBOM and secscan" workflow. It sometimes takes a while for the new releases to show up on PyPI.
+
+Two things are still yours to do by hand:
+
+1. On the summary page of the most recent Publish run, locate the secscan artifacts. There will be two artifacts: `secscan-report-upload-sdist` and `secscan-report-upload-wheel`.
 
     Download both of these, and then upload them to the [SSDLC Ops folder in Drive](https://drive.google.com/drive/folders/17pOwak4LQ6sicr6OekuVPMECt2OcMRj8?usp=drive_link). Open the artifacts and verify that the security scan has not found any vulnerabilities. If you are releasing from the 2.23-maintenance branch, then follow the manual process instead, for both [SBOM generation](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---software-bill-of-materials-(sbom)) and [security scanning](https://library.canonical.com/corporate-policies/information-security-policies/ssdlc/ssdlc---vulnerability-identification).
 
-6. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and
-[Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
+2. Announce the release on [Discourse](https://discourse.charmhub.io/c/framework/42) and [Matrix](https://matrix.to/#/#charmhub-charmdev:ubuntu.com).
 
-7. Post release: At the root directory of your forked `canonical/operator` repo, check out to the main branch to ensure the release automation script is up-to-date, then run: `tox -e post-release`.
+### Maintenance branches, pre-releases and major releases
 
-    > This assumes the same defaults as mentioned in step 1.
-    >
-    > Add parameters accordingly if your setup differs, for example, if you are releasing from a maintenance branch.
+A **maintenance release** is the same steps with `branch` set to, for example, `2.23-maintenance`. Both the version and the changelog come from that branch's own last tag rather than from the newest tag in the repository.
 
-8. Follow the steps of the `tox -e post-release` output. If it succeeds, a PR named "chore: adjust versions after release" will be created. Get it reviewed and merged.
+Nothing needs to be added to a maintenance branch first. Both workflows run from `main`, and read the version script from `main`, so the maintenance branch only has to have the files that get a new version written into them. The one difference is publishing: publishing the draft creates the tag, and a tag's publish workflow is the one on the branch it was cut from. On `2.23-maintenance` and `3.3-maintenance` that is the older tag-triggered workflow (`publish-ops.yaml` and its siblings on 2.23, and `publish.yaml` on 3.3), which uploads to PyPI in the same way.
 
-If the release automation script fails, delete the draft release and the newly created branches (`release-prep-*`, `post-release-*`) both locally and in the origin, fix issues, and retry.
+"Propose a release" stops with an error, instead of opening the PR, if the commits on a maintenance branch since its last tag include a feature or a breaking change. That means somebody has put a commit on the wrong branch, and a release is not the place to absorb it: fix the branch, or pass an explicit `version` if it really is what you want. Remember to untick "Set as the latest release" on the draft.
+
+A **pre-release** needs an explicit `version`, for example `3.9.0rc1`, because the commits never imply one. The draft is marked as a pre-release, and it does go to PyPI: the Publish workflow fires on any published release rather than on a version pattern. A pre-release gets a post-release bump like any other release, and the bump drops the suffix, so after 3.4.0b3 the branch goes back to working towards `3.4.0.dev0`.
+
+A **major release** needs an explicit `version` too. A `!` on a commit is surfaced in the changelog under "Breaking Changes" but is never read as a major bump, because we sometimes let a breaking change ride in a minor release.
+
+### Uploading to Test PyPI
+
+No release needs this. To build the packages and upload them to Test PyPI without making a release, run the Publish workflow by hand from whichever branch or tag you want built. A manual run only ever uploads to Test PyPI, and it needs the Test PyPI trusted publisher described in [Settings a repository admin has to create](#settings-a-repository-admin-has-to-create).
+
+### Settings a repository admin has to create
+
+Two things live in the repository settings, so no PR can add them.
+
+- An environment called `release-notes`, holding an `OPENROUTER_API_KEY` secret and an `OPENROUTER_MODEL` variable. The model is a variable so that changing it is a settings edit rather than a PR. The key should be its own, and not shared with another environment.
+
+    A release doesn't wait on this. With any of the three missing, "Propose a release" writes a placeholder in place of the notes - a line saying none were drafted, and an instruction to write them before merging - and carries on. Write them yourself in the PR description; everything after that works the same way.
+
+- A trusted publisher on Test PyPI pointing at `publish.yaml`. PyPI matches a trusted publisher against the workflow's *file name*.
+
+### If something fails partway
+
+Every step reads what it needs fresh from the branch or the API, so re-running the failed job is usually the fix. Specifically:
+
+- **"Propose a release" failed.** If it failed before pushing, nothing happened and you can run it again. If it pushed `release-prep-X.Y.Z` and then failed, close the PR if there is one and delete that branch before running it again: the workflow refuses to start while the branch exists, so that a half-finished attempt can't be mistaken for the real one.
+- **"Create the draft release" says the PR isn't a release.** The error says what the merge did to `ops/version.py`. The usual causes are the wrong PR number, or a version that still has a `.devN` suffix on it.
+- **"Create the draft release" failed.** Fix the cause and re-run the failed job; the merge doesn't have to happen again. A PR description can still be edited after the merge, so markers somebody removed can be put back. If a draft was created before the failure, delete it first, because the workflow refuses to make a second one.
+- **Publish failed.** Re-run it. The release stays published and the tag stays where it is, so there's nothing to unwind. If the packages reached PyPI before the failure, they can't be replaced: fix the problem in a new patch release.
+- **The draft was created but the post-release PR wasn't.** Re-run the failed "Open the post-release pull request" job on its own; it doesn't touch the draft. If the bump is already on the branch, it says so and stops, so a re-run after somebody did it by hand is safe. If a `post-release-X.Y.Z` branch is left over from an attempt, merge, close or delete it first.
+
+If you need to give up on an attempt, delete the draft release and any `release-prep-*` and `post-release-*` branches, then start again. The one thing that can't be undone is a published release: the tag and the PyPI upload are both permanent.
 
 # Updating the Charmcraft profiles
 

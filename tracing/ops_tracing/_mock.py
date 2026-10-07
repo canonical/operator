@@ -19,8 +19,9 @@ import pathlib
 from typing import Generator
 
 import opentelemetry.trace
+from opentelemetry.context import Context
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -62,8 +63,27 @@ def patch_tracing() -> Generator[InMemorySpanExporter, None, None]:
         opentelemetry.trace._TRACER_PROVIDER_SET_ONCE._done = real_otel_once_done
 
 
+class _SharedSpanProcessor(SpanProcessor):
+    """Forward spans to SPAN_PROCESSOR, but don't let a provider shut it down.
+
+    Ops shuts the tracer provider down at the end of every dispatch, which shuts
+    down its span processors. SPAN_PROCESSOR is shared by every run in the
+    process, and from opentelemetry-sdk 1.45 a SimpleSpanProcessor that has been
+    shut down drops every span after that, so it has to stay open.
+    """
+
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        SPAN_PROCESSOR.on_start(span, parent_context)
+
+    def on_end(self, span: ReadableSpan) -> None:
+        SPAN_PROCESSOR.on_end(span)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return SPAN_PROCESSOR.force_flush(timeout_millis)
+
+
 def _create_provider(resource: Resource, charm_dir: pathlib.Path) -> TracerProvider:
     """Create an OpenTelemetry tracing provider suitable for testing."""
     provider = TracerProvider(resource=resource)
-    provider.add_span_processor(SPAN_PROCESSOR)
+    provider.add_span_processor(_SharedSpanProcessor())
     return provider
