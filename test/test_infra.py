@@ -19,7 +19,6 @@ import pathlib
 import subprocess
 import sys
 import types
-import typing
 
 import pytest
 
@@ -79,17 +78,12 @@ def test_import_does_not_pull_in_pdb(tmp_path: pathlib.Path):
 
 def test_ops_testing_doc():
     """Ensure that ops.testing's documentation includes all the expected names."""
-    # We only document public classes and functions. `isinstance` rather than
-    # an exact type check, so that classes with a metaclass of their own -
-    # protocols, for example - are included. Type aliases are excluded: on
-    # Python 3.10 a generic alias like `Mapping[str, str]` is an instance of
-    # `type`, but it isn't something we document.
+    # We only document public classes and functions.
     expected_names = set(
         name
         for name in ops.testing.__all__
         if name not in ops.testing._compatibility_names
-        and isinstance(getattr(ops.testing, name), (type, types.FunctionType))
-        and typing.get_origin(getattr(ops.testing, name)) is None
+        and type(getattr(ops.testing, name)) in (type, types.FunctionType)
     )
     expected_names.update(
         f'errors.{name}' for name in dir(ops.testing.errors) if not name.startswith('_')
@@ -110,8 +104,10 @@ def test_ops_testing_doc():
         'docs/reference/ops-testing.rst',
     ):
         with open(test_doc) as testing_doc:
+            # An entry may give an explicit signature, like `Event()`, to hide
+            # a constructor that tests shouldn't call.
             found_names.update({
-                line.split('ops.testing.', 1)[1].strip()
+                line.split('ops.testing.', 1)[1].split('(', 1)[0].strip()
                 for line in testing_doc
                 if line.strip().startswith((
                     '.. autoclass:: ops.testing.',

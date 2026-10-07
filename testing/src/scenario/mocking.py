@@ -68,7 +68,7 @@ from .state import (
 if TYPE_CHECKING:  # pragma: no cover
     from .context import Context
     from .state import Container as ContainerSpec
-    from .state import Exec, Secret, State, _CharmSpec, _Event
+    from .state import Event, Exec, Secret, State, _CharmSpec
 
 logger = scenario_logger.getChild('mocking')
 
@@ -135,7 +135,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def __init__(
         self,
         state: State,
-        event: _Event,
+        event: Event,
         charm_spec: _CharmSpec[CharmType],
         context: Context[CharmType],
         juju_context: JujuContext,
@@ -654,7 +654,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         raise TypeError('relation_remote_app_name: unknown relation type')
 
     def action_set(self, results: dict[str, Any]):
-        if not self._event.action:
+        if not self._event._action:
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-set',
             )
@@ -668,21 +668,21 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             self._context.action_results = results
 
     def action_fail(self, message: str = ''):
-        if not self._event.action:
+        if not self._event._action:
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-fail',
             )
         self._context._action_failure_message = message
 
     def action_log(self, message: str):
-        if not self._event.action:
+        if not self._event._action:
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-log',
             )
         self._context.action_logs.append(message)
 
     def action_get(self):
-        action = self._event.action
+        action = self._event._action
         if not action:
             raise ActionMissingFromContextError(
                 'not in the context of an action event: cannot action-get',
@@ -705,7 +705,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         return [storage.index for storage in self._state.storages if storage.name == name]
 
     def _storage_event_details(self) -> tuple[int, str]:
-        storage = self._event.storage
+        storage = self._event._storage
         if not storage:
             # only occurs if this method is called when outside the scope of a storage event
             raise RuntimeError('unable to find storage key in ""')
@@ -801,7 +801,7 @@ class _MockPebbleClient(_TestingPebbleClient):
         mounts: Mapping[str, Mount],
         *,
         state: State,
-        event: _Event,
+        event: Event,
         charm_spec: _CharmSpec[CharmType],
         context: Context[CharmType],
         container_name: str,
