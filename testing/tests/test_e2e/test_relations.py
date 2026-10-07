@@ -30,9 +30,7 @@ class CharmEvents(ops.CharmEvents):
 class Charm(ops.CharmBase):
     _call: ClassVar[Callable[[Any], None] | None] = None
     called: ClassVar[bool] = False
-    # Narrowing CharmBase.on's type here is inherently invariant (it's a
-    # mutable attribute), so this needs an ignore regardless of "on"'s typing.
-    on: ClassVar[CharmEvents] = CharmEvents()  # type: ignore
+    on: ClassVar[CharmEvents] = CharmEvents()
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)

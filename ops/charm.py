@@ -1482,7 +1482,7 @@ class CharmBase(Object):
             charm.
     """
 
-    on: CharmEvents = CharmEvents()
+    on = CharmEvents()
     """This property is used to create an event handler using :meth:`Framework.observe`,
     and can be one of the events listed at :class:`CharmEvents`.
     """
