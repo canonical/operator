@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 
 import pytest
-from scenario import Context, Relation, State
+from scenario import Context, Relation, Secret, State
 
 import ops
 
@@ -56,6 +56,21 @@ def test_secret_not_found():
     assert isinstance(error, ops.SecretNotFoundError)
     assert _notes(error) == [
         "Hook command 'secret-get' (label='missing', refresh=False, peek=False) "
+        "failed during the 'update-status' hook."
+    ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
+def test_secret_info_get_records_id_only():
+    secret = Secret({'a': 'b'})
+    error = _run(
+        'update_status',
+        lambda charm: charm.model.get_secret(id=secret.id, label='foo').get_info(),
+        State(secrets={secret}),
+    )
+    assert isinstance(error, ops.SecretNotFoundError)
+    assert _notes(error) == [
+        f"Hook command 'secret-info-get' (id={secret.id!r}) "
         "failed during the 'update-status' hook."
     ]
 

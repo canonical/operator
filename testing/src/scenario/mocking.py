@@ -141,6 +141,11 @@ def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
     Record the same arguments as ops does under Juju. Each of ``params`` is a
     parameter of the decorated method, recorded under its own name, and each of
     ``renamed`` maps the name that ops records to the parameter holding the value.
+
+    The note is added to any ModelError the method raises, including errors
+    from the mock's own checks. Where ops would raise before running the hook
+    command, such as for an invalid status name, the ops API rejects the call
+    before it reaches the mock.
     """
 
     def decorator(func: _F) -> _F:
@@ -562,20 +567,26 @@ class _MockModelBackend(_ModelBackend):
 
         return dict(secret.tracked_content)
 
-    @_hook_command('secret-info-get', 'id', 'label')
     def secret_info_get(
         self,
         *,
         id: str | None = None,
         label: str | None = None,
     ) -> SecretInfo:
-        secret = self._get_secret(id, label)
-        # If both the id and label are provided, then update the label.
-        if id is not None and label is not None:
-            secret._set_label(label)
+        try:
+            secret = self._get_secret(id, label)
+            # If both the id and label are provided, then update the label.
+            if id is not None and label is not None:
+                secret._set_label(label)
 
-        # only "manage"=write access level can read secret info
-        self._check_can_manage_secret(secret)
+            # only "manage"=write access level can read secret info
+            self._check_can_manage_secret(secret)
+        except ModelError as e:
+            # Under Juju, ops runs secret-info-get with only the ID, or only the
+            # label if there's no ID, so the note does the same.
+            trace = {'id': id} if id is not None else {'label': label}
+            self._add_hook_command_note(e, 'secret-info-get', trace)
+            raise
 
         return SecretInfo(
             id=secret.id,

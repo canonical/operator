@@ -3658,6 +3658,14 @@ class _ModelBackend:
         return None if kind == 'actions' else name
 
     def _add_hook_command_note(self, error: ModelError, cmd: str, args: Mapping[str, Any]) -> None:
+        """Add a note to the error naming the hook command, its arguments, and the event.
+
+        The note typically ends up in the charm's logs, so never pass an
+        argument that may hold sensitive data, such as secret content,
+        relation data, or action results. Callers that go through
+        :meth:`_wrap_hookcmd` pass its ``trace`` arguments, which are already
+        restricted in the same way.
+        """
         if sys.version_info < (3, 11):
             return
         note = f'Hook command {cmd!r}'
@@ -4048,6 +4056,9 @@ class _ModelBackend:
             except hookcmds.Error as e:  # ruff: ignore[try-except-in-loop]
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
                 error = ModelError(e.stderr)
+                # Leave the message out of the note for the same reasons it
+                # isn't traced: it's arbitrary charm content that may be long
+                # or sensitive.
                 self._add_hook_command_note(error, 'juju-log', {'level': level})
                 raise error from e
 
