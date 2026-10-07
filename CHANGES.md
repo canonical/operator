@@ -1,3 +1,10 @@
+# 3.8.3 - 30 September 2026
+
+## **Security** Fixes
+
+* Stop recording secret content, relation data, pod specs, and action results and log messages in trace data (GHSA-4356-5g33-3qrp)
+* Stop including action results and action log messages in hook command errors
+
 # 3.8.2 - 31 August 2026
 
 ## Fixes

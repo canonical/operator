@@ -129,6 +129,7 @@ class TestCharmInit:
         charm_class: type[ops.CharmBase],
         *,
         extra_environ: dict[str, str] | None = None,
+        metadata: str = 'name: test',
         **kwargs: typing.Any,
     ):
         """Helper for below tests."""
@@ -146,7 +147,7 @@ class TestCharmInit:
                 tmpdirname = Path(tmpdirname)
                 fake_metadata = tmpdirname / 'metadata.yaml'
                 with fake_metadata.open('wb') as fh:
-                    fh.write(b'name: test')
+                    fh.write(metadata.encode())
 
                 ops.main(charm_class, **kwargs)
 
@@ -176,6 +177,34 @@ class TestCharmInit:
         with warnings.catch_warnings(record=True) as warn_cm:
             self._check(MyCharm)
         assert warn_cm == []
+
+    def test_backend_knows_peer_relations(self):
+        peer_endpoints: list[frozenset[str]] = []
+
+        # The relation events are defined on the charm's events class, so use a
+        # subclass rather than adding them to ops.CharmEvents for other tests.
+        class MyCharmEvents(ops.CharmEvents):
+            pass
+
+        class MyCharm(ops.CharmBase):
+            on = MyCharmEvents()  # type: ignore
+
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                peer_endpoints.append(self.model._backend._peer_endpoints)
+
+        metadata = """
+name: test
+requires:
+  db:
+    interface: db
+peers:
+  cluster:
+    interface: cluster
+"""
+        self._check(MyCharm, metadata=metadata)
+
+        assert peer_endpoints == [frozenset({'cluster'})]
 
     def test_storage_no_storage(self):
         # here we patch juju_backend_available so it refuses to set it up
