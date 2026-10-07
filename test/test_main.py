@@ -187,7 +187,7 @@ class TestCharmInit:
             pass
 
         class MyCharm(ops.CharmBase):
-            on = MyCharmEvents()  # type: ignore
+            on = MyCharmEvents()
 
             def __init__(self, framework: ops.Framework):
                 super().__init__(framework)
