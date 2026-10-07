@@ -4,7 +4,7 @@
 # pointing at a path that only exists in the workshop, and uv on the host
 # then refuses the project. Workshop's SDK guidance is ~/.profile for the
 # workshop user's own variables.
-cat <<EOF >> ~/.profile
+cat <<'EOF' >> ~/.profile
 
 export TOX_WORK_DIR=/home/workshop/.tox-ops
 export TOX_OVERRIDE=tox.venv_redirect=false

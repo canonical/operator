@@ -17,8 +17,10 @@ sdks:
 # Juju controller, and one can't run in a workshop. Run them on the host
 # instead.
 actions:
+  all: tox
   docs: make -C docs html
   docs-run: make -C docs run SPHINX_HOST=0.0.0.0
+  docs-spelling: make -C docs spelling
   format: tox -e format
   lint: tox -e lint
   pebble: tox -e pebble -- "$@"
