@@ -4004,13 +4004,21 @@ def _backend_for(
     return _ModelBackend('myapp/0', juju_context=context)
 
 
-class TestModelErrorHookContext:
-    def test_not_from_hook_command(self):
-        error = ops.ModelError('boom')
-        assert error.hook_command is None
-        assert error.event_info is None
-        assert _notes(error) == []
+def test_model_error_not_from_hook_command():
+    assert _notes(ops.ModelError('boom')) == []
 
+
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason='exception notes need Python 3.11')
+def test_model_error_no_note_before_python_311(fake_script: FakeScript):
+    backend = _backend_for('hooks/start')
+    fake_script.write('config-get', "echo 'ERROR boom' >&2; exit 1")
+    with pytest.raises(ops.ModelError) as excinfo:
+        backend.config_get()
+    assert _notes(excinfo.value) == []
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
+class TestModelErrorNote:
     def test_hook_command_failure(self, fake_script: FakeScript):
         backend = _backend_for('hooks/config-changed', 'config-changed')
         backend._hook_is_running = 'config_changed'
@@ -4019,19 +4027,10 @@ class TestModelErrorHookContext:
             backend.relation_set(3, {'password': 's3cret'}, is_app=True, relation_name='db')
         error = excinfo.value
         assert str(error) == 'ERROR boom\n'
-        assert error.hook_command == ops.HookCommandInfo(
-            name='relation-set', args={'relation_id': 3, 'endpoint': 'db', 'app': True}
-        )
-        assert error.event_info == ops.EventInfo(
-            hook='config-changed', event='config_changed', deferred=False
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'relation-set' (relation_id=3, endpoint='db', app=True) "
-                "failed during the 'config-changed' hook."
-            ]
-        else:
-            assert _notes(error) == []
+        assert _notes(error) == [
+            "Hook command 'relation-set' (relation_id=3, endpoint='db', app=True) "
+            "failed during the 'config-changed' hook."
+        ]
 
     def test_sensitive_args_excluded(self, fake_script: FakeScript):
         backend = _backend_for('hooks/config-changed')
@@ -4040,14 +4039,10 @@ class TestModelErrorHookContext:
             backend.secret_add(
                 {'password': 's3cret'}, label='db-pass', description='shown', owner='app'
             )
-        error = excinfo.value
-        assert error.hook_command == ops.HookCommandInfo(
-            name='secret-add',
-            args={'label': 'db-pass', 'description': 'shown', 'owner': 'app'},
-        )
-        for note in _notes(error):
-            assert 's3cret' not in note
-            assert 'password' not in note
+        assert _notes(excinfo.value) == [
+            "Hook command 'secret-add' (label='db-pass', description='shown', owner='app') "
+            "failed during the 'config-changed' hook."
+        ]
 
     def test_no_args(self, fake_script: FakeScript):
         backend = _backend_for('hooks/start')
@@ -4055,11 +4050,9 @@ class TestModelErrorHookContext:
         fake_script.write('config-get', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.config_get()
-        assert excinfo.value.hook_command == ops.HookCommandInfo(name='config-get', args={})
-        if sys.version_info >= (3, 11):
-            assert _notes(excinfo.value) == [
-                "Hook command 'config-get' failed during the 'start' hook."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'config-get' failed during the 'start' hook."
+        ]
 
     def test_action(self, fake_script: FakeScript):
         backend = _backend_for('actions/back-up', action_name='back-up')
@@ -4067,16 +4060,9 @@ class TestModelErrorHookContext:
         fake_script.write('action-fail', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_fail('disk full')
-        error = excinfo.value
-        assert error.hook_command == ops.HookCommandInfo(
-            name='action-fail', args={'message': 'disk full'}
-        )
-        assert error.event_info == ops.EventInfo(hook=None, event='back_up_action', deferred=False)
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'action-fail' (message='disk full') "
-                "failed during the 'back-up' action."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'action-fail' (message='disk full') failed during the 'back-up' action."
+        ]
 
     def test_action_other_event(self, fake_script: FakeScript):
         backend = _backend_for('actions/back-up', action_name='back-up')
@@ -4084,25 +4070,19 @@ class TestModelErrorHookContext:
         fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        error = excinfo.value
-        assert error.event_info == ops.EventInfo(
-            hook=None, event='collect_unit_status', deferred=False
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'is-leader' failed during the 'back-up' action "
-                "while handling the 'collect_unit_status' event."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'is-leader' failed during the 'back-up' action "
+            "while handling the 'collect_unit_status' event."
+        ]
 
     def test_action_set_results_excluded(self, fake_script: FakeScript):
         backend = _backend_for('actions/back-up', action_name='back-up')
         fake_script.write('action-set', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.action_set({'password': 's3cret'})
-        assert excinfo.value.hook_command == ops.HookCommandInfo(name='action-set', args={})
-        for note in _notes(excinfo.value):
-            assert 's3cret' not in note
-            assert 'password' not in note
+        assert _notes(excinfo.value) == [
+            "Hook command 'action-set' failed during the 'back-up' action."
+        ]
 
     @pytest.mark.parametrize(
         'dispatch_path,hook_name,expected',
@@ -4119,12 +4099,10 @@ class TestModelErrorHookContext:
         fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        assert excinfo.value.event_info == ops.EventInfo(hook=expected, event=None, deferred=False)
-        if sys.version_info >= (3, 11):
-            expected_note = "Hook command 'is-leader' failed"
-            if expected is not None:
-                expected_note += f' during the {expected!r} hook'
-            assert _notes(excinfo.value) == [f'{expected_note}.']
+        expected_note = "Hook command 'is-leader' failed"
+        if expected is not None:
+            expected_note += f' during the {expected!r} hook'
+        assert _notes(excinfo.value) == [f'{expected_note}.']
 
     def test_charm_init(self, fake_script: FakeScript):
         backend = _backend_for('hooks/install')
@@ -4132,14 +4110,10 @@ class TestModelErrorHookContext:
         fake_script.write('is-leader', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.is_leader()
-        assert excinfo.value.event_info == ops.EventInfo(
-            hook='install', event=None, deferred=False
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(excinfo.value) == [
-                "Hook command 'is-leader' failed during the 'install' hook "
-                'while initialising the charm.'
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'is-leader' failed during the 'install' hook "
+            'while initialising the charm.'
+        ]
 
     def test_subclasses(self, fake_script: FakeScript):
         backend = _backend_for('hooks/update-status')
@@ -4147,29 +4121,24 @@ class TestModelErrorHookContext:
         fake_script.write('secret-get', "echo 'ERROR secret not found' >&2; exit 1")
         with pytest.raises(ops.RelationNotFoundError) as relation_excinfo:
             backend.relation_list(7)
-        assert relation_excinfo.value.hook_command == ops.HookCommandInfo(
-            name='relation-list', args={'relation_id': 7}
-        )
-        assert relation_excinfo.value.event_info == ops.EventInfo(
-            hook='update-status', event=None, deferred=False
-        )
+        assert _notes(relation_excinfo.value) == [
+            "Hook command 'relation-list' (relation_id=7) failed during the 'update-status' hook."
+        ]
         with pytest.raises(ops.SecretNotFoundError) as secret_excinfo:
             backend.secret_get(label='missing')
-        assert secret_excinfo.value.hook_command == ops.HookCommandInfo(
-            name='secret-get', args={'label': 'missing', 'refresh': False, 'peek': False}
-        )
-        if sys.version_info >= (3, 11):
-            assert len(_notes(relation_excinfo.value)) == 1
-            assert len(_notes(secret_excinfo.value)) == 1
+        assert _notes(secret_excinfo.value) == [
+            "Hook command 'secret-get' (label='missing', refresh=False, peek=False) "
+            "failed during the 'update-status' hook."
+        ]
 
     def test_juju_log(self, fake_script: FakeScript):
         backend = _backend_for('hooks/install')
         fake_script.write('juju-log', "echo 'ERROR boom' >&2; exit 1")
         with pytest.raises(ops.ModelError) as excinfo:
             backend.juju_log('WARNING', 'the message is not included')
-        assert excinfo.value.hook_command == ops.HookCommandInfo(
-            name='juju-log', args={'level': 'WARNING'}
-        )
+        assert _notes(excinfo.value) == [
+            "Hook command 'juju-log' (level='WARNING') failed during the 'install' hook."
+        ]
 
     @pytest.fixture
     def charm(
@@ -4201,18 +4170,10 @@ class TestModelErrorHookContext:
     def test_event_matching_hook(self, charm: ops.CharmBase):
         with pytest.raises(ops.ModelError) as excinfo:
             charm.on.config_changed.emit()
-        error = excinfo.value
-        assert error.hook_command == ops.HookCommandInfo(
-            name='status-set', args={'status': 'active', 'message': 'ready', 'app': False}
-        )
-        assert error.event_info == ops.EventInfo(
-            hook='config-changed', event='config_changed', deferred=False
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'status-set' (status='active', message='ready', app=False) "
-                "failed during the 'config-changed' hook."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook."
+        ]
 
     def test_deferred_event(self, charm: ops.CharmBase):
         charm.defer_events = True  # type: ignore
@@ -4220,16 +4181,11 @@ class TestModelErrorHookContext:
         charm.defer_events = False  # type: ignore
         with pytest.raises(ops.ModelError) as excinfo:
             charm.framework.reemit()
-        error = excinfo.value
-        assert error.event_info == ops.EventInfo(
-            hook='config-changed', event='update_status', deferred=True
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'status-set' (status='active', message='ready', app=False) "
-                "failed during the 'config-changed' hook "
-                "while handling the deferred 'update_status' event."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the deferred 'update_status' event."
+        ]
 
     def test_deferred_event_same_as_hook(self, charm: ops.CharmBase):
         charm.defer_events = True  # type: ignore
@@ -4237,30 +4193,20 @@ class TestModelErrorHookContext:
         charm.defer_events = False  # type: ignore
         with pytest.raises(ops.ModelError) as excinfo:
             charm.framework.reemit()
-        error = excinfo.value
-        assert error.event_info == ops.EventInfo(
-            hook='config-changed', event='config_changed', deferred=True
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'status-set' (status='active', message='ready', app=False) "
-                "failed during the 'config-changed' hook "
-                "while handling the deferred 'config_changed' event."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the deferred 'config_changed' event."
+        ]
 
     def test_custom_event(self, charm: ops.CharmBase):
         with pytest.raises(ops.ModelError) as excinfo:
             charm.on.custom.emit()
-        error = excinfo.value
-        assert error.event_info == ops.EventInfo(
-            hook='config-changed', event='custom', deferred=False
-        )
-        if sys.version_info >= (3, 11):
-            assert _notes(error) == [
-                "Hook command 'status-set' (status='active', message='ready', app=False) "
-                "failed during the 'config-changed' hook "
-                "while handling the 'custom' event."
-            ]
+        assert _notes(excinfo.value) == [
+            "Hook command 'status-set' (status='active', message='ready', app=False) "
+            "failed during the 'config-changed' hook "
+            "while handling the 'custom' event."
+        ]
 
     def test_deferred_state_restored(self, charm: ops.CharmBase):
         charm.defer_events = True  # type: ignore

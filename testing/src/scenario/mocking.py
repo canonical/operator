@@ -136,7 +136,7 @@ _F = TypeVar('_F', bound=Callable[..., Any])
 
 
 def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
-    """Add the context that ops adds to a ModelError from a failed hook command.
+    """Add the note that ops adds to a ModelError from a failed hook command.
 
     Record the same arguments as ops does under Juju. Each of ``params`` is a
     parameter of the decorated method, recorded under its own name, and each of
@@ -155,7 +155,7 @@ def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
                 bound.apply_defaults()
                 trace = {name: bound.arguments[name] for name in params}
                 trace.update({key: bound.arguments[name] for key, name in renamed.items()})
-                self._add_hook_command_context(e, cmd, trace)
+                self._add_hook_command_note(e, cmd, trace)
                 raise
 
         return cast('_F', wrapper)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
+import pytest
 from scenario import Context, Relation, State
 
 import ops
@@ -43,22 +44,23 @@ def _notes(error: Exception) -> list[str]:
     return list(getattr(error, '__notes__', []))
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 11), reason='exception notes need Python 3.11')
+def test_no_note_before_python_311():
+    error = _run('update_status', lambda charm: charm.model.get_secret(label='missing'), State())
+    assert _notes(error) == []
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
 def test_secret_not_found():
     error = _run('update_status', lambda charm: charm.model.get_secret(label='missing'), State())
     assert isinstance(error, ops.SecretNotFoundError)
-    assert error.hook_command == ops.HookCommandInfo(
-        name='secret-get', args={'label': 'missing', 'refresh': False, 'peek': False}
-    )
-    assert error.event_info == ops.EventInfo(
-        hook='update-status', event='update_status', deferred=False
-    )
-    if sys.version_info >= (3, 11):
-        assert _notes(error) == [
-            "Hook command 'secret-get' (label='missing', refresh=False, peek=False) "
-            "failed during the 'update-status' hook."
-        ]
+    assert _notes(error) == [
+        "Hook command 'secret-get' (label='missing', refresh=False, peek=False) "
+        "failed during the 'update-status' hook."
+    ]
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
 def test_renamed_args():
     relation = Relation('db')
     error = _run(
@@ -67,16 +69,13 @@ def test_renamed_args():
         State(relations={relation}),
     )
     # Context's juju_version is too old for relation-model-get.
-    assert error.hook_command == ops.HookCommandInfo(
-        name='relation-model-get', args={'relation_id': relation.id, 'endpoint': 'db'}
-    )
+    assert _notes(error) == [
+        f"Hook command 'relation-model-get' (relation_id={relation.id}, endpoint='db') "
+        "failed during the 'update-status' hook."
+    ]
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason='exception notes need Python 3.11')
 def test_action():
     error = _run('back_up_action', lambda charm: charm.model.get_cloud_spec(), State())
-    assert error.hook_command == ops.HookCommandInfo(name='credential-get', args={})
-    assert error.event_info == ops.EventInfo(hook=None, event='back_up_action', deferred=False)
-    if sys.version_info >= (3, 11):
-        assert _notes(error) == [
-            "Hook command 'credential-get' failed during the 'back-up' action."
-        ]
+    assert _notes(error) == ["Hook command 'credential-get' failed during the 'back-up' action."]
