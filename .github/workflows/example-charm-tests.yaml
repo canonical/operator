@@ -79,3 +79,31 @@ jobs:
             --group=unit \
             --group=integration \
             mypy --explicit-package-bases --follow-imports=silent src tests
+      - name: Run pyrefly
+        working-directory: ${{ matrix.dir }}
+        run: |
+          search_paths=(--search-path src --search-path ../.. --search-path ../../testing/src)
+          if [ -d lib ]; then search_paths+=(--search-path lib); fi
+          uv run \
+            --with-requirements=../../mypy-requirements.txt \
+            --with=../.. \
+            --with=../../testing \
+            --group=lint \
+            --group=unit \
+            --group=integration \
+            pyrefly check "${search_paths[@]}" src tests
+      - name: Run ty
+        # ty is pre-1.0, so report problems without failing the job.
+        continue-on-error: true
+        working-directory: ${{ matrix.dir }}
+        run: |
+          search_paths=(--extra-search-path src --extra-search-path ../.. --extra-search-path ../../testing/src)
+          if [ -d lib ]; then search_paths+=(--extra-search-path lib); fi
+          uv run \
+            --with-requirements=../../mypy-requirements.txt \
+            --with=../.. \
+            --with=../../testing \
+            --group=lint \
+            --group=unit \
+            --group=integration \
+            ty check "${search_paths[@]}" src tests

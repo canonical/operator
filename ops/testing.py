@@ -40,6 +40,8 @@ The module includes:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from . import charm, framework, model, pebble, storage
 from ._private.harness import (
     ActionFailed,
@@ -118,7 +120,10 @@ try:
         layer_from_rockcraft,
     )
 except ImportError:
-    from .model import Container
+    # Hidden from type checkers so that they see only scenario.Container,
+    # rather than a union of scenario.Container and ops.model.Container.
+    if not TYPE_CHECKING:
+        from .model import Container
 else:
     # The Scenario unit testing framework.
     __all__.extend([
