@@ -776,6 +776,48 @@ def test_relation_load_abstract_mapping(annotation: Any):
 
 
 @pytest.mark.parametrize(
+    'annotation,expected',
+    [
+        pytest.param(set, {'red'}, id='set'),
+        pytest.param(frozenset, frozenset({'red'}), id='frozenset'),
+        pytest.param(tuple, ('red',), id='tuple'),
+        pytest.param(list, ['red'], id='list'),
+        pytest.param(collections.abc.Set, frozenset({'red'}), id='abc-set'),
+        pytest.param(collections.abc.MutableSet, {'red'}, id='abc-mutable-set'),
+        pytest.param(collections.abc.Sequence, ['red'], id='abc-sequence'),
+        pytest.param(collections.abc.Iterable, ['red'], id='abc-iterable'),
+        pytest.param(typing.Set, {'red'}, id='typing-set'),  # ruff: ignore[non-pep585-annotation]
+        pytest.param(typing.Sequence, ['red'], id='typing-sequence'),
+        pytest.param(typing.Tuple, ('red',), id='typing-tuple'),  # ruff: ignore[non-pep585-annotation]
+    ],
+)
+def test_relation_load_bare_collection_builds_collection(annotation: Any, expected: Any):
+    """A collection annotation without type arguments is built, but its items aren't coerced."""
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps(['red'])})
+    assert obj.value == expected
+    assert type(obj.value) is type(expected)
+
+
+@pytest.mark.parametrize(
+    'annotation',
+    [
+        pytest.param(dict, id='dict'),
+        pytest.param(collections.abc.Mapping, id='abc-mapping'),
+        pytest.param(typing.Dict, id='typing-dict'),  # ruff: ignore[non-pep585-annotation]
+    ],
+)
+def test_relation_load_bare_mapping_builds_dict(annotation: Any):
+    """A mapping annotation without type arguments is built as a dict, without coercion."""
+    data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
+
+    obj = _load_into(data_class, {'value': json.dumps({'a': 'red'})})
+    assert obj.value == {'a': 'red'}
+    assert type(obj.value) is dict
+
+
+@pytest.mark.parametrize(
     'annotation',
     [
         pytest.param(collections.abc.Iterable[_Colour], id='iterable'),
@@ -887,6 +929,43 @@ def test_relation_load_pydantic_dataclass_guard_without_is_pydantic_dataclass():
 
     obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
     assert isinstance(obj.nested, dict)
+
+
+@pytest.mark.skipif(
+    pydantic is None,
+    reason='pydantic is not available, so we cannot test pydantic-based classes.',
+)
+def test_relation_load_nested_pydantic_model():
+    """A nested Pydantic model is built by Pydantic, which applies its aliases and validation."""
+    assert pydantic is not None
+
+    class Model(pydantic.BaseModel):
+        secret_id: str = pydantic.Field(alias='secret-id')
+        count: int = pydantic.Field(default=0, ge=0)
+
+    data_class = dataclasses.make_dataclass(
+        'Data',
+        [('model', Model), ('models', list[Model]), ('maybe', Model | str | None, None)],
+    )
+    obj = _load_into(
+        data_class,
+        {
+            'model': json.dumps({'secret-id': 'a', 'count': '2'}),
+            'models': json.dumps([{'secret-id': 'b'}]),
+            'maybe': json.dumps({'secret-id': 'c'}),
+        },
+    )
+    assert isinstance(obj.model, Model)
+    assert (obj.model.secret_id, obj.model.count) == ('a', 2)
+    assert [m.secret_id for m in obj.models] == ['b']
+    assert isinstance(obj.maybe, Model)
+    assert obj.maybe.secret_id == 'c'
+
+    # The charm doesn't catch it, so ops.testing reports it as an uncaught error.
+    with pytest.raises(testing.errors.UncaughtCharmError, match='greater than or equal to 0'):
+        _load_into(
+            data_class, {'model': json.dumps({'secret-id': 'a', 'count': -1}), 'models': '[]'}
+        )
 
 
 @pytest.mark.parametrize(
@@ -1050,6 +1129,29 @@ def test_relation_load_falls_back_when_type_hint_is_not_a_type():
     obj = _load_into(Data, {'nested': json.dumps({'sub': 1})})
     assert obj.nested == {'sub': 1}
     assert obj.count == 0
+
+
+def test_relation_load_fallback_error_is_not_chained_to_type_hint_error():
+    """An error from the data class in the fallback path is reported on its own.
+
+    If it were raised while handling the get_type_hints error, the traceback
+    would lead with that error, which isn't the charm's problem.
+    """
+
+    @dataclasses.dataclass
+    class Data:
+        amount: decimal.Decimal | None = None
+        name: str = ''
+
+        def __post_init__(self):
+            raise ValueError('bad name')
+
+    with pytest.raises(testing.errors.UncaughtCharmError) as exc_info:
+        _load_into(Data, {'name': json.dumps('x')})
+    error = exc_info.value.__cause__
+    assert isinstance(error, ValueError)
+    assert str(error) == 'bad name'
+    assert error.__context__ is None
 
 
 def test_relation_load_extra_args_still_coerces_remaining_fields():

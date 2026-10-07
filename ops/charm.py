@@ -1728,6 +1728,13 @@ _ABSTRACT_COLLECTION_TYPES: dict[Any, type] = {
 _MAPPING_KEY_TYPES = (collections.abc.Iterable, collections.abc.Collection)
 
 
+def _is_pydantic_model(tp: Any) -> bool:
+    """Report whether class ``tp`` is a Pydantic ``BaseModel``, without importing Pydantic."""
+    # A Pydantic dataclass also has a validator, but no model_validate, and is
+    # built as a dataclass instead.
+    return hasattr(tp, '__pydantic_validator__') and hasattr(tp, 'model_validate')
+
+
 def _union_member_fits(member: Any, value: Any) -> bool:
     """Report whether a decoded ``value`` has the right shape for union ``member``.
 
@@ -1746,7 +1753,11 @@ def _union_member_fits(member: Any, value: Any) -> bool:
     kind = _ABSTRACT_COLLECTION_TYPES.get(kind, kind)
     if isinstance(kind, type) and issubclass(kind, _SEQUENCE_TYPES):
         return isinstance(value, _SEQUENCE_TYPES)
-    if (isinstance(kind, type) and issubclass(kind, Mapping)) or dataclasses.is_dataclass(member):
+    if (
+        (isinstance(kind, type) and issubclass(kind, Mapping))
+        or dataclasses.is_dataclass(member)
+        or _is_pydantic_model(member)
+    ):
         return isinstance(value, Mapping)
     return not isinstance(value, (*_SEQUENCE_TYPES, Mapping))
 
@@ -1773,20 +1784,25 @@ def _coerce_field(tp: Any, value: Any) -> Any:
     field's members.
     """
     origin = typing.get_origin(tp)
-    if origin is None:
-        if isinstance(tp, type):
-            return _coerce_class(tp, value)  # pyright: ignore[reportUnknownVariableType]
-        # Any, TypeVars, NewTypes and the like aren't classes, so there is
-        # nothing to build.
-        return value
     args = typing.get_args(tp)
-    if not args:
-        return value
+    if origin is None:
+        # A bare collection annotation, such as `set` or `Sequence`, still names
+        # the collection to build, although not the type of its items.
+        if tp in _ABSTRACT_COLLECTION_TYPES or tp in (*_SEQUENCE_TYPES, dict):
+            origin = tp
+        elif isinstance(tp, type):
+            return _coerce_class(tp, value)  # pyright: ignore[reportUnknownVariableType]
+        else:
+            # Any, TypeVars, NewTypes and the like aren't classes, so there is
+            # nothing to build.
+            return value
     if origin is typing.Union or origin is types.UnionType:
         return _coerce_union(tp, args, value)
     if origin in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
         value = list(cast('Mapping[Any, Any]', value))
     concrete = _ABSTRACT_COLLECTION_TYPES.get(origin, origin)
+    if not args:
+        args = {tuple: (Any, ...), dict: (Any, Any)}.get(concrete, (Any,))
     if concrete in _SEQUENCE_TYPES:
         return _coerce_sequence(tp, concrete, args, value)
     if concrete is dict and len(args) == 2:
@@ -1798,8 +1814,11 @@ def _coerce_field(tp: Any, value: Any) -> Any:
 def _coerce_class(tp: type[_T], value: Any) -> _T:
     """Coerce ``value`` against a class ``tp`` with no type arguments.
 
-    Builds a dataclass or enum; any other class is passed through as-is.
+    Builds a dataclass, enum, or Pydantic model; any other class is passed
+    through as-is.
     """
+    if issubclass(tp, enum.Enum):
+        return tp(value)
     if dataclasses.is_dataclass(tp):
         if isinstance(value, tp):
             # Already the class we want, for example built by a custom
@@ -1814,8 +1833,9 @@ def _coerce_class(tp: type[_T], value: Any) -> _T:
                 f'expected a mapping for {tp.__name__}, got {type(value).__name__}: {value!r}'
             )
         return _build_dataclass(tp, cast('Mapping[str, Any]', value))
-    if issubclass(tp, enum.Enum):
-        return tp(value)
+    if _is_pydantic_model(tp):
+        # Pydantic does its own coercion and validation, including aliases.
+        return cast('Any', tp).model_validate(value)
     return value
 
 
@@ -1920,18 +1940,20 @@ def _build_dataclass(
     ``ValueError``/``TypeError`` from coercion of malformed values.
     """
     extra_kwargs = extra_kwargs or {}
+    kwargs: Mapping[str, Any]
     try:
         hints = get_type_hints(cls)
     except (NameError, TypeError) as e:
         msg = 'Unable to resolve type hints for %s, not coercing relation data: %s'
         logger.debug(msg, cls.__name__, e)
-        # Relation data wins over a keyword argument of the same name.
-        return cls(*args, **{**extra_kwargs, **data})
-    kwargs: dict[str, Any] = {}
-    for field in dataclasses.fields(cls):
-        if field.name not in data:
-            continue
-        kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
+        kwargs = data
+    else:
+        kwargs = {}
+        for field in dataclasses.fields(cls):
+            if field.name not in data:
+                continue
+            kwargs[field.name] = _coerce_field(hints[field.name], data[field.name])
+    # Relation data wins over a keyword argument of the same name.
     return cls(*args, **{**extra_kwargs, **kwargs})
 
 

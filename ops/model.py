@@ -1798,11 +1798,13 @@ class Relation:
 
         For any other :func:`dataclasses.dataclass`, the decoded values are
         also recursively coerced to match each field's type hint before being
-        passed to ``__init__``:
+        passed to ``__init__``. A value that can't be coerced raises
+        ``TypeError`` or ``ValueError``, as described under *Raises*. The
+        coercion rules are:
 
-        - A nested dataclass or :class:`enum.Enum` field is constructed from
-          its decoded value. This includes a nested Pydantic dataclass, which
-          then does its own validation.
+        - A nested dataclass, Pydantic ``BaseModel``, or :class:`enum.Enum`
+          field is constructed from its decoded value. A nested Pydantic model
+          or Pydantic dataclass then does its own coercion and validation.
         - A ``list``, ``set``, ``frozenset``, or variable-length
           ``tuple[X, ...]`` field is built as that collection type, with each
           element coerced against the type argument. A ``dict`` field is built
@@ -1815,7 +1817,9 @@ class Relation:
           a ``set`` for ``MutableSet``, and a ``dict`` for ``Mapping`` or
           ``MutableMapping``. A mapping is an ``Iterable`` or ``Collection``
           of its keys, so an ``Iterable`` or ``Collection`` field given a
-          mapping is built as a ``list`` of its keys.
+          mapping is built as a ``list`` of its keys. An annotation without
+          type arguments, such as ``set`` or ``Sequence``, is built the same
+          way, without coercing its items.
         - A fixed-length ``tuple[X, Y]`` field is built as a ``tuple``, with
           each position coerced against its own type. The value must have
           exactly as many items as the annotation has positions. A ``tuple``
@@ -1823,16 +1827,14 @@ class Relation:
           is built as a ``tuple`` without coercing its items.
         - An ``Optional``/``Union`` field is coerced against the one member
           that matches the shape of the decoded value: a sequence type for a
-          list, a mapping type or dataclass for an object, or any other type
-          for a scalar. If more than one member matches (for example,
+          list, a mapping type, dataclass, or Pydantic model for an object, or
+          any other type for a scalar. If more than one member matches (for example,
           ``SomeEnum | str`` for a string), the value is passed through as-is.
         - The value for any other type annotation is passed through
           unchanged. This includes ``Literal``, scalar types such as ``int``
-          and ``str``, and classes that are neither
-          dataclasses nor enums, such as a nested Pydantic ``BaseModel``.
-          Values keep their decoded type: a ``'1'`` in the databag stays a
-          string for an ``int`` field, and an object stays a ``dict`` for a
-          nested ``BaseModel`` field.
+          and ``str``, and classes that are not dataclasses, enums, or
+          Pydantic models. Values keep their decoded type: a ``'1'`` in the
+          databag stays a string for an ``int`` field.
         - A field annotated with a type alias defined with the ``type``
           statement, such as ``type Pets = list[Pet]``, is passed through
           unchanged. This also applies when the alias is a member of a
