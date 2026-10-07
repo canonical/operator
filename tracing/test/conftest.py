@@ -24,6 +24,26 @@ import ops.testing
 import pytest
 
 import ops_tracing
+from ops_tracing._tracing_models import TracingProviderAppData
+
+
+@pytest.fixture
+def load_provider_app_data():
+    """Drive ``Relation.load(TracingProviderAppData, ...)`` against a raw databag."""
+
+    def _load(databag: dict[str, str]) -> TracingProviderAppData:
+        ctx = ops.testing.Context(
+            ops.CharmBase,
+            meta={'name': 'tester', 'requires': {'charm-tracing': {'interface': 'tracing'}}},
+        )
+        rel = ops.testing.Relation('charm-tracing', remote_app_data=databag)
+        state_in = ops.testing.State(leader=True, relations={rel})
+        with ctx(ctx.on.relation_changed(rel), state_in) as mgr:
+            relation = mgr.charm.model.get_relation('charm-tracing')
+            assert relation is not None and relation.app is not None
+            return relation.load(TracingProviderAppData, relation.app)
+
+    return _load
 
 
 @pytest.fixture
