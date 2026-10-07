@@ -1,0 +1,212 @@
+---
+name: Propose a release
+
+# The first of the two release workflows: work out the version, write the
+# changelog, rewrite the version strings, draft the release notes, and open a
+# pull request with all of it. A human reviews and merges that pull request;
+# creating the release is the next workflow's job.
+#
+# Worth knowing:
+#
+# - The previous version is taken from the last tag on the branch, never from
+#   ops/version.py, which only holds the post-release placeholder.
+# - The pull request is opened with the workflow's own token, so its checks
+#   don't start. Close and reopen it to run them.
+#   TODO: open it with a GitHub App token or a PAT so the checks start on
+#   their own, and drop the close-and-reopen step here, in
+#   create-draft-release.yaml, and in CONTRIBUTING.md.
+# - The scripts and data files in .github/ come from this workflow's own
+#   commit, not from the branch being released.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          The version to release, as X.Y.Z (or X.Y.ZrcN). Leave this empty to
+          work it out from the conventional commits since the last tag.
+        required: false
+        type: string
+      branch:
+        description: The branch to release from.
+        required: false
+        default: main
+        type: string
+      dry_run:
+        description: >-
+          Do everything except push the branch and open the pull request. The
+          proposed version, changelog and notes go in the run summary.
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+env:
+  # The team's release tools, pinned to a commit rather than a branch: a
+  # release should be reproducible, and these decide what the changelog and
+  # the drafted notes say.
+  CHANGELOG: >-
+    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=changelog
+  DRAFT_RELEASE_NOTES: >-
+    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=draft-release-notes
+
+jobs:
+  propose:
+    name: Propose a release
+    runs-on: ubuntu-latest
+    environment: release-notes  # Required to access secrets.OPENROUTER_API_KEY.
+    permissions:
+      contents: write  # To push the release-prep branch.
+      pull-requests: write  # To open the pull request.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0  # The whole history and its tags: the release is counted from the tag.
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          # This workflow's own .github/release/, beside the branch being
+          # released: the version script, the release-note exemplars and
+          # the pull request template are read from here.
+          ref: ${{ github.sha }}
+          path: release-tools
+          sparse-checkout: /.github/release/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: false
+
+      - name: Work out the version and write the changelog entry
+        id: propose
+        env:
+          BRANCH: ${{ inputs.branch }}
+          VERSION_INPUT: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 release-tools/.github/release/propose-release-version.py
+
+      - name: Add the entry to CHANGES.md
+        run: |
+          set -euo pipefail
+          cat "$RUNNER_TEMP/changes-entry.md" CHANGES.md > "$RUNNER_TEMP/CHANGES.md"
+          mv "$RUNNER_TEMP/CHANGES.md" CHANGES.md
+
+      - name: Update the version files
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 release-tools/.github/release/update-release-versions.py --version "$VERSION"
+          uv lock
+          git --no-pager diff --stat
+
+      # The exemplars in .github/release/release-note-exemplars.md are chosen
+      # for how they read rather than for being the most recent: 2.23.4 for a
+      # fixes release, 3.8.1 for features and polish, 3.8.2 for a release that
+      # says it is routine and stops. Replace one when a release beats it.
+      # Each is headed with the release's title, so the model sees how our
+      # titles read as well as our notes.
+      - name: Draft the release notes
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          PREVIOUS: ${{ steps.propose.outputs.previous }}
+          BRANCH: ${{ inputs.branch }}
+          # The model is a repository variable rather than something pinned
+          # here, so that changing it is a settings edit and not a pull
+          # request. Neither it nor the key existing is required: without
+          # them the notes are a placeholder for the reviewer to fill in.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: |
+          set -euo pipefail
+          uvx --from "$DRAFT_RELEASE_NOTES" draft-release-notes \
+            --repo "$GITHUB_REPOSITORY" \
+            --version "$VERSION" \
+            --previous "$PREVIOUS" \
+            --branch "$BRANCH" \
+            --changelog "$RUNNER_TEMP/changes-entry.md" \
+            --exemplars release-tools/.github/release/release-note-exemplars.md \
+            --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
+            --output "$RUNNER_TEMP/release-notes.md" \
+            --title-output "$RUNNER_TEMP/release-title.md"
+
+      - name: Write the pull request description and the run summary
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          PREVIOUS: ${{ steps.propose.outputs.previous }}
+          BRANCH: ${{ inputs.branch }}
+        shell: python
+        run: |
+          import os
+          import pathlib
+          import string
+
+          version = os.environ['VERSION']
+          previous = os.environ['PREVIOUS']
+          branch = os.environ['BRANCH']
+          temp = pathlib.Path(os.environ['RUNNER_TEMP'])
+          repo_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+          title = (temp / 'release-title.md').read_text()
+          notes = (temp / 'release-notes.md').read_text()
+          changes_entry = (temp / 'changes-entry.md').read_text()
+          template = pathlib.Path('release-tools/.github/release/release-pr-body.md').read_text()
+          body = string.Template(template).substitute(
+              version=version,
+              branch=branch,
+              previous=previous,
+              repo_url=repo_url,
+              title=title,
+              notes=notes,
+          )
+          (temp / 'pr-body.md').write_text(body)
+
+          summary = f"""\
+          ## {version}, from `{branch}`
+
+          Counted from the last tag on the branch, `{previous}`.
+
+          <details><summary>Changelog entry</summary>
+
+          {changes_entry}
+          </details>
+
+          ### Draft release title
+
+          {version}: {title}
+          ### Draft release notes
+
+          {notes}"""
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(summary)
+
+      - name: Commit, push, and open the pull request
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.propose.outputs.version }}
+          BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          head_branch="release-prep-$VERSION"
+
+          git config user.name 'Prints Charming [bot]'
+          git config user.email 'ben.hoyt+prints-charming-bot@canonical.com'
+          git switch -c "$head_branch"
+          # Every tracked file the steps above changed, and nothing else: the
+          # release-tools checkout is untracked, so it stays out.
+          git add -u
+          git commit -m "chore: prepare release $VERSION"
+          git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
+            "HEAD:refs/heads/$head_branch"
+
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base "$BRANCH" --head "$head_branch" \
+            --title "chore: update changelog and versions for $VERSION release" \
+            --body-file "$RUNNER_TEMP/pr-body.md")
+          echo "Opened $url"
+          printf '\n### Pull request\n\n%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
