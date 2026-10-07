@@ -70,7 +70,7 @@ def mycharm() -> type[CharmBase]:
     class MyCharm(CharmBase):
         _call: Callable[[EventBase], None] | None = None
         called = False
-        on = MyCharmEvents()  # type: ignore
+        on = MyCharmEvents()
 
         def __init__(self, framework: Framework):
             super().__init__(framework)

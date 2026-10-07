@@ -129,7 +129,7 @@ class StoragePermutations(abc.ABC):
             event = ops.EventSource(Evt)
 
         class Sample(ops.Object):
-            on = Events()  # type: ignore
+            on = Events()
 
             def __init__(self, parent: ops.Object, key: str):
                 super().__init__(parent, key)

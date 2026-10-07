@@ -71,7 +71,7 @@ class StorageTester(ops.CharmBase):
 
 
 class StorageWithHyphensHelper(ops.Object):
-    def __init__(self, parent: ops.Object, key: str):
+    def __init__(self, parent: ops.CharmBase, key: str):
         super().__init__(parent, key)
         self.changes: list[ops.EventBase] = []
         parent.framework.observe(
@@ -3528,7 +3528,7 @@ class TestNetwork:
 
 
 class DBRelationChangedHelper(ops.Object):
-    def __init__(self, parent: ops.Object, key: str):
+    def __init__(self, parent: ops.CharmBase, key: str):
         super().__init__(parent, key)
         self.changes: list[tuple[int, str]] = []
         parent.framework.observe(parent.on.db_relation_changed, self.on_relation_changed)
