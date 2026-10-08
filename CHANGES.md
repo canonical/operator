@@ -1,3 +1,54 @@
+# 3.9.0 - 08 October 2026
+
+## Features
+
+* Add hook command and event context to ModelError ([#2786](https://github.com/canonical/operator/pull/2786))
+
+## Fixes
+
+* Make _CharmSpec covariant in its charm type ([#2715](https://github.com/canonical/operator/pull/2715))
+* Say which tracing destination rejected the data ([#2714](https://github.com/canonical/operator/pull/2714))
+* Detect pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
+* Enforce relation databag read permissions on all access paths ([#2738](https://github.com/canonical/operator/pull/2738))
+* Use cached leadership in security logging, renew lease on success by @cristiangirlea ([#2778](https://github.com/canonical/operator/pull/2778))
+* A gone relation raises RelationNotFoundError, not "permission denied" ([#2748](https://github.com/canonical/operator/pull/2748))
+* Treat an _Abort(0) from the charm's __init__ as success in ops.testing ([#2780](https://github.com/canonical/operator/pull/2780))
+* Record trace data in every ops.testing run with opentelemetry-sdk 1.45 ([#2787](https://github.com/canonical/operator/pull/2787))
+* Let charms and libraries set `on` without a type: ignore ([#2775](https://github.com/canonical/operator/pull/2775))
+
+## Documentation
+
+* Surface the tool versions page ([#2712](https://github.com/canonical/operator/pull/2712))
+* Update Concierge links and intersphinx URLs in doc source ([#2725](https://github.com/canonical/operator/pull/2725))
+* Add retry loop to version check in K8s tutorial charm ([#2689](https://github.com/canonical/operator/pull/2689))
+* Merge HACKING.md into CONTRIBUTING.md, fewer files in root ([#2734](https://github.com/canonical/operator/pull/2734))
+* Add a how-to guide for securing a charm ([#2721](https://github.com/canonical/operator/pull/2721))
+* Condense and trim CONTRIBUTING.md ([#2754](https://github.com/canonical/operator/pull/2754))
+* Fix the self-review command in the discoverability how-to ([#2764](https://github.com/canonical/operator/pull/2764))
+* Mount the project directory to a target relative to the home directory ([#2765](https://github.com/canonical/operator/pull/2765))
+* Pull tutorial code snippets from examples/ ([#2544](https://github.com/canonical/operator/pull/2544))
+
+## Tests
+
+* Add conformance tests for the tracing and certificate_transfer interfaces ([#2711](https://github.com/canonical/operator/pull/2711))
+* Make pyright check whole trees rather than a list of directories ([#2779](https://github.com/canonical/operator/pull/2779))
+
+## Refactoring
+
+* Drop typing.cast where narrowing can do the work ([#2723](https://github.com/canonical/operator/pull/2723))
+* Only import pdb when a debugger is actually requested ([#2740](https://github.com/canonical/operator/pull/2740))
+
+## CI
+
+* Enrich scheduled-failure issues with an LLM triage pass ([#2663](https://github.com/canonical/operator/pull/2663))
+* Stop tox writing a .venv redirect file in the examples ([#2769](https://github.com/canonical/operator/pull/2769))
+* Pin the failure enricher to charm-tech-code main ([#2781](https://github.com/canonical/operator/pull/2781))
+* Move the release process from release.py to workflows ([#2772](https://github.com/canonical/operator/pull/2772))
+
+## Uncategorised
+
+* Merge commit from fork by Tony Meyer
+
 # 3.8.3 - 30 September 2026
 
 ## **Security** Fixes
