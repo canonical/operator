@@ -43,12 +43,28 @@ def app_version_set(version: str):
 # have no default value. We do not currently have a use-case for `--all` and
 # excluding it simplifies the method signature.
 @overload
-def config_get(key: str) -> bool | int | float | str: ...
+def config_get(key: str) -> bool | int | float | str | None: ...
 @overload
-def config_get(key: None = None) -> dict[str, bool | int | float | str]: ...
+def config_get(
+    key: None = None, *, all: Literal[False] = False
+) -> dict[str, bool | int | float | str]: ...
+@overload
+def config_get(
+    key: None = None, *, all: Literal[True]
+) -> dict[str, bool | int | float | str | None]: ...
 def config_get(
     key: str | None = None,
-) -> dict[str, bool | int | float | str] | bool | int | float | str:
+    *,
+    all: bool = False,
+) -> (
+    dict[str, bool | int | float | str]
+    | dict[str, bool | int | float | str | None]
+    | bool
+    | int
+    | float
+    | str
+    | None
+):
     """Retrieve application configuration.
 
     Note that 'secret' type options are returned as string secret IDs.
@@ -56,22 +72,27 @@ def config_get(
     If called without arguments, returns a dictionary containing all config
     settings that are either explicitly set, or which have a non-nil default
     value. If called with a key, it returns the value of that config option.
-    Missing config keys are reported as nulls, and do not return an error.
+    Missing config keys are reported as ``None``, and do not return an error.
 
     For more details, see:
     `Juju | Hook commands | config-get <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/config-get/>`_
 
     Args:
         key: The configuration option to retrieve.
+        all: If ``True``, also include config options that have neither a
+            value nor a default, with the value ``None``. Only valid without
+            a key.
     """
     args = ['--format=json']
+    if all:
+        args.append('--all')
     if key:
         args.append(key)
     stdout = run('config-get', *args)
     if key:
-        key_result: bool | int | float | str = json.loads(stdout)
+        key_result: bool | int | float | str | None = json.loads(stdout)
         return key_result
-    result: dict[str, bool | int | float | str] = json.loads(stdout)
+    result: dict[str, bool | int | float | str | None] = json.loads(stdout)
     return result
 
 
@@ -112,7 +133,9 @@ def is_leader() -> bool:
 
 
 def juju_log(
-    message: str, *, level: Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
+    message: str,
+    *,
+    level: Literal['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO',
 ):
     """Write a message to the juju log.
 

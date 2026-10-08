@@ -4180,7 +4180,7 @@ class _ModelBackend:
             expires=raw.expiry,  # Note the different names.
             rotation=SecretRotate(raw.rotation) if raw.rotation else None,
             rotates=raw.rotates,
-            description=raw.description,
+            description=raw.description or None,
             model_uuid=self.model_uuid,
         )
 
@@ -4208,7 +4208,7 @@ class _ModelBackend:
                 expire = expire or info.expires
                 rotate = rotate or info.rotation
                 # The label fix is needed for Juju < 3.5
-                label = label or info.label
+                label = label or info.label or None
         # `content` is intentionally excluded from tracing, as it contains the secret data.
         with self._wrap_hookcmd(
             'secret-set',

@@ -50,7 +50,7 @@ def relation_get(
     key: str,
     unit: str | None = None,
     app: bool = False,
-) -> str: ...
+) -> str | None: ...
 def relation_get(
     id: int | None = None,
     *,
@@ -58,7 +58,7 @@ def relation_get(
     key: str | None = None,
     unit: str | None = None,
     app: bool = False,
-) -> dict[str, str] | str:
+) -> dict[str, str] | str | None:
     """Get relation settings.
 
     Note that ``id`` can only be ``None`` if the current hook is a relation
@@ -76,6 +76,7 @@ def relation_get(
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
         key: The specific key to get data for, or ``None`` to get all data.
+            If the key is not set, ``None`` is returned.
         unit: The unit to get data for, or ``None`` to get data for the unit
             that triggered the current hook.
     """
@@ -98,7 +99,7 @@ def relation_get(
         args.append(key)
     stdout = run('relation-get', *args)
     if key is not None:
-        key_result: str = json.loads(stdout)
+        key_result: str | None = json.loads(stdout)
         return key_result
     result: dict[str, str] = json.loads(stdout)
     return result
@@ -153,9 +154,9 @@ def relation_list(
         args.extend(['-r', _format_relation_ref(id, endpoint)])
     stdout = run('relation-list', *args)
     if app:
-        app_result: list[str] = json.loads(stdout)
+        app_result: str = json.loads(stdout)
         return app_result
-    result: str = json.loads(stdout)
+    result: list[str] = json.loads(stdout)
     return result
 
 

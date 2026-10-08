@@ -34,10 +34,10 @@ def state_delete(key: str):
 
 
 @overload
-def state_get(key: str) -> str: ...
+def state_get(key: str, *, strict: bool = False) -> str: ...
 @overload
 def state_get(key: None) -> dict[str, str]: ...
-def state_get(key: str | None) -> dict[str, str] | str:
+def state_get(key: str | None, *, strict: bool = False) -> dict[str, str] | str:
     """Get server-side-state value.
 
     For more details, see:
@@ -46,16 +46,20 @@ def state_get(key: str | None) -> dict[str, str] | str:
     Args:
         key: The key of the server-side state to get. If ``None``, get all keys
             and values.
+        strict: If ``True``, raise :class:`Error` if the key is not set,
+            rather than returning an empty string.
     """
     args = ['--format=json']
+    if strict:
+        args.append('--strict')
     if key is not None:
         args.append(key)
     stdout = run('state-get', *args)
     if key is not None:
         key_result: str = json.loads(stdout)
         return key_result
-    # On Juju 4, `state-get --format=json` returns `null` rather than `{}` when
-    # no state has been set. Remove the `or {}` once that is fixed upstream.
+    # Juju 2.9, 3, and 4 all return `null` from `state-get --format=json`
+    # rather than `{}` when no state has been set.
     # See https://github.com/juju/juju/issues/22523.
     result: dict[str, str] = json.loads(stdout) or {}
     return result
