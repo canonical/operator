@@ -55,7 +55,7 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
-      - name: Write mypy-requirements.txt
+      - name: Write type checker requirements files
         shell: uv run --script --no-project {0}
         run: |
           # /// script
@@ -63,9 +63,10 @@ jobs:
           # ///
           import tomli, pathlib
           pyproject_toml = tomli.loads(pathlib.Path('pyproject.toml').read_text())
-          deps = '\n'.join(pyproject_toml['dependency-groups']['mypy'])
-          print(deps)  # logging
-          pathlib.Path('mypy-requirements.txt').write_text(deps)
+          for group in ('mypy', 'pyrefly', 'ty'):
+              deps = '\n'.join(pyproject_toml['dependency-groups'][group])
+              print(f'{group}: {deps}')  # logging
+              pathlib.Path(f'{group}-requirements.txt').write_text(deps)
       - name: Run mypy
         working-directory: ${{ matrix.dir }}
         env:
@@ -82,10 +83,11 @@ jobs:
       - name: Run pyrefly
         working-directory: ${{ matrix.dir }}
         run: |
-          search_paths=(--search-path src --search-path ../.. --search-path ../../testing/src)
+          # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
           if [ -d lib ]; then search_paths+=(--search-path lib); fi
           uv run \
-            --with-requirements=../../mypy-requirements.txt \
+            --with-requirements=../../pyrefly-requirements.txt \
             --with=../.. \
             --with=../../testing \
             --group=lint \
@@ -93,14 +95,16 @@ jobs:
             --group=integration \
             pyrefly check "${search_paths[@]}" src tests
       - name: Run ty
-        # ty is pre-1.0, so report problems without failing the job.
-        continue-on-error: true
         working-directory: ${{ matrix.dir }}
         run: |
-          search_paths=(--extra-search-path src --extra-search-path ../.. --extra-search-path ../../testing/src)
+          # uv run adds the --with packages through a .pth file that ty doesn't
+          # follow, so ty would otherwise see the Ops and Scenario releases
+          # installed in the charm's venv, rather than the local source.
+          search_paths=(--extra-search-path ../.. --extra-search-path ../../testing/src)
+          # Only some charms have a lib directory, after fetching charm libs.
           if [ -d lib ]; then search_paths+=(--extra-search-path lib); fi
           uv run \
-            --with-requirements=../../mypy-requirements.txt \
+            --with-requirements=../../ty-requirements.txt \
             --with=../.. \
             --with=../../testing \
             --group=lint \
