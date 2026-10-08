@@ -12,7 +12,7 @@
 This script handles multiple dependency management systems (pip, Poetry, uv)
 and updates them to use the specified version of ops and ops-scenario.
 
-Usage: patch-charm-deps.py <ops-wheel> <ops-scenario-wheel> [<ops-tracing-wheel>]
+Usage: patch-charm-deps.py <ops-wheel> <ops-scenario-wheel> <ops-tracing-wheel>
 """
 
 from __future__ import annotations
@@ -245,7 +245,7 @@ _LOCKED_INSTALL_RE = re.compile(r'^\s*(poetry install|uv sync)\b')
 
 
 def _wheel_install_commands(
-    ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> list[list[str]]:
     """Commands that force-install the ops wheels into the tox environment.
 
@@ -262,8 +262,6 @@ def _wheel_install_commands(
     """
     install = ['uv', 'pip', 'install', '--reinstall-package', 'ops']
     install += ['--reinstall-package', 'ops-scenario', ops_wheel, ops_scenario_wheel]
-    if not ops_tracing_wheel:
-        return [install]
     with_tracing = [*install, '--reinstall-package', 'ops-tracing', ops_tracing_wheel]
     script = (
         f'if uv pip show --quiet ops-tracing; then {shlex.join(with_tracing)}; '
@@ -310,7 +308,7 @@ def add_tox_pip_commands_ini(
     section: str,
     ops_wheel: str,
     ops_scenario_wheel: str,
-    ops_tracing_wheel: str | None,
+    ops_tracing_wheel: str,
 ) -> None:
     """Add commands to force-reinstall the ops wheels to a tox.ini section.
 
@@ -322,7 +320,7 @@ def add_tox_pip_commands_ini(
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
+        ops_tracing_wheel: Path to ops-tracing wheel file
     """
     config = configparser.ConfigParser()
     config.read(tox_ini_path)
@@ -368,7 +366,7 @@ def add_tox_pip_commands_ini(
 
 
 def _patch_tox_testenv_sections_toml(
-    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch all testenv sections in tox.toml.
 
@@ -376,7 +374,7 @@ def _patch_tox_testenv_sections_toml(
         tox_config: Path to tox.toml
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
+        ops_tracing_wheel: Path to ops-tracing wheel file
 
     Returns:
         True if any sections were patched, False otherwise
@@ -405,7 +403,7 @@ def _patch_tox_testenv_sections_toml(
 
 
 def _patch_tox_testenv_sections_ini(
-    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch all testenv sections in tox.ini.
 
@@ -413,7 +411,7 @@ def _patch_tox_testenv_sections_ini(
         tox_config: Path to tox.ini
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
+        ops_tracing_wheel: Path to ops-tracing wheel file
 
     Returns:
         True if any sections were patched, False otherwise
@@ -435,7 +433,7 @@ def _patch_tox_testenv_sections_ini(
 
 
 def patch_tox_testenv_sections(
-    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch all testenv sections in tox.ini or tox.toml.
 
@@ -461,7 +459,7 @@ def add_tox_pip_commands_toml(
     section: str,
     ops_wheel: str,
     ops_scenario_wheel: str,
-    ops_tracing_wheel: str | None,
+    ops_tracing_wheel: str,
 ) -> None:
     """Add commands to force-reinstall the ops wheels to a tox.toml section.
 
@@ -473,7 +471,7 @@ def add_tox_pip_commands_toml(
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
-        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
+        ops_tracing_wheel: Path to ops-tracing wheel file
     """
     with open(tox_toml_path, 'rb') as f:
         data = tomllib.load(f)
@@ -553,7 +551,7 @@ def _is_ops_dependency_line(line: str) -> bool:
 
 
 def patch_requirements_txt(
-    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch requirements.txt-based charm dependencies.
 
@@ -614,7 +612,7 @@ def patch_requirements_txt(
 
 
 def patch_poetry(
-    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch Poetry-based charm dependencies.
 
@@ -663,6 +661,10 @@ def _override_uv_lock(charm_root: Path, wheels: dict[str, str]) -> bool:
     replaces the requirement's extras, so the ops override carries every extra
     that the lock has on ops.
 
+    pyproject.toml is rewritten whole, which drops its comments and reformats
+    it. That's fine for a checkout that only exists for the test run, but it
+    means a diff of the patched file is mostly formatting.
+
     Args:
         charm_root: Root directory of the charm
         wheels: Path to the wheel for each package name
@@ -704,7 +706,7 @@ def _override_uv_lock(charm_root: Path, wheels: dict[str, str]) -> bool:
 
 
 def patch_uv(
-    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str
 ) -> bool:
     """Patch uv-based charm dependencies.
 
@@ -713,9 +715,11 @@ def patch_uv(
     """
     print('✓ Found uv-based charm')
 
-    wheels = {'ops': ops_wheel, 'ops-scenario': ops_scenario_wheel}
-    if ops_tracing_wheel:
-        wheels['ops-tracing'] = ops_tracing_wheel
+    wheels = {
+        'ops': ops_wheel,
+        'ops-scenario': ops_scenario_wheel,
+        'ops-tracing': ops_tracing_wheel,
+    }
     if not _override_uv_lock(charm_root, wheels):
         return False
 
@@ -733,9 +737,7 @@ def main() -> int:
     )
     parser.add_argument('ops_wheel', help='Path to ops wheel file')
     parser.add_argument('ops_scenario_wheel', help='Path to ops-scenario wheel file')
-    parser.add_argument(
-        'ops_tracing_wheel', nargs='?', help='Path to ops-tracing wheel file (optional)'
-    )
+    parser.add_argument('ops_tracing_wheel', help='Path to ops-tracing wheel file')
     parser.add_argument(
         '--charm-root',
         type=Path,
@@ -749,8 +751,7 @@ def main() -> int:
     print('Patching charm dependencies for newer ops compatibility testing')
     print(f'OPS WHEEL: {args.ops_wheel}')
     print(f'OPS-SCENARIO WHEEL: {args.ops_scenario_wheel}')
-    if args.ops_tracing_wheel:
-        print(f'OPS-TRACING WHEEL: {args.ops_tracing_wheel}')
+    print(f'OPS-TRACING WHEEL: {args.ops_tracing_wheel}')
     print('=========================================')
 
     # Update Python version requirements.

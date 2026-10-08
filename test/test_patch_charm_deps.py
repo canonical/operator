@@ -48,20 +48,19 @@ INSTALL = [
     OPS,
     SCENARIO,
 ]
+INSTALL_WITH_TRACING = [*INSTALL, '--reinstall-package', 'ops-tracing', TRACING]
+WHEEL_INSTALL = [
+    'sh',
+    '-c',
+    f'if uv pip show --quiet ops-tracing; then {shlex.join(INSTALL_WITH_TRACING)}; '
+    f'else {shlex.join(INSTALL)}; fi',
+]
 
 
 class TestWheelInstallCommands:
-    def test_without_tracing_wheel(self):
-        assert patch_charm_deps._wheel_install_commands(OPS, SCENARIO, None) == [INSTALL]
-
-    def test_with_tracing_wheel_only_installs_it_where_present(self):
-        [command] = patch_charm_deps._wheel_install_commands(OPS, SCENARIO, TRACING)
-        assert command[:2] == ['sh', '-c']
-        with_tracing = [*INSTALL, '--reinstall-package', 'ops-tracing', TRACING]
-        assert command[2] == (
-            f'if uv pip show --quiet ops-tracing; then {shlex.join(with_tracing)}; '
-            f'else {shlex.join(INSTALL)}; fi'
-        )
+    def test_only_installs_the_tracing_wheel_where_tracing_is_installed(self):
+        commands = patch_charm_deps._wheel_install_commands(OPS, SCENARIO, TRACING)
+        assert commands == [WHEEL_INSTALL]
 
 
 class TestInsertAfterLockedInstallsIni:
@@ -123,73 +122,62 @@ class TestInsertAfterLockedInstallsToml:
 
 
 class TestAddToxPipCommandsIni:
-    def _patch(self, tmp_path: pathlib.Path, section: str, tracing: str | None):
+    def _patch(self, tmp_path: pathlib.Path, section: str):
         tox_ini = tmp_path / 'tox.ini'
         tox_ini.write_text(section)
-        patch_charm_deps.add_tox_pip_commands_ini(tox_ini, 'testenv:unit', OPS, SCENARIO, tracing)
+        patch_charm_deps.add_tox_pip_commands_ini(tox_ini, 'testenv:unit', OPS, SCENARIO, TRACING)
         config = configparser.ConfigParser()
         config.read(tox_ini)
         return config['testenv:unit']
 
-    def test_without_tracing_wheel(self, tmp_path: pathlib.Path):
+    def test_commands(self, tmp_path: pathlib.Path):
         section = self._patch(
-            tmp_path,
-            '[testenv:unit]\ncommands =\n    poetry install\n    pytest\n',
-            None,
+            tmp_path, '[testenv:unit]\ncommands =\n    poetry install\n    pytest\n'
         )
-        assert section['allowlist_externals'].split() == ['uv']
+        assert section['allowlist_externals'].split() == ['sh']
+        # tox splits each command with shlex, so the script must come back whole.
         assert [shlex.split(line) for line in section['commands_pre'].split('\n') if line] == [
-            INSTALL
+            WHEEL_INSTALL
         ]
         assert [shlex.split(line) for line in section['commands'].split('\n') if line] == [
             ['poetry', 'install'],
-            INSTALL,
+            WHEEL_INSTALL,
             ['pytest'],
         ]
 
-    def test_with_tracing_wheel(self, tmp_path: pathlib.Path):
+    def test_appends_to_allowlist(self, tmp_path: pathlib.Path):
         section = self._patch(
-            tmp_path,
-            '[testenv:unit]\nallowlist_externals =\n    poetry\ncommands =\n    pytest\n',
-            TRACING,
+            tmp_path, '[testenv:unit]\nallowlist_externals =\n    poetry\ncommands =\n    pytest\n'
         )
         assert section['allowlist_externals'].split() == ['poetry', 'sh']
-        [command] = [shlex.split(line) for line in section['commands_pre'].split('\n') if line]
-        # tox splits each command with shlex, so the script must come back whole.
-        assert command == patch_charm_deps._wheel_install_commands(OPS, SCENARIO, TRACING)[0]
 
     def test_existing_allowlist_entry(self, tmp_path: pathlib.Path):
         section = self._patch(
-            tmp_path, '[testenv:unit]\nallowlist_externals = uv\ncommands = pytest\n', None
+            tmp_path, '[testenv:unit]\nallowlist_externals = sh\ncommands = pytest\n'
         )
-        assert section['allowlist_externals'].split() == ['uv']
+        assert section['allowlist_externals'].split() == ['sh']
 
 
 class TestAddToxPipCommandsToml:
-    def _patch(self, tmp_path: pathlib.Path, env: str, tracing: str | None) -> dict[str, Any]:
+    def _patch(self, tmp_path: pathlib.Path, env: str) -> dict[str, Any]:
         tox_toml = tmp_path / 'tox.toml'
         tox_toml.write_text(env)
         patch_charm_deps.add_tox_pip_commands_toml(
-            tox_toml, 'testenv:unit', OPS, SCENARIO, tracing
+            tox_toml, 'testenv:unit', OPS, SCENARIO, TRACING
         )
         return patch_charm_deps.tomllib.loads(tox_toml.read_text())['env']['unit']
 
-    def test_without_tracing_wheel(self, tmp_path: pathlib.Path):
-        env = self._patch(tmp_path, '[env.unit]\ncommands = [["uv", "sync"], ["pytest"]]\n', None)
-        assert env['allowlist_externals'] == ['uv']
-        assert env['commands_pre'] == [INSTALL]
-        assert env['commands'] == [['uv', 'sync'], INSTALL, ['pytest']]
+    def test_commands(self, tmp_path: pathlib.Path):
+        env = self._patch(tmp_path, '[env.unit]\ncommands = [["uv", "sync"], ["pytest"]]\n')
+        assert env['allowlist_externals'] == ['sh']
+        assert env['commands_pre'] == [WHEEL_INSTALL]
+        assert env['commands'] == [['uv', 'sync'], WHEEL_INSTALL, ['pytest']]
 
-    def test_with_tracing_wheel(self, tmp_path: pathlib.Path):
+    def test_appends_to_allowlist(self, tmp_path: pathlib.Path):
         env = self._patch(
-            tmp_path,
-            '[env.unit]\nallowlist_externals = ["poetry"]\ncommands = [["pytest"]]\n',
-            TRACING,
+            tmp_path, '[env.unit]\nallowlist_externals = ["poetry"]\ncommands = [["pytest"]]\n'
         )
         assert env['allowlist_externals'] == ['poetry', 'sh']
-        assert env['commands_pre'] == patch_charm_deps._wheel_install_commands(
-            OPS, SCENARIO, TRACING
-        )
 
 
 class TestLockedOpsExtras:
