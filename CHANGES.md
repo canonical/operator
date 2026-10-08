@@ -2,17 +2,17 @@
 
 ## Features
 
-* Add hook command and event context to ModelError ([#2786](https://github.com/canonical/operator/pull/2786))
+* Add an exception note when `ModelError` is raised ([#2786](https://github.com/canonical/operator/pull/2786))
 
 ## Fixes
 
-* Make _CharmSpec covariant in its charm type ([#2715](https://github.com/canonical/operator/pull/2715))
+* Make `_CharmSpec` covariant in its charm type ([#2715](https://github.com/canonical/operator/pull/2715))
 * Say which tracing destination rejected the data ([#2714](https://github.com/canonical/operator/pull/2714))
-* Detect pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
+* Detect Pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
 * Enforce relation databag read permissions on all access paths ([#2738](https://github.com/canonical/operator/pull/2738))
 * Use cached leadership in security logging, renew lease on success by @cristiangirlea ([#2778](https://github.com/canonical/operator/pull/2778))
-* A gone relation raises RelationNotFoundError, not "permission denied" ([#2748](https://github.com/canonical/operator/pull/2748))
-* Treat an _Abort(0) from the charm's __init__ as success in ops.testing ([#2780](https://github.com/canonical/operator/pull/2780))
+* A gone relation raises `RelationNotFoundError`, not "permission denied" ([#2748](https://github.com/canonical/operator/pull/2748))
+* Treat an `_Abort(0)` from the charm's `__init__` as success in ops.testing ([#2780](https://github.com/canonical/operator/pull/2780))
 * Record trace data in every ops.testing run with opentelemetry-sdk 1.45 ([#2787](https://github.com/canonical/operator/pull/2787))
 * Let charms and libraries set `on` without a type: ignore ([#2775](https://github.com/canonical/operator/pull/2775))
 
@@ -40,14 +40,9 @@
 
 ## CI
 
-* Enrich scheduled-failure issues with an LLM triage pass ([#2663](https://github.com/canonical/operator/pull/2663))
+* Enrich scheduled-failure issues with an LLM triage pass ([#2663](https://github.com/canonical/operator/pull/2663), [#2781](https://github.com/canonical/operator/pull/2781))
 * Stop tox writing a .venv redirect file in the examples ([#2769](https://github.com/canonical/operator/pull/2769))
-* Pin the failure enricher to charm-tech-code main ([#2781](https://github.com/canonical/operator/pull/2781))
 * Move the release process from release.py to workflows ([#2772](https://github.com/canonical/operator/pull/2772))
-
-## Uncategorised
-
-* Merge commit from fork by Tony Meyer
 
 # 3.8.3 - 30 September 2026
 
