@@ -24,7 +24,7 @@ def charm_type() -> type[ops.CharmBase]:
         pass
 
     class MyCharm(ops.CharmBase):
-        on = _CharmEvents()  # type: ignore
+        on = _CharmEvents()
         _event = None
 
         def __init__(self, framework: ops.Framework):
@@ -52,9 +52,7 @@ def test_event_emission():
         class MyEvt(ops.EventBase):
             pass
 
-        my_charm_type.on.define_event(  # type: ignore
-            'bar', MyEvt
-        )
+        my_charm_type.on.define_event('bar', MyEvt)
 
         charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
             my_charm_type,
