@@ -52,6 +52,7 @@ unit = [
     "ops[testing,tracing]",
     "pytest~=9.0",
     "pydantic~=2.10",
+    "tomli-w~=1.2",  # for test/test_patch_charm_deps.py
 ]
 xdist = [
     "pytest-xdist~=3.6",
