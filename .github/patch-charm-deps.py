@@ -273,33 +273,36 @@ def _wheel_install_commands(
 
 
 def _insert_after_locked_installs_ini(commands: str, new_lines: list[str]) -> str:
-    """Insert new_lines after the last locked install in an INI commands value."""
+    """Insert new_lines after each locked install in an INI commands value.
+
+    Each one, not just the last: commands can run tests between two installs,
+    such as `poetry install --only unit` before the unit tests and another
+    install before the static checks.
+    """
     lines = commands.split('\n')
-    last = None
+    patched: list[str] = []
     i = 0
     while i < len(lines):
         first = i
         while lines[i].rstrip().endswith('\\') and i + 1 < len(lines):
             i += 1
+        patched.extend(lines[first : i + 1])
         if _LOCKED_INSTALL_RE.match(lines[first]):
-            last = i
+            patched.extend(new_lines)
         i += 1
-    if last is None:
-        return commands
-    return '\n'.join(lines[: last + 1] + new_lines + lines[last + 1 :])
+    return '\n'.join(patched)
 
 
 def _insert_after_locked_installs_toml(
     commands: list[list[str]], new_commands: list[list[str]]
 ) -> list[list[str]]:
-    """Insert new_commands after the last locked install in a TOML commands list."""
-    last = None
-    for i, command in enumerate(commands):
+    """Insert new_commands after each locked install in a TOML commands list."""
+    patched: list[list[str]] = []
+    for command in commands:
+        patched.append(command)
         if isinstance(command, list) and _LOCKED_INSTALL_RE.match(' '.join(map(str, command))):
-            last = i
-    if last is None:
-        return commands
-    return commands[: last + 1] + new_commands + commands[last + 1 :]
+            patched.extend(new_commands)
+    return patched
 
 
 def add_tox_pip_commands_ini(
@@ -357,7 +360,7 @@ def add_tox_pip_commands_ini(
         commands = config.get(section, 'commands')
         patched = _insert_after_locked_installs_ini(commands, new_lines)
         if patched != commands:
-            print('    Reinstalling the wheels after the locked install in commands')
+            print('    Reinstalling the wheels after each locked install in commands')
             config.set(section, 'commands', patched)
 
     with open(tox_ini_path, 'w') as f:
@@ -520,7 +523,7 @@ def add_tox_pip_commands_toml(
     if isinstance(commands, list):
         patched = _insert_after_locked_installs_toml(commands, new_commands)
         if patched != commands:
-            print('    Reinstalling the wheels after the locked install in commands')
+            print('    Reinstalling the wheels after each locked install in commands')
             current['commands'] = patched
 
     with open(tox_toml_path, 'wb') as f:
