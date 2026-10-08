@@ -4194,6 +4194,7 @@ class _ModelBackend:
             expires=raw.expiry,  # Note the different names.
             rotation=SecretRotate(raw.rotation) if raw.rotation else None,
             rotates=raw.rotates,
+            # hookcmds gives '' for a missing description, but SecretInfo has always used None.
             description=raw.description or None,
             model_uuid=self.model_uuid,
         )

@@ -278,6 +278,10 @@ def secret_set(
     For more details, see:
     `Juju | Hook commands | secret-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/>`_
 
+    .. deprecated:: 3.9.0
+        The ``owner`` argument has no effect, as Juju ignores the owner when
+        updating a secret.
+
     Args:
         id: The ID of the secret to update.
         content: The content of the secret.
@@ -285,8 +289,8 @@ def secret_set(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: Deprecated, and has no effect. Juju ignores the owner when
-            updating a secret, so the owner set by :func:`secret_add` is kept.
+        owner: Deprecated, and has no effect. The owner set by
+            :func:`secret_add` is kept.
     """
     if owner is not None:
         warnings.warn(

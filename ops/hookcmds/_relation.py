@@ -76,7 +76,7 @@ def relation_get(
         id: The ID of the relation to get data for, or ``None`` to get data for
             the relation that triggered the current hook.
         key: The specific key to get data for, or ``None`` to get all data.
-            If the key is not set, ``None`` is returned.
+            Returns ``None`` if the key is not set.
         unit: The unit to get data for, or ``None`` to get data for the unit
             that triggered the current hook.
     """
