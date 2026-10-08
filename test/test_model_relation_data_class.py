@@ -686,6 +686,21 @@ def test_relation_load_heterogeneous_tuple():
     assert isinstance(obj.pair, tuple)
 
 
+@pytest.mark.parametrize('written', [[1], [1, 'red', 'blue']])
+def test_relation_load_fixed_length_tuple_rejects_a_length_mismatch(
+    written: list[object], monkeypatch: pytest.MonkeyPatch
+):
+    """A fixed-length tuple needs exactly as many values as annotated positions."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+
+    @dataclasses.dataclass
+    class Data:
+        pair: tuple[int, _Colour]
+
+    with pytest.raises(ValueError, match='zip'):
+        _load_into(Data, {'pair': json.dumps(written)})
+
+
 @pytest.mark.parametrize('form', ['star', 'unpack'])
 def test_relation_load_tuple_with_unpacked_member_builds_uncoerced_tuple(form: str):
     """A tuple with an unpacked member, such as *tuple[X, ...], is built without coercion."""
