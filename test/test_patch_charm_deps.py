@@ -191,6 +191,12 @@ class TestLockedOpsExtras:
         }
         assert patch_charm_deps._locked_ops_extras(lock) == {'testing', 'tracing'}
 
+    def test_string_extra(self):
+        lock = {
+            'package': [{'name': 'charm', 'dependencies': [{'name': 'ops', 'extra': 'tracing'}]}]
+        }
+        assert patch_charm_deps._locked_ops_extras(lock) == {'tracing'}
+
     def test_no_extras(self):
         lock = {'package': [{'name': 'charm', 'dependencies': [{'name': 'ops'}]}]}
         assert patch_charm_deps._locked_ops_extras(lock) == set()

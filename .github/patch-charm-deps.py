@@ -641,7 +641,9 @@ def _locked_ops_extras(node: object) -> set[str]:
     if isinstance(node, dict):
         if node.get('name') == 'ops':
             for key in ('extra', 'extras'):
-                extras.update(node.get(key, []))
+                value = node.get(key, [])
+                # A bare string is one extra, not a list of characters.
+                extras.update([value] if isinstance(value, str) else value)
         for value in node.values():
             extras |= _locked_ops_extras(value)
     elif isinstance(node, list):
