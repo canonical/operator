@@ -1,3 +1,13 @@
+# 2.23.6 - 08 October 2026
+
+## Fixes
+
+* Cherry-pick recent fixes from main into the 2.23-maintenance branch ([#2789](https://github.com/canonical/operator/pull/2789))
+
+## Refactoring
+
+* Move the otlp-json package to be a regular ops-tracing module (2.23) ([#2788](https://github.com/canonical/operator/pull/2788))
+
 # 2.23.5 - 31 August 2026
 
 ## Fixes
