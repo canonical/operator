@@ -20,10 +20,16 @@ from collections.abc import Sequence
 
 
 class Error(Exception):
-    """Raised when a hook command exits with a non-zero code."""
+    """Raised when a hook command exits with a non-zero code, or doesn't exist.
+
+    A hook command that doesn't exist, such as a secret command on Juju 2.9, is
+    reported with a return code of 127 (the shell's code for "command not
+    found"), and the original :class:`FileNotFoundError` as the
+    ``__cause__``.
+    """
 
     returncode: int
-    """Exit status of the child process."""
+    """Exit status of the child process, or 127 if the command doesn't exist."""
 
     cmd: list[str]
     """The command that was run.
@@ -67,6 +73,9 @@ def run(
     except subprocess.CalledProcessError as e:
         cmd = e.cmd if redacted_cmd is None else list(redacted_cmd)
         raise Error(returncode=e.returncode, cmd=cmd, stdout=e.stdout, stderr=e.stderr) from None
+    except FileNotFoundError as e:
+        cmd = list(args) if redacted_cmd is None else list(redacted_cmd)
+        raise Error(returncode=127, cmd=cmd, stderr=str(e)) from e
     return result.stdout
 
 

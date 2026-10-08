@@ -3789,6 +3789,31 @@ class TestModelBackend:
             backend.juju_log('BAR', 'foo')
         assert fake_script.calls(clear=True) == [['juju-log', '--log-level', 'BAR', '--', 'foo']]
 
+    @pytest.mark.parametrize(
+        'method,args,kwargs',
+        [
+            ('juju_log', ('INFO', 'foo'), {}),
+            ('relation_model_get', (1,), {}),
+            ('secret_get', (), {'id': 'secret:123'}),
+            ('reboot', (), {}),
+        ],
+    )
+    def test_missing_command(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+        root_logging: None,
+        backend: _ModelBackend,
+        method: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ):
+        # On Juju 2.9, for example, the secret and relation-model-get hook
+        # commands don't exist.
+        monkeypatch.setenv('PATH', str(tmp_path))
+        with pytest.raises(FileNotFoundError):
+            getattr(backend, method)(*args, **kwargs)
+
     def test_valid_metrics(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('add-metric', 'exit 0')
         test_cases: list[_ValidMetricsTestCase] = [

@@ -3581,6 +3581,18 @@ def _format_action_result_dict(
     return output_
 
 
+def _raise_if_command_missing(error: hookcmds.Error) -> None:
+    """Raise the original :class:`FileNotFoundError` if the hook command doesn't exist.
+
+    ``hookcmds`` reports a missing hook command (such as a secret command on
+    Juju 2.9, or any hook command outside Juju) as a :class:`hookcmds.Error`.
+    The model backend has always raised :class:`FileNotFoundError` in that case,
+    so it unwraps the original error to keep that behaviour.
+    """
+    if isinstance(error.__cause__, FileNotFoundError):
+        raise error.__cause__ from None
+
+
 class _ModelBackend:
     """Represents the connection between the Model representation and talking to Juju.
 
@@ -3636,6 +3648,7 @@ class _ModelBackend:
                         span.set_attribute('kwargs', [f'{k}={v}' for k, v in trace.items()])
                 yield
         except hookcmds.Error as e:
+            _raise_if_command_missing(e)
             stderr_lower = e.stderr.lower()
             if self._relation_is_gone(cmd, stderr_lower, trace):
                 # A gone relation isn't an authorisation failure, so it isn't
@@ -4054,6 +4067,7 @@ class _ModelBackend:
                     level=level,  # type: ignore[arg-type]
                 )
             except hookcmds.Error as e:  # ruff: ignore[try-except-in-loop]
+                _raise_if_command_missing(e)
                 self._check_for_security_event('juju-log', e.returncode, e.stderr)
                 error = ModelError(e.stderr)
                 # Leave the message out of the note for the same reasons it
@@ -4298,13 +4312,17 @@ class _ModelBackend:
             description=f'Rebooting unit {self.unit_name!r} in model {self.model_name!r}',
         )
         with tracer.start_as_current_span('juju-reboot'):
-            if now:
-                hookcmds.juju_reboot(now=True)
-                # Juju will kill the Charm process, and in testing no code after
-                # this point would execute. However, we want to guarantee that for
-                # Charmers, so we force that to be the case.
-                sys.exit()
-            hookcmds.juju_reboot()
+            try:
+                if now:
+                    hookcmds.juju_reboot(now=True)
+                    # Juju will kill the Charm process, and in testing no code after
+                    # this point would execute. However, we want to guarantee that for
+                    # Charmers, so we force that to be the case.
+                    sys.exit()
+                hookcmds.juju_reboot()
+            except hookcmds.Error as e:
+                _raise_if_command_missing(e)
+                raise
 
     def credential_get(self) -> CloudSpec:
         """Access cloud credentials by running the credential-get hook command.

@@ -270,7 +270,7 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 convention = "google"
 
 [tool.ruff.lint.flake8-builtins]
-builtins-ignorelist = ["all", "id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
+builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
 # Whole trees rather than a list of directories, so that a new package or test

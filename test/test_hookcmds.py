@@ -188,6 +188,15 @@ def test_run_error(run: Run):
     assert excinfo.value.stderr == 'error msg'
 
 
+def test_run_missing_command(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    monkeypatch.setenv('PATH', str(tmp_path))
+    with pytest.raises(hookcmds.Error) as excinfo:
+        hookcmds.secret_ids()
+    assert excinfo.value.returncode == 127
+    assert excinfo.value.cmd == ['secret-ids', '--format=json']
+    assert isinstance(excinfo.value.__cause__, FileNotFoundError)
+
+
 def test_action_fail(run: Run):
     run.handle(['action-fail'])
     hookcmds.action_fail()
@@ -294,15 +303,6 @@ def test_config_get_key_missing(run: Run):
     run.handle(['config-get', '--format=json', 'baz'], stdout='null')
     result = hookcmds.config_get('baz')
     assert result is None
-
-
-def test_config_get_all(run: Run):
-    run.handle(
-        ['config-get', '--format=json', '--all'],
-        stdout='{"foo": "bar", "unset": null}',
-    )
-    result = hookcmds.config_get(all=True)
-    assert result == {'foo': 'bar', 'unset': None}
 
 
 def test_credential_get(run: Run):
@@ -958,17 +958,6 @@ def test_state_get_key_missing(run: Run):
     run.handle(['state-get', '--format=json', 'foo'], stdout='""')
     result = hookcmds.state_get('foo')
     assert result == ''
-
-
-def test_state_get_key_strict(run: Run):
-    run.handle(
-        ['state-get', '--format=json', '--strict', 'foo'],
-        returncode=1,
-        stderr='ERROR "foo" not found',
-    )
-    with pytest.raises(hookcmds.Error) as excinfo:
-        hookcmds.state_get('foo', strict=True)
-    assert 'not found' in excinfo.value.stderr
 
 
 def test_state_set(run: Run):

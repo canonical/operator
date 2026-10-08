@@ -33,11 +33,15 @@ def state_delete(key: str):
     run('state-delete', key)
 
 
+# state-get has a `--strict` option, which we do not offer here. When `--strict`
+# is specified, Juju returns an error if the key does not exist, rather than an
+# empty string. We do not currently have a use-case for `--strict` and excluding
+# it simplifies the method signature.
 @overload
-def state_get(key: str, *, strict: bool = False) -> str: ...
+def state_get(key: str) -> str: ...
 @overload
 def state_get(key: None) -> dict[str, str]: ...
-def state_get(key: str | None, *, strict: bool = False) -> dict[str, str] | str:
+def state_get(key: str | None) -> dict[str, str] | str:
     """Get server-side-state value.
 
     For more details, see:
@@ -46,12 +50,8 @@ def state_get(key: str | None, *, strict: bool = False) -> dict[str, str] | str:
     Args:
         key: The key of the server-side state to get. If ``None``, get all keys
             and values.
-        strict: If ``True``, raise :class:`Error` if the key is not set,
-            rather than returning an empty string.
     """
     args = ['--format=json']
-    if strict:
-        args.append('--strict')
     if key is not None:
         args.append(key)
     stdout = run('state-get', *args)
