@@ -1,3 +1,19 @@
+# 2.23.6 - 08 October 2026
+
+## Fixes
+
+Cherry-picked recent fixes from main into the 2.23-maintenance branch ([#2789](https://github.com/canonical/operator/pull/2789)), including:
+
+* Only decode fields used by the data class in `Relation.load()` ([#2636](https://github.com/canonical/operator/pull/2636))
+* Detect Pydantic dataclasses from before 2.11 when mapping aliases ([#2768](https://github.com/canonical/operator/pull/2768))
+* In `ops.testing`, don't pass a message when converting an unknown status by name ([#2700](https://github.com/canonical/operator/pull/2700))
+* Say which tracing destination rejected the data ([#2714](https://github.com/canonical/operator/pull/2714))
+* Allow `IdentityDict` to be assigned `IdentityAccess` ([#2628](https://github.com/canonical/operator/pull/2628))
+
+## Refactoring
+
+* Move the otlp-json package to be a regular ops-tracing module (2.23) ([#2788](https://github.com/canonical/operator/pull/2788))
+
 # 2.23.5 - 31 August 2026
 
 ## Fixes
