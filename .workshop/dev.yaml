@@ -3,7 +3,7 @@ base: ubuntu@26.04
 sdks:
   - name: uv
     channel: latest/stable
-  - name: pi-coding-agent
+  - name: pi
     channel: latest/stable
   # The project- prefix tells Workshop to load this SDK from .workshop/tools/
   # rather than the store, and the directory and the name in its sdk.yaml must
