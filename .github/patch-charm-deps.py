@@ -21,6 +21,7 @@ import argparse
 import configparser
 import copy
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -243,7 +244,9 @@ def update_python_version_requirements(charm_root: Path) -> None:
 _LOCKED_INSTALL_RE = re.compile(r'^\s*(poetry install|uv sync)\b')
 
 
-def _wheel_install_commands(ops_wheel: str, ops_scenario_wheel: str) -> list[list[str]]:
+def _wheel_install_commands(
+    ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+) -> list[list[str]]:
     """Commands that force-install the ops wheels into the tox environment.
 
     These use uv rather than pip: an environment that tox-uv creates has no pip
@@ -251,20 +254,22 @@ def _wheel_install_commands(ops_wheel: str, ops_scenario_wheel: str) -> list[lis
     outside the environment. tox sets VIRTUAL_ENV for its commands, which is
     where `uv pip` installs. Dependencies are installed as well, since a charm
     locked to an older ops won't have everything the new one needs.
+
+    The ops-tracing wheel is only installed where the charm already has
+    ops-tracing. Installing it with its dependencies everywhere would add
+    OpenTelemetry to charms that don't use tracing, and an older ops-tracing
+    left next to the new ops requires the old ops.
     """
-    return [
-        [
-            'uv',
-            'pip',
-            'install',
-            '--reinstall-package',
-            'ops',
-            '--reinstall-package',
-            'ops-scenario',
-            ops_wheel,
-            ops_scenario_wheel,
-        ]
-    ]
+    install = ['uv', 'pip', 'install', '--reinstall-package', 'ops']
+    install += ['--reinstall-package', 'ops-scenario', ops_wheel, ops_scenario_wheel]
+    if not ops_tracing_wheel:
+        return [install]
+    with_tracing = [*install, '--reinstall-package', 'ops-tracing', ops_tracing_wheel]
+    script = (
+        f'if uv pip show --quiet ops-tracing; then {shlex.join(with_tracing)}; '
+        f'else {shlex.join(install)}; fi'
+    )
+    return [['sh', '-c', script]]
 
 
 def _insert_after_locked_installs_ini(commands: str, new_lines: list[str]) -> str:
@@ -298,7 +303,11 @@ def _insert_after_locked_installs_toml(
 
 
 def add_tox_pip_commands_ini(
-    tox_ini_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str
+    tox_ini_path: Path,
+    section: str,
+    ops_wheel: str,
+    ops_scenario_wheel: str,
+    ops_tracing_wheel: str | None,
 ) -> None:
     """Add commands to force-reinstall the ops wheels to a tox.ini section.
 
@@ -310,6 +319,7 @@ def add_tox_pip_commands_ini(
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
+        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
     """
     config = configparser.ConfigParser()
     config.read(tox_ini_path)
@@ -318,21 +328,27 @@ def add_tox_pip_commands_ini(
         print(f'  Section [{section}] not found in tox.ini, skipping')
         return
 
-    print(f'  Adding uv to allowlist_externals and commands_pre in [{section}]')
+    new_commands = _wheel_install_commands(ops_wheel, ops_scenario_wheel, ops_tracing_wheel)
+    externals = sorted({command[0] for command in new_commands})
+    print(
+        f'  Adding {", ".join(externals)} to allowlist_externals and commands_pre in [{section}]'
+    )
 
     if config.has_option(section, 'allowlist_externals'):
         allowlist = config.get(section, 'allowlist_externals')
-        if 'uv' not in allowlist.split():
-            print('    Found existing allowlist_externals, appending uv')
-            config.set(section, 'allowlist_externals', allowlist + '\n    uv')
+        missing = [name for name in externals if name not in allowlist.split()]
+        if missing:
+            print(f'    Found existing allowlist_externals, appending {", ".join(missing)}')
+            config.set(
+                section,
+                'allowlist_externals',
+                allowlist + ''.join(f'\n    {name}' for name in missing),
+            )
     else:
-        print('    Creating new allowlist_externals with uv')
-        config.set(section, 'allowlist_externals', 'uv')
+        print(f'    Creating new allowlist_externals with {", ".join(externals)}')
+        config.set(section, 'allowlist_externals', '\n'.join(externals))
 
-    new_lines = [
-        f'    {" ".join(command)}'
-        for command in _wheel_install_commands(ops_wheel, ops_scenario_wheel)
-    ]
+    new_lines = [f'    {shlex.join(command)}' for command in new_commands]
     print("    Adding commands_pre to force-reinstall ops 3.x (using 'uv pip install')")
     existing = config.get(section, 'commands_pre', fallback='')
     config.set(section, 'commands_pre', existing + '\n' + '\n'.join(new_lines))
@@ -349,7 +365,7 @@ def add_tox_pip_commands_ini(
 
 
 def _patch_tox_testenv_sections_toml(
-    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str
+    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
 ) -> bool:
     """Patch all testenv sections in tox.toml.
 
@@ -357,6 +373,7 @@ def _patch_tox_testenv_sections_toml(
         tox_config: Path to tox.toml
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
+        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
 
     Returns:
         True if any sections were patched, False otherwise
@@ -366,20 +383,26 @@ def _patch_tox_testenv_sections_toml(
 
     # Patch env_run_base (equivalent to [testenv]).
     if 'env_run_base' in data:
-        add_tox_pip_commands_toml(tox_config, 'testenv', ops_wheel, ops_scenario_wheel)
+        add_tox_pip_commands_toml(
+            tox_config, 'testenv', ops_wheel, ops_scenario_wheel, ops_tracing_wheel
+        )
 
     # Patch specific envs.
     if 'env' in data:
         for env_name in data['env']:
             add_tox_pip_commands_toml(
-                tox_config, f'testenv:{env_name}', ops_wheel, ops_scenario_wheel
+                tox_config,
+                f'testenv:{env_name}',
+                ops_wheel,
+                ops_scenario_wheel,
+                ops_tracing_wheel,
             )
 
     return True
 
 
 def _patch_tox_testenv_sections_ini(
-    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str
+    tox_config: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
 ) -> bool:
     """Patch all testenv sections in tox.ini.
 
@@ -387,6 +410,7 @@ def _patch_tox_testenv_sections_ini(
         tox_config: Path to tox.ini
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
+        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
 
     Returns:
         True if any sections were patched, False otherwise
@@ -400,12 +424,16 @@ def _patch_tox_testenv_sections_ini(
         return False
 
     for section in testenv_sections:
-        add_tox_pip_commands_ini(tox_config, section, ops_wheel, ops_scenario_wheel)
+        add_tox_pip_commands_ini(
+            tox_config, section, ops_wheel, ops_scenario_wheel, ops_tracing_wheel
+        )
 
     return True
 
 
-def patch_tox_testenv_sections(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
+def patch_tox_testenv_sections(
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+) -> bool:
     """Patch all testenv sections in tox.ini or tox.toml.
 
     Returns:
@@ -416,13 +444,21 @@ def patch_tox_testenv_sections(charm_root: Path, ops_wheel: str, ops_scenario_wh
         return False
 
     if tox_config.suffix == '.toml':
-        return _patch_tox_testenv_sections_toml(tox_config, ops_wheel, ops_scenario_wheel)
+        return _patch_tox_testenv_sections_toml(
+            tox_config, ops_wheel, ops_scenario_wheel, ops_tracing_wheel
+        )
 
-    return _patch_tox_testenv_sections_ini(tox_config, ops_wheel, ops_scenario_wheel)
+    return _patch_tox_testenv_sections_ini(
+        tox_config, ops_wheel, ops_scenario_wheel, ops_tracing_wheel
+    )
 
 
 def add_tox_pip_commands_toml(
-    tox_toml_path: Path, section: str, ops_wheel: str, ops_scenario_wheel: str
+    tox_toml_path: Path,
+    section: str,
+    ops_wheel: str,
+    ops_scenario_wheel: str,
+    ops_tracing_wheel: str | None,
 ) -> None:
     """Add commands to force-reinstall the ops wheels to a tox.toml section.
 
@@ -434,6 +470,7 @@ def add_tox_pip_commands_toml(
         section: Section name (e.g., "testenv:unit" or "testenv")
         ops_wheel: Path to ops wheel file
         ops_scenario_wheel: Path to ops-scenario wheel file
+        ops_tracing_wheel: Path to ops-tracing wheel file, if there is one
     """
     with open(tox_toml_path, 'rb') as f:
         data = tomllib.load(f)
@@ -457,18 +494,24 @@ def add_tox_pip_commands_toml(
             return
         current = current[key]
 
+    # tox 4 TOML format requires a list of lists for commands.
+    new_commands = _wheel_install_commands(ops_wheel, ops_scenario_wheel, ops_tracing_wheel)
+    externals = sorted({command[0] for command in new_commands})
     toml_section = '.'.join(section_keys)
-    print(f'  Adding uv to allowlist_externals and commands_pre in [{toml_section}]')
+    print(
+        f'  Adding {", ".join(externals)} to allowlist_externals '
+        f'and commands_pre in [{toml_section}]'
+    )
 
     if 'allowlist_externals' not in current:
-        print('    Creating new allowlist_externals with uv')
-        current['allowlist_externals'] = ['uv']
-    elif 'uv' not in current['allowlist_externals']:
-        print('    Found existing allowlist_externals, appending uv')
-        current['allowlist_externals'].append('uv')
+        print(f'    Creating new allowlist_externals with {", ".join(externals)}')
+        current['allowlist_externals'] = externals
+    else:
+        missing = [name for name in externals if name not in current['allowlist_externals']]
+        if missing:
+            print(f'    Found existing allowlist_externals, appending {", ".join(missing)}')
+            current['allowlist_externals'].extend(missing)
 
-    # tox 4 TOML format requires a list of lists for commands.
-    new_commands = _wheel_install_commands(ops_wheel, ops_scenario_wheel)
     print("    Adding commands_pre to force-reinstall ops 3.x (using 'uv pip install')")
     existing = current.get('commands_pre')
     current['commands_pre'] = (existing if isinstance(existing, list) else []) + new_commands
@@ -506,7 +549,9 @@ def _is_ops_dependency_line(line: str) -> bool:
     return False
 
 
-def patch_requirements_txt(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
+def patch_requirements_txt(
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+) -> bool:
     """Patch requirements.txt-based charm dependencies.
 
     Returns:
@@ -560,12 +605,14 @@ def patch_requirements_txt(charm_root: Path, ops_wheel: str, ops_scenario_wheel:
         with open(tox_config, 'w') as f:
             config.write(f)
         print('    ✓ Removed inline ops deps from tox.ini')
-        patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel)
+        patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel, ops_tracing_wheel)
 
     return updated
 
 
-def patch_poetry(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> bool:
+def patch_poetry(
+    charm_root: Path, ops_wheel: str, ops_scenario_wheel: str, ops_tracing_wheel: str | None
+) -> bool:
     """Patch Poetry-based charm dependencies.
 
     Returns:
@@ -576,7 +623,7 @@ def patch_poetry(charm_root: Path, ops_wheel: str, ops_scenario_wheel: str) -> b
 
     # Poetry doesn't support adding local wheels directly to the lock file.
     # Instead, patch tox config to force-reinstall the wheels after Poetry install.
-    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel):
+    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel, ops_tracing_wheel):
         print('    ✓ Updated tox config to force-reinstall ops 3.x wheels')
         return True
 
@@ -671,7 +718,7 @@ def patch_uv(
 
     # tox environments that install dependency groups or deps with `uv pip`
     # don't go through the lock, so reinstall the wheels there as well.
-    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel):
+    if patch_tox_testenv_sections(charm_root, ops_wheel, ops_scenario_wheel, ops_tracing_wheel):
         print('    ✓ Updated tox config to force-reinstall ops 3.x wheels')
     return True
 
@@ -711,11 +758,15 @@ def main() -> int:
 
     # 1. Handle requirements.txt-based charms.
     if list(args.charm_root.glob('*requirements*.txt')):
-        updated = patch_requirements_txt(args.charm_root, args.ops_wheel, args.ops_scenario_wheel)
+        updated = patch_requirements_txt(
+            args.charm_root, args.ops_wheel, args.ops_scenario_wheel, args.ops_tracing_wheel
+        )
 
     # 2. Handle Poetry-based charms.
     elif (args.charm_root / 'poetry.lock').exists():
-        updated = patch_poetry(args.charm_root, args.ops_wheel, args.ops_scenario_wheel)
+        updated = patch_poetry(
+            args.charm_root, args.ops_wheel, args.ops_scenario_wheel, args.ops_tracing_wheel
+        )
 
     # 3. Handle uv-based charms.
     elif (args.charm_root / 'uv.lock').exists():

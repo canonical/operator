@@ -274,30 +274,34 @@ jobs:
       # A charm's tox commands can install its locked dependencies after the
       # wheels, or run the tests in an environment of their own, and the tests
       # then pass against the charm's own ops. Fail rather than report that.
-      - name: Check that the tests used the ops wheel
+      # ops-scenario and ops-tracing are checked wherever they're installed,
+      # but only ops has to be there.
+      - name: Check that the tests used the ops wheels
         if: ${{ !cancelled() && steps.deps.outcome == 'success' && (steps.has-unit.outputs.unit == 'true' || steps.has-static.outputs.static == 'true') }}
         run: |
           set -euo pipefail
-          ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
-          expected="$(basename "$ops_wheel" | cut -d- -f2)"
           status=0
-          found=0
-          while IFS= read -r dist_info; do
-            found=$((found + 1))
-            version="$(basename "$dist_info" .dist-info)"
-            version="${version#ops-}"
-            if [ "$version" = "$expected" ]; then
-              echo "ops $version in $dist_info"
-            else
-              echo "::error::ops $version, not $expected, is installed in $dist_info"
+          for dist in ops ops_scenario ops_tracing; do
+            wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/"$dist"-[0-9]*.whl)"
+            expected="$(basename "$wheel" | cut -d- -f2)"
+            found=0
+            while IFS= read -r dist_info; do
+              found=$((found + 1))
+              version="$(basename "$dist_info" .dist-info)"
+              version="${version#"$dist"-}"
+              if [ "$version" = "$expected" ]; then
+                echo "$dist $version in $dist_info"
+              else
+                echo "::error::$dist $version, not $expected, is installed in $dist_info"
+                status=1
+              fi
+            done < <(find charm-repo "$HOME/.cache/pypoetry/virtualenvs" \
+              -type d -path "*site-packages/$dist-[0-9]*.dist-info" 2>/dev/null)
+            if [ "$dist" = ops ] && [ "$found" -eq 0 ]; then
+              echo "::error::no ops installation found, so the tests did not use the ops wheel"
               status=1
             fi
-          done < <(find charm-repo "$HOME/.cache/pypoetry/virtualenvs" \
-            -type d -path '*site-packages/ops-[0-9]*.dist-info' 2>/dev/null)
-          if [ "$found" -eq 0 ]; then
-            echo "::error::no ops installation found, so the tests did not use the ops wheel"
-            status=1
-          fi
+          done
           exit "$status"
 
 
