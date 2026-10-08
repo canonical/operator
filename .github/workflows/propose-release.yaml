@@ -124,6 +124,11 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
         run: |
           set -euo pipefail
+          # The commit messages are the pull request descriptions, which say
+          # what a change means rather than only what it is, and name the docs
+          # pages it changed so the notes can link them.
+          git log --reverse --no-merges --name-only --format='%x1e%s%x1f%b%x1f' \
+            "$PREVIOUS..HEAD" > "$RUNNER_TEMP/commits.txt"
           uvx --from "$DRAFT_RELEASE_NOTES" draft-release-notes \
             --repo "$GITHUB_REPOSITORY" \
             --version "$VERSION" \
@@ -132,6 +137,8 @@ jobs:
             --changelog "$RUNNER_TEMP/changes-entry.md" \
             --exemplars release-tools/.github/release/release-note-exemplars.md \
             --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
+            --commits "$RUNNER_TEMP/commits.txt" \
+            --docs-url https://canonical.com/juju/docs/ops/latest \
             --output "$RUNNER_TEMP/release-notes.md" \
             --title-output "$RUNNER_TEMP/release-title.md"
 

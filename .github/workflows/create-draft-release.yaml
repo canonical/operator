@@ -141,7 +141,7 @@ jobs:
           if previous=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' HEAD); then
             compare=(--compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$VERSION")
           else
-            echo "::warning::No earlier release tag to compare $VERSION with; the body has no Full Changelog link."
+            echo "::warning::No earlier release tag to compare $VERSION with; the body has no "All commits" link."
           fi
           uvx --from "$CHANGELOG" changelog release-body --version "$VERSION" --changes CHANGES.md \
             "${compare[@]}" < "$RUNNER_TEMP/pr-description.md" > "$RUNNER_TEMP/release-body.md"
