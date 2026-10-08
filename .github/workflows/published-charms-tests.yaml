@@ -275,13 +275,15 @@ jobs:
       # wheels, or run the tests in an environment of their own, and the tests
       # then pass against the charm's own ops. Fail rather than report that.
       - name: Check that the tests used the ops wheel
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' && (steps.has-unit.outputs.unit == 'true' || steps.has-static.outputs.static == 'true') }}
         run: |
           set -euo pipefail
           ops_wheel="$(ls "$GITHUB_WORKSPACE"/operator-wheels/ops-[0-9]*.whl)"
           expected="$(basename "$ops_wheel" | cut -d- -f2)"
           status=0
+          found=0
           while IFS= read -r dist_info; do
+            found=$((found + 1))
             version="$(basename "$dist_info" .dist-info)"
             version="${version#ops-}"
             if [ "$version" = "$expected" ]; then
@@ -292,6 +294,10 @@ jobs:
             fi
           done < <(find charm-repo "$HOME/.cache/pypoetry/virtualenvs" \
             -type d -path '*site-packages/ops-[0-9]*.dist-info' 2>/dev/null)
+          if [ "$found" -eq 0 ]; then
+            echo "::error::no ops installation found, so the tests did not use the ops wheel"
+            status=1
+          fi
           exit "$status"
 
 
