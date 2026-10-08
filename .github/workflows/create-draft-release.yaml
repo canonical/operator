@@ -35,7 +35,7 @@ permissions: {}
 env:
   # The team's release tools, pinned to a commit rather than a branch.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@61b97db7d2b1e985b0e2bf9150cb5a69a5650591#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@cc25c095ea7fee6277d02460771861fb5c5d398f#subdirectory=changelog
 
 # One run per pull request at a time. Drafts don't reserve their tag name, so
 # two runs of this could each create a draft for the same release.
