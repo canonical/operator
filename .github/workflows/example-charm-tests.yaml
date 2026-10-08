@@ -72,42 +72,24 @@ jobs:
         env:
           MYPYPATH: 'src:lib:../..'
         run: |
-          uv run \
-            --with-requirements=../../mypy-requirements.txt \
-            --with=../.. \
-            --with=../../testing \
-            --group=lint \
-            --group=unit \
-            --group=integration \
-            mypy --explicit-package-bases --follow-imports=silent src tests
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../mypy-requirements.txt
+          uv run --no-sync mypy --explicit-package-bases --follow-imports=silent src tests
       - name: Run pyrefly
         working-directory: ${{ matrix.dir }}
         run: |
           # Only some charms have a lib directory, after fetching charm libs.
           search_paths=()
           if [ -d lib ]; then search_paths+=(--search-path lib); fi
-          uv run \
-            --with-requirements=../../pyrefly-requirements.txt \
-            --with=../.. \
-            --with=../../testing \
-            --group=lint \
-            --group=unit \
-            --group=integration \
-            pyrefly check "${search_paths[@]}" src tests
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../pyrefly-requirements.txt
+          uv run --no-sync pyrefly check "${search_paths[@]}" src tests
       - name: Run ty
         working-directory: ${{ matrix.dir }}
         run: |
-          # uv run adds the --with packages through a .pth file that ty doesn't
-          # follow, so ty would otherwise see the Ops and Scenario releases
-          # installed in the charm's venv, rather than the local source.
-          search_paths=(--extra-search-path ../.. --extra-search-path ../../testing/src)
           # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
           if [ -d lib ]; then search_paths+=(--extra-search-path lib); fi
-          uv run \
-            --with-requirements=../../ty-requirements.txt \
-            --with=../.. \
-            --with=../../testing \
-            --group=lint \
-            --group=unit \
-            --group=integration \
-            ty check "${search_paths[@]}" src tests
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../ty-requirements.txt
+          uv run --no-sync ty check "${search_paths[@]}" src tests
