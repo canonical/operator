@@ -55,7 +55,7 @@ jobs:
         run: |
           cd ${{ matrix.dir }}
           tox -e unit
-      - name: Write mypy-requirements.txt
+      - name: Write type checker requirements files
         shell: uv run --script --no-project {0}
         run: |
           # /// script
@@ -63,19 +63,33 @@ jobs:
           # ///
           import tomli, pathlib
           pyproject_toml = tomli.loads(pathlib.Path('pyproject.toml').read_text())
-          deps = '\n'.join(pyproject_toml['dependency-groups']['mypy'])
-          print(deps)  # logging
-          pathlib.Path('mypy-requirements.txt').write_text(deps)
+          for group in ('mypy', 'pyrefly', 'ty'):
+              deps = '\n'.join(pyproject_toml['dependency-groups'][group])
+              print(f'{group}: {deps}')  # logging
+              pathlib.Path(f'{group}-requirements.txt').write_text(deps)
       - name: Run mypy
         working-directory: ${{ matrix.dir }}
         env:
           MYPYPATH: 'src:lib:../..'
         run: |
-          uv run \
-            --with-requirements=../../mypy-requirements.txt \
-            --with=../.. \
-            --with=../../testing \
-            --group=lint \
-            --group=unit \
-            --group=integration \
-            mypy --explicit-package-bases --follow-imports=silent src tests
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../mypy-requirements.txt
+          uv run --no-sync mypy --explicit-package-bases --follow-imports=silent src tests
+      - name: Run pyrefly
+        working-directory: ${{ matrix.dir }}
+        run: |
+          # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
+          if [ -d lib ]; then search_paths+=(--search-path lib); fi
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../pyrefly-requirements.txt
+          uv run --no-sync pyrefly check "${search_paths[@]}" src tests
+      - name: Run ty
+        working-directory: ${{ matrix.dir }}
+        run: |
+          # Only some charms have a lib directory, after fetching charm libs.
+          search_paths=()
+          if [ -d lib ]; then search_paths+=(--extra-search-path lib); fi
+          uv sync --group=lint --group=unit --group=integration
+          uv pip install ../.. ../../testing -r ../../ty-requirements.txt
+          uv run --no-sync ty check "${search_paths[@]}" src tests
