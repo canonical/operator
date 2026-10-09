@@ -59,8 +59,8 @@ full-help: $(DOCS_VENVDIR)
 $(DOCS_VENVDIR): requirements.txt ../uv.lock
 	@which uv || (echo "Error: uv is not installed. To install uv, run 'sudo snap install astral-uv --classic' or see https://docs.astral.sh/uv/"; exit 1)
 	@test -d $(DOCS_VENVDIR) || uv venv --python 3.11 $(DOCS_VENVDIR)
-	uv pip install --directory $(DOCS_VENVDIR) --requirements ../requirements.txt
-	uv pip install --directory $(DOCS_VENVDIR) "ops[testing,tracing] @ ../.."
+	uv pip install --directory $(DOCS_VENVDIR) --requirements $(CURDIR)/requirements.txt
+	uv pip install --directory $(DOCS_VENVDIR) "ops[testing,tracing] @ $(CURDIR)/.."
 	@touch $(DOCS_VENVDIR)
 
 pa11y-install:

@@ -52,3 +52,6 @@ juju-crashdump*.tar.xz
 /pkgs
 /reports
 .statefile.yaml
+
+# Workshop
+/.workshop.lock
