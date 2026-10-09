@@ -25,7 +25,7 @@ import sys
 import types
 import typing
 from collections.abc import Mapping, Sequence
-from typing import Any, TypeVar, cast, get_type_hints
+from typing import Any, Literal, TypeVar, cast, get_type_hints
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ _BUILTIN_MAPPING_TYPES: tuple[type, ...] = (dict,) if _FROZENDICT is None else (
 # Abstract collection annotations don't name a type to build, so each is
 # built as a concrete type that satisfies it. The read-only sequence types
 # would be better built as a tuple, but charms may rely on getting a list, so
-# that change is left for the next major release.
+# that change is left for the next major release (#2350).
 _ABSTRACT_COLLECTION_TYPES: dict[Any, type] = {
     collections.abc.Iterable: list,
     collections.abc.Collection: list,
@@ -104,10 +104,11 @@ def _resolve_alias(tp: Any) -> Any:
         tp = value
 
 
-_ANY_SHAPE = frozenset({'mapping', 'sequence', 'scalar'})
+_Shape = Literal['mapping', 'sequence', 'scalar']
+_ANY_SHAPE: frozenset[_Shape] = frozenset({'mapping', 'sequence', 'scalar'})
 
 
-def _value_shape(value: Any) -> str:
+def _value_shape(value: Any) -> _Shape:
     """Report whether a decoded ``value`` is a mapping, a sequence, or a scalar."""
     if isinstance(value, Mapping):
         return 'mapping'
@@ -118,7 +119,7 @@ def _value_shape(value: Any) -> str:
     return 'sequence'
 
 
-def _accepted_shapes(tp: Any) -> frozenset[str]:
+def _accepted_shapes(tp: Any) -> frozenset[_Shape]:
     """Report which value shapes the annotation ``tp`` can be coerced from.
 
     Only the annotation is inspected; nothing is constructed, so the check has
@@ -173,23 +174,9 @@ def _check_shape(tp: Any, value: Any) -> None:
 def _coerce_field(tp: Any, value: Any) -> Any:
     """Coerce a decoded ``value`` into the dataclass field type ``tp``.
 
-    Used by :meth:`ops.Relation.load` to recursively construct nested
-    dataclasses and enum values from JSON-decoded relation data. An
-    ``Optional``/``Union`` field is coerced against the one member that
-    matches the shape of the value; ``dict``, ``Mapping`` and
-    ``MutableMapping`` fields have their keys and values coerced; abstract
-    sequence and set fields such as ``Sequence[X]`` are built as a ``list``,
-    ``set`` or ``frozenset``; a variable-length ``tuple[X, ...]`` is coerced
-    element-wise against ``X`` and a fixed-length ``tuple[X, Y]`` is
-    coerced positionally.
-
-    Raises ``TypeError`` if the value for a sequence field is a string, bytes
-    or a mapping (other than a mapping for an ``Iterable`` or ``Collection``
-    field, which is built from its keys), or if the value for a mapping field
-    is not a mapping: those are all iterable, so coercing them element-wise
-    would quietly produce a wrong answer rather than fail. Also raises
-    ``TypeError`` if the value matches the shape of none of a ``Union``
-    field's members.
+    The rules are documented on :meth:`ops.Relation.load`. Raises
+    ``TypeError`` if the value has a shape that ``tp`` doesn't accept, or
+    matches none of a ``Union`` field's members.
     """
     tp = _resolve_alias(tp)
     origin = typing.get_origin(tp)
@@ -210,8 +197,6 @@ def _coerce_field(tp: Any, value: Any) -> Any:
             return value
     if origin is typing.Union or origin is types.UnionType:
         return _coerce_union(tp, args, value)
-    if origin in _MAPPING_KEY_TYPES and isinstance(value, Mapping):
-        value = list(cast('Mapping[Any, Any]', value))
     concrete = _ABSTRACT_COLLECTION_TYPES.get(origin, origin)
     if not args:
         if concrete is tuple:
@@ -239,6 +224,7 @@ def _coerce_class(tp: type[_T], value: Any) -> _T:
     if '__pydantic_validator__' in tp.__dict__:
         # A Pydantic model or Pydantic dataclass does its own coercion and
         # validation, including aliases.
+        # Pydantic isn't imported, so its validator is untyped here.
         return cast('Any', tp).__pydantic_validator__.validate_python(value)
     if dataclasses.is_dataclass(tp):
         if isinstance(value, tp):
@@ -250,7 +236,7 @@ def _coerce_class(tp: type[_T], value: Any) -> _T:
         # to nothing in the databag: `field.name not in 'oops'` is False for
         # every field, so every one is skipped.
         _check_shape(tp, value)
-        return build_dataclass(tp, cast('Mapping[str, Any]', value))
+        return build_dataclass(tp, value)
     return value
 
 
@@ -308,8 +294,8 @@ def _is_unpacked(arg: Any) -> bool:
 
 def _coerce_sequence(tp: Any, origin: type, args: tuple[Any, ...], value: Any) -> Any:
     """Coerce the elements of ``value`` against sequence type ``tp``."""
-    # Iterable and Collection fields have already had a mapping turned into
-    # its keys by the caller.
+    # A mapping passes the check only for an Iterable or Collection field, and
+    # iterating it gives its keys.
     _check_shape(tp, value)
     if origin is tuple:
         if len(args) == 2 and args[1] is Ellipsis:
@@ -331,10 +317,7 @@ def _coerce_sequence(tp: Any, origin: type, args: tuple[Any, ...], value: Any) -
 def _coerce_mapping(tp: Any, origin: type, key_type: Any, value_type: Any, value: Any) -> Any:
     """Coerce the keys and values of ``value`` against the key and value types of ``tp``."""
     _check_shape(tp, value)
-    mapping = cast('Mapping[Any, Any]', value)
-    coerced = {
-        _coerce_field(key_type, k): _coerce_field(value_type, v) for k, v in mapping.items()
-    }
+    coerced = {_coerce_field(key_type, k): _coerce_field(value_type, v) for k, v in value.items()}
     return coerced if origin is dict else origin(coerced)
 
 
@@ -346,8 +329,8 @@ def build_dataclass(
 ) -> Any:
     """Construct dataclass ``cls`` from ``data``, ``args``, and ``extra_kwargs``.
 
-    Recursively coerces nested dataclass / enum / list / set / tuple / dict
-    fields supplied via ``data``. The caller's ``args`` and ``extra_kwargs``
+    Recursively coerces the values in ``data`` to match each field's type
+    hint. The caller's ``args`` and ``extra_kwargs``
     are passed through as given rather than coerced; a name in both
     ``extra_kwargs`` and ``data`` is taken from ``data``.
 

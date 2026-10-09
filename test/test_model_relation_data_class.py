@@ -42,6 +42,11 @@ except ImportError:
     pydantic = None
 
 try:
+    import typing_extensions
+except ImportError:
+    typing_extensions = None
+
+try:
     from pydantic.experimental.missing_sentinel import MISSING
 except ImportError:
     MISSING = None  # type: ignore
@@ -465,7 +470,12 @@ def test_relation_load_extra_args():
     assert obj.c == 'foo'
 
 
-def _load_into(cls: type[Any], remote_app_data: dict[str, str]) -> Any:
+def _load_into(
+    cls: type[Any],
+    remote_app_data: dict[str, str],
+    *,
+    decoder: Callable[[str], Any] | None = None,
+) -> Any:
     """Load ``remote_app_data`` into ``cls`` via ``Relation.load`` and return the result."""
 
     class Charm(ops.CharmBase):
@@ -474,7 +484,7 @@ def _load_into(cls: type[Any], remote_app_data: dict[str, str]) -> Any:
             framework.observe(self.on['db'].relation_changed, self._on_relation_changed)
 
         def _on_relation_changed(self, event: ops.RelationChangedEvent):
-            self.data = event.relation.load(cls, event.app)
+            self.data = event.relation.load(cls, event.app, decoder=decoder)
 
     ctx = testing.Context(Charm, meta={'name': 'foo', 'requires': {'db': {'interface': 'db-int'}}})
     rel = testing.Relation('db', remote_app_data=remote_app_data)
@@ -697,6 +707,36 @@ def test_relation_load_generic_type_statement_alias():
     assert obj.value == [(_Colour.RED, _Colour.BLUE)]
 
 
+def test_relation_load_generic_type_statement_alias_with_unused_parameter():
+    """A generic alias whose value doesn't use its parameter is coerced as its value."""
+    ns = _type_statements('type Ids[T] = list[Nested]')
+    data_class = dataclasses.make_dataclass('Data', [('value', ns['Ids'][str])])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [Nested(sub=1)]
+
+
+def test_relation_load_union_type_statement_alias_that_includes_itself():
+    """A union alias that names itself as a member is expanded only once."""
+    ns = _type_statements('type Loop = _Colour | Loop')
+    data_class = dataclasses.make_dataclass('Data', [('value', ns['Loop'] | None)])
+
+    obj = _load_into(data_class, {'value': json.dumps('red')})
+    assert obj.value == _Colour.RED
+
+
+@pytest.mark.skipif(typing_extensions is None, reason='typing_extensions is not installed')
+def test_relation_load_typing_extensions_type_alias():
+    """A typing_extensions.TypeAliasType alias is coerced as the type it aliases."""
+    assert typing_extensions is not None
+    # Built at runtime for the test, rather than declared at module scope.
+    alias = typing_extensions.TypeAliasType('Pets', list[Nested])  # pyright: ignore[reportGeneralTypeIssues]
+    data_class = dataclasses.make_dataclass('Data', [('value', alias)])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [Nested(sub=1)]
+
+
 def test_relation_load_recursive_type_statement_alias():
     """A recursive type alias is coerced as deep as the data goes."""
     ns = _type_statements('type Tree = Nested | list[Tree]')
@@ -720,6 +760,9 @@ def test_relation_load_type_statement_alias_of_union_in_union():
     [
         pytest.param('type Bad = list[Missing]', id='undefined-name'),
         pytest.param('type Bad = Other\ntype Other = Bad', id='loop'),
+        pytest.param(
+            'type Pairs[T] = list[tuple[T, T]]\nBad = Pairs[int, str]', id='wrong-argument-count'
+        ),
     ],
 )
 def test_relation_load_unresolvable_type_statement_alias_passes_through(source: str):
@@ -1083,6 +1126,20 @@ def test_relation_load_nested_pydantic_model():
         _load_into(
             data_class, {'model': json.dumps({'secret-id': 'a', 'count': -1}), 'models': '[]'}
         )
+
+
+def test_relation_load_nested_dataclass_already_built_by_decoder():
+    """A nested dataclass that a custom decoder has already built is used as-is."""
+
+    @dataclasses.dataclass
+    class Data:
+        inner: Nested
+
+    def decode(raw: str) -> Any:
+        return Nested(**json.loads(raw))
+
+    obj = _load_into(Data, {'inner': json.dumps({'sub': 1})}, decoder=decode)
+    assert obj.inner == Nested(sub=1)
 
 
 @pytest.mark.skipif(

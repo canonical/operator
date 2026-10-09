@@ -1873,11 +1873,11 @@ class Relation:
         Raises:
             TypeError: If coercing a dataclass field finds a decoded value of
                 the wrong shape: a non-mapping for a nested dataclass or a
-                ``dict``, ``frozendict``, or ``Mapping`` field, a string, bytes, or mapping for a
-                sequence or set field (other than a mapping for an
-                ``Iterable`` or ``Collection`` field), or a value that matches
-                none of a ``Union`` field's members. Also raised if a nested
-                dataclass is missing a required field.
+                ``dict``, ``frozendict``, or ``Mapping`` field, a non-iterable,
+                string, bytes, or mapping for a sequence or set field (other
+                than a mapping for an ``Iterable`` or ``Collection`` field), or a
+                value that matches none of a ``Union`` field's members. Also
+                raised if a nested dataclass is missing a required field.
             ValueError: If coercing a dataclass field finds a value that isn't a
                 member of its ``Enum``, or a fixed-length ``tuple`` value with
                 the wrong number of items.
@@ -1898,7 +1898,7 @@ class Relation:
         # For plain (non-pydantic) dataclass targets, recursively coerce the data to
         # match each field's type hint. Pydantic targets handle their own coercion.
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
-        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic 2.11.
+        # checked for before 2.11; '__is_pydantic_dataclass__' only exists from 2.11.
         # The args and kwargs provided by the caller are passed through uncoerced.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
             return dataclass_coercion.build_dataclass(cls, data, args, kwargs)
