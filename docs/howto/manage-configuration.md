@@ -46,8 +46,9 @@ class WikiConfig(pydantic.BaseModel):
     name: str = pydantic.Field('Wiki')
     skin: str = pydantic.Field('vector')
 
-    @pydantic.validator('name')
-    def validate_name(cls, value):
+    @pydantic.field_validator('name')
+    @classmethod
+    def validate_name(cls, value: str) -> str:
         if len(value) < 4:
             raise ValueError('Name must be at least 4 characters long')
         if ' ' in value:
