@@ -35,7 +35,7 @@ permissions: {}
 env:
   # The team's release tools, pinned to a commit rather than a branch.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@cc25c095ea7fee6277d02460771861fb5c5d398f#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@badfec21db1c3e2ab95fccaa3a77f411d7ed2057#subdirectory=changelog
 
 # One run per pull request at a time. Drafts don't reserve their tag name, so
 # two runs of this could each create a draft for the same release.
@@ -195,6 +195,7 @@ jobs:
           TITLE: ${{ steps.assemble.outputs.title }}
           NUMBER: ${{ inputs.pr }}
           URL: ${{ steps.release.outputs.url }}
+          BRANCH: ${{ steps.pr.outputs.branch }}
         shell: python
         run: |
           import os
@@ -207,6 +208,15 @@ jobs:
               f' Nothing is published and the `{version}` tag does not exist yet:'
               ' publishing the draft is a human step, and it is what creates the tag.'
           )
+          # GitHub ticks "Set as the latest release" on every draft, and
+          # ignores what the draft was created with, so this is a reminder
+          # rather than something the draft can carry.
+          if os.environ['BRANCH'] != 'main':
+              explanation += (
+                  f"\n\n**Untick \"Set as the latest release\" before publishing.** This is a"
+                  f" release from `{os.environ['BRANCH']}`, and GitHub ticks the box on every"
+                  ' draft. If it is missed, mark the newest release as the latest again by hand.'
+              )
           summary = f"""\
           ## Draft release: {os.environ['TITLE']}
 
