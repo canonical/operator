@@ -54,7 +54,7 @@ from typing import (
 
 from . import charm as _charm
 from . import hookcmds, pebble
-from ._private import timeconv, tracer, yaml
+from ._private import dataclass_coercion, timeconv, tracer, yaml
 from .jujucontext import JujuContext
 from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
@@ -1807,9 +1807,9 @@ class Relation:
           or Pydantic dataclass then does its own coercion and validation.
         - A ``list``, ``set``, ``frozenset``, or variable-length
           ``tuple[X, ...]`` field is built as that collection type, with each
-          element coerced against the type argument. A ``dict`` field is built
-          as a ``dict``, with each key and value coerced against the key and
-          value types.
+          element coerced against the type argument. A ``dict`` or
+          ``frozendict`` field is built as that mapping type, with each key and
+          value coerced against the key and value types.
         - An abstract collection field is built as a concrete type, with each
           element, key, or value coerced against its type argument: a
           ``list`` for ``Iterable``, ``Collection``, ``Sequence``, or
@@ -1835,12 +1835,10 @@ class Relation:
           and ``str``, and classes that are not dataclasses, enums, or
           Pydantic models. Values keep their decoded type: a ``'1'`` in the
           databag stays a string for an ``int`` field.
-        - A field annotated with a type alias defined with the ``type``
-          statement, such as ``type Pets = list[Pet]``, is passed through
-          unchanged. This also applies when the alias is a member of a
-          ``Union``. To have the value coerced, annotate the field with the
-          aliased type directly, or define the alias with a plain assignment,
-          such as ``Pets = list[Pet]``.
+        - A type alias defined with the ``type`` statement, such as
+          ``type Pets = list[Pet]``, is coerced as the type it aliases. If the
+          alias can't be evaluated (for example, it refers to a name that
+          isn't defined), the value is passed through unchanged.
 
         Type hints are resolved with :func:`typing.get_type_hints`, which
         evaluates string annotations (including those from
@@ -1875,7 +1873,7 @@ class Relation:
         Raises:
             TypeError: If coercing a dataclass field finds a decoded value of
                 the wrong shape: a non-mapping for a nested dataclass or a
-                ``dict`` or ``Mapping`` field, a string, bytes, or mapping for a
+                ``dict``, ``frozendict``, or ``Mapping`` field, a string, bytes, or mapping for a
                 sequence or set field (other than a mapping for an
                 ``Iterable`` or ``Collection`` field), or a value that matches
                 none of a ``Union`` field's members. Also raised if a nested
@@ -1897,14 +1895,13 @@ class Relation:
             elif key in fields:
                 data[fields[key]] = decoder(value)
         kwargs = copy.deepcopy(kwargs)
-        # For plain (non-pydantic) dataclass targets, recursively coerce nested
-        # dataclass / enum / list / set fields. Pydantic handles its own coercion.
+        # For plain (non-pydantic) dataclass targets, recursively coerce the data to
+        # match each field's type hint. Pydantic targets handle their own coercion.
         # '__pydantic_validator__' is what pydantic.dataclasses.is_pydantic_dataclass
-        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic
-        # 2.11, so relying on it misses every earlier 2.x pydantic dataclass.
-        # Positional and keyword arguments are passed through uncoerced.
+        # itself checks for; '__is_pydantic_dataclass__' only exists from pydantic 2.11.
+        # The args and kwargs provided by the caller are passed through uncoerced.
         if dataclasses.is_dataclass(cls) and '__pydantic_validator__' not in cls.__dict__:
-            return _charm._build_dataclass(cls, data, args, kwargs)
+            return dataclass_coercion.build_dataclass(cls, data, args, kwargs)
         # Relation data wins over a keyword argument of the same name.
         return cls(*args, **{**kwargs, **data})
 

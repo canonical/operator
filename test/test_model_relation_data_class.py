@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import builtins
 import collections.abc
 import dataclasses
 import enum
@@ -543,6 +544,39 @@ def test_relation_load_dict_with_enum_keys():
     assert obj.by_colour == {_Colour.RED: Nested(sub=1)}
 
 
+_FROZENDICT: Any = getattr(builtins, 'frozendict', None)
+
+
+@pytest.mark.skipif(_FROZENDICT is None, reason='frozendict is new in Python 3.15')
+def test_relation_load_frozendict():
+    """frozendict[K, V] fields are built as a frozendict, with keys and values coerced."""
+    data_class = dataclasses.make_dataclass('Data', [('by_colour', _FROZENDICT[_Colour, Nested])])
+
+    obj = _load_into(data_class, {'by_colour': json.dumps({'red': {'sub': 1}})})
+    assert obj.by_colour == _FROZENDICT({_Colour.RED: Nested(sub=1)})
+    assert type(obj.by_colour) is _FROZENDICT
+
+
+@pytest.mark.skipif(_FROZENDICT is None, reason='frozendict is new in Python 3.15')
+def test_relation_load_bare_frozendict():
+    """A bare frozendict field is built as a frozendict without coercing its items."""
+    data_class = dataclasses.make_dataclass('Data', [('value', _FROZENDICT)])
+
+    obj = _load_into(data_class, {'value': json.dumps({'a': 'red'})})
+    assert obj.value == _FROZENDICT({'a': 'red'})
+    assert type(obj.value) is _FROZENDICT
+
+
+@pytest.mark.skipif(_FROZENDICT is None, reason='frozendict is new in Python 3.15')
+def test_relation_load_frozendict_rejects_non_mapping(monkeypatch: pytest.MonkeyPatch):
+    """A non-mapping value for a frozendict field raises."""
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'true')
+    data_class = dataclasses.make_dataclass('Data', [('value', _FROZENDICT[str, int])])
+
+    with pytest.raises(TypeError, match='expected a mapping'):
+        _load_into(data_class, {'value': json.dumps([1])})
+
+
 def test_relation_load_union_of_two_concrete_types_passes_through():
     """A Union with more than one concrete member is passed through as-is.
 
@@ -624,9 +658,17 @@ def test_relation_load_union_with_any_or_object_member_passes_through(wildcard: 
     assert obj.value == {'sub': 1}
 
 
+def test_relation_load_union_with_typevar_member_passes_through():
+    """A TypeVar member isn't a class, so checking it against the other members doesn't fail."""
+    data_class = dataclasses.make_dataclass('Data', [('value', str | typing.TypeVar('T'))])
+
+    obj = _load_into(data_class, {'value': json.dumps('red')})
+    assert obj.value == 'red'
+
+
 @pytest.mark.parametrize('form', ['alias', 'alias-or-none', 'alias-or-int'])
-def test_relation_load_type_statement_alias_passes_through(form: str):
-    """A type alias from the type statement isn't resolved, so the value is passed through."""
+def test_relation_load_type_statement_alias(form: str):
+    """A type alias from the type statement is coerced as the type it aliases."""
     if sys.version_info < (3, 12):
         pytest.skip('the type statement needs Python 3.12')
     alias = typing.TypeAliasType('Pets', list[Nested])
@@ -634,7 +676,64 @@ def test_relation_load_type_statement_alias_passes_through(form: str):
     data_class = dataclasses.make_dataclass('Data', [('value', annotation)])
 
     obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [Nested(sub=1)]
+
+
+def _type_statements(source: str) -> dict[str, Any]:
+    """Run type statements, which are a syntax error before Python 3.12."""
+    if sys.version_info < (3, 12):
+        pytest.skip('the type statement needs Python 3.12')
+    namespace: dict[str, Any] = {'Nested': Nested, '_Colour': _Colour}
+    exec(source, namespace)  # ruff: ignore[exec-builtin]
+    return namespace
+
+
+def test_relation_load_generic_type_statement_alias():
+    """A generic type alias is coerced with its type arguments substituted."""
+    ns = _type_statements('type Pairs[T] = list[tuple[T, T]]')
+    data_class = dataclasses.make_dataclass('Data', [('value', ns['Pairs'][_Colour])])
+
+    obj = _load_into(data_class, {'value': json.dumps([['red', 'blue']])})
+    assert obj.value == [(_Colour.RED, _Colour.BLUE)]
+
+
+def test_relation_load_recursive_type_statement_alias():
+    """A recursive type alias is coerced as deep as the data goes."""
+    ns = _type_statements('type Tree = Nested | list[Tree]')
+    data_class = dataclasses.make_dataclass('Data', [('value', ns['Tree'])])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}, [{'sub': 2}]])})
+    assert obj.value == [Nested(sub=1), [Nested(sub=2)]]
+
+
+def test_relation_load_type_statement_alias_of_union_in_union():
+    """A union member that aliases a union is expanded, so its members are matched by shape."""
+    ns = _type_statements('type PetsOrName = list[Nested] | str')
+    data_class = dataclasses.make_dataclass('Data', [('value', ns['PetsOrName'] | int)])
+
+    obj = _load_into(data_class, {'value': json.dumps([{'sub': 1}])})
+    assert obj.value == [Nested(sub=1)]
+
+
+@pytest.mark.parametrize(
+    'source',
+    [
+        pytest.param('type Bad = list[Missing]', id='undefined-name'),
+        pytest.param('type Bad = Other\ntype Other = Bad', id='loop'),
+    ],
+)
+def test_relation_load_unresolvable_type_statement_alias_passes_through(source: str):
+    """A type alias that can't be resolved is passed through, alone or in a Union."""
+    ns = _type_statements(source)
+    data_class = dataclasses.make_dataclass(
+        'Data', [('value', ns['Bad']), ('maybe', ns['Bad'] | int)]
+    )
+
+    obj = _load_into(
+        data_class, {'value': json.dumps([{'sub': 1}]), 'maybe': json.dumps([{'sub': 1}])}
+    )
     assert obj.value == [{'sub': 1}]
+    assert obj.maybe == [{'sub': 1}]
 
 
 def test_relation_load_union_with_none_member():
@@ -881,6 +980,9 @@ def test_relation_load_sequence_field_rejects_string_or_mapping(monkeypatch: pyt
     with pytest.raises(TypeError, match='expected a sequence'):
         _load_into(Data, {'tags': json.dumps({'a': 1})})
 
+    with pytest.raises(TypeError, match='expected a sequence'):
+        _load_into(Data, {'tags': json.dumps(1)})
+
     @dataclasses.dataclass
     class SetData:
         tags: set[str]
@@ -983,6 +1085,25 @@ def test_relation_load_nested_pydantic_model():
         )
 
 
+@pytest.mark.skipif(
+    pydantic is None,
+    reason='pydantic is not available, so we cannot test pydantic-based classes.',
+)
+def test_relation_load_nested_pydantic_dataclass():
+    """A nested Pydantic dataclass is built by Pydantic, which applies aliases and validation."""
+    assert pydantic is not None
+
+    @pydantic.dataclasses.dataclass
+    class Inner:
+        secret_id: str = pydantic.Field(alias='secret-id')
+        count: int = 0
+
+    data_class = dataclasses.make_dataclass('Data', [('inner', Inner)])
+    obj = _load_into(data_class, {'inner': json.dumps({'secret-id': 'a', 'count': '2'})})
+    assert isinstance(obj.inner, Inner)
+    assert (obj.inner.secret_id, obj.inner.count) == ('a', 2)
+
+
 @pytest.mark.parametrize(
     'written',
     [
@@ -997,7 +1118,7 @@ def test_relation_load_nested_pydantic_model():
 def test_relation_load_rejects_a_non_mapping_for_a_nested_dataclass(written: str):
     """A remote app can write anything, and ops must not invent an object from it.
 
-    `_build_dataclass` decides which fields to fill with `field.name not in
+    `build_dataclass` decides which fields to fill with `field.name not in
     data`, which is False for every field of a string or a list, so without
     this guard the charm is handed a confidently default-constructed object
     corresponding to nothing in the databag - or a TypeError from inside ops,
