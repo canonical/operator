@@ -13,13 +13,14 @@ it needs comes from the environment the workflow sets:
     CHANGELOG      The uvx `--from` spec for the team's changelog tool.
 
 It writes the changelog entry for the commits since the last tag to
-`$RUNNER_TEMP/changes-entry.md`, for the later steps, and sets `previous` and
-`version` as step outputs.
+`$RUNNER_TEMP/changes-entry.md`, for the later steps, and sets `previous`,
+`version` and `newest` as step outputs.
 Every refusal is a workflow error annotation and a non-zero exit.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
@@ -42,6 +43,46 @@ def fail(message: str) -> typing.NoReturn:
     """Report an error annotation on the workflow run, and stop."""
     print(f'::error::{message}')
     sys.exit(1)
+
+
+def backports(repository: str, log: str, runner_temp: pathlib.Path) -> pathlib.Path:
+    """Fetch the commits of each pull request in the range, for the changelog tool.
+
+    A maintenance branch takes its fixes from main as one squash-merged pull
+    request of cherry-picks, which leaves a single subject in the git log.
+    The pull request's own commits still have the cherry-picks' subjects,
+    and the changelog tool uses them to list the fixes individually. A pull
+    request whose commits can't be fetched is listed as one line, as it would
+    be without this, rather than stopping the release.
+    """
+    commits: dict[str, list[dict[str, str]]] = {}
+    for number in sorted(set(re.findall(r'\(#(\d+)\)$', log, re.MULTILINE))):
+        endpoint = f'repos/{repository}/pulls/{number}/commits'
+        try:
+            pages = json.loads(run('gh', 'api', '--paginate', '--slurp', endpoint))
+        except subprocess.CalledProcessError:
+            print(
+                f"::warning::Couldn't fetch the commits of #{number}, so it is listed as one line."
+            )
+            continue
+        listed = [commit for page in pages for commit in page]
+        commits[number] = [
+            {
+                'name': c['commit']['author']['name'],
+                'email': c['commit']['author']['email'],
+                'subject': c['commit']['message'].partition('\n')[0],
+            }
+            for c in listed
+        ]
+    path = runner_temp / 'backports.json'
+    path.write_text(json.dumps(commits))
+    return path
+
+
+def newest_release() -> str:
+    """The highest X.Y.Z release tag in the repository, from any branch."""
+    tags = run('git', 'tag', '--list', '[0-9]*.[0-9]*.[0-9]*', '--sort=-v:refname').split()
+    return next((tag for tag in tags if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', tag)), '')
 
 
 def main() -> None:
@@ -70,6 +111,7 @@ def main() -> None:
     log = run(
         'git', 'log', '--reverse', '--no-merges', f'--format={log_format}', f'{previous}..HEAD'
     )
+    subjects = run('git', 'log', '--no-merges', '--format=%s', f'{previous}..HEAD')
 
     if version_input:
         # An explicit version is used as it stands, with no inference: it is
@@ -116,14 +158,19 @@ def main() -> None:
             f'A release-prep-{version} branch already exists. Delete it, or finish the pull request that goes with it, before proposing {version} again.'
         )
 
-    entry = run(*tool, 'changes-entry', '--repo', repository, '--tag', version, input=log)
+    # Only a maintenance branch takes batches of cherry-picks, and it has few
+    # enough pull requests that asking about each one costs nothing.
+    extra: tuple[str, ...] = ()
+    if branch.endswith('-maintenance'):
+        extra = ('--backports', str(backports(repository, subjects, runner_temp)))
+    entry = run(*tool, 'changes-entry', '--repo', repository, '--tag', version, *extra, input=log)
     (runner_temp / 'changes-entry.md').write_text(entry)
     print(entry, end='')
 
     count = run('git', 'rev-list', '--count', f'{previous}..HEAD').strip()
     print(f'Releasing {version}, from the {count} commits since {previous}.')
     with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write(f'previous={previous}\nversion={version}\n')
+        f.write(f'previous={previous}\nversion={version}\nnewest={newest_release()}\n')
 
 
 if __name__ == '__main__':

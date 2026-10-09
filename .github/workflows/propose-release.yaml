@@ -47,9 +47,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@cc25c095ea7fee6277d02460771861fb5c5d398f#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@badfec21db1c3e2ab95fccaa3a77f411d7ed2057#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@cc25c095ea7fee6277d02460771861fb5c5d398f#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@badfec21db1c3e2ab95fccaa3a77f411d7ed2057#subdirectory=draft-release-notes
 
 jobs:
   propose:
@@ -115,6 +115,7 @@ jobs:
         env:
           VERSION: ${{ steps.propose.outputs.version }}
           PREVIOUS: ${{ steps.propose.outputs.previous }}
+          NEWEST: ${{ steps.propose.outputs.newest }}
           BRANCH: ${{ inputs.branch }}
           # The model is a repository variable rather than something pinned
           # here, so that changing it is a settings edit and not a pull
@@ -139,6 +140,7 @@ jobs:
             --compare-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$PREVIOUS...$VERSION" \
             --commits "$RUNNER_TEMP/commits.txt" \
             --docs-url https://canonical.com/juju/docs/ops/latest \
+            --newest-release "$NEWEST" \
             --output "$RUNNER_TEMP/release-notes.md" \
             --title-output "$RUNNER_TEMP/release-title.md"
 
@@ -162,6 +164,15 @@ jobs:
           notes = (temp / 'release-notes.md').read_text()
           changes_entry = (temp / 'changes-entry.md').read_text()
           template = pathlib.Path('release-tools/.github/release/release-pr-body.md').read_text()
+          # GitHub ticks "Set as the latest release" on every draft, whatever
+          # it was created with, so the person publishing has to untick it.
+          if branch == 'main':
+              latest_advice = 'Leave "Set as the latest release" ticked.'
+          else:
+              latest_advice = (
+                  'Untick "Set as the latest release" first: GitHub ticks it on every draft,'
+                  f' and a release from `{branch}` is not the latest.'
+              )
           body = string.Template(template).substitute(
               version=version,
               branch=branch,
@@ -169,6 +180,7 @@ jobs:
               repo_url=repo_url,
               title=title,
               notes=notes,
+              latest_advice=latest_advice,
           )
           (temp / 'pr-body.md').write_text(body)
 
@@ -211,9 +223,16 @@ jobs:
           git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
             "HEAD:refs/heads/$head_branch"
 
-          url=$(gh pr create --repo "$GITHUB_REPOSITORY" \
+          # A draft, so that whoever ran this can resolve the Unsure notes and
+          # tidy the title and notes before asking anyone else to look.
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" --draft \
             --base "$BRANCH" --head "$head_branch" \
             --title "chore: update changelog and versions for $VERSION release" \
             --body-file "$RUNNER_TEMP/pr-body.md")
+          # The next steps name this pull request's number, since it is the
+          # input to the next workflow, and the number only exists now.
+          number=${url##*/}
+          sed "s/@PR_NUMBER@/$number/g" "$RUNNER_TEMP/pr-body.md" > "$RUNNER_TEMP/pr-body-numbered.md"
+          gh pr edit "$url" --body-file "$RUNNER_TEMP/pr-body-numbered.md"
           echo "Opened $url"
           printf '\n### Pull request\n\n%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"
