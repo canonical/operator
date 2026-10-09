@@ -26,10 +26,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 testing = [
-    "ops-scenario==8.9.0.dev0",
+    "ops-scenario==8.9.0",
 ]
 tracing = [
-    "ops-tracing==3.9.0.dev0",
+    "ops-tracing==3.9.0",
 ]
 # Empty for now, because Harness is bundled with the base install, but allow
 # specifying the extra to ease transition later.
@@ -69,11 +69,6 @@ integration = [
     "jubilant-backports",
     "minio~=7.2",
     "httpx~=0.28",
-]
-release = [
-    "packaging>=24,<27",
-    "pygithub~=2.6",
-    "rich>=14.1,<16.0",
 ]
 tiobe = [
     "flake8==7.4.1",
@@ -256,6 +251,9 @@ exclude = ["tracing/ops_tracing/vendor/*"]
 ".github/patch-charm-deps.py" = [
     "start-process-with-partial-path",  # S607
 ]
+".github/release/propose-release-version.py" = [
+    "line-too-long",  # E501: The failure messages read best kept whole.
+]
 "docs/custom_conf.py" = [
     "undocumented-public-module",  # D100
     "undocumented-public-class",  # D101
@@ -275,9 +273,20 @@ convention = "google"
 builtins-ignorelist = ["id", "min", "map", "range", "type", "TimeoutError", "ConnectionError", "Warning", "input", "format"]
 
 [tool.pyright]
-include = ["ops/*.py", "ops/_private/*.py", "test/*.py", "test/charms/*/src/*.py", "testing/src/*.py", "testing/src/scenario/*.py", "testing/tests/*.py", "testing/tests/test_e2e/*.py"]
+# Whole trees rather than a list of directories, so that a new package or test
+# charm is checked from the day it's added. What isn't checked yet is listed
+# explicitly below instead.
+include = [".github/release", "ops", "test", "testing"]
 exclude = [
     "tracing/*",
+    # Legacy, and not yet clean.
+    "ops/lib",
+    # A symlink to ops, which is already checked as itself.
+    "test/charms/test_main/lib",
+    # Not yet clean: mostly Any from the juju and jubilant APIs.
+    "test/integration",
+    "test/smoke",
+    "testing/tests/benchmark",
 ]
 extraPaths = ["testing", "tracing"]
 pythonVersion = "3.10" # check no python > 3.10 features are used

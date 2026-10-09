@@ -727,7 +727,7 @@ class TestFramework:
             foo = ops.EventSource(MyEvent)
 
         class MyNotifier(ops.Object):
-            on = MyEvents()  # type: ignore
+            on = MyEvents()
 
         class MyObserver(ops.Object):
             def _on_foo(self, event: ops.EventBase):
@@ -836,7 +836,7 @@ class TestFramework:
             bar = ops.EventSource(MyEvent)
 
         class MyNotifier(ops.Object):
-            on = MyEvents()  # type: ignore
+            on = MyEvents()
 
         class MyObserver(ops.Object):
             def __init__(self, parent: ops.Object, key: str):
@@ -890,7 +890,7 @@ class TestFramework:
         with pytest.raises(RuntimeError) as excinfo:
 
             class MyNotifier(ops.Object):  # type: ignore
-                on = MyEvents()  # type: ignore
+                on = MyEvents()
                 bar = event
 
         if hasattr(excinfo.value, '__notes__'):
@@ -955,7 +955,7 @@ class TestFramework:
             foo = ops.EventSource(MyFoo)
 
         class MyNotifier(ops.Object):
-            on = MyEvents()  # type: ignore
+            on = MyEvents()
             bar = ops.EventSource(MyBar)
 
         class MyObserver(ops.Object):
@@ -1159,7 +1159,7 @@ class TestFramework:
             foo = ops.EventSource(FooEvent)
 
         class Emitter(ops.Object):
-            on = Events()  # type: ignore
+            on = Events()
 
         framework = create_framework(request)
         e = Emitter(framework, 'key')
@@ -1199,7 +1199,7 @@ class TestFramework:
 
         class ObjectWithStorage(ops.Object):
             _stored = ops.StoredState()
-            on = Events()  # type: ignore
+            on = Events()
 
             def __init__(self, framework: ops.Framework, key: str):
                 super().__init__(framework, key)
@@ -1395,6 +1395,13 @@ class TestStoredState:
             obj._stored.foo
         except AttributeError as e:
             assert str(e) == "attribute 'foo' is not stored"
+        else:
+            pytest.fail('AttributeError not raised')
+
+        try:
+            obj._stored.on
+        except AttributeError as e:
+            assert str(e) == "attribute 'on' is reserved"
         else:
             pytest.fail('AttributeError not raised')
 

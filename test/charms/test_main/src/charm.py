@@ -40,7 +40,7 @@ class MyCharmEvents(ops.CharmEvents):
 
 
 class Charm(ops.CharmBase):
-    on = MyCharmEvents()  # type: ignore
+    on = MyCharmEvents()
 
     _stored = ops.StoredState()
 
