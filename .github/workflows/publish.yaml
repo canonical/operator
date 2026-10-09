@@ -77,4 +77,4 @@ jobs:
 
   secscan:
     if: ${{ github.event_name == 'release' }}
-    uses: ./.github/workflows/sbom-secscan.yaml
+    uses: $/.github/workflows/sbom-secscan.yaml
