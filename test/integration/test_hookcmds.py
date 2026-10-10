@@ -161,10 +161,9 @@ def test_status_get_app(juju: jubilant.Juju, leader: str):
     # Leader should also return app fields.
     assert 'app-status' in results
     assert 'app-message' in results
-    assert 'app-unit-count' in results
-    # Machine charms: status-get --application does not populate per-unit status (returns 0).
-    # K8s charms: returns the unit count. Accept either.
-    assert int(results['app-unit-count']) >= 0
+    # Juju nests the unit statuses inside the application status.
+    assert results['app-unit-count'] == '2'
+    assert results['app-unit-names'] == 'test-hookcmds/0,test-hookcmds/1'
 
 
 def test_status_set_and_get(juju: jubilant.Juju, any_unit: str):
@@ -218,6 +217,13 @@ def test_config_get_int_key(juju: jubilant.Juju, any_unit: str):
     assert task.results['type'] == 'int'
 
 
+def test_config_get_missing_key(juju: jubilant.Juju, any_unit: str):
+    """config_get(key) for an option that doesn't exist returns None."""
+    task = juju.run(any_unit, 'get-config-value', params={'key': 'no-such-opt'})
+    assert task.success
+    assert task.results['type'] == 'NoneType'
+
+
 # Leadership (is_leader)
 
 
@@ -239,7 +245,7 @@ def test_is_leader_false_for_nonleader(juju: jubilant.Juju, nonleader: str):
 
 
 def test_juju_log_all_levels(juju: jubilant.Juju, any_unit: str):
-    """juju_log at all five log levels does not raise; running without error is the check."""
+    """juju_log at all six log levels does not raise; running without error is the check."""
     task = juju.run(any_unit, 'test-logging', params={'message': 'hookcmds integration test'})
     assert task.success
 
@@ -389,9 +395,15 @@ def test_secret_full_lifecycle(juju: jubilant.Juju, leader: str):
     assert r['initial-label'] == 'hookcmds-inttest'
     assert r['initial-description'] == 'Created by ops.hookcmds integration test'
     assert r['initial-revision'] == '1'
+    assert r['initial-owner'] == 'application'
     assert r['initial-password'] == 'initial-secret'
     assert r['updated-password'] == 'updated-secret'
     assert r['updated-description'] == 'Updated by hookcmds test'
+    # secret_set's owner argument is deprecated, and Juju ignores it anyway.
+    assert r['owner-warnings'] == 'DeprecationWarning'
+    assert r['updated-owner'] == 'application'
+    assert r['bare-label'] == "''"
+    assert r['bare-description'] == "''"
     assert r['label-lookup-password']  # non-empty
 
     # After the action the secret is fully removed; verify via juju.
@@ -445,6 +457,7 @@ def test_relation_data_roundtrip(juju: jubilant.Juju, leader: str):
     assert r['relation-id-int'].isdigit()
     assert int(r['member-count']) == 1
     assert r['retrieved-value'] == 'verified-by-integration-test'
+    assert r['missing-key-type'] == 'NoneType'
     all_data = json.loads(r['all-data'])
     assert 'hookcmds-inttest' in all_data
     assert all_data['hookcmds-inttest'] == 'verified-by-integration-test'
@@ -570,6 +583,11 @@ def test_secret_grant_revoke(juju: jubilant.Juju, leader: str):
     _xfail_juju4_commit_bug(juju, None)
     assert task.success
     assert task.results['revoked'] == 'true'
+    access = json.loads(task.results['access'])
+    assert len(access) == 1, access
+    assert access[0]['target'] == 'application-any-charm'
+    assert access[0]['role'] == 'view'
+    assert access[0]['scope'].startswith('relation-')
 
     # Verify the secret is fully gone from Juju's perspective.
     secrets = juju.secrets()
@@ -605,7 +623,7 @@ def test_storage_add(juju: jubilant.Juju, any_unit: str):
 
 
 def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
-    """open_port with endpoints='peer' appears scoped in opened_ports(endpoints=True)."""
+    """open_port with two endpoints appears with both in opened_ports(endpoints=True)."""
     # On Juju 4.0/k8s this action times out on the driver side, matching the
     # uniter commit-phase regression pattern. May be a separate upstream bug
     # from the secret ones; xfail until pinned down.
@@ -620,7 +638,7 @@ def test_ports_endpoint_scoped(juju: jubilant.Juju, any_unit: str):
         f'Port 7766/tcp not found with endpoint info; endpoints-list={r.get("endpoints-list")}'
     )
     assert r['endpoint-matches'] == 'true', (
-        f"Expected endpoint 'peer' in endpoints-list, got: {r.get('endpoints-list')}"
+        f"Expected endpoints 'peer' and 'anycharm', got: {r.get('endpoints-list')}"
     )
     assert r['closed-after'] == 'true'
 

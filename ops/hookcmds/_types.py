@@ -279,6 +279,34 @@ class RelationModel:
         )
 
 
+class SecretAccessDict(TypedDict):
+    target: str
+    scope: str
+    role: str
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class SecretAccess:
+    """A grant of access to a secret, found in :class:`SecretInfo` objects."""
+
+    target: str
+    """The entity that has access, such as ``application-mysql`` or ``unit-mysql-0``."""
+
+    scope: str
+    """The scope of the grant, such as ``relation-wordpress.db#mysql.server``."""
+
+    role: str
+    """The role granted, such as ``view`` or ``manage``."""
+
+    @classmethod
+    def _from_dict(cls, d: SecretAccessDict) -> SecretAccess:
+        return cls(
+            target=d['target'],
+            scope=d['scope'],
+            role=d['role'],
+        )
+
+
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class SecretInfo:
     """Metadata for Juju secrets."""
@@ -291,17 +319,30 @@ class SecretInfo:
     rotation: SecretRotate | None = None
     rotates: datetime.datetime | None = None
 
+    owner: Literal['application', 'unit', 'model'] | None = None
+    """The kind of entity that owns the secret."""
+
+    access: list[SecretAccess] = dataclasses.field(default_factory=list[SecretAccess])
+    """The grants of access to the secret.
+
+    .. jujuadded:: 3.4
+    """
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> SecretInfo:
         id, data = next(iter(d.items()))  # Juju returns dict of {secret_id: {info}}
+        # Juju omits the description and access when they are empty.
+        access: list[SecretAccessDict] = data.get('access') or []
         return cls(
             id=id,
-            label=data.get('label'),
-            description=data.get('description'),
+            label=data.get('label', ''),
+            description=data.get('description', ''),
             expiry=timeconv.parse_rfc3339(data['expiry']) if data.get('expiry') else None,
             rotation=data.get('rotation'),
             rotates=timeconv.parse_rfc3339(data['rotates']) if data.get('rotates') else None,
             revision=data['revision'],
+            owner=data.get('owner'),
+            access=[SecretAccess._from_dict(a) for a in access],
         )
 
 
@@ -323,11 +364,19 @@ class Storage:
 StatusDict = TypedDict(
     'StatusDict', {'message': str, 'status': str, 'status-data': dict[str, Any]}
 )
+AppStatusDetailsDict = TypedDict(
+    'AppStatusDetailsDict',
+    {
+        'message': str,
+        'status': str,
+        'status-data': dict[str, Any],
+        'units': dict[str, StatusDict],
+    },
+)
 AppStatusDict = TypedDict(
     'AppStatusDict',
     {
-        'application-status': StatusDict,
-        'units': dict[str, StatusDict],
+        'application-status': AppStatusDetailsDict,
     },
 )
 
@@ -360,8 +409,9 @@ class AppStatus:
 
     @classmethod
     def _from_dict(cls, d: AppStatusDict) -> AppStatus:
-        units = {name: UnitStatus._from_dict(u) for name, u in d.get('units', {}).items()}
+        # Juju nests the unit statuses inside the application status.
         app = d['application-status']
+        units = {name: UnitStatus._from_dict(u) for name, u in app.get('units', {}).items()}
         return cls(
             status=app['status'],
             message=app['message'],

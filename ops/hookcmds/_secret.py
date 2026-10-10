@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 import tempfile
+import warnings
 from typing import Any, Literal, overload
 
 from ._types import SecretInfo, SecretRotate
@@ -234,7 +235,11 @@ def secret_remove(id: str, *, revision: int | None = None):
 
 
 def secret_revoke(
-    id: str, *, relation_id: int | None, app: str | None = None, unit: str | None = None
+    id: str,
+    *,
+    relation_id: int | None = None,
+    app: str | None = None,
+    unit: str | None = None,
 ):
     """Revoke access to a secret.
 
@@ -266,12 +271,16 @@ def secret_set(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] = 'application',
+    owner: Literal['application', 'unit'] | None = None,
 ):
     """Update an existing secret.
 
     For more details, see:
     `Juju | Hook commands | secret-set <https://documentation.ubuntu.com/juju/3.6/reference/hook-command/list-of-hook-commands/secret-set/>`_
+
+    .. deprecated:: 3.9.0
+        The ``owner`` argument has no effect, as Juju ignores the owner when
+        updating a secret.
 
     Args:
         id: The ID of the secret to update.
@@ -280,8 +289,16 @@ def secret_set(
         description: The secret description.
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
-        owner: The owner of the secret, either the application or the unit.
+        owner: Deprecated, and has no effect. The owner set by
+            :func:`secret_add` is kept.
     """
+    if owner is not None:
+        warnings.warn(
+            'The owner argument to secret_set has no effect, as Juju does not '
+            'change the owner of an existing secret.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
     args: list[str] = []
     if label is not None:
         args.extend(['--label', label])
@@ -294,7 +311,6 @@ def secret_set(
             args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    args.extend(['--owner', owner])
     args.append(id)
 
     # Always use "key#file" arguments to provide the content to avoid secret data

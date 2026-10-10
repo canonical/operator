@@ -199,8 +199,9 @@ actions:
             relation ID used for the grant.
     test-secret-revoke:
         description: |
-            Revoke the grant on a previously granted secret (from test-secret-grant)
-            and remove the secret entirely.
+            Return the access grants on a previously granted secret (from
+            test-secret-grant) via secret_info_get, then revoke the grant and
+            remove the secret entirely.
         params:
             secret-id:
                 type: string
@@ -211,10 +212,11 @@ actions:
             hookcmds.storage_add and return the current count before adding.
     test-ports-endpoint-scoped:
         description: |
-            Open a TCP port scoped to the peer endpoint, verify it appears with
-            the correct endpoint via opened_ports(endpoints=True), then close it.
+            Open a TCP port scoped to the peer and anycharm endpoints, verify it
+            appears with both endpoints via opened_ports(endpoints=True), then
+            close it.
         params:
             port:
                 type: integer
-                description: Port number to open/close, scoped to the peer endpoint.
+                description: Port number to open/close, scoped to the peer and anycharm endpoints.
                 default: 7766

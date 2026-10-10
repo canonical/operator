@@ -188,6 +188,15 @@ def test_run_error(run: Run):
     assert excinfo.value.stderr == 'error msg'
 
 
+def test_run_missing_command(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    monkeypatch.setenv('PATH', str(tmp_path))
+    with pytest.raises(hookcmds.Error) as excinfo:
+        hookcmds.secret_ids()
+    assert excinfo.value.returncode == 127
+    assert excinfo.value.cmd == ['secret-ids', '--format=json']
+    assert isinstance(excinfo.value.__cause__, FileNotFoundError)
+
+
 def test_action_fail(run: Run):
     run.handle(['action-fail'])
     hookcmds.action_fail()
@@ -290,6 +299,12 @@ def test_config_get_key(run: Run):
     assert result == 42
 
 
+def test_config_get_key_missing(run: Run):
+    run.handle(['config-get', '--format=json', 'baz'], stdout='null')
+    result = hookcmds.config_get('baz')
+    assert result is None
+
+
 def test_credential_get(run: Run):
     cred: dict[str, Any] = {
         'type': 'cloud',
@@ -372,6 +387,11 @@ def test_juju_log(run: Run):
 def test_juju_log_level(run: Run):
     run.handle(['juju-log', '--log-level', 'DEBUG', '--', 'debug msg'])
     hookcmds.juju_log('debug msg', level='DEBUG')
+
+
+def test_juju_log_critical(run: Run):
+    run.handle(['juju-log', '--log-level', 'CRITICAL', '--', 'critical msg'])
+    hookcmds.juju_log('critical msg', level='CRITICAL')
 
 
 def test_juju_reboot(run: Run):
@@ -466,14 +486,25 @@ def test_opened_ports(run: Run):
 
 
 def test_opened_ports_endpoints(run: Run):
+    # This is the format Juju uses: endpoints are separated by ", ".
     run.handle(
         ['opened-ports', '--endpoints', '--format=json'],
-        stdout='["8080/tcp (ep1,ep2)"]',
+        stdout=json.dumps([
+            'icmp (*)',
+            '80/tcp (db, web)',
+            '443/tcp (*)',
+            '9000/tcp (peer)',
+            '8000-8100/udp (web)',
+        ]),
     )
     result = hookcmds.opened_ports(endpoints=True)
-    assert result[0].port == 8080
-    assert result[0].protocol == 'tcp'
-    assert result[0].endpoints == ['ep1', 'ep2']
+    assert result == [
+        hookcmds.Port(protocol='icmp', port=None, to_port=None, endpoints=['*']),
+        hookcmds.Port(protocol='tcp', port=80, to_port=None, endpoints=['db', 'web']),
+        hookcmds.Port(protocol='tcp', port=443, to_port=None, endpoints=['*']),
+        hookcmds.Port(protocol='tcp', port=9000, to_port=None, endpoints=['peer']),
+        hookcmds.Port(protocol='udp', port=8000, to_port=8100, endpoints=['web']),
+    ]
 
 
 @pytest.mark.parametrize('id', [None, 123])
@@ -508,6 +539,12 @@ def test_relation_get_key(run: Run, id: int | None, app: bool, unit: str | None)
     run.handle(cmd, stdout='"qux"')
     result = hookcmds.relation_get(key='baz', id=id, app=app, unit=unit)
     assert result == 'qux'
+
+
+def test_relation_get_key_missing(run: Run):
+    run.handle(['relation-get', '--format=json', '-r', '1', 'baz', 'myapp/0'], stdout='null')
+    result = hookcmds.relation_get(1, key='baz', unit='myapp/0')
+    assert result is None
 
 
 def test_relation_get_dash():
@@ -751,6 +788,54 @@ def test_secret_info_get_label(run: Run):
     assert result.label == 'lbl'
 
 
+def test_secret_info_get_owner_and_access(run: Run):
+    # This is the output of Juju 3.6 and 4.0 for a secret granted on a relation.
+    info = {
+        'kjgd9hr9jqn57rb5fgdg': {
+            'revision': 1,
+            'label': 'app-lbl',
+            'owner': 'application',
+            'description': 'app desc',
+            'rotation': 'daily',
+            'expiry': '2026-10-08T23:23:22Z',
+            'rotates': '2026-10-08T23:23:22Z',
+            'access': [
+                {'target': 'application-b', 'scope': 'relation-a.db#b.web', 'role': 'view'},
+                {'target': 'unit-c-0', 'scope': 'relation-a.db#c.web', 'role': 'view'},
+            ],
+        }
+    }
+    run.handle(['secret-info-get', '--format=json', 'secret:123'], stdout=json.dumps(info))
+    result = hookcmds.secret_info_get(id='secret:123')
+    when = datetime.datetime(2026, 10, 8, 23, 23, 22, tzinfo=datetime.timezone.utc)
+    assert result == hookcmds.SecretInfo(
+        id='kjgd9hr9jqn57rb5fgdg',
+        revision=1,
+        label='app-lbl',
+        owner='application',
+        description='app desc',
+        rotation='daily',
+        expiry=when,
+        rotates=when,
+        access=[
+            hookcmds.SecretAccess(
+                target='application-b', scope='relation-a.db#b.web', role='view'
+            ),
+            hookcmds.SecretAccess(target='unit-c-0', scope='relation-a.db#c.web', role='view'),
+        ],
+    )
+
+
+def test_secret_info_get_minimal(run: Run):
+    # Juju omits the description and access when they are empty.
+    info = {'123': {'revision': 1, 'label': '', 'owner': 'unit', 'rotation': 'never'}}
+    run.handle(['secret-info-get', '--format=json', 'secret:123'], stdout=json.dumps(info))
+    result = hookcmds.secret_info_get(id='secret:123')
+    assert result == hookcmds.SecretInfo(
+        id='123', revision=1, label='', owner='unit', description='', rotation='never'
+    )
+
+
 def test_secret_remove(run: Run):
     run.handle(['secret-remove', 'id'])
     hookcmds.secret_remove('id')
@@ -777,21 +862,21 @@ def test_secret_revoke(run: Run, relation_id: int | None, app: str | None, unit:
     hookcmds.secret_revoke('secret:id', relation_id=relation_id, app=app, unit=unit)
 
 
+def test_secret_revoke_app_only(run: Run):
+    run.handle(['secret-revoke', '--app', 'remote-app', 'secret:id'])
+    hookcmds.secret_revoke('secret:id', app='remote-app')
+
+
 def test_secret_set(run: Run, mock_temp_dir: str):
     run.handle([
         'secret-set',
-        '--owner',
-        'application',
         'secret:123',
         f'foo#file={mock_temp_dir}/foo',
     ])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
 
-@pytest.mark.parametrize('owner', ['application', 'unit'])
-def test_secret_set_with_metadata(
-    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
-):
+def test_secret_set_with_metadata(run: Run, mock_temp_dir: str):
     run.handle(
         [
             'secret-set',
@@ -803,8 +888,6 @@ def test_secret_set_with_metadata(
             '3d',
             '--rotate',
             'quarterly',
-            '--owner',
-            owner,
             'secret:id',
             f'foo#file={mock_temp_dir}/foo',
         ],
@@ -817,8 +900,17 @@ def test_secret_set_with_metadata(
         description='mydesc',
         expire='3d',
         rotate='quarterly',
-        owner=owner,
     )
+
+
+@pytest.mark.parametrize('owner', ['application', 'unit'])
+def test_secret_set_owner_deprecated(
+    run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
+):
+    # Juju ignores --owner for secret-set, so it's not passed.
+    run.handle(['secret-set', 'secret:id', f'foo#file={mock_temp_dir}/foo'])
+    with pytest.warns(DeprecationWarning, match='owner'):
+        hookcmds.secret_set('secret:id', content={'foo': 'bar'}, owner=owner)
 
 
 def test_secret_set_date(run: Run, mock_temp_dir: str):
@@ -827,8 +919,6 @@ def test_secret_set_date(run: Run, mock_temp_dir: str):
             'secret-set',
             '--expire',
             '2025-12-31T23:59:59Z',
-            '--owner',
-            'application',
             'secret:id',
             f'foo#file={mock_temp_dir}/foo',
         ],
@@ -858,6 +948,18 @@ def test_state_get_key(run: Run):
     assert result == 'bar'
 
 
+def test_state_get_empty(run: Run):
+    run.handle(['state-get', '--format=json'], stdout='null')
+    result = hookcmds.state_get(None)
+    assert result == {}
+
+
+def test_state_get_key_missing(run: Run):
+    run.handle(['state-get', '--format=json', 'foo'], stdout='""')
+    result = hookcmds.state_get('foo')
+    assert result == ''
+
+
 def test_state_set(run: Run):
     run.handle(['state-set', '--file', '-'])
     hookcmds.state_set({'foo': 'bar'})
@@ -874,14 +976,15 @@ def test_status_get_unit(run: Run):
 
 
 def test_status_get_app(run: Run):
+    # Juju nests the unit statuses inside the application status.
     app: hookcmds._types.AppStatusDict = {
         'application-status': {
             'message': 'all good',
             'status': 'active',
             'status-data': {},
-        },
-        'units': {
-            'myapp/0': {'status': 'active', 'message': 'ok', 'status-data': {}},
+            'units': {
+                'myapp/0': {'status': 'active', 'message': 'ok', 'status-data': {}},
+            },
         },
     }
     run.handle(

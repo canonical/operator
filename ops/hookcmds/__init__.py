@@ -33,6 +33,11 @@ for a list of all Juju hook commands.
 
 from __future__ import annotations
 
+# Some hook commands deliberately have no wrapper here. `leader-get`,
+# `leader-set`, `add-metric`, `pod-spec-*`, `k8s-*`, and `payload-*` have been
+# removed in Juju 4. `unit-get` is still available, but `network-get` provides
+# the same addresses (and more). `ops.model` runs the commands that it still
+# needs (`add-metric` and `pod-spec-set`) directly.
 from ._action import action_fail, action_get, action_log, action_set
 from ._other import (
     app_version_set,
@@ -71,6 +76,7 @@ from ._types import (
     Network,
     Port,
     RelationModel,
+    SecretAccess,
     SecretInfo,
     SecretRotate,
     SettableStatusName,
@@ -92,6 +98,7 @@ __all__ = [
     'Network',
     'Port',
     'RelationModel',
+    'SecretAccess',
     'SecretInfo',
     'SecretRotate',
     'SettableStatusName',
