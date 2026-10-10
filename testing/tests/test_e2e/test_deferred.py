@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import re
 import typing
 from collections.abc import Mapping
 
 import pytest
+import scenario
 from scenario import Context
-from scenario.state import Container, Relation, State, _Event
+from scenario.state import Container, Event, Relation, State
 
 import ops
 
@@ -56,7 +58,7 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore
 
     out = trigger(
-        State(deferred=[_Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
+        State(deferred=[Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
         'start',
         mycharm,
         meta=mycharm.META,  # type: ignore
@@ -82,7 +84,7 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
         State(
             relations={rel},
             deferred=[
-                _Event('foo_relation_changed', relation=rel).deferred(
+                Event('foo_relation_changed', _relation=rel).deferred(
                     handler=mycharm._on_event,  # type: ignore
                 )
             ],
@@ -145,7 +147,7 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
         State(
             containers={ctr},
             deferred=[
-                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
+                Event('foo_pebble_ready', _container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
             ],
         ),
         'start',
@@ -311,3 +313,29 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+class _NotAnEvent:
+    """Has the public interface of Event, but did not come from ctx.on."""
+
+    name = 'start'
+
+    def deferred(
+        self,
+        handler: typing.Callable[..., typing.Any],
+        event_id: int = 1,
+    ) -> scenario.DeferredEvent:
+        raise NotImplementedError()
+
+
+def test_run_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
+        ctx.run(_NotAnEvent(), State())  # type: ignore
+
+
+def test_manager_rejects_an_event_it_did_not_make(mycharm: type[ops.CharmBase]):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    with pytest.raises(TypeError, match=re.escape('expected an event from `ctx.on`')):
+        with ctx(_NotAnEvent(), State()):  # type: ignore
+            pass

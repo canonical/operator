@@ -8,9 +8,10 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+import scenario
 from scenario import Context, State
 from scenario.errors import ContextSetupError, UncaughtCharmError
-from scenario.state import _Event, _next_action_id
+from scenario.state import Event, _next_action_id
 
 import ops
 from ops import CharmBase
@@ -34,9 +35,14 @@ def test_run():
     e = p.call_args.kwargs['event']
     s = p.call_args.kwargs['state']
 
-    assert isinstance(e, _Event)
+    assert isinstance(e, Event)
     assert e.name == 'start'
     assert s is state
+
+
+def test_event_is_importable_by_its_private_name():
+    assert scenario.state._Event is scenario.Event
+    assert scenario.context._Event is scenario.Event
 
 
 def test_run_action():
@@ -54,12 +60,12 @@ def test_run_action():
     e = p.call_args.kwargs['event']
     s = p.call_args.kwargs['state']
 
-    assert isinstance(e, _Event)
+    assert isinstance(e, Event)
     assert e.name == 'do_foo_action'
     assert e._path.juju_prefix == 'do-foo'
     assert s is state
-    assert e.action is not None
-    assert e.action.id == expected_id
+    assert e._action is not None
+    assert e._action.id == expected_id
 
 
 @pytest.mark.parametrize('app_name', ('foo', 'bar', 'george'))

@@ -104,8 +104,10 @@ def test_ops_testing_doc():
         'docs/reference/ops-testing.rst',
     ):
         with open(test_doc) as testing_doc:
+            # An entry may give an explicit signature, like `Event()`, to hide
+            # a constructor that tests shouldn't call.
             found_names.update({
-                line.split('ops.testing.', 1)[1].strip()
+                line.split('ops.testing.', 1)[1].split('(', 1)[0].strip()
                 for line in testing_doc
                 if line.strip().startswith((
                     '.. autoclass:: ops.testing.',

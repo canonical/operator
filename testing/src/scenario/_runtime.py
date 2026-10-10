@@ -33,7 +33,7 @@ from .state import (
 if TYPE_CHECKING:  # pragma: no cover
     from ._ops_main_mock import Ops
     from .context import Context
-    from .state import State, _CharmSpec, _Event
+    from .state import Event, State, _CharmSpec
 
 logger = scenario_logger.getChild('runtime')
 
@@ -67,7 +67,7 @@ class Runtime(Generic[CharmType]):
         self._availability_zone = availability_zone
         self._principal_unit = principal_unit
 
-    def _get_event_env(self, state: State, event: _Event, charm_root: Path) -> dict[str, str]:
+    def _get_event_env(self, state: State, event: Event, charm_root: Path) -> dict[str, str]:
         """Build the simulated environment the operator framework expects."""
         env = {
             'JUJU_VERSION': self._juju_version,
@@ -89,7 +89,7 @@ class Runtime(Generic[CharmType]):
 
         if event._is_action_event:
             # Enforced by the consistency checker, but for type checkers:
-            action = event.action
+            action = event._action
             assert action is not None
             # Juju dispatches actions as `actions/<action-name>` (no
             # suffix, no `hooks/` prefix); JUJU_HOOK_NAME is empty.
@@ -106,7 +106,7 @@ class Runtime(Generic[CharmType]):
             env['JUJU_DISPATCH_PATH'] = f'hooks/{event._juju_name}'
             env['JUJU_HOOK_NAME'] = event._juju_name
 
-        if event._is_relation_event and (relation := event.relation):
+        if event._is_relation_event and (relation := event._relation):
             if isinstance(relation, PeerRelation):
                 remote_app_name = self._app_name
             elif isinstance(relation, (Relation, SubordinateRelation)):
@@ -121,7 +121,7 @@ class Runtime(Generic[CharmType]):
                 },
             )
 
-            remote_unit_id = event.relation_remote_unit_id
+            remote_unit_id = event._relation_remote_unit_id
 
             # don't check truthiness because remote_unit_id could be 0
             if remote_unit_id is None and not event.name.endswith(
@@ -153,17 +153,17 @@ class Runtime(Generic[CharmType]):
                 remote_unit = f'{remote_app_name}/{remote_unit_id}'
                 env['JUJU_REMOTE_UNIT'] = remote_unit
                 if event.name.endswith('_relation_departed'):
-                    if event.relation_departed_unit_id:
+                    if event._relation_departed_unit_id:
                         env['JUJU_DEPARTING_UNIT'] = (
-                            f'{remote_app_name}/{event.relation_departed_unit_id}'
+                            f'{remote_app_name}/{event._relation_departed_unit_id}'
                         )
                     else:
                         env['JUJU_DEPARTING_UNIT'] = remote_unit
 
-        if container := event.container:
+        if container := event._container:
             env.update({'JUJU_WORKLOAD_NAME': container.name})
 
-        if notice := event.notice:
+        if notice := event._notice:
             if hasattr(notice.type, 'value'):
                 notice_type = typing.cast('pebble.NoticeType', notice.type).value
             else:
@@ -176,13 +176,13 @@ class Runtime(Generic[CharmType]):
                 },
             )
 
-        if check_info := event.check_info:
+        if check_info := event._check_info:
             env['JUJU_PEBBLE_CHECK_NAME'] = check_info.name
 
-        if storage := event.storage:
+        if storage := event._storage:
             env.update({'JUJU_STORAGE_ID': f'{storage.name}/{storage.index}'})
 
-        if secret := event.secret:
+        if secret := event._secret:
             env.update(
                 {
                     'JUJU_SECRET_ID': secret.id,
@@ -190,8 +190,8 @@ class Runtime(Generic[CharmType]):
                 },
             )
             # Don't check truthiness because revision could be 0.
-            if event.secret_revision is not None:
-                env['JUJU_SECRET_REVISION'] = str(event.secret_revision)
+            if event._secret_revision is not None:
+                env['JUJU_SECRET_REVISION'] = str(event._secret_revision)
 
         return env
 
@@ -293,7 +293,7 @@ class Runtime(Generic[CharmType]):
     def exec(
         self,
         state: State,
-        event: _Event,
+        event: Event,
         context: Context[CharmType],
     ) -> Generator[Ops[CharmType]]:
         """Runs an event with this state as initial state on a charm.

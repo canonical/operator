@@ -217,8 +217,8 @@ def test_action_event_with_params():
         mgr.run()
         action_event, collect_status = mgr.charm.observed
         assert isinstance(action_event, ops.ActionEvent)
-        assert action_event.id == call_event.action.id
-        assert action_event.params['param'] == call_event.action.params['param']
+        assert action_event.id == call_event._action.id
+        assert action_event.params['param'] == call_event._action.params['param']
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 

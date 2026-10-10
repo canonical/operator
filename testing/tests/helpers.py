@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from scenario.context import _DEFAULT_JUJU_VERSION, Context
-from scenario.state import _Event
+from scenario.state import Event
 
 if TYPE_CHECKING:  # pragma: no cover
     from scenario.state import CharmType, State
@@ -20,7 +20,7 @@ logger = logging.getLogger()
 
 def trigger(
     state: State,
-    event: str | _Event,
+    event: str | Event,
     charm_type: type[CharmType],
     pre_event: Callable[[CharmType], None] | None = None,
     post_event: Callable[[CharmType], None] | None = None,
@@ -47,7 +47,7 @@ def trigger(
             event = getattr(ctx.on, event)(next(iter(state.containers)))
         else:
             event = getattr(ctx.on, event)()
-    assert isinstance(event, _Event)
+    assert isinstance(event, Event)
     with ctx(event, state=state) as mgr:
         if pre_event:
             pre_event(mgr.charm)
