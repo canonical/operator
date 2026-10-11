@@ -56,13 +56,16 @@ Open `~/k8s-tutorial/charmcraft.yaml` in your usual text editor or IDE, then cha
 :end-at: how to write a Kubernetes charm with Ops.
 ```
 
-Next, describe the workload container and its OCI image.
+Next, describe the workload container and its OCI image. You'll also make sure that neither the charm nor the workload runs as root:
+
+- `charm-user: non-root` tells Juju to run your charm as a non-root user.
+- `uid` and `gid` tell Juju which user and group to run the workload as. The demo server's OCI image is a rock that's built to run as the `_daemon_` user, which has ID 584792.
 
 In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
 :language: yaml
-:start-at: 'containers:'
+:start-at: 'charm-user: non-root'
 :end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0'
 ```
 
