@@ -350,10 +350,10 @@ def test_storage_name_invalid(name: str):
 def test_storage_name_invalid_is_fast():
     # An ambiguous storage-name regex would take seconds to backtrack on this input.
     name = 'a-' + 'aa-' * 26 + '!'
-    start = time.perf_counter()
+    start = time.process_time()
     with pytest.raises(StateValidationError):
         Storage(name)
-    assert time.perf_counter() - start < 1
+    assert time.process_time() - start < 1
 
 
 @pytest.mark.parametrize(

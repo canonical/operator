@@ -470,7 +470,7 @@ _NAME_RULES: dict[str, tuple[re.Pattern[str], str]] = {
         # Each hyphen-separated part after the first is "digits, then a letter,
         # then anything": equivalent to "contains a letter", but without the
         # ambiguity that makes the obvious [a-z0-9]*[a-z][a-z0-9]* backtrack
-        # exponentially.
+        # exponentially (on 'a-' + 'aa-' * 26 + '!', for example).
         re.compile(r'^[a-z][a-z0-9]*(?:-[0-9]*[a-z][a-z0-9]*)*$'),
         'lowercase alphanumeric characters separated by single hyphens, '
         'starting with a letter, with each hyphen-separated part '
