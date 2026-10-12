@@ -76,4 +76,4 @@ jobs:
     with:
       issue: ${{ needs.notify.outputs.issue }}
       origin: ${{ needs.notify.outputs.origin }}
-    uses: ./.github/workflows/ai-failure-enrich.yaml
+    uses: $/.github/workflows/ai-failure-enrich.yaml
