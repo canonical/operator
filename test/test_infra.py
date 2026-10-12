@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import types
@@ -98,6 +99,7 @@ def test_ops_testing_doc():
     # even though the above compatibility_names logic would exclude it.
     expected_names.add('Container')
 
+    directive = re.compile(r'\s*\.\. auto(?:class|method|function):: ops\.testing\.([\w.]+)')
     found_names: set[str] = set()
     for test_doc in (
         'docs/reference/ops-testing-harness.rst',
@@ -106,14 +108,8 @@ def test_ops_testing_doc():
         with open(test_doc) as testing_doc:
             # An entry may give an explicit signature, like `Event()`, to hide
             # a constructor that tests shouldn't call.
-            found_names.update({
-                line.split('ops.testing.', 1)[1].split('(', 1)[0].strip()
-                for line in testing_doc
-                if line.strip().startswith((
-                    '.. autoclass:: ops.testing.',
-                    '.. automethod:: ops.testing.',
-                    '.. autofunction:: ops.testing.',
-                ))
-            })
+            found_names.update(
+                match.group(1) for line in testing_doc if (match := directive.match(line))
+            )
 
     assert expected_names == found_names

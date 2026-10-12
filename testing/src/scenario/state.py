@@ -2468,6 +2468,8 @@ class Event:
     Tests should not instantiate this class directly: the methods of
     :class:`CharmEvents` make sure that the event is consistent with the
     component that it is about (the relation, container, secret, and so on).
+    The constructor is not part of the public API, and its arguments may
+    change in any release.
     """
 
     # The name of the event, for example ``start``, ``config_changed``,

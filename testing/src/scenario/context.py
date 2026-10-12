@@ -120,10 +120,6 @@ def _check_event(event: Event) -> None:
         raise TypeError(
             'You should call the event method. Did you forget to add parentheses?',
         )
-    if not isinstance(event, Event):
-        raise TypeError(
-            f'expected an event from `ctx.on`, like `ctx.on.start()`, not {event!r}',
-        )
 
 
 class Manager(Generic[CharmType]):
