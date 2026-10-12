@@ -23,7 +23,7 @@ class MyCharmEvents(CharmEvents):
 
 class MyCharm(CharmBase):
     META: Mapping[str, Any] = {'name': 'mycharm'}
-    on = MyCharmEvents()  # type: ignore
+    on = MyCharmEvents()
 
     def __init__(self, framework: Framework):
         super().__init__(framework)

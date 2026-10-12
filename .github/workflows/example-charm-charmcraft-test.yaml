@@ -75,4 +75,4 @@ jobs:
     secrets:
       # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    uses: ./.github/workflows/notify-scheduled-failure.yaml
+    uses: $/.github/workflows/notify-scheduled-failure.yaml

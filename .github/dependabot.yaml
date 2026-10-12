@@ -51,6 +51,7 @@ updates:
         patterns:
           - "ruff"
           - "pyright"
+          - "pyrefly"
           - "ty"
           - "codespell"
           - "coverage"

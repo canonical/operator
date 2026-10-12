@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from ._utils import run
 
@@ -59,6 +59,7 @@ def format_result_dict(
             key = f'{parent_key}.{key}'
 
         if isinstance(value, Mapping):
+            value = cast('Mapping[str, Any]', value)
             output_ = format_result_dict(value, key, output_)
         elif key in output_:
             raise ValueError(
