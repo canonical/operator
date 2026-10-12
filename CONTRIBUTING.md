@@ -75,6 +75,24 @@ PyYAML to use C speedups:
 sudo apt-get install libyaml-dev
 ```
 
+## Using a workshop
+
+Instead of installing the tools on your host, you can use the `dev` [Workshop](https://ubuntu.com/workshop) in `.workshop/`. It's a container with uv, `tox`, Pebble, `make`, and the [Pi](https://pi.dev) coding agent:
+
+```sh
+sudo snap install workshop --classic  # If you don't have it already.
+workshop launch dev
+workshop run dev lint
+```
+
+The `all` action runs `tox`, which runs the linter, type checker, and unit tests. The `format`, `lint`, `unit`, and `pebble` actions run the `tox` environments with the same names. `unit` and `pebble` pass extra arguments to `pytest`. For example, `workshop run dev unit -k <pattern>`. The `pi` action runs Pi in the workshop. Pi's settings and credentials are kept in a mount, so they survive `workshop refresh`.
+
+The `docs` action builds the docs into `docs/_build`. The `docs-run` action serves them, rebuilding as you edit, at `http://dev.<directory>.wp:8000`, where `<directory>` is the name of your project directory. Run `workshop info dev` to see the exact hostname. If your host doesn't use systemd-resolved, the hostname won't resolve, so use the workshop's IP address instead. The `docs-spelling` action checks the spelling in the docs.
+
+The workshop keeps tox's environments and the docs' virtual environment outside the project directory, so they don't clash with the ones on your host. Because of this, `make -C docs clean` fails in the workshop: it won't delete a virtual environment outside the `docs` directory. Use `make -C docs clean-doc` to delete the built docs instead. There are no smoke or integration test actions, because a Juju controller can't run in the workshop.
+
+If your checkout is a git worktree, git commands fail in the workshop, because the main repository isn't mounted there. The docs build fails too, because it reads page dates from git. Use a regular clone instead.
+
 # Tests
 
 Changes should include tests. Where reasonable, prefer to write 'Scenario' tests using [ops.testing](https://canonical.com/juju/docs/ops/latest/reference/ops-testing/) instead of legacy [ops.testing.Harness](https://canonical.com/juju/docs/ops/latest/reference/ops-testing-harness/) tests.

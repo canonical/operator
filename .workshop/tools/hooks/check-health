@@ -1,0 +1,11 @@
+# A failed apt-get, snap install, or uv tool install is otherwise invisible
+# until someone runs an action. tox goes into the workshop user's own prefix,
+# so look for it as that user.
+if command -v make >/dev/null 2>&1 &&
+    command -v killall >/dev/null 2>&1 &&
+    command -v pebble >/dev/null 2>&1 &&
+    sudo -iu workshop sh -c 'command -v tox' >/dev/null 2>&1; then
+    workshopctl set-health okay
+else
+    workshopctl set-health error
+fi
