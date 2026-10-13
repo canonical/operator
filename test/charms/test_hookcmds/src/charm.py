@@ -117,7 +117,7 @@ class TestHookcmdsCharm(ops.CharmBase):
 
     def _on_get_config_value(self, event: ops.ActionEvent):
         """Return a single config value and its Python type name."""
-        key = event.params['key']
+        key: str = event.params['key']
         value = hookcmds.config_get(key)
         event.set_results({'value': str(value), 'type': type(value).__name__})
 
@@ -133,7 +133,7 @@ class TestHookcmdsCharm(ops.CharmBase):
         """Call juju_log at every supported level; running without error is the check."""
         message = event.params.get('message', 'integration test log message')
         for level in ('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'):
-            hookcmds.juju_log(f'[{level}] {message}', level=level)  # type: ignore[arg-type]
+            hookcmds.juju_log(f'[{level}] {message}', level=level)
 
     # Application version
 
@@ -169,7 +169,7 @@ class TestHookcmdsCharm(ops.CharmBase):
         """Open TCP+UDP ports, capture port lists at each step, then close both."""
         port = int(event.params.get('port', 8877))
 
-        def _ports_json(ports: list) -> str:
+        def _ports_json(ports: list[hookcmds.Port]) -> str:
             return json.dumps([{'protocol': p.protocol, 'port': p.port} for p in ports])
 
         before = hookcmds.opened_ports()
@@ -194,7 +194,7 @@ class TestHookcmdsCharm(ops.CharmBase):
 
     def _on_test_unit_state(self, event: ops.ActionEvent):
         """Full state lifecycle: set → get(key) → get(all) → delete → verify."""
-        key = event.params['key']
+        key: str = event.params['key']
         value = event.params['value']
 
         hookcmds.state_set({key: value})

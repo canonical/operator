@@ -495,7 +495,7 @@ class CustomEvents(ops.ObjectEvents):
 
 
 class MyConsumer(ops.Object):
-    on = CustomEvents()  # type: ignore
+    on = CustomEvents()
 
     def __init__(self, charm: ops.CharmBase):
         super().__init__(charm, 'my-consumer')
@@ -513,7 +513,7 @@ class CustomCharm(ContextCharm):
 
 def test_custom_event_no_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
-    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:  # type: ignore
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
         mgr.run()
         custom_event, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)
@@ -523,7 +523,7 @@ def test_custom_event_no_args():
 def test_custom_event_with_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with ctx(
-        ctx.on.custom(MyConsumer.on.foo_changed, 'foo', arg1=42),  # type: ignore
+        ctx.on.custom(MyConsumer.on.foo_changed, 'foo', arg1=42),
         scenario.State(),
     ) as mgr:
         mgr.run()
@@ -537,7 +537,7 @@ def test_custom_event_with_args():
 def test_custom_event_is_hookevent():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with pytest.raises(ValueError):
-        ctx.on.custom(MyConsumer.on.foo_relation_changed)  # type: ignore
+        ctx.on.custom(MyConsumer.on.foo_relation_changed)
 
 
 def test_custom_event_with_scenario_args():
@@ -582,7 +582,7 @@ def test_custom_event_with_scenario_args():
 
     with ctx(
         ctx.on.custom(
-            MyConsumer.on.state_event,  # type: ignore
+            MyConsumer.on.state_event,
             cloudcredential=cloudcredential,
             cloudspec=cloudspec,
             secret=secret,
@@ -657,7 +657,7 @@ class OtherEvents(ops.ObjectEvents):
 
 
 class OtherConsumer(ops.Object):
-    on = OtherEvents()  # type: ignore
+    on = OtherEvents()
 
     def __init__(self, charm: ops.CharmBase, relation_name: str):
         super().__init__(charm, relation_name)
@@ -744,13 +744,13 @@ def test_storage_event_juju_name_preserves_storage_name(
 def test_custom_event_two_libraries():
     ctx = scenario.Context(TwoLibraryCharm, meta=META, actions=ACTIONS)
 
-    with ctx(ctx.on.custom(MyConsumer.on.foo_changed), scenario.State()) as mgr:  # type: ignore
+    with ctx(ctx.on.custom(MyConsumer.on.foo_changed), scenario.State()) as mgr:
         mgr.run()
         evt, cs = mgr.charm.observed
         assert isinstance(cs, ops.CollectStatusEvent)
         assert isinstance(evt, CustomEvent)
 
-    with ctx(ctx.on.custom(OtherConsumer.on.foo_changed), scenario.State()) as mgr:  # type: ignore
+    with ctx(ctx.on.custom(OtherConsumer.on.foo_changed), scenario.State()) as mgr:
         mgr.run()
         evt, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)

@@ -308,6 +308,11 @@ class _Manager:
 
         self._charm_root = self._juju_context.charm_dir
         self._charm_meta = self._load_charm_meta()
+        # The backend is created before the metadata is loaded, so that logging
+        # is set up as early as possible. It needs the peer relations to tell
+        # whether "permission denied" from reading an application databag means
+        # the relation is gone.
+        self._model_backend._peer_endpoints = frozenset(self._charm_meta.peers)
         self._use_juju_for_storage = use_juju_for_storage
 
         # Set up dispatcher, framework and charm objects.
