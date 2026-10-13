@@ -13,7 +13,7 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Container, Relation, Secret, State, Storage, _Action, _CharmSpec, _Event
+from scenario.state import Container, Event, Relation, Secret, State, Storage, _Action, _CharmSpec
 
 import ops
 from ops._main import _Abort
@@ -66,7 +66,7 @@ def test_event_emission():
         ctx = Context(my_charm_type, meta=meta)
         with runtime.exec(
             state=State(),
-            event=_Event('bar'),
+            event=Event('bar'),
             context=ctx,
         ) as mgr:
             mgr.run()
@@ -100,7 +100,7 @@ def test_unit_name(app_name: str, unit_id: int):
     ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with runtime.exec(
         state=State(),
-        event=_Event('start'),
+        event=Event('start'),
         context=ctx,
     ) as mgr:
         assert mgr.charm.unit.name == f'{app_name}/{unit_id}'
@@ -127,7 +127,7 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
     with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
-            event=_Event('box_relation_changed', relation=rel),
+            event=Event('box_relation_changed', _relation=rel),
             context=ctx,
         ) as mgr:
             assert mgr._juju_context.remote_app_name == remote_name
@@ -174,7 +174,7 @@ def test_relation_event_juju_hook_name_preserves_endpoint_spelling(
     ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with runtime.exec(
         state=State(relations={rel}),
-        event=_Event(f'{endpoint}_relation_changed', relation=rel),
+        event=Event(f'{endpoint}_relation_changed', _relation=rel),
         context=ctx,
     ):
         assert os.environ['JUJU_HOOK_NAME'] == expected_hook_name
@@ -356,7 +356,7 @@ def test_bare_charm_errors_not_set(monkeypatch: pytest.MonkeyPatch):
         ctx.run(ctx.on.update_status(), State())
 
 
-def _env_for(charm_meta: dict[str, Any], event: _Event, state: State) -> dict[str, str]:
+def _env_for(charm_meta: dict[str, Any], event: Event, state: State) -> dict[str, str]:
     """Build the dispatch env that Runtime would set, for direct assertions."""
     with TemporaryDirectory() as tmp:
         rt: Runtime[ops.CharmBase] = Runtime(
@@ -372,7 +372,7 @@ def test_workload_event_dispatch_path_preserves_container_name():
     """JUJU_HOOK_NAME/JUJU_DISPATCH_PATH carry the container name verbatim."""
     container = Container('temporal-worker')
     meta: dict[str, Any] = {'name': 'dashchk', 'containers': {'temporal-worker': {}}}
-    event = _Event('temporal-worker_pebble_ready', container=container)
+    event = Event('temporal-worker_pebble_ready', _container=container)
     env = _env_for(meta, event, State(containers={container}))
     assert env['JUJU_HOOK_NAME'] == 'temporal-worker-pebble-ready'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/temporal-worker-pebble-ready'
@@ -383,7 +383,7 @@ def test_relation_event_dispatch_path_and_id_match_juju():
     """JUJU_HOOK_NAME uses the verbatim endpoint; JUJU_RELATION_ID is ``endpoint:id``."""
     meta: dict[str, Any] = {'name': 'dashchk', 'requires': {'receive-ca-cert': {'interface': 'x'}}}
     relation = Relation('receive-ca-cert', remote_app_name='other')
-    event = _Event('receive-ca-cert_relation_changed', relation=relation)
+    event = Event('receive-ca-cert_relation_changed', _relation=relation)
     env = _env_for(meta, event, State(relations={relation}))
     assert env['JUJU_HOOK_NAME'] == 'receive-ca-cert-relation-changed'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/receive-ca-cert-relation-changed'
@@ -394,7 +394,7 @@ def test_relation_event_dispatch_path_and_id_match_juju():
 def test_storage_event_dispatch_path_preserves_storage_name():
     meta: dict[str, Any] = {'name': 'dashchk', 'storage': {'my-store': {'type': 'filesystem'}}}
     storage = Storage('my-store')
-    event = _Event('my-store_storage_attached', storage=storage)
+    event = Event('my-store_storage_attached', _storage=storage)
     env = _env_for(meta, event, State(storages={storage}))
     assert env['JUJU_HOOK_NAME'] == 'my-store-storage-attached'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/my-store-storage-attached'
@@ -404,7 +404,7 @@ def test_action_dispatch_path_uses_actions_prefix():
     """Real Juju dispatches actions under ``actions/<name>``, not ``hooks/...-action``."""
     meta = {'name': 'dashchk'}
     action = _Action('my-action')
-    event = _Event('my-action_action', action=action)
+    event = Event('my-action_action', _action=action)
     env = _env_for(meta, event, State())
     assert env['JUJU_HOOK_NAME'] == ''
     assert env['JUJU_DISPATCH_PATH'] == 'actions/my-action'
@@ -427,7 +427,7 @@ def test_builtin_event_dispatch_path_is_hyphenated(path: str, hook_name: str):
     """Juju hook names are hyphenated; scenario used to leak underscores."""
     meta = {'name': 'dashchk'}
     secret = Secret({'key': 'value'}, id='secret:0')
-    event = _Event(path, secret=secret if path == 'secret_changed' else None)
+    event = Event(path, _secret=secret if path == 'secret_changed' else None)
     env = _env_for(meta, event, State(secrets={secret}))
     assert env['JUJU_HOOK_NAME'] == hook_name
     assert env['JUJU_DISPATCH_PATH'] == f'hooks/{hook_name}'
