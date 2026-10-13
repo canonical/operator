@@ -33,6 +33,8 @@ config:
       default: "info"
       type: string
 
+charm-user: non-root
+
 containers:
   httpbin:
     resource: httpbin-image

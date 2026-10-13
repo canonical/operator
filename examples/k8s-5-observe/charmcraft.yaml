@@ -71,9 +71,15 @@ actions:
         default: false
     additionalProperties: false
 
+# Run the charm as a non-root user, and run the workload as the user that the
+# demo server's rock is built for (_daemon_).
+charm-user: non-root
+
 containers:
   demo-server:
     resource: demo-server-image
+    uid: 584792
+    gid: 584792
 
 resources:
   # An OCI image resource for the container listed above.
