@@ -21,7 +21,7 @@ import pathlib
 import socket
 import subprocess
 import time
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator
 
 import jubilant
 import minio
@@ -38,7 +38,7 @@ def juju() -> Generator[jubilant.Juju]:
 
 
 @contextlib.contextmanager
-def kubectl_port_forward(namespace: str, target: str, port: int) -> Iterator[tuple[str, int]]:
+def kubectl_port_forward(namespace: str, target: str, port: int) -> Generator[tuple[str, int]]:
     """Forward `target:port` to a free local port via kubectl port-forward.
 
     Yields (host, port) pointing at 127.0.0.1:<local>. Used by host-side test

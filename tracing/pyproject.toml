@@ -44,7 +44,7 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "ruff==0.16.9",
+    "ruff==0.16.10",
     "codespell==2.4.2",
     "pyright~=1.1",
 ]
