@@ -52,8 +52,8 @@ class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._stored.set_default(expensive_value=None)
-        framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
 
     def _calculate_expensive_value(self) -> int:
         # Pretend that working this out takes a long time.
@@ -66,14 +66,14 @@ Now, in any event handler, you can read or write data to the object you are
 storing, and it will be persisted across Juju events.
 
 ```python
-def _on_start(self, event: ops.StartEvent):
+def _on_install(self, event: ops.InstallEvent):
     if self._stored.expensive_value is None:
         self._stored.expensive_value = self._calculate_expensive_value()
 
 
-def _on_install(self, event: ops.InstallEvent):
+def _on_start(self, event: ops.StartEvent):
     # We can use self._stored.expensive_value here, and it will have the value
-    # set in the start event.
+    # set in the install event.
     logger.info('Current value: %s', self._stored.expensive_value)
 ```
 
@@ -101,7 +101,7 @@ having persisted from a previous event. For example, in your
 def test_charm_sets_stored_state():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
-    state_out = ctx.run(ctx.on.start(), state_in)
+    state_out = ctx.run(ctx.on.install(), state_in)
     ss = state_out.get_stored_state('_stored', owner_path='MyCharm')
     assert ss.content['expensive_value'] == 42
 
@@ -119,13 +119,11 @@ def test_charm_logs_stored_state():
             )
         }
     )
-    state_out = ctx.run(ctx.on.install(), state_in)
+    state_out = ctx.run(ctx.on.start(), state_in)
     assert testing.JujuLogLine('INFO', 'Current value: 42') in ctx.juju_log
 ```
 
-`ctx.juju_log` holds every line the unit logged during the event, including the
-ones `ops` itself writes, so look for the charm's line rather than indexing into
-the list.
+`ctx.juju_log` contains every line the unit logged during the event, including the ones `ops` itself writes. The charm's line isn't at a predictable position, so check for it with `in`.
 
 ## Storing state for the lifetime of the application
 
@@ -179,10 +177,7 @@ class MyCharm(ops.CharmBase):
         logger.info('Value at stop is: %s', value)
 ```
 
-Relation data values are always strings, so convert the value before storing it.
-Only the leader unit can write to the application databag, so the handler returns
-early on the other units. The peer relation can be gone by the time `stop`
-arrives, so check for `None` before using it.
+Relation data values are always strings, so convert the value before storing it. Only the leader unit can write to the application databag, so the handler returns early on the other units. The peer relation can be gone by the time `stop` arrives, so check for `None` before using it.
 
 ```{caution}
 Peer relations are not available early in the Charm lifecycle, so you'll need
@@ -217,5 +212,4 @@ def test_charm_sets_peer_data():
     assert rel.local_app_data['expensive-value'] == '42'
 ```
 
-The state has to be the leader, because the charm writes to the application
-databag. The key is the one the charm wrote, `expensive-value`.
+The state has to be the leader, because the charm writes to the application databag.

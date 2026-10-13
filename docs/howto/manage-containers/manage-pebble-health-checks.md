@@ -86,14 +86,13 @@ class PostgresCharm(ops.CharmBase):
         super().__init__(framework)
         # Note that "db" is the workload container's name
         framework.observe(
-            self.on['db'].pebble_check_failed, self._on_pebble_check_failed
+            self.on['db'].pebble_check_failed, self._on_pebble_check
         )
         framework.observe(
-            self.on['db'].pebble_check_recovered,
-            self._on_pebble_check_recovered,
+            self.on['db'].pebble_check_recovered, self._on_pebble_check
         )
 
-    def _on_pebble_check_failed(self, event: ops.PebbleCheckFailedEvent):
+    def _on_pebble_check(self, event: ops.PebbleCheckEvent):
         if event.info.name != 'up':
             # For now, we ignore the other tests.
             return
@@ -161,7 +160,7 @@ This means you should not usually have a `level=alive` check for a service in a 
 
 > Added in ops 2.17
 
-To test charms that use Pebble check events, use the `CheckInfo` class and then emit the appropriate event. For example, to simulate the "http-test" check failing in the first charm above, the charm test could do the following:
+To test charms that use Pebble check events, use the `CheckInfo` class and then emit the appropriate event. For example, to simulate the "http-test" check failing in the first `PostgresCharm` example above, the charm test could do the following:
 
 ```python
 import ops
@@ -189,7 +188,10 @@ def test_http_check_failing():
         threshold=layer.checks['http-test'].threshold,
     )
     container = testing.Container(
-        'db', check_infos={check_info}, layers={'layer1': layer}
+        'db',
+        can_connect=True,
+        check_infos={check_info},
+        layers={'layer1': layer},
     )
     state_in = testing.State(containers={container})
 
@@ -204,4 +206,4 @@ def test_http_check_failing():
 
 Define the layer before the `CheckInfo`, so that the check's `level`, `startup` and `threshold` come from the same place the charm gets them from. The container's plan must contain the check, otherwise `ops.testing` reports an inconsistent state.
 
-`threshold` is the number of errors in a row that the check tolerates. Set it in the layer even though Pebble defaults it to 3: `CheckInfo.threshold` is an `int`, and reading an unset value from the layer gives `None`. `failures` is the number of errors the check has had so far, and is only ever reported back in a `CheckInfo`, so don't put it in the layer.
+`threshold` is the number of errors in a row that the check tolerates. Set it in the layer even though Pebble defaults it to 3, otherwise the charm will read `event.info.threshold` as `None` during testing. `failures` is the number of errors the check has had so far. It's only ever reported back in a `CheckInfo`, so don't put it in the layer.
