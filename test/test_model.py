@@ -1254,6 +1254,50 @@ class TestModel:
         with pytest.warns(DeprecationWarning):
             assert JujuVersion.from_environ() == '0.0.0'
 
+    def test_proxy_config_from_juju_context(self):
+        context = JujuContext._from_dict({
+            'JUJU_VERSION': '3.6.2',
+            'JUJU_CHARM_HTTP_PROXY': 'http-proxy-url',
+            'JUJU_CHARM_HTTPS_PROXY': 'https-proxy-url',
+            'JUJU_CHARM_FTP_PROXY': 'ftp-proxy-url',
+            'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1',
+        })
+        backend = _ModelBackend('myapp/0', juju_context=context)
+        model = ops.Model(ops.CharmMeta(), backend)
+        assert model.proxy_config == ops.ProxyConfig(
+            http='http-proxy-url',
+            https='https-proxy-url',
+            ftp='ftp-proxy-url',
+            no='127.0.0.1,localhost,::1',
+        )
+
+    def test_proxy_config_unset(self):
+        context = JujuContext._from_dict({
+            'JUJU_VERSION': '3.6.2',
+            'JUJU_CHARM_HTTP_PROXY': '',
+            'JUJU_CHARM_HTTPS_PROXY': '',
+            'JUJU_CHARM_FTP_PROXY': '',
+            'JUJU_CHARM_NO_PROXY': '',
+        })
+        backend = _ModelBackend('myapp/0', juju_context=context)
+        model = ops.Model(ops.CharmMeta(), backend)
+        proxy_config = model.proxy_config
+        # An empty env var is read as None.
+        assert proxy_config.http is None
+        assert proxy_config.https is None
+        assert proxy_config.ftp is None
+        assert proxy_config.no is None
+
+    def test_proxy_config_not_read_from_os_environ(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv('JUJU_CHARM_HTTP_PROXY', 'environ-http-proxy-url')
+        context = JujuContext._from_dict({
+            'JUJU_VERSION': '3.6.2',
+            'JUJU_CHARM_HTTP_PROXY': 'context-http-proxy-url',
+        })
+        backend = _ModelBackend('myapp/0', juju_context=context)
+        model = ops.Model(ops.CharmMeta(), backend)
+        assert model.proxy_config.http == 'context-http-proxy-url'
+
     def test_relation_remote_model(self, fake_script: FakeScript, fake_juju_version: None):
         fake_script.write('relation-list', """echo '["remoteapp1/0"]'""")
         fake_script.write('relation-ids', """echo '["db0:1"]'""")

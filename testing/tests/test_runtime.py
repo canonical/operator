@@ -12,7 +12,18 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Container, Relation, Secret, State, Storage, _Action, _CharmSpec, _Event
+from scenario.state import (
+    Container,
+    Model,
+    ProxyConfig,
+    Relation,
+    Secret,
+    State,
+    Storage,
+    _Action,
+    _CharmSpec,
+    _Event,
+)
 
 import ops
 from ops._main import _Abort
@@ -316,6 +327,29 @@ def test_storage_event_dispatch_path_preserves_storage_name():
     env = _env_for(meta, event, State(storages={storage}))
     assert env['JUJU_HOOK_NAME'] == 'my-store-storage-attached'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/my-store-storage-attached'
+
+
+_PROXY_ENV_VARS = (
+    'JUJU_CHARM_HTTP_PROXY',
+    'JUJU_CHARM_HTTPS_PROXY',
+    'JUJU_CHARM_FTP_PROXY',
+    'JUJU_CHARM_NO_PROXY',
+)
+
+
+def test_proxy_env_vars_not_set_by_default():
+    env = _env_for({'name': 'dashchk'}, _Event('start'), State())
+    for key in _PROXY_ENV_VARS:
+        assert key not in env
+
+
+def test_proxy_env_vars_empty_string_is_set():
+    model = Model(proxy_config=ProxyConfig(http='', no=''))
+    env = _env_for({'name': 'dashchk'}, _Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == ''
+    assert 'JUJU_CHARM_HTTPS_PROXY' not in env
+    assert 'JUJU_CHARM_FTP_PROXY' not in env
 
 
 def test_action_dispatch_path_uses_actions_prefix():

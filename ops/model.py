@@ -221,6 +221,17 @@ class Model:
         """The version of Juju that is running the model."""
         return self._backend._juju_context.version
 
+    @property
+    def proxy_config(self) -> ProxyConfig:
+        """The juju-*-proxy configs set by Juju."""
+        context = self._backend._juju_context
+        return ProxyConfig(
+            http=context.charm_http_proxy,
+            https=context.charm_https_proxy,
+            ftp=context.charm_ftp_proxy,
+            no=context.charm_no_proxy,
+        )
+
     def get_unit(self, unit_name: str) -> Unit:
         """Get a unit by name.
 
@@ -4361,3 +4372,24 @@ class CloudSpec:
             skip_tls_verify=o.skip_tls_verify,
             is_controller_cloud=o.is_controller_cloud,
         )
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
+
+    A value is ``None`` if the corresponding model config is not available
+    (either its env var is unset, or its value is empty).
+    """
+
+    http: str | None = None
+    """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+
+    https: str | None = None
+    """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+
+    ftp: str | None = None
+    """The FTP proxy, from the ``juju-ftp-proxy`` model config."""
+
+    no: str | None = None
+    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""

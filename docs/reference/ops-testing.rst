@@ -112,6 +112,7 @@ This API for testing was previously called 'Scenario'.
 .. autoclass:: ops.testing.Notice
 .. autoclass:: ops.testing.PeerRelation
 .. autoclass:: ops.testing.Port
+.. autoclass:: ops.testing.ProxyConfig
 .. autoclass:: ops.testing.Relation
 .. autoclass:: ops.testing.RelationBase
 .. autoclass:: ops.testing.Resource

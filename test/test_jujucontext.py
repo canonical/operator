@@ -85,6 +85,57 @@ class TestJujuContext:
         })
         assert juju_context.storage_name == 'my-storage'
 
+    def test_proxy_fields_default_to_none(self):
+        juju_context = JujuContext._from_dict({'JUJU_VERSION': '0.0.0'})
+        # This test covers the situation where the JUJU_CHARM_*_PROXY env vars
+        # are unset. This differs from Juju, which always sets them, even if
+        # they are empty.
+        assert juju_context.charm_http_proxy is None
+        assert juju_context.charm_https_proxy is None
+        assert juju_context.charm_ftp_proxy is None
+        assert juju_context.charm_no_proxy is None
+
+    def test_parsing_proxy_fields(self):
+        juju_context = JujuContext._from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_CHARM_HTTP_PROXY': 'http-proxy-url',
+            'JUJU_CHARM_HTTPS_PROXY': 'https-proxy-url',
+            'JUJU_CHARM_FTP_PROXY': 'ftp-proxy-url',
+            'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1',
+        })
+        assert juju_context.charm_http_proxy == 'http-proxy-url'
+        assert juju_context.charm_https_proxy == 'https-proxy-url'
+        assert juju_context.charm_ftp_proxy == 'ftp-proxy-url'
+        assert juju_context.charm_no_proxy == '127.0.0.1,localhost,::1'
+
+    def test_parsing_proxy_fields_mixed(self):
+        juju_context = JujuContext._from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_CHARM_HTTP_PROXY': 'http-proxy-url',
+            'JUJU_CHARM_HTTPS_PROXY': '',
+            'JUJU_CHARM_FTP_PROXY': '',
+            'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1',
+        })
+        assert juju_context.charm_http_proxy == 'http-proxy-url'
+        assert juju_context.charm_https_proxy is None
+        assert juju_context.charm_ftp_proxy is None
+        assert juju_context.charm_no_proxy == '127.0.0.1,localhost,::1'
+
+    def test_empty_proxy_fields(self):
+        # Juju always exports the variables, as empty strings when the model
+        # configs are not set.
+        juju_context = JujuContext._from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_CHARM_HTTP_PROXY': '',
+            'JUJU_CHARM_HTTPS_PROXY': '',
+            'JUJU_CHARM_FTP_PROXY': '',
+            'JUJU_CHARM_NO_PROXY': '',
+        })
+        assert juju_context.charm_http_proxy is None
+        assert juju_context.charm_https_proxy is None
+        assert juju_context.charm_ftp_proxy is None
+        assert juju_context.charm_no_proxy is None
+
     def test_parsing_all_str_fields(self):
         env = {
             'JUJU_ACTION_NAME': 'backup',

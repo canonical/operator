@@ -36,6 +36,7 @@ import ops
 from ops import CharmBase, CharmEvents, SecretRotate, StatusBase, pebble
 from ops import CloudCredential as CloudCredential_Ops
 from ops import CloudSpec as CloudSpec_Ops
+from ops import ProxyConfig as ProxyConfig_Ops
 
 from . import _charmcraft_extensions
 from .errors import MetadataNotFoundError, StateValidationError
@@ -274,6 +275,31 @@ class CloudSpec:  # ruff: ignore[undocumented-public-class]
             ca_certificates=list(self.ca_certificates),
             skip_tls_verify=self.skip_tls_verify,
             is_controller_cloud=self.is_controller_cloud,
+        )
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class ProxyConfig:  # ruff: ignore[undocumented-public-class]
+    __doc__ = ops.ProxyConfig.__doc__
+
+    http: str | None = None
+    """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+
+    https: str | None = None
+    """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+
+    ftp: str | None = None
+    """The FTP proxy, from the ``juju-ftp-proxy`` model config."""
+
+    no: str | None = None
+    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
+
+    def _to_ops(self) -> ProxyConfig_Ops:
+        return ProxyConfig_Ops(
+            http=self.http or None,
+            https=self.https or None,
+            ftp=self.ftp or None,
+            no=self.no or None,
         )
 
 
@@ -911,6 +937,33 @@ class Model:
 
     The spec will be accessible in the charm via the
     :meth:`self.model.get_cloud_spec() <ops.Model.get_cloud_spec>` method.
+    """
+
+    proxy_config: ProxyConfig = dataclasses.field(default_factory=ProxyConfig)
+    """Proxy configs from the model's ``juju-*-proxy`` config.
+
+    Scenario sets the matching ``JUJU_CHARM_*_PROXY`` environment variables
+    from these values. A field set to ``None`` does not create its environment
+    variable. A field set to any string creates its environment variable with
+    that value.
+
+    Unlike Juju, Scenario does not set these environment variables by default.
+    This avoids breaking tests that set the variables themselves, for example
+    through ``os.environ``.
+
+    For example::
+
+        proxy_config = ProxyConfig(
+            http='http://proxy.example.com:3128',
+            https='http://proxy.example.com:3128',
+            no='127.0.0.1,localhost,::1',
+        )
+        state_in = State(
+            model=Model(proxy_config=proxy_config)
+        )
+
+    The configs are available to the charm as
+    :attr:`self.model.proxy_config <ops.Model.proxy_config>` attribute.
     """
 
 
