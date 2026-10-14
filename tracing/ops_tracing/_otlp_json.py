@@ -157,7 +157,8 @@ def _span(span: ReadableSpan):
     assert span.context  # ruff: ignore[assert]  # SDK invariant: ReadableSpan has a context.
     rv = {
         'name': span.name,
-        'kind': span.kind.value or 1,  # unspecified -> internal
+        # OTLP reserves 0 for SPAN_KIND_UNSPECIFIED, which the Python SpanKind enum lacks.
+        'kind': span.kind.value + 1,
         'traceId': _trace_id(span.context.trace_id),
         'spanId': _span_id(span.context.span_id),
         'flags': _REMOTE if span.parent and span.parent.is_remote else _LOCAL,
