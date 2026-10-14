@@ -152,3 +152,24 @@ def test_no_database_blocked(mock_version):
     state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
 
     assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")
+
+
+def test_database_not_ready_waiting(mock_version):
+    ctx = testing.Context(FastAPIDemoCharm)
+    # The relation exists, but PostgreSQL hasn't provided connection details yet.
+    relation = testing.Relation(endpoint="database", interface="postgresql_client")
+    container = testing.Container(
+        name="demo-server",
+        can_connect=True,
+        layers={"rock": ROCK_LAYER},
+        service_statuses={"fastapi": ops.pebble.ServiceStatus.ACTIVE},
+    )
+    state_in = testing.State(
+        containers={container},
+        relations={relation},
+        leader=True,
+    )
+
+    state_out = ctx.run(ctx.on.collect_unit_status(), state_in)
+
+    assert state_out.unit_status == testing.WaitingStatus("Waiting for database relation")
