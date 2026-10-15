@@ -3789,6 +3789,31 @@ class TestModelBackend:
             backend.juju_log('BAR', 'foo')
         assert fake_script.calls(clear=True) == [['juju-log', '--log-level', 'BAR', '--', 'foo']]
 
+    @pytest.mark.parametrize(
+        'method,args,kwargs',
+        [
+            ('juju_log', ('INFO', 'foo'), {}),
+            ('relation_model_get', (1,), {}),
+            ('secret_get', (), {'id': 'secret:123'}),
+            ('reboot', (), {}),
+        ],
+    )
+    def test_missing_command(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+        root_logging: None,
+        backend: _ModelBackend,
+        method: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ):
+        # On Juju 2.9, for example, the secret and relation-model-get hook
+        # commands don't exist.
+        monkeypatch.setenv('PATH', str(tmp_path))
+        with pytest.raises(FileNotFoundError):
+            getattr(backend, method)(*args, **kwargs)
+
     def test_valid_metrics(self, fake_script: FakeScript, backend: _ModelBackend):
         fake_script.write('add-metric', 'exit 0')
         test_cases: list[_ValidMetricsTestCase] = [
@@ -4714,6 +4739,17 @@ class TestSecretClass:
             ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
         ]
 
+    def test_get_info_no_label_or_description(self, model: ops.Model, fake_script: FakeScript):
+        # Juju omits the label and description keys when the secret has neither.
+        fake_script.write('secret-info-get', """echo '{"x": {"revision": 7}}'""")
+
+        secret = self.make_secret(model, id='x')
+        info = secret.get_info()
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
+        assert info.label is None
+        assert info.description is None
+        assert info.revision == 7
+
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
         fake_script.write('secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
@@ -4733,16 +4769,12 @@ class TestSecretClass:
         assert fake_script.calls(clear=True) == [
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/x',
                 mock.ANY,
             ],
             ['secret-info-get', '--format=json', '--label', 'y'],
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/z',
                 mock.ANY,
             ],
@@ -4779,8 +4811,6 @@ class TestSecretClass:
                 '2022-12-09T16:59:00',
                 '--rotate',
                 'monthly',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/x',
             ],
             ['secret-info-get', '--format=json', '--label', 'y'],
@@ -4788,8 +4818,6 @@ class TestSecretClass:
                 'secret-set',
                 '--label',
                 'lbl',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/z',
             ],
         ]
@@ -4809,8 +4837,6 @@ class TestSecretClass:
         assert calls == [
             [
                 'secret-set',
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/q',
                 mock.ANY,
             ],
@@ -4818,8 +4844,6 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 description,
-                '--owner',
-                'application',
                 f'secret://{model._backend.model_uuid}/q',
             ],
         ]
@@ -4841,15 +4865,13 @@ class TestSecretClass:
         secret_uri = f'secret://{model_pre36._backend.model_uuid}/q'
         assert calls == [
             ['secret-info-get', '--format=json', secret_uri],
-            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
+            ['secret-set', secret_uri, mock.ANY],
             ['secret-get', '--format=json', secret_uri, '--peek'],
             ['secret-info-get', '--format=json', secret_uri],
             [
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
@@ -4868,8 +4890,8 @@ class TestSecretClass:
         calls = fake_script.calls(clear=True)
         secret_uri = f'secret://{model._backend.model_uuid}/q'
         assert calls == [
-            ['secret-set', '--description', 'desc', '--owner', 'application', secret_uri],
-            ['secret-set', '--owner', 'application', secret_uri, mock.ANY],
+            ['secret-set', '--description', 'desc', secret_uri],
+            ['secret-set', secret_uri, mock.ANY],
         ]
         assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
 
@@ -4895,8 +4917,6 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
@@ -4905,8 +4925,6 @@ class TestSecretClass:
                 'secret-set',
                 '--description',
                 'desc',
-                '--owner',
-                'application',
                 secret_uri,
                 mock.ANY,
             ],
@@ -4924,14 +4942,10 @@ class TestSecretClass:
         calls = fake_script.calls(clear=True)
         assert calls[0][:-1] == [
             'secret-set',
-            '--owner',
-            'application',
             f'secret://{model._backend.model_uuid}/q',
         ]
         assert calls[0][:-1] == [
             'secret-set',
-            '--owner',
-            'application',
             f'secret://{model._backend.model_uuid}/q',
         ]
         assert fake_script.secrets() == {'foo': 'newbar', 'baz': 'qux'}

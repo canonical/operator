@@ -26,6 +26,7 @@ import json
 import os
 import pathlib
 import time
+import warnings
 from typing import Any
 
 import ops
@@ -93,6 +94,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             results['app-status'] = app_st.status
             results['app-message'] = app_st.message
             results['app-unit-count'] = str(len(app_st.units))
+            results['app-unit-names'] = ','.join(sorted(app_st.units))
         event.set_results(results)
 
     def _on_set_and_check_status(self, event: ops.ActionEvent):
@@ -132,7 +134,7 @@ class TestHookcmdsCharm(ops.CharmBase):
     def _on_test_logging(self, event: ops.ActionEvent):
         """Call juju_log at every supported level; running without error is the check."""
         message = event.params.get('message', 'integration test log message')
-        for level in ('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR'):
+        for level in ('TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
             hookcmds.juju_log(f'[{level}] {message}', level=level)
 
     # Application version
@@ -226,8 +228,18 @@ class TestHookcmdsCharm(ops.CharmBase):
         # Peek at the latest revision without updating the tracked revision.
         latest = hookcmds.secret_get(id=secret_id, peek=True)
 
-        hookcmds.secret_set(secret_id, description='Updated by hookcmds test')
+        # Juju ignores the owner when updating a secret, so passing one warns
+        # and the secret stays owned by the application.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            hookcmds.secret_set(secret_id, description='Updated by hookcmds test', owner='unit')
         updated_info = hookcmds.secret_info_get(id=secret_id)
+
+        # Juju omits the label and description from secret-info-get when they
+        # aren't set.
+        bare_id = hookcmds.secret_add({'password': 'bare'})
+        bare_info = hookcmds.secret_info_get(id=bare_id)
+        hookcmds.secret_remove(bare_id)
 
         by_label = hookcmds.secret_get(label='hookcmds-inttest')
 
@@ -240,9 +252,14 @@ class TestHookcmdsCharm(ops.CharmBase):
             'initial-label': info.label or '',
             'initial-description': info.description or '',
             'initial-revision': str(info.revision),
+            'initial-owner': str(info.owner),
             'initial-password': content.get('password', ''),
             'updated-password': latest.get('password', ''),
             'updated-description': updated_info.description or '',
+            'updated-owner': str(updated_info.owner),
+            'owner-warnings': ','.join(w.category.__name__ for w in caught),
+            'bare-label': repr(bare_info.label),
+            'bare-description': repr(bare_info.description),
             'label-lookup-password': by_label.get('password', ''),
         })
 
@@ -283,6 +300,7 @@ class TestHookcmdsCharm(ops.CharmBase):
         # Read our own unit's data back by key.
         unit_name = self.unit.name
         retrieved_key = hookcmds.relation_get(rel_id, key=test_key, unit=unit_name)
+        missing_key = hookcmds.relation_get(rel_id, key='no-such-key', unit=unit_name)
 
         # Read all data for our own unit.
         all_data = hookcmds.relation_get(rel_id, unit=unit_name)
@@ -292,6 +310,7 @@ class TestHookcmdsCharm(ops.CharmBase):
             'relation-id-int': str(rel_id),
             'member-count': str(len(members)),
             'retrieved-value': retrieved_key,
+            'missing-key-type': type(missing_key).__name__,
             'all-data': json.dumps(all_data),
         })
 
@@ -438,10 +457,14 @@ class TestHookcmdsCharm(ops.CharmBase):
             return
         rel_id = int(ids[0].split(':')[-1])
 
+        # The grant was made in an earlier hook, so Juju has committed it.
+        info = hookcmds.secret_info_get(id=secret_id)
+        access = [{'target': a.target, 'scope': a.scope, 'role': a.role} for a in info.access]
+
         hookcmds.secret_revoke(secret_id, relation_id=rel_id)
         hookcmds.secret_remove(secret_id)
 
-        event.set_results({'revoked': 'true'})
+        event.set_results({'revoked': 'true', 'access': json.dumps(access)})
 
     # Storage add
 
@@ -454,11 +477,11 @@ class TestHookcmdsCharm(ops.CharmBase):
     # Endpoint-scoped ports
 
     def _on_test_ports_endpoint_scoped(self, event: ops.ActionEvent):
-        """Open a port scoped to the peer endpoint, verify, then close it."""
+        """Open a port scoped to the peer and anycharm endpoints, verify, then close it."""
         port = int(event.params.get('port', 7766))
-        endpoint = 'peer'
+        endpoints = ['peer', 'anycharm']
 
-        hookcmds.open_port('tcp', port, endpoints=endpoint)
+        hookcmds.open_port('tcp', port, endpoints=endpoints)
 
         all_ports = hookcmds.opened_ports(endpoints=True)
         our_port = next(
@@ -468,9 +491,9 @@ class TestHookcmdsCharm(ops.CharmBase):
 
         port_found = our_port is not None
         ep_list = (our_port.endpoints or []) if our_port else []
-        endpoint_matches = port_found and endpoint in ep_list
+        endpoint_matches = port_found and sorted(ep_list) == sorted(endpoints)
 
-        hookcmds.close_port('tcp', port, endpoints=endpoint)
+        hookcmds.close_port('tcp', port, endpoints=endpoints)
 
         final = hookcmds.opened_ports(endpoints=True)
         still_open = any(p.port == port and p.protocol == 'tcp' for p in final)
