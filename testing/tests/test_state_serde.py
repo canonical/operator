@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import enum
+import importlib.metadata
 import json
 import pathlib
+import zoneinfo
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -14,10 +17,10 @@ import pytest
 from scenario import _state_serde
 
 import ops
-import ops.version
 from ops import pebble, testing
 
 FIRST = datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)
+VERSION = importlib.metadata.version('ops-scenario')
 
 
 def _secret_at_revision_2(*, track_latest: bool) -> testing.Secret:
@@ -126,6 +129,31 @@ NON_TRIVIAL = testing.State(
             id='timedelta',
         ),
         pytest.param(
+            _container(
+                notices=[
+                    testing.Notice(
+                        'example.com/n',
+                        repeat_after=datetime.timedelta(days=400000, microseconds=1),
+                    )
+                ]
+            ),
+            id='large-timedelta',
+        ),
+        pytest.param(
+            testing.State(
+                secrets={
+                    testing.Secret(
+                        {'k': 'v'},
+                        # The second 02:30 of the day the clocks go back.
+                        expire=datetime.datetime(
+                            2026, 4, 5, 2, 30, fold=1, tzinfo=zoneinfo.ZoneInfo('Pacific/Auckland')
+                        ),
+                    )
+                }
+            ),
+            id='zoned-ambiguous-datetime',
+        ),
+        pytest.param(
             testing.State(resources={testing.Resource(name='bin', path='/usr/bin/tool')}),
             id='str-path',
         ),
@@ -203,8 +231,43 @@ def test_secret_revisions_round_trip(track_latest: bool):
     assert decoded._tracked_revision == (2 if track_latest else 1)
 
 
+def test_a_zoned_datetime_keeps_its_zone_and_fold():
+    expire = datetime.datetime(
+        2026, 4, 5, 2, 30, fold=1, tzinfo=zoneinfo.ZoneInfo('Pacific/Auckland')
+    )
+    state = testing.State(secrets={testing.Secret({'k': 'v'}, expire=expire)})
+    out = _state_serde.decode_state(_state_serde.encode_state(state))
+    decoded = next(iter(out.secrets)).expire
+    assert decoded is not None
+    assert decoded.tzinfo == expire.tzinfo
+    assert decoded.fold == 1
+    assert decoded.utcoffset() == expire.utcoffset()
+
+
+def test_a_change_id_keeps_its_type():
+    state = _container(check_infos={testing.CheckInfo('http', change_id=pebble.ChangeID('42'))})
+    out = _state_serde.decode_state(_state_serde.encode_state(state))
+    change_id = next(iter(out.get_container('app').check_infos)).change_id
+    assert isinstance(change_id, pebble.ChangeID)
+    assert change_id == '42'
+
+
 class _Charm(ops.CharmBase):
     pass
+
+
+class _Events(ops.ObjectEvents):
+    ready = ops.EventSource(ops.EventBase)
+
+
+class _Lib(ops.Object):
+    on = _Events()
+
+
+def test_a_custom_event_has_no_encoding():
+    ctx = testing.Context(_Charm, meta={'name': 'c'})
+    with pytest.raises(TypeError, match="custom event \\('ready'\\)"):
+        _state_serde.encode_event(ctx.on.custom(_Lib.on.ready))
 
 
 @pytest.mark.parametrize(
@@ -228,12 +291,40 @@ class _StrEnum(str, enum.Enum):
     VALUE = 'value'
 
 
+class CheckLevel(enum.Enum):
+    # The same name as pebble.CheckLevel, with a member it shares.
+    ALIVE = 'alive'
+
+
+@dataclasses.dataclass(frozen=True)
+class Secret:
+    # The same name as testing.Secret, without its non-field attributes.
+    x: int = 1
+
+
+@dataclasses.dataclass(frozen=True)
+class Address:
+    # The same name and fields as testing.Address.
+    value: str = '10.0.0.1'
+    hostname: str = ''
+    cidr: str = ''
+
+
+@dataclasses.dataclass(frozen=True)
+class _Other:
+    x: int = 1
+
+
 @pytest.mark.parametrize(
     ('content', 'message'),
     [
         ({'bad': object()}, "No JSON encoding for type 'object' at path '.*content.bad'"),
         ({'e': _OtherEnum.VALUE}, 'Unrecognised enum type'),
         ({'e': _StrEnum.VALUE}, 'Unrecognised enum type'),
+        ({'e': CheckLevel.ALIVE}, "Unrecognised enum type 'CheckLevel' at path '.*content.e'"),
+        ({'d': Secret()}, "Unrecognised dataclass 'Secret' at path '.*content.d'"),
+        ({'d': Address()}, "Unrecognised dataclass 'Address' at path '.*content.d'"),
+        ({'d': _Other()}, "Unrecognised dataclass '_Other' at path '.*content.d'"),
         ({'p': pathlib.PureWindowsPath('C:/x')}, "No JSON encoding for type 'PureWindowsPath'"),
         ({(1, 2): 'x'}, 'keys must be all str or all int'),
         ({True: 1}, 'keys must be all str or all int'),
@@ -252,17 +343,33 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
         ({'__t__': 'dc', 'cls': 'NoSuchClass', 'f': {}}, 'Unknown dataclass'),
         ({'__t__': 'enum', 'cls': 'NoSuchEnum', 'name': 'FOO'}, 'Unknown enum class'),
         ({'__t__': 'status', 'name': 'no-such-status', 'msg': ''}, 'Unknown status name'),
+        ({'__t__': 'enum', 'cls': 'CheckLevel', 'name': 'OTHER'}, "Unknown member 'OTHER'"),
+        ({'__t__': 'dc', 'cls': 'State', 'f': {}, 'x': {'anything': 1}}, 'Unexpected attribute'),
+        ({'__t__': 'dc', 'cls': 'State'}, "Missing 'f'"),
+        ({'__t__': 'idict'}, "Missing 'v'"),
+        ({'__t__': 'idict', 'v': {'x': 1}}, 'Expected integer keys'),
+        ({'__t__': 'datetime', 'v': 'nope'}, 'Invalid datetime'),
+        ({'__t__': 'timedelta', 'v': 1.5}, 'Expected a list'),
+        ({'__t__': 'timedelta', 'v': [1, 2]}, r'Expected \[days, seconds, microseconds\]'),
+        ({'__t__': 'bytes', 'v': '!!'}, 'Invalid base64'),
+        ({'__t__': 7}, 'Expected a string type tag'),
         ('not-a-state', 'not a State'),
     ],
 )
 def test_unknown_encodings_are_rejected(encoded: Any, message: str):
-    payload = json.dumps({'ops_testing_version': ops.version.version, 'state': encoded})
+    payload = json.dumps({'ops_testing_version': VERSION, 'state': encoded})
     with pytest.raises(TypeError, match=message):
         _state_serde.decode_state(payload)
 
 
+def test_a_payload_without_its_kind_is_rejected():
+    payload = json.dumps({'ops_testing_version': VERSION})
+    with pytest.raises(TypeError, match="Missing 'state'"):
+        _state_serde.decode_state(payload)
+
+
 def test_an_event_payload_must_hold_an_event():
-    payload = json.dumps({'ops_testing_version': ops.version.version, 'event': 'install'})
+    payload = json.dumps({'ops_testing_version': VERSION, 'event': 'install'})
     with pytest.raises(TypeError, match='not an event'):
         _state_serde.decode_event(payload)
 
@@ -279,7 +386,7 @@ def test_a_payload_from_another_version_is_rejected(
     with pytest.raises(_state_serde._VersionMismatchError) as caught:
         decode(payload)
     assert str(version) in str(caught.value)
-    assert ops.version.version in str(caught.value)
+    assert VERSION in str(caught.value)
 
 
 def test_sets_encode_in_a_canonical_order():
@@ -293,4 +400,4 @@ def test_sets_encode_in_a_canonical_order():
 
 def test_the_payload_records_the_version():
     payload = json.loads(_state_serde.encode_state(testing.State()))
-    assert payload['ops_testing_version'] == ops.version.version
+    assert payload['ops_testing_version'] == VERSION
