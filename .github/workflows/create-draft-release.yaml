@@ -213,7 +213,7 @@ jobs:
           # rather than something the draft can carry.
           if os.environ['BRANCH'] != 'main':
               explanation += (
-                  f"\n\n**Untick \"Set as the latest release\" before publishing.** This is a"
+                  '\n\n**Untick "Set as the latest release" before publishing.** This is a'
                   f" release from `{os.environ['BRANCH']}`, and GitHub ticks the box on every"
                   ' draft. If it is missed, mark the newest release as the latest again by hand.'
               )

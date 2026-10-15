@@ -233,6 +233,7 @@ jobs:
           # input to the next workflow, and the number only exists now.
           number=${url##*/}
           sed "s/@PR_NUMBER@/$number/g" "$RUNNER_TEMP/pr-body.md" > "$RUNNER_TEMP/pr-body-numbered.md"
-          gh pr edit "$url" --body-file "$RUNNER_TEMP/pr-body-numbered.md"
+          gh pr edit "$url" --body-file "$RUNNER_TEMP/pr-body-numbered.md" \
+            || echo "::warning::Couldn't put $number into the next steps; use this pull request's own number."
           echo "Opened $url"
           printf '\n### Pull request\n\n%s\n' "$url" >> "$GITHUB_STEP_SUMMARY"

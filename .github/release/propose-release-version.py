@@ -56,7 +56,7 @@ def backports(repository: str, log: str, runner_temp: pathlib.Path) -> pathlib.P
     be without this, rather than stopping the release.
     """
     commits: dict[str, list[dict[str, str]]] = {}
-    for number in sorted(set(re.findall(r'\(#(\d+)\)$', log, re.MULTILINE))):
+    for number in sorted(set(re.findall(r'\(#(\d+)\)$', log, re.MULTILINE)), key=int):
         endpoint = f'repos/{repository}/pulls/{number}/commits'
         try:
             pages = json.loads(run('gh', 'api', '--paginate', '--slurp', endpoint))
@@ -111,8 +111,6 @@ def main() -> None:
     log = run(
         'git', 'log', '--reverse', '--no-merges', f'--format={log_format}', f'{previous}..HEAD'
     )
-    subjects = run('git', 'log', '--no-merges', '--format=%s', f'{previous}..HEAD')
-
     if version_input:
         # An explicit version is used as it stands, with no inference: it is
         # the escape hatch for everything below that would otherwise refuse.
@@ -162,6 +160,7 @@ def main() -> None:
     # enough pull requests that asking about each one costs nothing.
     extra: tuple[str, ...] = ()
     if branch.endswith('-maintenance'):
+        subjects = run('git', 'log', '--no-merges', '--format=%s', f'{previous}..HEAD')
         extra = ('--backports', str(backports(repository, subjects, runner_temp)))
     entry = run(*tool, 'changes-entry', '--repo', repository, '--tag', version, *extra, input=log)
     (runner_temp / 'changes-entry.md').write_text(entry)
