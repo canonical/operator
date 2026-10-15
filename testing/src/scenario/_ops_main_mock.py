@@ -77,21 +77,21 @@ class UnitStateDB:
         """Load any DeferredEvent data structures from the db."""
         db = self._db
         deferred: list[DeferredEvent] = []
-        # ops re-emits every notice, so don't filter on the event regex.
-        for handle_path in db.list_snapshots():
-            for handle, owner, observer in db.notices(handle_path):
-                try:
-                    snapshot_data = db.load_snapshot(handle)
-                except ops.storage.NoSnapshotError:
-                    snapshot_data: dict[str, Any] = {}
+        # ops re-emits every notice, in the order they were deferred, so don't
+        # filter on the event regex or go via the snapshots.
+        for handle, owner, observer in db.notices():
+            try:
+                snapshot_data = db.load_snapshot(handle)
+            except ops.storage.NoSnapshotError:
+                snapshot_data: dict[str, Any] = {}
 
-                event = DeferredEvent(
-                    handle_path=handle,
-                    owner=owner,
-                    observer=observer,
-                    snapshot_data=snapshot_data,
-                )
-                deferred.append(event)
+            event = DeferredEvent(
+                handle_path=handle,
+                owner=owner,
+                observer=observer,
+                snapshot_data=snapshot_data,
+            )
+            deferred.append(event)
 
         return deferred
 

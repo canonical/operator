@@ -63,7 +63,7 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     )
 
     # we deferred the first 2 events we saw: update-status, start.
-    start, update_status = out.deferred
+    update_status, start = out.deferred
     assert start.name == 'start'
     assert update_status.name == 'update_status'
 
