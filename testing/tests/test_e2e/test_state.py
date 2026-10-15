@@ -614,7 +614,7 @@ def test_init_converts_to_concrete_type(
         (TCPPort(80), 'opened_ports', '', ''),
         (Secret({'foo': 'bar'}), 'secrets', '', ''),
         (Resource(name='foo', path='bar'), 'resources', '', ''),
-        (StoredState(), 'stored_states', 'get_stored_state', 'name'),
+        (StoredState(owner_path='MyCharm'), 'stored_states', 'get_stored_state', 'name'),
     ],
 )
 def test_state_immutable(
