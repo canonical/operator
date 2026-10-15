@@ -1636,7 +1636,11 @@ class StoredState:
 
     @property
     def _handle_path(self):
-        return f'{self.owner_path or ""}/{self._data_type_name}[{self.name}]'
+        # Match ops.Handle.path: a Framework-owned object has no parent
+        # prefix at all, rather than an empty one.
+        if self.owner_path:
+            return f'{self.owner_path}/{self._data_type_name}[{self.name}]'
+        return f'{self._data_type_name}[{self.name}]'
 
     def __hash__(self) -> int:
         return hash(self._handle_path)
