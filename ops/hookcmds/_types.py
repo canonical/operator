@@ -29,6 +29,7 @@ from typing import (
 from .._private import timeconv
 
 SecretRotate = Literal['never', 'hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']
+SecretRole = Literal['view', 'rotate', 'manage']
 SettableStatusName = Literal['active', 'blocked', 'maintenance', 'waiting']
 ReadOnlyStatusName = Literal['error', 'unknown']
 StatusName: TypeAlias = SettableStatusName | ReadOnlyStatusName
@@ -282,7 +283,7 @@ class RelationModel:
 class SecretAccessDict(TypedDict):
     target: str
     scope: str
-    role: str
+    role: SecretRole
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -295,8 +296,12 @@ class SecretAccess:
     scope: str
     """The scope of the grant, such as ``relation-wordpress.db#mysql.server``."""
 
-    role: str
-    """The role granted, such as ``view`` or ``manage``."""
+    role: SecretRole
+    """The role granted.
+
+    Juju 3.6 has ``view``, ``rotate`` and ``manage``; Juju 4 has only ``view``
+    and ``manage``.
+    """
 
     @classmethod
     def _from_dict(cls, d: SecretAccessDict) -> SecretAccess:
