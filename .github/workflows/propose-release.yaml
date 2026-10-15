@@ -47,9 +47,9 @@ env:
   # release should be reproducible, and these decide what the changelog and
   # the drafted notes say.
   CHANGELOG: >-
-    git+https://github.com/canonical/charm-tech-code@badfec21db1c3e2ab95fccaa3a77f411d7ed2057#subdirectory=changelog
+    git+https://github.com/canonical/charm-tech-code@3448471e74d1c99aa9e0425c198c1afba3a17350#subdirectory=changelog
   DRAFT_RELEASE_NOTES: >-
-    git+https://github.com/canonical/charm-tech-code@badfec21db1c3e2ab95fccaa3a77f411d7ed2057#subdirectory=draft-release-notes
+    git+https://github.com/canonical/charm-tech-code@3448471e74d1c99aa9e0425c198c1afba3a17350#subdirectory=draft-release-notes
 
 jobs:
   propose:
