@@ -4739,6 +4739,17 @@ class TestSecretClass:
             ['secret-info-get', '--format=json', f'secret://{model._backend.model_uuid}/x'],
         ]
 
+    def test_get_info_no_label_or_description(self, model: ops.Model, fake_script: FakeScript):
+        # Juju omits the label and description keys when the secret has neither.
+        fake_script.write('secret-info-get', """echo '{"x": {"revision": 7}}'""")
+
+        secret = self.make_secret(model, id='x')
+        info = secret.get_info()
+        assert info.id == f'secret://{model._backend.model_uuid}/x'
+        assert info.label is None
+        assert info.description is None
+        assert info.revision == 7
+
     def test_set_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
         fake_script.write('secret-info-get', """echo '{"z": {"label": "y", "revision": 7}}'""")
