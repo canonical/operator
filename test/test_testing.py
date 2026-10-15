@@ -7399,6 +7399,57 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.location == 'https://loki2.example.com'
 
 
+def test_layers_merge_does_not_modify_layers(request: pytest.FixtureRequest):
+    layer1 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'replace',
+                'command': '/bin/sleep 10',
+                'after': ['db'],
+            },
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['server'],
+            }
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'merge',
+                'after': ['cache'],
+            }
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'merge',
+                'services': ['other'],
+            },
+        },
+    })
+    layer1_before = layer1.to_dict()
+    harness = ops.testing.Harness(
+        ops.CharmBase, meta='name: mycharm\ncontainers:\n  my-container:'
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.set_can_connect('my-container', True)
+    harness.begin()
+    container = harness.charm.unit.get_container('my-container')
+    container.add_layer('base', layer1)
+    container.add_layer('extra', layer2)
+
+    # Rendering the plan more than once must give the same result each time.
+    for _ in range(3):
+        plan = container.get_plan()
+        assert plan.services['server'].after == ['db', 'cache']
+        assert plan.log_targets['loki'].services == ['server', 'other']
+    assert layer1.to_dict() == layer1_before
+
+
 @pytest.mark.parametrize('test_context', ['init', 'event'])
 @pytest.mark.parametrize(
     'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
