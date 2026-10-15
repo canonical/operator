@@ -44,12 +44,22 @@ class Error(Exception):
     stderr: str = ''
     """Stderr output of the child process."""
 
-    def __init__(self, *, returncode: int, cmd: list[str], stdout: str = '', stderr: str = ''):
+    def __init__(
+        self,
+        *,
+        returncode: int,
+        cmd: list[str],
+        stdout: str = '',
+        stderr: str = '',
+        message: str | None = None,
+    ):
         self.returncode = returncode
         self.cmd = cmd
         self.stdout = stdout
         self.stderr = stderr
-        super().__init__(f'command {cmd!r} exited with status {returncode}')
+        if message is None:
+            message = f'command {cmd!r} exited with status {returncode}'
+        super().__init__(message)
 
 
 def run(
@@ -75,7 +85,9 @@ def run(
         raise Error(returncode=e.returncode, cmd=cmd, stdout=e.stdout, stderr=e.stderr) from None
     except FileNotFoundError as e:
         cmd = list(args) if redacted_cmd is None else list(redacted_cmd)
-        raise Error(returncode=127, cmd=cmd, stderr=str(e)) from e
+        raise Error(
+            returncode=127, cmd=cmd, stderr=str(e), message=f'command {cmd!r} not found'
+        ) from e
     return result.stdout
 
 

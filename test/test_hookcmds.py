@@ -195,6 +195,7 @@ def test_run_missing_command(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.
     assert excinfo.value.returncode == 127
     assert excinfo.value.cmd == ['secret-ids', '--format=json']
     assert isinstance(excinfo.value.__cause__, FileNotFoundError)
+    assert str(excinfo.value) == "command ['secret-ids', '--format=json'] not found"
 
 
 def test_action_fail(run: Run):
