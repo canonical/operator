@@ -4,9 +4,9 @@
 """Typed JSON encoding of ``State`` and events, for the isolated worker.
 
 Values JSON can't hold are wrapped in an envelope tagged with ``"__t__"``,
-and a tuple is a list that starts with ``"__tuple__"``. The encoding is
-internal: both ends run the same ``ops.testing``, which the payload records
-and the decoder checks.
+and so is a dict that has that key itself. The encoding is internal: both
+ends run the same ``ops.testing``, which the payload records and the decoder
+checks.
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ class _VersionMismatchError(RuntimeError):
 _JSON: TypeAlias = Union[bool, int, float, str, 'list[_JSON]', 'dict[str, _JSON]', None]
 
 _T = '__t__'
-_TUPLE_SENTINEL = '__tuple__'
 
 #: Attributes that aren't dataclass fields, so ``cls(**fields)`` can't
 #: restore them. They're set with ``object.__setattr__`` after construction.
@@ -184,12 +183,10 @@ def _encode(obj: Any, path: str) -> _JSON:
 
     if isinstance(obj, tuple):
         elements = cast('tuple[Any, ...]', obj)
-        return [_TUPLE_SENTINEL, *(_encode(x, f'{path}[]') for x in elements)]
+        return {_T: 'tuple', 'v': [_encode(x, f'{path}[]') for x in elements]}
 
     if isinstance(obj, list):
         items = cast('list[Any]', obj)
-        if items and items[0] == _TUPLE_SENTINEL:
-            raise TypeError(f'A list starting with {_TUPLE_SENTINEL!r} at path {path!r}.')
         return [_encode(x, f'{path}[{i}]') for i, x in enumerate(items)]
 
     if isinstance(obj, dict):
@@ -206,9 +203,10 @@ def _encode(obj: Any, path: str) -> _JSON:
                     f'No JSON encoding for dict key {k!r} of type {type(k).__qualname__!r} '
                     f'at path {path!r}: keys must be all str or all int.'
                 )
-        if _T in mapping:
-            raise TypeError(f'A dict with the key {_T!r} at path {path!r}.')
-        return {k: _encode(v, f'{path}.{k}') for k, v in mapping.items()}
+        encoded_mapping = {k: _encode(v, f'{path}.{k}') for k, v in mapping.items()}
+        if _T in encoded_mapping:
+            return {_T: 'dict', 'v': encoded_mapping}
+        return encoded_mapping
 
     raise TypeError(f'No JSON encoding for type {type(obj).__qualname__!r} at path {path!r}.')
 
@@ -242,8 +240,6 @@ def _as_dict(value: _JSON, field: str) -> dict[str, _JSON]:
 
 def _decode(obj: _JSON) -> Any:
     if isinstance(obj, list):
-        if obj and obj[0] == _TUPLE_SENTINEL:
-            return tuple(_decode(x) for x in obj[1:])
         return [_decode(x) for x in obj]
 
     if not isinstance(obj, dict):
@@ -253,6 +249,12 @@ def _decode(obj: _JSON) -> Any:
 
     if kind is None:
         return {k: _decode(v) for k, v in obj.items()}
+
+    if kind == 'dict':
+        return {k: _decode(v) for k, v in _as_dict(obj['v'], 'dict').items()}
+
+    if kind == 'tuple':
+        return tuple(_decode(x) for x in _as_list(obj['v'], 'tuple'))
 
     if kind == 'status':
         name = _as_str(obj['name'], 'status name')

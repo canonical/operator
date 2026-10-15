@@ -161,6 +161,9 @@ NON_TRIVIAL = testing.State(
         pytest.param(_stored({'n': ((1, 2), (3, 4))}), id='nested-tuple'),
         pytest.param(_stored({'l': [1, 2, 3]}), id='list'),
         pytest.param(_stored({'l': ['__t__']}), id='list-of-the-tag'),
+        pytest.param(_stored({'l': ['__tuple__', 1]}), id='list-starting-like-a-tuple'),
+        pytest.param(_stored({'d': {'__t__': 'bytes', 'v': 'AAAA'}}), id='dict-with-the-tag'),
+        pytest.param(_stored({'__t__': 'dc', 'cls': 'State', 'f': {}}), id='content-with-the-tag'),
         pytest.param(
             testing.State(secrets={_secret_at_revision_2(track_latest=False)}),
             id='secret-revisions',
@@ -224,8 +227,6 @@ class _StrEnum(str, enum.Enum):
         ({'p': pathlib.PureWindowsPath('C:/x')}, "No JSON encoding for type 'PureWindowsPath'"),
         ({(1, 2): 'x'}, 'keys must be all str or all int'),
         ({True: 1}, 'keys must be all str or all int'),
-        ({'d': {'__t__': 'bytes', 'v': 'AAAA'}}, "key '__t__' at path '.*content.d'"),
-        ({'l': ['__tuple__', 1]}, "starting with '__tuple__' at path '.*content.l'"),
     ],
 )
 def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], message: str):
