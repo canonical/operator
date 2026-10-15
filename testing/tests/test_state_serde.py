@@ -193,6 +193,16 @@ def test_state_round_trips(state: testing.State):
     assert _state_serde.encode_state(out) == _state_serde.encode_state(state)
 
 
+@pytest.mark.parametrize('track_latest', [False, True])
+def test_secret_revisions_round_trip(track_latest: bool):
+    # Secret equality doesn't see the revisions, so check them directly.
+    secret = _secret_at_revision_2(track_latest=track_latest)
+    out = _state_serde.decode_state(_state_serde.encode_state(testing.State(secrets={secret})))
+    decoded = next(iter(out.secrets))
+    assert decoded._latest_revision == 2
+    assert decoded._tracked_revision == (2 if track_latest else 1)
+
+
 class _Charm(ops.CharmBase):
     pass
 
@@ -272,14 +282,13 @@ def test_a_payload_from_another_version_is_rejected(
     assert ops.version.version in str(caught.value)
 
 
-def test_sets_encode_the_same_whatever_order_they_were_built_in():
+def test_sets_encode_in_a_canonical_order():
+    # Iteration order depends on the hash seed, so the members are sorted.
     names = [f'name{i}' for i in range(20)]
-    model = testing.Model('m', uuid='00000000-0000-4000-8000-000000000000')
-    forwards = testing.State(model=model, stored_states={testing.StoredState(n) for n in names})
-    backwards = testing.State(
-        model=model, stored_states={testing.StoredState(n) for n in reversed(names)}
-    )
-    assert _state_serde.encode_state(forwards) == _state_serde.encode_state(backwards)
+    state = testing.State(stored_states={testing.StoredState(n) for n in names})
+    members = json.loads(_state_serde.encode_state(state))['state']['f']['stored_states']['v']
+    assert members == sorted(members, key=lambda m: json.dumps(m, sort_keys=True))
+    assert len(members) == len(names)
 
 
 def test_the_payload_records_the_version():

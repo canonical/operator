@@ -139,7 +139,7 @@ def _encode(obj: Any, path: str) -> _JSON:
     if isinstance(obj, bytes):
         return {_T: 'bytes', 'v': base64.b64encode(obj).decode('ascii')}
 
-    # Before the dataclasses, because the status classes take positional arguments.
+    # Before the dataclasses, because the status __init__s take only a message.
     if isinstance(obj, _state._EntityStatus):
         return {_T: 'status', 'name': obj.name, 'msg': obj.message}
 
