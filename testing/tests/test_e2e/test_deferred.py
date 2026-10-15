@@ -352,6 +352,7 @@ def test_defer_custom_event_without_on():
         'MyCharm/on[workload_events]/workload_started[2]',
         'MyCharm/restart_workload[3]',
     ]
+    assert [e.name for e in state_1.deferred] == ['workload_started', 'restart_workload']
     assert [e.snapshot_data for e in state_1.deferred] == [
         {'arg0': 'started', 'arg1': 1},
         {'arg0': 'restart', 'arg1': 2},
