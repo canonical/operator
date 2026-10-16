@@ -33,3 +33,6 @@ sphinx-llm~=0.4
 # Vale dependencies
 rst2html
 vale==3.13.0.0
+
+# For Juju ecosystem docs search
+git+https://github.com/canonical/sphinx-unified-search.git@add-filter
