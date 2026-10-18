@@ -222,7 +222,7 @@ class Model:
 
     @property
     def proxy_config(self) -> ProxyConfig:
-        """The juju-*-proxy configs set by Juju."""
+        """The model's proxy configs set by Juju."""
         context = self._backend._juju_context
         return ProxyConfig(
             http=context.charm_http_proxy,
