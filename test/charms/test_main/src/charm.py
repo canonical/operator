@@ -17,14 +17,10 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import typing
 import warnings
 
 import ops
-
-sys.path.append('lib')
-
 
 logger = logging.getLogger()
 
@@ -44,7 +40,7 @@ class MyCharmEvents(ops.CharmEvents):
 
 
 class Charm(ops.CharmBase):
-    on = MyCharmEvents()  # type: ignore
+    on = MyCharmEvents()
 
     _stored = ops.StoredState()
 

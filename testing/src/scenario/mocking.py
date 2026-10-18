@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import copy
 import datetime
+import functools
+import inspect
 import io
 import shutil
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -22,6 +24,7 @@ from typing import (
     Literal,
     NoReturn,
     TextIO,
+    TypeVar,
     cast,
     get_args,
 )
@@ -129,9 +132,44 @@ class _MockExecProcess:
 
 _NOT_GIVEN = object()  # non-None default value sentinel
 
+_F = TypeVar('_F', bound=Callable[..., Any])
+
+
+def _hook_command(cmd: str, *params: str, **renamed: str) -> Callable[[_F], _F]:
+    """Add the note that ops adds to a ModelError from a failed hook command.
+
+    Record the same arguments as ops does under Juju. Each of ``params`` is a
+    parameter of the decorated method, recorded under its own name, and each of
+    ``renamed`` maps the name that ops records to the parameter holding the value.
+
+    The note is added to any ModelError the method raises, including errors
+    from the mock's own checks. Where ops would raise before running the hook
+    command, such as for an invalid status name, the ops API rejects the call
+    before it reaches the mock.
+    """
+
+    def decorator(func: _F) -> _F:
+        signature = inspect.signature(func)
+
+        @functools.wraps(func)
+        def wrapper(self: _MockModelBackend, *args: Any, **kwargs: Any) -> Any:
+            try:
+                return func(self, *args, **kwargs)
+            except ModelError as e:
+                bound = signature.bind(self, *args, **kwargs)
+                bound.apply_defaults()
+                trace = {name: bound.arguments[name] for name in params}
+                trace.update({key: bound.arguments[name] for key, name in renamed.items()})
+                self._add_hook_command_note(e, cmd, trace)
+                raise
+
+        return cast('_F', wrapper)
+
+    return decorator
+
 
 # pyright: reportIncompatibleMethodOverride=false
-class _MockModelBackend(_ModelBackend):  # type: ignore
+class _MockModelBackend(_ModelBackend):
     def __init__(
         self,
         state: State,
@@ -257,6 +295,9 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
                 f'setting application data is not supported on Juju version {version}',
             )
 
+    @_hook_command(
+        'relation-get', 'relation_id', endpoint='relation_name', unit='member_name', app='is_app'
+    )
     def relation_get(
         self,
         relation_id: int,
@@ -293,6 +334,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         unit_id = int(member_name.split('/')[-1])
         return relation._get_databag_for_remote(unit_id)
 
+    @_hook_command('relation-model-get', 'relation_id', endpoint='relation_name')
     def relation_model_get(
         self, relation_id: int, *, relation_name: str | None = None
     ) -> dict[str, Any]:
@@ -317,6 +359,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def relation_ids(self, relation_name: str):
         return [rel.id for rel in self._state.relations if rel.endpoint == relation_name]
 
+    @_hook_command('relation-list', 'relation_id', endpoint='relation_name')
     def relation_list(
         self, relation_id: int, *, relation_name: str | None = None
     ) -> tuple[str, ...]:
@@ -352,6 +395,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         return state_config  # full config
 
+    @_hook_command('network-get', 'binding_name', 'relation_id')
     def network_get(self, binding_name: str, relation_id: int | None = None):
         # validation:
         extra_bindings = self._charm_spec.meta.get('extra-bindings', ())
@@ -397,6 +441,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
 
         self._state._update_workload_version(version)
 
+    @_hook_command('status-set', 'status', 'message', app='is_app')
     def status_set(
         self,
         status: _SettableStatusName,
@@ -416,6 +461,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
     def juju_log(self, level: str, message: str):
         self._context.juju_log.append(JujuLogLine(level, message))
 
+    @_hook_command('relation-set', 'relation_id', endpoint='relation_name', app='is_app')
     def relation_set(
         self,
         relation_id: int,
@@ -493,6 +539,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             # charm-facing side: respect ops error
             raise ModelError('ERROR permission denied') from understandable_error
 
+    @_hook_command('secret-get', 'id', 'label', 'refresh', 'peek')
     def secret_get(
         self,
         *,
@@ -526,13 +573,20 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         id: str | None = None,
         label: str | None = None,
     ) -> SecretInfo:
-        secret = self._get_secret(id, label)
-        # If both the id and label are provided, then update the label.
-        if id is not None and label is not None:
-            secret._set_label(label)
+        try:
+            secret = self._get_secret(id, label)
+            # If both the id and label are provided, then update the label.
+            if id is not None and label is not None:
+                secret._set_label(label)
 
-        # only "manage"=write access level can read secret info
-        self._check_can_manage_secret(secret)
+            # only "manage"=write access level can read secret info
+            self._check_can_manage_secret(secret)
+        except ModelError as e:
+            # Under Juju, ops runs secret-info-get with only the ID, or only the
+            # label if there's no ID, so the note does the same.
+            trace = {'id': id} if id is not None else {'label': label}
+            self._add_hook_command_note(e, 'secret-info-get', trace)
+            raise
 
         return SecretInfo(
             id=secret.id,
@@ -545,6 +599,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             model_uuid=self._state.model.uuid,
         )
 
+    @_hook_command('secret-set', 'id', 'label', 'description', 'expire', 'rotate')
     def secret_set(
         self,
         id: str,
@@ -575,6 +630,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             rotate=rotate,
         )
 
+    @_hook_command('secret-grant', 'id', 'relation_id', 'unit')
     def secret_grant(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
@@ -587,6 +643,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         grants = cast('dict[int, frozenset[str]]', secret.remote_grants)
         grants[relation_id] = grants.get(relation_id, frozenset()).union({grantee})
 
+    @_hook_command('secret-revoke', 'id', 'relation_id', 'unit')
     def secret_revoke(self, id: str, relation_id: int, *, unit: str | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
@@ -601,6 +658,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
         if not grants[relation_id]:
             del grants[relation_id]
 
+    @_hook_command('secret-remove', 'id', 'revision')
     def secret_remove(self, id: str, *, revision: int | None = None):
         secret = self._get_secret(id)
         self._check_can_manage_secret(secret)
@@ -689,6 +747,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             )
         return copy.deepcopy(action.params)
 
+    @_hook_command('storage-add', 'name', 'count')
     def storage_add(self, name: str, count: int = 1):
         if not isinstance(count, int) or isinstance(count, bool):
             raise TypeError(
@@ -780,6 +839,7 @@ class _MockModelBackend(_ModelBackend):  # type: ignore
             f'Inconsistent state: resource {resource_name} not found in State. please pass it.',
         )
 
+    @_hook_command('credential-get')
     def credential_get(self) -> CloudSpec_Ops:
         if not self._context.app_trusted:
             raise ModelError(

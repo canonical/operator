@@ -275,7 +275,7 @@ class CustomEvents(ops.ObjectEvents):
 
 
 class MyConsumer(ops.Object):
-    on = CustomEvents()  # type: ignore
+    on = CustomEvents()
 
     def __init__(self, charm: ops.CharmBase):
         super().__init__(charm, 'my-consumer')

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import ops
 import ops.storage
-from ops._main import _Dispatcher, _Manager
+from ops._main import _Abort, _Dispatcher, _Manager
 from ops._main import logger as ops_logger
 from ops.framework import _event_regex
 from ops.log import JujuLogHandler, _get_juju_log_and_app_id
@@ -148,7 +148,23 @@ class Ops(_Manager, Generic[CharmType]):
             juju_context=juju_context,
         )
 
-        super().__init__(self.charm_spec.charm_type, model_backend, juju_context=juju_context)
+        self._aborted_in_init = False
+        try:
+            super().__init__(self.charm_spec.charm_type, model_backend, juju_context=juju_context)
+        except _Abort as e:
+            # ops.main() treats _Abort(0) from the charm's __init__ (for example, from
+            # load_config(errors='blocked')) as a clean exit: the event isn't emitted and
+            # nothing is committed, but any status the charm set stands. An _Abort before
+            # the framework exists comes from the dispatcher, not the charm, so propagate
+            # that as before.
+            if e.exit_code != 0 or not hasattr(self, 'framework'):
+                raise
+            self._aborted_in_init = True
+
+    def run(self):
+        if self._aborted_in_init:
+            return
+        super().run()
 
     def _load_charm_meta(self):
         metadata = (self._charm_root / 'metadata.yaml').read_text()
