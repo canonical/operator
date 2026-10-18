@@ -549,13 +549,13 @@ unified_search_cache_remote_indexes = True
 
 # Enable filter function in search results page
 unified_search_project_filter = True
-unified_search_local_project_name = "OPS"   # optional, defaults to `project`
+unified_search_local_project_name = "Ops"   # optional, defaults to `project`
 
 # Remote documentation projects that are part of the Juju ecosystem
 unified_search_projects = [
     # Public project - no auth needed, plain HTTP fetch
     {
-        "name": "Juju-CLI",
+        "name": "Juju CLI",
         "base_url": "https://canonical.com/juju/docs/juju-cli/3.6/",
         "searchindex_url": "https://canonical.com/juju/docs/juju-cli/3.6/searchindex.js",
     },
