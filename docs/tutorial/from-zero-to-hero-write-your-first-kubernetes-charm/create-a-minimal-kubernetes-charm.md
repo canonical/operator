@@ -184,8 +184,6 @@ services:
     summary: FastAPI demo server
     command: /bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000
     startup: enabled
-    environment:
-      DEMO_SERVER_LOGFILE: /tmp/demo_server.log
     ...
 ```
 
