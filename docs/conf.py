@@ -544,7 +544,7 @@ def setup(app):
 
 # sphinx-unified-search configuration
 
-# Downloads remote docs index once per `make run` to reduce rebuild time
+# Downloads remote docs index once per `make run`, so that automatic rebuilds don't take longer
 unified_search_cache_remote_indexes = True
 
 # Enable filter function in search results page
