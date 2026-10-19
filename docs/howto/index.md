@@ -158,6 +158,7 @@ Secure your charm <secure-your-charm>
 
 Publish your charm on Charmhub <publish-your-charm-on-charmhub>
 Make your charm discoverable <make-your-charm-discoverable>
+Set up production integrations <set-up-production-integrations>
 ```
 
 ## Migration guides
