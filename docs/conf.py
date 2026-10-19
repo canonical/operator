@@ -266,6 +266,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
+    "sphinx_unified_search",
 ]
 
 # Excludes files or directories from processing
@@ -539,3 +540,28 @@ def setup(app):
     app.add_directive("jujuadded", JujuAdded)
     app.add_directive("jujuchanged", JujuChanged)
     app.add_directive("jujuremoved", JujuRemoved)
+
+
+# sphinx-unified-search configuration
+
+# Downloads remote docs index once per `make run`, so that automatic rebuilds don't take longer
+unified_search_cache_remote_indexes = True
+
+# Enable filter function in search results page
+unified_search_project_filter = True
+unified_search_local_project_name = "Ops"   # optional, defaults to `project`
+
+# Remote documentation projects that are part of the Juju ecosystem
+unified_search_projects = [
+    # Public project - no auth needed, plain HTTP fetch
+    {
+        "name": "Juju CLI",
+        "base_url": "https://canonical.com/juju/docs/juju-cli/3.6/",
+        "searchindex_url": "https://canonical.com/juju/docs/juju-cli/3.6/searchindex.js",
+    },
+    {
+        "name": "Charmcraft",
+        "base_url": "https://canonical.com/juju/docs/charmcraft/4/",
+        "searchindex_url": "https://canonical.com/juju/docs/charmcraft/4/searchindex.js",
+    }
+]
