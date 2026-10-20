@@ -2477,7 +2477,7 @@ class Event:
     """
 
     # The name of the event, for example ``start``, ``config_changed``,
-    # ``my_relation_joined``, or ``custom.MyConsumer.lib_changed``.
+    # ``my_relation_joined``, or ``{custom}.MyConsumer.lib_changed``.
     _raw_path: str
 
     # The entity that the event is about, if any.
@@ -2521,7 +2521,7 @@ class Event:
 
     @property
     def name(self) -> str:
-        """Full event name.
+        """The event name.
 
         For Juju events, this is the Juju hook name with hyphens replaced by
         underscores. The name consists of a prefix, naming the entity the event
@@ -2530,6 +2530,10 @@ class Event:
         ``foo-bar-relation-changed``, and the event name is
         ``foo_bar_relation_changed``. Events that are not about an entity, such
         as ``update_status``, have no prefix.
+
+        For custom events, this is the event's attribute name on its emitter,
+        without the emitter or library name. For example, an event observed
+        as ``self.consumer.on.lib_changed`` has the name ``lib_changed``.
         """
         return self._path.python_name
 

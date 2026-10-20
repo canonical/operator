@@ -68,11 +68,7 @@ _DEFAULT_JUJU_VERSION = '3.6.14'
 
 
 def _check_event(event: Event) -> None:
-    """Check that the object passed as an event is one that :class:`CharmEvents` made.
-
-    Both entry points (:meth:`Context.run` and ``Context.__call__``) check
-    here, so the same mistake gets the same message whichever one is used.
-    """
+    """Raise TypeError if ``event`` is an event name or an uncalled ``ctx.on`` method."""
     # Help people transition from Scenario 6, where events were passed by
     # name. This doesn't need to track new CharmEvents methods: any name not
     # listed here gets the generic suggestion.

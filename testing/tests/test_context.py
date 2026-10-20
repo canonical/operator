@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 from unittest.mock import patch
 
@@ -111,6 +112,36 @@ def test_context_manager():
     with ctx(ctx.on.action('act'), state) as mgr:
         mgr.run()
         assert mgr.charm.meta.name == 'foo'
+
+
+@pytest.mark.parametrize(
+    'event,message',
+    [
+        ('start', 'like `ctx.on.start()`'),
+        ('relation-changed', 'like `ctx.on.relation_changed(my_relation)`'),
+        ('not_an_event', 'like `ctx.on.event()`'),
+    ],
+)
+@pytest.mark.parametrize('use_manager', [False, True])
+def test_event_passed_by_name(event: str, message: str, use_manager: bool):
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(TypeError, match=re.escape(message)):
+        if use_manager:
+            with ctx(event, State()):  # type: ignore
+                pass
+        else:
+            ctx.run(event, State())  # type: ignore
+
+
+@pytest.mark.parametrize('use_manager', [False, True])
+def test_event_method_not_called(use_manager: bool):
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(TypeError, match=re.escape('Did you forget to add parentheses?')):
+        if use_manager:
+            with ctx(ctx.on.start, State()):  # type: ignore
+                pass
+        else:
+            ctx.run(ctx.on.start, State())  # type: ignore
 
 
 class _RaisingCharm(ops.CharmBase):
