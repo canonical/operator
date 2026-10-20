@@ -11,8 +11,6 @@ sdks:
   # which the actions below run.
   - name: project-tools
 
-# The checks CONTRIBUTING.md asks for, and the docs build.
-#
 # There are deliberately no smoke or integration actions. Those tests need a
 # Juju controller, and one can't run in a workshop. Run them on the host
 # instead.
