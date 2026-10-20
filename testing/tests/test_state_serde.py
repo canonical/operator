@@ -35,6 +35,12 @@ def _container(**kwargs: Any) -> testing.State:
     return testing.State(containers={testing.Container('app', **kwargs)})
 
 
+def _layer(**service: Any) -> pebble.Layer:
+    # Layer passes these values through as given, though LayerDict doesn't describe them.
+    raw = {'services': {'s': {'override': 'replace', 'command': '/bin/s', **service}}}
+    return pebble.Layer(cast('pebble.LayerDict', raw))
+
+
 def _stored(content: dict[str, Any]) -> testing.State:
     return testing.State(stored_states={testing.StoredState(content=content)})
 
@@ -177,6 +183,14 @@ NON_TRIVIAL = testing.State(
             id='check-level',
         ),
         pytest.param(_container(layers={'l': pebble.Layer({})}), id='empty-layer'),
+        pytest.param(
+            _container(layers={'l': _layer(startup=pebble.ServiceStartup.ENABLED)}),
+            id='layer-service-startup',
+        ),
+        pytest.param(
+            _container(layers={'l': _layer(environment={'CONFIG': pathlib.Path('/etc/s.conf')})}),
+            id='layer-path-in-environment',
+        ),
         pytest.param(
             testing.State(
                 secrets={

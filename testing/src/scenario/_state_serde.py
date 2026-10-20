@@ -159,7 +159,9 @@ def _encode(obj: Any, path: str) -> _JSON:
         return {_T: 'status', 'name': obj.name, 'msg': obj.message}
 
     if isinstance(obj, pebble.Layer):
-        return {_T: 'layer', 'v': cast('dict[str, _JSON]', obj.to_dict())}
+        # Encoded rather than trusted: to_dict() passes values such as a
+        # ServiceStartup or a Path through as given.
+        return {_T: 'layer', 'v': _encode(obj.to_dict(), path)}
 
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         cls = type(obj)
@@ -305,7 +307,10 @@ def _decode(obj: _JSON) -> Any:
         )
 
     if kind == 'layer':
-        return pebble.Layer(cast('pebble.LayerDict', _as_dict(_field(obj, 'v', kind), kind)))
+        layer = _decode(_field(obj, 'v', kind))
+        if not isinstance(layer, dict):
+            raise TypeError(f'Expected an object for layer in the payload, got {layer!r}.')
+        return pebble.Layer(cast('pebble.LayerDict', layer))
 
     if kind == 'enum':
         cls_name = _as_str(_field(obj, 'cls', 'enum'), 'enum class')
