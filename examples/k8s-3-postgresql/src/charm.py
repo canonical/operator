@@ -173,10 +173,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         if not db_data:
             return {}
         return {
-            "DEMO_SERVER_DB_HOST": db_data["db_host"],
-            "DEMO_SERVER_DB_PORT": db_data["db_port"],
-            "DEMO_SERVER_DB_USER": db_data["db_username"],
-            "DEMO_SERVER_DB_PASSWORD": db_data["db_password"],
+            "POSTGRESQL_DB_HOSTNAME": db_data["db_host"],
+            "POSTGRESQL_DB_PORT": db_data["db_port"],
+            "POSTGRESQL_DB_USERNAME": db_data["db_username"],
+            "POSTGRESQL_DB_PASSWORD": db_data["db_password"],
         }
 
     def fetch_database_relation_data(self) -> dict[str, str]:

@@ -287,7 +287,9 @@ Run the ["Propose a release"](https://github.com/canonical/operator/actions/work
 
 > The version comes from the last tag, and never from `ops/version.py`. Between releases that file holds a development version left behind by the last post-release bump, which is a guess rather than something we shipped. The tag is also where the changelog starts, so the two can't drift apart.
 
-The workflow writes the `CHANGES.md` entry, updates the version strings across `ops`, `ops-scenario`, `ops-tracing` and the tool-versions table, runs `uv lock`, drafts the release title and notes, and opens a PR from a `release-prep-X.Y.Z` branch, titled "chore: update changelog and versions for X.Y.Z release".
+The workflow writes the `CHANGES.md` entry, updates the version strings across `ops`, `ops-scenario`, `ops-tracing` and the tool-versions table, runs `uv lock`, drafts the release title and notes, and opens a draft PR from a `release-prep-X.Y.Z` branch, titled "chore: update changelog and versions for X.Y.Z release". The PR's description lists the next steps, with the PR's number ready for the next workflow.
+
+The PR is a draft so that you can tidy it up before asking anyone else to look: resolve the **Unsure:** notes the model left, cut anything a reader doesn't need, and fix the changelog entry if it needs it. Then mark it ready for review and ask for one.
 
 Review both halves of it, because they are different jobs:
 
@@ -310,7 +312,7 @@ It also opens a PR titled "chore: adjust versions after the X.Y.Z release" that 
 
 This is where somebody reads the notes as a reader will see them, which is a different act from reviewing a diff. Read them, edit the release body if it needs it, and then:
 
-1. If you are releasing from `main`, tick "Set as the latest release". If you are releasing from a maintenance branch, untick it.
+1. If you are releasing from `main`, leave "Set as the latest release" ticked. If you are releasing from a maintenance branch, untick it. GitHub ticks it on every draft, whatever the draft was created with, so this can't be set ahead of time. If it is missed, edit the newest release and tick it there.
 2. Click "Publish release". GitHub creates the tag as it publishes.
 
 ### 3. Publishing does the rest
@@ -327,7 +329,7 @@ Two things are still yours to do by hand:
 
 ### Maintenance branches, pre-releases and major releases
 
-A **maintenance release** is the same steps with `branch` set to, for example, `2.23-maintenance`. Both the version and the changelog come from that branch's own last tag rather than from the newest tag in the repository.
+A **maintenance release** is the same steps with `branch` set to, for example, `2.23-maintenance`. Both the version and the changelog come from that branch's own last tag rather than from the newest tag in the repository. When a PR on the branch is a batch of cherry-picks from `main`, squash-merged, the changelog lists each of the fixes it brought in, with the PR the fix was first merged in, under a line for the batch. The fixes are found from the PR's own commits that still carry a `(#N)`.
 
 Nothing needs to be added to a maintenance branch first. Both workflows run from `main`, and read the version script from `main`, so the maintenance branch only has to have the files that get a new version written into them. The one difference is publishing: publishing the draft creates the tag, and a tag's publish workflow is the one on the branch it was cut from. On `2.23-maintenance` and `3.3-maintenance` that is the older tag-triggered workflow (`publish-ops.yaml` and its siblings on 2.23, and `publish.yaml` on 3.3), which uploads to PyPI in the same way.
 

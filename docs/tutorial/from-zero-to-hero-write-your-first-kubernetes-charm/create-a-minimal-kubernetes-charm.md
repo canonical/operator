@@ -63,7 +63,7 @@ In `charmcraft.yaml`, replace the `containers` and `resources` blocks with:
 ```{literalinclude} ../../../examples/k8s-1-minimal/charmcraft.yaml
 :language: yaml
 :start-at: 'containers:'
-:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0'
+:end-at: 'upstream-source: ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0'
 ```
 
 ### Write a helper module
@@ -184,8 +184,6 @@ services:
     summary: FastAPI demo server
     command: /bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000
     startup: enabled
-    environment:
-      DEMO_SERVER_LOGFILE: /tmp/demo_server.log
     ...
 ```
 
@@ -240,7 +238,7 @@ Deploy the `.charm` file, as below. Juju will create a Kubernetes `StatefulSet` 
 
 ```text
 juju deploy ./fastapi-demo_amd64.charm --resource \
-     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+     demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0
 ```
 
 
@@ -264,7 +262,7 @@ Model    Controller     Cloud/Region  Version  SLA          Timestamp
 testing  concierge-k8s  k8s           3.6.13   unsupported  13:38:19+01:00
 
 App           Version  Status  Scale  Charm         Channel  Rev  Address         Exposed  Message
-fastapi-demo  2.1.0    active      1  fastapi-demo             0  10.152.183.215  no
+fastapi-demo  3.0.0    active      1  fastapi-demo             0  10.152.183.215  no
 
 Unit             Workload  Agent  Address      Ports  Message
 fastapi-demo/0*  active    idle   10.1.157.73
@@ -281,7 +279,7 @@ curl 10.1.157.73:8000/version
 You should see a JSON string with the version of the application:
 
 ```
-{"version":"2.1.0"}
+{"version":"3.0.0"}
 ```
 
 Congratulations, you've successfully created a minimal Kubernetes charm!
