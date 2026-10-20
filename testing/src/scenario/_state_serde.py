@@ -15,7 +15,6 @@ import base64
 import dataclasses
 import datetime
 import enum
-import importlib.metadata
 import inspect
 import json
 import pathlib
@@ -26,6 +25,7 @@ from typing import Any, TypeAlias, Union, cast
 import ops
 from ops import pebble
 
+from . import _version
 from . import state as _state
 
 
@@ -38,8 +38,9 @@ _JSON: TypeAlias = Union[bool, int, float, str, 'list[_JSON]', 'dict[str, _JSON]
 
 _T = '__t__'
 
-#: The version of the ``ops-scenario`` distribution, which provides ``ops.testing``.
-_VERSION = importlib.metadata.version('ops-scenario')
+#: The ``ops-scenario`` version, from the source rather than the installed
+#: metadata: what matters is whether the same code encoded the payload.
+_VERSION = _version.version
 
 #: Attributes that aren't dataclass fields, so ``cls(**fields)`` can't
 #: restore them. They're set with ``object.__setattr__`` after construction.
