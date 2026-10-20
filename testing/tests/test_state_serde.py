@@ -7,8 +7,10 @@ import dataclasses
 import datetime
 import enum
 import importlib.metadata
+import inspect
 import json
 import pathlib
+import typing
 import zoneinfo
 from collections.abc import Callable
 from typing import Any, cast
@@ -415,3 +417,35 @@ def test_sets_encode_in_a_canonical_order():
 def test_the_payload_records_the_version():
     payload = json.loads(_state_serde.encode_state(testing.State()))
     assert payload['ops_testing_version'] == VERSION
+
+
+def _enums_reachable_from_state() -> set[type[enum.Enum]]:
+    found: set[type[enum.Enum]] = set()
+    seen: set[type] = set()
+
+    def walk(hint: Any):
+        for arg in typing.get_args(hint):
+            walk(arg)
+        if not inspect.isclass(hint):
+            return
+        if issubclass(hint, enum.Enum):
+            found.add(hint)
+        elif dataclasses.is_dataclass(hint) and hint not in seen:
+            seen.add(hint)
+            for field_hint in typing.get_type_hints(hint).values():
+                walk(field_hint)
+
+    for cls in _state_serde._DC_TYPES.values():
+        walk(cls)
+    return found
+
+
+def test_every_enum_in_a_state_has_an_encoding():
+    # _ENUM_TYPES is written by hand, so a new enum-typed field would otherwise
+    # only show up as an encoding error on a State that ops.testing accepts.
+    known = set(_state_serde._ENUM_TYPES.values())
+    reachable = _enums_reachable_from_state()
+    assert reachable <= known
+    # ServiceStartup is only reachable inside a Pebble layer, which the field
+    # annotations don't see into.
+    assert known - reachable == {pebble.ServiceStartup}
