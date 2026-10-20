@@ -47,6 +47,8 @@ def _stored(content: dict[str, Any]) -> testing.State:
     return testing.State(stored_states={testing.StoredState(content=content)})
 
 
+# Sets every field to something other than its default, recursing into the
+# nested types, so that a field added later with no encoding fails here.
 NON_TRIVIAL = testing.State(
     config={'log_level': 'debug', 'port': 8080, 'enabled': True},
     relations={
@@ -57,6 +59,13 @@ NON_TRIVIAL = testing.State(
             remote_app_data={'version': '14'},
         ),
         testing.PeerRelation('peers', peers_data={1: {'leader': 'true'}}),
+        testing.SubordinateRelation(
+            'logging',
+            remote_app_name='fluentbit',
+            remote_unit_id=2,
+            remote_app_data={'format': 'json'},
+            remote_unit_data={'ready': 'true'},
+        ),
     },
     containers={
         testing.Container(
@@ -79,6 +88,7 @@ NON_TRIVIAL = testing.State(
                     'http', level=pebble.CheckLevel.ALIVE, status=pebble.CheckStatus.UP
                 )
             },
+            execs={testing.Exec(['ls', '-l'], return_code=1, stdout='out', stderr='err')},
         )
     },
     secrets={
@@ -91,6 +101,40 @@ NON_TRIVIAL = testing.State(
         )
     },
     resources={testing.Resource(name='oci-image', path=pathlib.Path('/srv/image.tar'))},
+    networks={
+        testing.Network(
+            'db',
+            bind_addresses=[
+                testing.BindAddress(
+                    [testing.Address('10.0.0.5', hostname='app-0', cidr='10.0.0.0/24')],
+                    interface_name='eth0',
+                    mac_address='00:16:3e:00:00:01',
+                )
+            ],
+            ingress_addresses=['10.0.0.5'],
+            egress_subnets=['10.0.0.0/24'],
+        )
+    },
+    storages={testing.Storage('data', index=3)},
+    model=testing.Model(
+        'my-model',
+        uuid='00000000-0000-4000-8000-000000000000',
+        type='lxd',
+        cloud_spec=testing.CloudSpec(
+            'lxd',
+            name='localhost',
+            region='default',
+            endpoint='https://10.0.0.1:8443',
+            credential=testing.CloudCredential(
+                auth_type='certificate',
+                attributes={'client-cert': 'cert'},
+                redacted=['client-key'],
+            ),
+            ca_certificates=['ca'],
+            skip_tls_verify=True,
+            is_controller_cloud=True,
+        ),
+    ),
     stored_states={
         testing.StoredState(
             '_stored',
