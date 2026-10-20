@@ -210,7 +210,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0
 ```
 
 Next, test your charm's ability to integrate with Prometheus, Loki, and Grafana by following the steps below.
