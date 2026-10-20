@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from scenario import Context
-from scenario.state import State, _CharmSpec, _Event, _EventType
+from scenario.state import Event, State, _CharmSpec, _EventType
 
 import ops
 
@@ -33,7 +33,7 @@ import ops
     ),
 )
 def test_event_type(evt: str, expected_type: _EventType):
-    event = _Event(evt)
+    event = Event(evt)
     assert event._path.type is expected_type
 
     assert event._is_relation_event is (expected_type is _EventType.RELATION)
@@ -87,7 +87,7 @@ def test_event_type(evt: str, expected_type: _EventType):
 )
 def test_event_juju_name(evt: str, expected_juju_name: str):
     # See #2511.
-    event = _Event(evt)
+    event = Event(evt)
     assert event._juju_name == expected_juju_name
 
 
