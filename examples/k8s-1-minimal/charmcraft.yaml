@@ -37,7 +37,7 @@ config:
     # An example config option to customise the log level of the workload
     log-level:
       description: |
-        Configures the log level of gunicorn.
+        Configures the log level of the workload.
 
         Acceptable values are: "info", "debug", "warning", "error" and "critical"
       default: "info"
@@ -53,7 +53,7 @@ resources:
     type: oci-image
     description: OCI image from GitHub Container registry
     # The upstream-source field is ignored by Charmcraft and Juju, but it can be
-    # useful to developers in identifying the source of the OCI image.  It is also
+    # useful to developers in identifying the source of the OCI image. It is also
     # used by the 'canonical/charming-actions' GitHub action for automated releases.
     # The test_deploy function in tests/integration/test_charm.py reads upstream-source
     # to determine which OCI image to use when running the charm's integration tests.
