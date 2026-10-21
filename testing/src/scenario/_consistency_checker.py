@@ -41,7 +41,7 @@ from .state import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .state import State, _Event
+    from .state import Event, State
 
 logger = scenario_logger.getChild('consistency_checker')
 
@@ -59,7 +59,7 @@ class Results(NamedTuple):
 
 def check_consistency(
     state: State,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[Any],
     juju_version: str,
     unit_id: int,
@@ -150,12 +150,12 @@ def check_resource_consistency(
 
 def check_event_consistency(
     *,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[CharmType],
     state: State,
     **_kwargs: Any,
 ) -> Results:
-    """Check the internal consistency of the ``_Event`` data structure.
+    """Check the internal consistency of the ``Event`` data structure.
 
     For example, it checks that a relation event has a relation instance, and that
     the relation endpoint name matches the event prefix.
@@ -196,25 +196,25 @@ def check_event_consistency(
 
 def _check_relation_event(
     charm_spec: _CharmSpec[CharmType],
-    event: _Event,
+    event: Event,
     state: State,
     errors: list[str],
     warnings: list[str],
 ):
-    if not event.relation:
+    if not event._relation:
         errors.append(
             'cannot construct a relation event without the relation instance. Please pass one.',
         )
     else:
-        if event._path.juju_prefix != event.relation.endpoint:
+        if event._path.juju_prefix != event._relation.endpoint:
             errors.append(
                 f'relation event prefix {event._path.juju_prefix!r} does not match the relation '
-                f'endpoint name {event.relation.endpoint!r} (the endpoint name must appear '
+                f'endpoint name {event._relation.endpoint!r} (the endpoint name must appear '
                 'exactly as declared in the charm metadata).',
             )
-        if event.relation not in state.relations:
+        if event._relation not in state.relations:
             errors.append(
-                f'cannot emit {event.name} because relation {event.relation.id} is not in the '
+                f'cannot emit {event.name} because relation {event._relation.id} is not in the '
                 f'state (a relation with the same ID is not sufficient - you must '
                 f'pass the object in the state to the event).',
             )
@@ -222,48 +222,48 @@ def _check_relation_event(
 
 def _check_workload_event(
     charm_spec: _CharmSpec[CharmType],
-    event: _Event,
+    event: Event,
     state: State,
     errors: list[str],
     warnings: list[str],
 ):
-    if not event.container:
+    if not event._container:
         errors.append(
             'cannot construct a workload event without the container instance. Please pass one.',
         )
     else:
-        if event._path.juju_prefix != event.container.name:
+        if event._path.juju_prefix != event._container.name:
             errors.append(
                 f'workload event prefix {event._path.juju_prefix!r} does not match the container '
-                f'name {event.container.name!r} (the container name must appear exactly '
+                f'name {event._container.name!r} (the container name must appear exactly '
                 f'as declared in the charm metadata).',
             )
-        if event.container not in state.containers:
+        if event._container not in state.containers:
             errors.append(
-                f'cannot emit {event.name} because container {event.container.name} '
+                f'cannot emit {event.name} because container {event._container.name} '
                 f'is not in the state (a container with the same name is not '
                 f'sufficient. You must pass the object in the state to the event).',
             )
-        if not event.container.can_connect:
+        if not event._container.can_connect:
             warnings.append(
                 f'you **can** fire {event.name} while the container cannot connect, '
                 "but that's most likely not what you want.",
             )
-        names = Counter(exe.command_prefix for exe in event.container.execs)
+        names = Counter(exe.command_prefix for exe in event._container.execs)
         if dupes := [n for n in names if names[n] > 1]:
             errors.append(
-                f'container {event.container.name} has duplicate command prefixes: {dupes}',
+                f'container {event._container.name} has duplicate command prefixes: {dupes}',
             )
 
 
 def _check_action_event(
     charm_spec: _CharmSpec[CharmType],
-    event: _Event,
+    event: Event,
     state: State,
     errors: list[str],
     warnings: list[str],
 ):
-    action = event.action
+    action = event._action
     if not action:
         errors.append(
             'cannot construct an action event without the action instance. Please pass one.',
@@ -287,12 +287,12 @@ def _check_action_event(
 
 def _check_storage_event(
     charm_spec: _CharmSpec[CharmType],
-    event: _Event,
+    event: Event,
     state: State,
     errors: list[str],
     warnings: list[str],
 ):
-    storage = event.storage
+    storage = event._storage
     meta = charm_spec.meta
 
     if not storage:
@@ -469,7 +469,7 @@ def check_config_consistency(
 
 def check_secrets_consistency(
     *,
-    event: _Event,
+    event: Event,
     state: State,
     juju_version: tuple[int, ...],
     **_kwargs: Any,
@@ -479,9 +479,9 @@ def check_secrets_consistency(
     if not event._is_secret_event:
         return Results(errors, [])
 
-    assert event.secret is not None
-    if event.secret not in state.secrets:
-        secret_key = event.secret.id if event.secret.id else event.secret.label
+    assert event._secret is not None
+    if event._secret not in state.secrets:
+        secret_key = event._secret.id if event._secret.id else event._secret.label
         errors.append(
             f'cannot emit {event.name} because secret {secret_key} is not in the state '
             f'(a secret with the same ID is not sufficient - you must pass the object '
@@ -499,7 +499,7 @@ def check_secrets_consistency(
 def check_network_consistency(
     *,
     state: State,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
@@ -537,7 +537,7 @@ def check_network_consistency(
 def check_relation_consistency(
     *,
     state: State,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[CharmType],
     unit_id: int,
     **_kwargs: Any,
@@ -620,11 +620,11 @@ def check_relation_consistency(
     # with data.
     if (
         event.name.endswith(('_relation_joined', '_relation_changed', '_relation_departed'))
-        and event.relation_remote_unit_id is None
-        and event.relation is not None  # Another check will have complained if it is None.
+        and event._relation_remote_unit_id is None
+        and event._relation is not None  # Another check will have complained if it is None.
     ):
         try:
-            relation = state.get_relation(event.relation.id)
+            relation = state.get_relation(event._relation.id)
         except KeyError:
             # Another check will already have complained about this.
             pass
@@ -649,7 +649,7 @@ def check_relation_consistency(
 def check_containers_consistency(
     *,
     state: State,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[CharmType],
     **_kwargs: Any,
 ) -> Results:
@@ -679,15 +679,15 @@ def check_containers_consistency(
                 f'consistent, if it cannot connect; but it should at least be there.',
             )
         # - you're processing a Notice event and that notice is not in any of the containers
-        if event.notice and event.notice.id not in all_notices:
+        if event._notice and event._notice.id not in all_notices:
             errors.append(
-                f'the event being processed concerns notice {event.notice!r}, but that '
+                f'the event being processed concerns notice {event._notice!r}, but that '
                 'notice is not in any of the containers present in the state.',
             )
         # - you're processing a Check event and that check is not in the check's container
-        if event.check_info and (evt_container_name, event.check_info.name) not in all_checks:
+        if event._check_info and (evt_container_name, event._check_info.name) not in all_checks:
             errors.append(
-                f'the event being processed concerns check {event.check_info.name}, but that '
+                f'the event being processed concerns check {event._check_info.name}, but that '
                 f'check is not in the {evt_container_name} container.',
             )
 
@@ -752,7 +752,7 @@ def check_containers_consistency(
 def check_cloudspec_consistency(
     *,
     state: State,
-    event: _Event,
+    event: Event,
     charm_spec: _CharmSpec[CharmType],
     juju_version: tuple[int, ...],
     **_kwargs: Any,

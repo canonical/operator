@@ -37,7 +37,7 @@ from .state import (
 if TYPE_CHECKING:  # pragma: no cover
     from opentelemetry.sdk.trace import ReadableSpan
 
-    from .state import State, _CharmSpec, _Event
+    from .state import Event, State, _CharmSpec
 
 EVENT_REGEX = re.compile(_event_regex)
 STORED_STATE_REGEX = re.compile(
@@ -118,7 +118,7 @@ class Ops(_Manager, Generic[CharmType]):
     def __init__(
         self,
         state: State,
-        event: _Event,
+        event: Event,
         context: Context[CharmType],
         charm_spec: _CharmSpec[CharmType],
         juju_context: ops.JujuContext,
@@ -203,8 +203,8 @@ class Ops(_Manager, Generic[CharmType]):
 
     def _get_event_to_emit(self, event_name: str):
         if self.event._is_custom_event:
-            assert self.event.custom_event is not None
-            emitter_type = type(self.event.custom_event.emitter)
+            assert self.event._custom_event is not None
+            emitter_type = type(self.event._custom_event.emitter)
             # We require the event source to be an attribute on the charm object.
             # Essentially, we are replacing the unbound event with a bound one.
             for attr_name in dir(self.charm):
@@ -217,9 +217,11 @@ class Ops(_Manager, Generic[CharmType]):
                         continue
                     if type(sub_attr) is not emitter_type:
                         continue
-                    return getattr(sub_attr, self.event.custom_event.event_kind)
+                    return getattr(sub_attr, self.event._custom_event.event_kind)
 
-        owner = self._get_owner(self.charm, self.event.owner_path) if self.event else self.charm.on
+        owner = (
+            self._get_owner(self.charm, self.event._owner_path) if self.event else self.charm.on
+        )
 
         try:
             event_to_emit = getattr(owner, event_name)
@@ -252,11 +254,11 @@ class Ops(_Manager, Generic[CharmType]):
         # since the test code typically won't be able to create the ops objects,
         # as a model is required for many.
         args, kwargs = super()._get_event_args(bound_event)
-        if self.event.custom_event_args is not None:
-            for arg in self.event.custom_event_args:
+        if self.event._custom_event_args is not None:
+            for arg in self.event._custom_event_args:
                 args.append(self._object_to_ops_object(arg))
-        if self.event.custom_event_kwargs is not None:
-            for key, value in self.event.custom_event_kwargs.items():
+        if self.event._custom_event_kwargs is not None:
+            for key, value in self.event._custom_event_kwargs.items():
                 kwargs[key] = self._object_to_ops_object(value)
         return args, kwargs
 
