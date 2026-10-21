@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: Summarise standard interface names, interface libraries, and common integrations for ingress, observability, databases, TLS, object storage, and identity.
+    description: Guidance for integrating your charm with common services, including ingress, observability, databases, TLS, object storage, and identity.
 ---
 
 (set-up-production-integrations)=
@@ -47,10 +47,8 @@ Integrate your charm with the [Canonical Observability Stack (COS)](https://docu
 
 To integrate your charm with COS:
 
-* On Kubernetes, your charm integrates with each COS component over its own interface. Declare a `provides` endpoint for each of `prometheus_scrape` (Prometheus) and `grafana_dashboard` (Grafana), and a `requires` endpoint for `loki_push_api` (Loki). See {ref}`Observe your charm with COS Lite tutorial <observe-your-charm-with-cos-lite>`.
+* On Kubernetes, your charm integrates with each COS component over its own interface. Declare a `provides` endpoint for each of `prometheus_scrape` (Prometheus) and `grafana_dashboard` (Grafana), and a `requires` endpoint for `loki_push_api` (Loki). See {ref}`Observe your charm with COS Lite tutorial <observe-your-charm-with-cos-lite>`. To trace your charm code and send the trace data to COS, see {ref}`trace-your-charm`.
 * On machines, your charm declares a single `provides` endpoint that uses the `cos_agent` interface. Use the [`cos_agent` charm library](https://charmhub.io/grafana-agent/libraries/cos_agent) to implement it. The [OpenTelemetry Collector](https://charmhub.io/opentelemetry-collector) subordinate charm forwards everything to COS. See more: [COS | Instrument machine charms](https://documentation.ubuntu.com/observability/latest/how-to/integrate/instrument-machine-charms/).
-
-To trace your charm code and send the trace data to COS, see {ref}`trace-your-charm`.
 
 See more: [Hydra](https://github.com/canonical/hydra-operator/blob/main/src/charm.py), [Valkey](https://github.com/canonical/valkey-operator/blob/9/edge/src/events/observability.py).
 
