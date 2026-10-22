@@ -27,6 +27,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Final,
     Literal,
     NoReturn,
     TextIO,
@@ -89,7 +90,7 @@ class _ContainerBaseDict(TypedDict):
     architectures: list[str]
 
 
-logger = logging.getLogger(__name__)
+logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 class HookEvent(EventBase):
@@ -147,7 +148,7 @@ class ActionEvent(EventBase):
         """
         raise RuntimeError('cannot defer action events')
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to record the action.
 
         Not meant to be called directly by charm code.
@@ -164,7 +165,7 @@ class ActionEvent(EventBase):
         """
         return {'id': self.id}
 
-    def set_results(self, results: dict[str, Any]):
+    def set_results(self, results: dict[str, Any]) -> None:
         """Report the result of the action.
 
         Juju eventually only accepts a str:str mapping, so we will attempt
@@ -211,7 +212,7 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_set(results)
 
-    def log(self, message: str):
+    def log(self, message: str) -> None:
         """Send a message that a user will see while the action is running.
 
         Args:
@@ -219,7 +220,7 @@ class ActionEvent(EventBase):
         """
         self.framework.model._backend.action_log(message)
 
-    def fail(self, message: str = ''):
+    def fail(self, message: str = '') -> None:
         """Report that this action has failed.
 
         Args:
@@ -537,7 +538,7 @@ class CollectMetricsEvent(HookEvent):
 
     def add_metrics(
         self, metrics: Mapping[str, int | float], labels: Mapping[str, str] | None = None
-    ):
+    ) -> None:
         """Record metrics that have been gathered by the charm for this unit.
 
         Args:
@@ -614,7 +615,7 @@ class RelationEvent(HookEvent):
             snapshot['unit_name'] = self.unit.name
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -763,7 +764,7 @@ class RelationDepartedEvent(RelationEvent):
             return None
         return self.framework.model.get_unit(self._departing_unit_name)
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -821,7 +822,7 @@ class StorageEvent(HookEvent):
             snapshot['storage_location'] = str(self.storage.location)
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -914,7 +915,7 @@ class WorkloadEvent(HookEvent):
             snapshot['container_name'] = self.workload.name
         return snapshot
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -974,7 +975,7 @@ class PebbleNoticeEvent(WorkloadEvent):
         d['notice_key'] = self.notice.key
         return d
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1019,7 +1020,7 @@ class PebbleCheckEvent(WorkloadEvent):
         d['check_name'] = self.info.name
         return d
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1086,7 +1087,7 @@ class SecretEvent(HookEvent):
         """
         return {'id': self._id, 'label': self._label}
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1163,7 +1164,7 @@ class SecretRemoveEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def remove_revision(self):
+    def remove_revision(self) -> None:
         """Remove the revision this event refers to.
 
         Call this method after any required cleanup to inform Juju that the
@@ -1180,7 +1181,7 @@ class SecretRemoveEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1211,7 +1212,7 @@ class SecretExpiredEvent(SecretEvent):
         """The secret revision this event refers to."""
         return self._revision
 
-    def remove_revision(self):
+    def remove_revision(self) -> None:
         """Remove the revision this event refers to.
 
         Call this method after any required cleanup to inform Juju that the
@@ -1228,7 +1229,7 @@ class SecretExpiredEvent(SecretEvent):
         data['revision'] = self._revision
         return data
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Used by the framework to deserialize the event from disk.
 
         Not meant to be called by charm code.
@@ -1308,7 +1309,7 @@ class CollectStatusEvent(LifecycleEvent):
                 event.add_status(ops.ActiveStatus())
     """  # ruff: ignore[non-capitalized-section-name, overindented-section, no-blank-line-before-section, missing-section-name-colon]  Final return confuses docstyle.
 
-    def add_status(self, status: model.StatusBase):
+    def add_status(self, status: model.StatusBase) -> None:
         """Add a status for evaluation.
 
         See :class:`CollectStatusEvent` for a description of how to use this.
@@ -1893,7 +1894,7 @@ class CharmMeta:
         }
 
     @staticmethod
-    def from_charm_root(charm_root: pathlib.Path | str):
+    def from_charm_root(charm_root: pathlib.Path | str) -> CharmMeta:
         """Initialise CharmMeta from the path to a charm repository root folder."""
         charm_root = pathlib.Path(charm_root)
         metadata_path = charm_root / 'metadata.yaml'
@@ -1915,7 +1916,7 @@ class CharmMeta:
 
         return CharmMeta(meta, actions, options)
 
-    def _load_links(self, raw: dict[str, Any]):
+    def _load_links(self, raw: dict[str, Any]) -> None:
         websites = raw.get('website', [])
         if not websites and 'links' in raw:
             websites = raw['links'].get('website', [])
@@ -2207,6 +2208,13 @@ class JujuAssumes:
 class ActionMeta:
     """Object containing metadata about an action's definition."""
 
+    name: str
+    title: str
+    description: str
+    parameters: dict[str, Any]
+    required: list[str]
+    additional_properties: bool
+
     def __init__(self, name: str, raw: dict[str, Any] | None = None):
         raw = raw or {}
         self.name = name
@@ -2320,7 +2328,7 @@ class ContainerMeta:
         """
         return self._mounts
 
-    def _populate_mounts(self, mounts: list[_MountDict]):
+    def _populate_mounts(self, mounts: list[_MountDict]) -> None:
         """Populate a list of container mountpoints.
 
         Since Charm Metadata v2 specifies the mounts as a List, do a little data manipulation
@@ -2357,7 +2365,7 @@ class ContainerStorageMeta:
         self.storage = storage
         self._locations: list[str] = [location]
 
-    def add_location(self, location: str):
+    def add_location(self, location: str) -> None:
         """Add an additional mount point to a known storage."""
         self._locations.append(location)
 
