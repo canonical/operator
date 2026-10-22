@@ -54,42 +54,19 @@ uploading a charm to CharmHub (or when deploying/refreshing for local charms).
 
 ## Test the feature
 
-Since the version isn't set by the charm code itself, you'll want to test that
+Since the version isn't set by the charm code itself, you may want to test that
 the version is correctly set with an integration test, and don't need to write
 a unit test.
 
 > See first: {ref}`write-integration-tests-for-a-charm`
 
 To verify that setting the charm version works correctly in an integration test,
-in your `tests/integration/test_charm.py` file, add a new test after the
-`test_build_and_deploy` one that `charmcraft init` provides. In this test, get
-the status of the model, and check the `charm_version` attribute of the unit.
-For example:
+in your `tests/integration/test_charm.py` file, add a new test:
 
-```python
-# `charmcraft init` will provide this test for you.
-async def test_build_and_deploy(ops_test: OpsTest):
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-
-    # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
-    )
-
-async def test_charm_version_is_set(ops_test: OpsTest):
-    # Verify that the charm version has been set.
-    status = await ops_test.model.get_status()
-    version = status.applications[APP_NAME].charm_version
+```py
+def test_charm_version_is_set(juju: jubilant.Juju):
+    """Verify that the charm version has been set."""
+    version = juju.status().apps["your-app"].charm_version
     expected_version = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf8")
     assert version == expected_version
 ```
-
-<!---
-No "see more" link: this is not currently documented in the pylibjuju docs.
--->
-
-> Examples: [synapse checking that the unit's workload version matches the one reported by the server](https://github.com/canonical/synapse-operator/blob/778bcd414644c922373d542a304be14866835516/tests/integration/test_charm.py#L139)
