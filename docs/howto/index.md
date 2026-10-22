@@ -17,7 +17,7 @@ To make your charm deployable from Charmhub, publish your charm.
 
 - {doc}`Publish your charm on Charmhub <publish-your-charm-on-charmhub>`
 
-Set up production integrations for your charm so that it can fit into the Juju ecosystem, integrating with other applications.
+Integrate your charm with applications that production charms most often support.
 
 - {doc}`Set up production integrations <set-up-production-integrations>`
 
