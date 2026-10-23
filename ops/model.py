@@ -222,13 +222,12 @@ class Model:
 
     @property
     def proxy_config(self) -> ProxyConfig:
-        """The model's proxy configs set by Juju."""
+        """The model's proxy configuration as found in the Juju model config."""
         context = self._backend._juju_context
         return ProxyConfig(
-            http=context.charm_http_proxy,
-            https=context.charm_https_proxy,
-            ftp=context.charm_ftp_proxy,
-            no=context.charm_no_proxy,
+            http=context.http_proxy,
+            https=context.https_proxy,
+            no=context.no_proxy,
         )
 
     def get_unit(self, unit_name: str) -> Unit:
@@ -4575,9 +4574,6 @@ class ProxyConfig:
 
     https: str | None = None
     """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
-
-    ftp: str | None = None
-    """The FTP proxy, from the ``juju-ftp-proxy`` model config."""
 
     no: str | None = None
     """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""

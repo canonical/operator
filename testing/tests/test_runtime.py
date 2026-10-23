@@ -414,7 +414,6 @@ def test_storage_event_dispatch_path_preserves_storage_name():
 _PROXY_ENV_VARS = (
     'JUJU_CHARM_HTTP_PROXY',
     'JUJU_CHARM_HTTPS_PROXY',
-    'JUJU_CHARM_FTP_PROXY',
     'JUJU_CHARM_NO_PROXY',
 )
 
@@ -431,7 +430,6 @@ def test_proxy_env_vars_empty_string_is_set():
     assert env['JUJU_CHARM_HTTP_PROXY'] == ''
     assert env['JUJU_CHARM_NO_PROXY'] == ''
     assert 'JUJU_CHARM_HTTPS_PROXY' not in env
-    assert 'JUJU_CHARM_FTP_PROXY' not in env
 
 
 def test_action_dispatch_path_uses_actions_prefix():

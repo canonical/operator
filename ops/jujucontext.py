@@ -102,29 +102,22 @@ class JujuContext:
     For example '/var/lib/juju/agents/unit-bare-0/charm' (from ``JUJU_CHARM_DIR``).
     """
 
-    charm_ftp_proxy: str | None = None
-    """The FTP proxy for the charm.
-
-    Juju always sets the variable, so an empty value is read as ``None``
-    (from ``JUJU_CHARM_FTP_PROXY``).
-    """
-
-    charm_http_proxy: str | None = None
+    http_proxy: str | None = None
     """The HTTP proxy for the charm.
 
     Juju always sets the variable, so an empty value is read as ``None``
     (from ``JUJU_CHARM_HTTP_PROXY``).
     """
 
-    charm_https_proxy: str | None = None
+    https_proxy: str | None = None
     """The HTTPS proxy for the charm.
 
     Juju always sets the variable, so an empty value is read as ``None``
     (from ``JUJU_CHARM_HTTPS_PROXY``).
     """
 
-    charm_no_proxy: str | None = None
-    """The destination that should be excluded from proxying.
+    no_proxy: str | None = None
+    """Destinations that should be excluded from proxying.
 
     Juju uses the default value '127.0.0.1,localhost,::1' if this model config
     is not set (from ``JUJU_CHARM_NO_PROXY``).
@@ -274,13 +267,13 @@ class JujuContext:
                 if env.get('JUJU_CHARM_DIR')
                 else Path(f'{__file__}/../../..').resolve()
             ),
-            # JUJU_CHARM_*_PROXY (except for JUJU_CHARM_NO_PROXY) are set as
-            # empty strings if their juju-*-proxy model configs are
-            # not set.
-            charm_ftp_proxy=env.get('JUJU_CHARM_FTP_PROXY') or None,
-            charm_http_proxy=env.get('JUJU_CHARM_HTTP_PROXY') or None,
-            charm_https_proxy=env.get('JUJU_CHARM_HTTPS_PROXY') or None,
-            charm_no_proxy=env.get('JUJU_CHARM_NO_PROXY') or None,
+            # Juju set the default values of JUJU_CHARM_HTTP_PROXY and JUJU_CHARM_HTTP_PROXY
+            # to empty strings, the default value of JUJU_CHARM_NO_PROXY to
+            # `127.0.0.1,localhost,::1`.
+            # Juju always populates these env vars, so None always mean empty.
+            http_proxy=env.get('JUJU_CHARM_HTTP_PROXY') or None,
+            https_proxy=env.get('JUJU_CHARM_HTTPS_PROXY') or None,
+            no_proxy=env.get('JUJU_CHARM_NO_PROXY') or None,
             debug='JUJU_DEBUG' in env,
             debug_at=(
                 {x.strip() for x in env['JUJU_DEBUG_AT'].split(',')}

@@ -91,7 +91,6 @@ class Runtime(Generic[CharmType]):
         for env_name, value in (
             ('JUJU_CHARM_HTTP_PROXY', proxy_config.http),
             ('JUJU_CHARM_HTTPS_PROXY', proxy_config.https),
-            ('JUJU_CHARM_FTP_PROXY', proxy_config.ftp),
             ('JUJU_CHARM_NO_PROXY', proxy_config.no),
         ):
             if value is not None:

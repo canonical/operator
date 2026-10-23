@@ -1383,7 +1383,6 @@ class TestModel:
             'JUJU_VERSION': '3.6.2',
             'JUJU_CHARM_HTTP_PROXY': 'http-proxy-url',
             'JUJU_CHARM_HTTPS_PROXY': 'https-proxy-url',
-            'JUJU_CHARM_FTP_PROXY': 'ftp-proxy-url',
             'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1',
         })
         backend = _ModelBackend('myapp/0', juju_context=context)
@@ -1391,7 +1390,6 @@ class TestModel:
         assert model.proxy_config == ops.ProxyConfig(
             http='http-proxy-url',
             https='https-proxy-url',
-            ftp='ftp-proxy-url',
             no='127.0.0.1,localhost,::1',
         )
 
@@ -1400,7 +1398,6 @@ class TestModel:
             'JUJU_VERSION': '3.6.2',
             'JUJU_CHARM_HTTP_PROXY': '',
             'JUJU_CHARM_HTTPS_PROXY': '',
-            'JUJU_CHARM_FTP_PROXY': '',
             'JUJU_CHARM_NO_PROXY': '',
         })
         backend = _ModelBackend('myapp/0', juju_context=context)
@@ -1409,7 +1406,6 @@ class TestModel:
         # An empty env var is read as None.
         assert proxy_config.http is None
         assert proxy_config.https is None
-        assert proxy_config.ftp is None
         assert proxy_config.no is None
 
     def test_proxy_config_not_read_from_os_environ(self, monkeypatch: pytest.MonkeyPatch):

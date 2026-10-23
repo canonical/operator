@@ -289,9 +289,6 @@ class ProxyConfig:  # ruff: ignore[undocumented-public-class]
     https: str | None = None
     """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
 
-    ftp: str | None = None
-    """The FTP proxy, from the ``juju-ftp-proxy`` model config."""
-
     no: str | None = None
     """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
 
@@ -299,7 +296,6 @@ class ProxyConfig:  # ruff: ignore[undocumented-public-class]
         return ProxyConfig_Ops(
             http=self.http or None,
             https=self.https or None,
-            ftp=self.ftp or None,
             no=self.no or None,
         )
 
@@ -951,10 +947,6 @@ class Model:
     from these values. A field set to ``None`` does not create its environment
     variable. A field set to any string creates its environment variable with
     that value.
-
-    Unlike Juju, Scenario does not set these environment variables by default.
-    This avoids breaking tests that set the variables themselves, for example
-    through ``os.environ``.
 
     For example::
 

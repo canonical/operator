@@ -35,19 +35,16 @@ def ctx() -> scenario.Context[ProxyStatusCharm]:
         scenario.ProxyConfig(
             http='http-proxy-url',
             https='https-proxy-url',
-            ftp='ftp-proxy-url',
             no='127.0.0.1,localhost,::1',
         ),
         scenario.ProxyConfig(
             http='',
             https='https-proxy-url',
-            ftp='',
             no='127.0.0.1,localhost,::1',
         ),
         scenario.ProxyConfig(
             http='',
             https='',
-            ftp='',
             no='127.0.0.1,localhost,::1',
         ),
         # Omitted fields, empty strings, and ``None`` means the env vars
@@ -56,12 +53,10 @@ def ctx() -> scenario.Context[ProxyStatusCharm]:
         scenario.ProxyConfig(
             http='',
             https='',
-            ftp='',
             no='',
         ),
         scenario.ProxyConfig(
             https='',
-            ftp='',
         ),
         scenario.ProxyConfig(),
         scenario.ProxyConfig(
