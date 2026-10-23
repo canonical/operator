@@ -280,16 +280,19 @@ class CloudSpec:  # ruff: ignore[undocumented-public-class]
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class ProxyConfig:  # ruff: ignore[undocumented-public-class]
-    __doc__ = ops.ProxyConfig.__doc__
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
 
-    http: str | None = None
+    The default values of each attribute follow Juju's default values for ``juju-*-proxy`` config.
+    """
+
+    http: str = ''
     """The HTTP proxy, from the ``juju-http-proxy`` model config."""
 
-    https: str | None = None
+    https: str = ''
     """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
 
-    no: str | None = None
+    no: str = '127.0.0.1,localhost,::1'
     """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
 
     def _to_ops(self) -> ProxyConfig_Ops:
@@ -940,13 +943,13 @@ class Model:
     :meth:`self.model.get_cloud_spec() <ops.Model.get_cloud_spec>` method.
     """
 
-    proxy_config: ProxyConfig = dataclasses.field(default_factory=ProxyConfig)
+    proxy_config: ProxyConfig | None = None
     """Proxy configs from the model's ``juju-*-proxy`` config.
 
     Scenario sets the matching ``JUJU_CHARM_*_PROXY`` environment variables
-    from these values. A field set to ``None`` does not create its environment
-    variable. A field set to any string creates its environment variable with
-    that value.
+    from these values.
+
+    If this is ``None``, Scenario doesn't set any of the environment variables.
 
     For example::
 

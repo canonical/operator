@@ -47,9 +47,8 @@ def ctx() -> scenario.Context[ProxyStatusCharm]:
             https='',
             no='127.0.0.1,localhost,::1',
         ),
-        # Omitted fields, empty strings, and ``None`` means the env vars
-        # are not created in Runtime._get_env_var. They will all be read as None
-        # by ops.
+        # Empty strings create empty env vars, like Juju does when the model
+        # configs aren't set. Ops reads them as None.
         scenario.ProxyConfig(
             http='',
             https='',
@@ -59,29 +58,32 @@ def ctx() -> scenario.Context[ProxyStatusCharm]:
             https='',
         ),
         scenario.ProxyConfig(),
-        scenario.ProxyConfig(
-            https=None,
-        ),
     ],
 )
-def test_proxy_config(ctx: scenario.Context[ProxyStatusCharm], proxy_config: scenario.ProxyConfig):
+def test_proxy_config_round_trip(
+    ctx: scenario.Context[ProxyStatusCharm], proxy_config: scenario.ProxyConfig
+):
     model = scenario.Model(proxy_config=proxy_config)
     state_in = scenario.State(model=model)
     with ctx(ctx.on.start(), state_in) as mgr:
         assert mgr.charm.model.proxy_config == proxy_config._to_ops()
 
 
-def test_proxy_config_default(ctx: scenario.Context[ProxyStatusCharm]):
-    with ctx(ctx.on.start(), scenario.State()) as mgr:
+def test_model_no_proxy_config(ctx: scenario.Context[ProxyStatusCharm]):
+    model = scenario.Model()
+    assert model.proxy_config is None
+    with ctx(ctx.on.start(), scenario.State(model=model)) as mgr:
         assert mgr.charm.model.proxy_config == ops.ProxyConfig()
 
 
-@pytest.mark.parametrize('http', ['', None])
-def test_empty_string_unset(ctx: scenario.Context[ProxyStatusCharm], http: str | None):
-    model = scenario.Model(proxy_config=scenario.ProxyConfig(http=http))
-    state_in = scenario.State(model=model)
-    with ctx(ctx.on.start(), state_in) as mgr:
-        assert mgr.charm.model.proxy_config.http is None
+def test_model_proxy_config_defaults(ctx: scenario.Context[ProxyStatusCharm]):
+    model = scenario.Model(proxy_config=scenario.ProxyConfig())
+    with ctx(ctx.on.start(), scenario.State(model=model)) as mgr:
+        # Juju's default for juju-http-proxy and juju-https-proxy is an empty
+        # string, which ops reads as None.
+        assert mgr.charm.model.proxy_config == ops.ProxyConfig(
+            http=None, https=None, no='127.0.0.1,localhost,::1'
+        )
 
 
 def test_not_leaking_into_os_environ(

@@ -88,13 +88,10 @@ class Runtime(Generic[CharmType]):
             env['JUJU_PRINCIPAL_UNIT'] = self._principal_unit
 
         proxy_config = state.model.proxy_config
-        for env_name, value in (
-            ('JUJU_CHARM_HTTP_PROXY', proxy_config.http),
-            ('JUJU_CHARM_HTTPS_PROXY', proxy_config.https),
-            ('JUJU_CHARM_NO_PROXY', proxy_config.no),
-        ):
-            if value is not None:
-                env[env_name] = value
+        if proxy_config is not None:
+            env['JUJU_CHARM_HTTP_PROXY'] = proxy_config.http
+            env['JUJU_CHARM_HTTPS_PROXY'] = proxy_config.https
+            env['JUJU_CHARM_NO_PROXY'] = proxy_config.no
 
         if event._is_action_event:
             # Enforced by the consistency checker, but for type checkers:

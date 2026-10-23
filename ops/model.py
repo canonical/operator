@@ -4561,7 +4561,6 @@ class CloudSpec:
         )
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
 class ProxyConfig:
     """Proxy settings from the model's ``juju-*-proxy`` config.
 
@@ -4569,11 +4568,36 @@ class ProxyConfig:
     (either its env var is unset, or its value is empty).
     """
 
-    http: str | None = None
-    """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+    def __init__(
+        self,
+        *,
+        http: str | None = None,
+        https: str | None = None,
+        no: str | None = None,
+    ):
+        self._http = http
+        self._https = https
+        self._no = no
 
-    https: str | None = None
-    """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+    @property
+    def http(self) -> str | None:
+        """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+        return self._http
 
-    no: str | None = None
-    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
+    @property
+    def https(self) -> str | None:
+        """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+        return self._https
+
+    @property
+    def no(self) -> str | None:
+        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
+        return self._no
+
+    def __repr__(self) -> str:
+        return f'ProxyConfig(http={self._http!r}, https={self._https!r}, no={self._no!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProxyConfig):
+            return False
+        return (self._http, self._https, self._no) == (other._http, other._https, other._no)

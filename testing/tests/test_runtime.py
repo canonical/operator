@@ -424,12 +424,20 @@ def test_proxy_env_vars_not_set_by_default():
         assert key not in env
 
 
+def test_proxy_env_vars_juju_defaults():
+    model = Model(proxy_config=ProxyConfig())
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == '127.0.0.1,localhost,::1'
+
+
 def test_proxy_env_vars_empty_string_is_set():
     model = Model(proxy_config=ProxyConfig(http='', no=''))
     env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
     assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
     assert env['JUJU_CHARM_NO_PROXY'] == ''
-    assert 'JUJU_CHARM_HTTPS_PROXY' not in env
 
 
 def test_action_dispatch_path_uses_actions_prefix():
