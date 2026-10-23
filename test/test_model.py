@@ -1383,14 +1383,14 @@ class TestModel:
             'JUJU_VERSION': '3.6.2',
             'JUJU_CHARM_HTTP_PROXY': 'http-proxy-url',
             'JUJU_CHARM_HTTPS_PROXY': 'https-proxy-url',
-            'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1',
+            'JUJU_CHARM_NO_PROXY': '127.0.0.1,localhost,::1,*.example.com',
         })
         backend = _ModelBackend('myapp/0', juju_context=context)
         model = ops.Model(ops.CharmMeta(), backend)
         assert model.proxy_config == ops.ProxyConfig(
             http='http-proxy-url',
             https='https-proxy-url',
-            no='127.0.0.1,localhost,::1',
+            no=('127.0.0.1', 'localhost', '::1', '*.example.com'),
         )
 
     def test_proxy_config_unset(self):
@@ -1403,10 +1403,10 @@ class TestModel:
         backend = _ModelBackend('myapp/0', juju_context=context)
         model = ops.Model(ops.CharmMeta(), backend)
         proxy_config = model.proxy_config
-        # An empty env var is read as None.
+        # An empty env var is read as None, or as an empty tuple for ``no``.
         assert proxy_config.http is None
         assert proxy_config.https is None
-        assert proxy_config.no is None
+        assert proxy_config.no == ()
 
     def test_proxy_config_not_read_from_os_environ(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv('JUJU_CHARM_HTTP_PROXY', 'environ-http-proxy-url')

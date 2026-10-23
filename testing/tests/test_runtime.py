@@ -433,11 +433,17 @@ def test_proxy_env_vars_juju_defaults():
 
 
 def test_proxy_env_vars_empty_string_is_set():
-    model = Model(proxy_config=ProxyConfig(http='', no=''))
+    model = Model(proxy_config=ProxyConfig(http='', no=()))
     env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
     assert env['JUJU_CHARM_HTTP_PROXY'] == ''
     assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
     assert env['JUJU_CHARM_NO_PROXY'] == ''
+
+
+def test_no_proxy_entries_are_joined_with_commas():
+    model = Model(proxy_config=ProxyConfig(no=('localhost', '10.0.0.0/8', '*.example.com', '*')))
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_NO_PROXY'] == 'localhost,10.0.0.0/8,*.example.com,*'
 
 
 def test_action_dispatch_path_uses_actions_prefix():

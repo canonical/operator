@@ -292,14 +292,17 @@ class ProxyConfig:
     https: str = ''
     """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
 
-    no: str = '127.0.0.1,localhost,::1'
-    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
+    no: tuple[str, ...] = ('127.0.0.1', 'localhost', '::1')
+    """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+    Scenario joins the entries with commas to set ``JUJU_CHARM_NO_PROXY``.
+    """
 
     def _to_ops(self) -> ProxyConfig_Ops:
         return ProxyConfig_Ops(
             http=self.http or None,
             https=self.https or None,
-            no=self.no or None,
+            no=tuple(entry.strip() for entry in self.no if entry.strip()),
         )
 
 
@@ -956,7 +959,7 @@ class Model:
         proxy_config = ProxyConfig(
             http='http://proxy.example.com:3128',
             https='http://proxy.example.com:3128',
-            no='127.0.0.1,localhost,::1',
+            no=('127.0.0.1', 'localhost', '::1'),
         )
         state_in = State(
             model=Model(proxy_config=proxy_config)

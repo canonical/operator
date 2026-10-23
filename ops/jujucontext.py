@@ -116,11 +116,13 @@ class JujuContext:
     (from ``JUJU_CHARM_HTTPS_PROXY``).
     """
 
-    no_proxy: str | None = None
+    no_proxy: tuple[str, ...] = ()
     """Destinations that should be excluded from proxying.
 
-    Juju uses the default value '127.0.0.1,localhost,::1' if this model config
-    is not set (from ``JUJU_CHARM_NO_PROXY``).
+    The comma-separated value of ``JUJU_CHARM_NO_PROXY``, split into its entries.
+    Surrounding whitespace and empty entries are dropped, so this is an empty tuple
+    if the variable is unset or empty. Juju uses the default value
+    '127.0.0.1,localhost,::1' if the ``juju-no-proxy`` model config is not set.
     """
 
     debug: bool = False
@@ -267,13 +269,18 @@ class JujuContext:
                 if env.get('JUJU_CHARM_DIR')
                 else Path(f'{__file__}/../../..').resolve()
             ),
-            # Juju set the default values of JUJU_CHARM_HTTP_PROXY and JUJU_CHARM_HTTP_PROXY
-            # to empty strings, the default value of JUJU_CHARM_NO_PROXY to
+            # Juju sets the default values of JUJU_CHARM_HTTP_PROXY and JUJU_CHARM_HTTPS_PROXY
+            # to empty strings, and the default value of JUJU_CHARM_NO_PROXY to
             # `127.0.0.1,localhost,::1`.
-            # Juju always populates these env vars, so None always mean empty.
+            # Juju always populates these env vars, so None (or an empty tuple for
+            # JUJU_CHARM_NO_PROXY) always means empty.
             http_proxy=env.get('JUJU_CHARM_HTTP_PROXY') or None,
             https_proxy=env.get('JUJU_CHARM_HTTPS_PROXY') or None,
-            no_proxy=env.get('JUJU_CHARM_NO_PROXY') or None,
+            no_proxy=tuple(
+                entry.strip()
+                for entry in (env.get('JUJU_CHARM_NO_PROXY') or '').split(',')
+                if entry.strip()
+            ),
             debug='JUJU_DEBUG' in env,
             debug_at=(
                 {x.strip() for x in env['JUJU_DEBUG_AT'].split(',')}

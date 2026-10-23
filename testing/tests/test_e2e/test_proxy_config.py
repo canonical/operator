@@ -35,24 +35,32 @@ def ctx() -> scenario.Context[ProxyStatusCharm]:
         scenario.ProxyConfig(
             http='http-proxy-url',
             https='https-proxy-url',
-            no='127.0.0.1,localhost,::1',
+            no=('127.0.0.1', 'localhost', '::1'),
         ),
         scenario.ProxyConfig(
             http='',
             https='https-proxy-url',
-            no='127.0.0.1,localhost,::1',
+            no=('127.0.0.1', 'localhost', '::1'),
         ),
         scenario.ProxyConfig(
             http='',
             https='',
-            no='127.0.0.1,localhost,::1',
+            no=('127.0.0.1', 'localhost', '::1'),
         ),
-        # Empty strings create empty env vars, like Juju does when the model
-        # configs aren't set. Ops reads them as None.
+        scenario.ProxyConfig(
+            http='https://proxy.example.com',
+            no=('localhost', '10.0.0.0/8', '.svc.cluster.local', '*.example.com'),
+        ),
+        scenario.ProxyConfig(
+            http='https://proxy.example.com',
+            no=('*',),
+        ),
+        # Empty values create empty env vars, like Juju does when the model
+        # configs aren't set. Ops reads them as None, or as an empty tuple for ``no``.
         scenario.ProxyConfig(
             http='',
             https='',
-            no='',
+            no=(),
         ),
         scenario.ProxyConfig(
             https='',
@@ -82,7 +90,7 @@ def test_model_proxy_config_defaults(ctx: scenario.Context[ProxyStatusCharm]):
         # Juju's default for juju-http-proxy and juju-https-proxy is an empty
         # string, which ops reads as None.
         assert mgr.charm.model.proxy_config == ops.ProxyConfig(
-            http=None, https=None, no='127.0.0.1,localhost,::1'
+            http=None, https=None, no=('127.0.0.1', 'localhost', '::1')
         )
 
 

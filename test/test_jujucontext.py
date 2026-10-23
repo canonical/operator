@@ -92,7 +92,7 @@ class TestJujuContext:
         # they are empty.
         assert juju_context.http_proxy is None
         assert juju_context.https_proxy is None
-        assert juju_context.no_proxy is None
+        assert juju_context.no_proxy == ()
 
     def test_parsing_proxy_fields(self):
         juju_context = JujuContext._from_dict({
@@ -103,7 +103,7 @@ class TestJujuContext:
         })
         assert juju_context.http_proxy == 'http-proxy-url'
         assert juju_context.https_proxy == 'https-proxy-url'
-        assert juju_context.no_proxy == '127.0.0.1,localhost,::1'
+        assert juju_context.no_proxy == ('127.0.0.1', 'localhost', '::1')
 
     def test_parsing_proxy_fields_mixed(self):
         juju_context = JujuContext._from_dict({
@@ -114,7 +114,23 @@ class TestJujuContext:
         })
         assert juju_context.http_proxy == 'http-proxy-url'
         assert juju_context.https_proxy is None
-        assert juju_context.no_proxy == '127.0.0.1,localhost,::1'
+        assert juju_context.no_proxy == ('127.0.0.1', 'localhost', '::1')
+
+    def test_parsing_no_proxy_entries(self):
+        juju_context = JujuContext._from_dict({
+            'JUJU_VERSION': '0.0.0',
+            'JUJU_CHARM_NO_PROXY': (
+                ' localhost , 10.0.0.0/8,,.svc.cluster.local, *.example.com,* '
+            ),
+        })
+        # Whitespace and empty entries are dropped.
+        assert juju_context.no_proxy == (
+            'localhost',
+            '10.0.0.0/8',
+            '.svc.cluster.local',
+            '*.example.com',
+            '*',
+        )
 
     def test_empty_proxy_fields(self):
         juju_context = JujuContext._from_dict({
@@ -125,7 +141,7 @@ class TestJujuContext:
         })
         assert juju_context.http_proxy is None
         assert juju_context.https_proxy is None
-        assert juju_context.no_proxy is None
+        assert juju_context.no_proxy == ()
 
     def test_parsing_all_str_fields(self):
         env = {

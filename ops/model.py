@@ -4564,8 +4564,9 @@ class CloudSpec:
 class ProxyConfig:
     """Proxy settings from the model's ``juju-*-proxy`` config.
 
-    A value is ``None`` if the corresponding model config is not available
-    (either its env var is unset, or its value is empty).
+    The ``http`` and ``https`` attributes are ``None`` if the corresponding model config
+    is not available (either its env var is unset, or its value is empty). ``no`` is
+    an empty tuple in that case.
     """
 
     def __init__(
@@ -4573,7 +4574,7 @@ class ProxyConfig:
         *,
         http: str | None = None,
         https: str | None = None,
-        no: str | None = None,
+        no: tuple[str, ...] = (),
     ):
         self._http = http
         self._https = https
@@ -4590,8 +4591,12 @@ class ProxyConfig:
         return self._https
 
     @property
-    def no(self) -> str | None:
-        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config."""
+    def no(self) -> tuple[str, ...]:
+        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+        This is the comma-separated model config split into its entries, and is an
+        empty tuple if the model config is not available.
+        """
         return self._no
 
     def __repr__(self) -> str:
