@@ -99,6 +99,6 @@ Use the [Canonical Identity Stack](https://canonical-identity.readthedocs-hosted
 |:--|:--|:--|:--|
 | OAuth 2.0 and OpenID Connect (OIDC) | `oauth` | [`hydra`](https://canonical-identity.readthedocs-hosted.com/identity-platform/how-to/onboard-an-application-with-charmed-hydra/), [`authentik-server`](https://canonical-identity.readthedocs-hosted.com/authentik/how-to/protect-oidc-applications/) | {external+charmlibs:ref}`charmlibs.interfaces.oauth <charmlibs-interfaces-oauth>` |
 | LDAP | `ldap` | [`glauth-k8s`](https://canonical-identity.readthedocs-hosted.com/identity-platform/tutorial/charms/glauth/), [`authentik-ldap-outpost`](https://canonical-identity.readthedocs-hosted.com/authentik/how-to/protect-ldap-applications/) | {external+charmlibs:ref}`charmlibs.interfaces.ldap <charmlibs-interfaces-ldap>` |
-| SAML | `saml` | [`saml-integrator`](https://charmhub.io/saml-integrator) | [saml_integrator.saml](https://charmhub.io/saml-integrator/libraries/saml) |
+| SAML | `saml` | [`saml-integrator`](https://charmhub.io/saml-integrator) provides SAML configuration details to charms that authenticate with a SAML server. It doesn't provide SAML functionality. | [saml_integrator.saml](https://charmhub.io/saml-integrator/libraries/saml) |
 
 Example charms: [SSSD](https://github.com/canonical/sssd-operator/blob/main/src/integrations/ldap.py) uses the LDAP library. [Discourse](https://github.com/canonical/discourse-k8s-operator/blob/main/src/charm.py) uses the SAML library.
