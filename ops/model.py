@@ -4595,7 +4595,8 @@ class ProxyConfig:
         """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
 
         This is the comma-separated model config split into its entries, and is an
-        empty tuple if the model config is not available.
+        empty tuple if the model config is not available. Entries can contain '*',
+        and a '*' entry excludes all destinations.
         """
         return self._no
 
