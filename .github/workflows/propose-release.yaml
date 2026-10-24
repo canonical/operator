@@ -60,13 +60,13 @@ jobs:
       contents: write  # To push the release-prep branch.
       pull-requests: write  # To open the pull request.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ inputs.branch }}
           fetch-depth: 0  # The whole history and its tags: the release is counted from the tag.
           persist-credentials: false
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # This workflow's own .github/release/, beside the branch being
           # released: the version script, the release-note exemplars and

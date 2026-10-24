@@ -16,7 +16,7 @@ jobs:
       artifact-name: ${{ steps.artifact-name.outputs.name }}
     steps:
       - name: Checkout the operator repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -31,7 +31,7 @@ jobs:
         run: echo "name=operator-wheels-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload wheels as artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ${{ steps.artifact-name.outputs.name }}
           path: dist/*.whl
