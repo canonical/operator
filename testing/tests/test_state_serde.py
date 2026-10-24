@@ -475,8 +475,14 @@ def _enums_reachable_from_state() -> set[type[enum.Enum]]:
             found.add(hint)
         elif dataclasses.is_dataclass(hint) and hint not in seen:
             seen.add(hint)
-            for field_hint in typing.get_type_hints(hint).values():
-                walk(field_hint)
+            # typing.get_type_hints rejects KW_ONLY annotations on Python 3.10,
+            # so evaluate each class's own annotations and keep the real fields.
+            names = {f.name for f in dataclasses.fields(hint)}
+            for base in reversed(hint.__mro__):
+                annotations = inspect.get_annotations(base, eval_str=True)
+                for name, field_hint in annotations.items():
+                    if name in names:
+                        walk(field_hint)
 
     for cls in _state_serde._DC_TYPES.values():
         walk(cls)
