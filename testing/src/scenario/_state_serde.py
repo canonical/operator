@@ -113,7 +113,7 @@ def decode_event(payload: str) -> _state._Event:
     return result
 
 
-def _encode_payload(obj: Any, kind: str) -> str:
+def _encode_payload(obj: object, kind: str) -> str:
     return json.dumps({'ops_testing_version': _VERSION, kind: _encode(obj, kind)})
 
 
@@ -131,13 +131,13 @@ def _decode_payload(payload: str, kind: str) -> Any:
 # Encoder
 
 
-def _sorted_members(members: Iterable[Any], path: str) -> list[_JSON]:
+def _sorted_members(members: Iterable[object], path: str) -> list[_JSON]:
     # Sorted so that equal sets encode the same, whatever the hash seed.
     encoded = [_encode(x, f'{path}[]') for x in members]
     return sorted(encoded, key=lambda x: json.dumps(x, sort_keys=True))
 
 
-def _encode(obj: Any, path: str) -> _JSON:
+def _encode(obj: object, path: str) -> _JSON:
     # Before the primitives, so that a str or int enum keeps its type.
     if isinstance(obj, enum.Enum):
         cls_name = type(obj).__name__
@@ -205,34 +205,35 @@ def _encode(obj: Any, path: str) -> _JSON:
         return {_T: 'PurePosixPath', 'v': str(obj)}
 
     if isinstance(obj, frozenset):
-        return {_T: 'frozenset', 'v': _sorted_members(cast('frozenset[Any]', obj), path)}
+        return {_T: 'frozenset', 'v': _sorted_members(cast('frozenset[object]', obj), path)}
 
     if isinstance(obj, set):
-        return {_T: 'set', 'v': _sorted_members(cast('set[Any]', obj), path)}
+        return {_T: 'set', 'v': _sorted_members(cast('set[object]', obj), path)}
 
     if isinstance(obj, tuple):
-        elements = cast('tuple[Any, ...]', obj)
+        elements = cast('tuple[object, ...]', obj)
         return {_T: 'tuple', 'v': [_encode(x, f'{path}[]') for x in elements]}
 
     if isinstance(obj, list):
-        items = cast('list[Any]', obj)
+        items = cast('list[object]', obj)
         return [_encode(x, f'{path}[{i}]') for i, x in enumerate(items)]
 
     if isinstance(obj, dict):
-        mapping = cast('dict[Any, Any]', obj)
+        mapping = cast('dict[object, object]', obj)
         # type() rather than isinstance(), because int(str(True)) fails.
         if mapping and all(type(k) is int for k in mapping):
             return {
                 _T: 'idict',
                 'v': {str(k): _encode(v, f'{path}[{k}]') for k, v in mapping.items()},
             }
-        for k in mapping:
+        encoded_mapping: dict[str, _JSON] = {}
+        for k, v in mapping.items():
             if not isinstance(k, str):
                 raise TypeError(
                     f'No JSON encoding for dict key {k!r} of type {type(k).__qualname__!r} '
                     f'at path {path!r}: keys must be all str or all int.'
                 )
-        encoded_mapping = {k: _encode(v, f'{path}.{k}') for k, v in mapping.items()}
+            encoded_mapping[k] = _encode(v, f'{path}.{k}')
         if _T in encoded_mapping:
             return {_T: 'dict', 'v': encoded_mapping}
         return encoded_mapping
