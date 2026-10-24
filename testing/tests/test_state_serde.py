@@ -6,7 +6,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import enum
-import importlib.metadata
 import inspect
 import json
 import pathlib
@@ -16,13 +15,13 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
-from scenario import _state_serde
+from scenario import _state_serde, _version
 
 import ops
 from ops import pebble, testing
 
 FIRST = datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)
-VERSION = importlib.metadata.version('ops-scenario')
+VERSION = _version.version
 
 
 def _secret_at_revision_2(*, track_latest: bool) -> testing.Secret:

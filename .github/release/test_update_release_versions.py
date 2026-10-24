@@ -54,7 +54,7 @@ TREE = {
         "version: str = '8.8.2'\n"
     ),
     'testing/pyproject.toml': (
-        '[project]\nname = "ops-scenario"\nversion = "8.8.2"\ndependencies = [\n'
+        '[project]\nname = "ops-scenario"\ndynamic = ["version"]\ndependencies = [\n'
         '    "ops==3.8.2",\n]\n'
     ),
     'tracing/pyproject.toml': (
@@ -107,7 +107,7 @@ class TestPostRelease:
         assert 'ops-tracing==3.9.0.dev0' in root
 
         testing = (tree / 'testing/pyproject.toml').read_text()
-        assert 'version = "8.9.0.dev0"' in testing
+        assert 'dynamic = ["version"]' in testing
         assert 'ops==3.9.0.dev0' in testing
 
         tracing = (tree / 'tracing/pyproject.toml').read_text()
@@ -126,7 +126,7 @@ class TestPostRelease:
         assert "version: str = '2.23.6.dev0'" in (lts_tree / 'ops/version.py').read_text()
         scenario = (lts_tree / 'testing/src/scenario/_version.py').read_text()
         assert "version: str = '7.23.6.dev0'" in scenario
-        assert 'version = "7.23.6.dev0"' in (lts_tree / 'testing/pyproject.toml').read_text()
+        assert 'ops==2.23.6.dev0' in (lts_tree / 'testing/pyproject.toml').read_text()
         assert (lts_tree / 'docs/explanation/versions.md').read_text() == (
             TREE['docs/explanation/versions.md']
         )

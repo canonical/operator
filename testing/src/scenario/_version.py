@@ -1,10 +1,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Package version.
-
-The release scripts keep this in step with ``testing/pyproject.toml``.
-"""
+"""Package version."""
 
 from __future__ import annotations
 

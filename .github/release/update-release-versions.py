@@ -67,18 +67,31 @@ def scenario_version(ops_version: str) -> str:
     return f'{int(major) + SCENARIO_MAJOR_OFFSET}.{minor}.{patch}{pre or ""}{dev or ""}'
 
 
-def update_pyproject(path: pathlib.Path, version: str, deps: dict[str, str]) -> None:
-    """Rewrite a pyproject.toml's own version and its pins on our own packages."""
+def update_pyproject(path: pathlib.Path, version: str | None, deps: dict[str, str]) -> None:
+    """Rewrite a pyproject.toml's pins on our own packages, and its own version if given.
+
+    The version is None for a package whose pyproject.toml reads it from the
+    package's version module.
+    """
     content = path.read_text()
-    updated = re.sub(
-        rf'^version = "{EXISTING_VERSION}"$', f'version = "{version}"', content, flags=re.MULTILINE
-    )
+    updated = content
+    if version is not None:
+        updated = re.sub(
+            rf'^version = "{EXISTING_VERSION}"$',
+            f'version = "{version}"',
+            updated,
+            flags=re.MULTILINE,
+        )
     for package, pinned in deps.items():
         updated = re.sub(rf'{package}=={EXISTING_VERSION}', f'{package}=={pinned}', updated)
     if content == updated:
-        raise ValueError(f'Nothing changed in {path}: is it already at {version}?')
+        target = f'pins {deps}' if version is None else version
+        raise ValueError(f'Nothing changed in {path}: is it already at {target}?')
     path.write_text(updated)
-    print(f'{path}: version {version}, pins {deps}')
+    if version is None:
+        print(f'{path}: pins {deps}')
+    else:
+        print(f'{path}: version {version}, pins {deps}')
 
 
 def update_version_module(path: pathlib.Path, version: str) -> None:
@@ -107,9 +120,9 @@ def update_ops(ops_version: str, testing_version: str) -> None:
 
 
 def update_testing(ops_version: str, testing_version: str) -> None:
-    """Rewrite scenario/_version.py and testing/pyproject.toml."""
+    """Rewrite scenario/_version.py and the ops pin in testing/pyproject.toml."""
     update_version_module(VERSION_FILES['testing/src'], testing_version)
-    update_pyproject(VERSION_FILES['testing'], testing_version, deps={'ops': ops_version})
+    update_pyproject(VERSION_FILES['testing'], None, deps={'ops': ops_version})
 
 
 def update_tracing(ops_version: str) -> None:
