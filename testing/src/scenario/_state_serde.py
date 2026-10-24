@@ -97,9 +97,9 @@ def encode_event(event: _state._Event) -> str:
             no meaning in another one, and Juju never emits custom events,
             so they aren't encoded.
     """
-    if event.custom_event is not None:
+    if event._custom_event is not None:
         raise TypeError(
-            f'A custom event ({event.custom_event.event_kind!r}) has no JSON encoding: '
+            f'A custom event ({event._custom_event.event_kind!r}) has no JSON encoding: '
             'it is bound to an emitter in this process.'
         )
     return _encode_payload(event, 'event')
