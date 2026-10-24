@@ -240,7 +240,7 @@ First, repack and refresh your charm:
 charmcraft pack
 juju refresh fastapi-demo --force-units \
   --path ./fastapi-demo_amd64.charm \
-  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:2.1.0
+  --resource demo-server-image=ghcr.io/canonical/api_demo_server/api-demo-server:3.0.0
 ```
 
 Next, deploy the `postgresql-k8s` charm:
@@ -392,7 +392,7 @@ INFO     jubilant.wait:_juju.py:1491 wait: status changed:
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
 - .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
 + .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
-+ .apps['fastapi-demo'].version = '2.1.0'
++ .apps['fastapi-demo'].version = '3.0.0'
 PASSED
 ```
 
