@@ -304,8 +304,10 @@ def _decode(obj: _JSON) -> Any:
             raise TypeError(f'Unknown status name {name!r} in the payload.')
         message = _as_str(_field(obj, 'msg', 'status'), 'status message')
         # UnknownStatus has no message; from_status_name warns if given one.
+        if name == 'unknown':
+            message = ''
         return _state._EntityStatus.from_status_name(
-            cast('_state._RawStatusLiteral', name), message if name != 'unknown' else ''
+            cast('_state._RawStatusLiteral', name), message
         )
 
     if kind == 'layer':
