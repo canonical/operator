@@ -46,6 +46,7 @@ VERSION = re.compile(r'^(\d+)\.(\d+)\.(\d+)((?:a|b|rc)\d+)?(\.dev\d+)?$')
 VERSION_FILES = {
     'ops/src': pathlib.Path('ops/version.py'),
     'ops/pyproject': pathlib.Path('pyproject.toml'),
+    'testing/src': pathlib.Path('testing/src/scenario/_version.py'),
     'testing': pathlib.Path('testing/pyproject.toml'),
     'tracing': pathlib.Path('tracing/pyproject.toml'),
     'versions_doc': pathlib.Path('docs/explanation/versions.md'),
@@ -80,21 +81,24 @@ def update_pyproject(path: pathlib.Path, version: str, deps: dict[str, str]) -> 
     print(f'{path}: version {version}, pins {deps}')
 
 
-def update_ops(ops_version: str, testing_version: str) -> None:
-    """Rewrite ops/version.py and the top-level pyproject.toml."""
-    path = VERSION_FILES['ops/src']
+def update_version_module(path: pathlib.Path, version: str) -> None:
+    """Rewrite the `version: str = '...'` line of a package's version module."""
     content = path.read_text()
     updated = re.sub(
         rf"^version: str = '{EXISTING_VERSION}'$",
-        f"version: str = '{ops_version}'",
+        f"version: str = '{version}'",
         content,
         flags=re.MULTILINE,
     )
     if content == updated:
-        raise ValueError(f'Nothing changed in {path}: is it already at {ops_version}?')
+        raise ValueError(f'Nothing changed in {path}: is it already at {version}?')
     path.write_text(updated)
-    print(f'{path}: version {ops_version}')
+    print(f'{path}: version {version}')
 
+
+def update_ops(ops_version: str, testing_version: str) -> None:
+    """Rewrite ops/version.py and the top-level pyproject.toml."""
+    update_version_module(VERSION_FILES['ops/src'], ops_version)
     update_pyproject(
         VERSION_FILES['ops/pyproject'],
         ops_version,
@@ -103,7 +107,8 @@ def update_ops(ops_version: str, testing_version: str) -> None:
 
 
 def update_testing(ops_version: str, testing_version: str) -> None:
-    """Rewrite testing/pyproject.toml."""
+    """Rewrite scenario/_version.py and testing/pyproject.toml."""
+    update_version_module(VERSION_FILES['testing/src'], testing_version)
     update_pyproject(VERSION_FILES['testing'], testing_version, deps={'ops': ops_version})
 
 
