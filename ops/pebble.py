@@ -1038,7 +1038,11 @@ class Service:
             ('backoff-limit', self.backoff_limit),
             ('kill-delay', self.kill_delay),
         ]
-        dct = {name: value for name, value in fields if value}
+        dct = {
+            name: value
+            for name, value in fields
+            if value or (name in ('user-id', 'group-id') and value is not None)
+        }
         return typing.cast('ServiceDict', dct)
 
     def _merge(self, other: Service):
@@ -1048,6 +1052,9 @@ class Service:
         attributes take precedence.
         """
         for name, value in other.__dict__.items():
+            if name in ('user_id', 'group_id') and value is not None:
+                setattr(self, name, value)
+                continue
             if not value or name == 'name':
                 continue
             if name in ['after', 'before', 'requires']:

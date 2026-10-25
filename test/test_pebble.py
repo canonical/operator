@@ -927,6 +927,28 @@ summary: Sum Mary
 
 
 class TestService:
+    @pytest.mark.parametrize('field', ['user-id', 'group-id'])
+    def test_zero_identity_roundtrip(self, field: typing.Literal['user-id', 'group-id']):
+        raw: pebble.ServiceDict = {}
+        raw[field] = 0
+        service = pebble.Service('api', raw)
+
+        assert service.to_dict() == raw
+        layer = pebble.Layer({'services': {'api': raw}})
+        assert layer.to_dict() == {'services': {'api': raw}}
+
+    @pytest.mark.parametrize('field', ['user-id', 'group-id'])
+    def test_merge_zero_identity(self, field: typing.Literal['user-id', 'group-id']):
+        original: pebble.ServiceDict = {}
+        original[field] = 1000
+        replacement: pebble.ServiceDict = {}
+        replacement[field] = 0
+        service = pebble.Service('api', original)
+        service._merge(pebble.Service('api', replacement))
+
+        assert getattr(service, field.replace('-', '_')) == 0
+        assert service.to_dict() == replacement
+
     def _assert_empty(self, service: pebble.Service, name: str):
         assert service.name == name
         assert service.summary == ''
