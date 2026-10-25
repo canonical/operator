@@ -18,6 +18,7 @@ import dataclasses
 import datetime
 import email.message
 import email.parser
+import http.client
 import io
 import json
 import signal
@@ -505,6 +506,28 @@ single log
             occurrences=8,
         )
 
+    def test_notice_hashable(self):
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        def make(data: dict[str, str]):
+            return pebble.Notice(
+                id='123',
+                user_id=1000,
+                type=pebble.NoticeType.CUSTOM,
+                key='example.com/a',
+                first_occurred=now,
+                last_occurred=now,
+                last_repeated=now,
+                occurrences=1,
+                last_data=data,
+            )
+
+        # Frozen, so usable as a dict key or set member, with the dict field
+        # left out of the hash but still part of equality.
+        assert len({make({'a': '1'}), make({'a': '1'})}) == 1
+        assert make({'a': '1'}) != make({'a': '2'})
+        assert hash(make({'a': '1'})) == hash(make({'a': '2'}))
+
 
 class TestPlan:
     def test_services(self):
@@ -756,6 +779,16 @@ checks:
         # Reordered sections.
         assert plan4 == plan7
 
+    def test_null_sections(self):
+        plan = pebble.Plan("""
+services:
+checks:
+log-targets:
+""")
+        assert plan.services == {}
+        assert plan.checks == {}
+        assert plan.log_targets == {}
+
 
 class TestLayer:
     def _assert_empty(self, layer: pebble.Layer):
@@ -772,6 +805,16 @@ class TestLayer:
 
     def test_dict(self):
         s = pebble.Layer({})
+        self._assert_empty(s)
+
+    def test_null_sections(self):
+        s = pebble.Layer("""
+summary:
+description:
+services:
+checks:
+log-targets:
+""")
         self._assert_empty(s)
 
         d: pebble.LayerDict = {
@@ -1129,6 +1172,19 @@ class TestCheck:
         }
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
+
+    def test_merge_keeps_level(self):
+        base = pebble.Check(
+            'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
+        )
+        override = pebble.Check('chk', {'override': 'merge', 'period': '5s'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.ALIVE
+        assert base.period == '5s'
+
+        override = pebble.Check('chk', {'override': 'merge', 'level': 'ready'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.READY
 
     def test_equality(self):
         d: pebble.CheckDict = {
@@ -2452,6 +2508,29 @@ Content-Disposition: form-data; name="response"\r
             ),
         ]
 
+    def test_pull_non_ascii_path(self, client: MockClient):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/tmp/cr\xc3\xa8me.txt"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/tmp/cr\xc3\xa8me.txt"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+        with client.pull('/tmp/crème.txt') as infile:  # ruff: ignore[hardcoded-temp-file]
+            assert infile.read() == 'contents'
+
     def test_pull_protocol_errors(self, client: MockClient):
         client.responses.append(({'Content-Type': 'c/t'}, b''))
         with pytest.raises(pebble.ProtocolError) as excinfo:
@@ -3357,6 +3436,18 @@ class TestSocketClient:
         assert isinstance(excinfo.value, pebble.Error)
         assert 'Could not connect to Pebble' in str(excinfo.value)
 
+    def test_error_reading_response(self, monkeypatch: pytest.MonkeyPatch):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise http.client.RemoteDisconnected('Remote end closed connection')
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert 'RemoteDisconnected' in str(excinfo.value)
+
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
 
@@ -3685,6 +3776,78 @@ class TestExec:
             ('GET', '/v1/changes/123/wait', {'timeout': '4.000s'}, None),
         ]
         assert stdio.sends == []
+
+    def test_wait_output_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        # U+1F600 is four bytes in UTF-8; split it between two messages.
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me \xf0\x9f')
+        stdio.receives.append(b'\x98\x80\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        out, err = process.wait_output()
+        assert out == 'crème 😀\n'
+        assert err == ''
+
+    def test_stdout_read_multibyte_split_across_messages(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.append(b'cr\xc3')
+        stdio.receives.append(b'\xa8me\n')
+        stdio.receives.append('{"command":"end"}')
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        # Each read returns one message, less any character that is only
+        # partly in it, which comes with the next message.
+        assert process.stdout.read() == 'cr'
+        assert process.stdout.read() == 'ème\n'
+        assert process.stdout.read() == ''
+        process.wait()
+
+    def test_websocket_to_writer_multibyte_split_across_messages(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me\n', '{"command":"end"}']
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == 'crème\n'
+
+    def test_websocket_reader_holds_back_incomplete_character(self):
+        ws = MockWebsocket()
+        ws.receives = [b'cr\xc3', b'\xa8me \xf0', b'\x9f', b'\x98\x80\n', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        # Each read() returns one message's worth, less any incomplete
+        # character at the end, which is returned with the next message.
+        assert reader.read() == b'cr'
+        assert reader.read() == b'\xc3\xa8me '
+        # A message that is nothing but part of a character is joined with the next.
+        assert reader.read() == b'\xf0\x9f\x98\x80\n'
+        assert reader.read() == b''
+
+    def test_websocket_reader_incomplete_character_at_eof(self):
+        ws = MockWebsocket()
+        ws.receives = [b'ok \xc3', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'ok '
+        # There is nothing to complete it with, so the caller gets the bytes
+        # (and the decoding error they cause).
+        assert reader.read() == b'\xc3'
+        assert reader.read() == b''
+
+    def test_websocket_reader_bytes_reads_one_message(self):
+        ws = MockWebsocket()
+        ws.receives = [b'foo', b'bar', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws))
+        assert reader.read() == b'foo'
+        assert reader.read(1) == b'b'
+        assert reader.read() == b'ar'
+        assert reader.read() == b''
 
     def test_wait_output_combine_stderr(self, client: MockClient):
         stdio, _, _ = self.add_responses(client, '123', 0)
@@ -4054,6 +4217,33 @@ class TestExec:
         with pytest.raises(pebble.ConnectionError) as excinfo:
             client.exec(['foo'])
         assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
+
+    def test_connect_websocket_oserror(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id: str, websocket_id: str):
+                raise ConnectionRefusedError('refused')
+
+        client = Client()
+        self.add_responses(client, '123', 0, change_err='change error!')
+        with pytest.raises(pebble.ChangeError) as excinfo:
+            client.exec(['foo'])
+        assert str(excinfo.value) == 'change error!'
+
+    def test_connect_websocket_closes_socket_on_error(self, monkeypatch: pytest.MonkeyPatch):
+        sockets: list[socket.socket] = []
+        real_socket = socket.socket
+
+        def fake_socket(*args: typing.Any, **kwargs: typing.Any):
+            sock = real_socket(*args, **kwargs)
+            sockets.append(sock)
+            return sock
+
+        monkeypatch.setattr(pebble.socket, 'socket', fake_socket)
+        client = pebble.Client(socket_path='does_not_exist')
+        with pytest.raises(OSError):
+            client._connect_websocket('1', 'stdio')
+        assert len(sockets) == 1
+        assert sockets[0].fileno() == -1  # Closed.
 
     def test_websocket_send_raises(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)
