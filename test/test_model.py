@@ -1826,7 +1826,7 @@ def test_push_path_skips_symlinks(request: pytest.FixtureRequest, tmp_path: path
     (src / 'link-to-dir').symlink_to(src / 'sub')
     (src / 'dangling').symlink_to(src / 'missing')
 
-    # Links to directories and dangling links used to abort the whole tree.
+    # A link to a directory or a dangling link must not stop the rest of the tree.
     container.push_path(src, '/dst')
 
     pushed = {info.name for info in container.list_files('/dst/src')}

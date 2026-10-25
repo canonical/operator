@@ -2572,8 +2572,9 @@ class MultiPushPullError(Exception):
     errors: list[tuple[str, Exception]]
     """The list of errors.
 
-    Each error is represented by a tuple of (<source_path>, <exception>),
-    where source_path is the path being pushed to or pulled from.
+    Each error is represented by a tuple of (<path>, <exception>). The path is
+    the file that failed to copy, or the source path given to the method if
+    listing it failed.
     """
 
     def __init__(self, message: str, errors: list[tuple[str, Exception]]):
