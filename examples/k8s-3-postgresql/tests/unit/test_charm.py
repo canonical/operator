@@ -30,7 +30,6 @@ ROCK_LAYER = ops.pebble.Layer(
                 "summary": "FastAPI demo server",
                 "command": "/bin/uvicorn api_demo_server.app:app --host 0.0.0.0 --port 8000",
                 "startup": "enabled",
-                "environment": {"DEMO_SERVER_LOGFILE": "/tmp/demo_server.log"},
                 "on-success": "shutdown",
                 "on-failure": "shutdown",
             }
@@ -132,10 +131,10 @@ def test_relation_data(mock_version):
 
     assert state_out.get_container(container.name).plan.services["fastapi"].environment == {
         **ROCK_LAYER.services["fastapi"].environment,
-        "DEMO_SERVER_DB_HOST": "example.com",
-        "DEMO_SERVER_DB_PORT": "5432",
-        "DEMO_SERVER_DB_USER": "foo",
-        "DEMO_SERVER_DB_PASSWORD": "bar",
+        "POSTGRESQL_DB_HOSTNAME": "example.com",
+        "POSTGRESQL_DB_PORT": "5432",
+        "POSTGRESQL_DB_USERNAME": "foo",
+        "POSTGRESQL_DB_PASSWORD": "bar",
     }
 
 
