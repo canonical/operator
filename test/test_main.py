@@ -178,6 +178,28 @@ class TestCharmInit:
         fake_tracing._shutdown.assert_called_once()
         assert sys.breakpointhook is breakpointhook
 
+    def test_clean_abort_is_not_a_span_error(self):
+        class MyCharm(ops.CharmBase):
+            pass
+
+        span_context = MagicMock()
+        with (
+            patch('ops._main.tracer.start_as_current_span', return_value=span_context),
+            patch.object(ops, 'tracing', MagicMock()),
+            patch('ops.storage.juju_backend_available', return_value=True),
+            pytest.warns(DeprecationWarning, match='Controller storage is deprecated'),
+            pytest.raises(SystemExit) as excinfo,
+        ):
+            # A restricted hook is skipped with controller storage: _Abort(0).
+            self._check(
+                MyCharm,
+                extra_environ={'JUJU_DISPATCH_PATH': 'hooks/collect-metrics'},
+                use_juju_for_storage=True,
+            )
+
+        assert excinfo.value.code == 0
+        span_context.__exit__.assert_called_once_with(None, None, None)
+
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):

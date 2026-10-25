@@ -331,10 +331,7 @@ class _Manager:
                 self.framework.close()
                 raise
         except BaseException:
-            # main() only calls destroy() once construction has finished, so end
-            # the root span and flush the trace data here. A dispatch that fails
-            # in the charm's __init__ is one of the most useful ones to have a
-            # trace for.
+            # main() does not call destroy() if construction fails, so flush the trace here.
             self._finalise()
             raise
 

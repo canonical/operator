@@ -120,12 +120,8 @@ class Buffer:
         try:
             self._create_schema()
         except sqlite3.DatabaseError as e:
-            # Subclasses like OperationalError cover transient conditions, such as
-            # the database being locked. A bare DatabaseError means the file is not
-            # a usable SQLite database (corrupt, truncated, or not SQLite at all).
-            # Tracing is optional, so start over rather than fail every dispatch.
-            # The tracing destination is stored in the same file; it is set again
-            # at the next start, upgrade-charm, or tracing relation event.
+            # A bare DatabaseError means the file is not a usable database, as opposed to
+            # OperationalError for locks and I/O problems. Start over rather than fail every hook.
             if type(e) is not sqlite3.DatabaseError:
                 raise
             logger.warning('Discarding the unreadable trace buffer %s: %s', self.path, e)

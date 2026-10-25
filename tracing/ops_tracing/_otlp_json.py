@@ -123,9 +123,7 @@ def _value(v: Any) -> dict[str, Any]:
         return {'intValue': str(int(v))}
     if isinstance(v, float):
         if math.isnan(v) or math.isinf(v):
-            # JSON has no literal for these; the protobuf JSON mapping uses strings.
-            # Python's json module would otherwise write NaN or Infinity, which is
-            # invalid JSON that makes the collector reject the whole payload.
+            # The protobuf JSON mapping uses strings for these, as JSON has no literals.
             if math.isnan(v):
                 return {'doubleValue': 'NaN'}
             return {'doubleValue': 'Infinity' if v > 0 else '-Infinity'}
@@ -163,9 +161,8 @@ def _scope(scope: InstrumentationScope):
     return rv
 
 
-# OTLP span and link flags: the low byte holds the W3C trace flags (such as
-# sampled), 0x100 says that the parent-is-remote bit is known, and 0x200 is
-# that bit.
+# The low byte of the OTLP flags holds the W3C trace flags; 0x100 means the
+# parent-is-remote bit (0x200) is known.
 _REMOTE = 0x300
 _LOCAL = 0x100
 

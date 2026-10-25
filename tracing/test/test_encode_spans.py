@@ -25,7 +25,8 @@ from opentelemetry.trace import Link, NonRecordingSpan, SpanContext, TraceFlags
 from ops_tracing._otlp_json import encode_spans
 
 
-def _encode_one(span: ReadableSpan) -> dict[str, Any]:
+def _encode_one(span: trace.Span) -> dict[str, Any]:
+    assert isinstance(span, ReadableSpan)  # The SDK's Span is one; the API type is not.
     payload = encode_spans([span])
     # Reject NaN and Infinity, which Python's json module accepts but JSON does not allow.
     decoded = json.loads(payload, parse_constant=lambda c: pytest.fail(f'invalid JSON: {c}'))
@@ -49,7 +50,7 @@ def test_non_finite_floats():
     )
     span.end()
 
-    assert _attributes(_encode_one(span)) == {  # type: ignore
+    assert _attributes(_encode_one(span)) == {
         'nan': {'doubleValue': 'NaN'},
         'inf': {'doubleValue': 'Infinity'},
         'ninf': {'doubleValue': '-Infinity'},
@@ -62,7 +63,7 @@ def test_none_in_array():
     span = tracer.start_span('s', attributes={'seq': ['a', None, 'b']})
     span.end()
 
-    encoded = _encode_one(span)  # type: ignore
+    encoded = _encode_one(span)
     assert _attributes(encoded) == {
         'seq': {'arrayValue': {'values': [{'stringValue': 'a'}, {}, {'stringValue': 'b'}]}},
     }
@@ -75,7 +76,7 @@ def test_flags_local_parent():
     span = tracer.start_span('s')
     span.end()
 
-    flags = _encode_one(span)['flags']  # type: ignore
+    flags = _encode_one(span)['flags']
     assert flags & TraceFlags.SAMPLED
     assert flags & 0x100
     assert not flags & 0x200
@@ -87,7 +88,7 @@ def test_flags_remote_parent():
     span = tracer.start_span('s', context=trace.set_span_in_context(parent))
     span.end()
 
-    flags = _encode_one(span)['flags']  # type: ignore
+    flags = _encode_one(span)['flags']
     assert flags & TraceFlags.SAMPLED
     assert flags & 0x300 == 0x300
 
@@ -98,7 +99,7 @@ def test_links():
     span = tracer.start_span('s', links=[link])
     span.end()
 
-    encoded = _encode_one(span)  # type: ignore
+    encoded = _encode_one(span)
     assert encoded['links'] == [
         {
             'traceId': '00000000000000000000000000001234',
@@ -119,7 +120,7 @@ def test_dropped_events_and_links():
     span.add_event('two')
     span.end()
 
-    encoded = _encode_one(span)  # type: ignore
+    encoded = _encode_one(span)
     assert len(encoded['events']) == 1
     assert encoded['droppedEventsCount'] == 1
     assert len(encoded['links']) == 1
