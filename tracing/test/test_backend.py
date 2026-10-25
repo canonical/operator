@@ -123,3 +123,55 @@ def test_exporter_http_error_log_format(tmp_path: pathlib.Path, caplog: pytest.L
     # The body must be capped at 1000 bytes to bound log size.
     assert repr(b'x' * 1000) in message
     assert repr(b'x' * 1001) not in message
+
+
+def _http_error(url: str, code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(url, code, 'error', email.message.Message(), io.BytesIO(b'body'))
+
+
+@pytest.mark.parametrize(
+    'code,kept',
+    [
+        (400, False),
+        (413, False),
+        (401, True),
+        (404, True),
+        (429, True),
+        (503, True),
+    ],
+)
+def test_exporter_rejected_payload_is_dropped(tmp_path: pathlib.Path, code: int, kept: bool):
+    """A chunk the collector will never accept is removed so that it does not block the rest."""
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'http://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, None))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen', side_effect=_http_error(url, code)):
+        exporter.do_export(*rv)
+
+    assert (exporter.buffer.pushpop() is not None) is kept
+
+
+def test_exporter_invalid_ca_is_reported_once(
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+):
+    exporter = BufferingSpanExporter(tmp_path / 'buffer')
+    url = 'https://collector.example/v1/traces'
+    exporter.buffer.save_destination(Destination(url, 'FIRST\nSECOND'))
+    rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
+    assert rv
+
+    with patch('urllib.request.urlopen') as urlopen, caplog.at_level(
+        logging.ERROR, logger='ops_tracing._export'
+    ):
+        exporter.do_export(*rv)
+        exporter.do_export(*rv)
+
+    urlopen.assert_not_called()
+    errors = [r for r in caplog.records if 'Cannot load the CA list' in r.getMessage()]
+    assert len(errors) == 1
+    assert errors[0].exc_info is None
+    # The data is kept until a usable CA list is provided.
+    assert exporter.buffer.pushpop() == rv
