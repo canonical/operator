@@ -86,6 +86,27 @@ def test_has_secrets():
     assert not ops.JujuVersion('2.9.30').has_secrets
 
 
+def test_pre_release_is_before_the_release():
+    # 3.0-beta3 is earlier than 3.0.3, so does not have the 3.0.3 features.
+    assert not ops.JujuVersion('3.0-beta3').has_secrets
+    assert not ops.JujuVersion('3.0-beta3').supports_open_port_on_k8s
+    assert ops.JujuVersion('3.1-beta1').has_secrets
+    assert not ops.JujuVersion('2.8-rc1').has_controller_storage()
+    assert ops.JujuVersion('2.8-rc1').has_app_data()
+
+
+def test_equality_with_other_types():
+    assert ops.JujuVersion('3.6.0') != 3.6
+    assert ops.JujuVersion('3.6.0') != None  # ruff: ignore[none-comparison]
+    assert ops.JujuVersion('3.6.0') != (3, 6, 0)
+
+
+def test_hashable():
+    versions = {ops.JujuVersion('3.6.0'), ops.JujuVersion('3.6.0'), ops.JujuVersion('3.6-beta1')}
+    assert len(versions) == 2
+    assert ops.JujuVersion('3.6.0') in versions
+
+
 def test_supports_open_port_on_k8s():
     assert ops.JujuVersion('3.0.3').supports_open_port_on_k8s
     assert ops.JujuVersion('3.3.0').supports_open_port_on_k8s

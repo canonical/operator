@@ -272,6 +272,13 @@ class TestSQLiteStorage(StoragePermutations):
         request.addfinalizer(storage.close)
         return storage
 
+    def test_memory_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+        # A Path to the special name must not create a file of that name.
+        monkeypatch.chdir(tmp_path)
+        storage = ops.storage.SQLiteStorage(pathlib.Path(':memory:'))
+        storage.close()
+        assert list(tmp_path.iterdir()) == []
+
     def test_permissions_new(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, '.unit-state.db')
