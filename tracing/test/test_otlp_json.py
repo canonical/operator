@@ -20,7 +20,7 @@ import pytest
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import SpanKind
 
-from ops_tracing._otlp_json import encode_spans  # type: ignore
+from ops_tracing._otlp_json import encode_spans
 
 
 # The OTLP span kind values, from opentelemetry/proto/trace/v1/trace.proto.
