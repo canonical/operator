@@ -297,37 +297,45 @@ class _Manager:
             tracing._setup(juju_context, name)
         self._tracing_context = tracer.start_as_current_span('ops.main')
         self._tracing_context.__enter__()
-        self._charm_state_path = charm_state_path
-        self._charm_class = charm_class
-        if model_backend is None:
-            model_backend = _model._ModelBackend(juju_context=self._juju_context)
-        self._model_backend = model_backend
-
-        # Do this as early as possible to be sure to catch the most logs.
-        self._setup_root_logging()
-
-        self._charm_root = self._juju_context.charm_dir
-        self._charm_meta = self._load_charm_meta()
-        # The backend is created before the metadata is loaded, so that logging
-        # is set up as early as possible. It needs the peer relations to tell
-        # whether "permission denied" from reading an application databag means
-        # the relation is gone.
-        self._model_backend._peer_endpoints = frozenset(self._charm_meta.peers)
-        self._use_juju_for_storage = use_juju_for_storage
-
-        # Set up dispatcher, framework and charm objects.
-        self.dispatcher = _Dispatcher(self._charm_root, self._juju_context)
-        self.dispatcher.run_any_legacy_hook()
-
-        self.framework = self._make_framework(self.dispatcher)
         try:
-            with self.framework._event_context('__init__'):
-                self.charm = self._charm_class(self.framework)
+            self._charm_state_path = charm_state_path
+            self._charm_class = charm_class
+            if model_backend is None:
+                model_backend = _model._ModelBackend(juju_context=self._juju_context)
+            self._model_backend = model_backend
+
+            # Do this as early as possible to be sure to catch the most logs.
+            self._setup_root_logging()
+
+            self._charm_root = self._juju_context.charm_dir
+            self._charm_meta = self._load_charm_meta()
+            # The backend is created before the metadata is loaded, so that logging
+            # is set up as early as possible. It needs the peer relations to tell
+            # whether "permission denied" from reading an application databag means
+            # the relation is gone.
+            self._model_backend._peer_endpoints = frozenset(self._charm_meta.peers)
+            self._use_juju_for_storage = use_juju_for_storage
+
+            # Set up dispatcher, framework and charm objects.
+            self.dispatcher = _Dispatcher(self._charm_root, self._juju_context)
+            self.dispatcher.run_any_legacy_hook()
+
+            self.framework = self._make_framework(self.dispatcher)
+            try:
+                with self.framework._event_context('__init__'):
+                    self.charm = self._charm_class(self.framework)
+            except BaseException:
+                # If charm construction fails, close the framework so that the
+                # underlying storage (SQLite) is released; main() only reaches
+                # the run()/destroy() path when __init__ completes successfully.
+                self.framework.close()
+                raise
         except BaseException:
-            # If charm construction fails, close the framework so that the
-            # underlying storage (SQLite) is released; main() only reaches
-            # the run()/destroy() path when __init__ completes successfully.
-            self.framework.close()
+            # main() only calls destroy() once construction has finished, so end
+            # the root span and flush the trace data here. A dispatch that fails
+            # in the charm's __init__ is one of the most useful ones to have a
+            # trace for.
+            self._finalise()
             raise
 
     def _load_charm_meta(self):
@@ -497,11 +505,20 @@ class _Manager:
 
     def destroy(self):
         """Finalise the manager."""
+        self._finalise()
+
+    def _finalise(self):
+        """Restore the breakpoint hook, end the root span, and shut tracing down."""
         from . import tracing  # break circular import
 
         if self._saved_breakpointhook is not None:
             sys.breakpointhook = self._saved_breakpointhook
-        self._tracing_context.__exit__(*sys.exc_info())
+        exc_type, exc, tb = sys.exc_info()
+        if isinstance(exc, _Abort) and exc.exit_code == 0:
+            # A clean early exit, such as skipping a restricted hook, is not an
+            # error in the trace.
+            exc_type = exc = tb = None
+        self._tracing_context.__exit__(exc_type, exc, tb)
         if tracing:
             tracing._shutdown()
 

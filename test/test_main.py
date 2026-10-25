@@ -151,6 +151,33 @@ class TestCharmInit:
 
                 ops.main(charm_class, **kwargs)
 
+    def test_init_failure_finalises_tracing(self):
+        class MyCharm(ops.CharmBase):
+            def __init__(self, framework: ops.Framework):
+                super().__init__(framework)
+                raise RuntimeError('charm init failed')
+
+        breakpointhook = sys.breakpointhook
+        span_context = MagicMock()
+        fake_tracing = MagicMock()
+        with (
+            patch('ops._main.tracer.start_as_current_span', return_value=span_context),
+            patch.object(ops, 'tracing', fake_tracing),
+            pytest.raises(RuntimeError, match='charm init failed'),
+        ):
+            self._check(MyCharm)
+
+        # Nothing else calls destroy() when construction fails, so the root
+        # span must be ended and the trace data flushed from __init__.
+        span_context.__enter__.assert_called_once()
+        span_context.__exit__.assert_called_once()
+        exc_type, exc, _ = span_context.__exit__.call_args.args
+        assert exc_type is RuntimeError
+        assert str(exc) == 'charm init failed'
+        fake_tracing._setup.assert_called_once()
+        fake_tracing._shutdown.assert_called_once()
+        assert sys.breakpointhook is breakpointhook
+
     def test_init_signature_passthrough(self):
         class MyCharm(ops.CharmBase):
             def __init__(self, framework: ops.Framework):
