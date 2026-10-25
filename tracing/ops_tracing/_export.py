@@ -148,7 +148,7 @@ class BufferingSpanExporter(SpanExporter):
                 # The data stays in the buffer until a usable CA list is provided.
                 self.bad_ca = config.ca
                 logger.error(
-                    f'Cannot load the CA list for the tracing collector at {config.url}: {e}'
+                    'Cannot load the CA list for the tracing collector at %s: %s', config.url, e
                 )
                 return
 
@@ -167,7 +167,12 @@ class BufferingSpanExporter(SpanExporter):
         except urllib.error.HTTPError as e:
             with e.fp:
                 resp = e.fp.read(1000)
-            logger.error(f'Tracing collector at {config.url} rejected our data, {e.code=} {resp=}')
+            logger.error(
+                'Tracing collector at %s rejected our data, e.code=%r resp=%r',
+                config.url,
+                e.code,
+                resp,
+            )
             if e.code in PAYLOAD_REJECTED:
                 # The buffer always offers the oldest important chunk first, so a chunk
                 # that is never going to be accepted would block everything behind it.
