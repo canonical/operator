@@ -819,7 +819,7 @@ class Framework(Object):
 
         # The observer is stored by name and looked up again when the event is
         # emitted, so the name must find the method on the object.
-        if getattr(observer_obj, method_name, None) is None:
+        if not hasattr(observer_obj, method_name):
             raise TypeError(
                 f'{type(observer_obj).__name__} has no attribute {method_name!r}: observers '
                 f'must be methods, accessed by the name they are defined with'

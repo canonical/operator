@@ -834,10 +834,8 @@ class StorageEvent(HookEvent):
             storages = self.framework.model.storages[storage_name]
             storage = next((s for s in storages if s.index == storage_index), None)
             if storage is None:
-                # The storage has been removed since the event was deferred.
-                # Rebuild it from the snapshot so that the handler still runs
-                # (rather than failing on every dispatch from now on), using the
-                # location that was recorded when the event was first emitted.
+                # The storage has been removed since the event was deferred, so
+                # rebuild it from the snapshot rather than failing every dispatch.
                 storage = model.Storage(storage_name, storage_index, self.framework.model._backend)
             self.storage = storage
             if storage_location is None:
