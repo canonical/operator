@@ -874,7 +874,7 @@ def test_storedstate_consistency():
     # No owner_path means the framework's own stored state, which this isn't.
     assert_inconsistent(
         State(stored_states={StoredState(content={'foo': 'bar'})}),
-        _Event('start'),
+        Event('start'),
         _CharmSpec(MyCharm, meta={'name': 'foo'}),
     )
 
