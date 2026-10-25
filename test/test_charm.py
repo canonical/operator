@@ -818,6 +818,53 @@ containers:
     assert meta.containers['test2'].name == 'test2'
 
 
+def test_meta_null_sections():
+    # YAML reads a section header with nothing under it as null, and a
+    # metadata.yaml with the right overall shape is accepted by charmcraft.
+    meta = ops.CharmMeta.from_yaml("""
+name: sparse-charm
+tags:
+terms:
+series:
+assumes:
+requires:
+provides:
+peers:
+storage:
+resources:
+payloads:
+extra-bindings:
+containers:
+  workload:
+    mounts:
+    bases:
+""")
+    assert meta.tags == []
+    assert meta.terms == []
+    assert meta.series == []
+    assert meta.assumes.features == []
+    assert meta.relations == {}
+    assert meta.storages == {}
+    assert meta.resources == {}
+    assert meta.payloads == {}
+    assert meta.extra_bindings == {}
+    assert meta.containers['workload'].mounts == {}
+    assert meta.containers['workload'].bases == []
+
+
+def test_storage_meta_integer_range():
+    # An unquoted ``range: 2`` is an integer once the YAML is loaded.
+    meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+storage:
+  stor:
+    type: filesystem
+    multiple:
+      range: 2
+""")
+    assert meta.storages['stor'].multiple_range == (2, 2)
+
+
 def test_containers_storage():
     meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm
@@ -1623,6 +1670,122 @@ options:
     assert isinstance(typed_config, config_class)
     assert typed_config.x == 42  # type: ignore
     assert not hasattr(typed_config, 'y')
+
+
+@dataclasses.dataclass(frozen=True)
+class _DataclassAliasConfig:
+    workload_class: str = dataclasses.field(default='small', metadata={'alias': 'class'})
+    log_level: str = dataclasses.field(default='info', metadata={'alias': 'log-level'})
+    other: int = 1
+
+
+class _InitAliasConfig:
+    def __init__(self, *, log_level: str = 'info', other: int = 1):
+        self.workload_class = 'small'
+        self.log_level = log_level
+        self.other = other
+
+
+_alias_config_classes: list[type[object]] = [_DataclassAliasConfig]
+
+if pydantic is not None:
+
+    @pydantic.dataclasses.dataclass(frozen=True, init=False)
+    class _PydanticDataclassAliasConfig:
+        workload_class: str = dataclasses.field(default='small', metadata={'alias': 'class'})
+        log_level: str = dataclasses.field(default='info', metadata={'alias': 'log-level'})
+        other: int = 1
+
+    class _PydanticBaseModelAliasConfig(pydantic.BaseModel):
+        workload_class: str = pydantic.Field('small', alias='class')
+        log_level: str = pydantic.Field('info', alias='log-level')
+        other: int = 1
+
+    _alias_config_classes.extend([_PydanticDataclassAliasConfig, _PydanticBaseModelAliasConfig])
+
+
+_ALIAS_CONFIG_SCHEMA = """
+options:
+    class:
+        type: string
+        default: small
+    log-level:
+        type: string
+        default: info
+    other:
+        type: int
+        default: 1
+"""
+
+
+@pytest.mark.parametrize('config_class', _alias_config_classes)
+def test_config_alias(config_class: type[object], request: pytest.FixtureRequest):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(config_class)
+
+    harness = testing.Harness(Charm, config=_ALIAS_CONFIG_SCHEMA)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'class': 'large', 'log-level': 'debug', 'other': 2})
+    harness.begin()
+    typed_config = harness.charm.typed_config
+    assert isinstance(typed_config, config_class)
+    assert typed_config.workload_class == 'large'  # type: ignore
+    assert typed_config.log_level == 'debug'  # type: ignore
+    assert typed_config.other == 2  # type: ignore
+
+
+def test_config_without_fields_converts_dashes(request: pytest.FixtureRequest):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.typed_config = self.load_config(_InitAliasConfig)
+
+    schema = """
+options:
+    log-level:
+        type: string
+        default: info
+    other:
+        type: int
+        default: 1
+"""
+    harness = testing.Harness(Charm, config=schema)
+    request.addfinalizer(harness.cleanup)
+    harness.update_config({'log-level': 'debug'})
+    harness.begin()
+    assert harness.charm.typed_config.log_level == 'debug'
+
+
+@dataclasses.dataclass(frozen=True)
+class _DataclassDashedAlias:
+    foo_bar: int = dataclasses.field(default=42, metadata={'alias': 'foo-bar'})
+
+
+@pytest.mark.parametrize('action_params', [{}, {'foo-bar': 24}])
+def test_action_dashed_alias(action_params: dict[str, int], request: pytest.FixtureRequest):
+    class Charm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on['act'].action, self._on_action)
+
+        def _on_action(self, event: ops.ActionEvent):
+            params = event.load_params(_DataclassDashedAlias)
+            event.set_results({'params': params})
+
+    action_yaml = """
+act:
+    params:
+        foo-bar:
+            type: int
+            default: 42
+"""
+    harness = testing.Harness(Charm, actions=action_yaml)
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    params_out = harness.run_action('act', action_params).results['params']
+    assert params_out.foo_bar == action_params.get('foo-bar', 42)
 
 
 class MyAction:

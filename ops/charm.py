@@ -280,13 +280,10 @@ class ActionEvent(EventBase):
             fields = None
         params: dict[str, Any] = kwargs.copy()
         for key, value in sorted(self.params.items()):
-            attr = key.replace('-', '_')
-            if fields is None:
-                params[attr] = value
-            else:
-                if attr not in fields:
-                    continue
-                params[fields[attr]] = value
+            attr = _argument_name(fields, key)
+            if attr is None:
+                continue
+            params[attr] = value
         try:
             return cls(*args, **params)
         except ValueError as e:
@@ -1607,12 +1604,12 @@ class CharmBase(Object):
 
         config: dict[str, bool | int | float | str | model.Secret] = kwargs.copy()
         try:
-            fields = set(_juju_fields(cls))
+            fields = _juju_fields(cls)
         except ValueError:
             fields = None
         for key, value in self.config.items():
-            attr = key.replace('-', '_')
-            if fields is not None and attr not in fields:
+            attr = _argument_name(fields, key)
+            if attr is None:
                 continue
             option_type = self.meta.config.get(key)
             # Convert secret IDs to secret objects. We create the object rather
@@ -1653,6 +1650,27 @@ def _evaluate_status(charm: CharmBase):  # pyright: ignore[reportUnusedFunction]
     unit = charm.unit
     if unit._collected_statuses:
         unit.status = model.StatusBase._get_highest_priority(unit._collected_statuses)
+
+
+def _argument_name(fields: dict[str, str] | None, key: str) -> str | None:
+    """Return the argument name that the Juju option or parameter ``key`` maps to.
+
+    ``fields`` is the mapping from :func:`_juju_fields`, or ``None`` if the
+    class doesn't declare its fields, in which case every key is passed through
+    with dashes converted to underscores. An alias is matched as written in the
+    class, so an alias that contains dashes still matches, and a key that has
+    no alias matches the dash-to-underscore form of the attribute name.
+
+    Returns:
+        The name to use for the argument, or ``None`` if the key should not
+        be passed to the class.
+    """
+    attr = key.replace('-', '_')
+    if fields is None:
+        return attr
+    if key in fields:
+        return fields[key]
+    return fields.get(attr)
 
 
 def _juju_fields(cls: type[object]) -> dict[str, str]:
@@ -1803,7 +1821,9 @@ class CharmMeta:
         actions_raw: dict[str, Any] | None = None,
         config_raw: dict[str, Any] | None = None,
     ):
-        raw_: dict[str, Any] = raw or {}
+        # A section header with nothing under it is null once the YAML is
+        # loaded, and means the same as leaving the section out.
+        raw_: dict[str, Any] = {k: v for k, v in (raw or {}).items() if v is not None}
         actions_raw_: dict[str, Any] = actions_raw or {}
         # config_raw might be {'options': None} - this is accepted by
         # charmcraft, even though {'options: {}} would be more correct.
@@ -2095,7 +2115,8 @@ class StorageMeta:
         self.location = raw.get('location')
         self.multiple_range = None
         if 'multiple' in raw:
-            range = raw['multiple']['range']
+            # YAML reads an unquoted range such as ``range: 2`` as an integer.
+            range = str(raw['multiple']['range'])
             if range[-1] == '+':
                 self.multiple_range = (int(range[:-1]), None)
             elif '-' not in range:
@@ -2293,6 +2314,7 @@ class ContainerMeta:
 
         # This is not guaranteed to be populated/is not enforced yet
         if raw:
+            raw = {k: v for k, v in raw.items() if v is not None}
             self._populate_mounts(raw.get('mounts', []))
             self.resource = raw.get('resource')
             self.bases = [ContainerBase.from_dict(base) for base in raw.get('bases', ())]
