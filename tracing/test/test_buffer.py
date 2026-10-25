@@ -14,9 +14,15 @@
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import pathlib
+import sqlite3
 
-from ops_tracing._buffer import OBSERVED_PRIORITY, Buffer  # type: ignore
+import pytest
+
+from ops_tracing import _buffer
+from ops_tracing._buffer import DEFAULT_PRIORITY, OBSERVED_PRIORITY, Buffer  # type: ignore
 
 
 def setup_buffer_with_data(path: pathlib.Path, ids: list[int]) -> Buffer:
@@ -71,3 +77,50 @@ def test_mark_observed_missing_ids(tmp_path: pathlib.Path):
         assert priorities == {1: OBSERVED_PRIORITY, 2: OBSERVED_PRIORITY}
         assert buf.observed is True
         assert not buf.ids
+
+
+def test_eviction_frees_only_what_is_needed(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(_buffer, 'BUFFER_SIZE', 3 * 4096)
+    buf = Buffer(tmp_path / 'db')
+    mime = 'application/octet-stream'
+
+    # Fill the buffer with three observed (high priority) one-page chunks.
+    buf.observed = True
+    for _ in range(3):
+        buf.pushpop((b'x', mime))
+
+    # One more page is needed, so exactly one chunk must go, oldest first.
+    buf.observed = False
+    buf.pushpop((b'new', mime))
+
+    with buf.tx(readonly=True) as conn:
+        rows = list(conn.execute('SELECT id, priority FROM tracing ORDER BY id'))
+    assert rows == [(2, OBSERVED_PRIORITY), (3, OBSERVED_PRIORITY), (4, DEFAULT_PRIORITY)]
+    assert buf.stored == 3 * 4096
+
+
+def test_unreadable_buffer_is_recreated(tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture):
+    path = tmp_path / 'db'
+    path.write_bytes(b'this is not an sqlite database\n' * 100)
+
+    with caplog.at_level(logging.WARNING, logger='ops_tracing._buffer'):
+        buf = Buffer(path)
+
+    assert buf.pushpop() is None
+    assert 'Discarding the unreadable trace buffer' in caplog.text
+
+
+def test_locked_buffer_is_not_discarded(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    path = tmp_path / 'db'
+    Buffer(path).pushpop((b'data', 'application/octet-stream'))
+    monkeypatch.setattr(_buffer, 'LONG_DB_TIMEOUT', 0.01)
+
+    with contextlib.closing(sqlite3.connect(path, isolation_level=None)) as conn:
+        conn.execute('BEGIN EXCLUSIVE')
+        with pytest.raises(sqlite3.OperationalError):
+            Buffer(path)
+        conn.execute('ROLLBACK')
+
+    assert Buffer(path).pushpop() is not None

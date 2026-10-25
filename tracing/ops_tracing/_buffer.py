@@ -17,6 +17,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import functools
+import logging
 import os
 import pathlib
 import sqlite3
@@ -54,6 +55,8 @@ DEFAULT_PRIORITY = 10
 
 # Higher priority for data from dispatch where the juju event is observed.
 OBSERVED_PRIORITY = 50
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -114,6 +117,22 @@ class Buffer:
             if stat.S_IMODE(self.path.stat().st_mode) != mode:
                 self.path.chmod(mode)
 
+        try:
+            self._create_schema()
+        except sqlite3.DatabaseError as e:
+            # Subclasses like OperationalError cover transient conditions, such as
+            # the database being locked. A bare DatabaseError means the file is not
+            # a usable SQLite database (corrupt, truncated, or not SQLite at all).
+            # Tracing is optional, so start over rather than fail every dispatch.
+            # The tracing destination is stored in the same file; it is set again
+            # at the next start, upgrade-charm, or tracing relation event.
+            if type(e) is not sqlite3.DatabaseError:
+                raise
+            logger.warning('Discarding the unreadable trace buffer %s: %s', self.path, e)
+            self.path.unlink()
+            raise
+
+    def _create_schema(self) -> None:
         with self.tx(timeout=LONG_DB_TIMEOUT) as conn:
             conn.execute(
                 """
@@ -236,7 +255,7 @@ class Buffer:
                     for id_, size in cursor:
                         collected_ids.add(id_)
                         collected_size += size
-                        if collected_size > excess:
+                        if collected_size >= excess:
                             break
 
                     collected_template = ','.join(['?'] * len(collected_ids))
