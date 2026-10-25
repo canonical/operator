@@ -15,7 +15,9 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import datetime
+import gc
 import io
 import ipaddress
 import json
@@ -244,6 +246,18 @@ class TestModel:
                 ('relation_remote_app_name', 2, {'relation_name': 'db0'}),
             ],
         )
+
+    def test_relation_data_keeps_uncached_relation_alive(
+        self, harness: ops.testing.Harness[ops.CharmBase]
+    ):
+        # A relation fetched by an ID that relation-ids does not list (as
+        # happens during relation-broken) is not cached by the model.
+        relation = self.ensure_relation(harness, 'db1', 7)
+        data = relation.data
+        del relation
+        gc.collect()
+        assert data.relation.name == 'db1'
+        assert data[harness.model.unit] == {}
 
     def test_get_relation_wrong_endpoint(self, harness: ops.testing.Harness[ops.CharmBase]):
         # Regression test for https://github.com/canonical/operator/issues/2327
@@ -1058,6 +1072,19 @@ class TestModel:
         }
         for expected, status in test_cases.items():
             assert repr(status) == expected
+
+    def test_status_subclass_does_not_replace_builtin(self):
+        class ActiveWithReason(ops.ActiveStatus):
+            def __init__(self, message: str, reason: str):
+                super().__init__(message)
+                self.reason = reason
+
+        assert ActiveWithReason('ready', 'all checks up').name == 'active'
+        # The status that Juju reports back is still constructed as the
+        # built-in class, which ActiveWithReason could not be.
+        status = ops.StatusBase.from_name('active', 'ready')
+        assert type(status) is ops.ActiveStatus
+        assert status.message == 'ready'
 
     def test_status_eq(self):
         status_types = [
@@ -2906,6 +2933,30 @@ class TestModelBindings:
         binding = self.ensure_binding(model, self.ensure_relation(model, binding_name))
         self._check_binding_data(binding_name, binding)
         assert fake_script.calls(clear=True) == expected_calls
+
+    def test_cidr_with_host_bits(self, fake_script: FakeScript, model: ops.Model):
+        # Juju reports the interface's own address with the subnet prefix
+        # length, so the host bits are set.
+        network_get_out_obj = {
+            'bind-addresses': [
+                {
+                    'mac-address': '',
+                    'interface-name': 'eth0',
+                    'addresses': [
+                        {'hostname': '', 'value': '10.1.89.35', 'cidr': '10.1.89.35/24'}
+                    ],
+                }
+            ],
+            'egress-subnets': ['10.1.89.35/24'],
+            'ingress-addresses': ['10.1.89.35'],
+        }
+        network_get_out = json.dumps(network_get_out_obj)
+        fake_script.write(
+            'network-get', f"""[ "$2" = db0 ] && echo '{network_get_out}' || exit 1"""
+        )
+        binding = self.ensure_binding(model, 'db0')
+        assert binding.network.interfaces[0].subnet == ipaddress.ip_network('10.1.89.0/24')
+        assert binding.network.egress_subnets == [ipaddress.ip_network('10.1.89.0/24')]
 
     def test_binding_no_iface_name(self, fake_script: FakeScript, model: ops.Model):
         network_get_out_obj = {
@@ -4837,6 +4888,22 @@ class TestSecretClass:
         with pytest.raises(TypeError):
             secret.set_info()  # no args provided
 
+    def test_content_is_copied(self, model: ops.Model):
+        content = {'foo': 'bar'}
+        secret = self.make_secret(model, id='x', content=content)
+        content['foo'] = 'changed'
+        assert secret.get_content() == {'foo': 'bar'}
+
+    def test_get_info_unknown_rotation(self, model: ops.Model, fake_script: FakeScript):
+        fake_script.write(
+            'secret-info-get',
+            """echo '{"x": {"label": "y", "revision": 7, "rotation": "fortnightly"}}'""",
+        )
+        secret = self.make_secret(model, id='x')
+        info = secret.get_info()
+        assert info.revision == 7
+        assert info.rotation is None
+
     def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
 
@@ -5248,6 +5315,17 @@ class TestPorts:
             ['opened-ports', '--format=json'],
         ]
 
+    def test_set_ports_protocol_case(self, fake_script: FakeScript, unit: ops.Unit):
+        fake_script.write('open-port', 'exit 0')
+        fake_script.write('close-port', 'exit 0')
+        fake_script.write('opened-ports', """echo '["8000/tcp"]'""")
+        # Not what the type hints allow, but Juju is case-insensitive here, and
+        # the port must not be closed and reopened.
+        unit.set_ports(ops.Port(typing.cast('typing.Literal["tcp"]', 'TCP'), 8000))
+        assert fake_script.calls(clear=True) == [
+            ['opened-ports', '--format=json'],
+        ]
+
 
 class TestUnit:
     @staticmethod
@@ -5337,6 +5415,11 @@ class TestLazyNotice:
         with pytest.raises(AttributeError):
             assert n.not_exist
 
+        # Copying creates the new object without running __init__, so the
+        # private attributes are looked up through __getattr__.
+        assert copy.copy(n).id == '123'
+        assert calls == 1
+
     def test_repr(self):
         workload = typing.cast('ops.Container', None)
         n = ops.model.LazyNotice(workload, '123', 'custom', 'example.com/a')
@@ -5344,6 +5427,32 @@ class TestLazyNotice:
 
         n = ops.model.LazyNotice(workload, '123', 'foobar', 'example.com/a')
         assert repr(n) == "LazyNotice(id='123', type='foobar', key='example.com/a')"
+
+
+class TestLazyCheckInfo:
+    def test_lazy_check_info(self):
+        calls = 0
+
+        class FakeWorkload:
+            def get_check(self, name: str):
+                nonlocal calls
+                calls += 1
+                return ops.pebble.CheckInfo(
+                    name=name,
+                    level=ops.pebble.CheckLevel.ALIVE,
+                    status=ops.pebble.CheckStatus.UP,
+                )
+
+        workload = typing.cast('ops.Container', FakeWorkload())
+        info = ops.model.LazyCheckInfo(workload, 'http')
+        assert info.name == 'http'
+        assert calls == 0
+        assert copy.copy(info).name == 'http'
+        assert calls == 0
+        assert info.status == ops.pebble.CheckStatus.UP
+        assert calls == 1
+        with pytest.raises(AttributeError):
+            assert info.not_exist
 
 
 class TestCloudCredential:

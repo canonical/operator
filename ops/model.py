@@ -812,7 +812,7 @@ class Unit:
         # Normalise to get easier comparisons.
         existing = {(port.protocol, port.port) for port in self._backend.opened_ports()}
         desired = {
-            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
+            ('tcp', port) if isinstance(port, int) else (port.protocol.lower(), port.port)
             for port in ports
         }
         for protocol, port in existing - desired:
@@ -1145,7 +1145,7 @@ class Network:
 
         self.egress_subnets = []
         for subnet in network_info.get('egress-subnets', []):
-            self.egress_subnets.append(ipaddress.ip_network(subnet))
+            self.egress_subnets.append(ipaddress.ip_network(subnet, strict=False))
 
     @property
     def bind_address(self) -> ipaddress.IPv4Address | ipaddress.IPv6Address | str | None:
@@ -1210,7 +1210,7 @@ class NetworkInterface:
         cidr: str = address_info.get('cidr', '')
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
-            subnet = ipaddress.ip_network(cidr)
+            subnet = ipaddress.ip_network(cidr, strict=False)
         elif address:
             # If we have an address, convert it to a /32 or /128 IP network.
             subnet = ipaddress.ip_network(address)
@@ -1325,7 +1325,7 @@ class Secret:
         self._backend = backend
         self._id = id
         self._label = label
-        self._content = content
+        self._content = None if content is None else dict(content)
 
     def __repr__(self):
         fields: list[str] = []
@@ -1463,7 +1463,9 @@ class Secret:
 
         The content of the secret is cached on the :class:`Secret` object, so
         subsequent calls do not require querying the secret storage again,
-        unless ``refresh=True`` is used, or :meth:`set_content` is called.
+        unless ``refresh=True`` is used. Calling :meth:`set_content` does not
+        update the cached content: Juju applies the new content when the hook
+        completes, so use ``refresh=True`` in a later hook to read it.
 
         Args:
             refresh: If true, fetch the latest revision's content and tell
@@ -1949,7 +1951,11 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
         backend: _ModelBackend,
         remote_unit: Unit | None = None,
     ):
-        self.relation = weakref.proxy(relation)
+        # A strong reference: a Relation that the model does not cache (one
+        # fetched by ID outside relation-ids, during relation-broken for
+        # example) would otherwise be collected as soon as the caller dropped
+        # it, and then every access through .data would raise ReferenceError.
+        self.relation = relation
         self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
@@ -2255,6 +2261,12 @@ class StatusBase:
         self.message = message
 
     def __init_subclass__(cls):
+        # A charm's own subclass of a built-in status (to add behaviour, say)
+        # must not replace the built-in one, because from_name() constructs
+        # whichever class is registered when reading status back from Juju.
+        name = getattr(cls, 'name', None)
+        if isinstance(name, str) and name in StatusBase._statuses:
+            return
         StatusBase._register(cls)
 
     def __eq__(self, other: StatusBase) -> bool:
@@ -4183,12 +4195,17 @@ class _ModelBackend:
                 raw = hookcmds.secret_info_get(label=label)
         else:
             raise TypeError('either `id` or `label` must be provided')
+        try:
+            rotation = SecretRotate(raw.rotation) if raw.rotation else None
+        except ValueError:
+            logger.warning('Unknown secret rotation policy %r from Juju.', raw.rotation)
+            rotation = None
         return SecretInfo(
             raw.id,
             label=raw.label,
             revision=raw.revision,
             expires=raw.expiry,  # Note the different names.
-            rotation=SecretRotate(raw.rotation) if raw.rotation else None,
+            rotation=rotation,
             rotates=raw.rotates,
             description=raw.description,
             model_uuid=self.model_uuid,
@@ -4407,6 +4424,10 @@ class LazyNotice:
 
     def __getattr__(self, item: str):
         # Note: not called for defined attributes (id, type, key)
+        if item.startswith('_'):
+            # Looking up our own private attributes (as copy and pickle do
+            # before __init__ has run) must not trigger a load, or recurse.
+            raise AttributeError(item)
         self._ensure_loaded()
         return getattr(self._notice, item)
 
@@ -4445,6 +4466,8 @@ class LazyCheckInfo:
 
     def __getattr__(self, item: str):
         # Note: not called for defined attribute `name`.
+        if item.startswith('_'):
+            raise AttributeError(item)
         self._ensure_loaded()
         return getattr(self._info, item)
 
