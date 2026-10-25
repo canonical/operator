@@ -49,9 +49,15 @@ You then need to use `set_default` to set an initial value; for example:
 class MyCharm(ops.CharmBase):
     _stored = ops.StoredState()
 
-    def __init__(self, framework):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._stored.set_default(expensive_value=None)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+
+    def _calculate_expensive_value(self) -> int:
+        # Pretend that working this out takes a long time.
+        return 42
 ```
 
 See more: [](ops.StoredState)
@@ -60,14 +66,14 @@ Now, in any event handler, you can read or write data to the object you are
 storing, and it will be persisted across Juju events.
 
 ```python
-def _on_start(self, event: ops.StartEvent):
+def _on_install(self, event: ops.InstallEvent):
     if self._stored.expensive_value is None:
         self._stored.expensive_value = self._calculate_expensive_value()
 
 
-def _on_install(self, event: ops.InstallEvent):
+def _on_start(self, event: ops.StartEvent):
     # We can use self._stored.expensive_value here, and it will have the value
-    # set in the start event.
+    # set in the install event.
     logger.info('Current value: %s', self._stored.expensive_value)
 ```
 
@@ -95,7 +101,7 @@ having persisted from a previous event. For example, in your
 def test_charm_sets_stored_state():
     ctx = testing.Context(MyCharm)
     state_in = testing.State()
-    state_out = ctx.run(ctx.on.start(), state_in)
+    state_out = ctx.run(ctx.on.install(), state_in)
     ss = state_out.get_stored_state('_stored', owner_path='MyCharm')
     assert ss.content['expensive_value'] == 42
 
@@ -113,9 +119,11 @@ def test_charm_logs_stored_state():
             )
         }
     )
-    state_out = ctx.run(ctx.on.install(), state_in)
-    assert ctx.juju_log[0].message == 'Current value: 42'
+    state_out = ctx.run(ctx.on.start(), state_in)
+    assert testing.JujuLogLine('INFO', 'Current value: 42') in ctx.juju_log
 ```
+
+`ctx.juju_log` contains every line the unit logged during the event, including the ones `ops` itself writes. The charm's line isn't at a predictable position, so check for it with `in`.
 
 ## Storing state for the lifetime of the application
 
@@ -140,15 +148,36 @@ In your `src/charm.py` file, set and get the data from the peer relation
 databag. For example, to store an expensive calculation:
 
 ```python
-def _on_start(self, event: ops.StartEvent):
-    peer = self.model.get_relation('charm-peer')
-    peer.data[self.app]['expensive-value'] = self._calculate_expensive_value()
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.stop, self._on_stop)
 
+    def _calculate_expensive_value(self) -> int:
+        # Pretend that working this out takes a long time.
+        return 42
 
-def _on_stop(self, event: ops.StopEvent):
-    peer = self.model.get_relation('charm-peer')
-    logger.info('Value at stop is: %s', peer.data[self.app]['expensive-value'])
+    def _on_start(self, event: ops.StartEvent):
+        if not self.unit.is_leader():
+            return
+        peer = self.model.get_relation('charm-peer')
+        if peer is None:
+            return
+        peer.data[self.app]['expensive-value'] = str(
+            self._calculate_expensive_value()
+        )
+
+    def _on_stop(self, event: ops.StopEvent):
+        peer = self.model.get_relation('charm-peer')
+        if peer is None:
+            logger.warning('Peer relation is gone; no value to report')
+            return
+        value = peer.data[self.app].get('expensive-value')
+        logger.info('Value at stop is: %s', value)
 ```
+
+Relation data values are always strings, so convert the value before storing it. Only the leader unit can write to the application databag, so the handler returns early on the other units. The peer relation can be gone by the time `stop` arrives, so check for `None` before using it.
 
 ```{caution}
 Peer relations are not available early in the Charm lifecycle, so you'll need
@@ -174,11 +203,13 @@ In your `tests/unit/test_charm.py` file, add tests that have an initial state
 that includes a [](ops.testing.PeerRelation) object.
 
 ```python
-def test_charm_sets_stored_state():
+def test_charm_sets_peer_data():
     ctx = testing.Context(MyCharm)
     peer = testing.PeerRelation('charm-peer')
-    state_in = testing.State(relations={peer})
+    state_in = testing.State(relations={peer}, leader=True)
     state_out = ctx.run(ctx.on.start(), state_in)
     rel = state_out.get_relation(peer.id)
-    assert rel.local_app_data['expensive_value'] == '42'
+    assert rel.local_app_data['expensive-value'] == '42'
 ```
+
+The state has to be the leader, because the charm writes to the application databag.
