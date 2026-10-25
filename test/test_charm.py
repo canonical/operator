@@ -819,8 +819,7 @@ containers:
 
 
 def test_meta_null_sections():
-    # YAML reads a section header with nothing under it as null, and a
-    # metadata.yaml with the right overall shape is accepted by charmcraft.
+    # YAML reads a section header with nothing under it as null.
     meta = ops.CharmMeta.from_yaml("""
 name: sparse-charm
 tags:
