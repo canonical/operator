@@ -8,7 +8,7 @@ from collections.abc import Mapping
 
 import pytest
 from scenario import Context
-from scenario.state import Container, Relation, State, _Event
+from scenario.state import Container, Event, Relation, State
 
 import ops
 
@@ -56,7 +56,7 @@ def test_deferred_evt_emitted(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore
 
     out = trigger(
-        State(deferred=[_Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
+        State(deferred=[Event('update_status').deferred(handler=mycharm._on_event)]),  # type: ignore
         'start',
         mycharm,
         meta=mycharm.META,  # type: ignore
@@ -82,7 +82,7 @@ def test_deferred_relation_event(mycharm: type[ops.CharmBase]):
         State(
             relations={rel},
             deferred=[
-                _Event('foo_relation_changed', relation=rel).deferred(
+                Event('foo_relation_changed', _relation=rel).deferred(
                     handler=mycharm._on_event,  # type: ignore
                 )
             ],
@@ -145,7 +145,7 @@ def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
         State(
             containers={ctr},
             deferred=[
-                _Event('foo_pebble_ready', container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
+                Event('foo_pebble_ready', _container=ctr).deferred(handler=mycharm._on_event)  # type: ignore
             ],
         ),
         'start',

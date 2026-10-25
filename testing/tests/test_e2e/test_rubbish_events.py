@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 import pytest
-from scenario.state import State, _CharmSpec, _Event
+from scenario.state import Event, State, _CharmSpec
 
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Framework, Object
@@ -94,4 +94,4 @@ def test_is_custom_event(mycharm: type[CharmBase], evt_name: str, expected: bool
     spec: _CharmSpec[CharmBase] = _CharmSpec(
         charm_type=mycharm, meta={'name': 'mycharm', 'requires': {'foo': {}}}
     )
-    assert _Event(evt_name)._is_builtin_event(spec) is expected
+    assert Event(evt_name)._is_builtin_event(spec) is expected

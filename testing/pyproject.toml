@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ops-scenario"
 
-version = "8.9.0"
+version = "8.10.0.dev0"
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -18,7 +18,7 @@ license = "Apache-2.0"
 keywords = ["juju", "test"]
 
 dependencies = [
-    "ops==3.9.0",
+    "ops==3.10.0.dev0",
     "PyYAML>=6.0.1",
     "typing_extensions>=4.9.0",  # for `deprecated` decorator, replace with stdlib `warnings.deprecated` when we're Python 3.13+
 ]
