@@ -832,12 +832,14 @@ class StorageEvent(HookEvent):
 
         if storage_name and storage_index is not None:
             storages = self.framework.model.storages[storage_name]
-            self.storage = next((s for s in storages if s.index == storage_index), None)  # type: ignore
-            if self.storage is None:
-                raise RuntimeError(
-                    f'failed loading storage (name={storage_name!r}, '
-                    f'index={storage_index!r}) from snapshot'
-                )
+            storage = next((s for s in storages if s.index == storage_index), None)
+            if storage is None:
+                # The storage has been removed since the event was deferred.
+                # Rebuild it from the snapshot so that the handler still runs
+                # (rather than failing on every dispatch from now on), using the
+                # location that was recorded when the event was first emitted.
+                storage = model.Storage(storage_name, storage_index, self.framework.model._backend)
+            self.storage = storage
             if storage_location is None:
                 raise RuntimeError(
                     'failed loading storage location from snapshot.'

@@ -96,6 +96,11 @@ class Handle:
         self._parent: Handle | None = parent
         self._kind = kind
         self._key = key
+        if key and ('/' in key or '[' in key or ']' in key):
+            # The path is parsed back into handles by from_path, so a key
+            # containing the separators would be stored but could not be
+            # restored, and the error would only appear in a later dispatch.
+            raise ValueError(f'handle key {key!r} must not contain "/", "[" or "]"')
         if parent:
             if key:
                 self._path = f'{parent}/{kind}[{key}]'
@@ -114,7 +119,9 @@ class Handle:
     def __hash__(self):
         return hash((self.parent, self.kind, self.key))
 
-    def __eq__(self, other: Handle):
+    def __eq__(self, other: object):
+        if not isinstance(other, Handle):
+            return NotImplemented
         return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
 
     def __str__(self):
@@ -559,7 +566,7 @@ https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-co
 
 """
 
-_event_regex = r'^(|.*/)on/[a-zA-Z_]+\[\d+\]$'
+_event_regex = r'^(|.*/)on/\w+\[\d+\]$'
 
 
 class Framework(Object):
@@ -810,6 +817,14 @@ class Framework(Object):
                 "only 'self' and the 'event'"
             ) from e
 
+        # The observer is stored by name and looked up again when the event is
+        # emitted, so the name must find the method on the object.
+        if getattr(observer_obj, method_name, None) is None:
+            raise TypeError(
+                f'{type(observer_obj).__name__} has no attribute {method_name!r}: observers '
+                f'must be methods, accessed by the name they are defined with'
+            )
+
         # TODO Prevent the exact same parameters from being registered more than once.
 
         self._observer[observer_obj.handle.path] = observer_obj
@@ -971,6 +986,11 @@ class Framework(Object):
             try:
                 event = self.load_snapshot(event_handle)
             except NoTypeError:
+                logger.warning(
+                    'Dropping the deferred event %s: its type is no longer registered. '
+                    'Observe the event in every dispatch for deferred events to be re-emitted.',
+                    event_path,
+                )
                 self._storage.drop_notice(event_path, observer_path, method_name)
                 continue
 
@@ -997,7 +1017,14 @@ class Framework(Object):
                     logger.debug('Emitting custom event %s.', event)
 
                 custom_handler = getattr(observer, method_name, None)
-                if custom_handler:
+                if custom_handler is None:
+                    logger.warning(
+                        'Observer %s has no method %s to handle the event %s.',
+                        observer_path,
+                        method_name,
+                        event,
+                    )
+                else:
                     event_is_from_juju = isinstance(event, charm.HookEvent)
                     event_is_action = isinstance(event, charm.ActionEvent)
                     if event_is_from_juju:
@@ -1396,12 +1423,12 @@ class StoredList(typing.MutableSequence[Any]):
 
     def insert(self, index: int, value: Any):
         """Insert value before index."""
-        self._under.insert(index, value)
+        self._under.insert(index, _unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def append(self, value: Any):
         """Append value to the end of the list."""
-        self._under.append(value)
+        self._under.append(_unwrap_stored(self._stored_data, value))
         self._stored_data.dirty = True
 
     def __eq__(self, other: Any):
