@@ -5319,8 +5319,8 @@ class TestPorts:
         fake_script.write('open-port', 'exit 0')
         fake_script.write('close-port', 'exit 0')
         fake_script.write('opened-ports', """echo '["8000/tcp"]'""")
-        # Not what the type hints allow, but Juju is case-insensitive here, and
-        # the port must not be closed and reopened.
+        # Not what the type hints allow, but open_port and close_port lowercase
+        # the protocol, and the port must not be closed and reopened.
         unit.set_ports(ops.Port(typing.cast('typing.Literal["tcp"]', 'TCP'), 8000))
         assert fake_script.calls(clear=True) == [
             ['opened-ports', '--format=json'],

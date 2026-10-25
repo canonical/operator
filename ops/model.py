@@ -1464,8 +1464,9 @@ class Secret:
         The content of the secret is cached on the :class:`Secret` object, so
         subsequent calls do not require querying the secret storage again,
         unless ``refresh=True`` is used. Calling :meth:`set_content` does not
-        update the cached content: Juju applies the new content when the hook
-        completes, so use ``refresh=True`` in a later hook to read it.
+        update the cached content: use :meth:`peek_content` or
+        ``refresh=True`` to read the new content, otherwise this returns the
+        tracked revision until the tracking is updated.
 
         Args:
             refresh: If true, fetch the latest revision's content and tell
@@ -1951,10 +1952,8 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
         backend: _ModelBackend,
         remote_unit: Unit | None = None,
     ):
-        # A strong reference: a Relation that the model does not cache (one
-        # fetched by ID outside relation-ids, during relation-broken for
-        # example) would otherwise be collected as soon as the caller dropped
-        # it, and then every access through .data would raise ReferenceError.
+        # A strong reference: a Relation the model doesn't cache (fetched by an
+        # ID outside relation-ids) would otherwise be collected while in use.
         self.relation = relation
         self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
