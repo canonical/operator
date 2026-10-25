@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -109,7 +110,8 @@ def _attributes(
 
 def _ensure_homogeneous(value: Sequence[Any]) -> Sequence[Any]:
     # TODO: empty lists are allowed, aren't they?
-    if len(types := {type(v) for v in value}) > 1:
+    # The SDK allows None elements in an otherwise homogeneous array.
+    if len(types := {type(v) for v in value if v is not None}) > 1:
         raise ValueError(f'Attribute value arrays must be homogeneous, got {types=}')
     return value
 
@@ -120,6 +122,13 @@ def _value(v: Any) -> dict[str, Any]:
     if isinstance(v, int):
         return {'intValue': str(int(v))}
     if isinstance(v, float):
+        if math.isnan(v) or math.isinf(v):
+            # JSON has no literal for these; the protobuf JSON mapping uses strings.
+            # Python's json module would otherwise write NaN or Infinity, which is
+            # invalid JSON that makes the collector reject the whole payload.
+            if math.isnan(v):
+                return {'doubleValue': 'NaN'}
+            return {'doubleValue': 'Infinity' if v > 0 else '-Infinity'}
         return {'doubleValue': float(v)}
     if isinstance(v, bytes):
         # FIXME: not reached!
@@ -129,7 +138,12 @@ def _value(v: Any) -> dict[str, Any]:
     if isinstance(v, str):
         return {'stringValue': str(v)}
     if isinstance(v, Sequence):
-        return {'arrayValue': {'values': [_value(e) for e in _ensure_homogeneous(v)]}}
+        # An empty AnyValue is how OTLP represents a null array element.
+        return {
+            'arrayValue': {
+                'values': [{} if e is None else _value(e) for e in _ensure_homogeneous(v)]
+            }
+        }
     if isinstance(v, Mapping):
         return {'kvlistValue': {'values': [{k: _value(vv) for k, vv in v.items()}]}}
 
@@ -149,8 +163,15 @@ def _scope(scope: InstrumentationScope):
     return rv
 
 
+# OTLP span and link flags: the low byte holds the W3C trace flags (such as
+# sampled), 0x100 says that the parent-is-remote bit is known, and 0x200 is
+# that bit.
 _REMOTE = 0x300
 _LOCAL = 0x100
+
+
+def _flags(trace_flags: int, is_remote: bool) -> int:
+    return (_REMOTE if is_remote else _LOCAL) | (int(trace_flags) & 0xFF)
 
 
 def _span(span: ReadableSpan):
@@ -160,7 +181,7 @@ def _span(span: ReadableSpan):
         'kind': span.kind.value or 1,  # unspecified -> internal
         'traceId': _trace_id(span.context.trace_id),
         'spanId': _span_id(span.context.span_id),
-        'flags': _REMOTE if span.parent and span.parent.is_remote else _LOCAL,
+        'flags': _flags(span.context.trace_flags, bool(span.parent and span.parent.is_remote)),
         'startTimeUnixNano': str(span.start_time),
         'endTimeUnixNano': str(span.end_time),  # can this be unset?
         'status': _status(span.status),
@@ -173,8 +194,24 @@ def _span(span: ReadableSpan):
     # TODO: is this field really nullable?
     if span.events:
         rv['events'] = [_event(e) for e in span.events]
+    if span.dropped_events:
+        rv['droppedEventsCount'] = span.dropped_events
+
+    if span.links:
+        rv['links'] = [_link(link) for link in span.links]
+    if span.dropped_links:
+        rv['droppedLinksCount'] = span.dropped_links
 
     return rv
+
+
+def _link(link: Link) -> dict[str, Any]:
+    return {
+        'traceId': _trace_id(link.context.trace_id),
+        'spanId': _span_id(link.context.span_id),
+        'flags': _flags(link.context.trace_flags, link.context.is_remote),
+        **_attributes(link),
+    }
 
 
 def _trace_id(trace_id: int) -> str:
