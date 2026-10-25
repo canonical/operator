@@ -34,7 +34,7 @@ def secret_add(
     description: str | None = None,
     expire: datetime.datetime | str | None = None,
     rotate: SecretRotate | None = None,
-    owner: Literal['application', 'unit'] = 'application',
+    owner: Literal['application', 'unit'] | None = 'application',
 ) -> str:
     """Add a new secret.
 
@@ -48,6 +48,7 @@ def secret_add(
         expire: Either a duration or time when the secret should expire.
         rotate: The secret rotation policy.
         owner: The owner of the secret, either the application or the unit.
+            ``None`` leaves the choice to Juju, which defaults to the application.
     """
     args: list[str] = []
     if label is not None:
@@ -61,12 +62,15 @@ def secret_add(
             args.extend(['--expire', datetime_to_rfc3339(expire)])
     if rotate is not None:
         args.extend(['--rotate', rotate])
-    args.extend(['--owner', owner])
+    if owner is not None:
+        args.extend(['--owner', owner])
     with tempfile.TemporaryDirectory() as tmp:
-        for k, v in content.items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+        # The files are numbered rather than named after the keys, so that the
+        # keys are only ever validated by Juju, not used as paths.
+        for i, (k, v) in enumerate(content.items()):
+            with open(f'{tmp}/{i}', mode='w', encoding='utf-8') as f:
                 f.write(v)
-            args.append(f'{k}#file={tmp}/{k}')
+            args.append(f'{k}#file={tmp}/{i}')
         stdout = run('secret-add', *args)
     return stdout.strip()
 
@@ -317,8 +321,8 @@ def secret_set(
     # ending up in the command line, where it may be logged and also is visible
     # via /proc.
     with tempfile.TemporaryDirectory() as tmp:
-        for k, v in (content or {}).items():
-            with open(f'{tmp}/{k}', mode='w', encoding='utf-8') as f:
+        for i, (k, v) in enumerate((content or {}).items()):
+            with open(f'{tmp}/{i}', mode='w', encoding='utf-8') as f:
                 f.write(v)
-            args.append(f'{k}#file={tmp}/{k}')
+            args.append(f'{k}#file={tmp}/{i}')
         run('secret-set', *args)

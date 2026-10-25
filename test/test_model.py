@@ -4847,7 +4847,7 @@ class TestSecretClass:
                 f'secret://{model._backend.model_uuid}/q',
             ],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[0][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[0][-1])
 
     def test_set_content_then_info_pre36(
         self, model_pre36: ops.Model, fake_script: FakeScript, monkeypatch: pytest.MonkeyPatch
@@ -4876,8 +4876,8 @@ class TestSecretClass:
                 mock.ANY,
             ],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
-        assert re.fullmatch(r'foo#file=.*/foo', calls[4][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[1][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[4][-1])
 
     def test_set_info_then_content(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4893,7 +4893,7 @@ class TestSecretClass:
             ['secret-set', '--description', 'desc', secret_uri],
             ['secret-set', secret_uri, mock.ANY],
         ]
-        assert re.fullmatch(r'foo#file=.*/foo', calls[1][-1])
+        assert re.fullmatch(r'foo#file=.*/0', calls[1][-1])
 
     def test_set_info_then_content_pre36(self, model_pre36: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
@@ -4929,8 +4929,8 @@ class TestSecretClass:
                 mock.ANY,
             ],
         ]
-        assert re.fullmatch(r'old#file=.*/old', calls[2][-1])
-        assert re.fullmatch(r'new#file=.*/new', calls[4][-1])
+        assert re.fullmatch(r'old#file=.*/0', calls[2][-1])
+        assert re.fullmatch(r'new#file=.*/0', calls[4][-1])
 
     def test_set_content_aggregates(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")

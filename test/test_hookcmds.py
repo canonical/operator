@@ -170,7 +170,7 @@ def mock_temp_dir(monkeypatch: pytest.MonkeyPatch) -> Generator[TemporaryDirecto
     def mock_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if str(path).startswith(f'{dir_mock.name}/'):
             file_mock = NamedTemporaryFile()
-            file_mock.name = f'{dir_mock.name}/{file_mock.name}'
+            file_mock.name = str(path)
             dir_mock.files.append(file_mock)
             return file_mock
         return real_open(path, *args, **kwargs)  # type: ignore
@@ -641,11 +641,34 @@ def test_resource_get(run: Run):
 
 def test_secret_add(run: Run, mock_temp_dir: str):
     run.handle(
-        ['secret-add', '--owner', 'application', f'foo#file={mock_temp_dir}/foo'],
+        ['secret-add', '--owner', 'application', f'foo#file={mock_temp_dir}/0'],
         stdout='secretid',
     )
     result = hookcmds.secret_add({'foo': 'bar'})
     assert result == 'secretid'
+
+
+def test_secret_add_without_owner(run: Run, mock_temp_dir: str):
+    run.handle(['secret-add', f'foo#file={mock_temp_dir}/0'], stdout='secretid')
+    result = hookcmds.secret_add({'foo': 'bar'}, owner=None)
+    assert result == 'secretid'
+
+
+def test_secret_add_keys_are_not_paths(run: Run, mock_temp_dir: TemporaryDirectory):
+    # Juju rejects these keys; they must not be used as file names before it does.
+    run.handle(
+        [
+            'secret-add',
+            '--owner',
+            'application',
+            f'../leak#file={mock_temp_dir}/0',
+            f'sub/key#file={mock_temp_dir}/1',
+        ],
+        stdout='secretid',
+    )
+    hookcmds.secret_add({'../leak': 'one', 'sub/key': 'two'})
+    assert [f.name for f in mock_temp_dir.files] == [f'{mock_temp_dir}/0', f'{mock_temp_dir}/1']
+    assert [f.writes for f in mock_temp_dir.files] == [['one'], ['two']]
 
 
 @pytest.mark.parametrize('owner', ['application', 'unit'])
@@ -665,7 +688,7 @@ def test_secret_add_with_metadata(
             'quarterly',
             '--owner',
             owner,
-            f'foo#file={mock_temp_dir}/foo',
+            f'foo#file={mock_temp_dir}/0',
         ],
         stdout='secretid',
     )
@@ -688,7 +711,7 @@ def test_secret_add_date(run: Run, mock_temp_dir: str):
             '2025-12-31T23:59:59Z',
             '--owner',
             'application',
-            f'foo#file={mock_temp_dir}/foo',
+            f'foo#file={mock_temp_dir}/0',
         ],
         stdout='secretid',
     )
@@ -872,7 +895,7 @@ def test_secret_set(run: Run, mock_temp_dir: str):
     run.handle([
         'secret-set',
         'secret:123',
-        f'foo#file={mock_temp_dir}/foo',
+        f'foo#file={mock_temp_dir}/0',
     ])
     hookcmds.secret_set('secret:123', content={'foo': 'bar'})
 
@@ -890,7 +913,7 @@ def test_secret_set_with_metadata(run: Run, mock_temp_dir: str):
             '--rotate',
             'quarterly',
             'secret:id',
-            f'foo#file={mock_temp_dir}/foo',
+            f'foo#file={mock_temp_dir}/0',
         ],
         stdout='secretid',
     )
@@ -909,7 +932,7 @@ def test_secret_set_owner_deprecated(
     run: Run, mock_temp_dir: str, owner: Literal['application', 'unit']
 ):
     # Juju ignores --owner for secret-set, so it's not passed.
-    run.handle(['secret-set', 'secret:id', f'foo#file={mock_temp_dir}/foo'])
+    run.handle(['secret-set', 'secret:id', f'foo#file={mock_temp_dir}/0'])
     with pytest.warns(DeprecationWarning, match='owner'):
         hookcmds.secret_set('secret:id', content={'foo': 'bar'}, owner=owner)
 
@@ -921,7 +944,7 @@ def test_secret_set_date(run: Run, mock_temp_dir: str):
             '--expire',
             '2025-12-31T23:59:59Z',
             'secret:id',
-            f'foo#file={mock_temp_dir}/foo',
+            f'foo#file={mock_temp_dir}/0',
         ],
         stdout='secretid',
     )
