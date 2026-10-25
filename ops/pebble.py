@@ -850,9 +850,9 @@ class Plan:
 
     def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):
-            loaded: dict[str, Any] = yaml.safe_load(raw) or {}
+            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
         else:
-            loaded = typing.cast('dict[str, Any]', raw or {})
+            loaded = raw or {}
         # A section with nothing under it is null once the YAML is loaded.
         d = typing.cast('PlanDict', {k: v for k, v in loaded.items() if v is not None})
 
@@ -941,9 +941,9 @@ class Layer:
 
     def __init__(self, raw: str | LayerDict | None = None):
         if isinstance(raw, str):
-            loaded: dict[str, Any] = yaml.safe_load(raw) or {}
+            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
         else:
-            loaded = typing.cast('dict[str, Any]', raw or {})
+            loaded = raw or {}
         # A section with nothing under it is null once the YAML is loaded.
         d = typing.cast('LayerDict', {k: v for k, v in loaded.items() if v is not None})
 
