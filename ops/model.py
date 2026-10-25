@@ -2572,8 +2572,9 @@ class MultiPushPullError(Exception):
     errors: list[tuple[str, Exception]]
     """The list of errors.
 
-    Each error is represented by a tuple of (<source_path>, <exception>),
-    where source_path is the path being pushed to or pulled from.
+    Each error is represented by a tuple of (<path>, <exception>). The path is
+    the file that failed to copy, or the source path given to the method if
+    listing it failed.
     """
 
     def __init__(self, message: str, errors: list[tuple[str, Exception]]):
@@ -2983,21 +2984,28 @@ class Container:
         for source_path in source_paths:
             try:
                 for info in Container._list_recursive(local_list, source_path):
-                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        self.make_dir(dstpath, make_parents=True)
+                    if info.type is pebble.FileType.SYMLINK:
+                        logger.debug('skipped symlink in Container.push_path: %s', info.path)
                         continue
-                    with open(info.path, 'rb') as src:
-                        self.push(
-                            dstpath,
-                            src,
-                            make_dirs=True,
-                            permissions=info.permissions,
-                            user_id=info.user_id,
-                            user=info.user,
-                            group_id=info.group_id,
-                            group=info.group,
-                        )
+                    dstpath = self._build_destpath(info.path, source_path, dest_dir)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            self.make_dir(dstpath, make_parents=True)
+                            continue
+                        with open(info.path, 'rb') as src:
+                            self.push(
+                                dstpath,
+                                src,
+                                make_dirs=True,
+                                permissions=info.permissions,
+                                user_id=info.user_id,
+                                user=info.user,
+                                group_id=info.group_id,
+                                group=info.group,
+                            )
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
@@ -3067,13 +3075,17 @@ class Container:
             try:
                 for info in Container._list_recursive(self.list_files, source_path):
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
-                    if info.type is pebble.FileType.DIRECTORY:
-                        dstpath.mkdir(parents=True, exist_ok=True)
-                        continue
-                    dstpath.parent.mkdir(parents=True, exist_ok=True)
-                    with self.pull(info.path, encoding=None) as src:
-                        with dstpath.open(mode='wb') as dst:
-                            shutil.copyfileobj(src, dst)
+                    # Carry on with the rest of the tree if one file fails.
+                    try:
+                        if info.type is pebble.FileType.DIRECTORY:
+                            dstpath.mkdir(parents=True, exist_ok=True)
+                            continue
+                        dstpath.parent.mkdir(parents=True, exist_ok=True)
+                        with self.pull(info.path, encoding=None) as src:
+                            with dstpath.open(mode='wb') as dst:
+                                shutil.copyfileobj(src, dst)
+                    except (OSError, pebble.Error) as err:
+                        errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
         if errors:
