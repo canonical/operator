@@ -216,6 +216,15 @@ peers:
             ):
                 self._check(ops.CharmBase, use_juju_for_storage=True)
 
+    def test_storage_auto_detected(self):
+        # A podspec charm on a new enough Juju, with no local state yet, is
+        # given controller storage without asking for it.
+        metadata = 'name: test\nseries: [kubernetes]\n'
+        with patch('ops.storage.juju_backend_available') as juju_backend_available:
+            juju_backend_available.return_value = True
+            with pytest.raises(FileNotFoundError, match='state-get'):
+                self._check(ops.CharmBase, metadata=metadata)
+
     def test_storage_with_storage(self):
         # here we patch juju_backend_available, so it gets set up and falls over when used
         with patch('ops.storage.juju_backend_available') as juju_backend_available:

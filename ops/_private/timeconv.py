@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import datetime
+import itertools
 import re
 
 # Matches yyyy-mm-ddTHH:MM:SS(.sss)ZZZ
@@ -50,7 +51,7 @@ def parse_rfc3339(s: str) -> datetime.datetime:
     if zone in ('Z', 'z'):
         tz = datetime.timezone.utc
     else:
-        match = _TIMEOFFSET_RE.match(zone)
+        match = _TIMEOFFSET_RE.fullmatch(zone)
         if not match:
             raise ValueError(f'invalid timestamp {s!r}')
         sign, zh, zm = match.groups()
@@ -88,6 +89,8 @@ def parse_duration(s: str) -> datetime.timedelta:
         raise ValueError('invalid duration: no number-unit groups')
     if matches[0].start() != 0 or matches[-1].end() != len(s):
         raise ValueError('invalid duration: extra input at start or end')
+    if any(a.end() != b.start() for a, b in itertools.pairwise(matches)):
+        raise ValueError('invalid duration: extra input between number-unit groups')
 
     hours, minutes, seconds, milliseconds, microseconds = 0, 0, 0, 0, 0
     for match in matches:
@@ -107,13 +110,16 @@ def parse_duration(s: str) -> datetime.timedelta:
         else:
             raise ValueError(f'invalid duration: invalid unit {unit!r}')
 
-    duration = datetime.timedelta(
-        hours=hours,
-        minutes=minutes,
-        seconds=seconds,
-        milliseconds=milliseconds,
-        microseconds=microseconds,
-    )
+    try:
+        duration = datetime.timedelta(
+            hours=hours,
+            minutes=minutes,
+            seconds=seconds,
+            milliseconds=milliseconds,
+            microseconds=microseconds,
+        )
+    except OverflowError:
+        raise ValueError(f'invalid duration: {s!r} is out of range') from None
 
     return -duration if negative else duration
 

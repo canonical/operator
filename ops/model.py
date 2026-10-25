@@ -3793,12 +3793,18 @@ class _ModelBackend:
             f'Hook command {base_cmd!r}{leadership} failed with code {returncode}: '
             f'{stderr.strip()!r}. '
         )
-        _log_security_event(
-            _SecurityEventLevel.CRITICAL,
-            _SecurityEvent.AUTHZ_FAIL,
-            base_cmd,
-            description=description,
-        )
+        try:
+            _log_security_event(
+                _SecurityEventLevel.CRITICAL,
+                _SecurityEvent.AUTHZ_FAIL,
+                base_cmd,
+                description=description,
+            )
+        except ModelError:
+            # The event is sent with juju-log, so if that is the command that
+            # failed there is nowhere left to report it. The caller raises the
+            # original error.
+            pass
 
     def relation_ids(self, relation_name: str) -> list[int]:
         with self._wrap_hookcmd('relation-ids', relation_name=relation_name):

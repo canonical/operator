@@ -21,6 +21,19 @@ import pytest
 from ops._private import timeconv
 
 
+@pytest.mark.parametrize(
+    'input',
+    [
+        '2020-12-25T13:45:50+13:00junk',
+        '2020-12-25T13:45:50+13:00:00',
+        '2020-12-25T13:45:50+1300',
+    ],
+)
+def test_parse_rfc3339_errors(input: str):
+    with pytest.raises(ValueError):
+        timeconv.parse_rfc3339(input)
+
+
 def test_parse_rfc3339():
     nzdt = datetime.timezone(datetime.timedelta(hours=13))
     utc = datetime.timezone.utc
@@ -168,6 +181,9 @@ def test_parse_duration(input: str, expected: datetime.timedelta):
         '3hY',
         'X3hY',
         '3.4.5s',
+        '1h!!30m',
+        '1h 30m',
+        '9' * 30 + 'h',
     ],
 )
 def test_parse_duration_errors(input: str):

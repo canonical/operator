@@ -377,7 +377,7 @@ class _Manager:
             # Note that we don't exit nonzero, because that would cause Juju to rerun the hook
             raise _Abort(0)
 
-        if self._use_juju_for_storage:
+        if use_juju_for_storage:
             store = _storage.JujuStorage()
         else:
             store = _storage.SQLiteStorage(charm_state_path)
