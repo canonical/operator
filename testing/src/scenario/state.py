@@ -57,7 +57,7 @@ if TYPE_CHECKING:  # pragma: no cover
     # defaults; these have no metadata equivalent and pass straight through.
     class _StateKwargsRest(TypedDict, total=False):
         networks: Iterable[Network]
-        opened_ports: Iterable[Port]
+        opened_ports: Iterable[Port | ops.Port]
         leader: bool
         model: Model
         secrets: Iterable[Secret]
@@ -570,6 +570,10 @@ class BindAddress:
         # Stored as list for backwards compatibility.
         object.__setattr__(self, 'addresses', list(self.addresses))
 
+    def __hash__(self) -> int:
+        # The dataclass hash fails on the list.
+        return hash((tuple(self.addresses), self.interface_name, self.mac_address))
+
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook command would."""
         dct = {
@@ -615,11 +619,14 @@ class Network:
     def __init__(
         self,
         binding_name: str,
-        bind_addresses: Iterable[BindAddress] = (BindAddress([Address('192.0.2.0')]),),
+        bind_addresses: Iterable[BindAddress] | None = None,
         *,
         ingress_addresses: Iterable[str] = ('192.0.2.0',),
         egress_subnets: Iterable[str] = ('192.0.2.0/24',),
     ):
+        if bind_addresses is None:
+            # A fresh default each time: BindAddress.addresses is a list.
+            bind_addresses = (BindAddress([Address('192.0.2.0')]),)
         object.__setattr__(self, 'binding_name', binding_name)
         object.__setattr__(self, 'bind_addresses', list(bind_addresses))
         object.__setattr__(
@@ -835,7 +842,7 @@ class SubordinateRelation(RelationBase):
 
     def _get_databag_for_remote(self, unit_id: int) -> RawDataBagContents:
         """Return the databag for some remote unit ID."""
-        if unit_id is not self.remote_unit_id:
+        if unit_id != self.remote_unit_id:
             raise ValueError(
                 f'invalid unit id ({unit_id}): subordinate relation only has one '
                 f'remote and that has id {self.remote_unit_id}',
@@ -1719,6 +1726,8 @@ class Port:
                 'Port cannot be instantiated directly; please use TCPPort, UDPPort, or ICMPPort',
             )
 
+    # The subclasses use eq=False so that they inherit this, rather than the
+    # dataclass-generated __eq__, which would compare the class as well.
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (Port, ops.Port)):
             return (self.protocol, self.port) == (other.protocol, other.port)
@@ -1728,7 +1737,7 @@ class Port:
         return ops.Port(port=self.port, protocol=self.protocol)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class TCPPort(Port):
     """Represents a TCP port on the charm host."""
 
@@ -1748,7 +1757,7 @@ class TCPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class UDPPort(Port):
     """Represents a UDP port on the charm host."""
 
@@ -1768,7 +1777,7 @@ class UDPPort(Port):
             )
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True, eq=False)
 class ICMPPort(Port):
     """Represents an ICMP port on the charm host."""
 
@@ -1789,6 +1798,15 @@ _port_cls_by_protocol = {
     'udp': UDPPort,
     'icmp': ICMPPort,
 }
+
+
+def _port_from_ops(port: ops.Port) -> Port:
+    """Convert an :class:`ops.Port` to the matching Scenario port class."""
+    if port.protocol == 'icmp':
+        return ICMPPort()
+    if port.port is None:
+        raise StateValidationError(f'`port` is required for {port.protocol} ports')
+    return _port_cls_by_protocol[port.protocol](port.port)
 
 
 _next_storage_index_counter = 0  # storage indices start at 0
@@ -1885,7 +1903,11 @@ class State:
 
     # we don't use sets to make json serialization easier
     opened_ports: frozenset[Port]
-    """Ports opened by Juju on this charm."""
+    """Ports opened by Juju on this charm.
+
+    :class:`ops.Port` values passed to the constructor are converted to the
+    matching :class:`TCPPort`, :class:`UDPPort` or :class:`ICMPPort`.
+    """
     leader: bool
     """Whether this charm has leadership."""
     model: Model
@@ -1927,7 +1949,7 @@ class State:
         networks: Iterable[Network] = (),
         containers: Iterable[Container] = (),
         storages: Iterable[Storage] = (),
-        opened_ports: Iterable[Port] = (),
+        opened_ports: Iterable[Port | ops.Port] = (),
         leader: bool = False,
         model: Model | None = None,
         secrets: Iterable[Secret] = (),
@@ -1959,8 +1981,7 @@ class State:
 
         # Normalise ops.Port to scenario Port.
         normalised_ports = frozenset(
-            Port(protocol=port.protocol, port=port.port) if isinstance(port, ops.Port) else port
-            for port in opened_ports
+            _port_from_ops(port) if isinstance(port, ops.Port) else port for port in opened_ports
         )
         object.__setattr__(self, 'opened_ports', normalised_ports)
 
@@ -2085,12 +2106,12 @@ class State:
         Args:
             relation: A relation ID, or a relation object from a previous state.
                 If a relation object is passed, its ID is used to find the relation, and the
-                type, endpoint and interface of the found relation are validated against it.
+                type and endpoint of the found relation are validated against it.
 
         Raises:
             KeyError: If no relation matching the id is found.
             ValueError: If a relation object is passed but the found relation
-                has a mismatched type, endpoint, or interface.
+                has a mismatched type or endpoint.
         """
         rel_id = relation.id if isinstance(relation, RelationBase) else relation
         for state_relation in self.relations:
@@ -2691,7 +2712,13 @@ class Event:
             raise ValueError(
                 f'cannot construct DeferredEvent from {handler}; please create one manually.',
             )
-        owner_name, handler_name = match.groups()[0].split('.')[-2:]
+        qualname = match.groups()[0]
+        if '.' not in qualname:
+            raise ValueError(
+                f'cannot construct DeferredEvent from {handler}: the handler must be a method '
+                'of an ops.Object subclass, such as MyCharm._on_start.',
+            )
+        owner_name, handler_name = qualname.split('.')[-2:]
         handle_path = f'{owner_name}/on/{self.name}[{event_id}]'
 
         # Many events have no snapshot data: install, start, stop, remove, config-changed,
