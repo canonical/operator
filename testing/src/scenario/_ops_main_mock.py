@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import inspect
 import logging
 import marshal
 import re
@@ -207,14 +208,18 @@ class Ops(_Manager, Generic[CharmType]):
             emitter_type = type(self.event._custom_event.emitter)
             # We require the event source to be an attribute on the charm object.
             # Essentially, we are replacing the unbound event with a bound one.
+            # The static lookups avoid running every property on the charm and
+            # its objects just to find the event source.
             for attr_name in dir(self.charm):
-                attr = getattr(self.charm, attr_name)
-                if not isinstance(attr, ops.Object):
+                if not isinstance(inspect.getattr_static(self.charm, attr_name), ops.Object):
                     continue
+                attr = getattr(self.charm, attr_name)
                 for sub_attr_name in dir(attr):
-                    sub_attr = getattr(attr, sub_attr_name)
-                    if not isinstance(sub_attr, ops.ObjectEvents):
+                    if not isinstance(
+                        inspect.getattr_static(attr, sub_attr_name), ops.ObjectEvents
+                    ):
                         continue
+                    sub_attr = getattr(attr, sub_attr_name)
                     if type(sub_attr) is not emitter_type:
                         continue
                     return getattr(sub_attr, self.event._custom_event.event_kind)
