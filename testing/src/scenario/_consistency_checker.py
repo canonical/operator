@@ -28,7 +28,7 @@ from collections.abc import Callable, Iterable, Sequence
 from numbers import Number
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from ops import pebble
+from ops import JujuVersion, pebble
 
 from ._runtime import logger as scenario_logger
 from .errors import InconsistentScenarioError
@@ -81,11 +81,14 @@ def check_consistency(
     that are not in the charm's ``charmcraft.yaml`` is nonsense, and the
     combination of the two is inconsistent.
     """
-    juju_version_: tuple[int, ...] = tuple(map(int, juju_version.split('.')))
-
     if os.getenv('SCENARIO_SKIP_CONSISTENCY_CHECKS'):
         logger.info('skipping consistency checks.')
         return
+
+    # Parsed by JujuVersion so that a tagged version such as 3.6-beta1 works.
+    # A bare major version ("4") is accepted here, but not by JujuVersion.
+    version = JujuVersion(juju_version if '.' in juju_version else f'{juju_version}.0')
+    juju_version_: tuple[int, ...] = (version.major, version.minor, version.patch)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -335,6 +338,7 @@ def _check_action_param_types(
         'number': Number,
         'array': Sequence,
         'object': dict,
+        'null': type(None),
     }
     expected_param_type: dict[str, Any] = {}
     action_spec = cast('dict[str, Any]', actions[action.name] or {})
@@ -348,9 +352,11 @@ def _check_action_param_types(
             )
             continue
 
+        # JSON schema allows a list of types, such as ["string", "null"].
+        type_names = cast('list[Any]', value) if isinstance(value, list) else [value]
         try:
-            expected_param_type[par_name] = to_python_type[value]
-        except KeyError:
+            expected_param_type[par_name] = tuple(to_python_type[name] for name in type_names)
+        except (KeyError, TypeError):
             warnings.append(
                 f'unknown data type declared for parameter {par_name}: type={value}. '
                 f'Cannot consistency-check.',
@@ -365,9 +371,10 @@ def _check_action_param_types(
             )
             continue
         if not isinstance(provided_param_value, expected_type):
+            expected = ' or '.join(t.__name__ for t in expected_type)
             errors.append(
                 f'param {provided_param_name} is of type {type(provided_param_value)}: '
-                f'expecting {expected_type}',
+                f'expecting {expected}',
             )
 
 

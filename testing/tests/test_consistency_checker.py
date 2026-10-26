@@ -622,6 +622,27 @@ def test_action_params_type(ptype: str, good: Any, bad: Any):
         )
 
 
+def test_action_params_type_list():
+    # JSON schema allows a list of types.
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(
+        MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': ['string', 'null']}}}}
+    )
+    assert_consistent(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec)
+    assert_consistent(State(), ctx.on.action('foo', params={'bar': None}), spec)
+    assert_inconsistent(State(), ctx.on.action('foo', params={'bar': 42}), spec)
+
+
+@pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])
+def test_tagged_juju_version(juju_version: str):
+    assert_consistent(
+        State(),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        juju_version=juju_version,
+    )
+
+
 def test_duplicate_relation_ids():
     assert_inconsistent(
         State(relations={Relation('foo', id=1), Relation('bar', id=1)}),
