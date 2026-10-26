@@ -23,11 +23,11 @@ jobs:
       matrix:
         include:
           - charm-repo: canonical/alertmanager-k8s-operator
-            commit: a448fef5e050bbf77817976d6ca8dc56d6154b2c  # rev245 2026-09-15T16:02:16Z
+            commit: bdd9eaa7f203a03fe4a18c41029781136f26c4ba  # rev259 2026-10-15T04:02:30Z
           - charm-repo: canonical/prometheus-k8s-operator
-            commit: 30c6f9b761882c3625d55bc7ad1059decafc4105  # 2026-09-24T21:41:03Z
+            commit: 6e45243ff03f4ecdb882fc17ea1f839585b32798  # rev339 2026-10-15T04:02:52Z
           - charm-repo: canonical/grafana-k8s-operator
-            commit: 2ac8767c0fadc9dd34eb53174bd17c3415daeb98  # rev201 2026-09-14T20:08:32Z
+            commit: 4a94c6df122302aa0375e75a0ea414f508ade3c6  # rev208 2026-10-14T22:34:32Z
     steps:
       - name: Checkout the ${{ matrix.charm-repo }} repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
