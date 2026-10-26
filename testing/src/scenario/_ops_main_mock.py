@@ -211,13 +211,13 @@ class Ops(_Manager, Generic[CharmType]):
             # The static lookups avoid running every property on the charm and
             # its objects just to find the event source.
             for attr_name in dir(self.charm):
-                if not isinstance(inspect.getattr_static(self.charm, attr_name), ops.Object):
+                static = inspect.getattr_static(self.charm, attr_name, None)
+                if not isinstance(static, ops.Object):
                     continue
                 attr = getattr(self.charm, attr_name)
                 for sub_attr_name in dir(attr):
-                    if not isinstance(
-                        inspect.getattr_static(attr, sub_attr_name), ops.ObjectEvents
-                    ):
+                    sub_static = inspect.getattr_static(attr, sub_attr_name, None)
+                    if not isinstance(sub_static, ops.ObjectEvents):
                         continue
                     sub_attr = getattr(attr, sub_attr_name)
                     if type(sub_attr) is not emitter_type:

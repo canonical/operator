@@ -188,10 +188,8 @@ class Manager(Generic[CharmType]):
         try:
             self.ops.run()
         except BaseException:
-            # On failure, hand the in-flight exception to Runtime.exec()'s
-            # __exit__ so it can tear down the env snapshot, then propagate,
-            # unless it was a clean early exit (_Abort(0)) that exec() treats
-            # as normal completion.
+            # Hand the exception to Runtime.exec()'s __exit__ to tear down the
+            # env; it suppresses a clean early exit (_Abort(0)), which is normal.
             if not self._exit_wrapped_ctx(*sys.exc_info()):
                 raise
         # On success we must pass (None, None, None) explicitly — not
