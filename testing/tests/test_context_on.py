@@ -358,6 +358,19 @@ def test_relation_departed_event():
         assert isinstance(collect_status, ops.CollectStatusEvent)
 
 
+def test_relation_departed_event_unit_zero():
+    ctx = scenario.Context(ContextCharm, meta=META, actions=ACTIONS)
+    relation = scenario.Relation('baz')
+    state_in = scenario.State(relations=[relation])
+    # Unit 0 is a valid departing unit, and must not be mistaken for "not given".
+    with ctx(ctx.on.relation_departed(relation, remote_unit=2, departing_unit=0), state_in) as mgr:
+        mgr.run()
+        relation_event, _ = mgr.charm.observed
+        assert isinstance(relation_event, ops.RelationDepartedEvent)
+        assert relation_event.departing_unit is not None
+        assert relation_event.departing_unit.name == 'remote/0'
+
+
 class CustomEvent(ops.EventBase):
     pass
 
@@ -517,6 +530,34 @@ def test_custom_event_no_args():
         mgr.run()
         custom_event, collect_status = mgr.charm.observed
         assert isinstance(collect_status, ops.CollectStatusEvent)
+        assert isinstance(custom_event, CustomEvent)
+
+
+class CustomCharmWithProperties(CustomCharm):
+    @property
+    def broken(self) -> str:
+        raise RuntimeError('this property must not be evaluated to find the event source')
+
+
+class MyConsumerWithProperties(MyConsumer):
+    @property
+    def broken(self) -> str:
+        raise RuntimeError('this property must not be evaluated to find the event source')
+
+
+class CustomCharmWithPropertyObjects(ContextCharm):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.consumer = MyConsumerWithProperties(self)
+        framework.observe(self.consumer.on.foo_started, self._on_event)
+
+
+@pytest.mark.parametrize('charm_type', [CustomCharmWithProperties, CustomCharmWithPropertyObjects])
+def test_custom_event_does_not_run_properties(charm_type: type[ContextCharm]):
+    ctx = scenario.Context(charm_type, meta=META, actions=ACTIONS)
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
+        mgr.run()
+        custom_event, _ = mgr.charm.observed
         assert isinstance(custom_event, CustomEvent)
 
 

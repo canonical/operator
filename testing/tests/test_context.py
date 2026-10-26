@@ -377,6 +377,16 @@ def test_init_with_full_charmcraft_yaml_as_meta():
     ctx.run(ctx.on.update_status(), State())
 
 
+def test_init_with_charmcraft_yaml_extensions_as_meta():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    ctx = Context(MyCharm, charmcraft_yaml)
+    spec = ctx._charm_spec
+    # Expanded the same way as when the file is loaded from the charm root.
+    assert 'extensions' not in spec.meta
+    assert 'flask-app' in spec.meta['containers']
+    assert spec.config is not None and 'webserver-threads' in spec.config['options']
+
+
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}

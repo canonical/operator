@@ -236,6 +236,24 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
         assert exc.value.__cause__.exit_code == exit_code
 
 
+def test_ops_raises_abort_zero_in_manager(monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            framework.observe(self.on.start, self._on_start)
+
+        def _on_start(self, _: ops.StartEvent):
+            self.unit.status = ops.ActiveStatus()
+            raise _Abort(0)
+
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    # A clean early exit is normal completion for the manager, as for ctx.run().
+    with ctx(ctx.on.start(), State()) as mgr:
+        state_out = mgr.run()
+    assert state_out.unit_status == ActiveStatus()
+
+
 @dataclasses.dataclass
 class PortConfig:
     port: int

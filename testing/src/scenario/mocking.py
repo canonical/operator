@@ -58,6 +58,7 @@ from .state import (
     JujuLogLine,
     Mount,
     Network,
+    Notice,
     PeerRelation,
     Relation,
     RelationBase,
@@ -613,7 +614,8 @@ class _MockModelBackend(_ModelBackend):
         secret = self._get_secret(id, label)
         self._check_can_manage_secret(secret)
 
-        if content == secret.latest_content:
+        new_revision = content is not None
+        if content is not None and content == secret.latest_content:
             # In Juju 3.6 and higher, this is a no-op, but it's good to warn
             # charmers if they are doing this, because it's not generally good
             # practice.
@@ -621,6 +623,7 @@ class _MockModelBackend(_ModelBackend):
             logger.warning(
                 f'secret {id} contents set to the existing value: new revision not needed',
             )
+            new_revision = JujuVersion(self._context.juju_version) < '3.6'
 
         secret._update_metadata(
             content=content,
@@ -628,6 +631,7 @@ class _MockModelBackend(_ModelBackend):
             description=description,
             expire=expire,
             rotate=rotate,
+            new_revision=new_revision,
         )
 
     @_hook_command('secret-grant', 'id', 'relation_id', 'unit')
@@ -654,9 +658,12 @@ class _MockModelBackend(_ModelBackend):
         )
         assert grantee is not None  # guaranteed by _raise_on_error=True
         grants = cast('dict[int, frozenset[str]]', secret.remote_grants)
-        grants[relation_id] = grants[relation_id].difference({grantee})
-        if not grants[relation_id]:
-            del grants[relation_id]
+        # Juju accepts revoking a grant that was never made.
+        remaining = grants.get(relation_id, frozenset()).difference({grantee})
+        if remaining:
+            grants[relation_id] = remaining
+        else:
+            grants.pop(relation_id, None)
 
     @_hook_command('secret-remove', 'id', 'revision')
     def secret_remove(self, id: str, *, revision: int | None = None):
@@ -892,7 +899,9 @@ class _MockPebbleClient(_TestingPebbleClient):
             path = Path(mount.location).parts
             mounting_dir = container_root.joinpath(*path[1:])
             mounting_dir.parent.mkdir(parents=True, exist_ok=True)
-            mounting_dir.symlink_to(mount.source)
+            # A relative source would otherwise be resolved relative to the
+            # link's own directory inside the container root.
+            mounting_dir.symlink_to(Path(mount.source).absolute())
 
         self._root = container_root
 
@@ -917,6 +926,9 @@ class _MockPebbleClient(_TestingPebbleClient):
                 else:
                     notice_type = str(notice.type)
                 self._notices[notice_type, notice.key] = notice._to_ops()
+                # New notices get the next numeric ID, as in Pebble.
+                if notice.id.isdigit():
+                    self._last_notice_id = max(self._last_notice_id, int(notice.id))
             now = datetime.datetime.now()
             for check in container.check_infos:
                 self._check_infos[check.name] = check._to_ops()
@@ -941,6 +953,38 @@ class _MockPebbleClient(_TestingPebbleClient):
 
     def get_plan(self) -> pebble.Plan:
         return self._container.plan
+
+    def _notify(
+        self,
+        type: pebble.NoticeType,
+        key: str,
+        *,
+        data: dict[str, str] | None = None,
+        repeat_after: datetime.timedelta | None = None,
+    ) -> tuple[str, bool]:
+        result = super()._notify(type, key, data=data, repeat_after=repeat_after)
+        self._update_state_notices()
+        return result
+
+    def _update_state_notices(self):
+        """Copy any new or changed notices into the state."""
+        notices = [
+            Notice(
+                key=notice.key,
+                id=notice.id,
+                user_id=notice.user_id,
+                type=notice.type,
+                first_occurred=notice.first_occurred,
+                last_occurred=notice.last_occurred,
+                last_repeated=notice.last_repeated,
+                occurrences=notice.occurrences,
+                last_data=notice.last_data,
+                repeat_after=notice.repeat_after,
+                expire_after=notice.expire_after,
+            )
+            for notice in self._notices.values()
+        ]
+        object.__setattr__(self._container, 'notices', notices)
 
     def _update_state_check_infos(self):
         """Copy any new or changed check infos into the state."""
