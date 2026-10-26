@@ -311,3 +311,12 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+def _plain_function(event: ops.EventBase):
+    pass
+
+
+def test_deferred_handler_must_be_a_method():
+    with pytest.raises(ValueError, match='must be a method'):
+        Event('start').deferred(handler=_plain_function)
