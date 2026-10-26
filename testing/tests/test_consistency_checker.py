@@ -650,7 +650,7 @@ def test_duplicate_container_names():
 
 def test_duplicate_network_bindings():
     assert_inconsistent(
-        State(networks={Network('foo'), Network('foo', ingress_addresses=['10.0.0.1'])}),
+        State(networks={Network('foo'), Network('foo', ingress_addresses=['192.0.2.1'])}),
         Event('start'),
         _CharmSpec(MyCharm, meta={'name': 'foo', 'extra-bindings': {'foo': {}}}),
     )

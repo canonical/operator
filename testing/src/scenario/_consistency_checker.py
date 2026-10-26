@@ -128,12 +128,9 @@ def check_consistency(
 
 
 def _duplicates(kind: str, field: str, keys: Iterable[object]) -> list[str]:
-    """Describe any key that appears more than once.
-
-    The State entities hash by their identifier but compare by every field, so a
-    set holds two with the same identifier when any other field differs, and
-    the State's getters would return whichever came first.
-    """
+    """Describe any key that appears more than once."""
+    # The State entities hash by their identifier but compare by every field,
+    # so a set can hold two with the same identifier.
     seen: set[object] = set()
     errors: list[str] = []
     for key in keys:

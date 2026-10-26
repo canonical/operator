@@ -1903,7 +1903,11 @@ class State:
 
     # we don't use sets to make json serialization easier
     opened_ports: frozenset[Port]
-    """Ports opened by Juju on this charm."""
+    """Ports opened by Juju on this charm.
+
+    :class:`ops.Port` values passed to the constructor are converted to the
+    matching :class:`TCPPort`, :class:`UDPPort` or :class:`ICMPPort`.
+    """
     leader: bool
     """Whether this charm has leadership."""
     model: Model
