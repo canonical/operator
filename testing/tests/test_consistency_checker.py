@@ -879,6 +879,16 @@ def test_storedstate_consistency():
     )
 
 
+@pytest.mark.parametrize('owner_path', [None, ''])
+@pytest.mark.parametrize('content', [{'foo': 'bar'}, {'event_count': None}, {'event_count': '1'}])
+def test_storedstate_framework_content(owner_path: str | None, content: dict[str, Any]):
+    assert_inconsistent(
+        State(stored_states={StoredState(owner_path=owner_path, content=content)}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+    )
+
+
 @pytest.mark.parametrize('unit_id', (0, 1, 42))
 def test_own_unit_in_peers_data_consistency(unit_id: int):
     assert_consistent(
