@@ -26,7 +26,7 @@ Kubernetes sends the signal to the workload container as well as the charm conta
 
 A workload that needs more time must be given a suitable Kubernetes termination grace period by the workload's deployment configuration. It should still stop promptly: once the pod grace period expires, Kubernetes sends `SIGKILL` and no cleanup code can run. The charm should not assume that Pebble can finish stopping every service before the pod disappears.
 
-See {doc}`Manage the workload container <manage-containers/manage-the-workload-container>` for Pebble service shutdown details and {ref}`ops.Container` for the Ops container API.
+See {doc}`Manage the workload container <manage-containers/manage-the-workload-container>` for Pebble service shutdown details and [](ops.Container) for the Ops container API.
 
 ## Grace periods and timeouts
 
@@ -60,4 +60,4 @@ kubectl -n <model-namespace> logs <pod-name> -c <workload-container> --previous
 
 The exact ordering of log messages is not an API: scheduling, controller connectivity, and the grace period affect it. The durable contract is that a pod-level `SIGTERM` shuts down the agent and workload; it is not itself an additional charm event. Observe `stop` and `remove` only when Juju's model lifecycle says that the unit is dying.
 
-For the Kubernetes pod termination contract, see the Kubernetes documentation on {external+kubernetes:doc}`Pod Lifecycle <concepts/workloads/pods/pod-lifecycle/>` and {external+kubernetes:doc}`Pod termination <concepts/workloads/pods/pod-lifecycle/#pod-termination-flow>`.
+For the Kubernetes pod termination contract, see the [Kubernetes documentation on pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and its [pod termination flow](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination-flow).
