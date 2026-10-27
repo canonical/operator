@@ -5,7 +5,7 @@ myst:
 ---
 
 (handle-kubernetes-termination)=
-# Handle Kubernetes pod termination
+# How to handle Kubernetes pod termination
 
 When Kubernetes terminates a Juju unit pod, it sends `SIGTERM` to each container in the pod and starts the pod's termination grace period. This is different from a charm receiving a `stop` event: Kubernetes and the container runtime initiate the shutdown, while Juju decides whether the unit is being permanently removed or is expected to return.
 
