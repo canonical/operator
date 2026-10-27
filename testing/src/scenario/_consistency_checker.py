@@ -789,6 +789,22 @@ def check_storedstate_consistency(
                 f'{owner} has multiple StoredState objects with the same name.',
             )
 
+    # A StoredState with no owner (None or '') is the framework's own, which
+    # must have the framework's content. It's much more likely that the
+    # owner_path was left out by mistake.
+    for ss in state.stored_states:
+        if (
+            not ss.owner_path
+            and ss.name == '_stored'
+            and not isinstance(ss.content.get('event_count'), int)
+        ):
+            errors.append(
+                f"{ss} has no owner_path, so it is the framework's own stored state, "
+                "but it doesn't have the framework's content. To provide stored state "
+                'for the charm, set owner_path to the name of the charm class, '
+                "such as owner_path='MyCharm'.",
+            )
+
     # The content must be marshallable.
     for ss in state.stored_states:
         # We don't need the marshalled state, just to know that it can be.
