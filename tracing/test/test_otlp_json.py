@@ -85,6 +85,18 @@ def test_dropped_attributes_count_includes_sdk_limits():
     assert 'dropped_attributes_count' not in encoded_span
 
 
+def test_event_dropped_attributes_count_includes_sdk_limits():
+    tracer = TracerProvider(span_limits=SpanLimits(max_event_attributes=1)).get_tracer('test')
+    span = tracer.start_span('span')
+    span.add_event('event', attributes={'a': 1, 'b': 2, 'c': 3})
+    span.end()
+
+    payload = json.loads(encode_spans([span]))  # type: ignore
+
+    encoded_event = payload['resourceSpans'][0]['scopeSpans'][0]['spans'][0]['events'][0]
+    assert encoded_event['droppedAttributesCount'] == 2
+
+
 def test_dropped_attributes_count_includes_unencodable_values():
     encoded_span = _encode_span({'a': 1, 'mixed': [1, 'x']})
 
