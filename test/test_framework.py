@@ -162,6 +162,20 @@ class TestFramework:
         else:
             pytest.fail('exception NoSnapshotError not raised')
 
+    @pytest.mark.parametrize('key', ['a/b', 'a[b', 'a]b', 'on/foo[1]'])
+    def test_handle_key_with_separators(self, key: str):
+        # The key would be written into the path but could not be read back out
+        # by from_path, so it is rejected up front.
+        with pytest.raises(ValueError):
+            ops.Handle(None, 'kind', key)
+
+    def test_handle_eq_other_type(self):
+        handle = ops.Handle(None, 'kind', 'key')
+        assert handle != 'kind[key]'
+        assert handle != None  # ruff: ignore[none-comparison]
+        assert handle in {handle}
+        assert handle not in {'kind[key]'}
+
     def test_snapshot_roundtrip(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class Foo:
             handle_kind = 'foo'
@@ -390,6 +404,33 @@ class TestFramework:
 
         with pytest.raises(AttributeError):
             new_obs._stored.myotherdata
+
+    def test_observer_not_found_by_name(self, request: pytest.FixtureRequest):
+        framework = create_framework(request)
+
+        class MyEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+
+        def unwrapped(func: typing.Callable[..., None]) -> typing.Callable[..., None]:
+            # A decorator without functools.wraps leaves the method named
+            # 'wrapper', which is not an attribute of the observer.
+            def wrapper(self: ops.Object, event: ops.EventBase):
+                return func(self, event)
+
+            return wrapper
+
+        class MyObserver(ops.Object):
+            @unwrapped
+            def _on_foo(self, event: ops.EventBase):
+                pass
+
+        pub = MyNotifier(framework, '1')
+        obs = MyObserver(framework, '1')
+        with pytest.raises(TypeError, match="no attribute 'wrapper'"):
+            framework.observe(pub.foo, obs._on_foo)
 
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
@@ -899,11 +940,16 @@ class TestFramework:
             cause = str(excinfo.value.__cause__)
         assert cause == 'EventSource(MyEvent) reused as MyEvents.foo and MyNotifier.bar'
 
-    def test_reemit_ignores_unknown_event_type(self, request: pytest.FixtureRequest):
+    def test_reemit_ignores_unknown_event_type(
+        self,
+        request: pytest.FixtureRequest,
+        caplog: pytest.LogCaptureFixture,
+        tmp_path: pathlib.Path,
+    ):
         # The event type may have been gone for good, and nobody cares,
         # so this shouldn't be an error scenario.
 
-        framework = create_framework(request)
+        framework = create_framework(request, tmpdir=tmp_path)
 
         class MyEvent(ops.EventBase):
             handle_kind = 'test'
@@ -932,10 +978,13 @@ class TestFramework:
         framework.commit()
         framework.close()
 
-        framework_copy = create_framework(request)
+        framework_copy = create_framework(request, tmpdir=tmp_path)
 
-        # No errors on missing event types here.
-        framework_copy.reemit()
+        # No errors on missing event types here, but the dropped event is logged.
+        with caplog.at_level(logging.WARNING):
+            framework_copy.reemit()
+        assert 'Dropping the deferred event' in caplog.text
+        assert str(event_handle) in caplog.text
 
         # Register the type and check that the event is gone from storage.
         framework_copy.register_type(MyEvent, event_handle.parent, event_handle.kind)
@@ -1232,6 +1281,27 @@ class TestFramework:
             'ObjectWithStorage[obj]/StoredStateData[_stored]',
             'ObjectWithStorage[obj]/on/event[1]',
         ])
+
+    def test_remove_unreferenced_events_digits_in_kind(self, request: pytest.FixtureRequest):
+        # Event kinds derived from names such as 'redis2' contain digits.
+        framework = create_framework(request)
+
+        class Evt(ops.EventBase):
+            pass
+
+        class Events(ops.ObjectEvents):
+            redis2_ready = ops.EventSource(Evt)
+
+        class Obj(ops.Object):
+            on = Events()
+
+        o = Obj(framework, 'obj')
+        handle = ops.Handle(o.on, 'redis2_ready', '100')
+        framework.register_type(Evt, o.on, 'redis2_ready')
+        framework.save_snapshot(Evt(handle))
+        assert list(framework._storage.list_snapshots()) == [handle.path]
+        framework.remove_unreferenced_events()
+        assert list(framework._storage.list_snapshots()) == []
 
     def test_wrapped_handler(self, request: pytest.FixtureRequest):
         # It's fine to wrap the event handler, as long as the framework can
@@ -1540,6 +1610,26 @@ class TestStoredState:
         else:
             pytest.fail('AttributeError not raised')
 
+        framework.commit()
+
+    def test_stored_list_adds_stored_values(self, request: pytest.FixtureRequest):
+        # Values that are already wrapped are unwrapped before they are added,
+        # otherwise the error only appears later, in commit().
+        framework = create_framework(request)
+
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
+
+        obj = SomeObject(framework, '1')
+        obj._stored.items = []
+        obj._stored.inner = {'a': 1}
+        items: typing.Any = obj._stored.items  # pyright: ignore[reportUnknownMemberType]
+        assert isinstance(items, ops.StoredList)
+        items.append(obj._stored.inner)
+        items.insert(0, obj._stored.inner)
+        items.extend([obj._stored.inner])
+        assert items == [{'a': 1}, {'a': 1}, {'a': 1}]
+        assert all(type(item) is dict for item in items._under)
         framework.commit()
 
     def test_mutable_types(self, tmp_path: pathlib.Path):
