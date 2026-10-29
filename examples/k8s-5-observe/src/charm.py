@@ -18,6 +18,8 @@
 
 import dataclasses
 import logging
+import time
+import urllib.error
 
 import ops
 
@@ -197,7 +199,18 @@ class FastAPIDemoCharm(ops.CharmBase):
         except (ops.pebble.APIError, ops.pebble.ConnectionError) as e:
             logger.info("Unable to connect to Pebble: %s", e)
             return
-        version = fastapi_demo.get_version(config.server_port)
+        # The workload may not be ready immediately after replan(), so try get_version() in a loop.
+        for attempt in range(3):  # In general, allow more attempts for a complex workload.
+            if attempt:
+                time.sleep(2**attempt)  # If not first attempt, retry with exponential back-off.
+            try:
+                version = fastapi_demo.get_version(config.server_port)
+                break
+            except urllib.error.URLError:
+                continue
+        else:
+            logger.error("The workload was not available within the expected time")
+            raise RuntimeError("workload is not available")
         self.unit.set_workload_version(version)
 
     def _get_pebble_layer(self, port: int, env: dict[str, str]) -> ops.pebble.Layer:
@@ -221,10 +234,10 @@ class FastAPIDemoCharm(ops.CharmBase):
         if not db_data:
             return {}
         return {
-            "DEMO_SERVER_DB_HOST": db_data["db_host"],
-            "DEMO_SERVER_DB_PORT": db_data["db_port"],
-            "DEMO_SERVER_DB_USER": db_data["db_username"],
-            "DEMO_SERVER_DB_PASSWORD": db_data["db_password"],
+            "POSTGRESQL_DB_HOSTNAME": db_data["db_host"],
+            "POSTGRESQL_DB_PORT": db_data["db_port"],
+            "POSTGRESQL_DB_USERNAME": db_data["db_username"],
+            "POSTGRESQL_DB_PASSWORD": db_data["db_password"],
         }
 
     def fetch_database_relation_data(self) -> dict[str, str]:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import pathlib
 from tempfile import TemporaryDirectory
@@ -12,7 +13,18 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Container, Relation, Secret, State, Storage, _Action, _CharmSpec, _Event
+from scenario.state import (
+    Container,
+    Event,
+    Model,
+    ProxyConfig,
+    Relation,
+    Secret,
+    State,
+    Storage,
+    _Action,
+    _CharmSpec,
+)
 
 import ops
 from ops._main import _Abort
@@ -23,7 +35,7 @@ def charm_type() -> type[ops.CharmBase]:
         pass
 
     class MyCharm(ops.CharmBase):
-        on = _CharmEvents()  # type: ignore
+        on = _CharmEvents()
         _event = None
 
         def __init__(self, framework: ops.Framework):
@@ -51,9 +63,7 @@ def test_event_emission():
         class MyEvt(ops.EventBase):
             pass
 
-        my_charm_type.on.define_event(  # type: ignore
-            'bar', MyEvt
-        )
+        my_charm_type.on.define_event('bar', MyEvt)
 
         charm_spec: _CharmSpec[ops.CharmBase] = _CharmSpec(
             my_charm_type,
@@ -67,7 +77,7 @@ def test_event_emission():
         ctx = Context(my_charm_type, meta=meta)
         with runtime.exec(
             state=State(),
-            event=_Event('bar'),
+            event=Event('bar'),
             context=ctx,
         ) as mgr:
             mgr.run()
@@ -101,7 +111,7 @@ def test_unit_name(app_name: str, unit_id: int):
     ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with runtime.exec(
         state=State(),
-        event=_Event('start'),
+        event=Event('start'),
         context=ctx,
     ) as mgr:
         assert mgr.charm.unit.name == f'{app_name}/{unit_id}'
@@ -128,7 +138,7 @@ def test_env_clean_on_charm_error(monkeypatch: pytest.MonkeyPatch):
     with pytest.raises(UncaughtCharmError) as exc:
         with runtime.exec(
             state=State(relations={rel}),
-            event=_Event('box_relation_changed', relation=rel),
+            event=Event('box_relation_changed', _relation=rel),
             context=ctx,
         ) as mgr:
             assert mgr._juju_context.remote_app_name == remote_name
@@ -175,7 +185,7 @@ def test_relation_event_juju_hook_name_preserves_endpoint_spelling(
     ctx: Context[ops.CharmBase] = Context(my_charm_type, meta=meta)
     with runtime.exec(
         state=State(relations={rel}),
-        event=_Event(f'{endpoint}_relation_changed', relation=rel),
+        event=Event(f'{endpoint}_relation_changed', _relation=rel),
         context=ctx,
     ):
         assert os.environ['JUJU_HOOK_NAME'] == expected_hook_name
@@ -226,6 +236,89 @@ def test_ops_raises_abort(exit_code: int, monkeypatch: pytest.MonkeyPatch):
         assert exc.value.__cause__.exit_code == exit_code
 
 
+@dataclasses.dataclass
+class PortConfig:
+    port: int
+
+    def __post_init__(self):
+        if not 1 <= self.port <= 65535:
+            raise ValueError('port out of range')
+
+
+class LoadConfigBlockedCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+        self.typed_config = self.load_config(PortConfig, errors='blocked')
+
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+        self.unit.status = ops.ActiveStatus()
+
+
+def test_load_config_blocked_in_init():
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    state_out = ctx.run(ctx.on.config_changed(), State(config={'port': 0}))
+    # As in production, the event isn't emitted and nothing is committed.
+    assert not ctx.emitted_events
+    assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+def test_load_config_blocked_in_init_manager():
+    ctx = Context(
+        LoadConfigBlockedCharm,
+        meta={'name': 'foo'},
+        config={'options': {'port': {'type': 'int', 'default': 8080}}},
+    )
+    with ctx(ctx.on.config_changed(), State(config={'port': 0})) as mgr:
+        with pytest.raises(RuntimeError, match='exited early'):
+            mgr.charm  # ruff: ignore[useless-expression]
+        state_out = mgr.run()
+    assert not ctx.emitted_events
+    assert state_out.unit_status == ops.BlockedStatus('Invalid config: port out of range')
+
+
+@pytest.mark.parametrize('exit_code', (-1, 1, 42))
+def test_ops_raises_nonzero_abort_in_init(exit_code: int, monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            # Charms can't actually do this (_Abort is private, and the public
+            # APIs that raise it in __init__ use exit code 0), but this is
+            # simpler than causing the framework to raise it.
+            raise _Abort(exit_code)
+
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == exit_code
+
+
+def test_leaked_operator_dispatch_raises(monkeypatch: pytest.MonkeyPatch):
+    class MyCharm(ops.CharmBase):
+        initialised = False
+
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            MyCharm.initialised = True
+
+    # A leaked OPERATOR_DISPATCH makes the dispatcher raise _Abort(0) before the
+    # framework exists. That must fail the test rather than silently pass.
+    monkeypatch.setenv('OPERATOR_DISPATCH', '1')
+    monkeypatch.setenv('SCENARIO_BARE_CHARM_ERRORS', 'false')
+    ctx = Context(MyCharm, meta={'name': 'foo'})
+    with pytest.raises(UncaughtCharmError) as exc:
+        ctx.run(ctx.on.start(), State())
+    assert isinstance(exc.value.__cause__, _Abort)
+    assert exc.value.__cause__.exit_code == 0
+    assert not MyCharm.initialised
+
+
 class ValueErrorCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -274,7 +367,7 @@ def test_bare_charm_errors_not_set(monkeypatch: pytest.MonkeyPatch):
         ctx.run(ctx.on.update_status(), State())
 
 
-def _env_for(charm_meta: dict[str, Any], event: _Event, state: State) -> dict[str, str]:
+def _env_for(charm_meta: dict[str, Any], event: Event, state: State) -> dict[str, str]:
     """Build the dispatch env that Runtime would set, for direct assertions."""
     with TemporaryDirectory() as tmp:
         rt: Runtime[ops.CharmBase] = Runtime(
@@ -290,7 +383,7 @@ def test_workload_event_dispatch_path_preserves_container_name():
     """JUJU_HOOK_NAME/JUJU_DISPATCH_PATH carry the container name verbatim."""
     container = Container('temporal-worker')
     meta: dict[str, Any] = {'name': 'dashchk', 'containers': {'temporal-worker': {}}}
-    event = _Event('temporal-worker_pebble_ready', container=container)
+    event = Event('temporal-worker_pebble_ready', _container=container)
     env = _env_for(meta, event, State(containers={container}))
     assert env['JUJU_HOOK_NAME'] == 'temporal-worker-pebble-ready'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/temporal-worker-pebble-ready'
@@ -301,7 +394,7 @@ def test_relation_event_dispatch_path_and_id_match_juju():
     """JUJU_HOOK_NAME uses the verbatim endpoint; JUJU_RELATION_ID is ``endpoint:id``."""
     meta: dict[str, Any] = {'name': 'dashchk', 'requires': {'receive-ca-cert': {'interface': 'x'}}}
     relation = Relation('receive-ca-cert', remote_app_name='other')
-    event = _Event('receive-ca-cert_relation_changed', relation=relation)
+    event = Event('receive-ca-cert_relation_changed', _relation=relation)
     env = _env_for(meta, event, State(relations={relation}))
     assert env['JUJU_HOOK_NAME'] == 'receive-ca-cert-relation-changed'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/receive-ca-cert-relation-changed'
@@ -312,17 +405,52 @@ def test_relation_event_dispatch_path_and_id_match_juju():
 def test_storage_event_dispatch_path_preserves_storage_name():
     meta: dict[str, Any] = {'name': 'dashchk', 'storage': {'my-store': {'type': 'filesystem'}}}
     storage = Storage('my-store')
-    event = _Event('my-store_storage_attached', storage=storage)
+    event = Event('my-store_storage_attached', _storage=storage)
     env = _env_for(meta, event, State(storages={storage}))
     assert env['JUJU_HOOK_NAME'] == 'my-store-storage-attached'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/my-store-storage-attached'
+
+
+_PROXY_ENV_VARS = (
+    'JUJU_CHARM_HTTP_PROXY',
+    'JUJU_CHARM_HTTPS_PROXY',
+    'JUJU_CHARM_NO_PROXY',
+)
+
+
+def test_proxy_env_vars_not_set_by_default():
+    env = _env_for({'name': 'dashchk'}, Event('start'), State())
+    for key in _PROXY_ENV_VARS:
+        assert key not in env
+
+
+def test_proxy_env_vars_juju_defaults():
+    model = Model(proxy_config=ProxyConfig())
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == '127.0.0.1,localhost,::1'
+
+
+def test_proxy_env_vars_empty_string_is_set():
+    model = Model(proxy_config=ProxyConfig(http='', no=()))
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == ''
+
+
+def test_no_proxy_entries_are_joined_with_commas():
+    model = Model(proxy_config=ProxyConfig(no=('localhost', '10.0.0.0/8', '*.example.com', '*')))
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_NO_PROXY'] == 'localhost,10.0.0.0/8,*.example.com,*'
 
 
 def test_action_dispatch_path_uses_actions_prefix():
     """Real Juju dispatches actions under ``actions/<name>``, not ``hooks/...-action``."""
     meta = {'name': 'dashchk'}
     action = _Action('my-action')
-    event = _Event('my-action_action', action=action)
+    event = Event('my-action_action', _action=action)
     env = _env_for(meta, event, State())
     assert env['JUJU_HOOK_NAME'] == ''
     assert env['JUJU_DISPATCH_PATH'] == 'actions/my-action'
@@ -345,7 +473,7 @@ def test_builtin_event_dispatch_path_is_hyphenated(path: str, hook_name: str):
     """Juju hook names are hyphenated; scenario used to leak underscores."""
     meta = {'name': 'dashchk'}
     secret = Secret({'key': 'value'}, id='secret:0')
-    event = _Event(path, secret=secret if path == 'secret_changed' else None)
+    event = Event(path, _secret=secret if path == 'secret_changed' else None)
     env = _env_for(meta, event, State(secrets={secret}))
     assert env['JUJU_HOOK_NAME'] == hook_name
     assert env['JUJU_DISPATCH_PATH'] == f'hooks/{hook_name}'

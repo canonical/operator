@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import types
@@ -52,6 +53,30 @@ def test_import(mod_name: str, tmp_path: pathlib.Path):
     assert proc.returncode == 0
 
 
+def test_import_does_not_pull_in_pdb(tmp_path: pathlib.Path):
+    """`pdb` is only needed when JUJU_DEBUG_AT is set, and is expensive to import.
+
+    It pulls in asyncio and the rest of the debugger stack, which is around 30ms
+    on every hook of every unit, so the import lives in the two functions that
+    use it rather than at the top of ops/framework.py. This test is here to stop
+    that quietly regressing.
+    """
+    testfile = tmp_path / 'foo.py'
+    testfile.write_text(
+        'import sys\nimport ops\nassert "pdb" not in sys.modules, sorted(sys.modules)\n',
+        encoding='utf8',
+    )
+
+    environ = os.environ.copy()
+    if 'PYTHONPATH' in environ:
+        environ['PYTHONPATH'] = os.getcwd() + os.pathsep + environ['PYTHONPATH']
+    else:
+        environ['PYTHONPATH'] = os.getcwd()
+
+    proc = subprocess.run([sys.executable, testfile], env=environ)
+    assert proc.returncode == 0
+
+
 def test_ops_testing_doc():
     """Ensure that ops.testing's documentation includes all the expected names."""
     # We only document public classes and functions.
@@ -74,20 +99,17 @@ def test_ops_testing_doc():
     # even though the above compatibility_names logic would exclude it.
     expected_names.add('Container')
 
+    directive = re.compile(r'\s*\.\. auto(?:class|method|function):: ops\.testing\.([\w.]+)')
     found_names: set[str] = set()
     for test_doc in (
         'docs/reference/ops-testing-harness.rst',
         'docs/reference/ops-testing.rst',
     ):
         with open(test_doc) as testing_doc:
-            found_names.update({
-                line.split('ops.testing.', 1)[1].strip()
-                for line in testing_doc
-                if line.strip().startswith((
-                    '.. autoclass:: ops.testing.',
-                    '.. automethod:: ops.testing.',
-                    '.. autofunction:: ops.testing.',
-                ))
-            })
+            # An entry may give an explicit signature, like `Event()`, to hide
+            # a constructor that tests shouldn't call.
+            found_names.update(
+                match.group(1) for line in testing_doc if (match := directive.match(line))
+            )
 
     assert expected_names == found_names

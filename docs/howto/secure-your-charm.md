@@ -1,0 +1,105 @@
+---
+myst:
+  html_meta:
+    description: Concrete steps for securing a charm that uses Ops -- handling sensitive data, restricting access, keeping dependencies patched, and reporting vulnerabilities.
+---
+
+(secure-your-charm)=
+# How to secure your charm
+
+See first:
+
+- [](#security)
+- {external+juju:ref}`Juju | Harden your deployment <harden-your-deployment>`
+- {external+pebble:ref}`Pebble | Security <security>`
+
+This guide covers how to harden a charm that uses Ops. Not every charm needs every step.
+
+## Avoid leaking sensitive data
+
+Ops calls the `juju-log` hook command to send charm logs to Juju, and buffers trace data locally. The charm itself also exposes data to Juju: statuses, relation data, and action results -- including anything it has read from the workload. Any of these can end up in places visible to Juju users, like `juju debug-log`, `juju status`, trace receivers, crash reports, or the state database on disk.
+
+To avoid this:
+
+- Do not include secrets, tokens, or other sensitive values in log messages, exception messages, or trace attributes.
+- Do not pass sensitive values on the command line of processes you run from the charm; they typically end up in logs, traces, or exceptions. Pass them through the environment, a file, or standard input instead.
+- Do not put sensitive values into `ops.StoredState`. Ops restricts the state database to the charm user, but the database is not encrypted at rest (see [](#ops-charm-unit-databases)).
+
+Ops does not mask sensitive values for you.
+
+## Use Juju secrets for sensitive data
+
+Use {external+juju:ref}`Juju secrets <secret>` for anything that a charm needs to keep confidential, such as credentials, tokens, or TLS material. Juju stores the value, controls which units can read it, and rotates access when relations change.
+
+See more: {ref}`manage-secrets`
+
+If your charm accepts a user-provided secret through configuration, define the config option with `type: secret` in `charmcraft.yaml` rather than `type: string`.
+
+## Require TLS for trace data
+
+When a charm has the `ops[tracing]` extra installed and is integrated with a trace receiver, Ops sends buffered trace data over the network. This is the only outbound network connection Ops makes on the charm's behalf.
+
+To avoid traces being intercepted, ensure that Juju users who integrate your charm with a trace receiver also integrate it with a certificate authority provider so that the traffic is TLS-protected. Document this expectation in your charm's own docs.
+
+See more: [](#ops-cryptographic-technology)
+
+## Add static security checks to your project
+
+Configure your project to run checks before every merge:
+
+- **ruff** for Python lint rules, including [ruff's Bandit-derived security rules](https://docs.astral.sh/ruff/rules/#flake8-bandit-s). Enable the `S` rule set in `pyproject.toml`.
+- **zizmor** for GitHub Actions workflow audits. Configure it to run on every push against the workflow files in `.github/workflows/`.
+
+See more: [](#set-up-ci-linting-unit)
+
+## Keep dependencies patched
+
+Charms pick up security fixes for their dependencies (including Ops itself) at rebuild time, so your charm's release pipeline needs to see new versions promptly. To make that happen:
+
+1. Restrict the version of `ops` in `pyproject.toml` in a way that allows compatible releases to be picked up on the next re-lock, for example `ops~=3.0` (or `ops~=2.23` if you support Ubuntu 20.04). See [](#ops-supported-versions) for the current list of supported releases.
+2. Commit a lock file (`uv.lock`, `poetry.lock`, or equivalent) so every rebuild produces a reproducible dependency set.
+3. Enable automated dependency updates -- for example, [Dependabot](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/about-dependabot-security-updates) or [Renovate](https://www.mend.io/renovate/) -- for Python dependencies and any workflow actions your charm uses. Consider configuring a cooldown, so that a compromised release has time to be withdrawn before your charm picks it up. Dependabot applies a 3-day cooldown to version updates by default; Renovate's cooldown is opt-in.
+4. Rebuild and release the charm to its `stable` channel on a regular cadence, so that picked-up fixes actually reach deployed units.
+
+Avoid unnecessary or low-value runtime dependencies. Every dependency you add is a dependency you take on responsibility for updating.
+
+## Restrict what the charm can do on its host
+
+Machine charms and Kubernetes charms manage permissions in different ways.
+
+**Machine charms.** Set an explicit `os.umask()` before creating files or directories the workload will use, so that permissions are not inherited from whatever the calling context happened to be. Set ownership on files and directories the charm creates for the workload user.
+
+**Kubernetes charms.** Prefer running the charm and its sidecar containers as a non-root user. Set the {external+charmcraft:ref}`charm-user key in charmcraft.yaml <charmcraft-yaml-key-charm-user>` to `non-root`, and set an explicit `uid` and `gid` on each container in `charmcraft.yaml`.
+
+## Harden the workload
+
+The workload is separate from Ops and typically has its own security hardening story. Follow the guidance for your workload upstream; if there is no upstream hardening guide, produce one and link to it from the charm's documentation. For example:
+
+- [Charmed PostgreSQL on Kubernetes](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/security/)
+- [Charmed Kubeflow](https://discourse.charmhub.io/t/security/15935)
+- [Wordpress Hardening](https://developer.wordpress.org/advanced-administration/security/hardening/) (upstream)
+
+## Verify the version deployed in a unit
+
+To confirm which version of Ops is installed in a unit, for example after re-releasing your charm to pick up an Ops security fix:
+
+```text
+juju exec --unit <unit> -- bash -c '/var/lib/juju/agents/unit-*/charm/venv/bin/python -c "import ops; print(ops.__version__)"'
+```
+
+Compare the result to the [version on PyPI](https://pypi.org/project/ops/). See [](#ops-verifying-update) for background.
+
+## Document the security posture
+
+Include a security section in your charm's own documentation that covers, at a minimum:
+
+- Which workload the charm manages and where to find its upstream hardening guide.
+- Which relations the charm requires for a secure deployment (for example, a certificate authority provider for TLS).
+- Any configuration options that materially change the security posture (for example, opening extra ports, or relaxing authentication).
+- How to report vulnerabilities to you. If your charm repository has a `SECURITY.md`, link to it.
+
+Follow a similar structure to [](#security).
+
+## Report vulnerabilities in Ops
+
+If you find a vulnerability in Ops, do not open a public issue. Follow the instructions in [SECURITY.md](https://github.com/canonical/operator/blob/main/SECURITY.md) in the `canonical/operator` repository, which routes reports through the [Ubuntu Security disclosure and embargo policy](https://ubuntu.com/security/disclosure-policy).

@@ -75,6 +75,8 @@ As you write your charm, follow good security practices and produce security doc
 security
 ```
 
+For concrete actions, see [](#secure-your-charm).
+
 ## Charm maturity
 
 Your charm should increase in maturity and quality over time, especially if you plan for it to be publicly listed on Charmhub.

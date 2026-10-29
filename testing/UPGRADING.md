@@ -312,7 +312,9 @@ Several attributes and classes that were never intended for end users have been
 made private:
 
 * The `data_type_name` attribute of `StoredState` is now private.
-* The `Event` class is now private.
+* The `Event` class is now private. Scenario 8.10 made it public again, as
+  `ops.testing.Event`, for use in type annotations. Get events from
+  `Context.on` rather than creating `Event` objects directly.
 
 ### Use Catan rather than `scenario.sequences`
 
