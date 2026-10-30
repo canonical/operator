@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ops-scenario"
 
-version = "8.10.0.dev0"
+dynamic = ["version"]
 
 authors = [
     { name = "Pietro Pasotti", email = "pietro.pasotti@canonical.com" }
@@ -37,6 +37,11 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
+
+[tool.hatch.version]
+source = "code"
+path = "src/scenario/_version.py"
+expression = "version"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scenario"]  # Hatch looks for 'ops_scenario' by default.
