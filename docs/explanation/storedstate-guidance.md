@@ -21,7 +21,7 @@ Here's a simplified charm code snippet that will allow us to toggle the state of
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     mode = self.config['mode']
     if mode not in ('production', 'test'):
-        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r})
+        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r}')
         return
 
     with open('/etc/example_blog/mode', 'w') as mode_file:
@@ -42,16 +42,17 @@ def __init__(self, framework: ops.Framework):
     framework.observe(self.on.config_changed, self._on_config_changed)
     self._stored.set_default(current_mode='test')
 
+
 def _on_config_changed(self, event):
     mode = self.config['mode']
     if self._stored.current_mode == mode:
         return
     if mode not in ('production', 'test'):
-        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r})
+        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r}')
         return
 
     with open('/etc/example_blog/mode', 'w') as mode_file:
-        mode_file.write('{}\n'.format(mode)
+        mode_file.write(f'{mode}\n')
 
     self._restart()
 
@@ -78,7 +79,7 @@ In our example code, for instance, we might think about the fact that `config_ch
 def _on_config_changed(self, event: ops.ConfigChangedEvent):
     mode = self.config['mode']
     if mode not in ('production', 'test'):
-        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r})
+        self.unit.status = ops.BlockedStatus(f'Invalid mode: {mode!r}')
         return
 
     with open('/etc/example_blog/mode') as mode_file:
