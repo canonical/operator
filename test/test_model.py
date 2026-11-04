@@ -1816,13 +1816,14 @@ def _push_pull_container(request: pytest.FixtureRequest) -> ops.Container:
     return harness.model.unit.containers['foo']
 
 
-def test_push_path_skips_symlinks(
+def test_push_path_symlinks_in_a_tree(
     request: pytest.FixtureRequest, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
 ):
     container = _push_pull_container(request)
     src = tmp_path / 'src'
     (src / 'sub').mkdir(parents=True)
     (src / 'file.txt').write_text('file')
+    (src / 'file.txt').chmod(0o640)
     (src / 'sub' / 'inner.txt').write_text('inner')
     (src / 'link-to-file').symlink_to(src / 'file.txt')
     (src / 'link-to-dir').symlink_to(src / 'sub')
@@ -1832,12 +1833,16 @@ def test_push_path_skips_symlinks(
     with caplog.at_level(logging.INFO, logger='ops.model'):
         container.push_path(src, '/dst')
 
-    assert f'skipped 3 symbolic link(s) under {src}' in caplog.messages[-1]
+    assert f'skipped 2 symbolic link(s) under {src}' in caplog.messages[-1]
 
     pushed = {info.name for info in container.list_files('/dst/src')}
-    assert pushed == {'file.txt', 'sub'}
+    assert pushed == {'file.txt', 'link-to-file', 'sub'}
     with container.pull('/dst/src/sub/inner.txt') as f:
         assert f.read() == 'inner'
+    # A link to a file is copied with the contents and permissions of its target.
+    with container.pull('/dst/src/link-to-file') as f:
+        assert f.read() == 'file'
+    assert container.list_files('/dst/src/link-to-file')[0].permissions == 0o640
 
 
 def test_push_path_follows_named_symlink(request: pytest.FixtureRequest, tmp_path: pathlib.Path):

@@ -2924,11 +2924,12 @@ class Container:
     ):
         """Recursively push a local path or files to the remote system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped, except that a symbolic link named in ``source_path`` is followed.  Pushing is
-        attempted to completion even if errors occur during the process.  All errors are collected
-        incrementally. After copying has completed, if any errors occurred, a single
-        :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files, directories, and symbolic links to files are copied. Symbolic links to
+        directories found within a directory, dangling links, device files, etc. are skipped.
+        A dangling link named in ``source_path`` is an error.  Pushing is attempted to completion
+        even if errors occur during the process.  All errors are collected incrementally. After
+        copying has completed, if any errors occurred, a single :class:`MultiPushPullError` is
+        raised containing details for each error.
 
         Assuming the following files exist locally:
 
@@ -2978,8 +2979,13 @@ class Container:
 
         def local_list(source_path: Path) -> list[pebble.FileInfo]:
             if source_path.is_dir():
-                return [self._build_fileinfo(f) for f in source_path.iterdir()]
-            # Only a path the caller named gets here, so follow it if it's a link.
+                # is_file() follows links, so this is only false for a link to a directory or a
+                # dangling link, which are skipped.
+                return [
+                    self._build_fileinfo(f, follow_symlinks=f.is_file())
+                    for f in source_path.iterdir()
+                ]
+            # Only a path the caller named gets here, so always follow it if it's a link.
             return [self._build_fileinfo(source_path, follow_symlinks=True)]
 
         errors: list[tuple[str, Exception]] = []
