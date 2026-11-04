@@ -16,7 +16,7 @@ jobs:
           persist-credentials: false
 
         # We could store the report from the regular run, but this is cheap to do and keeps this isolated.
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - run: uv tool install tox --with tox-uv
 
       - name: Generate coverage report
@@ -28,7 +28,7 @@ jobs:
           pip install -e . -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
-        uses: tiobe/tics-github-action@06afa6781ba53ab58efbe766d41d84febad1f683  # v4.0.0
+        uses: tiobe/tics-github-action@48afe561ae55edd1e1ec484505dba636e90ba0a6  # v4.1.0
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
