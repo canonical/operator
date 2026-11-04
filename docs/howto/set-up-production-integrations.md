@@ -9,7 +9,7 @@ myst:
 
 See first: {ref}`charm-maturity`
 
-A production-ready charm should fit into the Juju ecosystem, integrating with other applications. Therefore, it needs to be compatible with other charms. This guide summarises the integrations that production charms most often support.
+A production-ready charm should fit into the Juju ecosystem, integrating with other applications. Therefore, it needs to be compatible with other charms. This guide summarises the integrations that production charms often need to support.
 
 These integrations are not mandatory for your charm to work. You need to decide which ones to use based on your charm's workload.
 
@@ -22,7 +22,7 @@ If your charm uses a Charmcraft 12-factor app extension, many integrations are s
 
 Juju can integrate two charms when their endpoints use the same interface name. You should use existing interface names for any integration that your charm supports. To browse the available interfaces and their supporting libraries, see {external+charmlibs:ref}`Charmlibs | Interface libraries <interface-libs-listing>`.
 
-Writing integration tests is the best way to validate that your charm can integrate well with others. See {ref}`How to write integration tests for a charm <write-integration-tests-for-a-charm>` then {ref}`How to manage relations <manage-relations-integration-tests>`.
+Writing integration tests is the best way to validate that your charm can integrate well with others. See {ref}`How to write integration tests for a charm <write-integration-tests-for-a-charm>`, then {ref}`How to manage relations | Integration tests <manage-relations-integration-tests>`.
 
 (set-up-production-integrations-ingress)=
 ## Ingress
