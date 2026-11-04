@@ -144,7 +144,7 @@ class BufferingSpanExporter(SpanExporter):
                 return
             try:
                 context = self.ssl_context(config.ca)
-            except ssl.SSLError as e:
+            except (ssl.SSLError, TypeError, ValueError) as e:
                 # The data stays in the buffer until a usable CA list is provided.
                 self.bad_ca = config.ca
                 logger.error(

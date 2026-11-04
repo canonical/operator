@@ -154,12 +154,13 @@ def test_exporter_rejected_payload_is_dropped(tmp_path: pathlib.Path, code: int,
     assert (exporter.buffer.pushpop() is not None) is kept
 
 
+@pytest.mark.parametrize('ca', ['FIRST\nSECOND', 'héllo'])
 def test_exporter_invalid_ca_is_reported_once(
-    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture, ca: str
 ):
     exporter = BufferingSpanExporter(tmp_path / 'buffer')
     url = 'https://collector.example/v1/traces'
-    exporter.buffer.save_destination(Destination(url, 'FIRST\nSECOND'))
+    exporter.buffer.save_destination(Destination(url, ca))
     rv = exporter.buffer.pushpop((b'\x00', 'application/json'))
     assert rv
 
