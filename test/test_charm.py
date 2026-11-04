@@ -864,6 +864,18 @@ storage:
     assert meta.storages['stor'].multiple_range == (2, 2)
 
 
+@pytest.mark.parametrize('multiple', ['', '{}'])
+def test_storage_meta_empty_multiple(multiple: str):
+    meta = ops.CharmMeta.from_yaml(f"""
+name: my-charm
+storage:
+  stor:
+    type: filesystem
+    multiple: {multiple}
+""")
+    assert meta.storages['stor'].multiple_range is None
+
+
 def test_containers_storage():
     meta = ops.CharmMeta.from_yaml("""
 name: k8s-charm

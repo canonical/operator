@@ -2114,9 +2114,9 @@ class StorageMeta:
         self.minimum_size = raw.get('minimum-size')
         self.location = raw.get('location')
         self.multiple_range = None
-        if 'multiple' in raw:
+        if multiple := raw.get('multiple'):
             # YAML reads an unquoted range such as ``range: 2`` as an integer.
-            range = str(raw['multiple']['range'])
+            range = str(multiple['range'])
             if range[-1] == '+':
                 self.multiple_range = (int(range[:-1]), None)
             elif '-' not in range:
