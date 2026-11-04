@@ -803,7 +803,12 @@ class StorageEvent(HookEvent):
     """
 
     storage: model.Storage
-    """Storage instance this event refers to."""
+    """Storage instance this event refers to.
+
+    If the event was deferred, the storage may have been removed by the time the
+    event is re-emitted. In that case, the storage isn't in :attr:`ops.Model.storages`,
+    and its location may no longer exist.
+    """
 
     def __init__(self, handle: Handle, storage: model.Storage):
         super().__init__(handle)
