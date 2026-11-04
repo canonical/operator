@@ -273,6 +273,7 @@ class _Manager:
 
     _framework_class = _framework.Framework
     _saved_breakpointhook: Any = None
+    _finalised = False
 
     def __init__(
         self,
@@ -506,6 +507,11 @@ class _Manager:
 
     def _finalise(self):
         """Restore the breakpoint hook, end the root span, and shut tracing down."""
+        # A subclass can catch an exception from __init__ and still call destroy().
+        if self._finalised:
+            return
+        self._finalised = True
+
         from . import tracing  # break circular import
 
         if self._saved_breakpointhook is not None:
