@@ -86,7 +86,8 @@ class Handle:
     same parent and kind will have unique keys.
 
     The handle key is a string uniquely identifying the object. No other objects
-    under the same parent and kind may have the same key.
+    under the same parent and kind may have the same key. The key must not contain
+    ``/``, ``[``, or ``]``.
     """
 
     def __init__(self, parent: Handle | Object | None, kind: str, key: str | None):
@@ -776,7 +777,7 @@ class Framework(Object):
             framework.observe(someobj.something_happened, self._on_something_happened)
 
         Raises:
-            RuntimeError: if bound_event or observer are the wrong type.
+            TypeError: if bound_event or observer are the wrong type.
         """
         if not isinstance(bound_event, BoundEvent):
             raise TypeError(
