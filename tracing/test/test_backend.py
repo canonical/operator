@@ -134,6 +134,8 @@ def _http_error(url: str, code: int) -> urllib.error.HTTPError:
     [
         (400, False),
         (413, False),
+        (415, False),
+        (422, False),
         (401, True),
         (404, True),
         (429, True),

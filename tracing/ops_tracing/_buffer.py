@@ -121,7 +121,8 @@ class Buffer:
             self._create_schema()
         except sqlite3.DatabaseError as e:
             # A bare DatabaseError means the file is not a usable database, as opposed to
-            # OperationalError for locks and I/O problems. Start over rather than fail every hook.
+            # OperationalError for locks and I/O problems. Start over rather than fail every hook:
+            # @retry runs this method again, which creates the schema in a new file.
             if type(e) is not sqlite3.DatabaseError:
                 raise
             logger.warning('Discarding the unreadable trace buffer %s: %s', self.path, e)

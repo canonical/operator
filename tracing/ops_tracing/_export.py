@@ -62,13 +62,14 @@ class BufferingSpanExporter(SpanExporter):
     """Buffers and sends out trace data."""
 
     cache: dict[str | None, ssl.SSLContext]
-    bad_ca: str | None = None
+    bad_ca: str | None
     """A CA list that could not be loaded, so that it is only reported once."""
 
     def __init__(self, buffer_path: pathlib.Path):
         self.buffer = Buffer(buffer_path)
         self.lock = threading.Lock()
         self.cache = {}
+        self.bad_ca = None
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         """Export a batch of telemetry data.
