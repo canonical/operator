@@ -1816,7 +1816,9 @@ def _push_pull_container(request: pytest.FixtureRequest) -> ops.Container:
     return harness.model.unit.containers['foo']
 
 
-def test_push_path_skips_symlinks(request: pytest.FixtureRequest, tmp_path: pathlib.Path):
+def test_push_path_skips_symlinks(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+):
     container = _push_pull_container(request)
     src = tmp_path / 'src'
     (src / 'sub').mkdir(parents=True)
@@ -1827,7 +1829,10 @@ def test_push_path_skips_symlinks(request: pytest.FixtureRequest, tmp_path: path
     (src / 'dangling').symlink_to(src / 'missing')
 
     # A link to a directory or a dangling link must not stop the rest of the tree.
-    container.push_path(src, '/dst')
+    with caplog.at_level(logging.INFO, logger='ops.model'):
+        container.push_path(src, '/dst')
+
+    assert f'skipped 3 symbolic link(s) under {src}' in caplog.messages[-1]
 
     pushed = {info.name for info in container.list_files('/dst/src')}
     assert pushed == {'file.txt', 'sub'}

@@ -2984,10 +2984,12 @@ class Container:
 
         errors: list[tuple[str, Exception]] = []
         for source_path in source_paths:
+            skipped_links = 0
             try:
                 for info in Container._list_recursive(local_list, source_path):
                     if info.type is pebble.FileType.SYMLINK:
                         logger.debug('skipped symlink in Container.push_path: %s', info.path)
+                        skipped_links += 1
                         continue
                     dstpath = self._build_destpath(info.path, source_path, dest_dir)
                     # Carry on with the rest of the tree if one file fails.
@@ -3010,6 +3012,12 @@ class Container:
                         errors.append((info.path, err))
             except (OSError, pebble.Error) as err:
                 errors.append((str(source_path), err))
+            if skipped_links:
+                logger.info(
+                    'Container.push_path skipped %d symbolic link(s) under %s',
+                    skipped_links,
+                    source_path,
+                )
         if errors:
             raise MultiPushPullError('failed to push one or more files', errors)
 
