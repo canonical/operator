@@ -1835,6 +1835,34 @@ def test_push_path_skips_symlinks(request: pytest.FixtureRequest, tmp_path: path
         assert f.read() == 'inner'
 
 
+def test_push_path_follows_named_symlink(request: pytest.FixtureRequest, tmp_path: pathlib.Path):
+    container = _push_pull_container(request)
+    target = tmp_path / 'target.txt'
+    target.write_text('target')
+    target.chmod(0o640)
+    link = tmp_path / 'link.txt'
+    link.symlink_to(target)
+
+    container.push_path(link, '/dst')
+
+    with container.pull('/dst/link.txt') as f:
+        assert f.read() == 'target'
+    assert container.list_files('/dst/link.txt')[0].permissions == 0o640
+
+
+def test_push_path_named_dangling_symlink_is_an_error(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+):
+    container = _push_pull_container(request)
+    link = tmp_path / 'link.txt'
+    link.symlink_to(tmp_path / 'missing')
+
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        container.push_path(link, '/dst')
+
+    assert [(p, type(e)) for p, e in excinfo.value.errors] == [(str(link), FileNotFoundError)]
+
+
 def test_push_path_continues_after_error(
     request: pytest.FixtureRequest, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ):

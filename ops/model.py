@@ -2925,9 +2925,10 @@ class Container:
         """Recursively push a local path or files to the remote system.
 
         Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pushing is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        skipped, except that a symbolic link named in ``source_path`` is followed.  Pushing is
+        attempted to completion even if errors occur during the process.  All errors are collected
+        incrementally. After copying has completed, if any errors occurred, a single
+        :class:`MultiPushPullError` is raised containing details for each error.
 
         Assuming the following files exist locally:
 
@@ -2976,9 +2977,10 @@ class Container:
         dest_dir = Path(dest_dir)
 
         def local_list(source_path: Path) -> list[pebble.FileInfo]:
-            paths = source_path.iterdir() if source_path.is_dir() else [source_path]
-            files = [self._build_fileinfo(f) for f in paths]
-            return files
+            if source_path.is_dir():
+                return [self._build_fileinfo(f) for f in source_path.iterdir()]
+            # Only a path the caller named gets here, so follow it if it's a link.
+            return [self._build_fileinfo(source_path, follow_symlinks=True)]
 
         errors: list[tuple[str, Exception]] = []
         for source_path in source_paths:
@@ -3092,10 +3094,10 @@ class Container:
             raise MultiPushPullError('failed to pull one or more files', errors)
 
     @staticmethod
-    def _build_fileinfo(path: str | Path) -> pebble.FileInfo:
+    def _build_fileinfo(path: str | Path, *, follow_symlinks: bool = False) -> pebble.FileInfo:
         """Constructs a FileInfo object by stat'ing a local path."""
         path = Path(path)
-        if path.is_symlink():
+        if path.is_symlink() and not follow_symlinks:
             ftype = pebble.FileType.SYMLINK
         elif path.is_dir():
             ftype = pebble.FileType.DIRECTORY
@@ -3107,7 +3109,7 @@ class Container:
         import grp
         import pwd
 
-        info = path.lstat()
+        info = path.stat() if follow_symlinks else path.lstat()
         try:
             pw_name = pwd.getpwuid(info.st_uid).pw_name
         except KeyError:
