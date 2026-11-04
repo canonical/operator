@@ -33,6 +33,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: false
       - name: Extract signature, dedupe, ask the LLM, apply
         id: enrich
         env:

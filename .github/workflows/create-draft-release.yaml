@@ -86,7 +86,7 @@ jobs:
             echo "target=$target"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The squash commit the merge made, which is the release. Its parent
           # is the branch before the merge, which is what the version is
@@ -247,7 +247,7 @@ jobs:
       contents: write  # To push the post-release branch.
       pull-requests: write  # To open the pull request.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The tip of the release branch rather than the release commit: the
           # branch may have moved on since, and the bump belongs on top of
@@ -255,7 +255,7 @@ jobs:
           ref: ${{ needs.draft.outputs.branch }}
           persist-credentials: false
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The version script, from the default branch, which is where this
           # workflow runs from. A maintenance branch doesn't have to carry it.
