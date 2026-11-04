@@ -41,6 +41,8 @@ def test_trace_data():
         'collect_app_status: TracedCharm',
         # Emitted on all units.
         'collect_unit_status: TracedCharm',
+        # The first party charm lib checks the destination on every dispatch.
+        'commit: Tracing',
     }
 
     main_span = next(s for s in ctx.trace_data if s.name == 'ops.main')
