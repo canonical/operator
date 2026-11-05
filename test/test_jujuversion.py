@@ -129,6 +129,20 @@ def test_supports_exec_service_context():
 @pytest.mark.parametrize(
     'version,has_support',
     [
+        ('3.1-beta6', False),
+        ('3.1-rc1', False),
+        ('3.2-beta1', False),
+        ('3.2-rc1', False),
+        ('3.3-beta1', True),
+    ],
+)
+def test_supports_exec_service_context_prerelease(version: str, has_support: bool):
+    assert ops.JujuVersion(version).supports_exec_service_context == has_support
+
+
+@pytest.mark.parametrize(
+    'version,has_support',
+    [
         ('2.9.50', False),
         ('3.3.6', False),
         ('3.4.0', True),
