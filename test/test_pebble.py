@@ -3818,6 +3818,36 @@ class TestExec:
         )
         assert out.getvalue() == 'crème\n'
 
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3', '{"command":"end"}'], 'ok �', id='partial-then-end'),
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-closed'),
+            pytest.param(
+                [b'a\xffb', b'more', '{"command":"end"}'], 'a�bmore', id='invalid-mid-stream'
+            ),
+        ],
+    )
+    def test_websocket_to_writer_replaces_undecodable_bytes(
+        self, receives: list[str | bytes], expected: str
+    ):
+        ws = MockWebsocket()
+        chunks = list(receives)
+
+        def recv():
+            if chunks:
+                return chunks.pop(0)
+            raise websocket.WebSocketConnectionClosedException('socket is already closed.')
+
+        ws.recv = recv
+        out = io.StringIO()
+        pebble._websocket_to_writer(
+            typing.cast('pebble._WebSocket', ws),
+            typing.cast('pebble._WebsocketWriter', out),
+            'utf-8',
+        )
+        assert out.getvalue() == expected
+
     def test_websocket_reader_holds_back_incomplete_character(self):
         ws = MockWebsocket()
         ws.receives = [b'cr\xc3', b'\xa8me \xf0', b'\x9f', b'\x98\x80\n', '{"command":"end"}']

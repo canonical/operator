@@ -2004,8 +2004,11 @@ def _reader_to_websocket(
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
     # A multi-byte character may be split across two websocket messages, so the
-    # messages cannot be decoded independently.
-    decoder = None if encoding is None else codecs.getincrementaldecoder(encoding)()
+    # messages cannot be decoded independently. This runs in a thread, so a
+    # decoding error would have nowhere to go, and would lose the rest of the output.
+    decoder = (
+        None if encoding is None else codecs.getincrementaldecoder(encoding)(errors='replace')
+    )
     while True:
         try:
             chunk = ws.recv()
