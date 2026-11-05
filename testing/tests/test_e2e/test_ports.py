@@ -64,6 +64,11 @@ def test_state_normalises_ops_ports():
     assert {type(port) for port in state.opened_ports} == {TCPPort, UDPPort, ICMPPort}
 
 
+def test_state_rejects_ops_icmp_port_with_port_number():
+    with pytest.raises(StateValidationError, match='cannot be set'):
+        State(opened_ports=[ops.Port('icmp', 80)])
+
+
 def test_port_equality_with_ops_port():
     assert TCPPort(80) == ops.Port('tcp', 80)
     assert UDPPort(53) == ops.Port('udp', 53)
