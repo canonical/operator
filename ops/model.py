@@ -3034,10 +3034,11 @@ class Container:
     ):
         """Recursively pull a remote path or files to the local system.
 
-        Only regular files and directories are copied; symbolic links, device files, etc. are
-        skipped.  Pulling is attempted to completion even if errors occur during the process.  All
-        errors are collected incrementally. After copying has completed, if any errors occurred, a
-        single :class:`MultiPushPullError` is raised containing details for each error.
+        Regular files and directories are copied, and symbolic links are followed. Device files,
+        etc. are skipped.  Pulling is attempted to completion even if errors occur during the
+        process.  All errors are collected incrementally. After copying has completed, if any
+        errors occurred, a single :class:`MultiPushPullError` is raised containing details for each
+        error.
 
         Assuming the following files exist remotely:
 
