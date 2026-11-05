@@ -910,7 +910,6 @@ class _MockPebbleClient(_TestingPebbleClient):
         self._changes: dict[str, pebble.Change] = {}
 
         # load any existing notices and check information from the state
-        self._notices: dict[tuple[str, str], pebble.Notice] = {}
         self._check_infos: dict[str, pebble.CheckInfo] = {}
         try:
             container = state.get_container(self._container_name)
