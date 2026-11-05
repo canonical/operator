@@ -2712,13 +2712,13 @@ class Event:
             raise ValueError(
                 f'cannot construct DeferredEvent from {handler}; please create one manually.',
             )
-        qualname = match.groups()[0]
-        if '.' not in qualname:
+        qualname_parts = match.groups()[0].split('.')
+        if len(qualname_parts) < 2 or qualname_parts[-2] == '<locals>':
             raise ValueError(
                 f'cannot construct DeferredEvent from {handler}: the handler must be a method '
                 'of an ops.Object subclass, such as MyCharm._on_start.',
             )
-        owner_name, handler_name = qualname.split('.')[-2:]
+        owner_name, handler_name = qualname_parts[-2:]
         handle_path = f'{owner_name}/on/{self.name}[{event_id}]'
 
         # Many events have no snapshot data: install, start, stop, remove, config-changed,
