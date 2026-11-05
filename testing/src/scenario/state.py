@@ -1733,6 +1733,10 @@ class Port:
             return (self.protocol, self.port) == (other.protocol, other.port)
         return False
 
+    # This matches the hash of an equal ops.Port, whose fields are the other way around.
+    def __hash__(self) -> int:
+        return hash((self.protocol, self.port))
+
     def _to_ops(self) -> ops.Port:
         return ops.Port(port=self.port, protocol=self.protocol)
 
