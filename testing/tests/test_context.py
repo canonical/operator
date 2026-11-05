@@ -387,6 +387,25 @@ def test_init_with_charmcraft_yaml_extensions_as_meta():
     assert spec.config is not None and 'webserver-threads' in spec.config['options']
 
 
+def test_init_with_charmcraft_yaml_extensions_and_explicit_config():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}
+    spec = Context(MyCharm, charmcraft_yaml, config=config)._charm_spec
+    assert spec.config == config
+    # The rest of the extension still applies.
+    assert 'flask-app' in spec.meta['containers']
+    assert spec.actions is not None and 'rotate-secret-key' in spec.actions
+
+
+def test_init_with_charmcraft_yaml_extensions_and_explicit_actions():
+    charmcraft_yaml = {'name': 'flask', 'extensions': ['flask-framework']}
+    actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
+    spec = Context(MyCharm, charmcraft_yaml, actions=actions)._charm_spec
+    assert spec.actions == actions
+    assert 'flask-app' in spec.meta['containers']
+    assert spec.config is not None and 'webserver-threads' in spec.config['options']
+
+
 def test_init_with_full_charmcraft_yaml_as_meta_and_explicit_config():
     charmcraft_yaml = {'name': 'elizabeth', 'config': CONFIG, 'actions': ACTIONS}
     config = {'options': {'match': {'type': 'string', 'default': 'darcy'}}}

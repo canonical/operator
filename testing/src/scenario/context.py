@@ -800,21 +800,17 @@ class Context(Generic[CharmType]):
 
         else:
             meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
+            if actions is not None and 'actions' in meta:
+                raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
+            if config is not None and 'config' in meta:
+                raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
             extensions = meta.pop('extensions', None)
             if extensions:
                 _apply_extensions(meta, extensions)
-            if actions is None:
-                actions = meta.pop('actions', None)
-            elif 'actions' in meta:
-                raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
-            else:
-                actions = copy.deepcopy(actions)
-            if config is None:
-                config = meta.pop('config', None)
-            elif 'config' in meta:
-                raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
-            else:
-                config = copy.deepcopy(config)
+            # An explicit argument wins over what an extension provides.
+            meta_actions, meta_config = meta.pop('actions', None), meta.pop('config', None)
+            actions = copy.deepcopy(actions) if actions is not None else meta_actions
+            config = copy.deepcopy(config) if config is not None else meta_config
             spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec
