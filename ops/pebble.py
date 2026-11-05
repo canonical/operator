@@ -2133,7 +2133,7 @@ class _WebsocketReader(io.BufferedIOBase):
     def _complete_length(self) -> int:
         """Return the length of the prefix of self.remaining that holds whole characters."""
         assert self._decoder_factory is not None
-        decoder = self._decoder_factory()
+        decoder = self._decoder_factory(errors='replace')
         decoder.decode(self.remaining)
         pending, _ = decoder.getstate()
         return len(self.remaining) - len(pending)
@@ -2161,7 +2161,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 while n == 0:
                     chunk = self._recv()
                     if chunk is None:
-                        # Hand back what there is: decoding it fails, as it should.
+                        # Hand back what there is, for the TextIOWrapper to replace.
                         self.eof = True
                         n = len(self.remaining)
                         break
@@ -3263,8 +3263,9 @@ class Client:
                 is ``True``.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
-                is used to encode them to bytes. If encoding is None, the
-                types read or written are raw bytes.
+                is used to encode them to bytes. Output bytes that can't be
+                decoded are replaced with the U+FFFD replacement character.
+                If encoding is None, the types read or written are raw bytes.
             combine_stderr: If true, process's stderr output is combined into
                 its stdout (the stderr argument must be None). If false,
                 separate streams are used for stdout and stderr.
@@ -3372,9 +3373,12 @@ class Client:
             else:
                 process_stdout = _WebsocketReader(stdio_ws, encoding)
                 if encoding is not None:
+                    # wait_output() reads this in a thread, where a decoding
+                    # error would be lost, along with all of the output.
                     process_stdout = io.TextIOWrapper(
                         process_stdout,  # type: ignore
                         encoding=encoding,
+                        errors='replace',
                         newline='',
                     )
 
@@ -3390,6 +3394,7 @@ class Client:
                         process_stderr = io.TextIOWrapper(
                             process_stderr,  # type: ignore
                             encoding=encoding,
+                            errors='replace',
                             newline='',
                         )
 

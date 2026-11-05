@@ -3865,10 +3865,46 @@ class TestExec:
         ws.receives = [b'ok \xc3', '{"command":"end"}']
         reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
         assert reader.read() == b'ok '
-        # There is nothing to complete it with, so the caller gets the bytes
-        # (and the decoding error they cause).
+        # There is nothing to complete it with, so the caller gets the bytes.
         assert reader.read() == b'\xc3'
         assert reader.read() == b''
+
+    def test_websocket_reader_invalid_bytes_do_not_raise(self):
+        ws = MockWebsocket()
+        ws.receives = [b'a\xffb', b'more', '{"command":"end"}']
+        reader = pebble._WebsocketReader(typing.cast('pebble._WebSocket', ws), 'utf-8')
+        assert reader.read() == b'a\xffb'
+        assert reader.read() == b'more'
+        assert reader.read() == b''
+
+    @pytest.mark.parametrize(
+        'receives,expected',
+        [
+            pytest.param([b'ok \xc3'], 'ok �', id='partial-then-end'),
+            pytest.param([b'a\xffb', b'more'], 'a�bmore', id='invalid-mid-stream'),
+        ],
+    )
+    def test_wait_output_replaces_undecodable_bytes(
+        self, client: MockClient, receives: list[str | bytes], expected: str
+    ):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([*receives, '{"command":"end"}'])
+        stderr.receives.extend([*receives, '{"command":"end"}'])
+
+        process = client.exec(['echo'])
+        assert process.wait_output() == (expected, expected)
+
+    def test_stdout_read_replaces_undecodable_bytes(self, client: MockClient):
+        stdio, stderr, _ = self.add_responses(client, '123', 0)
+        stdio.receives.extend([b'a\xffb', b'more', '{"command":"end"}'])
+        stderr.receives.append('{"command":"end"}')
+
+        process = client.exec(['echo'])
+        assert process.stdout is not None
+        assert process.stdout.read() == 'a�b'
+        assert process.stdout.read() == 'more'
+        assert process.stdout.read() == ''
+        process.wait()
 
     def test_websocket_reader_bytes_reads_one_message(self):
         ws = MockWebsocket()
