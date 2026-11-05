@@ -362,12 +362,21 @@ def _check_action_param_types(
             )
 
     for provided_param_name, provided_param_value in action.params.items():
-        expected_type = expected_param_type.get(provided_param_name)
-        if not expected_type:
+        if provided_param_name not in action_params:
             errors.append(
                 f'param {provided_param_name} is not a valid parameter for {action.name}: '
                 'missing from action specification',
             )
+            continue
+        expected_type = expected_param_type.get(provided_param_name)
+        if expected_type is None:
+            declared_type = action_params[provided_param_name].get('type')
+            # A missing type has already been reported.
+            if declared_type:
+                errors.append(
+                    f'param {provided_param_name} has an unknown data type declared: '
+                    f'type={declared_type}',
+                )
             continue
         if not isinstance(provided_param_value, expected_type):
             expected = ' or '.join(t.__name__ for t in expected_type)

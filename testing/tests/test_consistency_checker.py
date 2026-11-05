@@ -633,6 +633,38 @@ def test_action_params_type_list():
     assert_inconsistent(State(), ctx.on.action('foo', params={'bar': 42}), spec)
 
 
+@pytest.mark.parametrize('type_', [['string', 'bogus'], 'bogus', [['string']]])
+def test_action_params_unknown_type_is_not_missing(type_: Any):
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': type_}}}})
+    with pytest.raises(InconsistentScenarioError) as excinfo:
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    assert 'unknown data type declared' in str(excinfo.value)
+    assert 'missing from action specification' not in str(excinfo.value)
+
+
+def test_action_params_unknown_type_not_passed_is_consistent():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {'type': 'bogus'}}}})
+    assert_consistent(State(), ctx.on.action('foo'), spec)
+
+
+def test_action_params_no_type_is_not_missing():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {'bar': {}}}})
+    with pytest.raises(InconsistentScenarioError) as excinfo:
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+    assert 'has no type' in str(excinfo.value)
+    assert 'missing from action specification' not in str(excinfo.value)
+
+
+def test_action_params_not_declared_is_missing():
+    ctx = Context(MyCharm, meta={'name': 'foo'}, actions={'foo': {}})
+    spec = _CharmSpec(MyCharm, meta={}, actions={'foo': {'params': {}}})
+    with pytest.raises(InconsistentScenarioError, match='missing from action specification'):
+        check_consistency(State(), ctx.on.action('foo', params={'bar': 'baz'}), spec, '3.0', 0)
+
+
 @pytest.mark.parametrize('juju_version', ['3.6-beta1', '3.6.9.1', '4.0-rc2'])
 def test_tagged_juju_version(juju_version: str):
     assert_consistent(
