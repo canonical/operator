@@ -7,6 +7,7 @@ breakpoint
 callables
 Canonical's
 Charmlibs
+CIDRs
 configurator
 cooldown
 cosl
@@ -17,6 +18,7 @@ declaratively
 docstrings
 Dependabot
 dict's
+env
 failover
 IDE's
 jhack
