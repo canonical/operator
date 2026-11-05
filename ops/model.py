@@ -3801,9 +3801,9 @@ class _ModelBackend:
                 description=description,
             )
         except ModelError:
-            # The event is sent with juju-log, so if that is the command that
-            # failed there is nowhere left to report it. The caller raises the
-            # original error.
+            # The event is sent with juju-log, so if that is the command that failed there is
+            # nowhere left to report it. Logging this would recurse, because the Python logger
+            # also uses juju-log. The caller raises the original error.
             pass
 
     def relation_ids(self, relation_name: str) -> list[int]:
