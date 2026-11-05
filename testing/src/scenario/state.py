@@ -1804,6 +1804,8 @@ def _port_from_ops(port: ops.Port) -> Port:
     """Convert an :class:`ops.Port` to the matching Scenario port class."""
     if port.protocol == 'icmp':
         return ICMPPort(port=port.port)
+    if port.protocol not in _port_cls_by_protocol:
+        raise StateValidationError(f'unknown port protocol {port.protocol!r}')
     if port.port is None:
         raise StateValidationError(f'`port` is required for {port.protocol} ports')
     return _port_cls_by_protocol[port.protocol](port.port)

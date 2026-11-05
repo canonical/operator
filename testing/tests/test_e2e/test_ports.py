@@ -69,6 +69,11 @@ def test_state_rejects_ops_icmp_port_with_port_number():
         State(opened_ports=[ops.Port('icmp', 80)])
 
 
+def test_state_rejects_ops_port_with_unknown_protocol():
+    with pytest.raises(StateValidationError, match='unknown port protocol'):
+        State(opened_ports=[ops.Port('sctp', 80)])  # type: ignore
+
+
 def test_port_equality_with_ops_port():
     assert TCPPort(80) == ops.Port('tcp', 80)
     assert UDPPort(53) == ops.Port('udp', 53)
