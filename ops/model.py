@@ -295,8 +295,7 @@ class Model:
 
         The content of the secret is retrieved, so calls to
         :meth:`Secret.get_content` do not require querying the secret storage
-        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
-        has been called.
+        again, unless ``refresh=True`` is used.
 
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
@@ -1120,7 +1119,8 @@ class Network:
     """A list of networks representing the subnets that other units will see
     the charm connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
-    be constrained to a single address (for example, 10.0.0.1/32).
+    be constrained to a single address (for example, 10.0.0.1/32). Any host bits
+    in a CIDR from Juju are discarded, so 10.1.89.35/24 becomes 10.1.89.0/24.
     """
 
     def __init__(self, network_info: _NetworkDict):
@@ -4194,7 +4194,9 @@ class _ModelBackend:
         try:
             rotation = SecretRotate(raw.rotation) if raw.rotation else None
         except ValueError:
-            logger.warning('Unknown secret rotation policy %r from Juju.', raw.rotation)
+            logger.warning(
+                'Unknown secret rotation policy %r from Juju for secret %s.', raw.rotation, raw.id
+            )
             rotation = None
         return SecretInfo(
             raw.id,

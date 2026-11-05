@@ -4902,15 +4902,20 @@ class TestSecretClass:
         content['foo'] = 'changed'
         assert secret.get_content() == {'foo': 'bar'}
 
-    def test_get_info_unknown_rotation(self, model: ops.Model, fake_script: FakeScript):
+    def test_get_info_unknown_rotation(
+        self, model: ops.Model, fake_script: FakeScript, caplog: pytest.LogCaptureFixture
+    ):
         fake_script.write(
             'secret-info-get',
             """echo '{"x": {"label": "y", "revision": 7, "rotation": "fortnightly"}}'""",
         )
         secret = self.make_secret(model, id='x')
-        info = secret.get_info()
+        with caplog.at_level(level='WARNING', logger='ops'):
+            info = secret.get_info()
         assert info.revision == 7
         assert info.rotation is None
+        assert "'fortnightly'" in caplog.text
+        assert 'for secret x.' in caplog.text
 
     def test_set_content_then_info(self, model: ops.Model, fake_script: FakeScript):
         fake_script.write('secret-set', """exit 0""")
