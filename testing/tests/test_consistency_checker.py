@@ -433,7 +433,7 @@ def test_secrets_jujuv_bad(bad_v: str):
     )
 
 
-@pytest.mark.parametrize('good_v', ('3.0', '3.1', '3', '3.33', '4', '100'))
+@pytest.mark.parametrize('good_v', ('3.0', '3.1', '3.33', '4.0', '100.0'))
 def test_secrets_jujuv_good(good_v: str):
     assert_consistent(
         State(secrets={Secret({'a': 'b'})}),
@@ -641,6 +641,18 @@ def test_tagged_juju_version(juju_version: str):
         _CharmSpec(MyCharm, meta={'name': 'foo'}),
         juju_version=juju_version,
     )
+
+
+@pytest.mark.parametrize('juju_version', ['4', 'banana'])
+def test_invalid_juju_version(juju_version: str):
+    with pytest.raises(RuntimeError, match=f'"{juju_version}" is not a valid Juju version'):
+        check_consistency(
+            State(),
+            Event('start'),
+            _CharmSpec(MyCharm, meta={'name': 'foo'}),
+            juju_version,
+            0,
+        )
 
 
 def test_duplicate_relation_ids():

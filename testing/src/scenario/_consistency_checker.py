@@ -86,8 +86,7 @@ def check_consistency(
         return
 
     # Parsed by JujuVersion so that a tagged version such as 3.6-beta1 works.
-    # A bare major version ("4") is accepted here, but not by JujuVersion.
-    version = JujuVersion(juju_version if '.' in juju_version else f'{juju_version}.0')
+    version = JujuVersion(juju_version)
     juju_version_: tuple[int, ...] = (version.major, version.minor, version.patch)
 
     errors: list[str] = []
