@@ -561,6 +561,34 @@ def test_custom_event_does_not_run_properties(charm_type: type[ContextCharm]):
         assert isinstance(custom_event, CustomEvent)
 
 
+class CustomCharmWithConsumerProperty(CustomCharm):
+    @property
+    def another_consumer(self) -> MyConsumer:
+        # Running this would raise, because the charm already has this object.
+        return MyConsumer(self)
+
+
+class CustomCharmWithLazyConsumer(ContextCharm):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.lazy_consumer.on.foo_started, self._on_event)
+
+    @property
+    def lazy_consumer(self) -> MyConsumer:
+        return MyConsumer(self)
+
+
+@pytest.mark.parametrize(
+    'charm_type', [CustomCharmWithConsumerProperty, CustomCharmWithLazyConsumer]
+)
+def test_custom_event_source_and_properties(charm_type: type[ContextCharm]):
+    ctx = scenario.Context(charm_type, meta=META, actions=ACTIONS)
+    with ctx(ctx.on.custom(MyConsumer.on.foo_started), scenario.State()) as mgr:
+        mgr.run()
+        custom_event, _ = mgr.charm.observed
+        assert isinstance(custom_event, CustomEvent)
+
+
 def test_custom_event_with_args():
     ctx = scenario.Context(CustomCharm, meta=META, actions=ACTIONS)
     with ctx(
