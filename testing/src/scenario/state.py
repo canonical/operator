@@ -570,10 +570,6 @@ class BindAddress:
         # Stored as list for backwards compatibility.
         object.__setattr__(self, 'addresses', list(self.addresses))
 
-    def __hash__(self) -> int:
-        # The dataclass hash fails on the list.
-        return hash((tuple(self.addresses), self.interface_name, self.mac_address))
-
     def _hook_tool_output_fmt(self):
         """Dumps itself to dict in the same format the hook command would."""
         dct = {

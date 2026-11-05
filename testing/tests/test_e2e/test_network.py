@@ -179,12 +179,6 @@ def test_explicit_juju_info_network_override(mycharm: type[ops.CharmBase]):
         assert network.bind_address
 
 
-def test_bind_address_hashable():
-    address = BindAddress([Address('192.0.2.1')], interface_name='eth0')
-    assert hash(address) == hash(BindAddress([Address('192.0.2.1')], interface_name='eth0'))
-    assert {address, BindAddress([Address('192.0.2.1')], interface_name='eth0')} == {address}
-
-
 def test_default_bind_addresses_not_shared():
     first = Network('foo')
     second = Network('bar')
