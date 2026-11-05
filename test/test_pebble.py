@@ -3448,6 +3448,98 @@ class TestSocketClient:
             client.get_system_info()
         assert 'RemoteDisconnected' in str(excinfo.value)
 
+    @pytest.mark.parametrize(
+        'method,args,content_type',
+        [
+            ('get_system_info', (), 'application/json'),
+            ('pull', ('/f',), 'multipart/form-data; boundary=x'),
+            ('push', ('/f', 'data'), 'application/json'),
+        ],
+    )
+    @pytest.mark.parametrize(
+        'error,is_timeout',
+        [
+            pytest.param(http.client.IncompleteRead(b'x'), False, id='incomplete'),
+            pytest.param(ConnectionResetError('reset'), False, id='reset'),
+            pytest.param(TimeoutError('timed out'), True, id='timeout'),
+        ],
+    )
+    def test_error_reading_response_body(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        method: str,
+        args: tuple[str, ...],
+        content_type: str,
+        error: Exception,
+        is_timeout: bool,
+    ):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        def read(_: int | None = None, /) -> bytes:
+            raise error
+
+        response = MockHTTPResponse({'Content-Type': content_type}, b'')
+        response.read = read
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                return response
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            getattr(client, method)(*args)
+        assert type(error).__name__ in str(excinfo.value)
+        assert isinstance(excinfo.value, TimeoutError) is is_timeout
+
+    def test_socket_timeout_before_response(self, monkeypatch: pytest.MonkeyPatch):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise TimeoutError('timed out')
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert isinstance(excinfo.value, TimeoutError)
+
+    @pytest.mark.parametrize('in_body', [False, True], ids=['before-response', 'in-body'])
+    def test_wait_change_retries_after_socket_timeout(
+        self, monkeypatch: pytest.MonkeyPatch, in_body: bool
+    ):
+        client = pebble.Client(socket_path='does_not_exist')
+        change: dict[str, typing.Any] = {
+            'id': '70',
+            'kind': 'autostart',
+            'ready': True,
+            'ready-time': '2021-01-28T14:37:03.270218778+13:00',
+            'spawn-time': '2021-01-28T14:37:02.247202105+13:00',
+            'status': 'Done',
+            'summary': 'Autostart service "svc"',
+            'tasks': [],
+        }
+        body = json.dumps({'result': change, 'status-code': 200, 'type': 'sync'}).encode()
+        headers = {'Content-Type': 'application/json'}
+        requests: list[typing.Any] = []
+
+        def read(_: int | None = None, /) -> bytes:
+            raise TimeoutError('timed out')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                requests.append(request)
+                if len(requests) > 1:
+                    return MockHTTPResponse(headers, body)
+                if not in_body:
+                    raise TimeoutError('timed out')
+                response = MockHTTPResponse(headers, b'')
+                response.read = read
+                return response
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        assert client.wait_change(pebble.ChangeID('70'), timeout=30).status == 'Done'
+        assert len(requests) == 2
+
     def test_real_client(self):
         shutdown, socket_path = fake_pebble.start_server()
 
