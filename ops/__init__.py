@@ -384,8 +384,5 @@ Recommended usage:
 Args:
     charm_class: the charm class to instantiate and receive the event.
     use_juju_for_storage: whether to use controller-side storage.
-        The default is ``False`` for most charms.
-        Podspec charms that haven't previously used local storage and that
-        are running on a new enough Juju default to controller-side storage,
-        and local storage otherwise.
+        The default is to use local storage.
 """
