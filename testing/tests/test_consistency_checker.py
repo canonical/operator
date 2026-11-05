@@ -687,6 +687,28 @@ def test_invalid_juju_version(juju_version: str):
         )
 
 
+def test_skipped_checks_do_not_parse_juju_version(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv('SCENARIO_SKIP_CONSISTENCY_CHECKS', '1')
+    check_consistency(
+        State(),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        'banana',
+        0,
+    )
+
+
+def test_juju_version_tag_is_earlier_than_release():
+    # The number in the tag is not a patch version: this is before 3.6.0.
+    cloud_spec = CloudSpec(name='localhost', type='k8s')
+    assert_inconsistent(
+        State(model=Model(name='k8s-model', type='kubernetes', cloud_spec=cloud_spec)),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+        juju_version='3.6-rc12',
+    )
+
+
 def test_duplicate_relation_ids():
     assert_inconsistent(
         State(relations={Relation('foo', id=1), Relation('bar', id=1)}),

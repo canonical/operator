@@ -87,7 +87,6 @@ def check_consistency(
 
     # Parsed by JujuVersion so that a tagged version such as 3.6-beta1 works.
     version = JujuVersion(juju_version)
-    juju_version_: tuple[int, ...] = (version.major, version.minor, version.patch)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -109,7 +108,7 @@ def check_consistency(
             state=state,
             event=event,
             charm_spec=charm_spec,
-            juju_version=juju_version_,
+            juju_version=version,
             unit_id=unit_id,
         )
         errors.extend(results.errors)
@@ -427,7 +426,7 @@ def check_config_consistency(
     *,
     state: State,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of the :class:`scenario.State` config with the charm_spec config."""
@@ -449,7 +448,7 @@ def check_config_consistency(
             'float': float,
             'boolean': bool,
         }
-        if juju_version >= (3, 4):
+        if juju_version >= '3.4':
             converters['secret'] = str
 
         validators = {
@@ -486,7 +485,7 @@ def check_secrets_consistency(
     *,
     event: Event,
     state: State,
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of any :class:`scenario.Secret` in the :class:`scenario.State`."""
@@ -502,7 +501,7 @@ def check_secrets_consistency(
             f'(a secret with the same ID is not sufficient - you must pass the object '
             f'in the state to the event).',
         )
-    elif juju_version < (3,):
+    elif juju_version < '3.0':
         errors.append(
             f'secrets are not supported in the specified juju version {juju_version}. '
             f'Should be at least 3.0.',
@@ -769,14 +768,14 @@ def check_cloudspec_consistency(
     state: State,
     event: Event,
     charm_spec: _CharmSpec[CharmType],
-    juju_version: tuple[int, ...],
+    juju_version: JujuVersion,
     **_kwargs: Any,
 ) -> Results:
     """Check the consistency of :attr:`scenario.State.cloud_spec` with the model type."""
     errors: list[str] = []
     warnings: list[str] = []
 
-    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < (3, 6, 10):
+    if state.model.type == 'kubernetes' and state.model.cloud_spec and juju_version < '3.6.10':
         errors.append(
             'CloudSpec is not available for Kubernetes charms with Juju < 3.6.10. '
             'Set the juju_version to 3.6.10+ or '
