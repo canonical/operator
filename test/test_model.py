@@ -1086,6 +1086,14 @@ class TestModel:
         assert type(status) is ops.ActiveStatus
         assert status.message == 'ready'
 
+    def test_status_register_does_not_replace_builtin(self):
+        class ActiveWithReason(ops.ActiveStatus):
+            pass
+
+        with pytest.deprecated_call():
+            ops.StatusBase.register(ActiveWithReason)
+        assert type(ops.StatusBase.from_name('active', 'ready')) is ops.ActiveStatus
+
     def test_status_eq(self):
         status_types = [
             ops.ActiveStatus,

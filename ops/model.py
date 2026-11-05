@@ -2260,12 +2260,6 @@ class StatusBase:
         self.message = message
 
     def __init_subclass__(cls):
-        # A charm's own subclass of a built-in status (to add behaviour, say)
-        # must not replace the built-in one, because from_name() constructs
-        # whichever class is registered when reading status back from Juju.
-        name = getattr(cls, 'name', None)
-        if isinstance(name, str) and name in StatusBase._statuses:
-            return
         StatusBase._register(cls)
 
     def __eq__(self, other: StatusBase) -> bool:
@@ -2313,7 +2307,10 @@ class StatusBase:
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
             )
-        cls._statuses[child.name] = child
+        # The first class registered for a name wins. The built-in statuses are registered when
+        # ops is imported, so a charm's subclass can't replace them, and from_name() constructs
+        # the built-in class when reading status back from Juju.
+        cls._statuses.setdefault(child.name, child)
 
     _priorities: ClassVar[dict[str, Any]] = {
         'error': 5,
