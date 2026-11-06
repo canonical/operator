@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
-from scenario import State, StoredState
+from scenario import Context, State, StoredState
+from scenario.errors import InconsistentScenarioError
 
 import ops
 from tests.helpers import trigger
@@ -73,3 +74,22 @@ def test_default_arguments():
     assert s.owner_path is None
     assert s.content == {}
     assert s._data_type_name == 'StoredStateData'
+
+
+def test_stored_state_round_trip_has_no_duplicates():
+    # The framework's own _stored has no owner, so its handle path has no
+    # prefix. Writing it back with a leading '/' used to produce a second
+    # entry with owner_path='' on the next run.
+    ctx = Context(Charm, meta={'name': 'foo'})
+    state_1 = ctx.run(ctx.on.start(), State())
+    state_2 = ctx.run(ctx.on.update_status(), state_1)
+    expected = {('_stored', None), ('_stored', 'Charm'), ('_stored2', 'Charm')}
+    assert {(s.name, s.owner_path) for s in state_1.stored_states} == expected
+    assert {(s.name, s.owner_path) for s in state_2.stored_states} == expected
+
+
+def test_stored_state_without_owner_is_rejected():
+    ctx = Context(Charm, meta={'name': 'foo'})
+    state_in = State(stored_states={StoredState(content={'foo': 'bar'})})
+    with pytest.raises(InconsistentScenarioError, match="owner_path='MyCharm'"):
+        ctx.run(ctx.on.start(), state_in)
