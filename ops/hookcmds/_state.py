@@ -33,6 +33,10 @@ def state_delete(key: str):
     run('state-delete', key)
 
 
+# state-get has a `--strict` option, which we do not offer here. When `--strict`
+# is specified, Juju returns an error if the key does not exist, rather than an
+# empty string. We do not currently have a use-case for `--strict` and excluding
+# it simplifies the method signature.
 @overload
 def state_get(key: str) -> str: ...
 @overload
@@ -54,8 +58,8 @@ def state_get(key: str | None) -> dict[str, str] | str:
     if key is not None:
         key_result: str = json.loads(stdout)
         return key_result
-    # On Juju 4, `state-get --format=json` returns `null` rather than `{}` when
-    # no state has been set. Remove the `or {}` once that is fixed upstream.
+    # Juju 2.9, 3, and 4 all return `null` from `state-get --format=json`
+    # rather than `{}` when no state has been set.
     # See https://github.com/juju/juju/issues/22523.
     result: dict[str, str] = json.loads(stdout) or {}
     return result
