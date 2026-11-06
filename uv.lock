@@ -902,7 +902,6 @@ xdist = [{ name = "pytest-xdist", specifier = "~=3.6" }]
 
 [[package]]
 name = "ops-scenario"
-version = "8.10.0.dev0"
 source = { editable = "testing" }
 dependencies = [
     { name = "ops" },
