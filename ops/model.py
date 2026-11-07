@@ -295,8 +295,7 @@ class Model:
 
         The content of the secret is retrieved, so calls to
         :meth:`Secret.get_content` do not require querying the secret storage
-        again, unless ``refresh=True`` is used, or :meth:`Secret.set_content`
-        has been called.
+        again, unless ``refresh=True`` is used.
 
         .. jujuadded:: 3.0
             Charm secrets added in Juju 3.0, user secrets added in Juju 3.3
@@ -812,7 +811,7 @@ class Unit:
         # Normalise to get easier comparisons.
         existing = {(port.protocol, port.port) for port in self._backend.opened_ports()}
         desired = {
-            ('tcp', port) if isinstance(port, int) else (port.protocol, port.port)
+            ('tcp', port) if isinstance(port, int) else (port.protocol.lower(), port.port)
             for port in ports
         }
         for protocol, port in existing - desired:
@@ -1120,7 +1119,8 @@ class Network:
     """A list of networks representing the subnets that other units will see
     the charm connecting from. Due to things like NAT it isn't always possible to
     narrow it down to a single address, but when it is clear, the CIDRs will
-    be constrained to a single address (for example, 10.0.0.1/32).
+    be constrained to a single address (for example, 10.0.0.1/32). Any host bits
+    in a CIDR from Juju are discarded, so 10.1.89.35/24 becomes 10.1.89.0/24.
     """
 
     def __init__(self, network_info: _NetworkDict):
@@ -1145,7 +1145,7 @@ class Network:
 
         self.egress_subnets = []
         for subnet in network_info.get('egress-subnets', []):
-            self.egress_subnets.append(ipaddress.ip_network(subnet))
+            self.egress_subnets.append(ipaddress.ip_network(subnet, strict=False))
 
     @property
     def bind_address(self) -> ipaddress.IPv4Address | ipaddress.IPv6Address | str | None:
@@ -1210,7 +1210,7 @@ class NetworkInterface:
         cidr: str = address_info.get('cidr', '')
         # The cidr field may be empty, see LP: #1864102.
         if cidr:
-            subnet = ipaddress.ip_network(cidr)
+            subnet = ipaddress.ip_network(cidr, strict=False)
         elif address:
             # If we have an address, convert it to a /32 or /128 IP network.
             subnet = ipaddress.ip_network(address)
@@ -1325,7 +1325,7 @@ class Secret:
         self._backend = backend
         self._id = id
         self._label = label
-        self._content = content
+        self._content = None if content is None else dict(content)
 
     def __repr__(self):
         fields: list[str] = []
@@ -1463,7 +1463,10 @@ class Secret:
 
         The content of the secret is cached on the :class:`Secret` object, so
         subsequent calls do not require querying the secret storage again,
-        unless ``refresh=True`` is used, or :meth:`set_content` is called.
+        unless ``refresh=True`` is used. Calling :meth:`set_content` does not
+        update the cached content: use :meth:`peek_content` or
+        ``refresh=True`` to read the new content, otherwise this returns the
+        tracked revision until the tracking is updated.
 
         Args:
             refresh: If true, fetch the latest revision's content and tell
@@ -1949,7 +1952,9 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
         backend: _ModelBackend,
         remote_unit: Unit | None = None,
     ):
-        self.relation = weakref.proxy(relation)
+        # A strong reference: a Relation the model doesn't cache (fetched by an
+        # ID outside relation-ids) would otherwise be collected while in use.
+        self.relation = relation
         self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
             our_unit.app: RelationDataContent(self.relation, our_unit.app, backend),
@@ -2302,7 +2307,10 @@ class StatusBase:
                 f"Can't register StatusBase subclass {child}: ",
                 'missing required `name: str` class attribute',
             )
-        cls._statuses[child.name] = child
+        # The first class registered for a name wins. The built-in statuses are registered when
+        # ops is imported, so a charm's subclass can't replace them, and from_name() constructs
+        # the built-in class when reading status back from Juju.
+        cls._statuses.setdefault(child.name, child)
 
     _priorities: ClassVar[dict[str, Any]] = {
         'error': 5,
@@ -4183,12 +4191,19 @@ class _ModelBackend:
                 raw = hookcmds.secret_info_get(label=label)
         else:
             raise TypeError('either `id` or `label` must be provided')
+        try:
+            rotation = SecretRotate(raw.rotation) if raw.rotation else None
+        except ValueError:
+            logger.warning(
+                'Unknown secret rotation policy %r from Juju for secret %s.', raw.rotation, raw.id
+            )
+            rotation = None
         return SecretInfo(
             raw.id,
             label=raw.label,
             revision=raw.revision,
             expires=raw.expiry,  # Note the different names.
-            rotation=SecretRotate(raw.rotation) if raw.rotation else None,
+            rotation=rotation,
             rotates=raw.rotates,
             description=raw.description,
             model_uuid=self.model_uuid,
@@ -4407,6 +4422,10 @@ class LazyNotice:
 
     def __getattr__(self, item: str):
         # Note: not called for defined attributes (id, type, key)
+        if item.startswith('_'):
+            # Looking up our own private attributes (as copy and pickle do
+            # before __init__ has run) must not trigger a load, or recurse.
+            raise AttributeError(item)
         self._ensure_loaded()
         return getattr(self._notice, item)
 
@@ -4445,6 +4464,8 @@ class LazyCheckInfo:
 
     def __getattr__(self, item: str):
         # Note: not called for defined attribute `name`.
+        if item.startswith('_'):
+            raise AttributeError(item)
         self._ensure_loaded()
         return getattr(self._info, item)
 
