@@ -819,11 +819,13 @@ class Framework(Object):
             ) from e
 
         # The observer is stored by name and looked up again when the event is
-        # emitted, so the name must find the method on the object.
+        # emitted, so a name that doesn't find the method is never called.
         if not hasattr(observer_obj, method_name):
-            raise TypeError(
-                f'{type(observer_obj).__name__} has no attribute {method_name!r}: observers '
-                f'must be methods, accessed by the name they are defined with'
+            logger.warning(
+                '%s has no attribute %r, so this observer will not be called: observers '
+                'must be methods, accessed by the name they are defined with.',
+                type(observer_obj).__name__,
+                method_name,
             )
 
         # TODO Prevent the exact same parameters from being registered more than once.

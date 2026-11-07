@@ -405,7 +405,9 @@ class TestFramework:
         with pytest.raises(AttributeError):
             new_obs._stored.myotherdata
 
-    def test_observer_not_found_by_name(self, request: pytest.FixtureRequest):
+    def test_observer_not_found_by_name(
+        self, request: pytest.FixtureRequest, caplog: pytest.LogCaptureFixture
+    ):
         framework = create_framework(request)
 
         class MyEvent(ops.EventBase):
@@ -429,8 +431,14 @@ class TestFramework:
 
         pub = MyNotifier(framework, '1')
         obs = MyObserver(framework, '1')
-        with pytest.raises(TypeError, match="no attribute 'wrapper'"):
+        with caplog.at_level(logging.WARNING):
             framework.observe(pub.foo, obs._on_foo)
+        assert "MyObserver has no attribute 'wrapper'" in caplog.text
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            pub.foo.emit()
+        assert 'has no method wrapper' in caplog.text
 
     def test_defer_and_reemit(self, request: pytest.FixtureRequest):
         framework = create_framework(request)
