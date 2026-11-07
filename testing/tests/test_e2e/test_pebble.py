@@ -428,6 +428,46 @@ def test_pebble_custom_notice():
         assert container.get_notices() == [n._to_ops() for n in notices]
 
 
+class NotifyingCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.start, self._on_start)
+
+    def _on_start(self, _: ops.StartEvent):
+        container = self.unit.get_container('foo')
+        self.notice_id = container.pebble.notify(
+            ops.pebble.NoticeType.CUSTOM, 'example.com/new', data={'k': 'v'}
+        )
+
+
+def test_pebble_notify_ids_and_state():
+    existing = Notice(key='example.com/old', id='1')
+    container = Container(name='foo', can_connect=True, notices=[existing])
+    ctx = Context(NotifyingCharm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.start(), State(containers={container})) as mgr:
+        state_out = mgr.run()
+        # The new notice continues from the IDs already in the state.
+        assert mgr.charm.notice_id == '2'
+    notices = state_out.get_container('foo').notices
+    assert [notice.id for notice in notices] == ['1', '2']
+    assert notices[1].key == 'example.com/new'
+    assert notices[1].last_data == {'k': 'v'}
+    assert notices[1].occurrences == 1
+
+
+def test_mount_relative_source(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / 'src').mkdir()
+    (tmp_path / 'src' / 'file.txt').write_text('hello')
+    monkeypatch.chdir(tmp_path)
+    container = Container(
+        name='foo', can_connect=True, mounts={'foo': Mount(location='/foo', source='src')}
+    )
+    ctx = Context(Charm, meta={'name': 'foo', 'containers': {'foo': {}}})
+    with ctx(ctx.on.start(), State(containers={container})) as mgr:
+        with mgr.charm.unit.get_container('foo').pull('/foo/file.txt') as f:
+            assert f.read() == 'hello'
+
+
 class CustomNoticeCharm(ops.CharmBase):
     key: str
     data: dict[str, str]

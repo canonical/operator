@@ -42,6 +42,7 @@ from .state import (
     Secret,
     Storage,
     _Action,
+    _apply_extensions,
     _CharmSpec,
 )
 from .state import (
@@ -187,10 +188,10 @@ class Manager(Generic[CharmType]):
         try:
             self.ops.run()
         except BaseException:
-            # On failure, hand the in-flight exception to Runtime.exec()'s
-            # __exit__ so it can tear down the env snapshot, then propagate.
-            self._exit_wrapped_ctx(*sys.exc_info())
-            raise
+            # Hand the exception to Runtime.exec()'s __exit__ to tear down the
+            # env; it suppresses a clean early exit (_Abort(0)), which is normal.
+            if not self._exit_wrapped_ctx(*sys.exc_info()):
+                raise
         # On success we must pass (None, None, None) explicitly — not
         # sys.exc_info(). When run() is invoked from Manager.__exit__ (the
         # implicit-run path), sys.exc_info() reports the *outer* exception
@@ -207,12 +208,16 @@ class Manager(Generic[CharmType]):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
-        """Close the Runtime.exec() context exactly once."""
+    ) -> bool:
+        """Close the Runtime.exec() context exactly once.
+
+        Returns:
+            Whether the context suppressed the exception.
+        """
         if self._wrapped_ctx_exited:
-            return
+            return False
         self._wrapped_ctx_exited = True
-        self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb)
+        return bool(self._wrapped_ctx.__exit__(exc_type, exc_val, exc_tb))
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         try:
@@ -795,18 +800,17 @@ class Context(Generic[CharmType]):
 
         else:
             meta = copy.deepcopy(meta) if meta else {'name': str(charm_type.__name__)}
-            if actions is None:
-                actions = meta.pop('actions', None)
-            elif 'actions' in meta:
+            if actions is not None and 'actions' in meta:
                 raise ValueError('Cannot specify actions in both charmcraft.yaml and separately')
-            else:
-                actions = copy.deepcopy(actions)
-            if config is None:
-                config = meta.pop('config', None)
-            elif 'config' in meta:
+            if config is not None and 'config' in meta:
                 raise ValueError('Cannot specify config in both charmcraft.yaml and separately')
-            else:
-                config = copy.deepcopy(config)
+            extensions = meta.pop('extensions', None)
+            if extensions:
+                _apply_extensions(meta, extensions)
+            # An explicit argument wins over what an extension provides.
+            meta_actions, meta_config = meta.pop('actions', None), meta.pop('config', None)
+            actions = copy.deepcopy(actions) if actions is not None else meta_actions
+            config = copy.deepcopy(config) if config is not None else meta_config
             spec = _CharmSpec(charm_type=charm_type, meta=meta, actions=actions, config=config)
 
         self._charm_spec = spec

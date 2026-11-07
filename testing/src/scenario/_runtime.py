@@ -159,7 +159,7 @@ class Runtime(Generic[CharmType]):
                 remote_unit = f'{remote_app_name}/{remote_unit_id}'
                 env['JUJU_REMOTE_UNIT'] = remote_unit
                 if event.name.endswith('_relation_departed'):
-                    if event._relation_departed_unit_id:
+                    if event._relation_departed_unit_id is not None:
                         env['JUJU_DEPARTING_UNIT'] = (
                             f'{remote_app_name}/{event._relation_departed_unit_id}'
                         )

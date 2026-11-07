@@ -592,6 +592,57 @@ def test_remove_bad_revision():
     )
 
 
+def test_secret_with_newer_latest_content_has_two_revisions():
+    secret = Secret({'foo': '1'}, latest_content={'foo': '2'}, owner='unit', label='mylabel')
+    assert secret._tracked_revision == 1
+    assert secret._latest_revision == 2
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        assert mgr.charm.model.get_secret(label='mylabel').get_info().revision == 2
+
+    same = Secret({'foo': '1'}, latest_content={'foo': '1'})
+    assert same._latest_revision == 1
+
+
+def test_set_info_does_not_create_a_revision():
+    secret = Secret({'foo': 'b'}, owner='unit', label='mylabel')
+    ctx = Context(Charm, meta={'name': 'local'})
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        secret_obj = mgr.charm.model.get_secret(label='mylabel')
+        secret_obj.set_info(description='only metadata')
+        assert secret_obj.get_info().revision == 1
+        secret_obj.set_content({'foo': 'c'})
+        assert secret_obj.get_info().revision == 2
+        state_out = mgr.run()
+    assert state_out.get_secret(label='mylabel')._latest_revision == 2
+
+
+@pytest.mark.parametrize('juju_version,expected', [('3.5.0', 3), ('3.6.0', 2)])
+def test_set_same_content_revision(juju_version: str, expected: int):
+    # Juju 3.6 does not create a new revision for identical content.
+    secret = Secret({'foo': 'b'}, owner='unit', label='mylabel')
+    ctx = Context(Charm, meta={'name': 'local'}, juju_version=juju_version)
+    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+        secret_obj = mgr.charm.model.get_secret(label='mylabel')
+        secret_obj.set_content({'foo': 'c'})
+        secret_obj.set_content({'foo': 'c'})
+        assert secret_obj.get_info().revision == expected
+
+
+def test_revoke_without_grant():
+    ctx = Context(Charm, meta={'name': 'local', 'requires': {'foo': {'interface': 'bar'}}})
+    secret = Secret({'a': 'b'}, owner='unit', label='mylabel')
+    with ctx(
+        ctx.on.update_status(), State(relations=[Relation('foo', 'remote')], secrets={secret})
+    ) as mgr:
+        foo = mgr.charm.model.get_relation('foo')
+        assert foo is not None
+        # Revoking something that was never granted is accepted, as in Juju.
+        mgr.charm.model.get_secret(label='mylabel').revoke(relation=foo)
+        output = mgr.run()
+    assert output.get_secret(label='mylabel').remote_grants == {}
+
+
 def test_set_label_on_get():
     class SecretCharm(ops.CharmBase):
         def __init__(self, framework: ops.Framework):
