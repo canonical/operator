@@ -374,6 +374,49 @@ storage:
     ]
 
 
+def test_deferred_storage_event_after_storage_removed(
+    request: pytest.FixtureRequest, fake_script: FakeScript
+):
+    class MyCharm(ops.CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.seen: list[ops.Storage] = []
+            self.framework.observe(self.on['stor'].storage_detaching, self._on_detaching)
+
+        def _on_detaching(self, event: ops.StorageDetachingEvent):
+            self.seen.append(event.storage)
+            if len(self.seen) == 1:
+                event.defer()
+
+    meta = ops.CharmMeta.from_yaml("""
+name: my-charm
+storage:
+  stor:
+    type: filesystem
+""")
+    fake_script.write(
+        'storage-get',
+        """echo '{"kind": "filesystem", "location": "/var/srv/stor/0"}'""",
+    )
+    fake_script.write('storage-list', """echo '["stor/0"]'""")
+    framework = create_framework(request, meta=meta)
+    charm = MyCharm(framework)
+    charm.on['stor'].storage_detaching.emit(ops.Storage('stor', 0, charm.model._backend))
+    assert len(charm.seen) == 1
+
+    # The storage is gone by the time the deferred event is re-emitted, so
+    # the event is restored from the snapshot rather than the model.
+    fake_script.write('storage-list', "echo '[]'")
+    fake_script.write('storage-get', 'exit 1')
+    # The model caches the storage list, so forget it as a fresh dispatch would.
+    charm.model.storages._storage_map['stor'] = None
+    framework.reemit()
+    assert len(charm.seen) == 2
+    assert charm.seen[1].name == 'stor'
+    assert charm.seen[1].index == 0
+    assert charm.seen[1].location == Path('/var/srv/stor/0')
+
+
 def test_workload_events(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
     def mock_change(self: ops.pebble.Client, change_id: str):
         return ops.pebble.Change.from_dict({
