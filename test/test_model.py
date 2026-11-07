@@ -1800,6 +1800,130 @@ def test_push_path_relative(case: PushPullCase, request: pytest.FixtureRequest):
             os.chdir(cwd)
 
 
+def _push_pull_container(request: pytest.FixtureRequest) -> ops.Container:
+    harness = ops.testing.Harness(
+        ops.CharmBase,
+        meta="""
+        name: test-app
+        containers:
+          foo:
+            resource: foo-image
+        """,
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.begin()
+    harness.set_can_connect('foo', True)
+    return harness.model.unit.containers['foo']
+
+
+def test_push_path_symlinks_in_a_tree(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+):
+    container = _push_pull_container(request)
+    src = tmp_path / 'src'
+    (src / 'sub').mkdir(parents=True)
+    (src / 'file.txt').write_text('file')
+    (src / 'file.txt').chmod(0o640)
+    (src / 'sub' / 'inner.txt').write_text('inner')
+    (src / 'link-to-file').symlink_to(src / 'file.txt')
+    (src / 'link-to-dir').symlink_to(src / 'sub')
+    (src / 'dangling').symlink_to(src / 'missing')
+
+    # A link to a directory or a dangling link must not stop the rest of the tree.
+    with caplog.at_level(logging.INFO, logger='ops.model'):
+        container.push_path(src, '/dst')
+
+    assert f'skipped 2 symbolic link(s) under {src}' in caplog.messages[-1]
+
+    pushed = {info.name for info in container.list_files('/dst/src')}
+    assert pushed == {'file.txt', 'link-to-file', 'sub'}
+    with container.pull('/dst/src/sub/inner.txt') as f:
+        assert f.read() == 'inner'
+    # A link to a file is copied with the contents and permissions of its target.
+    with container.pull('/dst/src/link-to-file') as f:
+        assert f.read() == 'file'
+    assert container.list_files('/dst/src/link-to-file')[0].permissions == 0o640
+
+
+def test_push_path_follows_named_symlink(request: pytest.FixtureRequest, tmp_path: pathlib.Path):
+    container = _push_pull_container(request)
+    target = tmp_path / 'target.txt'
+    target.write_text('target')
+    target.chmod(0o640)
+    link = tmp_path / 'link.txt'
+    link.symlink_to(target)
+
+    container.push_path(link, '/dst')
+
+    with container.pull('/dst/link.txt') as f:
+        assert f.read() == 'target'
+    assert container.list_files('/dst/link.txt')[0].permissions == 0o640
+
+
+def test_push_path_named_dangling_symlink_is_an_error(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+):
+    container = _push_pull_container(request)
+    link = tmp_path / 'link.txt'
+    link.symlink_to(tmp_path / 'missing')
+
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        container.push_path(link, '/dst')
+
+    assert [(p, type(e)) for p, e in excinfo.value.errors] == [(str(link), FileNotFoundError)]
+
+
+def test_push_path_continues_after_error(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    container = _push_pull_container(request)
+    src = tmp_path / 'src'
+    src.mkdir()
+    for name in ('a.txt', 'b.txt', 'c.txt'):
+        (src / name).write_text(name)
+
+    real_push = container.push
+
+    def failing_push(path: str | pathlib.PurePath, *args: Any, **kwargs: Any):
+        if pathlib.PurePath(path).name == 'b.txt':
+            raise pebble.PathError('generic-file-error', 'disk full')
+        return real_push(path, *args, **kwargs)
+
+    monkeypatch.setattr(container, 'push', failing_push)
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        container.push_path(src, '/dst')
+
+    assert [(pathlib.Path(p).name, type(e)) for p, e in excinfo.value.errors] == [
+        ('b.txt', pebble.PathError)
+    ]
+    pushed = {info.name for info in container.list_files('/dst/src')}
+    assert pushed == {'a.txt', 'c.txt'}
+
+
+def test_pull_path_continues_after_error(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    container = _push_pull_container(request)
+    for name in ('a.txt', 'b.txt', 'c.txt'):
+        container.push(f'/src/{name}', name, make_dirs=True)
+
+    real_pull = container.pull
+
+    def failing_pull(path: str | pathlib.PurePath, *args: Any, **kwargs: Any):
+        if pathlib.PurePath(path).name == 'b.txt':
+            raise pebble.PathError('generic-file-error', 'read error')
+        return real_pull(path, *args, **kwargs)
+
+    monkeypatch.setattr(container, 'pull', failing_pull)
+    with pytest.raises(ops.MultiPushPullError) as excinfo:
+        container.pull_path('/src', tmp_path)
+
+    assert [(pathlib.Path(p).name, type(e)) for p, e in excinfo.value.errors] == [
+        ('b.txt', pebble.PathError)
+    ]
+    assert {p.name for p in (tmp_path / 'src').iterdir()} == {'a.txt', 'c.txt'}
+
+
 class TestApplication:
     @pytest.fixture
     def harness(self):
