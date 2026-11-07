@@ -633,6 +633,46 @@ def test_duplicate_relation_ids():
     )
 
 
+def test_duplicate_container_names():
+    meta: dict[str, Any] = {'name': 'foo', 'containers': {'bar': {}}}
+    assert_inconsistent(
+        State(containers={Container('bar'), Container('bar', can_connect=True)}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta=meta),
+    )
+    # Identical containers collapse to one, so there is no duplicate.
+    assert_consistent(
+        State(containers={Container('bar'), Container('bar')}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta=meta),
+    )
+
+
+def test_duplicate_network_bindings():
+    assert_inconsistent(
+        State(networks={Network('foo'), Network('foo', ingress_addresses=['192.0.2.1'])}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo', 'extra-bindings': {'foo': {}}}),
+    )
+
+
+def test_duplicate_secret_ids():
+    assert_inconsistent(
+        State(secrets={Secret({'a': 'b'}, id='x'), Secret({'c': 'd'}, id='x')}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta={'name': 'foo'}),
+    )
+
+
+def test_duplicate_resource_names():
+    meta = {'name': 'foo', 'resources': {'bar': {'type': 'file'}}}
+    assert_inconsistent(
+        State(resources={Resource(name='bar', path='/a'), Resource(name='bar', path='/b')}),
+        Event('start'),
+        _CharmSpec(MyCharm, meta=meta),
+    )
+
+
 def test_relation_without_endpoint():
     assert_inconsistent(
         State(relations={Relation('foo', id=1), Relation('bar', id=1)}),
