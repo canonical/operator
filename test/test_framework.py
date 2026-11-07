@@ -26,7 +26,7 @@ import re
 import sys
 import typing
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -2351,3 +2351,36 @@ class TestDebugHook:
                 publisher.install.emit()
                 assert fake_stderr.getvalue() == _BREAKPOINT_WELCOME_MESSAGE
         assert mock.call_count == 2
+
+
+class TestTracingObserved:
+    def test_framework_events_do_not_mark_observed(
+        self, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    ):
+        fake_tracing = MagicMock()
+        monkeypatch.setattr(ops, 'tracing', fake_tracing)
+        framework = create_framework(request)
+
+        class MyEvent(ops.EventBase):
+            pass
+
+        class MyNotifier(ops.Object):
+            foo = ops.EventSource(MyEvent)
+
+        class MyObserver(ops.Object):
+            def on_foo(self, event: ops.EventBase):
+                pass
+
+            def on_commit(self, event: ops.EventBase):
+                pass
+
+        pub = MyNotifier(framework, '1')
+        obs = MyObserver(framework, '1')
+        framework.observe(framework.on.commit, obs.on_commit)
+        framework.observe(pub.foo, obs.on_foo)
+
+        # Observed by StoredState in nearly every dispatch, so not a signal.
+        framework.commit()
+        assert fake_tracing._mark_observed.call_count == 0
+        pub.foo.emit()
+        assert fake_tracing._mark_observed.call_count == 1

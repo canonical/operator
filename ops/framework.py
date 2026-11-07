@@ -892,7 +892,7 @@ class Framework(Object):
         if saved:
             from . import tracing  # break circular import
 
-            if tracing:
+            if tracing and not isinstance(event, LifecycleEvent):
                 # To ensure that the trace data collected during the processing of early events
                 # (such as install or start) are not evicted from the tracing buffer before the
                 # tracing relation is established, we mark any dispatch where the Juju event has an
@@ -900,6 +900,8 @@ class Framework(Object):
                 # This increases the priority of those trace entries within the buffer, preserving
                 # the initial trace data longer and helping charm developers analyze the charm's
                 # behavior during application startup.
+                # Framework events such as commit and collect-status are observed in nearly
+                # every dispatch (StoredState observes commit), so they do not count.
                 tracing._mark_observed()
             self._reemit(event_path)
 
