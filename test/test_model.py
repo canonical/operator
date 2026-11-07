@@ -3172,6 +3172,20 @@ class TestModelBackend:
         description = json.loads(calls[1][-1])['description']
         assert description.startswith(f"Hook command 'config-get'{leadership} failed")
 
+    def test_juju_log_authz_failure_does_not_recurse(
+        self, fake_script: FakeScript, backend: _ModelBackend, root_logging: None
+    ):
+        # The security event is reported with juju-log, so if that is what
+        # failed there is nothing more to do.
+        fake_script.write('juju-log', 'echo "ERROR permission denied" >&2; exit 1')
+        fake_script.write('is-leader', 'echo false')
+        with pytest.raises(ops.ModelError) as excinfo:
+            backend.juju_log('INFO', 'hello')
+        assert str(excinfo.value) == 'ERROR permission denied\n'
+        calls = fake_script.calls(clear=True)
+        # The original message, then one attempt to report the failure.
+        assert [call[0] for call in calls] == ['juju-log', 'juju-log']
+
     def test_is_leader_authz_failure_is_reported_once(
         self, fake_script: FakeScript, backend: _ModelBackend, root_logging: None
     ):

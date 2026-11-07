@@ -29,10 +29,9 @@ recreated with every charm update.
 ```
 
 ```{note}
-In Kubernetes charms that use the older 'podspec' model, rather than the sidecar
-pattern, or when the `use_juju_for_storage` option is set, this data will be
-stored in Juju instead, and will persist for the life of the application.
-Avoid using `StoredState` objects in these situations.
+When the `use_juju_for_storage` option is set, this data will be stored in Juju
+instead, and will persist for the life of the application. Avoid using
+`StoredState` objects in this situation.
 ```
 
 A `StoredState` object is capable of persisting simple data types, such as

@@ -151,6 +151,9 @@ def _get_juju_log_and_app_id():
     return juju_log, 'charm'
 
 
+_reporting_security_event = False
+
+
 def _log_security_event(
     level: _SecurityEventLevel | str,
     event_type: _SecurityEvent | str,
@@ -169,6 +172,12 @@ def _log_security_event(
           consumption. Includes additional details of the event that do not
           fit in the event name.
     """
+    global _reporting_security_event
+    if _reporting_security_event:
+        # The event is sent with juju-log. If that itself fails with an
+        # authorisation error, the failure is reported as a security event,
+        # which would recurse until the stack ran out.
+        return
     juju_log, app_id = _get_juju_log_and_app_id()
     type = event_type if isinstance(event_type, str) else event_type.value
     data: dict[str, typing.Any] = {
@@ -183,4 +192,8 @@ def _log_security_event(
         'event': f'{type}:{event_data}',
         'description': description,
     }
-    juju_log('TRACE', json.dumps(data))
+    _reporting_security_event = True
+    try:
+        juju_log('TRACE', json.dumps(data))
+    finally:
+        _reporting_security_event = False
