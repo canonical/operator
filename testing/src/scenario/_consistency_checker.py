@@ -713,9 +713,7 @@ def check_containers_consistency(
                 )
                 continue
             plan_check = plan.checks[check.name]
-            # Scenario allows None for unset, Pebble defaults to UNSET.
-            check_level = check.level if check.level is not None else pebble.CheckLevel.UNSET
-            if check_level != plan_check.level:
+            if check.level != plan_check.level:
                 errors.append(
                     f'container {container.name!r} has a check {check.name!r} with a '
                     f"different 'level' ({check.level}) than the plan ({plan_check.level}).",

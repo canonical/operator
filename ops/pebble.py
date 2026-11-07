@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import binascii
 import builtins
+import codecs
 import contextlib
 import copy
 import dataclasses
@@ -461,6 +462,20 @@ class ConnectionError(Error):
     """Raised when the Pebble client can't connect to the socket."""
 
 
+class _ConnectionTimeoutError(ConnectionError, builtins.TimeoutError):
+    """Raised when a request to Pebble times out.
+
+    This is also a built-in ``TimeoutError``, because :meth:`Client.wait_change`
+    needs to tell a timeout apart from losing the connection, and so might a charm.
+    """
+
+
+def _wrap_response_error(e: OSError | http.client.HTTPException) -> ConnectionError:
+    """Return the ConnectionError to raise for an error reading a response from Pebble."""
+    cls = _ConnectionTimeoutError if isinstance(e, builtins.TimeoutError) else ConnectionError
+    return cls(f'{type(e).__name__} - {e}')
+
+
 class ProtocolError(Error):
     """Raised when there's a higher-level protocol error talking to Pebble."""
 
@@ -848,11 +863,12 @@ class Plan:
     """
 
     def __init__(self, raw: str | PlanDict | None = None):
-        if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
-            d = yaml.safe_load(raw) or {}  # type: ignore
+        if isinstance(raw, str):
+            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
         else:
-            d = raw or {}
-        d = typing.cast('PlanDict', d)
+            loaded = raw or {}
+        # A section with nothing under it is null once the YAML is loaded.
+        d = typing.cast('PlanDict', {k: v for k, v in loaded.items() if v is not None})
 
         self._raw = raw
         self._services: dict[str, Service] = {
@@ -938,11 +954,12 @@ class Layer:
     log_targets: dict[str, LogTarget]
 
     def __init__(self, raw: str | LayerDict | None = None):
-        if isinstance(raw, str):  # ruff: ignore[if-else-block-instead-of-if-exp]
-            d = yaml.safe_load(raw) or {}  # type: ignore # (Any 'raw' type)
+        if isinstance(raw, str):
+            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
         else:
-            d = raw or {}
-        d = typing.cast('LayerDict', d)
+            loaded = raw or {}
+        # A section with nothing under it is null once the YAML is loaded.
+        d = typing.cast('LayerDict', {k: v for k, v in loaded.items() if v is not None})
 
         self.summary = d.get('summary', '')
         self.description = d.get('description', '')
@@ -1260,9 +1277,11 @@ class Check:
                 self._merge_exec(value)
             elif name == 'startup' and value == CheckStartup.UNSET:
                 continue
-            # Note that CheckLevel.UNSET has a different meaning to
-            # CheckStartup.UNSET. In the former, it means 'there is no level';
-            # in the latter it means 'use the default'.
+            elif name == 'level' and value == CheckLevel.UNSET:
+                # Like every other field, a level the other layer does not
+                # set leaves this layer's level alone (which is what Pebble
+                # does when it combines the layers).
+                continue
             else:
                 setattr(self, name, value)
 
@@ -1462,7 +1481,8 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or
+    :attr:`CheckLevel.UNSET` (level not set).
     """
 
     startup: CheckStartup
@@ -1693,7 +1713,7 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
+    last_data: dict[str, str] = dataclasses.field(default_factory=dict[str, str], hash=False)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None
@@ -2004,6 +2024,12 @@ def _reader_to_websocket(
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
+    # A multi-byte character may be split across two websocket messages, so the
+    # messages cannot be decoded independently. This runs in a thread, so a
+    # decoding error would have nowhere to go, and would lose the rest of the output.
+    decoder = (
+        None if encoding is None else codecs.getincrementaldecoder(encoding)(errors='replace')
+    )
     while True:
         try:
             chunk = ws.recv()
@@ -2030,9 +2056,15 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
             # Received "end" command (EOF signal), stop thread
             break
 
-        if encoding is not None:
-            chunk = chunk.decode(encoding)
+        if decoder is not None:
+            chunk = decoder.decode(chunk)
+            if not chunk:
+                continue
         writer.write(chunk)
+    if decoder is not None:
+        tail = decoder.decode(b'', final=True)
+        if tail:
+            writer.write(tail)
 
 
 class _WebsocketWriter(io.BufferedIOBase):
@@ -2075,22 +2107,23 @@ class _WebsocketWriter(io.BufferedIOBase):
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws: _WebSocket):
+    def __init__(self, ws: _WebSocket, encoding: str | None = None):
         self.ws = ws
         self.remaining = b''
         self.eof = False
+        # Only used to find where complete characters end; the decoding itself
+        # is done by the TextIOWrapper around this reader.
+        self._decoder_factory = (
+            None if encoding is None else codecs.getincrementaldecoder(encoding)
+        )
 
     def readable(self) -> bool:
         """Denote this file-like object as readable."""
         return True
 
-    def read(self, n: int = -1) -> str | bytes:
-        """Read up to n bytes from the websocket (or one message if n<0)."""
-        if self.eof:
-            # Calling read() multiple times after EOF should still return EOF
-            return b''
-
-        while not self.remaining:
+    def _recv(self) -> bytes | None:
+        """Receive the next data message from the websocket, or None at EOF."""
+        while True:
             try:
                 chunk = self.ws.recv()
             except (websocket.WebSocketException, OSError) as e:
@@ -2099,8 +2132,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 # connection down): treat it as end-of-file. The error that
                 # caused the teardown is reported by wait()/wait_output().
                 logger.debug('exec output stream closed: %s', e)
-                self.eof = True
-                return b''
+                return None
 
             if isinstance(chunk, str):
                 try:
@@ -2115,13 +2147,47 @@ class _WebsocketReader(io.BufferedIOBase):
                     logger.warning('Invalid I/O command %r', command)
                     continue
                 # Received "end" command, return EOF designator
+                return None
+
+            return chunk
+
+    def _complete_length(self) -> int:
+        """Return the length of the prefix of self.remaining that holds whole characters."""
+        assert self._decoder_factory is not None
+        decoder = self._decoder_factory(errors='replace')
+        decoder.decode(self.remaining)
+        pending, _ = decoder.getstate()
+        return len(self.remaining) - len(pending)
+
+    def read(self, n: int = -1) -> str | bytes:
+        """Read up to n bytes from the websocket (or one message if n<0)."""
+        if self.eof and not self.remaining:
+            # Calling read() multiple times after EOF should still return EOF
+            return b''
+
+        while not self.remaining:
+            chunk = self._recv()
+            if chunk is None:
                 self.eof = True
                 return b''
-
             self.remaining = chunk
 
         if n < 0:
             n = len(self.remaining)
+            if self._decoder_factory is not None:
+                # A multi-byte character may be split across two messages, and
+                # TextIOWrapper.read() decodes what it gets here as complete,
+                # so hold back an incomplete character for the next read.
+                n = self._complete_length()
+                while n == 0:
+                    chunk = self._recv()
+                    if chunk is None:
+                        # Hand back what there is, for the TextIOWrapper to replace.
+                        self.eof = True
+                        n = len(self.remaining)
+                        break
+                    self.remaining += chunk
+                    n = self._complete_length()
         result: str | bytes = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
@@ -2313,7 +2379,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp: dict[str, Any] = json.loads(response.read())
+        raw_resp: dict[str, Any] = json.loads(self._read_response(response))
         return raw_resp
 
     @staticmethod
@@ -2370,8 +2436,21 @@ class Client:
                     '(container restarted?)'
                 ) from None
             raise ConnectionError(e.reason) from e
+        except (OSError, http.client.HTTPException) as e:
+            # urllib only wraps errors from sending the request. Errors while
+            # reading the response, such as Pebble closing the connection or a
+            # timeout, come through unwrapped.
+            raise _wrap_response_error(e) from e
 
         return response
+
+    @staticmethod
+    def _read_response(response: http.client.HTTPResponse, n: int | None = None) -> bytes:
+        """Read from a response, raising ConnectionError if the read fails."""
+        try:
+            return response.read(n)
+        except (OSError, http.client.HTTPException) as e:
+            raise _wrap_response_error(e) from e
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
@@ -2770,7 +2849,7 @@ class Client:
             parser = _FilesParser(boundary)
             try:
                 while True:
-                    chunk = response.read(self._chunk_size)
+                    chunk = self._read_response(response, self._chunk_size)
                     if not chunk:
                         break
                     parser.feed(chunk)
@@ -2861,7 +2940,7 @@ class Client:
             }
             response = self._request_raw('POST', '/v1/files', None, headers, data)
             self._ensure_content_type(response.headers, 'application/json')
-            resp = json.loads(response.read())
+            resp = json.loads(self._read_response(response))
             # we need to cast the Dict[Any, Any] to _FilesResponse
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
@@ -3213,8 +3292,9 @@ class Client:
                 is ``True``.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
-                is used to encode them to bytes. If encoding is None, the
-                types read or written are raw bytes.
+                is used to encode them to bytes. Output bytes that can't be
+                decoded are replaced with the U+FFFD replacement character.
+                If encoding is None, the types read or written are raw bytes.
             combine_stderr: If true, process's stderr output is combined into
                 its stdout (the stderr argument must be None). If false,
                 separate streams are used for stdout and stderr.
@@ -3279,7 +3359,7 @@ class Client:
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
                     connected.append(stderr_ws)
-            except websocket.WebSocketException as e:
+            except (websocket.WebSocketException, OSError) as e:
                 # Error connecting to websockets, probably due to the exec/change
                 # finishing early with an error. Close any websockets that did
                 # connect, then call wait_change to pick up the change error.
@@ -3320,11 +3400,14 @@ class Client:
                 threads.append(t)
                 process_stdout = None
             else:
-                process_stdout = _WebsocketReader(stdio_ws)
+                process_stdout = _WebsocketReader(stdio_ws, encoding)
                 if encoding is not None:
+                    # wait_output() reads this in a thread, where a decoding
+                    # error would be lost, along with all of the output.
                     process_stdout = io.TextIOWrapper(
                         process_stdout,  # type: ignore
                         encoding=encoding,
+                        errors='replace',
                         newline='',
                     )
 
@@ -3335,11 +3418,12 @@ class Client:
                     threads.append(t)
                 else:
                     ws = typing.cast('_WebSocket', stderr_ws)
-                    process_stderr = _WebsocketReader(ws)
+                    process_stderr = _WebsocketReader(ws, encoding)
                     if encoding is not None:
                         process_stderr = io.TextIOWrapper(
                             process_stderr,  # type: ignore
                             encoding=encoding,
+                            errors='replace',
                             newline='',
                         )
 
@@ -3367,10 +3451,14 @@ class Client:
         # case the Pebble side times out (5s), so this side doesn't hang. See:
         # https://github.com/canonical/operator/issues/1246
         sock.settimeout(self.timeout)
-        sock.connect(self.socket_path)
-        url = self._websocket_url(task_id, websocket_id)
-        ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
-        ws.connect(url, socket=sock)
+        try:
+            sock.connect(self.socket_path)
+            url = self._websocket_url(task_id, websocket_id)
+            ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+            ws.connect(url, socket=sock)
+        except BaseException:
+            sock.close()
+            raise
         # Reset to no timeout so connection can be "long polling" when data is
         # being received.
         sock.settimeout(None)
@@ -3632,8 +3720,10 @@ class _FilesParser:
         self._parser.feed(b'\r\n')
 
     def _process_header(self, data: bytearray):
-        parser = email.parser.BytesFeedParser()
-        parser.feed(data)
+        # The bytes parser replaces anything outside ASCII in a header value,
+        # which loses a non-ASCII path. Pebble sends the headers as UTF-8.
+        parser = email.parser.FeedParser()
+        parser.feed(data.decode('utf-8', 'surrogateescape'))
         self._headers = parser.close()
 
         content_disposition = self._headers.get_content_disposition()
