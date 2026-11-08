@@ -392,36 +392,36 @@ When the tests are done, the output should show these passing tests:
 ```text
 tests/integration/test_charm.py::test_deploy
 ...
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running start hook'
-+ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
+INFO jubilant.wait [fastapi-demo] status: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+...
+INFO jubilant.wait [fastapi-demo] status changed: maintenance (Assembling Pebble layers) -> blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status changed: maintenance (Assembling Pebble layers) -> blocked (Waiting for database relation)
 PASSED
 ```
 
 ```text
 tests/integration/test_charm.py::test_workload_version_is_set
 ...
-INFO     jubilant.wait:_juju.py:1491 wait: status changed:
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
-+ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
-+ .apps['fastapi-demo'].version = '3.0.0'
+INFO jubilant.wait [fastapi-demo] status: blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status: blocked (Waiting for database relation)
 PASSED
 ```
 
 ```text
 tests/integration/test_charm.py::test_database_integration
 ...
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['postgresql-k8s'].app_status.current = 'waiting'
-- .apps['postgresql-k8s'].app_status.message = 'awaiting for cluster to start'
-+ .apps['postgresql-k8s'].app_status.current = 'active'
-+ .apps['postgresql-k8s'].app_status.message = 'Primary'
-- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'waiting'
-- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'awaiting for cluster to start'
-+ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
-+ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
+INFO jubilant.wait [fastapi-demo] status: blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status: blocked (Waiting for database relation)
+INFO jubilant.wait [postgresql-k8s] status: waiting (installing agent)
+INFO jubilant.wait [postgresql-k8s/0] status: waiting (installing agent)
+...
+INFO jubilant.wait [postgresql-k8s] status changed: waiting (awaiting for cluster to start) -> active (Primary)
+INFO jubilant.wait [postgresql-k8s/0] status changed: waiting (awaiting for cluster to start) -> active (Primary)
+INFO jubilant.wait [fastapi-demo] status changed: maintenance (Assembling Pebble layers) -> active ()
+INFO jubilant.wait [fastapi-demo/0] status changed: maintenance (Assembling Pebble layers) -> active ()
 PASSED
 ```
 
