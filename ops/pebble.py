@@ -459,14 +459,18 @@ class TimeoutError(TimeoutError, Error):
 
 
 class ConnectionError(Error):
-    """Raised when the Pebble client can't connect to the socket."""
+    """Raised when the Pebble client can't connect to the socket.
+
+    This is also raised if the connection fails or times out before Pebble's
+    response is complete.
+    """
 
 
 class _ConnectionTimeoutError(ConnectionError, builtins.TimeoutError):
     """Raised when a request to Pebble times out.
 
     This is also a built-in ``TimeoutError``, because :meth:`Client.wait_change`
-    needs to tell a timeout apart from losing the connection, and so might a charm.
+    needs to tell a timeout apart from losing the connection.
     """
 
 
@@ -2429,10 +2433,11 @@ class Client:
                     '(container restarted?)'
                 ) from None
             raise ConnectionError(e.reason) from e
-        except (OSError, http.client.HTTPException) as e:
+        except OSError as e:
             # urllib only wraps errors from sending the request. Errors while
-            # reading the response, such as Pebble closing the connection or a
-            # timeout, come through unwrapped.
+            # waiting for the response, such as Pebble closing the connection or
+            # a timeout, come through unwrapped. This doesn't catch HTTPException,
+            # because building the request raises that for a bad URL.
             raise _wrap_response_error(e) from e
 
         return response

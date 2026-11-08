@@ -3448,6 +3448,12 @@ class TestSocketClient:
             client.get_system_info()
         assert 'RemoteDisconnected' in str(excinfo.value)
 
+    def test_invalid_url_not_connection_error(self):
+        client = pebble.Client(socket_path='does_not_exist')
+        # A bad URL is a bug in the caller, not a problem reaching Pebble.
+        with pytest.raises(http.client.InvalidURL):
+            client.get_change(pebble.ChangeID('1 2'))
+
     @pytest.mark.parametrize(
         'method,args,content_type',
         [
