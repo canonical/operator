@@ -807,16 +807,6 @@ class TestLayer:
         s = pebble.Layer({})
         self._assert_empty(s)
 
-    def test_null_sections(self):
-        s = pebble.Layer("""
-summary:
-description:
-services:
-checks:
-log-targets:
-""")
-        self._assert_empty(s)
-
         d: pebble.LayerDict = {
             'summary': 'Sum Mary',
             'description': 'The quick brown fox!',
@@ -859,6 +849,37 @@ log-targets:
         assert s.log_targets['baz'].labels == {'key': 'value $VAR'}
 
         assert s.to_dict() == d
+
+    def test_null_sections(self):
+        s = pebble.Layer("""
+summary:
+description:
+services:
+checks:
+log-targets:
+""")
+        self._assert_empty(s)
+
+    @pytest.mark.parametrize(
+        'yaml',
+        [
+            pytest.param('services:\n  svc:\n', id='service'),
+            pytest.param('services:\n  svc:\n    environment:\n', id='service-environment'),
+            pytest.param('services:\n  svc:\n    after:\n', id='service-after'),
+            pytest.param('services:\n  svc:\n    on-check-failure:\n', id='service-on-check'),
+            pytest.param('checks:\n  chk:\n    startup:\n', id='check-startup'),
+            pytest.param('checks:\n  chk:\n    level:\n', id='check-level'),
+            pytest.param('log-targets:\n  t:\n    services:\n', id='log-target-services'),
+        ],
+    )
+    def test_null_fields(self, yaml: str):
+        layer = pebble.Layer(yaml)
+        for section in (layer.services, layer.checks, layer.log_targets):
+            for item in section.values():
+                assert item.to_dict() == {}
+        for check in layer.checks.values():
+            assert check.level == pebble.CheckLevel.UNSET
+            assert check.startup == pebble.CheckStartup.UNSET
 
     def test_yaml(self):
         s = pebble.Layer('')

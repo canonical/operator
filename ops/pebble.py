@@ -858,6 +858,15 @@ class Change:
         )
 
 
+def _without_nulls(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Return a copy of raw without its null values.
+
+    A key with nothing after it in YAML, such as a bare ``services:`` header,
+    is null once loaded. Pebble treats that the same as leaving the key out.
+    """
+    return {k: v for k, v in (raw or {}).items() if v is not None}
+
+
 class Plan:
     """Represents the effective Pebble configuration.
 
@@ -868,11 +877,10 @@ class Plan:
 
     def __init__(self, raw: str | PlanDict | None = None):
         if isinstance(raw, str):
-            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
+            loaded: Mapping[str, Any] | None = yaml.safe_load(raw)
         else:
-            loaded = raw or {}
-        # A section with nothing under it is null once the YAML is loaded.
-        d = typing.cast('PlanDict', {k: v for k, v in loaded.items() if v is not None})
+            loaded = raw
+        d = typing.cast('PlanDict', _without_nulls(loaded))
 
         self._raw = raw
         self._services: dict[str, Service] = {
@@ -959,11 +967,10 @@ class Layer:
 
     def __init__(self, raw: str | LayerDict | None = None):
         if isinstance(raw, str):
-            loaded: Mapping[str, Any] = yaml.safe_load(raw) or {}
+            loaded: Mapping[str, Any] | None = yaml.safe_load(raw)
         else:
-            loaded = raw or {}
-        # A section with nothing under it is null once the YAML is loaded.
-        d = typing.cast('LayerDict', {k: v for k, v in loaded.items() if v is not None})
+            loaded = raw
+        d = typing.cast('LayerDict', _without_nulls(loaded))
 
         self.summary = d.get('summary', '')
         self.description = d.get('description', '')
@@ -1011,7 +1018,7 @@ class Service:
 
     def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
-        dct: ServiceDict = raw or {}
+        dct = typing.cast('ServiceDict', _without_nulls(raw))
         self.summary = dct.get('summary', '')
         self.description = dct.get('description', '')
         self.startup = dct.get('startup', '')
@@ -1149,7 +1156,7 @@ class Check:
 
     def __init__(self, name: str, raw: CheckDict | None = None):
         self.name = name
-        dct: CheckDict = raw or {}
+        dct = typing.cast('CheckDict', _without_nulls(raw))
         self.override: str = dct.get('override', '')
         try:
             level: CheckLevel | str = CheckLevel(dct.get('level', ''))
@@ -1312,7 +1319,7 @@ class LogTarget:
 
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
-        dct: LogTargetDict = raw or {}
+        dct = typing.cast('LogTargetDict', _without_nulls(raw))
         self.override: str = dct.get('override', '')
         self.type = dct.get('type', '')
         self.location = dct.get('location', '')
