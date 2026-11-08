@@ -48,6 +48,10 @@ juju-crashdump*.tar.xz
 # Libs for example charms
 /examples/*/lib
 
+# uv.lock for tutorial charms
+/examples/k8s-*/uv.lock
+/examples/machine-tinyproxy/uv.lock
+
 # sbomber
 /pkgs
 /reports
