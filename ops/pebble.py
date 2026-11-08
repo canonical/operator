@@ -1200,6 +1200,10 @@ class Check:
         if self.exec is None:
             self.exec = {}
         for name, value in other.items():
+            # A user or group ID of 0 (root) is an explicit value, so only None is unset.
+            if name in ('user-id', 'group-id') and value is not None:
+                self.exec[name] = value
+                continue
             if not value:
                 continue
             if name == 'environment':
