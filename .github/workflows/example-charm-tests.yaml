@@ -47,6 +47,10 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Lock dependencies
+        run: |
+          cd ${{ matrix.dir }}
+          uv lock
       - name: Run linting and static checks
         run: |
           cd ${{ matrix.dir }}
