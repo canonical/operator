@@ -1,183 +1,27 @@
 (manage-interfaces)=
 # How to manage interfaces
 
+See also: {ref}`charm-relation-interfaces`
+
+## Find an existing interface
+
+Before you create a new interface, check whether one already exists that does what you need. Browse [Interfaces on Charmhub](https://charmhub.io/interfaces), or the {external+charmlibs:doc}`interface specifications <reference/interfaces>` in the Charmlibs documentation. Each interface's page describes the data that the provider and requirer exchange, and lists the charms that implement it.
+
+If an existing interface is close to what you need, consider extending it rather than creating a new one.
+
 (register-an-interface)=
 ## Register an interface
 
+To register a new interface, add its definition to the `interfaces` directory of the [`charmlibs` monorepo](https://github.com/canonical/charmlibs) and open a pull request. The definition records:
 
-Suppose you have determined that you need to create a new relation interface called `my_fancy_database`.
+* The specification. This describes what charms on each side of the interface are expected to do.
+* The reference charms. These are the charms that implement the interface.
+* The schema. This defines the relation data that each side exchanges.
 
-Suppose that your interface specification has the following data model:
-- the requirer app is supposed to forward a list of tables that it wants to be provisioned by the database provider
-- the provider app (the database) at that point will reply with an API endpoint and, for each replica, it will provide a separate secret ID to authenticate the requests
+You don't need to publish a charm library to register an interface. A directory that contains only the interface definition is enough. Follow the layout of an existing interface in the `interfaces` directory.
 
-These are the steps you need to take in order to register it in the [`charmlibs` monorepo](#charm-relation-interfaces).
+If you also want to publish a library that implements the interface, run `just init --interface` in your `charmlibs` checkout. For more information, see {external+charmlibs:doc}`how-to/python-package`.
 
-### 1. Clone (a fork of) [the `charmlibs` repo](https://github.com/canonical/charmlibs)
+Before you write the schema, read {external+charmlibs:doc}`how-to/design-relation-interfaces`. It explains how to design relation data that can change without breaking charms that are already deployed.
 
-```bash
-git clone https://github.com/canonical/charmlibs
-cd /path/to/charmlibs
-```
-
-### 2. Create the interface directory
-
-Registering an interface means adding its definition to `charmlibs`; you don't need to publish a Python package to do that. Create a directory for the interface under `interfaces/`, named with the canonical interface name as it appears in `charmcraft.yaml` files -- for example `my_fancy_database` -- and add the three files that make up the definition inside an `interface/v0/` subdirectory:
-
-```bash
-mkdir -p ./interfaces/my_fancy_database/interface/v0
-touch ./interfaces/my_fancy_database/interface/v0/{README.md,interface.yaml,schema.py}
-```
-
-The `interface/` level is what marks the directory as an interface definition: `charmlibs`' own tooling looks for it, and a directory without one is skipped when the interface index is generated, so the interface never appears in the docs or on Charmhub. The version below it is the interface version, starting at `v0`; a later incompatible revision is added alongside as `v1` rather than replacing it.
-
-```{note}
-
-If you also want to ship a charm library implementing the interface, run `just init --interface` from the repository root and answer the prompts. That scaffolds a full `charmlibs.interfaces.<name>` package, which is published to PyPI. It scaffolds the library only -- you still add the definition files above. See the [`charmlibs` documentation](https://canonical.com/juju/docs/charmlibs/) for how to develop and release one.
-```
-
-(edit-interface-yaml)=
-### 3. Edit `interface.yaml`
-
-Add to `interface.yaml` the charm that owns the reference implementation of the `my_fancy_database` interface. Assuming your `my_fancy_database_charm` plays the `provider` role in the interface, your `interface.yaml` will look like this:
-
-```yaml
-# interface.yaml
-providers:
-  - name: my-fancy-database-operator  # same as metadata.yaml's .name
-    url: https://github.com/your-github-slug/my-fancy-database-operator
-```
-
-### 4. Edit `schema.py`
-
-Edit `schema.py` to contain:
-
-```python
-# schema.py
-
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, AnyHttpUrl, Field, Json
-import typing
-
-
-class ProviderUnitData(BaseModel):
-    secret_id: str = Field(
-        description='Secret ID for the key you need in order to query this unit.',
-        title='Query key secret ID',
-        examples=['secret:12312323112313123213'],
-    )
-
-
-class ProviderAppData(BaseModel):
-    api_endpoint: AnyHttpUrl = Field(
-        description="URL to the database's endpoint.",
-        title='Endpoint API address',
-        examples=['https://example.com/v1/query'],
-    )
-
-
-class ProviderSchema(DataBagSchema):
-    app: ProviderAppData
-    unit: ProviderUnitData
-
-
-class RequirerAppData(BaseModel):
-    tables: Json[typing.List[str]] = Field(
-        description='Tables that the requirer application needs.',
-        title='Requested tables.',
-        examples=[['users', 'passwords']],
-    )
-
-
-class RequirerSchema(DataBagSchema):
-    app: RequirerAppData
-    # we can omit `unit` because the requirer makes no use of the unit databags
-```
-
-`DataBagSchema` comes from `pytest-interface-tester`, which every interface in `charmlibs` currently uses, although `charmlibs` intends to replace it.
-
-### 5. Edit `README.md`
-
-Edit the `README.md` file to contain:
-
-```markdown
-# `my_fancy_database`
-
-## Overview
-This relation interface describes the expected behavior between of any charm claiming to be able to interface with a Fancy Database and the Fancy Database itself.
-Other Fancy Database-compatible providers can be used interchangeably as well.
-
-## Usage
-
-Typically, you can use the implementation of this interface from [this charm library](https://github.com/your_org/my_fancy_database_operator/blob/main/lib/charms/my_fancy_database/v0/fancy.py), although charm developers are free to provide alternative libraries as long as they comply with this interface specification.
-
-## Direction
-The `my_fancy_database` interface implements a provider/requirer pattern.
-The requirer is a charm that wishes to act as a Fancy Database Service consumer, and the provider is a charm exposing a Fancy Database (-compatible API).
-
-/```mermaid
-flowchart TD
-    Requirer -- tables --> Provider
-    Provider -- endpoint, access_keys --> Requirer
-/```
-
-## Behavior
-
-The requirer and the provider must adhere to a certain set of criteria to be considered compatible with the interface.
-
-### Requirer
-
-- Is expected to publish a list of tables in the application databag
-
-
-### Provide
-
-- Is expected to publish an endpoint URL in the application databag
-- Is expected to create and grant a Juju Secret containing the access key for each shard and publish its secret ID in the unit databags.
-
-## Relation Data
-
-See the {ref}`\[Pydantic Schema\] <12689md>`
-
-
-### Requirer
-
-The requirer publishes a list of tables to be created, as a json-encoded list of strings.
-
-#### Example
-\```yaml
-application_data: {
-   "tables": "{ref}`'users', 'passwords']"
-}
-\```
-
-### Provider
-
-The provider publishes an endpoint url and access keys for each shard.
-
-#### Example
-\```
-application_data: {
-   "api_endpoint": "https://foo.com/query"
-},
-units_data : {
-  "my_fancy_unit/0": {
-     "secret_id": "secret:12312321321312312332312323"
-  },
-  "my_fancy_unit/1": {
-     "secret_id": "secret:45646545645645645646545456"
-  }
-}
-\```
-```
-
-### 6. Open a PR to [the `charmlibs` repo](https://github.com/canonical/charmlibs)
-
-Finally, open a pull request to the `charmlibs` repo and drive it to completion, addressing any feedback or concerns that the maintainers may have.
-
-## Example
-
-For an example of a registered interface, see [`ingress`](https://github.com/canonical/charmlibs/tree/main/interfaces/ingress), which has two versions, `interface/v1` and `interface/v2`. Taking v2:
-   - As you can see from its [`interface.yaml`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/interface.yaml), the [`canonical/traefik-k8s-operator` charm](https://github.com/canonical/traefik-k8s-operator) plays the provider role in the interface.
-   - The schema of this interface is defined in [`schema.py`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/schema.py).
-   - You can find out more information about this interface in its [`README.md`](https://github.com/canonical/charmlibs/blob/main/interfaces/ingress/interface/v2/README.md).
+The `charmlibs` maintainers review the pull request. Address their feedback until the pull request is merged.
