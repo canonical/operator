@@ -24,27 +24,28 @@ requires-python = ">=3.10"
 # 'charm-libs' block in charmcraft.yaml, run `charmcraft fetch-libs` to download the libraries,
 # then inspect the libraries for dependencies specified in PYDEPS. List those dependencies here.
 dependencies = [
-    "ops>=3.9.0,<4",
+    "ops~=3.9",
 ]
 
 [dependency-groups]
 # Dependencies of linting and static type checks
 lint = [
-    "ruff",
-    "codespell",
-    "pyright",
+    "ruff~=0.17",
+    "codespell>=2.4,<3",
+    "pyright>=1.1,<2",
 ]
 # Dependencies of unit tests
 unit = [
-    "coverage[toml]",
-    "ops[testing]",
-    "pytest",
+    "coverage[toml]>=7.10,<8",
+    "ops[testing]",  # uv will use the correct version based on the 'ops' dependency.
+    "pytest>=9.1,<10",
 ]
 # Dependencies of integration tests
 integration = [
-    "jubilant>=1.14.0,<2",
-    "pytest-jubilant>=2.3.0,<3",
-    "pyyaml",
+    "jubilant>=1.14,<2",
+    "pytest>=9.1,<10",
+    "pytest-jubilant>=2.3,<3",
+    "PyYAML>=6.0,<7",
 ]
 
 # Testing tools configuration

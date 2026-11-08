@@ -133,6 +133,7 @@ dependencies = [
 [package.dev-dependencies]
 integration = [
     { name = "jubilant" },
+    { name = "pytest" },
     { name = "pytest-jubilant" },
     { name = "pyyaml" },
 ]
@@ -148,23 +149,24 @@ unit = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ops", specifier = ">=3.9.0,<4" }]
+requires-dist = [{ name = "ops", specifier = "~=3.9" }]
 
 [package.metadata.requires-dev]
 integration = [
-    { name = "jubilant", specifier = ">=1.14.0,<2" },
-    { name = "pytest-jubilant", specifier = ">=2.3.0,<3" },
-    { name = "pyyaml" },
+    { name = "jubilant", specifier = ">=1.14,<2" },
+    { name = "pytest", specifier = ">=9.1,<10" },
+    { name = "pytest-jubilant", specifier = ">=2.3,<3" },
+    { name = "pyyaml", specifier = ">=6.0,<7" },
 ]
 lint = [
-    { name = "codespell" },
-    { name = "pyright" },
-    { name = "ruff" },
+    { name = "codespell", specifier = ">=2.4,<3" },
+    { name = "pyright", specifier = ">=1.1,<2" },
+    { name = "ruff", specifier = "~=0.17" },
 ]
 unit = [
-    { name = "coverage", extras = ["toml"] },
+    { name = "coverage", extras = ["toml"], specifier = ">=7.10,<8" },
     { name = "ops", extras = ["testing"] },
-    { name = "pytest" },
+    { name = "pytest", specifier = ">=9.1,<10" },
 ]
 
 [[package]]
