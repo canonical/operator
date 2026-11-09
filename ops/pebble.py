@@ -3279,7 +3279,7 @@ class Client:
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
                     connected.append(stderr_ws)
-            except websocket.WebSocketException as e:
+            except (websocket.WebSocketException, OSError) as e:
                 # Error connecting to websockets, probably due to the exec/change
                 # finishing early with an error. Close any websockets that did
                 # connect, then call wait_change to pick up the change error.

@@ -4145,6 +4145,17 @@ class TestExec:
             client.exec(['foo'])
         assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
 
+    def test_connect_websocket_oserror(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id: str, websocket_id: str):
+                raise ConnectionRefusedError('refused')
+
+        client = Client()
+        self.add_responses(client, '123', 0, change_err='change error!')
+        with pytest.raises(pebble.ChangeError) as excinfo:
+            client.exec(['foo'])
+        assert str(excinfo.value) == 'change error!'
+
     def test_websocket_send_raises(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)
         raised = False
