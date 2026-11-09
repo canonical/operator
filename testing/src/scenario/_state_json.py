@@ -36,6 +36,11 @@ class _VersionMismatchError(RuntimeError):
 #: Any value that survives a ``json.dumps``/``json.loads`` round trip.
 _JSON: TypeAlias = Union[bool, int, float, str, 'list[_JSON]', 'dict[str, _JSON]', None]
 
+#: The key that marks an envelope: a JSON object holding a value that JSON
+#: can't represent directly, such as bytes, an enum, a status, a Pebble layer,
+#: a datetime, a set, a tuple, or a dict with integer keys. A dict that has this
+#: key itself is wrapped too, so that charm data such as ``StoredState`` content
+#: can't be mistaken for an envelope.
 _T = '__t__'
 
 #: The ``ops-scenario`` version, from the source rather than the installed
