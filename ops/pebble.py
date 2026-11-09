@@ -458,7 +458,25 @@ class TimeoutError(TimeoutError, Error):
 
 
 class ConnectionError(Error):
-    """Raised when the Pebble client can't connect to the socket."""
+    """Raised when the Pebble client can't connect to the socket.
+
+    This is also raised if the connection fails or times out before Pebble's
+    response is complete.
+    """
+
+
+class _ConnectionTimeoutError(ConnectionError, builtins.TimeoutError):
+    """Raised when a request to Pebble times out.
+
+    This is also a built-in ``TimeoutError``, because :meth:`Client.wait_change`
+    needs to tell a timeout apart from losing the connection.
+    """
+
+
+def _wrap_response_error(e: OSError | http.client.HTTPException) -> ConnectionError:
+    """Return the ConnectionError to raise for an error reading a response from Pebble."""
+    cls = _ConnectionTimeoutError if isinstance(e, builtins.TimeoutError) else ConnectionError
+    return cls(f'{type(e).__name__} - {e}')
 
 
 class ProtocolError(Error):
@@ -2313,7 +2331,7 @@ class Client:
 
         response = self._request_raw(method, path, query, headers, data)
         self._ensure_content_type(response.headers, 'application/json')
-        raw_resp: dict[str, Any] = json.loads(response.read())
+        raw_resp: dict[str, Any] = json.loads(self._read_response(response))
         return raw_resp
 
     @staticmethod
@@ -2370,8 +2388,22 @@ class Client:
                     '(container restarted?)'
                 ) from None
             raise ConnectionError(e.reason) from e
+        except OSError as e:
+            # urllib only wraps errors from sending the request. Errors while
+            # waiting for the response, such as Pebble closing the connection or
+            # a timeout, come through unwrapped. This doesn't catch HTTPException,
+            # because building the request raises that for a bad URL.
+            raise _wrap_response_error(e) from e
 
         return response
+
+    @staticmethod
+    def _read_response(response: http.client.HTTPResponse, n: int | None = None) -> bytes:
+        """Read from a response, raising ConnectionError if the read fails."""
+        try:
+            return response.read(n)
+        except (OSError, http.client.HTTPException) as e:
+            raise _wrap_response_error(e) from e
 
     def get_system_info(self) -> SystemInfo:
         """Get system info."""
@@ -2770,7 +2802,7 @@ class Client:
             parser = _FilesParser(boundary)
             try:
                 while True:
-                    chunk = response.read(self._chunk_size)
+                    chunk = self._read_response(response, self._chunk_size)
                     if not chunk:
                         break
                     parser.feed(chunk)
@@ -2861,7 +2893,7 @@ class Client:
             }
             response = self._request_raw('POST', '/v1/files', None, headers, data)
             self._ensure_content_type(response.headers, 'application/json')
-            resp = json.loads(response.read())
+            resp = json.loads(self._read_response(response))
             # we need to cast the Dict[Any, Any] to _FilesResponse
             self._raise_on_path_error(typing.cast('_FilesResponse', resp), path)
 
