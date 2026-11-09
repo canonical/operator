@@ -199,6 +199,8 @@ Open `~/tinyproxy-tutorial/charmcraft.yaml` in your usual text editor or IDE, th
 :end-at: how to write a machine charm with Ops.
 ```
 
+Next, remove the `actions` block. Your charm won't define any actions.
+
 ### Write a helper module
 
 Your charm will interact with tinyproxy, so it's a good idea to write a helper module that wraps tinyproxy.
@@ -240,16 +242,55 @@ You can also run these commands in `~/tinyproxy-tutorial` if uv and tox are avai
 
 ### Handle the install event
 
-We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic, containing a class called `TinyproxyCharm`. We'll refer to `TinyproxyCharm` as the "charm class".
+We'll now write the charm code that handles events from Juju. Charmcraft created `src/charm.py` as the location for this logic.
 
-In `src/charm.py`, replace the `_on_install` method of the charm class with:
+The placeholder code in `src/charm.py` covers more functionality than we'll need. Replace the contents of `src/charm.py` with:
 
-```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
-:language: python
-:pyobject: TinyproxyCharm._on_install
+```py
+#!/usr/bin/env python3
+
+"""Charm the application."""
+
+import logging
+
+import ops
+
+# A standalone module for workload-specific logic (no charming concerns):
+import tinyproxy
+
+logger = logging.getLogger(__name__)
+
+
+class TinyproxyCharm(ops.CharmBase):
+    """Charm the application."""
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        framework.observe(self.on.install, self._on_install)
+        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.config_changed, self._on_config_changed)
+
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Install tinyproxy on the machine."""
+        if not tinyproxy.is_installed():
+            tinyproxy.install()
+            version = tinyproxy.get_version()
+            self.unit.set_workload_version(version)
+
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
+        pass  # We'll implement this later.
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent) -> None:
+        """Handle config-changed event."""
+        pass  # We'll implement this later.
+
+
+if __name__ == "__main__":  # pragma: nocover
+    ops.main(TinyproxyCharm)
 ```
 
-When your charm receives the "install" event from Juju, Ops runs this method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
+We'll refer to `TinyproxyCharm` as the "charm class". When your charm receives the "install" event from Juju, Ops instantiates the charm class, then runs the `_on_install` method and tells Juju the version of tinyproxy that's installed on the machine. Juju shows the version in its status output.
 
 As you write your charm, keep in mind that the charm code only runs when there's an event to handle.
 
@@ -329,22 +370,12 @@ We're now ready to implement the logic to load `slug` and configure and start ti
 
 The `configure_and_run` method ensures that tinyproxy is running and correctly configured, regardless of whether tinyproxy was already running. We can therefore use this method to handle two different Juju events: "start" and "config-changed".
 
-Replace the `_on_start` method of the charm class with:
+Replace the `_on_start` and `_on_config_changed` methods of the charm class with:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
 :pyobject: TinyproxyCharm._on_start
 ```
-
-Next, add the following line to the `__init__` method of the charm class:
-
-```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
-:language: python
-:start-at: framework.observe(self.on.config_changed
-:end-at: framework.observe(self.on.config_changed
-```
-
-Then add the following method to the charm class:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/src/charm.py
 :language: python
