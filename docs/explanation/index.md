@@ -5,7 +5,7 @@ These guides explain how Ops works.
 
 ## Interface definitions
 
-Juju interface definitions are maintained in the [`charmlibs` monorepo](https://github.com/canonical/charmlibs).
+Juju interface definitions are part of {external+charmlibs:doc}`Charmlibs <index>`.
 
 ```{toctree}
 :maxdepth: 1

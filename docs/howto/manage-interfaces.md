@@ -18,9 +18,9 @@ To register a new interface, add its definition to the `interfaces` directory of
 * The reference charms. These are the charms that implement the interface.
 * The schema. This defines the relation data that each side exchanges.
 
-You don't need to publish a charm library to register an interface. A directory that contains only the interface definition is enough. Follow the layout of an existing interface in the `interfaces` directory.
+You can register an interface before its library is ready. A directory that contains only the interface definition is enough to start with. Follow the layout of an existing interface in the `interfaces` directory.
 
-If you also want to publish a library that implements the interface, run `just init --interface` in your `charmlibs` checkout. For more information, see {external+charmlibs:doc}`how-to/python-package`.
+To publish the library that implements the interface, run `just init --interface` in your `charmlibs` checkout. For more information, see {external+charmlibs:doc}`how-to/python-package`.
 
 Before you write the schema, read {external+charmlibs:doc}`how-to/design-relation-interfaces`. It explains how to design relation data that can change without breaking charms that are already deployed.
 
