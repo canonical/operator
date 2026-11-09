@@ -118,14 +118,24 @@ def _encode_payload(obj: object, kind: str) -> str:
 
 
 def _decode_payload(payload: str, kind: str) -> Any:
-    data = _as_dict(json.loads(payload), 'payload')
+    try:
+        data = _as_dict(json.loads(payload), 'payload')
+    except ValueError as e:
+        raise TypeError(f'The payload is not valid JSON: {e}') from None
     version = data.get('ops_testing_version')
     if version != _VERSION:
         raise _VersionMismatchError(
             f'The {kind} was encoded by ops.testing (ops-scenario) {version!r}, but this '
             f'process has {_VERSION!r}. The environment is stale, or this is a bug.'
         )
-    return _decode(_field(data, kind, 'payload'))
+    try:
+        return _decode(_field(data, kind, 'payload'))
+    except TypeError:
+        raise
+    # Constructors and dataclass validation raise their own exception types,
+    # but a caller should only need to catch TypeError.
+    except Exception as e:
+        raise TypeError(f'Invalid {kind} in the payload: {e}') from e
 
 
 # Encoder
@@ -393,11 +403,19 @@ def _decode(obj: _JSON) -> Any:
 
     if kind == 'idict':
         mapping = _as_dict(_field(obj, 'v', kind), kind)
-        try:
-            return {int(k): _decode(v) for k, v in mapping.items()}
-        except ValueError:
-            raise TypeError(
-                f'Expected integer keys for idict in the payload, got {list(mapping)!r}.'
-            ) from None
+        result: dict[int, Any] = {}
+        for k, v in mapping.items():
+            try:
+                key = int(k)
+            except ValueError:
+                key = None
+            # Only the canonical form is accepted, so that two keys such as
+            # '1' and '01' can't decode to the same integer.
+            if key is None or str(key) != k:
+                raise TypeError(
+                    f'Expected integer keys for idict in the payload, got {list(mapping)!r}.'
+                )
+            result[key] = _decode(v)
+        return result
 
     raise TypeError(f'Unknown type tag {kind!r} in the payload.')

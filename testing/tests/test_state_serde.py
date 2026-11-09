@@ -407,6 +407,10 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
         ({'__t__': 'dc', 'cls': 'State'}, "Missing 'f'"),
         ({'__t__': 'idict'}, "Missing 'v'"),
         ({'__t__': 'idict', 'v': {'x': 1}}, 'Expected integer keys'),
+        ({'__t__': 'idict', 'v': {'1': 'a', '01': 'b'}}, 'Expected integer keys'),
+        ({'__t__': 'idict', 'v': {' 1': 'a'}}, 'Expected integer keys'),
+        ({'__t__': 'idict', 'v': {'+1': 'a'}}, 'Expected integer keys'),
+        ({'__t__': 'timedelta', 'v': [10**10, 0, 0]}, 'Invalid state'),
         ({'__t__': 'datetime', 'v': 'nope'}, 'Invalid datetime'),
         ({'__t__': 'timedelta', 'v': 1.5}, 'Expected a list'),
         ({'__t__': 'timedelta', 'v': [1, 2]}, r'Expected \[days, seconds, microseconds\]'),
@@ -418,6 +422,12 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
 def test_unknown_encodings_are_rejected(encoded: Any, message: str):
     payload = json.dumps({'ops_testing_version': VERSION, 'state': encoded})
     with pytest.raises(TypeError, match=message):
+        _state_serde.decode_state(payload)
+
+
+@pytest.mark.parametrize('payload', ['', '{', '[1,', 'not json'])
+def test_invalid_json_is_rejected(payload: str):
+    with pytest.raises(TypeError, match='not valid JSON'):
         _state_serde.decode_state(payload)
 
 
