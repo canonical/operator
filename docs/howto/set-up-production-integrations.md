@@ -31,7 +31,7 @@ Integrate your charm with an ingress provider when your workload serves HTTP or 
 
 Some providers:
 
-* [Traefik](https://charmhub.io/traefik-k8s), [NGINX Ingress Integrator](https://charmhub.io/nginx-ingress-integrator), and [Istio Ingress](https://charmhub.io/istio-ingress-k8s) on Kubernetes.
+* [Gateway API Integrator](https://charmhub.io/gateway-api-integrator), [NGINX Ingress Integrator](https://charmhub.io/nginx-ingress-integrator), and [Istio Ingress](https://charmhub.io/istio-ingress-k8s) on Kubernetes.
 * [Ingress Configurator](https://charmhub.io/ingress-configurator) on machines. It translates `ingress` to the `haproxy-route` interface of the [HAProxy](https://charmhub.io/haproxy) charm.
 
 In most cases, your charm can use the [`traefik_k8s.ingress`](https://charmhub.io/traefik-k8s/libraries/ingress) library. See also the {external+charmlibs:ref}`ingress v2 interface specification <interfaces-ingress-v2>`.
@@ -41,12 +41,12 @@ Example charm: [Jenkins](https://github.com/canonical/jenkins-k8s-operator/blob/
 (set-up-production-integrations-observability)=
 ## Observability
 
-Integrate your charm with the [Canonical Observability Stack (COS)](https://documentation.ubuntu.com/observability/) to provide metrics, logs, alerts, and dashboards for your workload. Most charms with a workload need it. A charm that doesn't run a workload, such as an integrator charm, might not.
+Integrate your charm with the [Canonical Observability Stack (COS)](https://canonical.com/observability/docs/track-3.0/) to provide metrics, logs, alerts, and dashboards for your workload. Most charms with a workload need it. A charm that doesn't run a workload, such as an integrator charm, might not.
 
 To integrate your charm with COS:
 
 * On Kubernetes, your charm integrates with each COS component over its own interface. Declare a `provides` endpoint for each of `prometheus_scrape` (Prometheus) and `grafana_dashboard` (Grafana), and a `requires` endpoint for `loki_push_api` (Loki). See {ref}`Observe your charm with COS Lite <observe-your-charm-with-cos-lite>` in our Kubernetes charm tutorial. To trace your charm code and send the trace data to COS, see {ref}`trace-your-charm`.
-* On machines, your charm declares a single `provides` endpoint that uses the `cos_agent` interface. Use the [`grafana_agent.cos_agent`](https://charmhub.io/grafana-agent/libraries/cos_agent) library to implement it. The [OpenTelemetry Collector](https://charmhub.io/opentelemetry-collector) subordinate charm forwards everything to COS. See more: [COS | Instrument machine charms](https://documentation.ubuntu.com/observability/latest/how-to/integrate/instrument-machine-charms/).
+* On machines, your charm declares a single `provides` endpoint that uses the `cos_agent` interface. Use the [`grafana_agent.cos_agent`](https://charmhub.io/grafana-agent/libraries/cos_agent) library to implement it. The [OpenTelemetry Collector](https://charmhub.io/opentelemetry-collector) subordinate charm forwards everything to COS. See more: [COS | Instrument machine charms](https://canonical.com/observability/docs/latest/how-to/integrate/instrument-machine-charms/).
 
 Example charms: [Hydra](https://github.com/canonical/hydra-operator/blob/main/src/charm.py), [Valkey](https://github.com/canonical/valkey-operator/blob/9/edge/src/events/observability.py)
 
@@ -86,7 +86,7 @@ Example charms: [NGINX Ingress Integrator](https://github.com/canonical/nginx-in
 
 Integrate your charm with an object storage provider when your workload needs S3-compatible storage. Your charm declares a `requires` endpoint that uses the `s3` interface, and receives the endpoint, bucket, and credentials from the provider.
 
-The main provider is [S3 Integrator](https://github.com/canonical/object-storage-integrator/blob/main/s3/README.md), which you configure with the details of an S3-compatible service. Its documentation explains how to set it up and which charm library to use.
+The main provider is [S3 Integrator](https://charmhub.io/s3-integrator), which you configure with the details of an S3-compatible service. Use the [`object-storage-charmlib`](https://github.com/canonical/object-storage-integrator/blob/main/lib/README.md) library to implement the integration.
 
 Example charms: [MLflow](https://github.com/canonical/mlflow-operator/blob/main/src/charm.py), [Valkey](https://github.com/canonical/valkey-operator/blob/9/edge/src/events/backup.py)
 
