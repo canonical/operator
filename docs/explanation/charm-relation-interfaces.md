@@ -1,40 +1,22 @@
 (charm-relation-interfaces)=
-# Charm-relation-interfaces
+# Interface definitions
 
 See also: {ref}`manage-interfaces`
 
-[`charm-relation-interfaces`](https://github.com/canonical/charm-relation-interfaces) is a repository containing specifications, databag schemas and interface tests for Juju relation interfaces. In other words, it is the source of truth for data and behavior of providers and requirers of relations.
+An interface definition records what a Juju relation interface means. It describes what providers and requirers of the interface are expected to do, and the data they exchange. It is the source of truth for the data and behaviour of both sides of a relation.
 
-The purpose of this project is to provide uniformity in the landscape of all possible relations and promote charm interoperability.
+Juju interfaces are untyped. For Juju to consider two charms compatible, the interface names of the two endpoints only need to be the same string. Two charms could have incompatible implementations of two different relations that happen to share a name. Keeping interface definitions in a single, shared location prevents this, and avoids a sprawl of subtly different interfaces with the same purpose.
 
-Juju interfaces are untyped, which means that for juju to think two charms can be integrated all it looks at is whether the interface names of the two endpoints you're trying to connect are the same string. But it might be that the two charms have different, incompatible implementations of two different relations that happen to have the same name.
+Interface definitions are part of {external+charmlibs:doc}`Charmlibs <index>`. To browse the interfaces that already exist, see [Interfaces on Charmhub](https://charmhub.io/interfaces) or the {external+charmlibs:doc}`interface specifications <reference/interfaces>` in the Charmlibs documentation.
 
-In order to prevent two separate charms from rolling their own relation with the same name, and prevent a sprawl of many subtly different interfaces with similar semantics and similar purposes, we introduced `charm-relation-interfaces`.
+```{note}
+Interface definitions used to live in the `canonical/charm-relation-interfaces` repository, which is now archived. Contribute new interfaces and updates to `charmlibs` instead.
+```
 
-## Using `charm-relation-interfaces`
+## Using interfaces
 
-If you have a charm that provides a service, you should search `charm-relation-interfaces` (or directly charmhub in the future) and see if it exists already, or perhaps a similar one exists that lacks the semantics you need and can be extended to support it.
+If your charm provides a service, check whether an interface for it already exists. A similar interface might also exist that can be extended to support what you need. If your charm needs a service, such as a database, an ingress URL, or an authentication endpoint, check whether there is an interface you can use and which charms provide it.
 
-Conversely, if the charm you are developing needs some service (a database, an ingress URL, an authentication endpoint...)  you should search `charm-relation-interfaces` to see if there is an interface you can use, and to find existing charms that provide it.
+Every interface should have an official library that implements it, and every charm that provides or requires the interface should use that library. The same people maintain an interface's library and its definition.
 
-There are three actors in play:
-
-* **the owner of the specification** of the interface, which also owns the tests that can be used to verify "does charm X 'really' support this interface?". This is the `charm-relation-interfaces` repo.
-* **the owner of the implementation** of an interface. In practice, this often is the charm that owns the charm library with the reference implementation for an interface.
-* **the interface user**: a charm that wants to use the interface (either as requirer or as provider).
-
-The interface user needs the implementation (typically, the provider also happens to be the owner and so it already has the implementation). This is addressed by `charmcraft fetch-lib`.
-
-The owner of the implementation needs the specification, to help check that the implementation is in fact compliant.
-
-## Repository structure
-
-For each interface, the charm-relation-interfaces repository hosts:
-- the **specification**: a semi-formal definition of what the semantics of the interface is, and what its implementations are expected to do in terms of both the provider and the requirer
-- a list of **reference charms**: these are the charms that implement this interface, typically, the owner of the charm library providing the original implementation.
-- the **schema**: pydantic models unambiguously defining the accepted unit and application databag contents for provider and requirer.
-- the **interface tests**: python tests that can be run to verify that a charm complies with the interface specification.
-
-
-## Charm relation interfaces in Charmhub
-Charmhub will, for all charms using the interface, verify that they implement it correctly (regardless of whether they use the 'official' implementation or they roll their own) in order to give the charm a happy checkmark on `charmhub.io`. In order to do that it will need to fetch the specification (from `charm-relation-interfaces`) *and* the charm repo, because we can't know what implementation they are using: we need the source code.
+Interface libraries are published on PyPI as `charmlibs-interfaces-<interface name>`, and you import them as `charmlibs.interfaces.<interface name>`. For more information, see {external+charmlibs:ref}`charm-libs-interface` and the {external+charmlibs:ref}`list of interface libraries <interface-libs-listing>`.
