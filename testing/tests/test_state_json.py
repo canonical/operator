@@ -15,7 +15,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
-from scenario import _state_serde, _version
+from scenario import _state_json, _version
 
 import ops
 from ops import pebble, testing
@@ -273,18 +273,18 @@ NON_TRIVIAL = testing.State(
     ],
 )
 def test_state_round_trips(state: testing.State):
-    out = _state_serde.decode_state(_state_serde.encode_state(state))
+    out = _state_json.decode_state(_state_json.encode_state(state))
     assert out == state
     # Equality doesn't see every type (an enum and its value, a Path and a str)
     # or the attributes that aren't fields, but the encoding does.
-    assert _state_serde.encode_state(out) == _state_serde.encode_state(state)
+    assert _state_json.encode_state(out) == _state_json.encode_state(state)
 
 
 @pytest.mark.parametrize('track_latest', [False, True])
 def test_secret_revisions_round_trip(track_latest: bool):
     # Secret equality doesn't see the revisions, so check them directly.
     secret = _secret_at_revision_2(track_latest=track_latest)
-    out = _state_serde.decode_state(_state_serde.encode_state(testing.State(secrets={secret})))
+    out = _state_json.decode_state(_state_json.encode_state(testing.State(secrets={secret})))
     decoded = next(iter(out.secrets))
     assert decoded._latest_revision == 2
     assert decoded._tracked_revision == (2 if track_latest else 1)
@@ -295,7 +295,7 @@ def test_a_zoned_datetime_keeps_its_zone_and_fold():
         2026, 4, 5, 2, 30, fold=1, tzinfo=zoneinfo.ZoneInfo('Pacific/Auckland')
     )
     state = testing.State(secrets={testing.Secret({'k': 'v'}, expire=expire)})
-    out = _state_serde.decode_state(_state_serde.encode_state(state))
+    out = _state_json.decode_state(_state_json.encode_state(state))
     decoded = next(iter(out.secrets)).expire
     assert decoded is not None
     assert decoded.tzinfo == expire.tzinfo
@@ -305,7 +305,7 @@ def test_a_zoned_datetime_keeps_its_zone_and_fold():
 
 def test_a_change_id_keeps_its_type():
     state = _container(check_infos={testing.CheckInfo('http', change_id=pebble.ChangeID('42'))})
-    out = _state_serde.decode_state(_state_serde.encode_state(state))
+    out = _state_json.decode_state(_state_json.encode_state(state))
     change_id = next(iter(out.get_container('app').check_infos)).change_id
     assert isinstance(change_id, pebble.ChangeID)
     assert change_id == '42'
@@ -326,7 +326,7 @@ class _Lib(ops.Object):
 def test_a_custom_event_has_no_encoding():
     ctx = testing.Context(_Charm, meta={'name': 'c'})
     with pytest.raises(TypeError, match="custom event \\('ready'\\)"):
-        _state_serde.encode_event(ctx.on.custom(_Lib.on.ready))
+        _state_json.encode_event(ctx.on.custom(_Lib.on.ready))
 
 
 @pytest.mark.parametrize(
@@ -339,7 +339,7 @@ def test_a_custom_event_has_no_encoding():
 def test_event_round_trips(name: str, kwargs: dict[str, Any]):
     ctx = testing.Context(_Charm, meta={'name': 'c', 'requires': {'db': {'interface': 'db'}}})
     event = getattr(ctx.on, name)(**kwargs)
-    assert _state_serde.decode_event(_state_serde.encode_event(event)) == event
+    assert _state_json.decode_event(_state_json.encode_event(event)) == event
 
 
 class _OtherEnum(enum.Enum):
@@ -392,7 +392,7 @@ class _Other:
 def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], message: str):
     state = _stored(cast('dict[str, Any]', content))
     with pytest.raises(TypeError, match=message):
-        _state_serde.encode_state(state)
+        _state_json.encode_state(state)
 
 
 @pytest.mark.parametrize(
@@ -422,37 +422,37 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
 def test_unknown_encodings_are_rejected(encoded: Any, message: str):
     payload = json.dumps({'ops_testing_version': VERSION, 'state': encoded})
     with pytest.raises(TypeError, match=message):
-        _state_serde.decode_state(payload)
+        _state_json.decode_state(payload)
 
 
 @pytest.mark.parametrize('payload', ['', '{', '[1,', 'not json'])
 def test_invalid_json_is_rejected(payload: str):
     with pytest.raises(TypeError, match='not valid JSON'):
-        _state_serde.decode_state(payload)
+        _state_json.decode_state(payload)
 
 
 def test_a_payload_without_its_kind_is_rejected():
     payload = json.dumps({'ops_testing_version': VERSION})
     with pytest.raises(TypeError, match="Missing 'state'"):
-        _state_serde.decode_state(payload)
+        _state_json.decode_state(payload)
 
 
 def test_an_event_payload_must_hold_an_event():
     payload = json.dumps({'ops_testing_version': VERSION, 'event': 'install'})
     with pytest.raises(TypeError, match='not an event'):
-        _state_serde.decode_event(payload)
+        _state_json.decode_event(payload)
 
 
 @pytest.mark.parametrize(
     ('kind', 'decode'),
-    [('state', _state_serde.decode_state), ('event', _state_serde.decode_event)],
+    [('state', _state_json.decode_state), ('event', _state_json.decode_event)],
 )
 @pytest.mark.parametrize('version', ['0.0.0-does-not-exist', None])
 def test_a_payload_from_another_version_is_rejected(
     kind: str, decode: Callable[[str], object], version: str | None
 ):
     payload = json.dumps({'ops_testing_version': version, kind: {}})
-    with pytest.raises(_state_serde._VersionMismatchError) as caught:
+    with pytest.raises(_state_json._VersionMismatchError) as caught:
         decode(payload)
     assert str(version) in str(caught.value)
     assert VERSION in str(caught.value)
@@ -462,13 +462,13 @@ def test_sets_encode_in_a_canonical_order():
     # Iteration order depends on the hash seed, so the members are sorted.
     names = [f'name{i}' for i in range(20)]
     state = testing.State(stored_states={testing.StoredState(n) for n in names})
-    members = json.loads(_state_serde.encode_state(state))['state']['f']['stored_states']['v']
+    members = json.loads(_state_json.encode_state(state))['state']['f']['stored_states']['v']
     assert members == sorted(members, key=lambda m: json.dumps(m, sort_keys=True))
     assert len(members) == len(names)
 
 
 def test_the_payload_records_the_version():
-    payload = json.loads(_state_serde.encode_state(testing.State()))
+    payload = json.loads(_state_json.encode_state(testing.State()))
     assert payload['ops_testing_version'] == VERSION
 
 
@@ -494,7 +494,7 @@ def _enums_reachable_from_state() -> set[type[enum.Enum]]:
                     if name in names:
                         walk(field_hint)
 
-    for cls in _state_serde._DC_TYPES.values():
+    for cls in _state_json._DC_TYPES.values():
         walk(cls)
     return found
 
@@ -502,7 +502,7 @@ def _enums_reachable_from_state() -> set[type[enum.Enum]]:
 def test_every_enum_in_a_state_has_an_encoding():
     # _ENUM_TYPES is written by hand, so a new enum-typed field would otherwise
     # only show up as an encoding error on a State that ops.testing accepts.
-    known = set(_state_serde._ENUM_TYPES.values())
+    known = set(_state_json._ENUM_TYPES.values())
     reachable = _enums_reachable_from_state()
     assert reachable <= known
     # ServiceStartup is only reachable inside a Pebble layer, which the field
