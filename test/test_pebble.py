@@ -1024,6 +1024,96 @@ class TestService:
         assert d['environment'] == {'k1': 'v1', 'k2': 'v2'}
         assert d['on-check-failure'] == {'chk1': 'halt'}
 
+    def test_dict_zero_fields(self):
+        d: pebble.ServiceDict = {
+            'user': 'root',
+            'user-id': 0,
+            'group': 'root',
+            'group-id': 0,
+        }
+        s = pebble.Service('Name 1', d)
+        assert s.user_id == 0
+        assert s.group_id == 0
+        assert s.to_dict() == d
+
+        layer = pebble.Layer({'services': {'Name 1': d}})
+        assert layer.to_dict() == {'services': {'Name 1': d}}
+
+    def test_merge(self):
+        s = pebble.Service(
+            'Name 1',
+            {
+                'summary': 'Sum Mary',
+                'description': 'The lazy quick brown',
+                'startup': 'enabled',
+                'override': 'merge',
+                'command': 'echo sum mary',
+                'after': ['a1', 'a2'],
+                'before': ['b1', 'b2'],
+                'requires': ['r1', 'r2'],
+                'environment': {'k1': 'v1', 'k2': 'v2'},
+                'user': 'bob',
+                'user-id': 1000,
+                'group': 'staff',
+                'group-id': 2000,
+                'working-dir': '/working/dir',
+                'on-success': 'restart',
+                'on-failure': 'ignore',
+                'on-check-failure': {'chk1': 'halt'},
+                'backoff-delay': '1s',
+                'backoff-factor': 4,
+                'backoff-limit': '10s',
+                'kill-delay': '420s',
+            },
+        )
+        s._merge(
+            pebble.Service(
+                'Name 2',
+                {
+                    'summary': 'New summary',
+                    'description': '',
+                    'startup': 'disabled',
+                    'override': 'replace',
+                    'command': 'echo new',
+                    'after': ['a3'],
+                    'before': ['b3'],
+                    'requires': ['r3'],
+                    'environment': {'k3': 'v3'},
+                    'user': '',
+                    'user-id': 0,
+                    'group': 'wheel',
+                    'working-dir': '/new/dir',
+                    'on-success': 'shutdown',
+                    'on-failure': 'restart',
+                    'on-check-failure': {'chk2': 'ignore'},
+                    'backoff-delay': '2s',
+                    'kill-delay': '60s',
+                },
+            )
+        )
+        assert s.name == 'Name 1'
+        assert s.summary == 'New summary'
+        assert s.description == 'The lazy quick brown'
+        assert s.startup == 'disabled'
+        assert s.override == 'replace'
+        assert s.command == 'echo new'
+        assert s.after == ['a1', 'a2', 'a3']
+        assert s.before == ['b1', 'b2', 'b3']
+        assert s.requires == ['r1', 'r2', 'r3']
+        assert s.environment == {'k1': 'v1', 'k2': 'v2', 'k3': 'v3'}
+        assert s.user == 'bob'
+        assert s.user_id == 0
+        assert s.group == 'wheel'
+        assert s.group_id == 2000
+        assert s.working_dir == '/new/dir'
+        assert s.on_success == 'shutdown'
+        assert s.on_failure == 'restart'
+        assert s.on_check_failure == {'chk1': 'halt', 'chk2': 'ignore'}
+        assert s.backoff_delay == '2s'
+        assert s.backoff_factor == 4
+        assert s.backoff_limit == '10s'
+        assert s.kill_delay == '60s'
+
     def test_equality(self):
         d: pebble.ServiceDict = {
             'summary': 'Sum Mary',

@@ -13,7 +13,18 @@ import pytest
 from scenario import ActiveStatus, Context
 from scenario._runtime import Runtime
 from scenario.errors import UncaughtCharmError
-from scenario.state import Container, Event, Relation, Secret, State, Storage, _Action, _CharmSpec
+from scenario.state import (
+    Container,
+    Event,
+    Model,
+    ProxyConfig,
+    Relation,
+    Secret,
+    State,
+    Storage,
+    _Action,
+    _CharmSpec,
+)
 
 import ops
 from ops._main import _Abort
@@ -398,6 +409,41 @@ def test_storage_event_dispatch_path_preserves_storage_name():
     env = _env_for(meta, event, State(storages={storage}))
     assert env['JUJU_HOOK_NAME'] == 'my-store-storage-attached'
     assert env['JUJU_DISPATCH_PATH'] == 'hooks/my-store-storage-attached'
+
+
+_PROXY_ENV_VARS = (
+    'JUJU_CHARM_HTTP_PROXY',
+    'JUJU_CHARM_HTTPS_PROXY',
+    'JUJU_CHARM_NO_PROXY',
+)
+
+
+def test_proxy_env_vars_not_set_by_default():
+    env = _env_for({'name': 'dashchk'}, Event('start'), State())
+    for key in _PROXY_ENV_VARS:
+        assert key not in env
+
+
+def test_proxy_env_vars_juju_defaults():
+    model = Model(proxy_config=ProxyConfig())
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == '127.0.0.1,localhost,::1'
+
+
+def test_proxy_env_vars_empty_string_is_set():
+    model = Model(proxy_config=ProxyConfig(http='', no=()))
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_HTTP_PROXY'] == ''
+    assert env['JUJU_CHARM_HTTPS_PROXY'] == ''
+    assert env['JUJU_CHARM_NO_PROXY'] == ''
+
+
+def test_no_proxy_entries_are_joined_with_commas():
+    model = Model(proxy_config=ProxyConfig(no=('localhost', '10.0.0.0/8', '*.example.com', '*')))
+    env = _env_for({'name': 'dashchk'}, Event('start'), State(model=model))
+    assert env['JUJU_CHARM_NO_PROXY'] == 'localhost,10.0.0.0/8,*.example.com,*'
 
 
 def test_action_dispatch_path_uses_actions_prefix():

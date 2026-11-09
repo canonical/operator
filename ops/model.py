@@ -220,6 +220,16 @@ class Model:
         """The version of Juju that is running the model."""
         return self._backend._juju_context.version
 
+    @property
+    def proxy_config(self) -> ProxyConfig:
+        """The model's proxy configuration as found in the Juju model config."""
+        context = self._backend._juju_context
+        return ProxyConfig(
+            http=context.http_proxy,
+            https=context.https_proxy,
+            no=context.no_proxy,
+        )
+
     def get_unit(self, unit_name: str) -> Unit:
         """Get a unit by name.
 
@@ -4549,3 +4559,51 @@ class CloudSpec:
             skip_tls_verify=o.skip_tls_verify,
             is_controller_cloud=o.is_controller_cloud,
         )
+
+
+class ProxyConfig:
+    """Proxy settings from the model's ``juju-*-proxy`` config.
+
+    The ``http`` and ``https`` attributes are ``None`` if the corresponding model config
+    is not available (either its env var is unset, or its value is empty). ``no`` is
+    an empty tuple in that case.
+    """
+
+    def __init__(
+        self,
+        *,
+        http: str | None = None,
+        https: str | None = None,
+        no: tuple[str, ...] = (),
+    ):
+        self._http = http
+        self._https = https
+        self._no = no
+
+    @property
+    def http(self) -> str | None:
+        """The HTTP proxy, from the ``juju-http-proxy`` model config."""
+        return self._http
+
+    @property
+    def https(self) -> str | None:
+        """The HTTPS proxy, from the ``juju-https-proxy`` model config."""
+        return self._https
+
+    @property
+    def no(self) -> tuple[str, ...]:
+        """Destinations to exclude from proxying, from the ``juju-no-proxy`` model config.
+
+        This is the comma-separated model config split into its entries, and is an
+        empty tuple if the model config is not available. Entries can contain '*',
+        and a '*' entry excludes all destinations.
+        """
+        return self._no
+
+    def __repr__(self) -> str:
+        return f'ProxyConfig(http={self._http!r}, https={self._https!r}, no={self._no!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ProxyConfig):
+            return False
+        return (self._http, self._https, self._no) == (other._http, other._https, other._no)

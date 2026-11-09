@@ -87,6 +87,6 @@ def test_open_ports(juju: jubilant.Juju):
 
     # Set the port to 6789 and validate the app goes to active status with the port opened.
     juju.config('your-app', {'server-port': '6789'})
-    juju.wait(jubuilant.all_active)
+    juju.wait(jubilant.all_active)
     assert is_port_open(address, 6789)
 ```

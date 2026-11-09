@@ -102,6 +102,29 @@ class JujuContext:
     For example '/var/lib/juju/agents/unit-bare-0/charm' (from ``JUJU_CHARM_DIR``).
     """
 
+    http_proxy: str | None = None
+    """The HTTP proxy for the charm.
+
+    Juju always sets the variable, so an empty value is read as ``None``
+    (from ``JUJU_CHARM_HTTP_PROXY``).
+    """
+
+    https_proxy: str | None = None
+    """The HTTPS proxy for the charm.
+
+    Juju always sets the variable, so an empty value is read as ``None``
+    (from ``JUJU_CHARM_HTTPS_PROXY``).
+    """
+
+    no_proxy: tuple[str, ...] = ()
+    """Destinations that should be excluded from proxying.
+
+    The comma-separated value of ``JUJU_CHARM_NO_PROXY``, split into its entries.
+    Surrounding whitespace and empty entries are dropped, so this is an empty tuple
+    if the variable is unset or empty. Juju uses the default value
+    '127.0.0.1,localhost,::1' if the ``juju-no-proxy`` model config is not set.
+    """
+
     debug: bool = False
     """Debug mode.
 
@@ -245,6 +268,18 @@ class JujuContext:
                 Path(env['JUJU_CHARM_DIR']).resolve()
                 if env.get('JUJU_CHARM_DIR')
                 else Path(f'{__file__}/../../..').resolve()
+            ),
+            # Juju sets the default values of JUJU_CHARM_HTTP_PROXY and JUJU_CHARM_HTTPS_PROXY
+            # to empty strings. So None always means empty.
+            http_proxy=env.get('JUJU_CHARM_HTTP_PROXY') or None,
+            https_proxy=env.get('JUJU_CHARM_HTTPS_PROXY') or None,
+            # Juju sets the default value of JUJU_CHARM_NO_PROXY to
+            # `127.0.0.1,localhost,::1`. So an empty tuple means JUJU_CHARM_NO_PROXY is set to
+            # an empty string.
+            no_proxy=tuple(
+                entry.strip()
+                for entry in (env.get('JUJU_CHARM_NO_PROXY') or '').split(',')
+                if entry.strip()
             ),
             debug='JUJU_DEBUG' in env,
             debug_at=(
