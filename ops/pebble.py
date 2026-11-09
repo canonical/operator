@@ -1693,7 +1693,7 @@ class Notice:
     occurrences: int
     """The number of times one of these notices has occurred."""
 
-    last_data: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
+    last_data: dict[str, str] = dataclasses.field(default_factory=dict[str, str], hash=False)
     """Additional data captured from the last occurrence of one of these notices."""
 
     repeat_after: datetime.timedelta | None = None

@@ -505,6 +505,28 @@ single log
             occurrences=8,
         )
 
+    def test_notice_hashable(self):
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        def make(data: dict[str, str]):
+            return pebble.Notice(
+                id='123',
+                user_id=1000,
+                type=pebble.NoticeType.CUSTOM,
+                key='example.com/a',
+                first_occurred=now,
+                last_occurred=now,
+                last_repeated=now,
+                occurrences=1,
+                last_data=data,
+            )
+
+        # Frozen, so usable as a dict key or set member, with the dict field
+        # left out of the hash but still part of equality.
+        assert len({make({'a': '1'}), make({'a': '1'})}) == 1
+        assert make({'a': '1'}) != make({'a': '2'})
+        assert hash(make({'a': '1'})) == hash(make({'a': '2'}))
+
 
 class TestPlan:
     def test_services(self):
