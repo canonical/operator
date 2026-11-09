@@ -24,7 +24,6 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
@@ -39,7 +38,8 @@ _UNSUPPORTED_PLUGINS = ('poetry', 'reactive')
 _OTHER_PLUGINS = ('nil', 'dump', 'make', 'autotools', 'cmake', 'go', 'rust', 'npm')
 
 #: The charm's environment never has these installed: the test's own are used.
-_OPS_DISTRIBUTIONS = ('ops', 'ops-scenario')
+#: ops-tracing pins an exact ops version, so it has to match the test's ops too.
+_OPS_DISTRIBUTIONS = ('ops', 'ops-scenario', 'ops-tracing')
 
 _REQUIREMENT_NAME = re.compile(r'^\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
 _HASH_OPTION = re.compile(r'\s--hash[=\s]\S+')
@@ -52,7 +52,9 @@ class _RequirementsError(RuntimeError):
 def charm_requirements(charm_root: pathlib.Path) -> list[str]:
     """The charm's dependencies, one requirement or option per entry.
 
-    ``ops`` and ``ops-scenario`` are left out, as are repeats.
+    ``ops``, ``ops-scenario`` and ``ops-tracing`` are left out, as are
+    repeats. The list is complete, as it is for charmcraft, so install it
+    without resolving dependencies (``--no-deps``).
 
     Raises:
         _RequirementsError: if the build plugin can't be found or isn't
@@ -71,24 +73,21 @@ def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
     """Find the charm's build plugin, and the ``charmcraft.yaml`` part that uses it.
 
     The first part whose plugin installs Python dependencies is the one
-    used. With no ``charmcraft.yaml``, a ``uv.lock`` means the ``uv`` plugin.
+    used.
 
     Raises:
-        _RequirementsError: if ``charmcraft.yaml`` can't be read, or the
-            plugin isn't supported. That includes the deprecated ``charm``
-            plugin, which charmcraft uses when ``charmcraft.yaml`` has no
-            ``parts``, or there's neither a ``charmcraft.yaml`` nor a
-            ``uv.lock``.
+        _RequirementsError: if there's no ``charmcraft.yaml`` or it can't be
+            read, or the plugin isn't supported. That includes the deprecated
+            ``charm`` plugin, which charmcraft uses when ``charmcraft.yaml``
+            has no ``parts``.
     """
     path = charm_root / 'charmcraft.yaml'
-    if not path.exists():
-        if (charm_root / 'uv.lock').exists():
-            return 'uv', {}
-        if (charm_root / 'poetry.lock').exists():
-            raise _RequirementsError(f'{charm_root} has a poetry.lock: {_unsupported("poetry")}')
-        raise _charm_plugin(f'{charm_root} has no charmcraft.yaml or uv.lock')
     try:
         charmcraft: Any = yaml.safe_load(path.read_text()) or {}
+    except FileNotFoundError:
+        raise _RequirementsError(
+            f'{charm_root} has no charmcraft.yaml, so its build plugin is unknown.'
+        ) from None
     except (OSError, yaml.YAMLError) as e:
         raise _RequirementsError(f'Could not read {path}: {e}') from None
     parts: Any = (
@@ -166,22 +165,23 @@ def _uv_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> list[
         uv,
         'export',
         '--locked',
-        # The options charmcraft's uv plugin passes to `uv sync`.
-        '--no-dev',
-        '--no-editable',
-        '--no-emit-project',
         '--no-hashes',
         '--no-header',
         '--format',
         'requirements-txt',
         '--directory',
         str(charm_root),
+        # The options charmcraft's uv plugin passes to `uv sync`.
+        '--no-dev',
+        '--no-editable',
+        # charmcraft passes `--no-install-project`: the charm's code is copied, not installed.
+        '--no-emit-project',
     ]
     for extra in part.get('uv-extras', ()):
         cmd += ['--extra', str(extra)]
     for group in part.get('uv-groups', ()):
         cmd += ['--group', str(group)]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=charm_root)
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         output = result.stderr.strip()
         if '--locked' in output or 'needs to be updated' in output:
@@ -190,30 +190,30 @@ def _uv_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> list[
                 'Run `uv lock` in it.'
             )
         raise _RequirementsError(f'`uv export` failed in {charm_root}:\n{output}\n')
-    with tempfile.TemporaryDirectory(prefix='ops-testing-export-') as tmp:
-        exported = pathlib.Path(tmp) / 'requirements.txt'
-        exported.write_text(result.stdout)
-        # uv writes path dependencies relative to the project.
-        return read_requirements(exported, base=charm_root)
+    # uv writes path dependencies relative to the project.
+    return _parse_requirements(result.stdout, base=charm_root)
 
 
 def read_requirements(
-    path: pathlib.Path,
-    *,
-    base: pathlib.Path | None = None,
-    seen: frozenset[pathlib.Path] = frozenset(),
+    path: pathlib.Path, *, seen: frozenset[pathlib.Path] = frozenset()
 ) -> list[str]:
     """Read a requirements file into a flat list, one requirement or option per entry.
 
     Included files (``-r``) are read in place. Hashes are dropped, because
-    requirements from several files are installed together and ``uv``
-    requires either every requirement to have one or none to. Relative paths
-    are made absolute against ``base``, which defaults to the file's
-    directory, so that the list can be installed from anywhere.
+    requirements from several files are installed together, and pip refuses
+    a mix of requirements with and without hashes. Relative paths are made
+    absolute against the file's directory, so that the list can be installed
+    from anywhere.
     """
     path = path.resolve()
-    base = base or path.parent
-    lines = path.read_text().replace('\\\n', ' ').splitlines()
+    return _parse_requirements(path.read_text(), base=path.parent, seen=seen | {path})
+
+
+def _parse_requirements(
+    text: str, *, base: pathlib.Path, seen: frozenset[pathlib.Path] = frozenset()
+) -> list[str]:
+    """Parse requirements file content, with relative paths resolved against ``base``."""
+    lines = text.replace('\\\n', ' ').splitlines()
     requirements: list[str] = []
     for line in lines:
         line = re.sub(r'(^|\s)#.*$', '', line).strip()
@@ -227,7 +227,7 @@ def read_requirements(
         if option in ('-r', '--requirement'):
             included = (base / value).resolve()
             if included not in seen:
-                requirements.extend(read_requirements(included, seen=seen | {path}))
+                requirements.extend(read_requirements(included, seen=seen))
         elif option in ('-c', '--constraint', '-e', '--editable', '-f', '--find-links'):
             requirements.append(f'{option} {_absolute_location(value, base)}')
         elif line.startswith('-'):

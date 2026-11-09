@@ -69,13 +69,11 @@ def test_charmcraft_yaml_with_no_parts_is_the_charm_plugin(tmp_path: pathlib.Pat
         _charm_requirements.detect_plugin(root)
 
 
-def test_with_no_charmcraft_yaml_a_uv_lock_means_uv(tmp_path: pathlib.Path):
-    with pytest.raises(
-        _RequirementsError, match=rf'no charmcraft.yaml or uv.lock.*{CHARM_PLUGIN_ERROR}'
-    ):
-        _charm_requirements.detect_plugin(tmp_path)
+def test_no_charmcraft_yaml_is_an_error(tmp_path: pathlib.Path):
+    # A lockfile isn't enough: charmcraft can't build a charm without charmcraft.yaml.
     (tmp_path / 'uv.lock').write_text('')
-    assert _charm_requirements.detect_plugin(tmp_path) == ('uv', {})
+    with pytest.raises(_RequirementsError, match=r'has no charmcraft.yaml'):
+        _charm_requirements.detect_plugin(tmp_path)
 
 
 @pytest.mark.parametrize('plugin', ['poetry', 'reactive'])
@@ -83,12 +81,6 @@ def test_unsupported_plugins_are_an_error(tmp_path: pathlib.Path, plugin: str):
     root = _charmcraft(tmp_path, f'parts:\n  charm:\n    plugin: {plugin}\n')
     with pytest.raises(_RequirementsError, match=rf"the {plugin} plugin isn't supported"):
         _charm_requirements.detect_plugin(root)
-
-
-def test_a_poetry_lock_without_charmcraft_yaml_is_an_error(tmp_path: pathlib.Path):
-    (tmp_path / 'poetry.lock').write_text('')
-    with pytest.raises(_RequirementsError, match=r"poetry.lock.*poetry plugin isn't supported"):
-        _charm_requirements.detect_plugin(tmp_path)
 
 
 def test_no_python_part_names_the_parts(tmp_path: pathlib.Path):
@@ -131,6 +123,8 @@ def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
             -r sub/more.txt
             -c constraints.txt
             --find-links=wheels
+            -f https://example.com/wheels/
+            -e ./local/editable
             ./local/package
             named @ ./local/named
             named-url @ https://example.com/x.whl
@@ -145,6 +139,8 @@ def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
         'base>=2',
         f'-c {tmp_path / "constraints.txt"}',
         f'--find-links {tmp_path / "wheels"}',
+        '-f https://example.com/wheels/',
+        f'-e {tmp_path / "local" / "editable"}',
         str(tmp_path / 'local' / 'package'),
         f'named @ {(tmp_path / "local" / "named").as_uri()}',
         'named-url @ https://example.com/x.whl',
@@ -168,14 +164,16 @@ def test_python_plugin_requirements(tmp_path: pathlib.Path):
             python-constraints: [constraints.txt]
         """,
     )
-    (root / 'requirements.txt').write_text('requests==2.32\nops==2.17.0\nops_scenario>=7\n')
+    (root / 'requirements.txt').write_text(
+        'requests==2.32\nops==2.17.0\nops_scenario>=7\nOps.Tracing==2.17.0\n'
+    )
     (root / 'constraints.txt').write_text('urllib3<3\n')
     # charmcraft's python plugin doesn't install charm libraries' PYDEPS.
     (root / 'lib' / 'charms' / 'thing' / 'v0').mkdir(parents=True)
     (root / 'lib' / 'charms' / 'thing' / 'v0' / 'thing.py').write_text(
         'PYDEPS = ["pydantic>=2"]\n'
     )
-    # ops and ops-scenario are left out, and so are repeats.
+    # ops, ops-scenario and ops-tracing are left out, and so are repeats.
     assert _charm_requirements.charm_requirements(root) == [
         'requests==2.32',
         'extra==1',
@@ -197,7 +195,7 @@ def test_a_missing_listed_file_is_an_error(tmp_path: pathlib.Path, kind: str):
 
 def _uv_charm(root: pathlib.Path, part: str = '', pyproject: str = '') -> pathlib.Path:
     """A uv charm with path dependencies, so that locking it needs no index."""
-    for name in ('base', 'extra', 'grouped', 'dev'):
+    for name in ('base', 'extra', 'grouped', 'dev', 'editable'):
         (root / 'deps' / name).mkdir(parents=True)
         (root / 'deps' / name / 'pyproject.toml').write_text(
             f'[project]\nname = "{name}"\nversion = "1.0"\n'
@@ -209,7 +207,7 @@ def _uv_charm(root: pathlib.Path, part: str = '', pyproject: str = '') -> pathli
             name = "charm"
             version = "0"
             requires-python = ">=3.10"
-            dependencies = ["base"]
+            dependencies = ["base", "editable"]
 
             [project.optional-dependencies]
             x = ["extra"]
@@ -223,6 +221,12 @@ def _uv_charm(root: pathlib.Path, part: str = '', pyproject: str = '') -> pathli
             extra = { path = "deps/extra" }
             grouped = { path = "deps/grouped" }
             dev = { path = "deps/dev" }
+            editable = { path = "deps/editable", editable = true }
+
+            # A charm that's a package, so that leaving the project out is tested.
+            [build-system]
+            requires = ["uv_build"]
+            build-backend = "uv_build"
         """)
         + pyproject
     )
@@ -235,15 +239,18 @@ def _uv_charm(root: pathlib.Path, part: str = '', pyproject: str = '') -> pathli
 @needs_uv
 def test_uv_plugin_leaves_out_the_dev_group(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
-    # Path dependencies are made absolute.
-    assert _charm_requirements.charm_requirements(root) == [str(root / 'deps' / 'base')]
+    # Path dependencies are made absolute, editable ones aren't editable, and
+    # the charm itself isn't included.
+    assert sorted(_charm_requirements.charm_requirements(root)) == [
+        str(root / 'deps' / name) for name in ('base', 'editable')
+    ]
 
 
 @needs_uv
 def test_uv_plugin_keeps_other_default_groups(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path, pyproject='\n[tool.uv]\ndefault-groups = ["dev", "g"]\n')
     assert sorted(_charm_requirements.charm_requirements(root)) == [
-        str(root / 'deps' / name) for name in ('base', 'grouped')
+        str(root / 'deps' / name) for name in ('base', 'editable', 'grouped')
     ]
 
 
@@ -251,7 +258,7 @@ def test_uv_plugin_keeps_other_default_groups(tmp_path: pathlib.Path):
 def test_uv_plugin_forwards_extras_and_groups(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path, '    uv-extras: [x]\n    uv-groups: [g]\n')
     assert sorted(_charm_requirements.charm_requirements(root)) == [
-        str(root / 'deps' / name) for name in ('base', 'extra', 'grouped')
+        str(root / 'deps' / name) for name in ('base', 'editable', 'extra', 'grouped')
     ]
 
 
@@ -259,7 +266,9 @@ def test_uv_plugin_forwards_extras_and_groups(tmp_path: pathlib.Path):
 def test_uv_plugin_with_a_stale_lockfile(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
     pyproject = root / 'pyproject.toml'
-    pyproject.write_text(pyproject.read_text().replace('["base"]', '["base", "extra"]'))
+    pyproject.write_text(
+        pyproject.read_text().replace('["base", "editable"]', '["base", "editable", "extra"]')
+    )
     with pytest.raises(_RequirementsError, match=r'uv.lock .* is out of date.*`uv lock`'):
         _charm_requirements.charm_requirements(root)
 
