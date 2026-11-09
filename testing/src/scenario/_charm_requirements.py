@@ -8,9 +8,8 @@ can be run in a virtual environment with its own dependencies rather than the
 test's. Two plugins are supported:
 
 * ``python``: the ``python-requirements`` files, ``python-packages`` and
-  ``python-constraints``, plus the ``PYDEPS`` of every charm library in
-  ``lib/``. Charmcraft's python plugin doesn't install ``PYDEPS``, but a
-  charm's tests import its libraries, so they're added here.
+  ``python-constraints``. As with charmcraft's python plugin, the ``PYDEPS``
+  of the charm's libraries aren't included.
 * ``uv``: what ``uv sync`` would install from the charm's ``uv.lock``, with
   the same options as charmcraft's uv plugin and the part's ``uv-extras``
   and ``uv-groups``.
@@ -21,7 +20,6 @@ absolute, so that it can be installed from anywhere.
 
 from __future__ import annotations
 
-import ast
 import pathlib
 import re
 import shutil
@@ -140,7 +138,6 @@ def _python_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> l
     requirements.extend(str(package) for package in part.get('python-packages', ()))
     for name in part.get('python-constraints', ()):
         requirements.append(f'-c {_listed_file(charm_root, name, "constraints")}')
-    requirements.extend(harvest_pydeps(charm_root))
     return requirements
 
 
@@ -255,46 +252,6 @@ def _absolute(requirement: str, base: pathlib.Path) -> str:
     if at and location.startswith(('./', '../')):
         return f'{name} @ {(base / location).resolve().as_uri()}'
     return requirement
-
-
-def harvest_pydeps(charm_root: pathlib.Path) -> list[str]:
-    """The ``PYDEPS`` of every charm library under ``lib/``, without importing them.
-
-    Only a list or tuple of string literals assigned to ``PYDEPS`` at module
-    level is read.
-    """
-    lib = charm_root / 'lib'
-    if not lib.is_dir():
-        return []
-    requirements: list[str] = []
-    for path in sorted(lib.rglob('*.py')):
-        if '__pycache__' in path.parts:
-            continue
-        source = path.read_bytes()
-        if b'PYDEPS' not in source:
-            continue
-        try:
-            tree = ast.parse(source, filename=str(path))
-        except (SyntaxError, ValueError):
-            # The charm's tests will fail to import it, with a better error.
-            continue
-        for node in tree.body:
-            if isinstance(node, ast.Assign):
-                targets = node.targets
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                targets = [node.target]
-            else:
-                continue
-            if not any(isinstance(t, ast.Name) and t.id == 'PYDEPS' for t in targets):
-                continue
-            value = node.value
-            if isinstance(value, (ast.List, ast.Tuple)):
-                requirements.extend(
-                    element.value
-                    for element in value.elts
-                    if isinstance(element, ast.Constant) and isinstance(element.value, str)
-                )
-    return requirements
 
 
 def _canonical_name(requirement: str) -> str | None:

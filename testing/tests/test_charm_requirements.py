@@ -113,7 +113,7 @@ def test_a_malformed_charmcraft_yaml_is_an_error(tmp_path: pathlib.Path, text: s
         _charm_requirements.detect_plugin(root)
 
 
-# Reading requirements files and PYDEPS
+# Reading requirements files
 
 
 def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
@@ -152,20 +152,6 @@ def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
     ]
 
 
-def test_pydeps_are_harvested_from_lib_without_importing(tmp_path: pathlib.Path):
-    lib = tmp_path / 'lib' / 'charms'
-    (lib / 'one' / 'v0').mkdir(parents=True)
-    (lib / 'two' / 'v1').mkdir(parents=True)
-    (lib / 'one' / 'v0' / 'a.py').write_text(
-        'raise RuntimeError("never imported")\nPYDEPS = ["first>=1", "second"]\n'
-    )
-    (lib / 'two' / 'v1' / 'b.py').write_text('PYDEPS: list[str] = ("third==3",)\n')
-    (lib / 'two' / 'v1' / 'c.py').write_text('PYDEPS = [f"{x}" for x in ()]\nOTHER = ["no"]\n')
-    (lib / 'two' / 'v1' / 'd.py').write_text('PYDEPS = [\n')
-    assert _charm_requirements.harvest_pydeps(tmp_path) == ['first>=1', 'second', 'third==3']
-    assert _charm_requirements.harvest_pydeps(tmp_path / 'nothing') == []
-
-
 # The python plugin
 
 
@@ -184,14 +170,16 @@ def test_python_plugin_requirements(tmp_path: pathlib.Path):
     )
     (root / 'requirements.txt').write_text('requests==2.32\nops==2.17.0\nops_scenario>=7\n')
     (root / 'constraints.txt').write_text('urllib3<3\n')
-    (root / 'lib').mkdir()
-    (root / 'lib' / 'lib.py').write_text('PYDEPS = ["pydantic>=2", "ops"]\n')
+    # charmcraft's python plugin doesn't install charm libraries' PYDEPS.
+    (root / 'lib' / 'charms' / 'thing' / 'v0').mkdir(parents=True)
+    (root / 'lib' / 'charms' / 'thing' / 'v0' / 'thing.py').write_text(
+        'PYDEPS = ["pydantic>=2"]\n'
+    )
     # ops and ops-scenario are left out, and so are repeats.
     assert _charm_requirements.charm_requirements(root) == [
         'requests==2.32',
         'extra==1',
         f'-c {root / "constraints.txt"}',
-        'pydantic>=2',
     ]
 
 
