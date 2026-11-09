@@ -417,6 +417,19 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
         ({'__t__': 'intdict', 'v': {'+1': 'a'}}, 'Expected integer keys'),
         ({'__t__': 'timedelta', 'v': [10**10, 0, 0]}, 'Invalid state'),
         ({'__t__': 'datetime', 'v': 'nope'}, 'Invalid datetime'),
+        (
+            {'__t__': 'datetime', 'v': '2026-01-01T00:00:00', 'tz': 'No/Such_Zone'},
+            'Unknown time zone',
+        ),
+        (
+            {'__t__': 'datetime', 'v': '2026-01-01T00:00:00', 'tz': '/etc/passwd'},
+            'Unknown time zone',
+        ),
+        (
+            {'__t__': 'datetime', 'v': '2026-01-01T00:00:00', 'tz': 5},
+            'Expected a string for time zone',
+        ),
+        ({'__t__': 'layer', 'v': [1]}, 'Expected an object for layer'),
         ({'__t__': 'timedelta', 'v': 1.5}, 'Expected a list'),
         ({'__t__': 'timedelta', 'v': [1, 2]}, r'Expected \[days, seconds, microseconds\]'),
         ({'__t__': 'bytes', 'v': '!!'}, 'Invalid base64'),

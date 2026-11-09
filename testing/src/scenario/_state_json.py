@@ -369,7 +369,8 @@ def _decode(obj: _JSON) -> Any:
             key = _as_str(obj['tz'], 'time zone')
             try:
                 value = value.replace(tzinfo=zoneinfo.ZoneInfo(key))
-            except zoneinfo.ZoneInfoNotFoundError:
+            # A malformed key, such as an absolute path, is a ValueError.
+            except (zoneinfo.ZoneInfoNotFoundError, ValueError):
                 raise TypeError(f'Unknown time zone {key!r} in the payload.') from None
         if obj.get('fold'):
             value = value.replace(fold=1)
