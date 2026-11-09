@@ -53,7 +53,7 @@ _OTHER_PLUGINS = ('nil', 'dump', 'make', 'autotools', 'cmake', 'go', 'rust', 'np
 _OPS_DISTRIBUTIONS = ('ops', 'ops-scenario', 'ops-tracing')
 
 
-class _RequirementsError(RuntimeError):
+class _RequirementsError(Exception):
     """The charm's dependencies can't be found or installed."""
 
 
