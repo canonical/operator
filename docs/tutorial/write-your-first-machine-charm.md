@@ -642,9 +642,11 @@ TOTAL                118     31     26      7    69%
 
 Integration tests are an important way to check that your charm works correctly when deployed. In contrast to unit tests, integration tests require Juju to be available, and events aren't simulated.
 
-When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests. We'll expand the tests to cover more of your charm's functionality.
+When you created the initial version of your charm, Charmcraft included integration tests. The tests use {external+jubilant:doc}`Jubilant <index>` to interact with Juju. The [`pytest-jubilant`](https://github.com/canonical/pytest-jubilant) plugin provides the `juju` fixture used in the tests.
 
-In `tests/integration/test_charm.py`, change `juju.wait(jubilant.all_active)` to:
+The integration tests cover functionality that we removed from the placeholder charm code. We'll adapt the tests to match your charm's functionality.
+
+First, in `tests/integration/test_charm.py`, remove all functions except `test_deploy` and `test_workload_version_is_set`. Then change `juju.wait(jubilant.all_active)` to:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/tests/integration/test_charm.py
 :language: python
