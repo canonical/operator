@@ -58,7 +58,10 @@ show_missing = true
 [tool.pytest.ini_options]
 minversion = "6.0"
 log_cli_level = "INFO"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore:JujuVersion.from_environ:DeprecationWarning",  # Known issue with some libraries.
+]
 
 # Linting tools configuration
 [tool.ruff]
