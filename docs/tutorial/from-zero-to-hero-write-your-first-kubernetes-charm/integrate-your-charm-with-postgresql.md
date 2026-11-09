@@ -337,7 +337,21 @@ Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a dat
 :end-at: 'assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")'
 ```
 
-Now run `tox -e unit` to make sure all test cases pass.
+Now run `tox -e unit`. You should see one test failure:
+
+```text
+FAILED tests/unit/test_charm.py::test_relation_data - scenario.errors.UncaughtCharmError: Uncaught DeprecationWarning in charm...
+```
+
+The test failed because the `data_interfaces` library uses [](#ops.JujuVersion.from_environ), which is no longer recommended. A future version of the tutorial will use the more modern [`dpcharmlibs-interfaces`](https://pypi.org/project/dpcharmlibs-interfaces/) library instead of `data_platform_libs.data_interfaces`. In the meantime, it's best to tell pytest to ignore the issue. In `pyproject.toml`, extend the `filterwarnings` list:
+
+```{literalinclude} ../../../examples/k8s-3-postgresql/pyproject.toml
+:language: toml
+:start-at: filterwarnings = [
+:end-at: ]
+```
+
+Then run `tox -e unit` and check that all tests pass.
 
 ## Write an integration test
 
