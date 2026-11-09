@@ -1260,9 +1260,11 @@ class Check:
                 self._merge_exec(value)
             elif name == 'startup' and value == CheckStartup.UNSET:
                 continue
-            # Note that CheckLevel.UNSET has a different meaning to
-            # CheckStartup.UNSET. In the former, it means 'there is no level';
-            # in the latter it means 'use the default'.
+            elif name == 'level' and value == CheckLevel.UNSET:
+                # Like every other field, a level the other layer does not
+                # set leaves this layer's level alone (which is what Pebble
+                # does when it combines the layers).
+                continue
             else:
                 setattr(self, name, value)
 

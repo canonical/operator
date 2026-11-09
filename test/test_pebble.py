@@ -1220,6 +1220,19 @@ class TestCheck:
         check = pebble.Check('chk-http', d)
         assert check.level == 'foobar!'  # remains a string
 
+    def test_merge_keeps_level(self):
+        base = pebble.Check(
+            'chk', {'override': 'replace', 'level': 'alive', 'http': {'url': 'http://a/'}}
+        )
+        override = pebble.Check('chk', {'override': 'merge', 'period': '5s'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.ALIVE
+        assert base.period == '5s'
+
+        override = pebble.Check('chk', {'override': 'merge', 'level': 'ready'})
+        base._merge(override)
+        assert base.level == pebble.CheckLevel.READY
+
     def test_equality(self):
         d: pebble.CheckDict = {
             'override': 'replace',
