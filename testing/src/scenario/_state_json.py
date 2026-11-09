@@ -233,7 +233,7 @@ def _encode(obj: object, path: str) -> _JSON:
         # type() rather than isinstance(), because int(str(True)) fails.
         if mapping and all(type(k) is int for k in mapping):
             return {
-                _T: 'idict',
+                _T: 'intdict',
                 'v': {str(k): _encode(v, f'{path}[{k}]') for k, v in mapping.items()},
             }
         encoded_mapping: dict[str, _JSON] = {}
@@ -401,7 +401,7 @@ def _decode(obj: _JSON) -> Any:
         except ValueError as e:
             raise TypeError(f'Invalid base64 in the payload: {e}') from None
 
-    if kind == 'idict':
+    if kind == 'intdict':
         mapping = _as_dict(_field(obj, 'v', kind), kind)
         result: dict[int, Any] = {}
         for k, v in mapping.items():
@@ -413,7 +413,7 @@ def _decode(obj: _JSON) -> Any:
             # '1' and '01' can't decode to the same integer.
             if key is None or str(key) != k:
                 raise TypeError(
-                    f'Expected integer keys for idict in the payload, got {list(mapping)!r}.'
+                    f'Expected integer keys for intdict in the payload, got {list(mapping)!r}.'
                 )
             result[key] = _decode(v)
         return result
