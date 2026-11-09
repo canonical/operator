@@ -3632,8 +3632,10 @@ class _FilesParser:
         self._parser.feed(b'\r\n')
 
     def _process_header(self, data: bytearray):
-        parser = email.parser.BytesFeedParser()
-        parser.feed(data)
+        # The bytes parser replaces anything outside ASCII in a header value,
+        # which loses a non-ASCII path. Pebble sends the headers as UTF-8.
+        parser = email.parser.FeedParser()
+        parser.feed(data.decode('utf-8', 'surrogateescape'))
         self._headers = parser.close()
 
         content_disposition = self._headers.get_content_disposition()

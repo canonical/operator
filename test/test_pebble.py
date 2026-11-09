@@ -2542,6 +2542,29 @@ Content-Disposition: form-data; name="response"\r
             ),
         ]
 
+    def test_pull_non_ascii_path(self, client: MockClient):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="/tmp/cr\xc3\xa8me.txt"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+{
+    "result": [{"path": "/tmp/cr\xc3\xa8me.txt"}],
+    "status": "OK",
+    "status-code": 200,
+    "type": "sync"
+}\r
+--01234567890123456789012345678901--\r
+""",
+        ))
+        with client.pull('/tmp/crème.txt') as infile:  # ruff: ignore[hardcoded-temp-file]
+            assert infile.read() == 'contents'
+
     def test_pull_protocol_errors(self, client: MockClient):
         client.responses.append(({'Content-Type': 'c/t'}, b''))
         with pytest.raises(pebble.ProtocolError) as excinfo:
