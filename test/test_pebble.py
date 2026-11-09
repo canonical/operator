@@ -4145,6 +4145,22 @@ class TestExec:
             client.exec(['foo'])
         assert str(excinfo.value) in 'unexpected error connecting to websockets: conn!'
 
+    def test_connect_websocket_closes_socket_on_error(self, monkeypatch: pytest.MonkeyPatch):
+        sockets: list[socket.socket] = []
+        real_socket = socket.socket
+
+        def fake_socket(*args: typing.Any, **kwargs: typing.Any):
+            sock = real_socket(*args, **kwargs)
+            sockets.append(sock)
+            return sock
+
+        monkeypatch.setattr(pebble.socket, 'socket', fake_socket)
+        client = pebble.Client(socket_path='does_not_exist')
+        with pytest.raises(OSError):
+            client._connect_websocket('1', 'stdio')
+        assert len(sockets) == 1
+        assert sockets[0].fileno() == -1  # Closed.
+
     def test_websocket_send_raises(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)
         raised = False
