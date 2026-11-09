@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import binascii
 import builtins
+import codecs
 import contextlib
 import copy
 import dataclasses
@@ -2004,6 +2005,12 @@ def _reader_to_websocket(
 
 def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str | None):
     """Receive messages from websocket (until end signal) and write to writer."""
+    # A multi-byte character may be split across two websocket messages, so the
+    # messages cannot be decoded independently. This runs in a thread, so a
+    # decoding error would have nowhere to go, and would lose the rest of the output.
+    decoder = (
+        None if encoding is None else codecs.getincrementaldecoder(encoding)(errors='replace')
+    )
     while True:
         try:
             chunk = ws.recv()
@@ -2030,9 +2037,15 @@ def _websocket_to_writer(ws: _WebSocket, writer: _WebsocketWriter, encoding: str
             # Received "end" command (EOF signal), stop thread
             break
 
-        if encoding is not None:
-            chunk = chunk.decode(encoding)
+        if decoder is not None:
+            chunk = decoder.decode(chunk)
+            if not chunk:
+                continue
         writer.write(chunk)
+    if decoder is not None:
+        tail = decoder.decode(b'', final=True)
+        if tail:
+            writer.write(tail)
 
 
 class _WebsocketWriter(io.BufferedIOBase):
@@ -2075,22 +2088,23 @@ class _WebsocketWriter(io.BufferedIOBase):
 class _WebsocketReader(io.BufferedIOBase):
     """A readable file-like object whose reads come from a websocket."""
 
-    def __init__(self, ws: _WebSocket):
+    def __init__(self, ws: _WebSocket, encoding: str | None = None):
         self.ws = ws
         self.remaining = b''
         self.eof = False
+        # Only used to find where complete characters end; the decoding itself
+        # is done by the TextIOWrapper around this reader.
+        self._decoder_factory = (
+            None if encoding is None else codecs.getincrementaldecoder(encoding)
+        )
 
     def readable(self) -> bool:
         """Denote this file-like object as readable."""
         return True
 
-    def read(self, n: int = -1) -> str | bytes:
-        """Read up to n bytes from the websocket (or one message if n<0)."""
-        if self.eof:
-            # Calling read() multiple times after EOF should still return EOF
-            return b''
-
-        while not self.remaining:
+    def _recv(self) -> bytes | None:
+        """Receive the next data message from the websocket, or None at EOF."""
+        while True:
             try:
                 chunk = self.ws.recv()
             except (websocket.WebSocketException, OSError) as e:
@@ -2099,8 +2113,7 @@ class _WebsocketReader(io.BufferedIOBase):
                 # connection down): treat it as end-of-file. The error that
                 # caused the teardown is reported by wait()/wait_output().
                 logger.debug('exec output stream closed: %s', e)
-                self.eof = True
-                return b''
+                return None
 
             if isinstance(chunk, str):
                 try:
@@ -2115,13 +2128,47 @@ class _WebsocketReader(io.BufferedIOBase):
                     logger.warning('Invalid I/O command %r', command)
                     continue
                 # Received "end" command, return EOF designator
+                return None
+
+            return chunk
+
+    def _complete_length(self) -> int:
+        """Return the length of the prefix of self.remaining that holds whole characters."""
+        assert self._decoder_factory is not None
+        decoder = self._decoder_factory(errors='replace')
+        decoder.decode(self.remaining)
+        pending, _ = decoder.getstate()
+        return len(self.remaining) - len(pending)
+
+    def read(self, n: int = -1) -> str | bytes:
+        """Read up to n bytes from the websocket (or one message if n<0)."""
+        if self.eof and not self.remaining:
+            # Calling read() multiple times after EOF should still return EOF
+            return b''
+
+        while not self.remaining:
+            chunk = self._recv()
+            if chunk is None:
                 self.eof = True
                 return b''
-
             self.remaining = chunk
 
         if n < 0:
             n = len(self.remaining)
+            if self._decoder_factory is not None:
+                # A multi-byte character may be split across two messages, and
+                # TextIOWrapper.read() decodes what it gets here as complete,
+                # so hold back an incomplete character for the next read.
+                n = self._complete_length()
+                while n == 0:
+                    chunk = self._recv()
+                    if chunk is None:
+                        # Hand back what there is, for the TextIOWrapper to replace.
+                        self.eof = True
+                        n = len(self.remaining)
+                        break
+                    self.remaining += chunk
+                    n = self._complete_length()
         result: str | bytes = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result
@@ -3213,8 +3260,9 @@ class Client:
                 is ``True``.
             encoding: If encoding is set (the default is UTF-8), the types
                 read or written to stdin/stdout/stderr are str, and encoding
-                is used to encode them to bytes. If encoding is None, the
-                types read or written are raw bytes.
+                is used to encode them to bytes. Output bytes that can't be
+                decoded are replaced with the U+FFFD replacement character.
+                If encoding is None, the types read or written are raw bytes.
             combine_stderr: If true, process's stderr output is combined into
                 its stdout (the stderr argument must be None). If false,
                 separate streams are used for stdout and stderr.
@@ -3320,11 +3368,14 @@ class Client:
                 threads.append(t)
                 process_stdout = None
             else:
-                process_stdout = _WebsocketReader(stdio_ws)
+                process_stdout = _WebsocketReader(stdio_ws, encoding)
                 if encoding is not None:
+                    # wait_output() reads this in a thread, where a decoding
+                    # error would be lost, along with all of the output.
                     process_stdout = io.TextIOWrapper(
                         process_stdout,  # type: ignore
                         encoding=encoding,
+                        errors='replace',
                         newline='',
                     )
 
@@ -3335,11 +3386,12 @@ class Client:
                     threads.append(t)
                 else:
                     ws = typing.cast('_WebSocket', stderr_ws)
-                    process_stderr = _WebsocketReader(ws)
+                    process_stderr = _WebsocketReader(ws, encoding)
                     if encoding is not None:
                         process_stderr = io.TextIOWrapper(
                             process_stderr,  # type: ignore
                             encoding=encoding,
+                            errors='replace',
                             newline='',
                         )
 
