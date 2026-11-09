@@ -12,7 +12,12 @@ test's. Two plugins are supported:
   of the charm's libraries aren't included.
 * ``uv``: what ``uv sync`` would install from the charm's ``uv.lock``, with
   the same options as charmcraft's uv plugin and the part's ``uv-extras``
-  and ``uv-groups``.
+  and ``uv-groups``. Unlike charmcraft, which uses the lockfile as it is, a
+  ``uv.lock`` that's out of date with ``pyproject.toml`` is an error, so that
+  the charm isn't tested with dependencies other than the ones it asks for.
+
+Charms that use an extension, such as ``flask-framework``, aren't supported:
+the extension adds parts that aren't in ``charmcraft.yaml``.
 
 The result is one flat list of requirements, with relative paths made
 absolute, so that it can be installed from anywhere.
@@ -42,6 +47,9 @@ _OTHER_PLUGINS = ('nil', 'dump', 'make', 'autotools', 'cmake', 'go', 'rust', 'np
 _OPS_DISTRIBUTIONS = ('ops', 'ops-scenario', 'ops-tracing')
 
 _REQUIREMENT_NAME = re.compile(r'^\s*([A-Za-z0-9][A-Za-z0-9._-]*)')
+_EGG_NAME = re.compile(r'#(?:.*&)?egg=([A-Za-z0-9][A-Za-z0-9._-]*)')
+# pip also accepts these options with the value attached, as in ``-rbase.txt``.
+_ATTACHED_SHORT_OPTION = re.compile(r'^(-[rcef])(?=[^\s=])')
 _HASH_OPTION = re.compile(r'\s--hash[=\s]\S+')
 
 
@@ -79,7 +87,8 @@ def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
         _RequirementsError: if there's no ``charmcraft.yaml`` or it can't be
             read, or the plugin isn't supported. That includes the deprecated
             ``charm`` plugin, which charmcraft uses when ``charmcraft.yaml``
-            has no ``parts``.
+            has no ``parts``, and charms that use an extension, unless one of
+            their own parts sets the python or uv plugin.
     """
     path = charm_root / 'charmcraft.yaml'
     try:
@@ -90,13 +99,28 @@ def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:
         ) from None
     except (OSError, yaml.YAMLError) as e:
         raise _RequirementsError(f'Could not read {path}: {e}') from None
-    parts: Any = (
-        cast('dict[str, Any]', charmcraft).get('parts') if isinstance(charmcraft, dict) else None
-    )
+    if not isinstance(charmcraft, dict):
+        raise _RequirementsError(f'{path} is not a mapping.')
+    charmcraft = cast('dict[str, Any]', charmcraft)
+    parts: Any = charmcraft.get('parts')
+    if parts and not isinstance(parts, dict):
+        raise _RequirementsError(f'parts in {path} is not a mapping.')
+    try:
+        return _python_part(path, parts)
+    except _RequirementsError:
+        if extensions := charmcraft.get('extensions'):
+            # The part that the extension adds, or changes, decides the plugin.
+            raise _RequirementsError(
+                f'{path} uses the {", ".join(map(str, extensions))} extension, which adds '
+                "parts that aren't in charmcraft.yaml, so finding the charm's dependencies "
+                "isn't supported."
+            ) from None
+        raise
+
+
+def _python_part(path: pathlib.Path, parts: Any) -> tuple[str, Mapping[str, Any]]:
     if not parts:
         raise _charm_plugin(f'{path} has no parts')
-    if not isinstance(parts, dict):
-        raise _RequirementsError(f'parts in {path} is not a mapping.')
     unknown: list[str] = []
     for name, part in cast('dict[str, Any]', parts).items():
         # A part with no keys at all is null in YAML.
@@ -132,12 +156,20 @@ def _charm_plugin(reason: str) -> _RequirementsError:
 def _python_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> list[str]:
     """The requirements the ``python`` plugin would install."""
     requirements: list[str] = []
-    for name in part.get('python-requirements', ()):
+    for name in _list(charm_root, part, 'python-requirements'):
         requirements.extend(read_requirements(_listed_file(charm_root, name, 'requirements')))
-    requirements.extend(str(package) for package in part.get('python-packages', ()))
-    for name in part.get('python-constraints', ()):
+    requirements.extend(_list(charm_root, part, 'python-packages'))
+    for name in _list(charm_root, part, 'python-constraints'):
         requirements.append(f'-c {_listed_file(charm_root, name, "constraints")}')
     return requirements
+
+
+def _list(charm_root: pathlib.Path, part: Mapping[str, Any], key: str) -> list[str]:
+    """A list option of the part, which is empty if it isn't set."""
+    value = part.get(key, [])
+    if not isinstance(value, list):
+        raise _RequirementsError(f'{key} in {charm_root / "charmcraft.yaml"} is not a list.')
+    return [str(item) for item in cast('list[Any]', value)]
 
 
 def _listed_file(charm_root: pathlib.Path, name: str, kind: str) -> pathlib.Path:
@@ -164,6 +196,8 @@ def _uv_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> list[
     cmd = [
         uv,
         'export',
+        # charmcraft uses the lockfile as it is (UV_FROZEN), but testing with a stale
+        # lockfile would test the charm with dependencies it no longer asks for.
         '--locked',
         '--no-hashes',
         '--no-header',
@@ -177,10 +211,10 @@ def _uv_requirements(charm_root: pathlib.Path, part: Mapping[str, Any]) -> list[
         # charmcraft passes `--no-install-project`: the charm's code is copied, not installed.
         '--no-emit-project',
     ]
-    for extra in part.get('uv-extras', ()):
-        cmd += ['--extra', str(extra)]
-    for group in part.get('uv-groups', ()):
-        cmd += ['--group', str(group)]
+    for extra in _list(charm_root, part, 'uv-extras'):
+        cmd += ['--extra', extra]
+    for group in _list(charm_root, part, 'uv-groups'):
+        cmd += ['--group', group]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         output = result.stderr.strip()
@@ -220,6 +254,7 @@ def _parse_requirements(
         line = _HASH_OPTION.sub('', f' {line}').strip()
         if not line:
             continue
+        line = _ATTACHED_SHORT_OPTION.sub(r'\1 ', line)
         option, _, value = line.partition(' ')
         if '=' in option and option.startswith('--'):
             option, _, value = option.partition('=')
@@ -255,21 +290,31 @@ def _absolute(requirement: str, base: pathlib.Path) -> str:
 
 
 def _canonical_name(requirement: str) -> str | None:
-    match = _REQUIREMENT_NAME.match(requirement)
+    """The distribution a requirement names, if it names one.
+
+    An editable requirement only names one in its ``#egg=`` fragment.
+    """
+    if requirement.startswith('-'):
+        option, _, value = requirement.partition(' ')
+        if option not in ('-e', '--editable'):
+            return None
+        match = _EGG_NAME.search(value)
+    else:
+        match = _REQUIREMENT_NAME.match(requirement)
     if match is None:
         return None
     return re.sub(r'[-_.]+', '-', match.group(1)).lower()
 
 
 def _deduplicated(requirements: Iterable[str]) -> list[str]:
-    """Drop repeats, and the charm's own ``ops`` and ``ops-scenario`` requirements."""
+    """Drop repeats, and the charm's own ``ops``, ``ops-scenario`` and ``ops-tracing``."""
     seen: set[str] = set()
     result: list[str] = []
     for requirement in requirements:
         if requirement in seen:
             continue
         seen.add(requirement)
-        if not requirement.startswith('-') and _canonical_name(requirement) in _OPS_DISTRIBUTIONS:
+        if _canonical_name(requirement) in _OPS_DISTRIBUTIONS:
             continue
         result.append(requirement)
     return result

@@ -12,8 +12,6 @@ import pytest
 from scenario import _charm_requirements
 from scenario._charm_requirements import _RequirementsError
 
-needs_uv = pytest.mark.skipif(shutil.which('uv') is None, reason='needs uv on PATH')
-
 
 def _charmcraft(root: pathlib.Path, text: str) -> pathlib.Path:
     root.mkdir(parents=True, exist_ok=True)
@@ -76,6 +74,21 @@ def test_no_charmcraft_yaml_is_an_error(tmp_path: pathlib.Path):
         _charm_requirements.detect_plugin(tmp_path)
 
 
+@pytest.mark.parametrize('parts', ['', 'parts:\n  charm:\n    build-snaps: [rustup]\n'])
+def test_an_extension_is_an_error(tmp_path: pathlib.Path, parts: str):
+    # The extension's part sets the plugin, which depends on the base.
+    root = _charmcraft(tmp_path, f'base: ubuntu@26.04\nextensions: [flask-framework]\n{parts}')
+    with pytest.raises(_RequirementsError, match=r'uses the flask-framework extension'):
+        _charm_requirements.detect_plugin(root)
+
+
+def test_an_extension_with_a_uv_part(tmp_path: pathlib.Path):
+    root = _charmcraft(
+        tmp_path, 'extensions: [flask-framework]\nparts:\n  charm:\n    plugin: uv\n'
+    )
+    assert _charm_requirements.detect_plugin(root)[0] == 'uv'
+
+
 @pytest.mark.parametrize('plugin', ['poetry', 'reactive'])
 def test_unsupported_plugins_are_an_error(tmp_path: pathlib.Path, plugin: str):
     root = _charmcraft(tmp_path, f'parts:\n  charm:\n    plugin: {plugin}\n')
@@ -95,6 +108,7 @@ def test_no_python_part_names_the_parts(tmp_path: pathlib.Path):
     ('text', 'error'),
     [
         ('parts: [\n', 'Could not read'),
+        ('[parts]\n', 'charmcraft.yaml is not a mapping'),
         ('parts: [a, b]\n', 'parts in .* is not a mapping'),
         ('parts:\n  charm: x\n', "Part 'charm' in .* is not a mapping"),
     ],
@@ -111,7 +125,7 @@ def test_a_malformed_charmcraft_yaml_is_an_error(tmp_path: pathlib.Path, text: s
 def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
     (tmp_path / 'sub').mkdir()
     (tmp_path / 'sub' / 'more.txt').write_text('included==1  # A comment.\n-r ../base.txt\n')
-    (tmp_path / 'base.txt').write_text('base>=2\n-r sub/more.txt\n')
+    (tmp_path / 'base.txt').write_text('base>=2\n-rsub/more.txt\n')
     (tmp_path / 'constraints.txt').write_text('')
     (tmp_path / 'requirements.txt').write_text(
         textwrap.dedent("""\
@@ -121,10 +135,11 @@ def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
                 --hash=sha256:def
             marked==2.0 ; python_version >= "3.8"
             -r sub/more.txt
-            -c constraints.txt
+            -cconstraints.txt
             --find-links=wheels
             -f https://example.com/wheels/
             -e ./local/editable
+            -e./local/attached
             ./local/package
             named @ ./local/named
             named-url @ https://example.com/x.whl
@@ -141,6 +156,7 @@ def test_read_requirements_flattens_a_requirements_file(tmp_path: pathlib.Path):
         f'--find-links {tmp_path / "wheels"}',
         '-f https://example.com/wheels/',
         f'-e {tmp_path / "local" / "editable"}',
+        f'-e {tmp_path / "local" / "attached"}',
         str(tmp_path / 'local' / 'package'),
         f'named @ {(tmp_path / "local" / "named").as_uri()}',
         'named-url @ https://example.com/x.whl',
@@ -165,7 +181,14 @@ def test_python_plugin_requirements(tmp_path: pathlib.Path):
         """,
     )
     (root / 'requirements.txt').write_text(
-        'requests==2.32\nops==2.17.0\nops_scenario>=7\nOps.Tracing==2.17.0\n'
+        textwrap.dedent("""\
+            requests==2.32
+            ops==2.17.0
+            ops_scenario>=7
+            Ops.Tracing==2.17.0
+            -e git+https://github.com/canonical/operator@main#egg=ops
+            -e git+https://example.com/other.git#subdirectory=x&egg=other
+            """)
     )
     (root / 'constraints.txt').write_text('urllib3<3\n')
     # charmcraft's python plugin doesn't install charm libraries' PYDEPS.
@@ -176,6 +199,7 @@ def test_python_plugin_requirements(tmp_path: pathlib.Path):
     # ops, ops-scenario and ops-tracing are left out, and so are repeats.
     assert _charm_requirements.charm_requirements(root) == [
         'requests==2.32',
+        '-e git+https://example.com/other.git#subdirectory=x&egg=other',
         'extra==1',
         f'-c {root / "constraints.txt"}',
     ]
@@ -187,6 +211,17 @@ def test_a_missing_listed_file_is_an_error(tmp_path: pathlib.Path, kind: str):
         tmp_path, f'parts:\n  charm:\n    plugin: python\n    python-{kind}: [x.txt]\n'
     )
     with pytest.raises(_RequirementsError, match=rf'lists x.txt as a {kind} file'):
+        _charm_requirements.charm_requirements(root)
+
+
+@pytest.mark.parametrize(
+    'key', ['python-requirements', 'python-packages', 'python-constraints', 'uv-extras']
+)
+def test_a_list_option_that_is_not_a_list_is_an_error(tmp_path: pathlib.Path, key: str):
+    plugin = key.partition('-')[0]
+    root = _charmcraft(tmp_path, f'parts:\n  charm:\n    plugin: {plugin}\n    {key}: x.txt\n')
+    (root / 'uv.lock').write_text('')
+    with pytest.raises(_RequirementsError, match=rf'{key} in .* is not a list'):
         _charm_requirements.charm_requirements(root)
 
 
@@ -236,7 +271,6 @@ def _uv_charm(root: pathlib.Path, part: str = '', pyproject: str = '') -> pathli
     return root
 
 
-@needs_uv
 def test_uv_plugin_leaves_out_the_dev_group(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
     # Path dependencies are made absolute, editable ones aren't editable, and
@@ -246,7 +280,6 @@ def test_uv_plugin_leaves_out_the_dev_group(tmp_path: pathlib.Path):
     ]
 
 
-@needs_uv
 def test_uv_plugin_keeps_other_default_groups(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path, pyproject='\n[tool.uv]\ndefault-groups = ["dev", "g"]\n')
     assert sorted(_charm_requirements.charm_requirements(root)) == [
@@ -254,7 +287,6 @@ def test_uv_plugin_keeps_other_default_groups(tmp_path: pathlib.Path):
     ]
 
 
-@needs_uv
 def test_uv_plugin_forwards_extras_and_groups(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path, '    uv-extras: [x]\n    uv-groups: [g]\n')
     assert sorted(_charm_requirements.charm_requirements(root)) == [
@@ -262,7 +294,6 @@ def test_uv_plugin_forwards_extras_and_groups(tmp_path: pathlib.Path):
     ]
 
 
-@needs_uv
 def test_uv_plugin_with_a_stale_lockfile(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
     pyproject = root / 'pyproject.toml'
