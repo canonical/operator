@@ -250,7 +250,9 @@ NON_TRIVIAL = testing.State(
         pytest.param(_stored({'l': ['__t__']}), id='list-of-the-tag'),
         pytest.param(_stored({'l': ['__tuple__', 1]}), id='list-starting-like-a-tuple'),
         pytest.param(_stored({'d': {'__t__': 'bytes', 'v': 'AAAA'}}), id='dict-with-the-tag'),
-        pytest.param(_stored({'__t__': 'dc', 'cls': 'State', 'f': {}}), id='content-with-the-tag'),
+        pytest.param(
+            _stored({'__t__': 'dataclass', 'cls': 'State', 'f': {}}), id='content-with-the-tag'
+        ),
         pytest.param(
             testing.State(secrets={_secret_at_revision_2(track_latest=False)}),
             id='secret-revisions',
@@ -399,12 +401,15 @@ def test_values_without_an_encoding_are_rejected(content: dict[Any, Any], messag
     ('encoded', 'message'),
     [
         ({'__t__': '__no_such_type__', 'v': None}, 'Unknown type tag'),
-        ({'__t__': 'dc', 'cls': 'NoSuchClass', 'f': {}}, 'Unknown dataclass'),
+        ({'__t__': 'dataclass', 'cls': 'NoSuchClass', 'f': {}}, 'Unknown dataclass'),
         ({'__t__': 'enum', 'cls': 'NoSuchEnum', 'name': 'FOO'}, 'Unknown enum class'),
         ({'__t__': 'status', 'name': 'no-such-status', 'msg': ''}, 'Unknown status name'),
         ({'__t__': 'enum', 'cls': 'CheckLevel', 'name': 'OTHER'}, "Unknown member 'OTHER'"),
-        ({'__t__': 'dc', 'cls': 'State', 'f': {}, 'x': {'anything': 1}}, 'Unexpected attribute'),
-        ({'__t__': 'dc', 'cls': 'State'}, "Missing 'f'"),
+        (
+            {'__t__': 'dataclass', 'cls': 'State', 'f': {}, 'x': {'anything': 1}},
+            'Unexpected attribute',
+        ),
+        ({'__t__': 'dataclass', 'cls': 'State'}, "Missing 'f'"),
         ({'__t__': 'idict'}, "Missing 'v'"),
         ({'__t__': 'idict', 'v': {'x': 1}}, 'Expected integer keys'),
         ({'__t__': 'idict', 'v': {'1': 'a', '01': 'b'}}, 'Expected integer keys'),

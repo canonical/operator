@@ -184,7 +184,7 @@ def _encode(obj: object, path: str) -> _JSON:
             for f in dataclasses.fields(obj)
             if f.init
         }
-        encoded: dict[str, _JSON] = {_T: 'dc', 'cls': cls.__name__, 'f': fields}
+        encoded: dict[str, _JSON] = {_T: 'dataclass', 'cls': cls.__name__, 'f': fields}
         extra = {
             name: _encode(getattr(obj, name), f'{path}.{name}')
             for name in _NON_FIELD_ATTRS.get(cls, ())
@@ -337,7 +337,7 @@ def _decode(obj: _JSON) -> Any:
             raise TypeError(f'Unknown member {member_name!r} of {cls_name} in the payload.')
         return member
 
-    if kind == 'dc':
+    if kind == 'dataclass':
         cls_name = _as_str(_field(obj, 'cls', 'dataclass'), 'dataclass name')
         dc_cls = _DC_TYPES.get(cls_name)
         if dc_cls is None:
