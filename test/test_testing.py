@@ -7399,6 +7399,61 @@ def test_layers_merge_in_plan(request: pytest.FixtureRequest, layer1_name: str, 
     assert log_target.location == 'https://loki2.example.com'
 
 
+def test_get_plan_does_not_mutate_layers(request: pytest.FixtureRequest):
+    layer1 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'replace',
+                'command': '/bin/sleep 10',
+                'after': ['db'],
+            },
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'replace',
+                'type': 'loki',
+                'location': 'https://loki.example.com',
+                'services': ['server'],
+            }
+        },
+    })
+    layer2 = pebble.Layer({
+        'services': {
+            'server': {
+                'override': 'merge',
+                'command': '/bin/sleep 20',
+                'after': ['cache'],
+            },
+        },
+        'log-targets': {
+            'loki': {
+                'override': 'merge',
+                'services': ['worker'],
+            }
+        },
+    })
+    harness = ops.testing.Harness(
+        ops.CharmBase, meta='name: mycharm\ncontainers:\n  my-container:'
+    )
+    request.addfinalizer(harness.cleanup)
+    harness.set_can_connect('my-container', True)
+    harness.begin()
+    container = harness.charm.unit.get_container('my-container')
+    container.add_layer('a-base', layer1)
+    container.add_layer('b-override', layer2)
+
+    for _ in range(3):
+        plan = container.get_plan()
+        assert plan.services['server'].command == '/bin/sleep 20'
+        assert plan.services['server'].after == ['db', 'cache']
+        assert plan.log_targets['loki'].services == ['server', 'worker']
+
+    # The layers that were added are not changed by rendering the plan.
+    assert layer1.services['server'].command == '/bin/sleep 10'
+    assert layer1.services['server'].after == ['db']
+    assert layer1.log_targets['loki'].services == ['server']
+
+
 @pytest.mark.parametrize('test_context', ['init', 'event'])
 @pytest.mark.parametrize(
     'is_leader', [pytest.param(True, id='leader'), pytest.param(False, id='minion')]
