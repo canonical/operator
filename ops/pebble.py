@@ -620,6 +620,7 @@ class SystemInfo:
     """System information object."""
 
     version: str
+    """Version of the Pebble daemon."""
 
     def __init__(self, version: str) -> None:
         self.version = version
@@ -637,11 +638,22 @@ class Warning:
     """Warning object."""
 
     message: str
+    """Human-readable warning message."""
+
     first_added: datetime.datetime
+    """Time the warning was first added."""
+
     last_added: datetime.datetime
+    """Time the warning was last added."""
+
     last_shown: datetime.datetime | None
+    """Time the warning was last shown, or ``None`` if it hasn't been shown."""
+
     expire_after: str
+    """Duration after which the warning expires, for example ``'672h0m0s'``."""
+
     repeat_after: str
+    """Duration after which the warning is shown again, for example ``'24h0m0s'``."""
 
     def __init__(
         self,
@@ -691,8 +703,13 @@ class TaskProgress:
     """Task progress object."""
 
     label: str
+    """Short description of the progress."""
+
     done: int
+    """Number of units completed."""
+
     total: int
+    """Total number of units."""
 
     def __init__(
         self,
@@ -728,14 +745,31 @@ class Task:
     """Task object."""
 
     id: TaskID
+    """Server-generated ID for this task."""
+
     kind: str
+    """Kind of task, for example ``'exec'`` or ``'start'``."""
+
     summary: str
+    """Human-readable summary of the task."""
+
     status: str
+    """Status of the task, for example ``'Doing'`` or ``'Done'``."""
+
     log: list[str]
+    """Log entries recorded while running the task."""
+
     progress: TaskProgress
+    """Progress of the task."""
+
     spawn_time: datetime.datetime
+    """Time the task was created."""
+
     ready_time: datetime.datetime | None
+    """Time the task finished, or ``None`` if it hasn't finished."""
+
     data: dict[str, Any]
+    """Additional data associated with the task."""
 
     def __init__(
         self,
@@ -804,15 +838,34 @@ class Change:
     """Change object."""
 
     id: ChangeID
+    """Server-generated ID for this change."""
+
     kind: str
+    """Kind of change, for example ``'exec'`` or ``'replan'``."""
+
     summary: str
+    """Human-readable summary of the change."""
+
     status: str
+    """Status of the change, for example ``'Doing'`` or ``'Done'``."""
+
     tasks: list[Task]
+    """Tasks that make up the change."""
+
     ready: bool
+    """Whether the change has finished."""
+
     err: str | None
+    """Error message if the change failed, or ``None`` otherwise."""
+
     spawn_time: datetime.datetime
+    """Time the change was created."""
+
     ready_time: datetime.datetime | None
+    """Time the change finished, or ``None`` if it hasn't finished."""
+
     data: dict[str, Any]
+    """Additional data associated with the change."""
 
     def __init__(
         self,
@@ -1024,27 +1077,79 @@ class Service:
     """Represents a service description in a Pebble configuration layer."""
 
     name: str
+    """Name of the service."""
+
     summary: str
+    """Short description of the service."""
+
     description: str
+    """Longer description of the service."""
+
     startup: str
+    """Startup mode, ``'enabled'`` or ``'disabled'``."""
+
     override: str
+    """How this service combines with a service of the same name in earlier layers.
+
+    Either ``'merge'`` or ``'replace'``.
+    """
+
     command: str
+    """Command to run the service."""
+
     after: list[str]
+    """Services that this service starts after."""
+
     before: list[str]
+    """Services that this service starts before."""
+
     requires: list[str]
+    """Services that must start along with this service."""
+
     environment: dict[str, str]
+    """Environment variables for the service's command."""
+
     user: str
+    """Username to run the service as."""
+
     user_id: int | None
+    """User ID to run the service as."""
+
     group: str
+    """Group name to run the service as."""
+
     group_id: int | None
+    """Group ID to run the service as."""
+
     working_dir: str
+    """Working directory for the service's command."""
+
     on_success: str
+    """Action to take when the service exits successfully.
+
+    For example, ``'restart'`` or ``'shutdown'``.
+    """
+
     on_failure: str
+    """Action to take when the service exits with an error.
+
+    For example, ``'restart'`` or ``'shutdown'``.
+    """
+
     on_check_failure: dict[str, Any]
+    """Actions to take when a health check fails, keyed by check name."""
+
     backoff_delay: str
+    """Initial delay before restarting the service, for example ``'500ms'``."""
+
     backoff_factor: int | None
+    """Factor by which the backoff delay increases after each restart."""
+
     backoff_limit: str
+    """Maximum backoff delay, for example ``'30s'``."""
+
     kill_delay: str | None
+    """Time to wait after sending SIGTERM before sending SIGKILL, for example ``'5s'``."""
 
     def __init__(self, name: str, raw: ServiceDict | None = None) -> None:
         self.name = name
@@ -1154,8 +1259,13 @@ class ServiceInfo:
     """Service status information."""
 
     name: str
+    """Name of the service."""
+
     startup: ServiceStartup | str
+    """Startup mode, or the raw string if Pebble returns an unknown value."""
+
     current: ServiceStatus | str
+    """Current status of the service, or the raw string if Pebble returns an unknown value."""
 
     def __init__(
         self,
@@ -2326,9 +2436,16 @@ class Client:
     _chunk_size = 8192
 
     socket_path: str
+    """Path to the Pebble API Unix socket."""
+
     opener: urllib.request.OpenerDirector
+    """Opener used to send HTTP requests to Pebble."""
+
     base_url: str
+    """Base URL for requests to the Pebble API."""
+
     timeout: float
+    """Timeout in seconds for blocking operations, such as connecting to Pebble."""
 
     def __init__(
         self,
