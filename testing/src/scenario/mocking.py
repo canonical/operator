@@ -899,8 +899,6 @@ class _MockPebbleClient(_TestingPebbleClient):
             path = Path(mount.location).parts
             mounting_dir = container_root.joinpath(*path[1:])
             mounting_dir.parent.mkdir(parents=True, exist_ok=True)
-            # A relative source would otherwise be resolved relative to the
-            # link's own directory inside the container root.
             mounting_dir.symlink_to(Path(mount.source).absolute())
 
         self._root = container_root

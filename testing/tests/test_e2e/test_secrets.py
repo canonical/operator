@@ -594,14 +594,11 @@ def test_remove_bad_revision():
 
 def test_secret_with_newer_latest_content_has_two_revisions():
     secret = Secret({'foo': '1'}, latest_content={'foo': '2'}, owner='unit', label='mylabel')
-    assert secret._tracked_revision == 1
-    assert secret._latest_revision == 2
+    same = Secret({'foo': '1'}, latest_content={'foo': '1'}, owner='unit', label='same')
     ctx = Context(Charm, meta={'name': 'local'})
-    with ctx(ctx.on.update_status(), State(secrets={secret})) as mgr:
+    with ctx(ctx.on.update_status(), State(secrets={secret, same})) as mgr:
         assert mgr.charm.model.get_secret(label='mylabel').get_info().revision == 2
-
-    same = Secret({'foo': '1'}, latest_content={'foo': '1'})
-    assert same._latest_revision == 1
+        assert mgr.charm.model.get_secret(label='same').get_info().revision == 1
 
 
 def test_set_info_does_not_create_a_revision():

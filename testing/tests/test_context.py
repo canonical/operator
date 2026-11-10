@@ -402,6 +402,7 @@ def test_init_with_charmcraft_yaml_extensions_and_explicit_actions():
     actions = {'do-bar': {'description': 'Do `bar`, whatever that is.'}}
     spec = Context(MyCharm, charmcraft_yaml, actions=actions)._charm_spec
     assert spec.actions == actions
+    # The rest of the extension still applies.
     assert 'flask-app' in spec.meta['containers']
     assert spec.config is not None and 'webserver-threads' in spec.config['options']
 

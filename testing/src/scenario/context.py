@@ -189,7 +189,8 @@ class Manager(Generic[CharmType]):
             self.ops.run()
         except BaseException:
             # Hand the exception to Runtime.exec()'s __exit__ to tear down the
-            # env; it suppresses a clean early exit (_Abort(0)), which is normal.
+            # env. That __exit__ also suppresses a clean early exit (_Abort(0)),
+            # which is a normal completion.
             if not self._exit_wrapped_ctx(*sys.exc_info()):
                 raise
         # On success we must pass (None, None, None) explicitly — not
@@ -759,7 +760,7 @@ class Context(Generic[CharmType]):
             ``actions`` will be automatically extracted from it (if not explicitly provided).
             Otherwise, if no meta, actions, or config were provided, will be loaded from the
             ``charmcraft.yaml`` file in the charm root (falling back to ``metadata.yaml``).
-            If the ``charmcraft.yaml`` contains an ``extensions`` key (e.g.
+            If the charm metadata contains an ``extensions`` key (for example,
             ``extensions: [flask-framework]``), the extension's metadata,
             config, and actions will be automatically merged in.
         :arg actions: charm actions to use. Needs to be a valid actions.yaml format (as a dict).
