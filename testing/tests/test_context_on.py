@@ -578,8 +578,19 @@ class CustomCharmWithLazyConsumer(ContextCharm):
         return MyConsumer(self)
 
 
+class CustomCharmWithBrokenAndLazyConsumer(CustomCharmWithLazyConsumer):
+    @property
+    def broken(self) -> str:
+        raise RuntimeError('this property must not stop the event source search')
+
+
 @pytest.mark.parametrize(
-    'charm_type', [CustomCharmWithConsumerProperty, CustomCharmWithLazyConsumer]
+    'charm_type',
+    [
+        CustomCharmWithConsumerProperty,
+        CustomCharmWithLazyConsumer,
+        CustomCharmWithBrokenAndLazyConsumer,
+    ],
 )
 def test_custom_event_source_and_properties(charm_type: type[ContextCharm]):
     ctx = scenario.Context(charm_type, meta=META, actions=ACTIONS)

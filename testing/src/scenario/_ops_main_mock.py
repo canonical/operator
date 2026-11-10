@@ -116,13 +116,17 @@ class UnitStateDB:
 def _attrs_of_type(obj: object, attr_type: type[_T], *, static: bool) -> Iterator[_T]:
     """Yield the attributes of obj that are of attr_type.
 
-    If static is true, only attributes that are of attr_type without running a
-    descriptor are considered, so properties aren't evaluated.
+    If static is true, properties aren't evaluated.
     """
     for name in dir(obj):
         if static and not isinstance(inspect.getattr_static(obj, name, None), attr_type):
             continue
-        attr = getattr(obj, name)
+        try:
+            attr = getattr(obj, name)
+        except Exception:  # ruff: ignore[try-except-continue]
+            # A property that raises can't be the event source, so it shouldn't
+            # stop the search from reaching one that is.
+            continue
         if isinstance(attr, attr_type):
             yield attr
 
@@ -225,8 +229,9 @@ class Ops(_Manager, Generic[CharmType]):
             # We require the event source to be an attribute on the charm object.
             # Essentially, we are replacing the unbound event with a bound one.
             # The static pass avoids running every property on the charm and its
-            # objects, which can raise or have side effects. Only an event source
-            # that can only be reached through a property needs the second pass.
+            # objects. Running a property can raise or have side effects. Only an
+            # event source that can only be reached through a property needs the
+            # broader pass.
             for static in (True, False):
                 for attr in _attrs_of_type(self.charm, ops.Object, static=static):
                     for sub_attr in _attrs_of_type(attr, ops.ObjectEvents, static=static):
