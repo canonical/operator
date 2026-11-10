@@ -136,6 +136,37 @@ def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]):
     assert isinstance(start, ops.StartEvent)
 
 
+@pytest.mark.parametrize(
+    'remote_unit,departing_unit,expected',
+    [
+        (1, 2, 'remote/2'),
+        (1, None, 'remote/1'),
+        (0, None, 'remote/0'),
+        (None, None, None),
+    ],
+)
+def test_deferred_relation_departed_departing_unit(
+    mycharm: type[ops.CharmBase],
+    remote_unit: int | None,
+    departing_unit: int | None,
+    expected: str | None,
+):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    rel = Relation(endpoint='foo', remote_app_name='remote')
+    deferred = ctx.on.relation_departed(
+        rel, remote_unit=remote_unit, departing_unit=departing_unit
+    ).deferred(handler=mycharm._on_event)  # type: ignore
+    ctx.run(ctx.on.update_status(), State(relations={rel}, deferred=[deferred]))
+
+    relation_departed, _ = mycharm.captured  # type: ignore
+    assert isinstance(relation_departed, ops.RelationDepartedEvent)
+    if expected is None:
+        assert relation_departed.departing_unit is None
+    else:
+        assert relation_departed.departing_unit is not None
+        assert relation_departed.departing_unit.name == expected
+
+
 def test_deferred_workload_event(mycharm: type[ops.CharmBase]):
     mycharm.defer_next = 2  # type: ignore
 

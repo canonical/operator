@@ -2749,7 +2749,11 @@ class Event:
             if not self.name.endswith(('_created', '_broken')):
                 snapshot_data['unit_name'] = f'{remote_app}/{self._relation_remote_unit_id}'
             if self.name.endswith('_departed'):
-                snapshot_data['departing_unit'] = f'{remote_app}/{self._relation_departed_unit_id}'
+                departing_unit_id = self._relation_departed_unit_id
+                if departing_unit_id is None:
+                    departing_unit_id = self._relation_remote_unit_id
+                if departing_unit_id is not None:
+                    snapshot_data['departing_unit'] = f'{remote_app}/{departing_unit_id}'
 
         elif self._is_storage_event:
             # Enforced by the consistency checker, but for type checkers:
