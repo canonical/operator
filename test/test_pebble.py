@@ -2479,7 +2479,7 @@ Content-Disposition: form-data; name="response"\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="files"; filename="/etc/hosts"\r
 \r
-127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\r
+127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80\r
 --01234567890123456789012345678901\r
 Content-Disposition: form-data; name="response"\r
 \r
@@ -2495,7 +2495,7 @@ Content-Disposition: form-data; name="response"\r
 
         with client.pull('/etc/hosts', encoding=None) as infile:
             content = infile.read()
-        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar'
+        assert content == b'127.0.0.1 localhost  # \xf0\x9f\x98\x80\nfoo\r\nbar\xff\xfe\x00\x80'
 
         assert client.requests == [
             (
