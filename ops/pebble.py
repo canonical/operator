@@ -1200,6 +1200,12 @@ class Check:
         if self.exec is None:
             self.exec = {}
         for name, value in other.items():
+            # A user or group ID of 0 (root) is an explicit value, so only None is unset.
+            if name in ('user-id', 'group-id') and value is not None:
+                # Pyright knows self.exec[name] should be an int because of name,
+                # but not that value must be an int here because it came from items().
+                self.exec[name] = value  # pyright: ignore[reportGeneralTypeIssues]
+                continue
             if not value:
                 continue
             if name == 'environment':
