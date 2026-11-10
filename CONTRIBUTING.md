@@ -140,6 +140,14 @@ The framework has some tests that interact with a real/live Pebble server, which
 tox -e pebble
 ```
 
+Property-based tests, which use [Hypothesis](https://hypothesis.readthedocs.io/), live in `test/property/` and run on their own rather than as part of the unit tests. Hypothesis is in its own `property` dependency group, so the unit tests don't need it.
+
+```sh
+tox -e property
+```
+
+Set `HYPOTHESIS_PROFILE` to `ci` for the small, repeatable run that pull requests get, or to `nightly` for the much longer run that's scheduled every night. If the nightly run finds a failing example, fix the bug and add the example to the test with `@example(...)`, so that every later run checks it.
+
 ## Using an `ops` branch in a charm
 
 When making changes to `ops`, you'll commonly want to try those changes out in
