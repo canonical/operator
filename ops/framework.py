@@ -27,9 +27,10 @@ import sys
 import types
 import typing
 import weakref
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Generator, Hashable, Iterable, Iterator, Mapping
+from collections.abc import Set as AbstractSet
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Literal, NoReturn, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, NoReturn, Protocol, TypeAlias, TypeVar
 
 import opentelemetry.trace
 
@@ -48,7 +49,7 @@ class Serializable(typing.Protocol):
     handle_kind = ''
 
     @property
-    def handle(self) -> 'Handle': ...  # ruff: ignore[undocumented-public-method, quoted-annotation]
+    def handle(self) -> Handle: ...  # ruff: ignore[undocumented-public-method]
     @handle.setter
     def handle(self, val: Handle): ...
     def snapshot(self) -> dict[str, Any]: ...  # ruff: ignore[undocumented-public-method]
@@ -59,20 +60,22 @@ class _StoredObject(Protocol):
     _under: Any = None
 
 
-StoredObject = 'StoredList | StoredSet | StoredDict'
+StoredObject: TypeAlias = 'StoredList | StoredSet | StoredDict'
 
-_Path = _Kind = _MethodName = _EventKey = str
+_Path: TypeAlias = str
+_Kind: TypeAlias = str
+_MethodName: TypeAlias = str
+_EventKey: TypeAlias = str
 # used to type Framework Attributes
-_ObserverPath = list[tuple[_Path, _MethodName, _Path, _EventKey]]
-_ObjectPath = tuple[_Path | None, _Kind]
-_PathToObjectMapping = dict[_Path, 'Object']
-_PathToSerializableMapping = dict[_Path, Serializable]
+_ObserverPath: TypeAlias = list[tuple[_Path, _MethodName, _Path, _EventKey]]
+_ObjectPath: TypeAlias = tuple[_Path | None, _Kind]
+_PathToObjectMapping: TypeAlias = dict[_Path, 'Object']
+_PathToSerializableMapping: TypeAlias = dict[_Path, Serializable]
 
 _T = TypeVar('_T')
-_EventType = TypeVar('_EventType', bound='EventBase')
 _ObjectType = TypeVar('_ObjectType', bound='Object')
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Handle:
@@ -89,7 +92,7 @@ class Handle:
     under the same parent and kind may have the same key.
     """
 
-    def __init__(self, parent: Handle | Object | None, kind: str, key: str | None):
+    def __init__(self, parent: Handle | Object | None, kind: str, key: str | None) -> None:
         if isinstance(parent, Object):
             # if it's not an Object, it will be either a Handle (good) or None (no parent)
             parent = parent.handle
@@ -111,13 +114,17 @@ class Handle:
         """Create a new handle as child of the current one."""
         return Handle(self, kind, key)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.parent, self.kind, self.key))
 
-    def __eq__(self, other: Handle):
-        return (self.parent, self.kind, self.key) == (other.parent, other.kind, other.key)
+    def __eq__(self, other: Handle) -> bool:
+        return (self.parent, self.kind, self.key) == (
+            other.parent,
+            other.kind,
+            other.key,
+        )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.path
 
     @property
@@ -176,11 +183,11 @@ class EventBase:
     framework: Framework = None  # type: ignore
     """The :class:`Framework` instance (set by the framework itself)."""
 
-    def __init__(self, handle: Handle):
-        self.handle = handle
+    def __init__(self, handle: Handle) -> None:
+        self.handle: Handle = handle
         self.deferred: bool = False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self.__class__.__name__} via {self.handle}>'
 
     def defer(self) -> None:
@@ -241,7 +248,7 @@ class EventBase:
         """
         return {}
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore the value state from the given snapshot.
 
         Subclasses must override to restore their custom state.
@@ -265,7 +272,7 @@ class EventSource:
     the event.
     """
 
-    def __init__(self, event_type: type[EventBase]):
+    def __init__(self, event_type: type[EventBase]) -> None:
         if not isinstance(event_type, type) or not issubclass(event_type, EventBase):
             raise RuntimeError(
                 f'Event requires a subclass of EventBase as an argument, got {event_type}'
@@ -274,7 +281,7 @@ class EventSource:
         self.event_kind: str | None = None
         self.emitter_type: type[Object] | None = None
 
-    def __set_name__(self, emitter_type: type[Object], event_kind: str):
+    def __set_name__(self, emitter_type: type[Object], event_kind: str) -> None:
         if self.event_kind is not None:
             raise RuntimeError(
                 'EventSource({}) reused as {}.{} and {}.{}'.format(
@@ -304,18 +311,27 @@ class EventSource:
 class BoundEvent:
     """Event bound to an Object."""
 
-    def __repr__(self):
+    emitter: Object
+    """The object that emits the event, for example ``charm.on``."""
+
+    event_type: type[EventBase]
+    """The class of the event, for example :class:`ops.StartEvent`."""
+
+    event_kind: str
+    """The name of the event on the emitter, for example ``'start'``."""
+
+    def __init__(self, emitter: Object, event_type: type[EventBase], event_kind: str) -> None:
+        self.emitter = emitter
+        self.event_type = event_type
+        self.event_kind = event_kind
+
+    def __repr__(self) -> str:
         return (
             f'<BoundEvent {self.event_type.__name__} bound to '
             f'{type(self.emitter).__name__}.{self.event_kind} at {hex(id(self))}>'
         )
 
-    def __init__(self, emitter: Object, event_type: type[EventBase], event_kind: str):
-        self.emitter = emitter
-        self.event_type = event_type
-        self.event_kind = event_kind
-
-    def emit(self, *args: Any, **kwargs: Any):
+    def emit(self, *args: Any, **kwargs: Any) -> None:
         """Emit event to all registered observers.
 
         The current storage state is committed before and after each observer
@@ -374,7 +390,7 @@ class Object:
 
     handle_kind: str = HandleKind()  # type: ignore
 
-    def __init__(self, parent: Framework | Object, key: str | None):
+    def __init__(self, parent: Framework | Object, key: str | None) -> None:
         self.framework: Framework = None  # type: ignore
         self.handle: Handle = None  # type: ignore
 
@@ -403,7 +419,7 @@ class ObjectEvents(Object):
 
     handle_kind = 'on'
 
-    def __init__(self, parent: Object | None = None, key: str | None = None):
+    def __init__(self, parent: Object | None = None, key: str | None = None) -> None:
         if parent is not None:
             super().__init__(parent, key)
         self._cache: weakref.WeakKeyDictionary[Object, Self] = weakref.WeakKeyDictionary()
@@ -419,7 +435,7 @@ class ObjectEvents(Object):
         return instance
 
     @classmethod
-    def define_event(cls, event_kind: str, event_type: type[EventBase]):
+    def define_event(cls, event_kind: str, event_type: type[EventBase]) -> None:
         """Define an event on this type at runtime.
 
         Note that attempting to define the same event kind more than once will
@@ -477,7 +493,7 @@ class ObjectEvents(Object):
     def __getitem__(self, key: str) -> PrefixedEvents:
         return PrefixedEvents(self, key)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         k = type(self)
         event_kinds = ', '.join(sorted(self._event_kinds()))
         return f'<{k.__module__}.{k.__qualname__}: {event_kinds}>'
@@ -494,7 +510,7 @@ class ObjectEvents(Object):
 class PrefixedEvents:
     """Events to be found in all events using a specific prefix."""
 
-    def __init__(self, emitter: Object, key: str):
+    def __init__(self, emitter: Object, key: str) -> None:
         self._emitter = emitter
         self._prefix = key.replace('-', '_') + '_'
 
@@ -542,10 +558,13 @@ class FrameworkEvents(ObjectEvents):
 class NoTypeError(Exception):
     """No class to hold it was found when restoring an event."""
 
-    def __init__(self, handle_path: str):
+    handle_path: str
+    """The handle path of the event that couldn't be restored."""
+
+    def __init__(self, handle_path: str) -> None:
         self.handle_path = handle_path
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'cannot restore {self.handle_path} since no class was registered for it'
 
 
@@ -589,7 +608,7 @@ class Framework(Object):
         event_name: str | None = None,
         juju_debug_at: set[str] | None = None,
         skip_duplicate_events: bool = True,
-    ):
+    ) -> None:
         super().__init__(self, None)
 
         # an old, deprecated __init__ interface accepted an Optional charm_dir,
@@ -605,7 +624,7 @@ class Framework(Object):
         self._event_name = event_name
         self.meta = meta
         self.model = model
-        self.skip_duplicate_events = skip_duplicate_events
+        self.skip_duplicate_events: bool = skip_duplicate_events
         # [(observer_path, method_name, parent_path, event_key)]
         self._observers: _ObserverPath = []
         # {observer_path: observing Object}
@@ -667,7 +686,7 @@ class Framework(Object):
         self._storage.close()
         self._closed = True
 
-    def _track(self, obj: Serializable):
+    def _track(self, obj: Serializable) -> None:
         """Track object and ensure it is the only object created using its handle path."""
         if obj is self:
             # Framework objects don't track themselves
@@ -676,7 +695,7 @@ class Framework(Object):
             raise RuntimeError(f'two objects claiming to be {obj.handle.path} have been created')
         self._objects[obj.handle.path] = obj
 
-    def _forget(self, obj: Serializable):
+    def _forget(self, obj: Serializable) -> None:
         """Stop tracking the given object. See also _track."""
         self._objects.pop(obj.handle.path, None)
 
@@ -696,7 +715,7 @@ class Framework(Object):
         cls: type[Serializable],
         parent: Handle | Object | None,
         kind: str | None = None,
-    ):
+    ) -> None:
         """Register a type to a handle."""
         parent_path: str | None = None
         if isinstance(parent, Object):
@@ -708,7 +727,9 @@ class Framework(Object):
         self._type_registry[parent_path, kind_] = cls
         self._type_known.add(cls)
 
-    def _validate_snapshot_data(self, value: StoredStateData | EventBase, data: dict[str, Any]):
+    def _validate_snapshot_data(
+        self, value: StoredStateData | EventBase, data: dict[str, Any]
+    ) -> None:
         if type(value) not in self._type_known:
             raise RuntimeError(
                 f'cannot save {type(value).__name__} values before registering that type'
@@ -725,7 +746,7 @@ class Framework(Object):
             msg = 'unable to save the data for {}, it must contain only simple types: {!r}'
             raise ValueError(msg.format(value.__class__.__name__, data)) from None
 
-    def save_snapshot(self, value: StoredStateData | EventBase):
+    def save_snapshot(self, value: StoredStateData | EventBase) -> None:
         """Save a persistent snapshot of the provided value."""
         data = value.snapshot()
         self._validate_snapshot_data(value, data)
@@ -748,11 +769,11 @@ class Framework(Object):
         self._track(obj)
         return obj
 
-    def drop_snapshot(self, handle: Handle):
+    def drop_snapshot(self, handle: Handle) -> None:
         """Discard a persistent snapshot."""
         self._storage.drop_snapshot(handle.path)
 
-    def observe(self, bound_event: BoundEvent, observer: Callable[[Any], None]):
+    def observe(self, bound_event: BoundEvent, observer: Callable[[Any], None]) -> None:
         """Register observer to be called when bound_event is emitted.
 
         If this is called multiple times for the same event type, the
@@ -823,7 +844,11 @@ class Framework(Object):
         return str(self._stored['event_count'])
 
     def _event_is_in_storage(
-        self, observer_path: str, method_name: str, event_path: str, event_data: dict[str, Any]
+        self,
+        observer_path: str,
+        method_name: str,
+        event_path: str,
+        event_data: dict[str, Any],
     ) -> bool:
         """Check if there is already a notice with the same snapshot in the storage."""
         # Check all the notices to see if there is one that is the same other
@@ -849,7 +874,7 @@ class Framework(Object):
                 return True
         return False
 
-    def _emit(self, event: EventBase):
+    def _emit(self, event: EventBase) -> None:
         """See BoundEvent.emit for the public way to call this."""
         saved = False
         event_path = event.handle.path
@@ -914,7 +939,7 @@ class Framework(Object):
         self._reemit()
 
     @contextmanager
-    def _event_context(self, event_name: str, *, deferred: bool = False):
+    def _event_context(self, event_name: str, *, deferred: bool = False) -> Generator[None]:
         """Handles toggling the hook-is-running and event-is-deferred state in backends.
 
         This allows e.g. harness logic to know if it is executing within a running hook context
@@ -955,7 +980,7 @@ class Framework(Object):
             backend._event_is_deferred = old_event_is_deferred
             self._event_name = old_event_name
 
-    def _reemit(self, single_event_path: str | None = None):
+    def _reemit(self, single_event_path: str | None = None) -> None:
         last_event_path = None
         deferred = True
         notices = tuple(self._storage.notices(single_event_path))
@@ -1050,13 +1075,13 @@ class Framework(Object):
         if not deferred and last_event_path is not None:
             self._storage.drop_snapshot(last_event_path)
 
-    def _show_debug_code_message(self):
+    def _show_debug_code_message(self) -> None:
         """Present the welcome message (only once!) when using debugger functionality."""
         if not self._breakpoint_welcomed:
             self._breakpoint_welcomed = True
             print(_BREAKPOINT_WELCOME_MESSAGE, file=sys.stderr, end='')
 
-    def breakpoint(self, name: str | None = None):
+    def breakpoint(self, name: str | None = None) -> None:
         """Add breakpoint, optionally named, at the place where this method is called.
 
         For the breakpoint to be activated the JUJU_DEBUG_AT environment variable
@@ -1122,7 +1147,7 @@ class Framework(Object):
 class StoredStateData(Object):
     """Manager of the stored data."""
 
-    def __init__(self, parent: Object, attr_name: str):
+    def __init__(self, parent: Object, attr_name: str) -> None:
         super().__init__(parent, attr_name)
         self._cache: dict[str, Any] = {}
         self.dirty: bool = False
@@ -1130,18 +1155,18 @@ class StoredStateData(Object):
     def __getitem__(self, key: str) -> Any:
         return self._cache.get(key)
 
-    def __setitem__(self, key: str, value: Any):
+    def __setitem__(self, key: str, value: Any) -> None:
         self._cache[key] = value
         self.dirty = True
 
-    def __contains__(self, key: str):
+    def __contains__(self, key: str) -> bool:
         return key in self._cache
 
     def snapshot(self) -> dict[str, Any]:
         """Return the current state."""
         return self._cache
 
-    def restore(self, snapshot: dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore current state to the given snapshot."""
         self._cache = snapshot
         self.dirty = False
@@ -1164,7 +1189,7 @@ class BoundStoredState:
         @property
         def _attr_name(self) -> str: ...
 
-    def __init__(self, parent: Object, attr_name: str):
+    def __init__(self, parent: Object, attr_name: str) -> None:
         parent.framework.register_type(StoredStateData, parent)
 
         handle = Handle(parent, StoredStateData.handle_kind, attr_name)
@@ -1187,7 +1212,7 @@ class BoundStoredState:
             raise AttributeError(f"attribute '{key}' is not stored")
         return _wrap_stored(self._data, self._data[key])
 
-    def __setattr__(self, key: str, value: Any):
+    def __setattr__(self, key: str, value: Any) -> None:
         if key == 'on':
             raise AttributeError("attribute 'on' is reserved and cannot be set")
 
@@ -1201,7 +1226,7 @@ class BoundStoredState:
 
         self._data[key] = unwrapped
 
-    def set_default(self, **kwargs: Any):
+    def set_default(self, **kwargs: Any) -> None:
         """Set the value of any given key if it has not already been set."""
         for k, v in kwargs.items():
             if k not in self._data:
@@ -1238,18 +1263,14 @@ class StoredState:
     instead of `StoredState`.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.parent_type: type[Any] | None = None
         self.attr_name: str | None = None
 
     @typing.overload
-    def __get__(self, parent: Literal[None], parent_type: type[_ObjectType]) -> StoredState:
-        pass
-
+    def __get__(self, parent: None, parent_type: type[_ObjectType]) -> StoredState: ...
     @typing.overload
-    def __get__(self, parent: _ObjectType, parent_type: type[_ObjectType]) -> BoundStoredState:
-        pass
-
+    def __get__(self, parent: _ObjectType, parent_type: type[_ObjectType]) -> BoundStoredState: ...
     def __get__(
         self, parent: _ObjectType | None, parent_type: type[_ObjectType]
     ) -> StoredState | BoundStoredState:
@@ -1336,28 +1357,28 @@ class StoredDict(typing.MutableMapping[Hashable, Any]):
     class to store dictionaries.
     """
 
-    def __init__(self, stored_data: StoredStateData, under: dict[Hashable, Any]):
+    def __init__(self, stored_data: StoredStateData, under: dict[Hashable, Any]) -> None:
         self._stored_data = stored_data
         self._under = under
 
-    def __getitem__(self, key: Hashable):
+    def __getitem__(self, key: Hashable) -> Any:
         return _wrap_stored(self._stored_data, self._under[key])
 
-    def __setitem__(self, key: Hashable, value: Any):
+    def __setitem__(self, key: Hashable, value: Any) -> None:
         self._under[key] = _unwrap_stored(self._stored_data, value)
         self._stored_data.dirty = True
 
-    def __delitem__(self, key: Hashable):
+    def __delitem__(self, key: Hashable) -> None:
         del self._under[key]
         self._stored_data.dirty = True
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Hashable]:
         return self._under.__iter__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._under)
 
-    def __eq__(self, other: Any):
+    def __eq__(self, other: StoredDict | Mapping[Any, Any]) -> bool:
         if isinstance(other, StoredDict):
             return self._under == other._under
         elif isinstance(other, collections.abc.Mapping):
@@ -1376,35 +1397,35 @@ class StoredList(typing.MutableSequence[Any]):
     class to store lists.
     """
 
-    def __init__(self, stored_data: StoredStateData, under: list[Any]):
+    def __init__(self, stored_data: StoredStateData, under: list[Any]) -> None:
         self._stored_data = stored_data
         self._under = under
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> Any:
         return _wrap_stored(self._stored_data, self._under[index])
 
-    def __setitem__(self, index: int, value: Any):
+    def __setitem__(self, index: int, value: Any) -> None:
         self._under[index] = _unwrap_stored(self._stored_data, value)
         self._stored_data.dirty = True
 
-    def __delitem__(self, index: int):
+    def __delitem__(self, index: int) -> None:
         del self._under[index]
         self._stored_data.dirty = True
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._under)
 
-    def insert(self, index: int, value: Any):
+    def insert(self, index: int, value: Any) -> None:
         """Insert value before index."""
         self._under.insert(index, value)
         self._stored_data.dirty = True
 
-    def append(self, value: Any):
+    def append(self, value: Any) -> None:
         """Append value to the end of the list."""
         self._under.append(value)
         self._stored_data.dirty = True
 
-    def __eq__(self, other: Any):
+    def __eq__(self, other: StoredList | list[Any]) -> bool:
         if isinstance(other, StoredList):
             return self._under == other._under
         elif isinstance(other, list):
@@ -1412,7 +1433,7 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    def __lt__(self, other: Any):
+    def __lt__(self, other: StoredList | list[Any]) -> bool:
         if isinstance(other, StoredList):
             return self._under < other._under
         elif isinstance(other, list):
@@ -1420,7 +1441,7 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    def __le__(self, other: Any):
+    def __le__(self, other: StoredList | list[Any]) -> bool:
         if isinstance(other, StoredList):
             return self._under <= other._under
         elif isinstance(other, list):
@@ -1428,7 +1449,7 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    def __gt__(self, other: Any):
+    def __gt__(self, other: StoredList | list[Any]) -> bool:
         if isinstance(other, StoredList):
             return self._under > other._under
         elif isinstance(other, list):
@@ -1436,7 +1457,7 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    def __ge__(self, other: Any):
+    def __ge__(self, other: StoredList | list[Any]) -> bool:
         if isinstance(other, StoredList):
             return self._under >= other._under
         elif isinstance(other, list):
@@ -1444,7 +1465,12 @@ class StoredList(typing.MutableSequence[Any]):
         else:
             return NotImplemented
 
-    __repr__ = _wrapped_repr  # type: ignore
+    if TYPE_CHECKING:
+
+        def __repr__(self) -> str: ...
+
+    else:
+        __repr__ = _wrapped_repr
 
 
 class StoredSet(typing.MutableSet[Any]):
@@ -1455,11 +1481,11 @@ class StoredSet(typing.MutableSet[Any]):
     class to store sets.
     """
 
-    def __init__(self, stored_data: StoredStateData, under: set[Any]):
+    def __init__(self, stored_data: StoredStateData, under: set[Any]) -> None:
         self._stored_data = stored_data
         self._under = under
 
-    def add(self, key: Any):
+    def add(self, key: Any) -> None:
         """Add a key to a set.
 
         This has no effect if the key is already present.
@@ -1467,7 +1493,7 @@ class StoredSet(typing.MutableSet[Any]):
         self._under.add(key)
         self._stored_data.dirty = True
 
-    def discard(self, key: Any):
+    def discard(self, key: Any) -> Any:
         """Remove a key from a set if it is a member.
 
         If the key is not a member, do nothing.
@@ -1475,13 +1501,13 @@ class StoredSet(typing.MutableSet[Any]):
         self._under.discard(key)
         self._stored_data.dirty = True
 
-    def __contains__(self, key: Any):
+    def __contains__(self, key: Any) -> bool:
         return key in self._under
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return self._under.__iter__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._under)
 
     @classmethod
@@ -1495,7 +1521,7 @@ class StoredSet(typing.MutableSet[Any]):
         """
         return set(it)
 
-    def __le__(self, other: Any):
+    def __le__(self, other: StoredSet | AbstractSet[Any]) -> bool:
         if isinstance(other, StoredSet):
             return self._under <= other._under
         elif isinstance(other, collections.abc.Set):
@@ -1503,7 +1529,7 @@ class StoredSet(typing.MutableSet[Any]):
         else:
             return NotImplemented
 
-    def __ge__(self, other: Any):
+    def __ge__(self, other: StoredSet | AbstractSet[Any]) -> bool:
         if isinstance(other, StoredSet):
             return self._under >= other._under
         elif isinstance(other, collections.abc.Set):
@@ -1511,7 +1537,7 @@ class StoredSet(typing.MutableSet[Any]):
         else:
             return NotImplemented
 
-    def __eq__(self, other: Any):
+    def __eq__(self, other: StoredSet | AbstractSet[Any]) -> bool:
         if isinstance(other, StoredSet):
             return self._under == other._under
         elif isinstance(other, collections.abc.Set):
@@ -1519,4 +1545,9 @@ class StoredSet(typing.MutableSet[Any]):
         else:
             return NotImplemented
 
-    __repr__ = _wrapped_repr  # type: ignore
+    if TYPE_CHECKING:
+
+        def __repr__(self) -> str: ...
+
+    else:
+        __repr__ = _wrapped_repr
