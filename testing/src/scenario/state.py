@@ -2746,7 +2746,10 @@ class Event:
                     'app_name': remote_app,
                 },
             )
-            if not self.name.endswith(('_created', '_broken')):
+            if (
+                not self.name.endswith(('_created', '_broken'))
+                and self._relation_remote_unit_id is not None
+            ):
                 snapshot_data['unit_name'] = f'{remote_app}/{self._relation_remote_unit_id}'
             if self.name.endswith('_departed'):
                 departing_unit_id = self._relation_departed_unit_id

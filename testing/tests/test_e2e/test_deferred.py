@@ -137,6 +137,35 @@ def test_deferred_relation_event_from_relation(mycharm: type[ops.CharmBase]):
 
 
 @pytest.mark.parametrize(
+    'remote_unit,expected',
+    [
+        (1, 'remote/1'),
+        (0, 'remote/0'),
+        (None, None),
+    ],
+)
+def test_deferred_relation_event_remote_unit(
+    mycharm: type[ops.CharmBase],
+    remote_unit: int | None,
+    expected: str | None,
+):
+    ctx = Context(mycharm, meta=mycharm.META)  # type: ignore
+    rel = Relation(endpoint='foo', remote_app_name='remote')
+    deferred = ctx.on.relation_changed(rel, remote_unit=remote_unit).deferred(
+        handler=mycharm._on_event  # type: ignore
+    )
+    ctx.run(ctx.on.update_status(), State(relations={rel}, deferred=[deferred]))
+
+    relation_changed, _ = mycharm.captured  # type: ignore
+    assert isinstance(relation_changed, ops.RelationChangedEvent)
+    if expected is None:
+        assert relation_changed.unit is None
+    else:
+        assert relation_changed.unit is not None
+        assert relation_changed.unit.name == expected
+
+
+@pytest.mark.parametrize(
     'remote_unit,departing_unit,expected',
     [
         (1, 2, 'remote/2'),
