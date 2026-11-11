@@ -10,27 +10,27 @@ Assuming you are familiar with Juju, you will know that to start using a charm y
 -->
 
 <!--
-If you are familiar with  Juju, as we assume here, you'll know that, to start using a charm, you run `juju deploy`, and also that, when you do that on a Kubernetes-type cloud, this triggers all of the following: 
+If you are familiar with  Juju, as we assume here, you'll know that, to start using a charm, you run `juju deploy`, and also that, when you do that on a Kubernetes-type cloud, this triggers all of the following:
 -->
 
 As you already know from your knowledge of Juju, when you deploy a Kubernetes charm, the following things happen:
 
-1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`. 
-1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready. 
-1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble. 
-1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations. 
+1. The Juju controller provisions a pod with at least two containers, one for the Juju unit agent and the charm itself and one container for each application workload container that is specified in the `containers` field of a file in the charm that is called `charmcraft.yaml`.
+1. The same Juju controller injects Pebble -- a lightweight, API-driven process supervisor -- into each workload container and overrides the container entrypoint so that Pebble starts when the container is ready.
+1. When the Kubernetes API reports that a workload container is ready, the Juju controller informs the charm that the instance of Pebble in that container is ready. At that point, the charm knows that it can start communicating with Pebble.
+1. Typically, at this point the charm will make calls to Pebble so that Pebble can configure and start the workload and begin operations.
 
 > Note: In the past, the containers were specified in a `metadata.yaml` file, but the modern practice is that all charm specification is in a single `charmcraft.yaml` file.
 
 <!--the container for the unit agent and the charm is named 'charm'-->
 <!--PIETRO'S ORIGINAL WORDING:
-1. Typically, at this point the charm will configure and start its workload (through pebble calls) and begin operations. 
+1. Typically, at this point the charm will configure and start its workload (through pebble calls) and begin operations.
 -->
 
 <!--Pebble is a lightweight, API-driven process supervisor designed to give workload containers something akin to an `init` system that will allow the charm container to interact with it. -->
 <!--The charm already knows how to contact Pebble (because the information can be predicted from the container name).
 <!--
-Conceptually, a charm is code that instructs Juju to deploy and manage an application in the cloud. For every Kubernetes charm Juju will deploy a pod with two containers, one for the Juju agent and the charm code and one for the application workload. The communication between these containers, and the orchestration of the local service processes for the workload application, both happen via Pebble, a lightweight API-driven process supervisor. For a visual representation of the deployment see the picture below. 
+Conceptually, a charm is code that instructs Juju to deploy and manage an application in the cloud. For every Kubernetes charm Juju will deploy a pod with two containers, one for the Juju agent and the charm code and one for the application workload. The communication between these containers, and the orchestration of the local service processes for the workload application, both happen via Pebble, a lightweight API-driven process supervisor. For a visual representation of the deployment see the picture below.
 -->
 
 All  subsequent workload management happens in the same way -- the Juju controller sends events to the charm and the charm responds to these events by managing the workload application in various ways via Pebble. The picture below illustrates all of this for a simple case where there is just one workload container.
@@ -41,7 +41,7 @@ All  subsequent workload management happens in the same way -- the Juju controll
 
 As a charm developer, your first job is to use this knowledge to create the basic structure and content for your charm:
 
- - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and 
+ - descriptive files (e.g., YAML configuration files like the `charmcraft.yaml` file mentioned above) that give Juju, Python, or Charmcraft various bits of information about your charm, and
 - executable files (like the `src/charm.py` file that we will see shortly) where you will use Ops-enriched Python to write all the logic of your charm.
 
 
@@ -77,7 +77,7 @@ Third, describe the workload container, as below. Below, `demo-server` is the na
 containers:
   demo-server:
     resource: demo-server-image
-``` 
+```
 
 
 Fourth, describe the workload container resources, as below. The name of the resource below, `demo-server-image`, is the one you defined above.
@@ -100,10 +100,10 @@ resources:
 ## Define the charm initialisation and application services
 
 <!--
-The recommended way to develop charms is by using a Python library called Ops (`ops`) (also known as the Charmed Operator Framework, as in 'the framework for building charmed operators'). 
+The recommended way to develop charms is by using a Python library called Ops (`ops`) (also known as the Charmed Operator Framework, as in 'the framework for building charmed operators').
 -->
 
-Create a file called `requirements.txt`. This is a  file that describes all the required external Python dependencies that will be used by your charm. 
+Create a file called `requirements.txt`. This is a  file that describes all the required external Python dependencies that will be used by your charm.
 
 
 In this file, declare the `ops` dependency, as below. At this point you're ready to start using constructs from the Ops library.
@@ -275,7 +275,7 @@ type: charm
 ```
 
 
-Also add the block below. This declares that your charm will build and run charm on Ubuntu 22.04. 
+Also add the block below. This declares that your charm will build and run charm on Ubuntu 22.04.
 
 ```
 bases:
@@ -321,7 +321,7 @@ If packing failed - perhaps you forgot to make the charm.py executable earlier -
 
 ```{important}
 
-**Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents. 
+**Did you know?** A `.charm` file is really just a zip file of your charm files and code dependencies that makes it more convenient to share, publish, and retrieve your charm contents.
 
 ```
 
@@ -365,19 +365,19 @@ Model        Controller           Cloud/Region        Version  SLA          Time
 welcome-k8s  tutorial-controller  microk8s/localhost  3.0.0    unsupported  13:38:19+01:00
 
 App             Version  Status  Scale  Charm           Channel  Rev  Address         Exposed  Message
-demo-api-charm           active      1  demo-api-charm             1  10.152.183.215  no       
+demo-api-charm           active      1  demo-api-charm             1  10.152.183.215  no
 
 Unit               Workload  Agent  Address      Ports  Message
-demo-api-charm/0*  active    idle   10.1.157.73  
+demo-api-charm/0*  active    idle   10.1.157.73
 ```
 
-Now, validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.  
+Now, validate that the app is running and reachable by sending an HTTP  request as below, where `10.1.157.73` is the IP of our pod and `8000` is the default application port.
 
 ```
 curl 10.1.157.73:8000/version
 ```
 
-You should see a JSON string with the version of the application: 
+You should see a JSON string with the version of the application:
 
 ```
 {"version":"1.0.0"}
@@ -534,12 +534,12 @@ def test_pebble_layer():
 In your Multipass Ubuntu VM shell, run your test:
 
 ```text
-ubuntu@charm-dev:~/fastapi-demo$ tox -e unit     
+ubuntu@charm-dev:~/fastapi-demo$ tox -e unit
 ```
 
 The result should be similar to the following output:
 
-```text                                             
+```text
 unit: install_deps> python -I -m pip install 'coverage[toml]' 'ops[testing]' pytest -r /home/ubuntu/juju-sdk-tutorial-k8s/requirements.txt
 unit: commands[0]> coverage run --source=/home/ubuntu/juju-sdk-tutorial-k8s/src -m pytest --tb native -v -s /home/ubuntu/juju-sdk-tutorial-k8s/tests/unit
 =================================================================== test session starts ===================================================================
@@ -572,7 +572,7 @@ A charm should function correctly not just in a mocked environment, but also in 
 
 For example, it should be able to pack, deploy, and integrate without throwing exceptions or getting stuck in a `waiting` or a `blocked` status -- that is, it should correctly reach a status of `active` or `idle`.
 
-You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`pytest-operator`](https://github.com/charmed-kubernetes/pytest-operator) library.
+You can ensure this by writing integration tests for your charm. In the charming world, these are usually written with the [`jubilant`](https://documentation.ubuntu.com/jubilant/) library.
 
 In this section we'll write a small integration test to check that the charm packs and deploys correctly.
 
@@ -585,8 +585,7 @@ In your `tox.ini` file, add the following new environment:
 description = Run integration tests
 deps =
     pytest
-    juju
-    pytest-operator
+    jubilant
     -r {tox_root}/requirements.txt
 commands =
     pytest \
@@ -612,96 +611,95 @@ mkdir -p tests/integration
 
 Let's begin with the simplest possible integration test, a [smoke test](https://en.wikipedia.org/wiki/Smoke_testing_(software)). This test will build and deploy the charm, then verify that the installation event is handled without errors.
 
-In your `tests/integration` directory, create a file called `test_charm.py` and add the following test:
+In your `tests/integration` directory, create a file called `conftest.py` and add the following fixtures:
 
 ```python
-import asyncio
-import logging
-from pathlib import Path
+import pathlib
+import subprocess
 
+import jubilant
 import pytest
+
+
+@pytest.fixture(scope='module')
+def juju(request: pytest.FixtureRequest):
+    with jubilant.temp_model() as juju:
+        yield juju
+
+        if request.session.testsfailed:
+            log = juju.debug_log(limit=1000)
+            print(log, end='')
+
+
+@pytest.fixture(scope='session')
+def charm():
+    subprocess.check_call(['charmcraft', 'pack'])  # noqa
+    return next(pathlib.Path('.').glob('*.charm'))
+```
+
+In the same directory, create a file called `test_charm.py` and add the following test:
+
+```python
+import logging
+import pathlib
+
+import jubilant
 import yaml
-from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path('./charmcraft.yaml').read_text())
+METADATA = yaml.safe_load(pathlib.Path('./charmcraft.yaml').read_text())
 APP_NAME = METADATA['name']
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+def test_deploy(charm: pathlib.Path, juju: jubilant.Juju):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before integration or configuration.
+    Assert on the unit status before any relations/configurations take place.
     """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm('.')
     resources = {
         'demo-server-image': METADATA['resources']['demo-server-image']['upstream-source']
     }
 
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status='active', raise_on_blocked=False, timeout=300
-        ),
-    )
+    # Deploy the charm and wait for active/idle status
+    juju.deploy(f'./{charm}', app=APP_NAME, resources=resources)
+    juju.wait(jubilant.all_active)
 ```
 
-The test takes some time to run as the `pytest-operator` running in the background will add a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
+The test takes some time to run as Jubilant adds a new model to an existing cluster (whose presence it assumes). If successful, it'll verify that your charm can pack and deploy as expected.
 
 The result should be similar to the following output:
 
-```bash
-integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/juju-sdk-tutorial-k8s/tests/integration
-=================================================================== test session starts ===================================================================
-platform linux -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- /home/ubuntu/juju-sdk-tutorial-k8s/.tox/integration/bin/python
+```text
+integration: commands[0]> pytest -v -s --tb native --log-cli-level=INFO /home/ubuntu/fastapi-demo/tests/integration
+============================= test session starts ==============================
+platform linux -- Python 3.10.18, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/integration/bin/python3
 cachedir: .tox/integration/.pytest_cache
-rootdir: /home/ubuntu/juju-sdk-tutorial-k8s
+rootdir: /home/ubuntu/fastapi-demo
 configfile: pyproject.toml
-plugins: operator-0.41.0, asyncio-0.21.2
-asyncio: mode=Mode.STRICT
 collected 1 item
 
-tests/integration/test_charm.py::test_build_and_deploy
---------------------------------------------------------------------- live log setup ----------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:753 Adding model microk8s:test-charm-7zn0 on cloud microk8s
-WARNING  juju.client.connection:connection.py:858 unexpected facade SSHServer received from the controller
----------------------------------------------------------------------- live log call ----------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:612 Using tmp_path: /home/ubuntu/juju-sdk-tutorial-k8s/.tox/integration/tmp/pytest/test-charm-7zn00
-INFO     pytest_operator.plugin:plugin.py:1199 Building charm demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1204 Built charm demo-api-charm in 11.60s
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm (missing)
-INFO     juju.model:__init__.py:2301 Deploying local:demo-api-charm-0
-INFO     juju.model:__init__.py:3254 Waiting for model:
-  demo-api-charm/0 [idle] active:
+tests/integration/test_charm.py::test_deploy
+
+-------------------------------- live log setup --------------------------------
+INFO     jubilant:_juju.py:227 cli: juju add-model --no-switch jubilant-823cf1fd
+-------------------------------- live log call ---------------------------------
+INFO     jubilant:_juju.py:227 cli: juju deploy --model jubilant-823cf1fd ./demo-api-charm_ubuntu-22.04-amd64.charm demo-api-charm --resource demo-server-image=ghcr.io/canonical/api_demo_server:1.0.1
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
++ .model.name = 'jubilant-823cf1fd'
+...
+INFO     jubilant.wait:_juju.py:1164 wait: status changed:
+- .apps['demo-api-charm'].app_status.current = 'waiting'
+- .apps['demo-api-charm'].app_status.message = 'installing agent'
++ .apps['demo-api-charm'].app_status.current = 'active'
 PASSED
--------------------------------------------------------------------- live log teardown --------------------------------------------------------------------
-INFO     pytest_operator.plugin:plugin.py:937 Model status:
-
-Model            Controller  Cloud/Region        Version  SLA          Timestamp
-test-charm-7zn0  microk8s    microk8s/localhost  3.6.4    unsupported  12:07:36+08:00
-
-App             Version  Status  Scale  Charm           Channel  Rev  Address        Exposed  Message
-demo-api-charm           active      1  demo-api-charm             0  10.152.183.60  no
-
-Unit               Workload  Agent  Address       Ports  Message
-demo-api-charm/0*  active    idle   10.1.226.162
-
-INFO     pytest_operator.plugin:plugin.py:943 Juju error logs:
+------------------------------ live log teardown -------------------------------
+INFO     jubilant:_juju.py:227 cli: juju destroy-model jubilant-823cf1fd --no-prompt --destroy-storage --force
 
 
-INFO     pytest_operator.plugin:plugin.py:1049 Resetting model test-charm-7zn0...
-INFO     pytest_operator.plugin:plugin.py:1038    Destroying applications demo-api-charm
-INFO     pytest_operator.plugin:plugin.py:1054 Not waiting on reset to complete.
-INFO     pytest_operator.plugin:plugin.py:1025 Forgetting model main...
-
-
-=================================================================== 1 passed in 49.30s ====================================================================
-  integration: OK (49.69=setup[0.02]+cmd[49.67] seconds)
-  congratulations :) (49.71 seconds)
+========================= 1 passed in 63.92s (0:01:03) =========================
+  integration: OK (64.10=setup[0.01]+cmd[64.10] seconds)
+  congratulations :) (64.15 seconds)
 ```
 
 ## Review the final code
@@ -709,6 +707,6 @@ INFO     pytest_operator.plugin:plugin.py:1025 Forgetting model main...
 For the full code see: [01_create_minimal_charm](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/01_create_minimal_charm)
 
 For a comparative view of the code before and after our edits see:
-[Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)  
+[Comparison](https://github.com/canonical/juju-sdk-tutorial-k8s/compare/main...01_create_minimal_charm)
 
 >**See next: {ref}`Make your charm configurable <make-your-charm-configurable>`**
