@@ -1265,7 +1265,9 @@ class Check:
             elif name == 'level' and value == CheckLevel.UNSET:
                 # Like every other field, a level the other layer does not
                 # set leaves this layer's level alone (which is what Pebble
-                # does when it combines the layers).
+                # does when it combines the layers). This is a separate case
+                # from startup because CheckLevel.UNSET means 'there is no
+                # level', while CheckStartup.UNSET means 'use the default'.
                 continue
             else:
                 setattr(self, name, value)
