@@ -1557,10 +1557,24 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.dev-dependencies]
+unit = [
+    { name = "jsonpatch" },
+    { name = "ops-tracing" },
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
+]
+
+[package.metadata.requires-dev]
+unit = [
+    { name = "jsonpatch", specifier = "~=1.33" },
+    { name = "ops-tracing", editable = "tracing" },
+    { name = "pytest", specifier = "~=8.0" },
 ]
 
 [[package]]
@@ -1581,6 +1595,7 @@ dev = [
     { name = "ruff" },
 ]
 testing = [
+    { name = "ops-scenario" },
     { name = "pytest" },
 ]
 
@@ -1596,7 +1611,10 @@ dev = [
     { name = "pyright", specifier = "~=1.1" },
     { name = "ruff", specifier = "~=0.9" },
 ]
-testing = [{ name = "pytest", specifier = "~=8.3.4" }]
+testing = [
+    { name = "ops-scenario", editable = "testing" },
+    { name = "pytest", specifier = "~=8.3.4" },
+]
 
 [[package]]
 name = "packaging"

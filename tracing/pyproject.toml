@@ -49,6 +49,7 @@ dev = [
     "ruff ~= 0.9",
 ]
 testing = [
+    "ops-scenario",
     "pytest ~= 8.3.4",
 ]
 
