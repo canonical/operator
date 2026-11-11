@@ -36,14 +36,7 @@ import typing
 import warnings
 import weakref
 from abc import ABC, abstractmethod
-from collections.abc import (
-    Callable,
-    Generator,
-    Iterable,
-    Iterator,
-    Mapping,
-    MutableMapping,
-)
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, MutableMapping
 from pathlib import Path, PurePath
 from typing import (
     Any,
@@ -66,8 +59,6 @@ from .jujuversion import JujuVersion
 from .log import _log_security_event, _SecurityEvent, _SecurityEventLevel
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
-
     from .hookcmds._types import AddressDict as _AddressDict
     from .hookcmds._types import BindAddressDict as _BindAddressDict
 
@@ -128,7 +119,7 @@ class Model:
         backend: _ModelBackend,
         broken_relation_id: int | None = None,
         remote_unit_name: str | None = None,
-    ) -> None:
+    ):
         self._cache = _ModelCache(meta, backend)
         self._backend = backend
         self._unit = self.get_unit(self._backend.unit_name)
@@ -350,7 +341,7 @@ class Model:
 
 
 class _ModelCache:
-    def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend) -> None:
+    def __init__(self, meta: _charm.CharmMeta, backend: _ModelBackend):
         self._meta = meta
         self._backend = backend
         # (entity type, name): instance.
@@ -392,7 +383,7 @@ class Application:
 
     def __init__(
         self, name: str, meta: _charm.CharmMeta, backend: _ModelBackend, cache: _ModelCache
-    ) -> None:
+    ):
         self.name = name
         self._backend = backend
         self._cache = cache
@@ -584,7 +575,7 @@ class Unit:
         meta: _charm.CharmMeta,
         backend: _ModelBackend,
         cache: _ModelCache,
-    ) -> None:
+    ):
         self.name = name
 
         app_name = name.split('/')[0]
@@ -935,7 +926,7 @@ class RelationMapping(Mapping[str, list['Relation']]):
         cache: _ModelCache,
         broken_relation_id: int | None,
         _remote_unit: Unit | None = None,
-    ) -> None:
+    ):
         self._peers: set[str] = set()
         for name, relation_meta in relations_meta.items():
             if relation_meta.role.is_peer():
@@ -1027,7 +1018,7 @@ class BindingMapping(Mapping[str, 'Binding']):
     :meth:`Model.get_binding`
     """
 
-    def __init__(self, backend: _ModelBackend) -> None:
+    def __init__(self, backend: _ModelBackend):
         self._backend = backend
         self._data: _BindingDictType = {}
 
@@ -1069,7 +1060,7 @@ class Binding:
     name: str
     """The name of the endpoint this binding represents (eg, 'db')."""
 
-    def __init__(self, name: str, relation_id: int | None, backend: _ModelBackend) -> None:
+    def __init__(self, name: str, relation_id: int | None, backend: _ModelBackend):
         self.name = name
         self._relation_id = relation_id
         self._backend = backend
@@ -1132,7 +1123,7 @@ class Network:
     be constrained to a single address (for example, 10.0.0.1/32).
     """
 
-    def __init__(self, network_info: _NetworkDict) -> None:
+    def __init__(self, network_info: _NetworkDict):
         """Initialize a Network instance.
 
         Args:
@@ -1203,7 +1194,7 @@ class NetworkInterface:
     (for example, '10.0.1.2/32').
     """
 
-    def __init__(self, name: str, address_info: _AddressDict) -> None:
+    def __init__(self, name: str, address_info: _AddressDict):
         self.name = name
         # TODO: expose a hardware address here, see LP: #1864070.
 
@@ -1251,7 +1242,7 @@ class SecretInfo:
     """Label used to reference the secret locally. See :attr:`Secret.label`."""
 
     revision: int
-    """The secret's current revision."""
+    """The secret's latest revision."""
 
     expires: datetime.datetime | None
     """Time at which the secret expires, or ``None`` if it never expires."""
@@ -1276,7 +1267,7 @@ class SecretInfo:
         description: str | None = None,
         *,
         model_uuid: str | None = None,
-    ) -> None:
+    ):
         if model_uuid is None:
             warnings.warn(
                 '`model_uuid` should always be provided when creating a '
@@ -1347,7 +1338,7 @@ class Secret:
         id: str | None = None,
         label: str | None = None,
         content: dict[str, str] | None = None,
-    ) -> None:
+    ):
         if not (id or label):
             raise TypeError('Must provide an id or label, or both')
         if id is not None:
@@ -1726,7 +1717,7 @@ class Relation:
         cache: _ModelCache,
         active: bool = True,
         _remote_unit: Unit | None = None,
-    ) -> None:
+    ):
         self.name = relation_name
         self.id = relation_id
         self.units = set()
@@ -1981,7 +1972,7 @@ class RelationData(Mapping[Unit | Application, 'RelationDataContent']):
         our_unit: Unit,
         backend: _ModelBackend,
         remote_unit: Unit | None = None,
-    ) -> None:
+    ):
         self.relation = weakref.proxy(relation)
         self._data: dict[Unit | Application, RelationDataContent] = {
             our_unit: RelationDataContent(self.relation, our_unit, backend),
@@ -2028,7 +2019,7 @@ class RelationDataContent(LazyMapping, MutableMapping[str, str]):
         relation: Relation,
         entity: Unit | Application,
         backend: _ModelBackend,
-    ) -> None:
+    ):
         self.relation = relation
         self._entity = entity
         self._backend = backend
@@ -2271,7 +2262,7 @@ class ConfigData(_GenericLazyMapping['bool | int | float | str']):
     that this unit is part of, use :meth:`CharmBase.load_config` or :attr:`CharmBase.config`.
     """
 
-    def __init__(self, backend: _ModelBackend) -> None:
+    def __init__(self, backend: _ModelBackend):
         self._backend = backend
 
     def _load(self) -> dict[str, bool | int | float | str]:
@@ -2293,12 +2284,12 @@ class StatusBase:
     message: str
     """The status message."""
 
-    def __init__(self, message: str = '') -> None:
+    def __init__(self, message: str = ''):
         if self.__class__ is StatusBase:
             raise TypeError('cannot instantiate a base class')
         self.message = message
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls):
         StatusBase._register(cls)
 
     def __eq__(self, other: StatusBase) -> bool:
@@ -2310,7 +2301,7 @@ class StatusBase:
         return f'{self.__class__.__name__}({self.message!r})'
 
     @classmethod
-    def from_name(cls, name: str, message: str) -> UnknownStatus | StatusBase:
+    def from_name(cls, name: str, message: str) -> StatusBase:
         """Create a status instance from a name and message.
 
         If ``name`` is "unknown", ``message`` is ignored, because unknown status
@@ -2378,7 +2369,7 @@ class UnknownStatus(StatusBase):
 
     name = 'unknown'
 
-    def __init__(self) -> None:
+    def __init__(self):
         # Unknown status cannot be set and does not have a message associated with it.
         super().__init__('')
 
@@ -2410,7 +2401,7 @@ class ActiveStatus(StatusBase):
 
     name = 'active'
 
-    def __init__(self, message: str = '') -> None:
+    def __init__(self, message: str = ''):
         super().__init__(message)
 
 
@@ -2454,7 +2445,7 @@ class WaitingStatus(StatusBase):
 class Resources:
     """Object representing resources for the charm."""
 
-    def __init__(self, names: Iterable[str], backend: _ModelBackend) -> None:
+    def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
         self._paths: dict[str, Path | None] = dict.fromkeys(names)
 
@@ -2489,7 +2480,7 @@ class Pod:
         New charms should use the sidecar pattern with Pebble.
     """
 
-    def __init__(self, backend: _ModelBackend) -> None:
+    def __init__(self, backend: _ModelBackend):
         self._backend = backend
 
     def set_spec(self, spec: K8sSpec, k8s_resources: K8sSpec | None = None) -> None:
@@ -2509,7 +2500,7 @@ class Pod:
 class StorageMapping(Mapping[str, list['Storage']]):
     """Map of storage names to lists of Storage instances."""
 
-    def __init__(self, storage_names: Iterable[str], backend: _ModelBackend) -> None:
+    def __init__(self, storage_names: Iterable[str], backend: _ModelBackend):
         self._backend = backend
         self._storage_map: _StorageDictType = dict.fromkeys(storage_names)
 
@@ -2563,7 +2554,7 @@ class Storage:
     name: str
     """Name of the storage."""
 
-    def __init__(self, storage_name: str, storage_index: int, backend: _ModelBackend) -> None:
+    def __init__(self, storage_name: str, storage_index: int, backend: _ModelBackend):
         self.name = storage_name
         self._index = storage_index
         self._backend = backend
@@ -2620,7 +2611,7 @@ class MultiPushPullError(Exception):
     where source_path is the path being pushed to or pulled from.
     """
 
-    def __init__(self, message: str, errors: list[tuple[str, Exception]]) -> None:
+    def __init__(self, message: str, errors: list[tuple[str, Exception]]):
         self.message = message
         self.errors = errors
 
@@ -2656,7 +2647,7 @@ class Container:
 
     def __init__(
         self, name: str, backend: _ModelBackend, pebble_client: pebble.Client | None = None
-    ) -> None:
+    ):
         self.name = name
 
         self._juju_version = backend._juju_context.version
@@ -3452,7 +3443,7 @@ class ContainerMapping(Mapping[str, Container]):
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, names: Iterable[str], backend: _ModelBackend) -> None:
+    def __init__(self, names: Iterable[str], backend: _ModelBackend):
         self._containers = {name: Container(name, backend) for name in names}
 
     def __getitem__(self, key: str) -> Container:
@@ -3475,7 +3466,7 @@ class ServiceInfoMapping(Mapping[str, pebble.ServiceInfo]):
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, services: Iterable[pebble.ServiceInfo]) -> None:
+    def __init__(self, services: Iterable[pebble.ServiceInfo]):
         self._services = {s.name: s for s in services}
 
     def __getitem__(self, key: str) -> pebble.ServiceInfo:
@@ -3498,7 +3489,7 @@ class CheckInfoMapping(Mapping[str, pebble.CheckInfo]):
     can extend it later, and so it's not mutable.
     """
 
-    def __init__(self, checks: Iterable[pebble.CheckInfo]) -> None:
+    def __init__(self, checks: Iterable[pebble.CheckInfo]):
         self._checks = {c.name: c for c in checks}
 
     def __getitem__(self, key: str) -> pebble.CheckInfo:
@@ -3538,7 +3529,7 @@ class TooManyRelatedAppsError(ModelError):
     max_supported: int
     """The maximum number of integrated applications supported."""
 
-    def __init__(self, relation_name: str, num_related: int, max_supported: int) -> None:
+    def __init__(self, relation_name: str, num_related: int, max_supported: int):
         super().__init__(
             f'Too many remote applications on {relation_name} ({num_related} > {max_supported})'
         )
@@ -3659,7 +3650,7 @@ class _ModelBackend:
         model_name: str | None = None,
         model_uuid: str | None = None,
         juju_context: JujuContext | None = None,
-    ) -> None:
+    ):
         if juju_context is None:
             juju_context = JujuContext._from_dict(os.environ)
         self._juju_context = juju_context
@@ -4443,7 +4434,7 @@ class LazyNotice:
     repeat_after: datetime.timedelta | None
     expire_after: datetime.timedelta | None
 
-    def __init__(self, container: Container, id: str, type: str, key: str) -> None:
+    def __init__(self, container: Container, id: str, type: str, key: str):
         self._container = container
         self.id = id
         try:
@@ -4488,7 +4479,7 @@ class LazyCheckInfo:
     threshold: int
     change_id: pebble.ChangeID | None
 
-    def __init__(self, container: Container, name: str) -> None:
+    def __init__(self, container: Container, name: str):
         self._container = container
         self.name = name
         self._info: pebble.CheckInfo | None = None
@@ -4529,7 +4520,7 @@ class CloudCredential:
     """A list of redacted secrets."""
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> Self:
+    def from_dict(cls, d: dict[str, Any]) -> CloudCredential:
         """Create a new CloudCredential object from a dictionary."""
         return cls(
             auth_type=d['auth-type'],
@@ -4538,7 +4529,7 @@ class CloudCredential:
         )
 
     @classmethod
-    def _from_hookcmds(cls, o: hookcmds.CloudCredential) -> Self:
+    def _from_hookcmds(cls, o: hookcmds.CloudCredential) -> CloudCredential:
         """Create a new model.CloudCredential object from a hookcmds.CloudCredential object."""
         return cls(
             auth_type=o.auth_type,
@@ -4628,7 +4619,7 @@ class ProxyConfig:
         http: str | None = None,
         https: str | None = None,
         no: tuple[str, ...] = (),
-    ) -> None:
+    ):
         self._http = http
         self._https = https
         self._no = no
