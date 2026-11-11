@@ -130,6 +130,8 @@ if __name__ == "__main__":  # pragma: nocover
 
 As you can see, a charm is a pure Python class that inherits from the [`CharmBase`](ops.CharmBase) class of Ops and which we pass to [](ops.main). We'll refer to `FastAPIDemoCharm` as the "charm class".
 
+Before continuing, delete `tests/unit/test_charm.py`. That file depends on the version of `src/charm.py` you just replaced. Deleting `test_charm.py` ensures that `tox -e lint` doesn't report unhelpful errors. We'll recreate `test_charm.py` later in the tutorial.
+
 ### Add logger functionality
 
 In the imports section of `src/charm.py`, import the Python `logging` module and define a logger object, as below. This will allow you to read log data in `juju`.
@@ -339,7 +341,7 @@ In this section we'll write a test to check that the `fastapi` service is starte
 
 ### Write a test
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/tests/unit/test_charm.py
 :language: python
