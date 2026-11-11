@@ -54,8 +54,8 @@ _status_strategy = st.one_of(
 
 # All three concrete Port types; TCPPort/UDPPort accept validated port numbers.
 _port_strategy = st.one_of(
-    st.integers(min_value=1, max_value=65535).map(TCPPort),
-    st.integers(min_value=1, max_value=65535).map(UDPPort),
+    st.builds(TCPPort, port=st.integers(min_value=1, max_value=65535)),
+    st.builds(UDPPort, port=st.integers(min_value=1, max_value=65535)),
     st.just(ICMPPort()),
 )
 
