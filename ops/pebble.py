@@ -2093,10 +2093,18 @@ class _WebsocketReader(io.BufferedIOBase):
         self.remaining = b''
         self.eof = False
         # Only used to find where complete characters end; the decoding itself
-        # is done by the TextIOWrapper around this reader.
-        self._decoder_factory = (
-            None if encoding is None else codecs.getincrementaldecoder(encoding)
+        # is done by the TextIOWrapper around this reader. It is fed every
+        # message as it arrives, so it keeps the codec's state across the
+        # whole stream (a UTF-16 or UTF-32 byte order mark is only at the
+        # start, for example).
+        self._decoder = (
+            None if encoding is None else codecs.getincrementaldecoder(encoding)(errors='replace')
         )
+        # How many characters the decoder has produced from bytes that a
+        # read(-1) hasn't returned yet. A message can hold bytes that decode
+        # to nothing (a byte order mark sent on its own), and returning only
+        # those would look like end-of-file to the TextIOWrapper's caller.
+        self._unreturned_chars = 0
 
     def readable(self) -> bool:
         """Denote this file-like object as readable."""
@@ -2130,15 +2138,21 @@ class _WebsocketReader(io.BufferedIOBase):
                 # Received "end" command, return EOF designator
                 return None
 
+            if self._decoder is not None:
+                self._unreturned_chars += len(self._decoder.decode(chunk))
             return chunk
 
     def _complete_length(self) -> int:
-        """Return the length of the prefix of self.remaining that holds whole characters."""
-        assert self._decoder_factory is not None
-        decoder = self._decoder_factory(errors='replace')
-        decoder.decode(self.remaining)
-        pending, _ = decoder.getstate()
-        return len(self.remaining) - len(pending)
+        """Return the length of the prefix of self.remaining that holds whole characters.
+
+        The decoder holds back the bytes of a character that hasn't arrived in
+        full yet, and those are always the last bytes received, so they are a
+        suffix of self.remaining (or overlap it, if a sized read has already
+        handed some of them out).
+        """
+        assert self._decoder is not None
+        pending, _ = self._decoder.getstate()
+        return max(0, len(self.remaining) - len(pending))
 
     def read(self, n: int = -1) -> str | bytes:
         """Read up to n bytes from the websocket (or one message if n<0)."""
@@ -2155,12 +2169,12 @@ class _WebsocketReader(io.BufferedIOBase):
 
         if n < 0:
             n = len(self.remaining)
-            if self._decoder_factory is not None:
+            if self._decoder is not None:
                 # A multi-byte character may be split across two messages, and
                 # TextIOWrapper.read() decodes what it gets here as complete,
                 # so hold back an incomplete character for the next read.
                 n = self._complete_length()
-                while n == 0:
+                while n == 0 or not self._unreturned_chars:
                     chunk = self._recv()
                     if chunk is None:
                         # Hand back what there is, for the TextIOWrapper to replace.
@@ -2169,6 +2183,7 @@ class _WebsocketReader(io.BufferedIOBase):
                         break
                     self.remaining += chunk
                     n = self._complete_length()
+                self._unreturned_chars = 0
         result: str | bytes = self.remaining[:n]
         self.remaining = self.remaining[n:]
         return result

@@ -3790,6 +3790,38 @@ class TestExec:
         assert out == 'crème 😀\n'
         assert err == ''
 
+    @pytest.mark.parametrize(
+        'encoding,text',
+        [
+            ('utf-8', 'crème 😀\n'),
+            ('utf-16', 'crème 😀\n'),
+            ('utf-32', 'crème 😀\n'),
+            ('utf-16-le', 'crème 😀\n'),
+            ('shift_jis', '日本語\n'),
+        ],
+    )
+    def test_output_split_anywhere_decodes_whole(
+        self, client: MockClient, encoding: str, text: str
+    ):
+        # The BOM-sniffing codecs (utf-16, utf-32) only see a byte order mark
+        # at the start of the stream, so every later message must be decoded
+        # with the state the earlier ones left behind.
+        data = text.encode(encoding)
+        for split in range(1, len(data)):
+            stdio, stderr, _ = self.add_responses(client, '123', 0)
+            stdio.receives.append(data[:split])
+            stdio.receives.append(data[split:])
+            stdio.receives.append('{"command":"end"}')
+            stderr.receives.append('{"command":"end"}')
+
+            process = client.exec(['echo'], encoding=encoding)
+            assert process.stdout is not None
+            pieces: list[str] = []
+            while piece := process.stdout.read():
+                pieces.append(piece)
+            process.wait()
+            assert ''.join(pieces) == text, f'split at byte {split}'
+
     def test_stdout_read_multibyte_split_across_messages(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)
         stdio.receives.append(b'cr\xc3')
