@@ -839,13 +839,33 @@ class Change:
         )
 
 
-def _without_nulls(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+def _without_nulls(
+    raw: Mapping[str, Any] | None, string_maps: tuple[str, ...] = ()
+) -> dict[str, Any]:
     """Return a copy of raw without its null values.
 
     A key with nothing after it in YAML, such as a bare ``services:`` header,
     is null once loaded. Pebble treats that the same as leaving the key out.
+
+    The keys in string_maps hold maps of strings, such as ``environment``.
+    Pebble reads a null value in one of those as an empty string, so those
+    values are replaced with ``''`` rather than dropped.
     """
-    return {k: v for k, v in (raw or {}).items() if v is not None}
+    d = {k: v for k, v in (raw or {}).items() if v is not None}
+    for key in string_maps:
+        if isinstance(d.get(key), Mapping):
+            d[key] = {k: '' if v is None else v for k, v in d[key].items()}
+    return d
+
+
+def _copy_check_settings(raw: Any, string_maps: tuple[str, ...] = ()) -> Any:
+    """Return a copy of a check's http, tcp, or exec settings without nulls."""
+    if raw is None:
+        return None
+    raw = copy.deepcopy(raw)
+    if isinstance(raw, Mapping):
+        return _without_nulls(typing.cast('Mapping[str, Any]', raw), string_maps)
+    return raw
 
 
 class Plan:
@@ -999,7 +1019,7 @@ class Service:
 
     def __init__(self, name: str, raw: ServiceDict | None = None):
         self.name = name
-        dct = typing.cast('ServiceDict', _without_nulls(raw))
+        dct = typing.cast('ServiceDict', _without_nulls(raw, ('environment', 'on-check-failure')))
         self.summary = dct.get('summary', '')
         self.description = dct.get('description', '')
         self.startup = dct.get('startup', '')
@@ -1156,20 +1176,9 @@ class Check:
         self.timeout: str | None = dct.get('timeout', '')
         self.threshold: int | None = dct.get('threshold')
 
-        http = dct.get('http')
-        if http is not None:
-            http = copy.deepcopy(http)
-        self.http: HttpDict | None = http
-
-        tcp = dct.get('tcp')
-        if tcp is not None:
-            tcp = copy.deepcopy(tcp)
-        self.tcp: TcpDict | None = tcp
-
-        exec_ = dct.get('exec')
-        if exec_ is not None:
-            exec_ = copy.deepcopy(exec_)
-        self.exec: ExecDict | None = exec_
+        self.http: HttpDict | None = _copy_check_settings(dct.get('http'), ('headers',))
+        self.tcp: TcpDict | None = _copy_check_settings(dct.get('tcp'))
+        self.exec: ExecDict | None = _copy_check_settings(dct.get('exec'), ('environment',))
 
     def to_dict(self) -> CheckDict:
         """Convert this check object to its dict representation."""
@@ -1305,7 +1314,7 @@ class LogTarget:
 
     def __init__(self, name: str, raw: LogTargetDict | None = None):
         self.name = name
-        dct = typing.cast('LogTargetDict', _without_nulls(raw))
+        dct = typing.cast('LogTargetDict', _without_nulls(raw, ('labels',)))
         self.override: str = dct.get('override', '')
         self.type = dct.get('type', '')
         self.location = dct.get('location', '')
