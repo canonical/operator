@@ -3374,10 +3374,14 @@ class Client:
         # case the Pebble side times out (5s), so this side doesn't hang. See:
         # https://github.com/canonical/operator/issues/1246
         sock.settimeout(self.timeout)
-        sock.connect(self.socket_path)
-        url = self._websocket_url(task_id, websocket_id)
-        ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
-        ws.connect(url, socket=sock)
+        try:
+            sock.connect(self.socket_path)
+            url = self._websocket_url(task_id, websocket_id)
+            ws: _WebSocket = websocket.WebSocket(skip_utf8_validation=True)  # type: ignore
+            ws.connect(url, socket=sock)
+        except BaseException:
+            sock.close()
+            raise
         # Reset to no timeout so connection can be "long polling" when data is
         # being received.
         sock.settimeout(None)
