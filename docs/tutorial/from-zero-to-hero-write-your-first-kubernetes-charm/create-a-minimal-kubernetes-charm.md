@@ -86,7 +86,7 @@ Replace the content of `src/fastapi_demo.py` with:
 
 ```{literalinclude} ../../../examples/k8s-1-minimal/src/fastapi_demo.py
 :language: python
-:start-at: import json
+:start-at: '"""Functions for interacting with the workload.'
 ```
 
 Notice that the helper module is stateless. In fact, your charm as a whole will be stateless. The main logic of your charm will:
