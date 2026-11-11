@@ -2189,7 +2189,14 @@ class _WebsocketReader(io.BufferedIOBase):
         return result
 
     def read1(self, n: int = -1) -> str | bytes:
-        """An alias for read."""
+        """An alias for read.
+
+        TextIOWrapper calls this with a size (for readline() and iteration),
+        so it never reaches read()'s hold-back of a partial character. That
+        is fine: on that path the wrapper's own decoder carries a partial
+        character over to the next chunk. The hold-back is only for read(-1),
+        which TextIOWrapper.read() decodes as if it were final.
+        """
         return self.read(n)
 
 
