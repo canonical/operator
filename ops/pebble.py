@@ -1468,7 +1468,8 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or
+    :attr:`CheckLevel.UNSET` (level not set).
     """
 
     startup: CheckStartup
