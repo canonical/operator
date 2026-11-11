@@ -3460,6 +3460,53 @@ class TestSocketClient:
             client.get_system_info()
         assert 'RemoteDisconnected' in str(excinfo.value)
 
+    @pytest.mark.parametrize(
+        'error',
+        [
+            pytest.param(http.client.BadStatusLine('hello'), id='bad-status'),
+            pytest.param(http.client.LineTooLong('header line'), id='line-too-long'),
+            pytest.param(http.client.IncompleteRead(b'x'), id='incomplete'),
+        ],
+    )
+    def test_bad_response(self, monkeypatch: pytest.MonkeyPatch, error: Exception):
+        client = pebble.Client(socket_path='does_not_exist')
+
+        class Opener:
+            def open(self, request: typing.Any, timeout: float):
+                raise error
+
+        monkeypatch.setattr(client, 'opener', Opener())
+        with pytest.raises(pebble.ConnectionError) as excinfo:
+            client.get_system_info()
+        assert type(error).__name__ in str(excinfo.value)
+        assert not isinstance(excinfo.value, TimeoutError)
+
+    def test_not_pebble_on_socket(self):
+        # Something other than Pebble listening on the socket, such as the
+        # wrong service, is a connection error rather than a crash.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            socket_path = f'{tmpdir}/sock'
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(socket_path)
+            server.listen(1)
+
+            def serve():
+                conn, _ = server.accept()
+                with conn:
+                    conn.recv(4096)
+                    conn.sendall(b'hello\n')
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            try:
+                client = pebble.Client(socket_path=socket_path)
+                with pytest.raises(pebble.ConnectionError) as excinfo:
+                    client.get_system_info()
+                assert 'BadStatusLine' in str(excinfo.value)
+            finally:
+                thread.join()
+                server.close()
+
     def test_invalid_url_not_connection_error(self):
         client = pebble.Client(socket_path='does_not_exist')
         # A bad URL is a bug in the caller, not a problem reaching Pebble.

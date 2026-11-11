@@ -2388,11 +2388,14 @@ class Client:
                     '(container restarted?)'
                 ) from None
             raise ConnectionError(e.reason) from e
-        except OSError as e:
+        except (OSError, http.client.HTTPException) as e:
             # urllib only wraps errors from sending the request. Errors while
-            # waiting for the response, such as Pebble closing the connection or
-            # a timeout, come through unwrapped. This doesn't catch HTTPException,
-            # because building the request raises that for a bad URL.
+            # waiting for the response, such as Pebble closing the connection,
+            # a timeout, or something other than Pebble answering on the socket,
+            # come through unwrapped. InvalidURL is the exception: building the
+            # request raises that for a bad URL, so it isn't a connection error.
+            if isinstance(e, http.client.InvalidURL):
+                raise
             raise _wrap_response_error(e) from e
 
         return response
