@@ -1240,6 +1240,28 @@ class TestCheck:
         assert one != d
         assert one != 5
 
+    def test_merge_exec_zero_ids(self):
+        check = pebble.Check(
+            'chk',
+            {
+                'override': 'merge',
+                'exec': {'command': 'echo foo', 'user-id': 1000, 'group-id': 2000},
+            },
+        )
+        check._merge(
+            pebble.Check(
+                'chk',
+                {
+                    'override': 'merge',
+                    'exec': {'command': 'echo foo', 'user-id': 0, 'group-id': 0},
+                },
+            )
+        )
+        assert check.exec == {'command': 'echo foo', 'user-id': 0, 'group-id': 0}
+
+        check._merge(pebble.Check('chk', {'override': 'merge', 'exec': {'command': 'echo bar'}}))
+        assert check.exec == {'command': 'echo bar', 'user-id': 0, 'group-id': 0}
+
 
 class TestLogTarget:
     def _assert_empty(self, target: pebble.LogTarget, name: str):
@@ -4160,6 +4182,17 @@ class TestExec:
             client._connect_websocket('1', 'stdio')
         assert len(sockets) == 1
         assert sockets[0].fileno() == -1  # Closed.
+
+    def test_connect_websocket_oserror(self):
+        class Client(MockClient):
+            def _connect_websocket(self, change_id: str, websocket_id: str):
+                raise ConnectionRefusedError('refused')
+
+        client = Client()
+        self.add_responses(client, '123', 0, change_err='change error!')
+        with pytest.raises(pebble.ChangeError) as excinfo:
+            client.exec(['foo'])
+        assert str(excinfo.value) == 'change error!'
 
     def test_websocket_send_raises(self, client: MockClient):
         stdio, stderr, _ = self.add_responses(client, '123', 0)

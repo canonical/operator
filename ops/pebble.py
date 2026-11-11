@@ -1200,6 +1200,12 @@ class Check:
         if self.exec is None:
             self.exec = {}
         for name, value in other.items():
+            # A user or group ID of 0 (root) is an explicit value, so only None is unset.
+            if name in ('user-id', 'group-id') and value is not None:
+                # Pyright knows self.exec[name] should be an int because of name,
+                # but not that value must be an int here because it came from items().
+                self.exec[name] = value  # pyright: ignore[reportGeneralTypeIssues]
+                continue
             if not value:
                 continue
             if name == 'environment':
@@ -1462,7 +1468,8 @@ class CheckInfo:
     level: CheckLevel | str | None
     """Check level.
 
-    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or ``None`` (level not set).
+    This can be :attr:`CheckLevel.ALIVE`, :attr:`CheckLevel.READY`, or
+    :attr:`CheckLevel.UNSET` (level not set).
     """
 
     startup: CheckStartup
@@ -3279,7 +3286,7 @@ class Client:
                 if not combine_stderr:
                     stderr_ws = self._connect_websocket(task_id, 'stderr')
                     connected.append(stderr_ws)
-            except websocket.WebSocketException as e:
+            except (websocket.WebSocketException, OSError) as e:
                 # Error connecting to websockets, probably due to the exec/change
                 # finishing early with an error. Close any websockets that did
                 # connect, then call wait_change to pick up the change error.
