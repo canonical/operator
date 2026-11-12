@@ -17,6 +17,7 @@ Originally vendored from https://github.com/dimaqq/otlp-json.
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 from collections.abc import Mapping, Sequence
@@ -91,16 +92,20 @@ def _resource(resource: Resource):
 def _attributes(
     thing: Resource | InstrumentationScope | ReadableSpan | Event | Link | LogRecord,
 ) -> dict[str, Any]:
-    rv = {'attributes': [], 'dropped_attributes_count': 0}
+    rv = {'attributes': [], 'droppedAttributesCount': 0}
 
     assert thing.attributes is not None  # ruff: ignore[assert]  # SDK invariant.
     for k, v in thing.attributes.items():
         with contextlib.suppress(ValueError):
             rv['attributes'].append({'key': k, 'value': _value(v)})
 
-    rv['dropped_attributes_count'] = len(thing.attributes) - len(rv['attributes'])  # type: ignore
+    # Count both the attributes the SDK dropped (for example, due to span limits)
+    # and the ones that couldn't be encoded. A Resource doesn't track dropped attributes.
+    sdk_dropped = getattr(thing, 'dropped_attributes', 0)
+    encoder_dropped = len(thing.attributes) - len(rv['attributes'])
+    rv['droppedAttributesCount'] = sdk_dropped + encoder_dropped  # type: ignore
 
-    for k in ('attributes', 'dropped_attributes_count'):
+    for k in ('attributes', 'droppedAttributesCount'):
         if not rv[k]:
             del rv[k]
 
@@ -122,16 +127,16 @@ def _value(v: Any) -> dict[str, Any]:
     if isinstance(v, float):
         return {'doubleValue': float(v)}
     if isinstance(v, bytes):
-        # FIXME: not reached!
-        # The API/SDK coerces bytes to str or drops the attribute, see comment in:
-        # https://github.com/open-telemetry/opentelemetry-python/issues/4118
-        return {'bytesValue': bytes(v).hex()}
+        # OTLP/JSON encodes bytes as base64; only trace and span IDs use hex.
+        return {'bytesValue': base64.b64encode(v).decode('ascii')}
     if isinstance(v, str):
         return {'stringValue': str(v)}
     if isinstance(v, Sequence):
         return {'arrayValue': {'values': [_value(e) for e in _ensure_homogeneous(v)]}}
     if isinstance(v, Mapping):
-        return {'kvlistValue': {'values': [{k: _value(vv) for k, vv in v.items()}]}}
+        return {
+            'kvlistValue': {'values': [{'key': k, 'value': _value(vv)} for k, vv in v.items()]}
+        }
 
     raise ValueError(f'Cannot convert attribute value of {type(v)=}')
 
