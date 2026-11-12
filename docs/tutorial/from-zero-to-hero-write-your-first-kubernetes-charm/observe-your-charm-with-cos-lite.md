@@ -312,14 +312,13 @@ chmod +x ~/fastapi-demo/simulate.sh
 . ~/fastapi-demo/simulate.sh
 ```
 
-The output should look like:
+The output should be similar to:
 
 ```text
-{"names":{}}
-{"names":{}}
-{"names":{}}
+{"names":{"1":"maksim","2":"simon"}}
 Internal server error
-{"names":{}}
+Internal server error
+{"names":{"1":"maksim","2":"simon"}}
 ...
 ```
 
