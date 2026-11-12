@@ -356,23 +356,15 @@ The result should be similar to the following output:
 
 ```text
 ...
-============================================ test session starts =============================================
-platform linux -- Python 3.12.3, pytest-8.4.1, pluggy-1.6.0 -- /home/ubuntu/fastapi-demo/.tox/unit/bin/python3
-cachedir: .tox/unit/.pytest_cache
-rootdir: /home/ubuntu/fastapi-demo
-configfile: pyproject.toml
-collected 1 item
 
-tests/unit/test_charm.py::test_pebble_layer PASSED
-
-============================================= 1 passed in 0.54s ==============================================
+============================= 1 passed in 0.54s ==============================
 unit: commands[1]> coverage report
 Name                  Stmts   Miss Branch BrPart  Cover   Missing
 -----------------------------------------------------------------
-src/charm.py             20      0      0      0   100%
+src/charm.py             25      5      4      2    76%   34, 38-42
 src/fastapi_demo.py       8      3      0      0    62%   35-37
 -----------------------------------------------------------------
-TOTAL                    28      3      0      0    89%
+TOTAL                    33      8      4      2    73%
   unit: OK (1.91=setup[0.09]+cmd[1.54,0.28] seconds)
   congratulations :) (1.93 seconds)
 ```
