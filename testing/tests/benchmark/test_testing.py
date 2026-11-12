@@ -25,8 +25,7 @@ import pytest
 import ops
 from ops import testing
 
-# The 'benchmark' fixture comes from the pytest-benchmark plugin.
-pytest.importorskip('pytest_benchmark')
+pytest.importorskip('pytest_benchmark')  # Provides the 'benchmark' fixture.
 
 
 @pytest.fixture
