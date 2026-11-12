@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 jobs:
-  test:
+  property:
     runs-on: ubuntu-latest
 
     steps:
