@@ -757,6 +757,16 @@ checks:
         # Reordered sections.
         assert plan4 == plan7
 
+    def test_null_sections(self):
+        plan = pebble.Plan("""
+services:
+checks:
+log-targets:
+""")
+        assert plan.services == {}
+        assert plan.checks == {}
+        assert plan.log_targets == {}
+
 
 class TestLayer:
     def _assert_empty(self, layer: pebble.Layer):
@@ -817,6 +827,78 @@ class TestLayer:
         assert s.log_targets['baz'].labels == {'key': 'value $VAR'}
 
         assert s.to_dict() == d
+
+    def test_null_sections(self):
+        s = pebble.Layer("""
+summary:
+description:
+services:
+checks:
+log-targets:
+""")
+        self._assert_empty(s)
+
+    @pytest.mark.parametrize(
+        'yaml',
+        [
+            pytest.param('services:\n  svc:\n', id='service'),
+            pytest.param('services:\n  svc:\n    environment:\n', id='service-environment'),
+            pytest.param('services:\n  svc:\n    after:\n', id='service-after'),
+            pytest.param('services:\n  svc:\n    on-check-failure:\n', id='service-on-check'),
+            pytest.param('checks:\n  chk:\n    startup:\n', id='check-startup'),
+            pytest.param('checks:\n  chk:\n    level:\n', id='check-level'),
+            pytest.param('log-targets:\n  t:\n    services:\n', id='log-target-services'),
+        ],
+    )
+    def test_null_fields(self, yaml: str):
+        layer = pebble.Layer(yaml)
+        for section in (layer.services, layer.checks, layer.log_targets):
+            for item in section.values():
+                assert item.to_dict() == {}
+        for check in layer.checks.values():
+            assert check.level == pebble.CheckLevel.UNSET
+            assert check.startup == pebble.CheckStartup.UNSET
+
+    def test_nested_null_values(self):
+        # Pebble reads a null in a map of strings as an empty string, and a
+        # null in a check's http, tcp, or exec settings as leaving it out.
+        layer = pebble.Layer("""
+services:
+  svc:
+    environment:
+      FOO:
+    on-check-failure:
+      chk:
+checks:
+  chk:
+    http:
+      url:
+      headers:
+        X-Foo:
+  tcp:
+    tcp:
+      port: 8080
+      host:
+  ex:
+    exec:
+      command: echo hi
+      environment:
+        FOO:
+      user-id:
+log-targets:
+  t:
+    labels:
+      k:
+""")
+        svc = layer.services['svc']
+        assert svc.environment == {'FOO': ''}
+        assert svc.on_check_failure == {'chk': ''}
+        assert layer.checks['chk'].http == {'headers': {'X-Foo': ''}}
+        assert layer.checks['tcp'].tcp == {'port': 8080}
+        assert layer.checks['ex'].exec == {'command': 'echo hi', 'environment': {'FOO': ''}}
+        assert layer.log_targets['t'].labels == {'k': ''}
+        assert 'None' not in layer.to_yaml()
+        assert 'null' not in layer.to_yaml()
 
     def test_yaml(self):
         s = pebble.Layer('')
