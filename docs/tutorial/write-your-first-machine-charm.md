@@ -298,6 +298,8 @@ As you write your charm, keep in mind that the charm code only runs when there's
 Juju executes `charm.py` on every event, with event data in the environment. Your call to `ops.main` creates a fresh instance of the charm class, then Ops runs the appropriate method on the charm class. You can't persist data between Juju events by storing it in memory.
 ```
 
+Before continuing, delete `tests/unit/test_charm.py`. That file depends on the version of `src/charm.py` you just replaced. Deleting `test_charm.py` ensures that `tox -e lint` doesn't report unhelpful errors. We'll recreate `test_charm.py` later in the tutorial.
+
 ### Define a configuration option
 
 After deploying your charm, you'll use the `juju config` command to change the path of the reverse proxy, so we need to define a configuration option called `slug`. We'll do this in two places:
@@ -606,7 +608,7 @@ It's helpful to think of each test this way:
 2. Ops runs the event handler with the mocked input, which simulates your charm receiving the event.
 3. You assert that the event handler acted correctly.
 
-Replace the contents of `tests/unit/test_charm.py` with:
+Create a file `tests/unit/test_charm.py` containing:
 
 ```{literalinclude} ../../examples/machine-tinyproxy/tests/unit/test_charm.py
 :language: python
