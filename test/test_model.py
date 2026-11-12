@@ -5460,6 +5460,8 @@ class TestLazyCheckInfo:
         info = ops.model.LazyCheckInfo(workload, 'http')
         assert info.name == 'http'
         assert calls == 0
+        # Copying creates the new object without running __init__, so the
+        # private attributes are looked up through __getattr__.
         assert copy.copy(info).name == 'http'
         assert calls == 0
         assert info.status == ops.pebble.CheckStatus.UP
