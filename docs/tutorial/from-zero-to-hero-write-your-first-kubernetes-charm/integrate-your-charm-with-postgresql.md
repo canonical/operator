@@ -36,13 +36,13 @@ Next, run the following command to download the library:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-When you run this command, you might see a warning:
+When you run this command, you'll see a warning similar to:
 
 ```text
-WARNING: Cannot get a keyring. Every store interaction that requires authentication will require you to log in again.
+WARNING: Charmhub-hosted charm libraries are deprecated.
 ```
 
-You won't need to authenticate with Charmhub, so you can ignore the warning.
+You can ignore the warning. A future version of the tutorial will use a library from PyPI instead of Charmhub.
 
 After Charmcraft has downloaded the library, your project directory contains a `lib` directory:
 
@@ -337,7 +337,21 @@ Then modify `test_pebble_layer`. Since `test_pebble_layer` doesn't arrange a dat
 :end-at: 'assert state_out.unit_status == testing.BlockedStatus("Waiting for database relation")'
 ```
 
-Now run `tox -e unit` to make sure all test cases pass.
+Now run `tox -e unit`. You should see one test failure:
+
+```text
+FAILED tests/unit/test_charm.py::test_relation_data - scenario.errors.UncaughtCharmError: Uncaught DeprecationWarning in charm...
+```
+
+The test failed because the `data_interfaces` library uses [](#ops.JujuVersion.from_environ), which is no longer recommended. A future version of the tutorial will use the more modern [`dpcharmlibs-interfaces`](https://pypi.org/project/dpcharmlibs-interfaces/) library instead of `data_platform_libs.data_interfaces`. In the meantime, it's best to tell pytest to ignore the issue. In `pyproject.toml`, extend the `filterwarnings` list:
+
+```{literalinclude} ../../../examples/k8s-3-postgresql/pyproject.toml
+:language: toml
+:start-at: filterwarnings = [
+:end-at: ]
+```
+
+Then run `tox -e unit` and check that all tests pass.
 
 ## Write an integration test
 
@@ -378,36 +392,36 @@ When the tests are done, the output should show these passing tests:
 ```text
 tests/integration/test_charm.py::test_deploy
 ...
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running start hook'
-+ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
+INFO jubilant.wait [fastapi-demo] status: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo/0] status: waiting (installing agent)
+INFO jubilant.wait [fastapi-demo] status changed: waiting (installing agent) -> waiting (agent initialising)
+INFO jubilant.wait [fastapi-demo/0] status changed: waiting (installing agent) -> waiting (agent initialising)
+...
+INFO jubilant.wait [fastapi-demo] status changed: maintenance (Assembling Pebble layers) -> blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status changed: maintenance (Assembling Pebble layers) -> blocked (Waiting for database relation)
 PASSED
 ```
 
 ```text
 tests/integration/test_charm.py::test_workload_version_is_set
 ...
-INFO     jubilant.wait:_juju.py:1491 wait: status changed:
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'executing'
-- .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.message = 'running demo-server-pebble-ready hook'
-+ .apps['fastapi-demo'].units['fastapi-demo/0'].juju_status.current = 'idle'
-+ .apps['fastapi-demo'].version = '3.0.0'
+INFO jubilant.wait [fastapi-demo] status: blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status: blocked (Waiting for database relation)
 PASSED
 ```
 
 ```text
 tests/integration/test_charm.py::test_database_integration
 ...
-INFO     jubilant.wait:_juju.py:1164 wait: status changed:
-- .apps['postgresql-k8s'].app_status.current = 'waiting'
-- .apps['postgresql-k8s'].app_status.message = 'awaiting for cluster to start'
-+ .apps['postgresql-k8s'].app_status.current = 'active'
-+ .apps['postgresql-k8s'].app_status.message = 'Primary'
-- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'waiting'
-- .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'awaiting for cluster to start'
-+ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.current = 'active'
-+ .apps['postgresql-k8s'].units['postgresql-k8s/0'].workload_status.message = 'Primary'
+INFO jubilant.wait [fastapi-demo] status: blocked (Waiting for database relation)
+INFO jubilant.wait [fastapi-demo/0] status: blocked (Waiting for database relation)
+INFO jubilant.wait [postgresql-k8s] status: waiting (installing agent)
+INFO jubilant.wait [postgresql-k8s/0] status: waiting (installing agent)
+...
+INFO jubilant.wait [postgresql-k8s] status changed: waiting (awaiting for cluster to start) -> active (Primary)
+INFO jubilant.wait [postgresql-k8s/0] status changed: waiting (awaiting for cluster to start) -> active (Primary)
+INFO jubilant.wait [fastapi-demo] status changed: maintenance (Assembling Pebble layers) -> active ()
+INFO jubilant.wait [fastapi-demo/0] status changed: maintenance (Assembling Pebble layers) -> active ()
 PASSED
 ```
 

@@ -42,7 +42,7 @@ Charmcraft created several files, including:
 - `src/charm.py` - The Python file that will contain the logic of your charm.
 - `src/fastapi_demo.py` - A helper module that will contain functions for interacting with your workload application.
 
-These files currently contain placeholder code and configuration.
+These files currently contain placeholder code and configuration. It would be possible to deploy your charm to Juju, but it wouldn't do anything useful at this stage.
 
 ## Write your charm
 

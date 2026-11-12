@@ -122,7 +122,7 @@ import pytest
 
 @pytest.fixture(scope='session')
 def charm():
-    """Return the path of the charm under test."""
+    """Return the absolute path of the charm under test."""
     charm = os.environ.get('CHARM_PATH')
     if not charm:
         charm_dir = (
