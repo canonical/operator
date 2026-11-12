@@ -475,15 +475,21 @@ def test_opened_ports(run: Run):
         stdout='["8080/tcp", "icmp", "8081-8090/udp", "80"]',
     )
     result = hookcmds.opened_ports()
-    assert result[0].port == 8080
-    assert result[0].protocol == 'tcp'
-    assert result[1].port is None
-    assert result[1].protocol == 'icmp'
-    assert result[2].port == 8081
-    assert result[2].to_port == 8090
-    assert result[2].protocol == 'udp'
-    assert result[3].port == 80
-    assert result[3].protocol == 'tcp'
+    assert result == [
+        hookcmds.Port(protocol='tcp', port=8080, to_port=None, endpoints=None),
+        hookcmds.Port(protocol='icmp', port=None, to_port=None, endpoints=None),
+        hookcmds.Port(protocol='udp', port=8081, to_port=8090, endpoints=None),
+        hookcmds.Port(protocol='tcp', port=80, to_port=None, endpoints=None),
+    ]
+
+
+@pytest.mark.parametrize('endpoints', [False, True])
+def test_opened_ports_none(run: Run, endpoints: bool):
+    cmd = ['opened-ports', '--format=json']
+    if endpoints:
+        cmd.insert(1, '--endpoints')
+    run.handle(cmd, stdout='[]')
+    assert hookcmds.opened_ports(endpoints=endpoints) == []
 
 
 def test_opened_ports_endpoints(run: Run):
@@ -655,7 +661,8 @@ def test_secret_add_without_owner(run: Run, mock_temp_dir: str):
 
 
 def test_secret_add_keys_are_not_paths(run: Run, mock_temp_dir: TemporaryDirectory):
-    # Juju rejects these keys; they must not be used as file names before it does.
+    # Juju rejects these keys, but the files are written before Juju sees them,
+    # so the keys must not be used as file names.
     run.handle(
         [
             'secret-add',

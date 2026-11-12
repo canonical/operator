@@ -325,7 +325,10 @@ class SecretInfo:
     rotates: datetime.datetime | None = None
 
     owner: Literal['application', 'unit', 'model'] | None = None
-    """The kind of entity that owns the secret."""
+    """The kind of entity that owns the secret.
+
+    .. jujuadded:: 3.1
+    """
 
     access: list[SecretAccess] = dataclasses.field(default_factory=list[SecretAccess])
     """The grants of access to the secret.
