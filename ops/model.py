@@ -1466,7 +1466,7 @@ class Secret:
         unless ``refresh=True`` is used. Calling :meth:`set_content` does not
         update the cached content: use :meth:`peek_content` or
         ``refresh=True`` to read the new content, otherwise this returns the
-        tracked revision until the tracking is updated.
+        tracked revision.
 
         Args:
             refresh: If true, fetch the latest revision's content and tell
