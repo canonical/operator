@@ -1,13 +1,16 @@
 name: ops Property Tests
 
+# The property tests live on the long-lived property-tests branch. This file
+# gives that branch's pushes and pull requests the small, derandomised run.
+# GitHub only schedules workflows from the default branch, so the nightly run
+# is property-tests-nightly.yaml on main, which checks this branch out.
 on:
   push:
     branches:
-      - main
+      - property-tests
   pull_request:
-  workflow_dispatch:
-  schedule:
-    - cron: '17 15 * * *'
+    branches:
+      - property-tests
 
 permissions: {}
 
@@ -22,22 +25,8 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - run: uv tool install tox --with tox-uv
 
-      # Pull requests and pushes get a small, derandomised run. The scheduled
-      # and manual runs get a large budget with fresh randomness, to look for
-      # inputs nobody has tried yet.
       - name: Run property tests
         run: tox -e property
         env:
-          HYPOTHESIS_PROFILE: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'nightly' || 'ci' }}
+          HYPOTHESIS_PROFILE: ci
         timeout-minutes: 60
-
-  open-issue-on-failure-if-scheduled:
-    if: ${{ failure() && github.event_name == 'schedule' }}
-    needs: [test]
-    permissions:
-      issues: write
-      actions: read  # for ai-failure-enrich.yaml
-    secrets:
-      # For ai-failure-enrich.yaml -- can only be read in the ai-failure-triage environment.
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    uses: $/.github/workflows/notify-scheduled-failure.yaml
