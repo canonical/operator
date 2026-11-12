@@ -36,13 +36,13 @@ Next, run the following command to download the library:
 ubuntu@juju-sandbox-k8s:~/fastapi-demo$ charmcraft fetch-libs
 ```
 
-When you run this command, you might see a warning:
+When you run this command, you'll see a warning similar to:
 
 ```text
-WARNING: Cannot get a keyring. Every store interaction that requires authentication will require you to log in again.
+WARNING: Charmhub-hosted charm libraries are deprecated.
 ```
 
-You won't need to authenticate with Charmhub, so you can ignore the warning.
+You can ignore the warning. A future version of the tutorial will use a library from PyPI instead of Charmhub.
 
 After Charmcraft has downloaded the library, your project directory contains a `lib` directory:
 
