@@ -4465,6 +4465,8 @@ class LazyCheckInfo:
     def __getattr__(self, item: str):
         # Note: not called for defined attribute `name`.
         if item.startswith('_'):
+            # Looking up our own private attributes (as copy and pickle do
+            # before __init__ has run) must not trigger a load, or recurse.
             raise AttributeError(item)
         self._ensure_loaded()
         return getattr(self._info, item)
