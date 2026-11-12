@@ -29,6 +29,10 @@ jobs:
       - name: Prepare for deploying machine charms
         run: sudo concierge prepare -p machine
         timeout-minutes: 90  # Abandon the job if the GHA runner gets stuck.
+      - name: Lock dependencies
+        run: |
+          cd ${{ matrix.dir }}
+          uv lock
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}
@@ -70,6 +74,10 @@ jobs:
           if grep -Eq "^charm-libs:" charmcraft.yaml; then
             charmcraft fetch-libs
           fi
+      - name: Lock dependencies
+        run: |
+          cd ${{ matrix.dir }}
+          uv lock
       - name: Pack charm
         run: |
           cd ${{ matrix.dir }}

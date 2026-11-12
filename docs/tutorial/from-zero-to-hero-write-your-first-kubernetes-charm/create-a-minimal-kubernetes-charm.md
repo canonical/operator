@@ -44,6 +44,14 @@ Charmcraft created several files, including:
 
 These files currently contain placeholder code and configuration.
 
+Charmcraft didn't write the exact dependency versions into a lock file. Do that now:
+
+```text
+uv lock
+```
+
+This creates a file called `uv.lock`, which specifies the exact dependency versions that will be installed when you test and build your charm. If you commit your charm to source control, include `uv.lock`.
+
 ## Write your charm
 
 ### Edit the metadata
