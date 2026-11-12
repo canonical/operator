@@ -590,10 +590,10 @@ Create a file `tests/unit/test_tinyproxy.py` containing:
 :start-at: import pytest
 ```
 
-We'll run all the tests later in the tutorial. But if you'd like to see whether this test passes, run:
+To check that this test passes, run:
 
 ```text
-tox -e unit -- -k test_version
+tox -e unit
 ```
 
 ### Write state-transition tests
