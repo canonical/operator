@@ -406,6 +406,32 @@ def test_a_failed_install_is_an_error(tmp_path: pathlib.Path, venv: pathlib.Path
         _charm_requirements.install_charm_requirements(root, venv)
 
 
+def _no_uv(name: str) -> str | None:
+    return None
+
+
+def test_pip_fallback_command(monkeypatch: pytest.MonkeyPatch):
+    # Without uv, the test's own pip is used, and it only accepts --python
+    # before the command.
+    monkeypatch.setattr(shutil, 'which', _no_uv)
+    python = pathlib.Path('/env/bin/python')
+    pip = [sys.executable, '-m', 'pip', '--python', str(python)]
+    assert _charm_requirements._pip(python, 'install', '--no-deps', 'a') == [
+        *pip,
+        'install',
+        '--quiet',
+        '--no-deps',
+        'a',
+    ]
+    assert _charm_requirements._pip(python, 'uninstall', 'ops') == [
+        *pip,
+        'uninstall',
+        '--quiet',
+        '--yes',
+        'ops',
+    ]
+
+
 def test_install_refuses_the_tests_own_environment(tmp_path: pathlib.Path):
     root = _charmcraft(tmp_path, 'parts:\n  charm:\n    plugin: python\n')
     with pytest.raises(_RequirementsError, match="test's own environment"):
