@@ -39,6 +39,7 @@ import dataclasses
 import datetime
 import email.message
 import email.parser
+import email.utils
 import enum
 import http.client
 import io
@@ -3647,7 +3648,11 @@ class _FilesParser:
 
         name = self._headers.get_param('name', header='content-disposition')
         if name == 'files':
-            filename = self._headers.get_filename()
+            # Not get_filename(), because that strips leading and trailing
+            # whitespace, which can be part of the path.
+            filename = self._headers.get_param('filename', header='content-disposition')
+            if isinstance(filename, tuple):
+                filename = email.utils.collapse_rfc2231_value(filename)
             if filename is None:
                 raise ProtocolError('multipart "files" part missing filename')
             self._prepare_tempfile(filename)

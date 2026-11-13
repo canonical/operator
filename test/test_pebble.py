@@ -2565,6 +2565,34 @@ Content-Disposition: form-data; name="response"\r
         with client.pull('/tmp/crème.txt') as infile:  # ruff: ignore[hardcoded-temp-file]
             assert infile.read() == 'contents'
 
+    @pytest.mark.parametrize('path', ['/srv/file ', '/srv/file\t', ' /srv/file', '/srv/ file '])
+    def test_pull_path_with_surrounding_whitespace(self, client: MockClient, path: str):
+        client.responses.append((
+            {'Content-Type': 'multipart/form-data; boundary=01234567890123456789012345678901'},
+            b"""\
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="files"; filename="%s"\r
+\r
+contents\r
+--01234567890123456789012345678901\r
+Content-Disposition: form-data; name="response"\r
+\r
+%s\r
+--01234567890123456789012345678901--\r
+"""
+            % (
+                path.encode(),
+                json.dumps({
+                    'result': [{'path': path}],
+                    'status': 'OK',
+                    'status-code': 200,
+                    'type': 'sync',
+                }).encode(),
+            ),
+        ))
+        with client.pull(path) as infile:
+            assert infile.read() == 'contents'
+
     def test_pull_protocol_errors(self, client: MockClient):
         client.responses.append(({'Content-Type': 'c/t'}, b''))
         with pytest.raises(pebble.ProtocolError) as excinfo:
