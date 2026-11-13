@@ -910,11 +910,23 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 
+[package.dev-dependencies]
+unit = [
+    { name = "ops-tracing" },
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "ops", editable = "." },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "typing-extensions", specifier = ">=4.9.0" },
+]
+
+[package.metadata.requires-dev]
+unit = [
+    { name = "ops-tracing", editable = "tracing" },
+    { name = "pytest", specifier = "~=9.0" },
 ]
 
 [[package]]
@@ -935,7 +947,7 @@ lint = [
     { name = "ruff" },
 ]
 unit = [
-    { name = "ops", extra = ["testing"] },
+    { name = "ops-scenario" },
     { name = "pytest" },
 ]
 
@@ -954,7 +966,7 @@ lint = [
     { name = "ruff", specifier = "==0.17.2" },
 ]
 unit = [
-    { name = "ops", extras = ["testing"], editable = "." },
+    { name = "ops-scenario", editable = "testing" },
     { name = "pytest", specifier = "~=9.0" },
 ]
 

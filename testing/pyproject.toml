@@ -38,5 +38,11 @@ classifiers = [
 "Homepage" = "https://github.com/canonical/operator"
 "Bug Tracker" = "https://github.com/canonical/operator/issues"
 
+[dependency-groups]
+unit = [
+    "ops-tracing",
+    "pytest~=9.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/scenario"]  # Hatch looks for 'ops_scenario' by default.
