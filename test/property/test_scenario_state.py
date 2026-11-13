@@ -42,14 +42,14 @@ from scenario.state import (
 # The choices below are deliberately broad so the tool can discover input
 # combinations the authors wouldn't reach for by hand.
 
-# Every status type. UnknownStatus takes no message, so it is the one fixed value.
+# Every status type that carries a message. Unknown is tested separately, because
+# it drops its message.
 _status_strategy = st.one_of(
     st.builds(ActiveStatus, message=st.text()),
     st.builds(BlockedStatus, message=st.text()),
     st.builds(MaintenanceStatus, message=st.text()),
     st.builds(WaitingStatus, message=st.text()),
     st.builds(ErrorStatus, message=st.text()),
-    st.just(UnknownStatus()),
 )
 
 # All three concrete Port types; TCPPort/UDPPort accept validated port numbers.
@@ -69,12 +69,23 @@ def test_entity_status_ops_roundtrip(status: _EntityStatus) -> None:
 
     This bridges the scenario and ops status representations; any mismatch in
     the name/message mapping would silently corrupt the visible status after a
-    charm event.
+    charm event. The unknown status is the exception: see the next test.
     """
     round_tripped = _EntityStatus.from_ops(status._to_ops())
     assert round_tripped == status
     assert round_tripped.name == status.name
     assert round_tripped.message == status.message
+
+
+@given(message=st.text())
+def test_unknown_status_drops_its_message(message: str) -> None:
+    """An unknown status round-trips to UnknownStatus(), whatever its message.
+
+    ops has no message for an unknown status, so it's dropped on the way to ops
+    and doesn't come back.
+    """
+    status = _EntityStatus(name='unknown', message=message)
+    assert _EntityStatus.from_ops(status._to_ops()) == UnknownStatus()
 
 
 @given(port=_port_strategy)
