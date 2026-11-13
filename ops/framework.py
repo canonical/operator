@@ -507,6 +507,10 @@ class PrefixedEvents:
         self._prefix = key.replace('-', '_') + '_'
 
     def __getattr__(self, name: str) -> BoundEvent:
+        if name.startswith('_'):
+            # Looking up our own private attributes (as copy and pickle do
+            # before __init__ has run) must not recurse.
+            raise AttributeError(name)
         return getattr(self._emitter, self._prefix + name)
 
 
@@ -1210,6 +1214,10 @@ class BoundStoredState:
         parent.framework.observe(parent.framework.on.commit, self._data.on_commit)
 
     def __getattr__(self, key: str) -> Any:
+        if '_data' not in self.__dict__:
+            # Looking up attributes (as copy and pickle do) before __init__
+            # has run must not recurse through self._data.
+            raise AttributeError(key)
         # "on" is the only reserved key that can't be used in the data map.
         if key == 'on':
             raise AttributeError("attribute 'on' is reserved")

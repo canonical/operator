@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import copy
 import datetime
 import functools
 import gc
@@ -1351,6 +1352,18 @@ class TestFramework:
         with pytest.raises(TypeError, match="only 'self' and the 'event'"):
             framework.observe(charm.on.start, charm._on_event)
 
+    def test_prefixed_events_copy(self, request: pytest.FixtureRequest):
+        class MyEvents(ops.ObjectEvents):
+            db_relation_changed = ops.EventSource(ops.EventBase)
+
+        class MyNotifier(ops.Object):
+            on = MyEvents()
+
+        framework = create_framework(request)
+        notifier = MyNotifier(framework, 'notifier')
+        prefixed = notifier.on['db']
+        assert copy.copy(prefixed).relation_changed.event_kind == 'db_relation_changed'
+
 
 MutableTypesTestCase = tuple[
     typing.Callable[[], typing.Any],  # Called to get operand A.
@@ -1399,6 +1412,18 @@ class TestStoredState:
     def test_stored_set_repr(self):
         assert repr(ops.StoredSet(None, set())) == 'ops.framework.StoredSet()'  # type: ignore
         assert repr(ops.StoredSet(None, {1})) == 'ops.framework.StoredSet({1})'  # type: ignore
+
+    def test_copy_bound_stored_state(self, request: pytest.FixtureRequest):
+        class SomeObject(ops.Object):
+            _stored = ops.StoredState()
+
+        framework = create_framework(request)
+        obj = SomeObject(framework, 'obj')
+        obj._stored._private = 1
+        obj._stored.set_default(_default=2)
+        stored_copy = copy.copy(obj._stored)
+        assert stored_copy._private == 1
+        assert stored_copy._default == 2
 
     def test_basic_state_storage(self, request: pytest.FixtureRequest, tmp_path: pathlib.Path):
         class SomeObject(ops.Object):
