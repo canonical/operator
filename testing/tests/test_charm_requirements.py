@@ -115,12 +115,22 @@ def test_unsupported_plugins_are_an_error(tmp_path: pathlib.Path, plugin: str):
         _charm_requirements.detect_plugin(root)
 
 
-def test_no_python_part_names_the_parts(tmp_path: pathlib.Path):
+@pytest.mark.parametrize('python_plugin', ['', '  deps:\n    plugin: uv\n'])
+def test_unknown_plugin_is_refused(tmp_path: pathlib.Path, python_plugin: str):
+    # Even next to a Python part: the unknown one might install dependencies too.
     root = _charmcraft(
-        tmp_path, 'parts:\n  web:\n    plugin: flask-framework\n  files:\n    plugin: dump\n'
+        tmp_path,
+        f'parts:\n{python_plugin}  web:\n    plugin: flask-framework\n'
+        '  files:\n    plugin: dump\n',
     )
-    with pytest.raises(_RequirementsError, match=r'use: web \(flask-framework\)\.$'):
+    with pytest.raises(_RequirementsError, match=r'too: web \(flask-framework\)\.$'):
         _charm_requirements.detect_plugin(root)
+
+
+def test_other_craft_parts_plugins_are_skipped(tmp_path: pathlib.Path):
+    root = _charmcraft(tmp_path, 'parts:\n  deps:\n    plugin: uv\n  java:\n    plugin: maven\n')
+    plugin, _ = _charm_requirements.detect_plugin(root)
+    assert plugin == 'uv'
 
 
 @pytest.mark.parametrize(

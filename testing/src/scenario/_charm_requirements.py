@@ -45,8 +45,15 @@ _SUPPORTED_PLUGINS = ('python', 'uv')
 #: Plugins that are charmcraft's, but that dependencies can't be found for.
 _UNSUPPORTED_PLUGINS = ('poetry', 'reactive')
 #: Plugins that don't install Python dependencies, so are skipped when looking
-#: for the part that does.
-_OTHER_PLUGINS = ('nil', 'dump', 'make', 'autotools', 'cmake', 'go', 'rust', 'npm')
+#: for the part that does: craft-parts' built-in plugins, apart from the Python
+#: ones above. A part using any other plugin might install Python dependencies,
+#: so the charm is refused rather than given an environment that could be
+#: missing some.
+_OTHER_PLUGINS = (
+    'ant', 'autotools', 'bazel', 'cargo-use', 'cmake', 'dotnet', 'dump', 'go', 'go-use',
+    'gradle', 'gradle-use', 'jlink', 'make', 'maven', 'maven-use', 'meson', 'nil', 'npm',
+    'npm-use', 'qmake', 'ruby', 'rust', 'scons',
+)  # fmt: skip
 
 #: The charm's environment never has these installed: the test's own are used.
 #: ops-tracing pins an exact ops version, so it has to match the test's ops too.
@@ -181,6 +188,11 @@ def _python_part(path: pathlib.Path, parts: dict[str, Any]) -> tuple[str, Mappin
             )
         elif plugin not in _OTHER_PLUGINS:
             unknown.append(f'{name} ({plugin})')
+    if unknown:
+        raise _RequirementsError(
+            f"Can't find the dependencies of the charm in {path}, because these parts use "
+            f'plugins that might install Python dependencies too: {", ".join(unknown)}.'
+        )
     if len(found) > 1:
         names = ', '.join(f'{name} ({plugin})' for name, plugin, _ in found)
         raise _RequirementsError(
@@ -190,8 +202,7 @@ def _python_part(path: pathlib.Path, parts: dict[str, Any]) -> tuple[str, Mappin
     if found:
         _, plugin, part = found[0]
         return plugin, part
-    listed = f' Its parts use: {", ".join(unknown)}.' if unknown else ''
-    raise _RequirementsError(f'No part in {path} uses the python or uv plugin.{listed}')
+    raise _RequirementsError(f'No part in {path} uses the python or uv plugin.')
 
 
 def _unsupported(plugin: str) -> str:
