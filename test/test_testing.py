@@ -4473,6 +4473,28 @@ class TestTestingPebbleClient:
             == client.get_plan().to_yaml()
         )
 
+    def test_add_layer_merge_keeps_layers_unchanged(self, client: _TestingPebbleClient):
+        client.add_layer(
+            'base',
+            {
+                'services': {'s': {'override': 'replace', 'command': 'x', 'after': ['a']}},
+                'log-targets': {'t': {'override': 'replace', 'type': 'loki', 'services': ['a']}},
+            },
+        )
+        client.add_layer(
+            'over',
+            {
+                'services': {'s': {'override': 'merge', 'after': ['b']}},
+                'log-targets': {'t': {'override': 'merge', 'services': ['b']}},
+            },
+        )
+        # Rendering the plan must not merge into the layers themselves, or
+        # every call would append the merged lists again.
+        for _ in range(3):
+            plan = client.get_plan()
+            assert plan.services['s'].after == ['a', 'b']
+            assert plan.log_targets['t'].services == ['a', 'b']
+
     def test_add_layer_not_combined(self, client: _TestingPebbleClient):
         plan = client.get_plan()
         assert isinstance(plan, pebble.Plan)
