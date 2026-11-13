@@ -14,15 +14,18 @@
 
 """Hypothesis property-based tests for scenario.state.
 
-These test the _EntityStatus and Port conversions between scenario and ops.
-Both are pure in-memory round-trips with a wide input space and a simple
-invariant, which is where property-based testing earns its keep.
+These test the _EntityStatus conversion between scenario and ops, and the
+port-number validation of TCPPort, UDPPort and ICMPPort. Both are pure and
+in-memory, with a wide input space and a simple invariant, which is where
+property-based testing earns its keep.
 """
 
 from __future__ import annotations
 
-from hypothesis import given
+import pytest
+from hypothesis import example, given
 from hypothesis import strategies as st
+from scenario.errors import StateValidationError
 from scenario.state import (
     ActiveStatus,
     BlockedStatus,
@@ -50,13 +53,6 @@ _status_strategy = st.one_of(
     st.builds(MaintenanceStatus, message=st.text()),
     st.builds(WaitingStatus, message=st.text()),
     st.builds(ErrorStatus, message=st.text()),
-)
-
-# All three concrete Port types; TCPPort/UDPPort accept validated port numbers.
-_port_strategy = st.one_of(
-    st.builds(TCPPort, port=st.integers(min_value=1, max_value=65535)),
-    st.builds(UDPPort, port=st.integers(min_value=1, max_value=65535)),
-    st.just(ICMPPort()),
 )
 
 
@@ -88,13 +84,30 @@ def test_unknown_status_drops_its_message(message: str) -> None:
     assert _EntityStatus.from_ops(status._to_ops()) == UnknownStatus()
 
 
-@given(port=_port_strategy)
-def test_port_to_ops_preserves_attributes(port: TCPPort | UDPPort | ICMPPort) -> None:
-    """Port._to_ops() faithfully copies port number and protocol to ops.Port.
+@given(port_type=st.sampled_from([TCPPort, UDPPort]), number=st.integers())
+# Random integers almost never land on the edges, so check those every time.
+@example(port_type=TCPPort, number=0)
+@example(port_type=TCPPort, number=1)
+@example(port_type=TCPPort, number=65535)
+@example(port_type=TCPPort, number=65536)
+@example(port_type=UDPPort, number=0)
+@example(port_type=UDPPort, number=1)
+@example(port_type=UDPPort, number=65535)
+@example(port_type=UDPPort, number=65536)
+def test_tcp_and_udp_ports_validate_their_range(
+    port_type: type[TCPPort | UDPPort], number: int
+) -> None:
+    """A TCP or UDP port can be created exactly when its number is in [1, 65535]."""
+    if 1 <= number <= 65535:
+        port = port_type(number)
+        assert port._to_ops().port == number
+    else:
+        with pytest.raises(StateValidationError):
+            port_type(number)
 
-    If the mapping were to swap protocol strings or clamp the port number, ops
-    would open the wrong port at runtime.
-    """
-    ops_port = port._to_ops()
-    assert ops_port.port == port.port
-    assert ops_port.protocol == port.protocol
+
+@given(number=st.integers())
+def test_icmp_port_rejects_any_port(number: int) -> None:
+    """ICMP has no ports, so an ICMPPort with any port number is rejected."""
+    with pytest.raises(StateValidationError):
+        ICMPPort(port=number)
