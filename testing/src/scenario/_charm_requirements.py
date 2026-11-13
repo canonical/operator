@@ -20,7 +20,9 @@ arguments that charmcraft does, from the same directory: the part's
   the charm isn't tested with dependencies other than the ones it asks for.
 
 The charm's own ``ops``, ``ops-scenario`` and ``ops-tracing`` are never left
-installed: the charm uses the test's.
+installed: the charm uses the test's. Whatever runs the charm in this
+environment has to make the test's own ``ops`` importable. This module only
+makes sure the charm's copies can't shadow it.
 
 Charms that use an extension, such as ``flask-framework``, aren't supported:
 the extension adds parts that aren't in ``charmcraft.yaml``. Nor are charms
