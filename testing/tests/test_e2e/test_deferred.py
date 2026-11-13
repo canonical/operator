@@ -311,3 +311,30 @@ def test_defer_custom_event(mycharm: type[ops.CharmBase]):
         == {'arg0': 'foo', 'arg1': 28}
     )
     assert not state_2.deferred
+
+
+def _plain_function(event: ops.EventBase):
+    pass
+
+
+def test_deferred_handler_must_be_a_method():
+    with pytest.raises(ValueError, match='must be a method'):
+        Event('start').deferred(handler=_plain_function)
+
+
+def test_deferred_handler_must_not_be_a_nested_function():
+    def nested(event: ops.EventBase):
+        pass
+
+    with pytest.raises(ValueError, match='must be a method'):
+        Event('start').deferred(handler=nested)
+
+
+def test_deferred_handler_can_be_a_method_of_a_nested_class():
+    class NestedCharm(ops.CharmBase):
+        def _on_start(self, event: ops.EventBase):
+            pass
+
+    deferred = Event('start').deferred(handler=NestedCharm._on_start)
+    assert deferred.handle_path == 'NestedCharm/on/start[1]'
+    assert deferred.observer == '_on_start'
