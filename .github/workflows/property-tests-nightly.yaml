@@ -30,7 +30,10 @@ jobs:
       - name: Merge main
         run: |
           git fetch origin main
-          git merge --no-commit --no-ff FETCH_HEAD
+          git merge --no-commit --no-ff FETCH_HEAD || {
+            echo "::error title=property-tests needs merging::main doesn't merge cleanly into property-tests; merge it by hand"
+            exit 1
+          }
         env:
           # git wants an identity even for a merge it doesn't commit.
           GIT_AUTHOR_NAME: github-actions[bot]
