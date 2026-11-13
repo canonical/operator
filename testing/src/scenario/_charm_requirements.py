@@ -248,7 +248,14 @@ def _charm_plugin(reason: str) -> _RequirementsError:
 
 
 def _build_directory(charm_root: pathlib.Path, part: Mapping[str, Any]) -> pathlib.Path:
-    """The directory charmcraft builds the part in: its ``source`` and ``source-subdir``."""
+    """The directory charmcraft builds the part in: its ``source`` and ``source-subdir``.
+
+    A ``source`` may lead out of the charm, up to the root of the git repository
+    it's in: charmcraft's experimental monorepo mode mounts the whole repository,
+    and its documentation has charms use ``source: ../..`` with a
+    ``source-subdir`` back to the charm. Nothing outside the repository is ever
+    available to charmcraft, so that's refused.
+    """
     source = str(part.get('source', '.'))
     if '://' in source or source.startswith('git@'):
         raise _RequirementsError(
@@ -256,12 +263,25 @@ def _build_directory(charm_root: pathlib.Path, part: Mapping[str, Any]) -> pathl
             "charm's dependencies isn't supported."
         )
     directory = (charm_root / source / str(part.get('source-subdir', ''))).resolve()
+    if not directory.is_relative_to(_repository_root(charm_root.resolve())):
+        raise _RequirementsError(
+            f"The part's source is {directory}, which is outside the charm's git repository, "
+            "so charmcraft can't build it."
+        )
     if not directory.is_dir():
         raise _RequirementsError(
             f"The part's source is {directory}, which isn't a directory, so finding the "
             "charm's dependencies isn't supported."
         )
     return directory
+
+
+def _repository_root(charm_root: pathlib.Path) -> pathlib.Path:
+    """The root of the git repository the charm is in, or the charm itself if it isn't in one."""
+    for directory in (charm_root, *charm_root.parents):
+        if (directory / '.git').exists():
+            return directory
+    return charm_root
 
 
 def _python_requirements(directory: pathlib.Path, part: Mapping[str, Any]) -> tuple[str, ...]:

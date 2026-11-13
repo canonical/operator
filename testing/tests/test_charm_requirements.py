@@ -299,6 +299,52 @@ def test_uv_plugin_uses_the_source_subdir(tmp_path: pathlib.Path):
     assert sorted(requirements.args) == ['./deps/base', './deps/editable']
 
 
+def test_uv_plugin_in_a_monorepo(tmp_path: pathlib.Path):
+    # The layout charmcraft's experimental monorepo mode documents: the part's
+    # source is the repository root, and the charm uses shared code from it.
+    repo = tmp_path / 'repo'
+    (repo / '.git').mkdir(parents=True)
+    (repo / 'shared' / 'common').mkdir(parents=True)
+    (repo / 'shared' / 'common' / 'pyproject.toml').write_text(
+        '[project]\nname = "common"\nversion = "1.0"\n'
+    )
+    root = repo / 'charms' / 'my-charm'
+    _charmcraft(
+        root,
+        'parts:\n  my-charm:\n    plugin: uv\n    source: ../..\n'
+        '    source-subdir: charms/my-charm\n',
+    )
+    (root / 'pyproject.toml').write_text(
+        textwrap.dedent("""
+            [project]
+            name = "my-charm"
+            version = "0"
+            requires-python = ">=3.10"
+            dependencies = ["common"]
+
+            [tool.uv.sources]
+            common = { path = "../../shared/common" }
+        """)
+    )
+    subprocess.run(
+        [shutil.which('uv') or 'uv', 'lock', '--quiet', '--offline'], cwd=root, check=True
+    )
+    requirements = _charm_requirements.charm_requirements(root)
+    assert requirements.directory == root.resolve()
+    assert requirements.args == ('../../shared/common',)
+
+
+def test_a_part_source_outside_the_repository_is_an_error(tmp_path: pathlib.Path):
+    (tmp_path / 'repo' / '.git').mkdir(parents=True)
+    (tmp_path / 'elsewhere').mkdir()
+    root = _charmcraft(
+        tmp_path / 'repo' / 'charm',
+        'parts:\n  charm:\n    plugin: python\n    source: ../../elsewhere\n',
+    )
+    with pytest.raises(_RequirementsError, match="outside the charm's git repository"):
+        _charm_requirements.charm_requirements(root)
+
+
 def test_uv_plugin_with_a_stale_lockfile(tmp_path: pathlib.Path):
     root = _uv_charm(tmp_path)
     pyproject = root / 'pyproject.toml'
