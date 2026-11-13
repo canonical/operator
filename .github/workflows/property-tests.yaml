@@ -29,4 +29,4 @@ jobs:
         run: tox -e property
         env:
           HYPOTHESIS_PROFILE: ci
-        timeout-minutes: 60
+        timeout-minutes: 10
