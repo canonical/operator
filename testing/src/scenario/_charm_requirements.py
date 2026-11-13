@@ -74,6 +74,13 @@ class _Requirements:
     args: tuple[str, ...]
     """Requirements and options, as separate command-line arguments."""
 
+    check: bool = False
+    """Whether to run ``pip check`` after installing, as charmcraft's python plugin does.
+
+    The uv plugin's export leaves out ``ops``, so a locked package that
+    depends on it would fail the check.
+    """
+
 
 def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -> None:
     """Install the charm's dependencies into the environment that ``python`` runs in.
@@ -98,6 +105,9 @@ def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -
     if requirements.args:
         install = _pip(python, 'install', '--no-deps', *requirements.args)
         _run(install, cwd=requirements.directory)
+        # Before ops is removed, which deliberately leaves dependencies missing.
+        if requirements.check:
+            _run(_pip(python, 'check'))
     _run(_pip(python, 'uninstall', *_OPS_DISTRIBUTIONS))
 
 
@@ -145,7 +155,7 @@ def charm_requirements(charm_root: pathlib.Path) -> _Requirements:
     directory = _build_directory(charm_root, part)
     if plugin == 'uv':
         return _Requirements(directory, _uv_requirements(directory, part))
-    return _Requirements(directory, _python_requirements(directory, part))
+    return _Requirements(directory, _python_requirements(directory, part), check=True)
 
 
 def detect_plugin(charm_root: pathlib.Path) -> tuple[str, Mapping[str, Any]]:

@@ -180,6 +180,7 @@ def test_python_plugin_requirements(tmp_path: pathlib.Path):
             'extra==1',
             './vendor/lib',
         ),
+        check=True,
     )
 
 
@@ -322,14 +323,15 @@ def test_uv_plugin_without_uv(tmp_path: pathlib.Path, monkeypatch: pytest.Monkey
         _charm_requirements.charm_requirements(root)
 
 
-def _wheel(directory: pathlib.Path, name: str) -> str:
+def _wheel(directory: pathlib.Path, name: str, requires: str = '') -> str:
     """Build a wheel with no code, so that installing it needs no index or build."""
     directory.mkdir(parents=True, exist_ok=True)
     stem = f'{name.replace("-", "_")}-1.0'
+    metadata = f'Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n'
+    if requires:
+        metadata += f'Requires-Dist: {requires}\n'
     with zipfile.ZipFile(directory / f'{stem}-py3-none-any.whl', 'w') as wheel:
-        wheel.writestr(
-            f'{stem}.dist-info/METADATA', f'Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n'
-        )
+        wheel.writestr(f'{stem}.dist-info/METADATA', metadata)
         wheel.writestr(
             f'{stem}.dist-info/WHEEL',
             'Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n',
@@ -430,6 +432,21 @@ def test_pip_fallback_command(monkeypatch: pytest.MonkeyPatch):
         '--yes',
         'ops',
     ]
+
+
+def test_install_python_plugin_checks_the_requirements_are_complete(
+    tmp_path: pathlib.Path, venv: pathlib.Path
+):
+    # charmcraft runs pip check after installing with --no-deps, so a
+    # requirements file that's missing a dependency fails the pack.
+    wheel = _wheel(tmp_path / 'wheels', 'needy', requires='missing')
+    root = _charmcraft(
+        tmp_path,
+        'parts:\n  charm:\n    plugin: python\n    source: .\n'
+        f'    python-packages: [wheels/{wheel}]\n',
+    )
+    with pytest.raises(_RequirementsError, match='missing'):
+        _charm_requirements.install_charm_requirements(root, venv)
 
 
 def test_install_refuses_the_tests_own_environment(tmp_path: pathlib.Path):
