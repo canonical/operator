@@ -39,8 +39,6 @@ from scenario.state import (
     _EntityStatus,
 )
 
-# ── strategies ──────────────────────────────────────────────────────────────
-#
 # Strategy design is where Hypothesis pays off or doesn't.
 # The choices below are deliberately broad so the tool can discover input
 # combinations the authors wouldn't reach for by hand.
@@ -54,9 +52,6 @@ _status_strategy = st.one_of(
     st.builds(WaitingStatus, message=st.text()),
     st.builds(ErrorStatus, message=st.text()),
 )
-
-
-# ── tests ────────────────────────────────────────────────────────────────────
 
 
 @given(status=_status_strategy)
