@@ -32,9 +32,10 @@ import os
 
 from hypothesis import settings
 
-# Generation is cheap here, but CI machines are noisy, and a timing-based
-# failure would say nothing about the code.
-settings.register_profile('dev', deadline=None)
+# Locally, the default deadline catches a change that makes something
+# accidentally slow. CI machines are noisy, though, and a timing-based failure
+# there would say nothing about the code, so the CI runs have no deadline.
+settings.register_profile('dev')
 settings.register_profile('ci', deadline=None, derandomize=True, print_blob=True)
 settings.register_profile('nightly', deadline=None, max_examples=10_000, print_blob=True)
 
