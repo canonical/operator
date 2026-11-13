@@ -146,7 +146,7 @@ Property-based tests, which use [Hypothesis](https://hypothesis.readthedocs.io/)
 tox -e property
 ```
 
-Set `HYPOTHESIS_PROFILE` to `ci` for the small, repeatable run that pull requests get, or to `nightly` for the much longer run that's scheduled every night (from `main`, against this branch). If the nightly run finds a failing example, fix the bug on `main`, and add the example to the property test with `@example(...)` on `property-tests`, so that every later run checks it.
+Set `HYPOTHESIS_PROFILE` to `ci` for the repeatable run that pull requests get, or to `nightly` for the much longer run that's scheduled every night (from `main`, against this branch). If the nightly run finds a failing example, fix the bug on `main`, and add the example to the property test with `@example(...)` on `property-tests`, so that every later run checks it.
 
 ## Using an `ops` branch in a charm
 

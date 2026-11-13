@@ -1,7 +1,7 @@
 name: ops Property Tests
 
 # The property tests live on the long-lived property-tests branch. This file
-# gives that branch's pushes and pull requests the small, derandomised run.
+# gives that branch's pushes and pull requests the derandomised run.
 # GitHub only schedules workflows from the default branch, so the nightly run
 # is property-tests-nightly.yaml on main, which checks this branch out.
 on:

@@ -17,8 +17,8 @@
 The profile is chosen with the ``HYPOTHESIS_PROFILE`` environment variable:
 
 * ``dev`` (the default): Hypothesis's usual budget, for running locally.
-* ``ci``: a small, derandomised budget, so a pull request's result doesn't
-  depend on luck.
+* ``ci``: Hypothesis's usual budget, derandomised, so a pull request's result
+  doesn't depend on luck.
 * ``nightly``: a large budget with fresh randomness, for the scheduled run.
 
 Tests shouldn't set ``max_examples`` themselves, so that the profile decides
