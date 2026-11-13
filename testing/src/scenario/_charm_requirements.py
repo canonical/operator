@@ -140,7 +140,9 @@ def _pip(python: pathlib.Path, command: str, *args: str) -> list[str]:
 def _run(cmd: Sequence[str], cwd: pathlib.Path | None = None) -> None:
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     if result.returncode != 0:
-        raise _RequirementsError(f'`{shlex.join(cmd)}` failed:\n{result.stderr.strip()}\n')
+        # pip writes some failures, such as pip check's, to stdout rather than stderr.
+        output = '\n'.join(o.strip() for o in (result.stderr, result.stdout) if o.strip())
+        raise _RequirementsError(f'`{shlex.join(cmd)}` failed:\n{output}\n')
 
 
 def charm_requirements(charm_root: pathlib.Path) -> _Requirements:

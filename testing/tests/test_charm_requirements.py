@@ -458,6 +458,13 @@ def _no_uv(name: str) -> str | None:
     return None
 
 
+def test_a_failed_command_shows_its_stdout_too():
+    script = 'import sys; print("on stdout"); print("on stderr", file=sys.stderr); sys.exit(1)'
+    with pytest.raises(_RequirementsError) as excinfo:
+        _charm_requirements._run([sys.executable, '-c', script])
+    assert str(excinfo.value).endswith('failed:\non stderr\non stdout\n')
+
+
 def test_pip_fallback_command(monkeypatch: pytest.MonkeyPatch):
     # Without uv, the test's own pip is used, and it only accepts --python
     # before the command.
