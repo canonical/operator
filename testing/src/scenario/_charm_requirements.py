@@ -80,17 +80,38 @@ def install_charm_requirements(charm_root: pathlib.Path, python: pathlib.Path) -
 
     The list of dependencies is complete, as it is for charmcraft, so they
     are installed without resolving dependencies. The charm's own ``ops``,
-    ``ops-scenario`` and ``ops-tracing`` are then removed.
+    ``ops-scenario`` and ``ops-tracing`` are then removed. The uv plugin's
+    export already leaves them out, but removing them whatever the plugin
+    keeps that true without relying on it.
 
     Raises:
         _RequirementsError: if the charm's dependencies can't be found (see
-            :func:`charm_requirements`), or installing them fails.
+            :func:`charm_requirements`), installing them fails, or ``python``
+            is the interpreter running the tests, whose ``ops`` would be
+            removed.
     """
+    if _prefix(python) == pathlib.Path(sys.prefix).resolve():
+        raise _RequirementsError(
+            "Refusing to install a charm's dependencies into the test's own environment."
+        )
     requirements = charm_requirements(charm_root)
     if requirements.args:
         install = _pip(python, 'install', '--no-deps', *requirements.args)
         _run(install, cwd=requirements.directory)
     _run(_pip(python, 'uninstall', *_OPS_DISTRIBUTIONS))
+
+
+def _prefix(python: pathlib.Path) -> pathlib.Path:
+    """The environment that ``python`` runs in.
+
+    A virtual environment's interpreter is usually a symlink to the base one,
+    so the interpreter's own path doesn't say which environment it is.
+    """
+    cmd = [str(python), '-c', 'import sys; print(sys.prefix)']
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise _RequirementsError(f'`{shlex.join(cmd)}` failed:\n{result.stderr.strip()}\n')
+    return pathlib.Path(result.stdout.strip()).resolve()
 
 
 def _pip(python: pathlib.Path, command: str, *args: str) -> list[str]:

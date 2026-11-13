@@ -406,6 +406,12 @@ def test_a_failed_install_is_an_error(tmp_path: pathlib.Path, venv: pathlib.Path
         _charm_requirements.install_charm_requirements(root, venv)
 
 
+def test_install_refuses_the_tests_own_environment(tmp_path: pathlib.Path):
+    root = _charmcraft(tmp_path, 'parts:\n  charm:\n    plugin: python\n')
+    with pytest.raises(_RequirementsError, match="test's own environment"):
+        _charm_requirements.install_charm_requirements(root, pathlib.Path(sys.executable))
+
+
 def test_install_with_no_dependencies(tmp_path: pathlib.Path, venv: pathlib.Path):
     root = _charmcraft(tmp_path, 'parts:\n  charm:\n    plugin: python\n')
     _charm_requirements.install_charm_requirements(root, venv)
