@@ -1241,6 +1241,15 @@ class TestCheck:
         assert one != d
         assert one != 5
 
+    def test_merge_keeps_level(self):
+        check = pebble.Check('chk', {'override': 'replace', 'level': 'ready', 'tcp': {'port': 80}})
+        check._merge(pebble.Check('chk', {'override': 'merge', 'period': '1m'}))
+        assert check.level == pebble.CheckLevel.READY
+        assert check.period == '1m'
+
+        check._merge(pebble.Check('chk', {'override': 'merge', 'level': 'alive'}))
+        assert check.level == pebble.CheckLevel.ALIVE
+
     def test_merge_exec_zero_ids(self):
         check = pebble.Check(
             'chk',
