@@ -26,6 +26,7 @@ liveness
 manpages
 misconfiguration
 mitigations
+OAuth
 pathops
 Parca
 protobuf
@@ -53,6 +54,7 @@ uniter
 untyped
 unpatched
 uv
+Valkey
 VM
 websockets
 Wordpress
