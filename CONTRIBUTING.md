@@ -140,6 +140,14 @@ The framework has some tests that interact with a real/live Pebble server, which
 tox -e pebble
 ```
 
+Property-based tests, which use [Hypothesis](https://hypothesis.readthedocs.io/), live in `test/property/` on the long-lived `property-tests` branch, not on `main`. That includes property tests for `ops.testing`, so that every property test shares the settings profiles in `test/property/conftest.py`. They run on their own rather than as part of the unit tests, and Hypothesis is in its own `property` dependency group, so the unit tests don't need it. Open pull requests that add or change property tests against `property-tests`. Changes from `main` are merged into it regularly. A bug the property tests find is fixed on `main`, with an ordinary unit test for the failing example.
+
+```sh
+tox -e property
+```
+
+Set `HYPOTHESIS_PROFILE` to `ci` for the repeatable run that pull requests get, or to `nightly` for the much longer run that's scheduled every night (from `main`, against this branch). If the nightly run finds a failing example, fix the bug on `main`, and add the example to the property test with `@example(...)` on `property-tests`, so that every later run checks it.
+
 ## Using an `ops` branch in a charm
 
 When making changes to `ops`, you'll commonly want to try those changes out in
